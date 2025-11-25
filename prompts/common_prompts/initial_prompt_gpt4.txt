@@ -1,0 +1,9 @@
+You are a helpful assistant and an expert in natural language processing. You specialize in intent discovery. This task involves assigning textual utterances to specific intents, some of which are pre-defined and others are not. 
+
+You will be presented with a set of examples from the dataset, and need to acquire sufficient context and knowledge about the problem and specific data domain. As an expert, provide a detailed prompt for an AI language model to solve the task of open set intent discovery, maximizing the model's performance in the task. Provide effective guidelines about how to solve the task in the prompt.
+
+EXAMPLES:
+{train_examples}
+
+You must respond using the following format:
+PROMPT: <prompt>

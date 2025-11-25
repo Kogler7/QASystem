@@ -1,0 +1,78 @@
+re the 100 pairs of utterances and intents that are the most difficult to classify, along with a prompt for an AI language model to solve the task of open set intent discovery:
+
+HARD EXAMPLES (100 pairs):
+
+1. Utterance: i tried transferring to an account but it won't let me., Intent: beneficiary_not_allowed
+2. Utterance: why is my beneficiary not allowed?, Intent: beneficiary_not_allowed
+3. Utterance: my beneficiary is not allowed? why?, Intent: beneficiary_not_allowed
+4. Utterance: do all atms accept this card?, Intent: atm_support
+5. Utterance: will this card work at any atm?, Intent: atm_support
+6. Utterance: can i use my card to withdraw from my account?, Intent: atm_support
+7. Utterance: can you show me how to verify the top-up card?, Intent: verify_top_up
+8. Utterance: can you explain to me the way to verify my top-up has gone through?, Intent: verify_top_up
+9. Utterance: for what reason must i authenticate the top-up?, Intent: verify_top_up
+10. Utterance: i want to revert a transaction i did this morning, Intent: cancel_transfer
+11. Utterance: how do i cancel a transaction?, Intent: cancel_transfer
+12. Utterance: i need to stop a transaction that i made., Intent: cancel_transfer
+13. Utterance: my phone was stolen! what do i need to do?, Intent: lost_or_stolen_phone
+14. Utterance: i forgot my phone at the hotel, so i can't access the app., Intent: lost_or_stolen_phone
+15. Utterance: what do i do if i can't access the app?, Intent: lost_or_stolen_phone
+16. Utterance: we want to start a college fund for my daughter., Intent: age_limit
+17. Utterance: hold old do my kids have to be to use the service?, Intent: age_limit
+18. Utterance: what is minimum age for an account?, Intent: age_limit
+19. Utterance: there is a charge i don't recognize, Intent: card_payment_not_recognised
+20. Utterance: if i see a payment in the app that i don't recognize, what should i do?, Intent: card_payment_not_recognised
+21. Utterance: my statement contains an unknown payment, Intent: card_payment_not_recognised
+22. Utterance: will there be a charge for topping up by account with a sepa transfer?, Intent: top_up_by_bank_transfer_charge
+23. Utterance: will i receive all the money sent to my account by sepa transfer?, Intent: top_up_by_bank_transfer_charge
+24. Utterance: do you accept swift transfers?, Intent: top_up_by_bank_transfer_charge
+25. Utterance: could you please tell me why my purchases from this morning say payment is pending?, Intent: pending_card_payment
+26. Utterance: why are my payments not working and show pending?, Intent: pending_card_payment
+27. Utterance: why are the things i bought earlier today still showing as pending?, Intent: pending_card_payment
+28. Utterance: what is my money worth in other countries?, Intent: exchange_rate
+29. Utterance: i would like to know how exchange rates are calculated when transferring funds., Intent: exchange_rate
+30. Utterance: if i need to cash foreign transfers, how does that work?, Intent: exchange_rate
+31. Utterance: there is a direct debit that looks suspicious., Intent: direct_debit_payment_not_recognised
+32. Utterance: please tell me what this direct debit in my statement is, Intent: direct_debit_payment_not_recognised
+33. Utterance: is there a strict timeline regarding disputing transactions made on my account? i just noticed a fraudulent charge on a statement from a couple months ago., Intent: direct_debit_payment_not_recognised
+34. Utterance: please help me unblock my pin which i put the wrong one too many times., Intent: pin_blocked
+35. Utterance: help me unblock my account. i entered the pin wrong too many times., Intent: pin_blocked
+36. Utterance: i forgot my pin and now it is blocked., Intent: pin_blocked
+37. Utterance: can i get a few more physical cards?, Intent: getting_spare_card
+38. Utterance: what is the procedure for me to get more cards on my account?, Intent: getting_spare_card
+39. Utterance: how do i get a spare card?, Intent: getting_spare_card
+40. Utterance: can you help me with proving my identity?, Intent: unable_to_verify_identity
+41. Utterance: this stupid system is not letting me prove my identity., Intent: unable_to_verify_identity
+42. Utterance: you will hear back from us about your verification results in 10 minutes to a one hour timeframe. if these verification results do fail, please double-check to make sure your images are clear and have no glare or blur ; your photos need to be fully readable. you need to be 18 years of age or older and a resident of switzerland or the european economic area to create an account., Intent: unable_to_verify_identity
+43. Utterance: can you tell me why the card payment came back?, Intent: reverted_card_payment
+44. Utterance: hey a seller just contacted me that my money didn't come through. it was definitely deducted from my account, but now it appears it's back with me! sort this out asap please., Intent: reverted_card_payment
+45. Utterance: my payment didn't work and the money is back in my account., Intent: reverted_card_payment
+46. Utterance: do you have any options to top up with a cheque on my account?, Intent: top_up_by_cash_or_cheque
+47. Utterance: is there somewhere i can send a check to add to my account?, Intent: top_up_by_cash_or_cheque
+48. Utterance: will a cheque suffice?, Intent: top_up_by_cash_or_cheque
+49. Utterance: need to know if there is a maximum i can top up, Intent: top_up_limits
+50. Utterance: is there a top-up limit that i have to stay under during a given period of time?, Intent: top_up_limits
+51. Utterance: can i top-up any amount i wish on any given day?, Intent: top_up_limits
+52. Utterance: which currencies do you accept for adding money?, Intent: supported_cards_and_currencies
+53. Utterance: can i use my american express card to add money into my account?, Intent: supported_cards_and_currencies
+54. Utterance: do you accept any card and currency?, Intent: supported_cards_and_currencies
+55. Utterance: i made a payment with my card and was charged a fee, why would you do that, Intent: card_payment_fee_charged
+56. Utterance: why is there a fee when i thought there would be no fees?, Intent: card_payment_fee_charged
+57. Utterance: why was i charged an extra fee when paying with card?, Intent: card_payment_fee_charged
+58. Utterance: google play top-up help?, Intent: apple_pay_or_google_pay
+59. Utterance: why isn't my google top-up pay working?, Intent: apple_pay_or_google_pay
+60. Utterance: i got my american express in apple pay, why is top-up not working in my country?, Intent: apple_pay_or_google_pay
+61. Utterance: my credit card was declined for top-up. can you see if there is enough funds in my account?, Intent: top_up_failed
+62. Utterance: hi, my card is getting declined during top-up. as it urgent, could you please resolve this issue, or guide me with other alternatives if any., Intent: top_up_failed
+63. Utterance: why has my top-up failed?, Intent: top_up_failed
+64. Utterance: i am having trouble doing a transfer. a "decline" message appears after making the transfer., Intent: declined_transfer
+65. Utterance: transfer was declined., Intent: declined_transfer
+66. Utterance: why would my transfer be declined?, Intent: declined_transfer
+67. Utterance: how long do transfers take, mine just says pending?, Intent: pending_transfer
+68. Utterance: why is the transfer showing pending?, Intent: pending_transfer
+69. Utterance: what am i supposed to do if the funds haven't show up from a transfer completed this morning?, Intent: pending_transfer
+70. Utterance: my money transaction can't be seen by the person i sent it to, Intent: transfer_not_received_by_recipient
+71. Utterance: the app isn't showing my transactions, Intent: transfer_not_received_by_recipient
+72. Utterance: why isn't the recipient seeing the transaction? i just sent the money., Intent: transfer_not_received_by_recipient
+73. Utterance: where did my money come from?, Intent: verify_source_of_funds
+74. Utterance: can i check to see where the funds came from?, Intent: verify_source_of_f

@@ -1,0 +1,34 @@
+**Intent Discovery Task**
+
+Your task is to develop an open-set intent discovery model that can accurately classify a given text into one of the pre-defined intents or identify a new intent not present in the provided examples. The model should be trained on the provided dataset and tested on unseen data.
+
+**Task Requirements**
+
+1. **Intent Labeling**: Label each utterance in the provided dataset with its corresponding intent. Ensure that the intent labels are accurate and consistent.
+2. **Intent Discovery**: Develop an open-set intent discovery model that can identify new intents not present in the provided dataset. The model should be able to classify unseen text into one of the pre-defined intents or identify a new intent.
+3. **Model Evaluation**: Evaluate the performance of the intent discovery model using metrics such as precision, recall, and F1-score. Compare the performance of the model on the provided dataset and unseen data.
+4. **Model Interpretability**: Provide an explanation for the model's predictions, highlighting the most important features and their corresponding weights.
+
+**Additional Requirements**
+
+1. **Domain Knowledge**: Familiarize yourself with the domain of the provided dataset, including the terminology, concepts, and relationships between intents.
+2. **Data Preprocessing**: Preprocess the dataset by tokenizing the text, removing stop words, and stemming or lemmatizing the words.
+3. **Feature Engineering**: Engineer features from the preprocessed data, such as bag-of-words, TF-IDF, or word embeddings.
+4. **Model Selection**: Select a suitable machine learning algorithm for the intent discovery task, such as a neural network, decision tree, or random forest.
+5. **Hyperparameter Tuning**: Tune the hyperparameters of the selected algorithm using techniques such as grid search, random search, or Bayesian optimization.
+
+**Evaluation Metrics**
+
+1. **Precision**: The ratio of true positives to the sum of true positives and false positives.
+2. **Recall**: The ratio of true positives to the sum of true positives and false negatives.
+3. **F1-score**: The harmonic mean of precision and recall.
+
+**Submission Requirements**
+
+1. **Model Code**: Provide the code for the intent discovery model, including the preprocessing, feature engineering, and model training steps.
+2. **Model Evaluation Report**: Submit a report detailing the performance of the model on the provided dataset and unseen data, including the evaluation metrics and any visualizations.
+3. **Model Interpretability Report**: Provide a report explaining the model's predictions, highlighting the most important features and their corresponding weights.
+
+**Timeline**
+
+The task is due in [insert timeframe]. Late submissions will not be accepted.
