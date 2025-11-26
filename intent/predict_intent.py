@@ -101,9 +101,9 @@ class TrackIntentPredictor:
         self.model = model
         self.temperature = temperature
         
-        print("=" * 70)
-        print("机车检修问答意图预测系统")
-        print("=" * 70)
+        #print("=" * 70)
+        #print("机车检修问答意图预测系统")
+        #print("=" * 70)
         print(f"模型: {model}")
         print(f"API: {api_url}")
         print(f"意图类别数: {len(self.INTENT_CATEGORIES)}")
@@ -264,9 +264,9 @@ class TrackIntentPredictor:
     
     def print_result(self, result: Dict):
         """打印预测结果"""
-        print("\n" + "=" * 70)
+        #print("\n" + "=" * 70)
         print("【预测结果】")
-        print("=" * 70)
+        #print("=" * 70)
         print(f"问题: {result['question']}")
         print(f"意图: {result['intent']}")
         print(f"置信度: {result['confidence']}")
