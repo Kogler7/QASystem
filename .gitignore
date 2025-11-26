@@ -92,3 +92,10 @@ data/
 # Neo4j / 知识图谱缓存数据
 .neo4j/
 .graph_cache/
+
+# wzc
+intent/embeddings/
+intent/track/
+intent/models/
+intent/results_v3/
+intent/dataset
