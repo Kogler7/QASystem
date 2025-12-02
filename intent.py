@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-"""
-QASystem 统一意图识别接口
-
-集成qasystem-wzc-dev项目的意图识别功能,提供简洁的Python接口。
-用于识别机车检修问答的意图类别。
-
-基本使用:
-    >>> from intent import QAIntentSystem
-    >>> system = QAIntentSystem()
-    >>> result = system.predict("轴承径向游隙的标准范围是多少?")
-    >>> print(result['intent'])  # "参数标准"
-
-详细文档请参考: INTERFACE_DESIGN.md
-"""
-
 import os
 import sys
 import time
