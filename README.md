@@ -1,241 +1,93 @@
-# 轨道交通知识服务系统
+# QASystem
 
-## 项目简介
 
-轨道交通知识服务系统是一个基于 Vue 3 + FastAPI + Dify 的智能知识问答系统，旨在为用户提供轨道交通领域的专业知识查询和对话服务。
 
-## 技术栈
+## Getting started
 
-### 前端
-- Vue 3 + Vite
-- Element Plus
-- Vue Router
-- Pinia
-- Axios
-- Marked (Markdown 渲染)
-- KaTeX (数学公式)
-- Highlight.js (代码高亮)
+To make it easy for you to get started with GitLab, here's a list of recommended next steps.
 
-### 后端
-- FastAPI
-- SQLAlchemy
-- JWT 认证
-- Dify API 集成
+Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
 
-## 快速开始
+## Add your files
 
-### 前置条件
-- Node.js 18+
-- Python 3.10+
-- MySQL 数据库
-- Dify 平台账号和 API Key
-
-### 步骤 1: 克隆项目
-
-```bash
-git clone <repository-url>
-cd rail-assistant
-```
-
-### 步骤 2: 配置后端环境
-
-1. 进入后端目录并安装依赖
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows 系统请使用 venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-2. 复制环境变量示例文件并修改
-
-```bash
-cp .env.example .env
-```
-
-在 `.env` 文件中填入以下信息：
+- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
+- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
 
 ```
-# Dify 配置
-DIFY_API_URL=<your-dify-api-url>
-DIFY_API_KEY=<your-dify-api-key>
-DIFY_KNOWLEDGE_API_KEY=<your-dify-knowledge-api-key>
-
-# JWT 配置
-JWT_SECRET=<your-jwt-secret>
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# 数据库配置
-DATABASE_URL=mysql+asyncmy://<username>:<password>@localhost:3306/<database-name>
+cd existing_repo
+git remote add origin http://10.126.62.88/qasystem/qasystem.git
+git branch -M main
+git push -uf origin main
 ```
 
-### 步骤 3: 配置前端环境
+## Integrate with your tools
 
-1. 回到项目根目录并安装前端依赖
+- [ ] [Set up project integrations](http://10.126.62.88/qasystem/qasystem/-/settings/integrations)
 
-```bash
-cd ..
-npm install
-```
+## Collaborate with your team
 
-### 步骤 4: 启动后端服务
+- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
+- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
+- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
+- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
+- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
 
-```bash
-cd backend
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
+## Test and Deploy
 
-### 步骤 5: 启动前端服务
+Use the built-in continuous integration in GitLab.
 
-在另一个终端中执行：
+- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
+- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
+- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
+- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
+- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
 
-```bash
-cd rail-assistant
-npm run dev
-```
+***
 
-### 步骤 6: 访问系统
+# Editing this README
 
-打开浏览器访问 `http://localhost:5173` 即可进入系统。
+When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
 
-## 项目结构
+## Suggestions for a good README
 
-```text
-rail-assistant/
-├── backend/                # FastAPI 后端
-│   ├── app/                # 后端应用
-│   │   ├── main.py         # FastAPI 入口
-│   │   ├── config.py       # 配置文件
-│   │   ├── db.py           # 数据库初始化
-│   │   ├── routers/        # API 路由
-│   │   ├── services/       # 业务逻辑
-│   │   ├── models/         # 数据模型
-│   │   └── deps/           # 依赖注入
-│   ├── data/               # 数据存储
-│   ├── .env.example        # 环境变量示例
-│   ├── requirements.txt    # 依赖文件
-│   └── run.bat             # 启动脚本
-├── src/                    # Vue 前端
-│   ├── api/                # API 调用
-│   ├── assets/             # 静态资源
-│   ├── router/             # 路由配置
-│   ├── utils/              # 工具函数
-│   ├── views/              # 页面组件
-│   ├── App.vue             # 根组件
-│   └── main.js             # 前端入口
-├── docs/                   # 文档
-├── public/                 # 公共资源
-├── .gitignore              # Git 忽略文件
-├── README.md               # 项目说明
-├── index.html              # HTML 模板
-├── package.json            # 前端依赖
-└── vite.config.js          # Vite 配置
-```
+Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
 
-## 功能特性
+## Name
+Choose a self-explaining name for your project.
 
-### 1. 智能对话
-- 基于 Dify 平台的智能问答
-- 支持上下文对话
-- 支持 Markdown 格式回复
-- 支持代码高亮和数学公式
+## Description
+Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
 
-### 2. 知识库管理
-- 文档上传功能
-- 文档列表查看
-- 文档删除功能
-- 知识库检索
+## Badges
+On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
 
-### 3. 用户管理
-- 用户注册
-- 用户登录
-- JWT 认证
-- 当前用户信息获取
+## Visuals
+Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
 
-## 接口说明
+## Installation
+Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-### 前端接口
+## Usage
+Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-#### 对话接口
-- `POST /api/chat` - 发送消息并获取回复
-- 请求体：`{ "message": string, "history": Array }`
-- 响应体：`{ "success": true, "reply": string, "conversation_id": string | null, "error": null }`
+## Support
+Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
 
-#### 知识库接口
-- `GET /api/knowledge/documents` - 获取文档列表
-- `POST /api/knowledge/documents` - 上传文档（multipart/form-data）
-- `DELETE /api/knowledge/documents/{id}` - 删除文档
-- `POST /api/knowledge/query` - 知识库检索
+## Roadmap
+If you have ideas for releases in the future, it is a good idea to list them in the README.
 
-#### 用户接口
-- `POST /api/auth/register` - 用户注册
-- `POST /api/auth/login` - 用户登录
-- `GET /api/users/me` - 获取当前用户信息
+## Contributing
+State if you are open to contributions and what your requirements are for accepting them.
 
-### 后端接口
+For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
 
-后端接口与前端接口一一对应，详细说明请参考 `backend/README.md` 文件。
+You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
 
-## 注意事项
+## Authors and acknowledgment
+Show your appreciation to those who have contributed to the project.
 
-1. **端口配置**：前端 Vite 代理指向 `http://localhost:8000`，请确保后端服务使用端口 8000 启动。
+## License
+For open source projects, say how it is licensed.
 
-2. **Dify 配置**：需要在 Dify 平台创建应用并获取 API Key，确保 Dify 应用配置正确。
-
-3. **数据库配置**：需要配置 MySQL 数据库连接信息，确保数据库已创建。
-
-4. **文件存储**：上传的文档存储在 `backend/data/documents/` 目录，请确保该目录存在且有写入权限。
-
-5. **安全配置**：生产环境中请使用强密码和安全的 JWT 密钥。
-
-## 开发指南
-
-### 前端开发
-
-- 启动开发服务器：`npm run dev`
-- 构建生产版本：`npm run build`
-- 预览生产版本：`npm run preview`
-
-### 后端开发
-
-- 启动开发服务器：`uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
-- 健康检查：`curl http://localhost:8000/health`
-
-## 部署指南
-
-### 前端部署
-
-1. 构建生产版本：
-
-```bash
-npm run build
-```
-
-2. 将 `dist` 目录部署到 Web 服务器（如 Nginx、Apache 等）。
-
-### 后端部署
-
-1. 安装依赖：
-
-```bash
-pip install -r requirements.txt
-```
-
-2. 启动生产服务器（推荐使用 Gunicorn）：
-
-```bash
-cd backend
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000
-```
-
-3. 配置反向代理（如 Nginx）指向后端服务。
-
-## 许可证
-
-MIT License
-
-## 联系方式
-
-如有问题，请联系项目维护者。
+## Project status
+If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
