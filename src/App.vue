@@ -84,9 +84,12 @@ const isMobile = computed(() => {
     </header>
 
     <main class="app-main">
-      <router-view v-slot="{ Component }">
+      <router-view v-slot="{ Component, route: currentRoute }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" />
+          <component 
+            :is="Component" 
+            :key="currentRoute.path"
+          />
         </transition>
       </router-view>
     </main>
@@ -204,6 +207,8 @@ const isMobile = computed(() => {
 
 .app-main {
   flex: 1;
+  position: relative;
+  overflow: visible; /* 确保内容可以正常显示 */
 }
 
 .fade-enter-active,

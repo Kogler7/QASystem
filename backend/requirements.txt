@@ -9,4 +9,5 @@ passlib[bcrypt]
 PyJWT
 SQLAlchemy
 asyncmy
+cryptography
 

@@ -82,8 +82,21 @@ async def chat_endpoint(body: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail="message or content is required")
 
     user_id = body.userId or "default"
+    use_workflow = settings.DIFY_USE_WORKFLOW and dify_client.workflow_api_key
+    use_chat = dify_client.chat_api_key
+    
+    if not use_workflow and not use_chat:
+        error_msg = "Dify API配置错误：未配置DIFY_API_KEY或DIFY_WORKFLOW_API_KEY"
+        logger.error(error_msg)
+        return ChatResponse(
+            success=False,
+            reply=error_msg,
+            conversation_id=None,
+            error=error_msg
+        )
+    
     try:
-        if settings.DIFY_USE_WORKFLOW and dify_client.workflow_api_key:
+        if use_workflow:
             inputs = {dify_client.workflow_input_var: query_text}
             dify_resp = await dify_client.workflow_run(inputs=inputs, user_id=user_id)
             data = dify_resp.get("data") or {}
@@ -130,6 +143,7 @@ async def chat_endpoint(body: ChatRequest) -> ChatResponse:
             )
             conversation_id = dify_resp.get("conversation_id") or dify_resp.get("id")
     except Exception as e:  # noqa: BLE001
+        logger.exception(f"处理聊天请求异常: {e}")
         return ChatResponse(success=False, reply=str(e), conversation_id=None, error=str(e))
 
     return ChatResponse(
