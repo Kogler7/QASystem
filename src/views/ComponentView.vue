@@ -1,26 +1,65 @@
 <script setup>
-import { Aim, Connection, RefreshRight } from '@element-plus/icons-vue'
+import { Aim, Connection, RefreshRight, DataAnalysis } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const components = [
+    {
+    id: 'data-preprocessing',
+    title: '多源数据预处理组件',
+    desc: '从多个数据源获取数据，进行清洗、转换和标准化处理，将数据转换为统一格式，确保数据质量和一致性。',
+    icon: DataAnalysis,
+    color: 'var(--warning)'
+  },
   {
+    id: 'intent-recognition',
     title: '意图识别组件',
     desc: '对用户输入进行意图分类，识别查询、故障诊断、规范查询等类型，并路由到对应处理流程。',
     icon: Aim,
     color: 'var(--primary-500)'
   },
   {
+    id: 'question-splitting',
     title: '问题切分组件',
     desc: '将复杂问题拆解为多个子问题，支持多轮追问与子问题并行检索，提升回答准确度。',
     icon: Connection,
     color: 'var(--success)'
   },
   {
+    id: 'knowledge-graph-update',
     title: '知识图谱更新组件',
     desc: '对接知识库与图谱数据源，支持增量更新与实体关系维护，保障检索与推理的时效性。',
     icon: RefreshRight,
     color: 'var(--info)'
   }
 ]
+
+// 组件点击处理函数
+const handleComponentClick = (componentId) => {
+  console.log(`点击了组件: ${componentId}`)
+  // 预留跳转逻辑
+  // 未来可以根据componentId跳转到对应的组件详情页面
+  // 例如: router.push(`/component/${componentId}`)
+  
+  // 这里可以添加具体的组件处理逻辑
+  switch (componentId) {
+    case 'data-preprocessing':
+      // 多源数据预处理模块处理逻辑
+      break
+    case 'intent-recognition':
+      // 意图识别组件处理逻辑
+      break
+    case 'question-splitting':
+      // 问题切分组件处理逻辑
+      break
+    case 'knowledge-graph-update':
+      // 知识图谱更新组件处理逻辑
+      break
+    default:
+      break
+  }
+}
 </script>
 
 <template>
@@ -35,15 +74,17 @@ const components = [
         <span class="title-highlight">组件管理</span>
       </h1>
       <p class="page-desc">
-        系统核心组件说明与功能展示，包括意图识别、问题切分与知识图谱更新等模块。
+        系统核心组件说明与功能展示，包括多源数据预处理、意图识别、问题切分与知识图谱更新等模块。
       </p>
 
       <div class="component-grid">
         <el-card
           v-for="item in components"
-          :key="item.title"
+          :key="item.id"
           class="component-card"
           shadow="hover"
+          @click="handleComponentClick(item.id)"
+          style="cursor: pointer;"
         >
           <div class="card-icon-wrap" :style="{ color: item.color }">
             <el-icon :size="36"><component :is="item.icon" /></el-icon>
@@ -111,12 +152,12 @@ const components = [
   font-size: 16px;
   color: var(--gray-600);
   margin-bottom: 40px;
-  max-width: 560px;
+  max-width: 1000px;
 }
 
 .component-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: var(--grid-gap);
 }
 
