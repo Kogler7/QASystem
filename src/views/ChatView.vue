@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { ChatDotRound, Delete, Loading, Promotion } from '@element-plus/icons-vue'
 import { sendChatMessage } from '../api/chat'
 import { renderMarkdown } from '../utils/markdown'
@@ -9,6 +9,41 @@ const messages = ref([])
 const inputText = ref('')
 const loading = ref(false)
 const chatContainer = ref(null)
+// 控制显示模式：true 显示 iframe，false 显示原有聊天界面
+const useIframe = ref(false)
+const iframeLoading = ref(true)
+const iframeError = ref(false)
+const iframeSrc = ref('')
+
+const handleIframeLoad = () => {
+  iframeLoading.value = false
+  iframeError.value = false
+}
+
+const handleIframeError = () => {
+  iframeLoading.value = false
+  iframeError.value = true
+  console.error('Iframe加载失败:', iframeSrc.value)
+}
+
+// 切换模式时重置 iframe 状态
+const toggleIframe = () => {
+  useIframe.value = !useIframe.value
+  if (useIframe.value) {
+    // 切换到 iframe 模式时重置状态
+    iframeLoading.value = true
+    iframeError.value = false
+  }
+}
+
+// 延迟加载 iframe，避免阻塞初始渲染
+onMounted(() => {
+  // 确保组件已挂载后再设置 iframe src
+  iframeSrc.value = 'http://localhost/chatbot/78WZ21FuxzRdqaF2'
+  // 重置 iframe 状态，避免从其他页面返回时状态异常
+  iframeLoading.value = true
+  iframeError.value = false
+})
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -54,10 +89,22 @@ const send = async () => {
     assistantPlaceholder.time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     assistantPlaceholder.loading = false
   } catch (err) {
-    const res = err?.response?.data
-    const detail = res?.detail || res?.error || res?.reply || err?.message
-    const tip = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail[0]?.msg : null)
-    const displayMsg = tip && tip.trim() ? tip.trim() : '网络或服务异常，请稍后重试。'
+    // 检查是否为超时错误
+    const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout') || err?.message?.includes('超时')
+    
+    let displayMsg = '网络或服务异常，请稍后重试。'
+    
+    if (isTimeout) {
+      displayMsg = '请求超时，AI响应时间较长，请稍后重试或检查网络连接。'
+    } else {
+      const res = err?.response?.data
+      const detail = res?.detail || res?.error || res?.reply || err?.message
+      const tip = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail[0]?.msg : null)
+      if (tip && tip.trim()) {
+        displayMsg = tip.trim()
+      }
+    }
+    
     assistantPlaceholder.content = displayMsg
     assistantPlaceholder.time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     assistantPlaceholder.loading = false
@@ -82,7 +129,22 @@ const handleKeydown = (e) => {
 </script>
 
 <template>
-  <div class="chat-view">
+  <div class="chat-wrapper">
+    <!-- 使用 iframe 显示外部聊天机器人 -->
+    <div v-if="useIframe" class="iframe-container">
+      <iframe
+        v-if="iframeSrc"
+        :src="iframeSrc"
+        class="chatbot-iframe"
+        frameborder="0"
+        allow="microphone"
+        @load="handleIframeLoad"
+        @error="handleIframeError">
+      </iframe>
+    </div>
+
+    <!-- 原有的聊天界面 -->
+    <div v-else class="chat-view">
     <div class="chat-bg-deco">
       <span class="circle circle-1"></span>
       <span class="circle circle-2"></span>
@@ -166,10 +228,28 @@ const handleKeydown = (e) => {
         </div>
       </el-card>
     </div>
+    </div>
+    
+    <!-- 切换按钮 -->
+    <el-button
+      class="switch-mode-btn"
+      type="primary"
+      circle
+      :icon="useIframe ? ChatDotRound : Promotion"
+      @click="toggleIframe"
+      :title="useIframe ? '切换到内置聊天' : '切换到外部聊天'"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
+.chat-wrapper {
+  width: 100%;
+  min-height: calc(100vh - var(--nav-height));
+  position: relative;
+  background: var(--gray-50);
+}
+
 .chat-view {
   min-height: calc(100vh - var(--nav-height));
   padding: 24px;
@@ -372,9 +452,55 @@ const handleKeydown = (e) => {
   color: var(--gray-500);
 }
 
+.iframe-container {
+  width: 100%;
+  height: calc(100vh - var(--nav-height));
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.chatbot-iframe {
+  width: 90%;
+  height: 100%;
+  min-height: 650px;
+  border: none;
+}
+
+.switch-mode-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999; /* 低于导航栏的 z-index: 1000 */
+  width: 56px;
+  height: 56px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  pointer-events: auto; /* 确保可以点击 */
+
+  &:hover {
+    transform: scale(1.1) translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
 @media (max-width: 768px) {
   .message-body {
     max-width: 85%;
+  }
+
+  .switch-mode-btn {
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
   }
 }
 </style>
