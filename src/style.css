@@ -1,0 +1,122 @@
+/* 设计系统 - 轨道交通知识服务系统 */
+@import 'highlight.js/styles/github.css';
+:root {
+  /* 主色调 - 轨道蓝 */
+  --primary-500: #0EA5E9;
+  --primary-400: #38BDF8;
+  --primary-600: #0284C7;
+  --primary-gradient: linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%);
+
+  /* 功能色 */
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #8B5CF6;
+
+  /* 中性色 */
+  --gray-900: #0F172A;
+  --gray-600: #475569;
+  --gray-500: #64748B;
+  --gray-200: #E2E8F0;
+  --gray-100: #F1F5F9;
+  --white: #FFFFFF;
+
+  /* 背景 */
+  --bg-primary: #F8FAFC;
+  --bg-card: rgba(255, 255, 255, 0.9);
+
+  /* 布局 */
+  --content-max-width: 1400px;
+  --nav-height: 72px;
+  --card-radius: 12px;
+  --card-radius-lg: 16px;
+  --button-radius: 12px;
+  --padding-block: 20px;
+  --padding-inline: 24px;
+  --grid-gap: 24px;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(14, 165, 233, 0.3);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 6px 20px rgba(14, 165, 233, 0.4);
+
+  /* 过渡 */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--gray-900);
+  background-color: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(0, -10px);
+  }
+}
+
+.title-highlight {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Element Plus 主题覆盖 */
+.el-button--primary {
+  --el-button-bg-color: var(--primary-500);
+  --el-button-border-color: var(--primary-500);
+  --el-button-hover-bg-color: var(--primary-400);
+  --el-button-hover-border-color: var(--primary-400);
+}
+
+.el-button.action-button.primary {
+  border-radius: var(--button-radius);
+  font-weight: 500;
+}
+
+.el-button.action-button.secondary {
+  border-radius: var(--button-radius);
+  border: 1px solid var(--gray-200);
+  color: var(--gray-600);
+}
+
+.el-button.action-button.secondary:hover {
+  border-color: var(--primary-400);
+  color: var(--primary-500);
+}
