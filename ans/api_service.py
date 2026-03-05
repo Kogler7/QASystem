@@ -1,8 +1,13 @@
+import sys
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uvicorn
-from QA.answer_solve import Neo4jQAService
+qa_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'QA'))
+if qa_dir not in sys.path:
+    sys.path.insert(0, qa_dir)
+from answer_solve import Neo4jQAService
 from contextlib import asynccontextmanager
 from neo4j import GraphDatabase
 
@@ -90,7 +95,7 @@ async def health_check():
 
     try:
         driver = GraphDatabase.driver(
-            "bolt://10.126.62.88:7687",
+            "bolt://localhost:7687",
             auth=("neo4j", "neo4j2025")
         )
         with driver.session() as session:

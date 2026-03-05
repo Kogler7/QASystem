@@ -1,18 +1,13 @@
-from ToG.models import ProblemModel, SolutionModel, ProblemSolutionMatch
+from models import ProblemModel, SolutionModel, ProblemSolutionMatch
 from typing import Dict, List, Optional
 from datetime import datetime
-from ToG.wiki_func import *
-from ToG.utils import *
-from ToG.entity_linker import EntityLinker
+from wiki_func import *
+from utils import *
+from entity_linker import EntityLinker
 import json
 
 
 class ProblemSolver:
-    """
-    通用问题求解器
-    输入：自然语言问题
-    输出：问题模型 + 方案模型 + 执行计划
-    """
 
     def __init__(self, neo4j_client, args):
         self.client = neo4j_client
