@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { APP_TITLE } from '@/constants'
 import { componentRoutes } from '@/views/component/config'
 
 const routes = [
@@ -66,7 +67,7 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   if (to.meta?.title) {
-    document.title = `${to.meta.title} - 轨道交通知识服务系统`
+    document.title = `${to.meta.title} - ${APP_TITLE}`
   }
   next()
 })
