@@ -1,0 +1,18 @@
+2026-03-03 21:17:10 - logging_config - INFO - 日志系统已启动，级别: INFO
+2026-03-03 21:17:10 - logging_config - INFO - 日志文件: logs/kg_update_20260303_211710.log
+2026-03-03 21:17:10 - root - INFO - 知识图谱更新与删除测试启动
+2026-03-03 21:17:10 - root - INFO - 配置加载成功，阈值: 0.7
+2026-03-03 21:17:10 - KGUpdator - INFO - 初始化知识图谱更新器...
+2026-03-03 21:17:10 - KGUpdator - INFO - 初始化完成，数据库: neo4j，阈值: 0.7
+2026-03-03 21:17:10 - root - INFO - 
+=== 1. 添加三元组 ===
+2026-03-03 21:17:10 - KGUpdator - INFO - 开始添加 5 个三元组
+2026-03-03 21:17:10 - KGUpdator - INFO - 处理第 1/5: (列车A)-[发生故障]->(制动系统) 置信度=0.92
+2026-03-03 21:17:10 - neo4j.pool - WARNING - Transaction failed and will be retried in 1.1175252572197738s (Couldn't connect to 10.126.62.88:7687 (resolved to ('10.126.62.88:7687',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7687)) (reason [Errno 111] Connection refused))
+2026-03-03 21:17:11 - neo4j.pool - WARNING - Transaction failed and will be retried in 1.898964152298511s (Couldn't connect to 10.126.62.88:7687 (resolved to ('10.126.62.88:7687',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7687)) (reason [Errno 111] Connection refused))
+2026-03-03 21:17:13 - neo4j.pool - WARNING - Transaction failed and will be retried in 4.677108955920073s (Couldn't connect to 10.126.62.88:7687 (resolved to ('10.126.62.88:7687',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7687)) (reason [Errno 111] Connection refused))
+2026-03-03 21:17:17 - neo4j.pool - WARNING - Transaction failed and will be retried in 9.10779833766091s (Couldn't connect to 10.126.62.88:7687 (resolved to ('10.126.62.88:7687',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7687)) (reason [Errno 111] Connection refused))
