@@ -1,0 +1,20 @@
+2026-03-03 21:18:32 - logging_config - INFO - 日志系统已启动，级别: INFO
+2026-03-03 21:18:32 - logging_config - INFO - 日志文件: logs/kg_update_20260303_211832.log
+2026-03-03 21:18:32 - root - INFO - 知识图谱更新与删除测试启动
+2026-03-03 21:18:32 - root - INFO - 配置加载成功，阈值: 0.7
+2026-03-03 21:18:32 - KGUpdator - INFO - 初始化知识图谱更新器...
+2026-03-03 21:18:32 - KGUpdator - INFO - 初始化完成，数据库: neo4j，阈值: 0.7
+2026-03-03 21:18:32 - root - INFO - 
+=== 1. 添加三元组 ===
+2026-03-03 21:18:32 - KGUpdator - INFO - 开始添加 5 个三元组
+2026-03-03 21:18:32 - KGUpdator - INFO - 处理第 1/5: (列车A)-[发生故障]->(制动系统) 置信度=0.92
+2026-03-03 21:18:32 - neo4j.pool - WARNING - Transaction failed and will be retried in 0.8553717169368477s (Couldn't connect to 10.126.62.88:7474 (resolved to ('10.126.62.88:7474',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7474)) (reason [Errno 111] Connection refused))
+2026-03-03 21:18:33 - neo4j.pool - WARNING - Transaction failed and will be retried in 2.106659527217077s (Couldn't connect to 10.126.62.88:7474 (resolved to ('10.126.62.88:7474',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7474)) (reason [Errno 111] Connection refused))
+2026-03-03 21:18:35 - neo4j.pool - WARNING - Transaction failed and will be retried in 3.9403167762943623s (Couldn't connect to 10.126.62.88:7474 (resolved to ('10.126.62.88:7474',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7474)) (reason [Errno 111] Connection refused))
+2026-03-03 21:18:39 - neo4j.pool - WARNING - Transaction failed and will be retried in 6.851150870412218s (Couldn't connect to 10.126.62.88:7474 (resolved to ('10.126.62.88:7474',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7474)) (reason [Errno 111] Connection refused))
+2026-03-03 21:18:46 - neo4j.pool - WARNING - Transaction failed and will be retried in 13.004391046204374s (Couldn't connect to 10.126.62.88:7474 (resolved to ('10.126.62.88:7474',)):
+Failed to establish connection to ResolvedIPv4Address(('10.126.62.88', 7474)) (reason [Errno 111] Connection refused))

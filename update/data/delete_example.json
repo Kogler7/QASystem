@@ -1,0 +1,5 @@
+[
+  {"subject": "列车A", "predicate": "发生故障", "object": "制动系统"},
+  {"subject": "车站B", "predicate": "位于", "object": "北京"},
+  {"subject": "信号系统", "predicate": "类型", "object": "CBTC"}
+]
