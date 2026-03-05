@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+httpx
+python-multipart
+pydantic
+pydantic-settings
+python-dotenv
+passlib[bcrypt]
+PyJWT
+SQLAlchemy
+asyncmy
+cryptography
+
+openai
+neo4j
+llamafactory
+bitsandbytes>=0.39.0

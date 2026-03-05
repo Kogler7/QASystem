@@ -1,0 +1,12 @@
+fastapi
+matplotlib
+numpy
+pandas
+pyshacl
+rdflib
+Requests
+SPARQLWrapper
+SPARQLWrapper
+uvicorn
+
+clingo==5.8.0
