@@ -13,8 +13,10 @@ class Config:
         self.milvus_consistency_level = os.getenv("MILVUS_CONSISTENCY_LEVEL")
         self.max_drop_retries = os.getenv("MAX_DROP_RETRIES")
         self.drop_retry_delay = os.getenv("DROP_RETRY_DELAY")
-        self.model_path = os.getenv("MODEL_PATH")
-        self.log_path = os.getenv("LOG_PATH")
+        # 默认 BGE-M3 模型路径：/mnt/data3/srv/qasystem/models（可通过 MODEL_PATH 覆盖）
+        _default_model_dir = Path("/mnt/data3/srv/qasystem/models")
+        self.model_path = os.getenv("MODEL_PATH") or str(_default_model_dir / "bge_m3")
+        self.log_path = os.getenv("LOG_PATH") or str(_project_root / "logs")
         self.api_key = os.getenv("DEEPSEEK_API_KEY")
 
 if __name__ == "__main__":

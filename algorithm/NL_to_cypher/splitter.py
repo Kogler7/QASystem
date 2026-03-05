@@ -1,4 +1,4 @@
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     CharacterTextSplitter,
     MarkdownTextSplitter,
@@ -7,7 +7,7 @@ from langchain.text_splitter import (
     NLTKTextSplitter,
     SpacyTextSplitter
 )
-# from langchain.schema import Document
+from langchain_core.documents import Document
 # import tiktoken
 from typing import List
 

@@ -15,6 +15,8 @@ from intent_recognition.create_agent import create_agent
 # 配置日志
 config = Config()
 log_path = config.log_path
+if log_path:
+    os.makedirs(log_path, exist_ok=True)
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

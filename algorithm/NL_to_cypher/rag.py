@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import requests
 from langchain_community.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_chroma import Chroma
@@ -14,9 +14,16 @@ from langchain.embeddings.base import Embeddings
 from langchain_experimental.text_splitter import SemanticChunker
 # from langchain.memory import ConversationBufferMemory #处理多轮对话的记忆功能
 
-# Ollama 与 Chroma 可由环境变量覆盖（便于后端/部署配置）
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.5.180:11434/api/generate")
-MODEL_NAME = os.environ.get("OLLAMA_MODEL_NAME", "deepseek-r1:32b")
+# 使用统一 LLM 接口（algorithm/common）
+import sys
+from pathlib import Path
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+from common.llm_client import complete, extract_final_response
+
+def call_llm(prompt: str, timeout: int = 500) -> str:
+    return complete(prompt, timeout=timeout)
 
 # 修改：使用Chroma本地存储路径，可由环境变量覆盖
 CHROMA_DB_PATH = os.environ.get("NL2CYPHER_CHROMA_DB_PATH", "./chroma_db")
@@ -36,27 +43,6 @@ class CustomHuggingFaceEmbeddings(Embeddings):
 
     def embed_query(self, text):
         return self.embed_documents([text])[0]
-
-# 模型选取
-def call_llm(prompt: str) -> str:
-    """调用Ollama API"""
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": prompt,
-        "stream": False
-    }
-
-    try:
-        response = requests.post(OLLAMA_URL, json=payload, timeout=500)
-        response.raise_for_status()
-        result = response.json()
-        result=result.get("response", "").strip()
-        result=extract_final_response(result)
-        return result
-    except Exception as e:
-        print(f"LLM API调用错误: {e}")
-        return ""
-
 
 # 加载数据
 def load_txt(filepath: str) -> list[Document]:
@@ -253,7 +239,7 @@ def rag_query(question: str, k=3):
     final_prompt = prompt_template.format(context=context, question=question)
 
     # 调用LLM生成回答
-    answer = call_llm(final_prompt)
+    answer = call_llm(final_prompt, timeout=500)
 
     return answer
 
@@ -281,18 +267,7 @@ def interactive_qa(): #多轮问答
             print(f"查询过程中出现错误: {e}")
 
 
-def extract_final_response(response_text):
-    if "<think>" in response_text and "</think>" in response_text:
-        # 分割思考部分和回答部分
-        parts = response_text.split("</think>", 1)
-        if len(parts) > 1:
-            final_response = parts[1].strip()
-            # 清理开头可能的多余换行
-            final_response = re.sub(r'^\n+', '', final_response)
-            return final_response
-        else:
-            return response_text
-    return response_text
+# extract_final_response 已由 llm_client 提供
 
 
 def main():
