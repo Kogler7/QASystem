@@ -38,6 +38,7 @@ gitignore/
 # Python (backend)
 backend/venv/
 backend/.venv/
+backend/data/documents/
 __pycache__/
 *.py[cod]
 *$py.class
