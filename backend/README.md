@@ -9,6 +9,7 @@
 - **向量转化存储与自然语言转 Cypher 组件**（进程内调用 `algorithm/NL_to_cypher`，根据自然语言问题与图谱 Schema 生成 Cypher，依赖 Ollama，见 `algorithm/NL_to_cypher`）
 - **意图识别组件**（进程内调用 `algorithm/intent_recognition_model`，Milvus 混合检索 + DeepSeek 结构化输出，配置见 `algorithm/intent_recognition_model/.env`）
 - **答案生成组件**（进程内调用 `algorithm/ans`，Neo4j 知识图谱问答与问题求解器，配置见 `algorithm/ans/QA/config.py` 或算法内默认）
+- **文档预处理组件**（进程内调用 `algorithm/preproc`，PDF/DOCX/Excel/HTML 转 Markdown/文本，支持 MinerU，配置见 `algorithm/preproc/config/settings.py`）
 - 基础 **用户注册 / 登录 / 当前用户** 模块（JWT）
 
 ## 目录结构
@@ -74,6 +75,8 @@ pip install -r requirements.txt
 若需使用 **意图识别** 组件，需安装 `algorithm/intent_recognition_model` 所需依赖（如 langchain-deepseek、pymilvus、milvus-model 等），并配置 `algorithm/intent_recognition_model/.env`（`MILVUS_URI`、`DEEPSEEK_API_KEY`、`MODEL_PATH`、`DATA_DIR`、`COLLECTION_NAME` 等），且 Milvus 已启动、意图集合已初始化。未配置或不可用时，该组件接口返回“模块不可用”。
 
 若需使用 **答案生成** 组件，需安装 `algorithm/ans/QA/requirements.txt` 中的依赖（neo4j、openai、pyvis、networkx 等），并保证 Neo4j 可连通；Neo4j 与 LLM 参数见 `algorithm/ans/QA/answer_solve.py` 中默认配置或 `QA/config.py`。未配置或不可用时，该组件接口返回“模块不可用”。
+
+若需使用 **文档预处理** 组件，需安装 `algorithm/preproc` 所需依赖（见该目录 README/requirements）；可选配置 MinerU（`MINERU_CONFIG_PATH`、`MINERU_MODEL_SOURCE`）。转换结果输出至 `backend/data/preproc_output`。未安装或不可用时，该组件接口返回“模块不可用”。
 
 ```bash
 # 仅使用知识抽取时按需安装，例如：

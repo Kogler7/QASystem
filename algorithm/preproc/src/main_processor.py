@@ -34,7 +34,7 @@ class DocumentProcessor:
 
         # 初始化 MinerU 处理器
         if mineru_config_path is None:
-            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "C:/Users/chengly/mineru.json")
+            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "/mnt/data3/srv/qasystem/models/mineru.json")
         self.mineru_processor = OCRProcessor(    # MinerU 封装（类名与上面相同，但实际已重构）
             config_path=mineru_config_path,
             model_source=mineru_model_source

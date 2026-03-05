@@ -5,7 +5,7 @@ import time
 
 from pymilvus import MilvusClient, MilvusException, Collection, connections
 
-from config.config import Config
+from ir_config.config import Config
 from utils.encoder import HybridEncoder
 
 # 配置日志

@@ -1,0 +1,6 @@
+Looking in indexes: https://mirrors.aliyun.com/pypi/simple/
+Collecting mysql-connector-python
+  Downloading https://mirrors.aliyun.com/pypi/packages/82/44/67bb61c71f398fbc739d07e8dcadad94e2f655874cb32ae851454066bea0/mysql_connector_python-9.6.0-cp312-cp312-manylinux_2_28_x86_64.whl (34.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 34.5/34.5 MB 18.3 MB/s  0:00:01
+Installing collected packages: mysql-connector-python
+Successfully installed mysql-connector-python-9.6.0

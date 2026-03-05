@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 import logging
 
 import numpy as np
-from config.config import Config
+from ir_config.config import Config
 from utils.encoder import HybridEncoder
 from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
 

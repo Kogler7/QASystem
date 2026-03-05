@@ -8,10 +8,18 @@
  * 新增组件时：1) 在 componentMenuItems 中增加一项并设置 route；2) 在 componentRoutes 中增加路由；
  * 3) 在 views/component/ 下新建 {route}/index.vue；4) 在 api/modules/component/ 下新建 {route}.js 并在 index.js 中导出
  */
-import { Aim, RefreshRight, Reading, DocumentCopy, ChatDotRound } from '@element-plus/icons-vue'
+import { Aim, RefreshRight, Reading, DocumentCopy, ChatDotRound, FolderOpened } from '@element-plus/icons-vue'
 
 /** 组件列表（主页面卡片），route 有值则点击跳转到 /component/{route} */
 export const componentMenuItems = [
+  {
+    id: 'document-preproc',
+    title: '文档预处理组件',
+    desc: '多源文档（PDF、DOCX、Excel、HTML）转换为 Markdown/文本，支持 MinerU 解析与结构化输出。',
+    icon: FolderOpened,
+    color: 'var(--warning)',
+    route: 'document-preproc'
+  },
   {
     id: 'intent-recognition',
     title: '意图识别组件',
@@ -56,6 +64,12 @@ export const componentMenuItems = [
 
 /** 组件子路由（有独立页面的组件），与 componentMenuItems 中带 route 的项一一对应 */
 export const componentRoutes = [
+  {
+    path: 'document-preproc',
+    name: 'document-preproc',
+    component: () => import('./document-preproc/index.vue'),
+    meta: { title: '文档预处理' }
+  },
   {
     path: 'knowledge-extract',
     name: 'knowledge-extract',

@@ -1,0 +1,23 @@
+# 文档预处理 algorithm/preproc 依赖
+# 安装（建议在项目虚拟环境中）:
+#   cd /path/to/qasystem && pip install -r algorithm/preproc/requirements.txt
+# 若遇权限错误，可使用: pip install --user -r algorithm/preproc/requirements.txt
+# 或先创建 venv: python -m venv .venv && source .venv/bin/activate 再 pip install
+
+# DOCX: docling
+docling>=1.0.0
+
+# Excel: pandas, openpyxl
+pandas>=1.5.0
+openpyxl>=3.0.0
+numpy>=1.20.0
+
+# PDF / MinerU（含 OCR、公式与表格）
+loguru>=0.7.0
+mineru
+
+# 数据库（可选，文档预处理未启用 DB 时可不装）
+mysql-connector-python>=8.0.0
+
+# ES / HTTP（可选）
+requests>=2.28.0

@@ -1,9 +1,11 @@
 import os
 
-import torch
-from milvus_model.hybrid import BGEM3EmbeddingFunction
+# 先完整加载 torch 与 torchvision，再加载 milvus_model/transformers，避免循环导入导致 torchvision.extension 未就绪
+import torch  # type: ignore[import-untyped]
+import torchvision  # type: ignore[import-untyped]
+from milvus_model.hybrid import BGEM3EmbeddingFunction  # type: ignore[import-untyped]
 
-from config.config import Config
+from ir_config.config import Config
 
 
 class HybridEncoder:

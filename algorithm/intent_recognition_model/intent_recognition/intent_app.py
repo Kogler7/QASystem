@@ -7,7 +7,7 @@ import sys
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from pydantic import BaseModel, Field
-from config.config import Config
+from ir_config.config import Config
 from utils.search_intent import HybridSearch
 from intent_recognition.create_agent import create_agent
 

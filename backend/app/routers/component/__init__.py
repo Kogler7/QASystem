@@ -6,3 +6,4 @@ from . import kg_update  # noqa: F401
 from . import nl2cypher  # noqa: F401
 from . import intent_recognition  # noqa: F401
 from . import answer_generation  # noqa: F401
+from . import document_preproc  # noqa: F401

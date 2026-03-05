@@ -24,7 +24,7 @@ class Settings:
 
     MYSQL_HOST = "localhost"
     MYSQL_PORT = 3306
-    MYSQL_DATABASE = "rail_documents"
+    MYSQL_DATABASE = "rail_assistant"
 
     @classmethod
     def init_dirs(cls):
