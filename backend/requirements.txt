@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+httpx
+python-multipart
+pydantic
+pydantic-settings
+python-dotenv
+passlib[bcrypt]
+PyJWT
+SQLAlchemy
+asyncmy
+cryptography
+
