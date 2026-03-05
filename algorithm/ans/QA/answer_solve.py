@@ -1,10 +1,18 @@
+import sys
+import os
+
+# 添加当前目录到Python路径
+current_dir = os.path.dirname(__file__)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from datetime import datetime
 from typing import Dict, Any
 import traceback
-from ToG.problem_solver import ProblemSolver
-from ToG.neo4j_client import MultiServerWikidataQueryClient
-from ToG.entity_linker import EntityLinker
-from ToG.neo4j_visualizer import Neo4jPathVisualizer, EnhancedPathVisualizer
+from problem_solver import ProblemSolver
+from neo4j_client import MultiServerWikidataQueryClient
+from entity_linker import EntityLinker
+from neo4j_visualizer import Neo4jPathVisualizer, EnhancedPathVisualizer
 
 
 class Neo4jQAService:
@@ -58,7 +66,7 @@ class Neo4jQAService:
         config.auto_entity_linking = True
 
         # Neo4j连接参数
-        config.neo4j_uri = "bolt://10.126.62.88:7687"
+        config.neo4j_uri = "bolt://localhost:7687"
         config.neo4j_user = "neo4j"
         config.neo4j_password = "neo4j2025"
 

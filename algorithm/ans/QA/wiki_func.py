@@ -1,4 +1,4 @@
-from ToG.prompt_list import *
+from prompt_list import *
 from utils import *
 
 def clean_relations_neo4j(string, entity_id, available_relations, direction="outgoing"):

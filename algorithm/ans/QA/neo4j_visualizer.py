@@ -11,7 +11,7 @@ import os
 class Neo4jPathVisualizer:
     """Neo4j 路径可视化工具"""
 
-    def __init__(self, uri="bolt://10.126.62.88:7687", user="neo4j", password="neo4j2025"):
+    def __init__(self, uri="bolt://localhost:7687", user="neo4j", password="neo4j2025"):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):

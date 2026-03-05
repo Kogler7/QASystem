@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Neo4jClient:
     """Neo4j知识图谱客户端"""
-    def __init__(self, uri: str = "bolt://10.126.62.88:7687",
+    def __init__(self, uri: str = "bolt://localhost:7687",
                  username: str = "neo4j",
                  password: str = "password"):
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
@@ -264,7 +264,7 @@ class Neo4jClient:
 
 class MultiServerWikidataQueryClient:
     """兼容原接口的包装类，使用Neo4j客户端"""
-    def __init__(self, neo4j_uri="bolt://10.126.62.88:7687",
+    def __init__(self, neo4j_uri="bolt://localhost:7687",
                  username="neo4j", password="password"):
         self.client = Neo4jClient(neo4j_uri, username, password)
         logger.info("Neo4j知识图谱客户端初始化完成")
