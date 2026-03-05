@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .db import init_db
 from .routers import chat, knowledge, users
-from .routers.component import extract
+from .routers.component import extract, kg_update, nl2cypher, intent_recognition, answer_generation
 
 # 配置日志
 logging.basicConfig(
@@ -77,6 +77,10 @@ app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
 app.include_router(extract.router)
+app.include_router(kg_update.router)
+app.include_router(nl2cypher.router)
+app.include_router(intent_recognition.router)
+app.include_router(answer_generation.router)
 
 
 @app.get("/health")

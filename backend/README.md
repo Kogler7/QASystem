@@ -5,6 +5,10 @@
 - 作为前端与 **Dify** 之间的中间层（对话与知识检索）
 - 本地 **知识库文档管理**（上传、列表、删除）
 - **知识抽取组件**（进程内调用 `algorithm/uie`，按函数封装，无需单独启动抽取服务）
+- **知识图谱更新组件**（进程内调用 `algorithm/KGUpdate`，支持三元组批量添加/删除与图谱统计，配置见 `algorithm/KGUpdate/config.json`）
+- **向量转化存储与自然语言转 Cypher 组件**（进程内调用 `algorithm/NL_to_cypher`，根据自然语言问题与图谱 Schema 生成 Cypher，依赖 Ollama，见 `algorithm/NL_to_cypher`）
+- **意图识别组件**（进程内调用 `algorithm/intent_recognition_model`，Milvus 混合检索 + DeepSeek 结构化输出，配置见 `algorithm/intent_recognition_model/.env`）
+- **答案生成组件**（进程内调用 `algorithm/ans`，Neo4j 知识图谱问答与问题求解器，配置见 `algorithm/ans/QA/config.py` 或算法内默认）
 - 基础 **用户注册 / 登录 / 当前用户** 模块（JWT）
 
 ## 目录结构
@@ -62,6 +66,14 @@ pip install -r requirements.txt
 ```
 
 若需使用 **知识抽取** 组件，还需安装 `algorithm/uie` 的依赖（如 openai、neo4j 等），见项目根目录下 [algorithm/uie/README.md](../algorithm/uie/README.md)。未安装时，抽取接口会返回“模块不可用”，其余接口不受影响。
+
+若需使用 **知识图谱更新** 组件，需保证 Neo4j 可连通，并在 `algorithm/KGUpdate/config.json` 中配置 `neo4j`（uri/username/password/database）与 `system.confidence_threshold`。后端已依赖 `neo4j`，无需额外安装。
+
+若需使用 **向量转化存储与自然语言转 Cypher** 组件，需安装 `algorithm/NL_to_cypher/requirements.txt` 中的依赖（如 langchain、requests 等），并启动 Ollama 服务。可通过环境变量 `OLLAMA_URL`、`OLLAMA_MODEL_NAME` 覆盖默认 Ollama 地址与模型。未安装时，该组件接口返回“模块不可用”。
+
+若需使用 **意图识别** 组件，需安装 `algorithm/intent_recognition_model` 所需依赖（如 langchain-deepseek、pymilvus、milvus-model 等），并配置 `algorithm/intent_recognition_model/.env`（`MILVUS_URI`、`DEEPSEEK_API_KEY`、`MODEL_PATH`、`DATA_DIR`、`COLLECTION_NAME` 等），且 Milvus 已启动、意图集合已初始化。未配置或不可用时，该组件接口返回“模块不可用”。
+
+若需使用 **答案生成** 组件，需安装 `algorithm/ans/QA/requirements.txt` 中的依赖（neo4j、openai、pyvis、networkx 等），并保证 Neo4j 可连通；Neo4j 与 LLM 参数见 `algorithm/ans/QA/answer_solve.py` 中默认配置或 `QA/config.py`。未配置或不可用时，该组件接口返回“模块不可用”。
 
 ```bash
 # 仅使用知识抽取时按需安装，例如：

@@ -1,8 +1,8 @@
+import os
+import re
 from typing import Optional
 
 import torch
-import re
-
 import requests
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -14,11 +14,12 @@ from langchain.embeddings.base import Embeddings
 from langchain_experimental.text_splitter import SemanticChunker
 # from langchain.memory import ConversationBufferMemory #处理多轮对话的记忆功能
 
-OLLAMA_URL = "http://192.168.5.180:11434/api/generate"
-MODEL_NAME = "deepseek-r1:32b"  # 使用的模型名称
+# Ollama 与 Chroma 可由环境变量覆盖（便于后端/部署配置）
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.5.180:11434/api/generate")
+MODEL_NAME = os.environ.get("OLLAMA_MODEL_NAME", "deepseek-r1:32b")
 
-# 修改：使用Chroma本地存储路径
-CHROMA_DB_PATH = "./chroma_db"
+# 修改：使用Chroma本地存储路径，可由环境变量覆盖
+CHROMA_DB_PATH = os.environ.get("NL2CYPHER_CHROMA_DB_PATH", "./chroma_db")
 
 class CustomHuggingFaceEmbeddings(Embeddings):
     def __init__(self, model, tokenizer):

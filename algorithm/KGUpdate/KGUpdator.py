@@ -382,14 +382,16 @@ class KGUpdator:
                 MATCH ()-[r]->()
                 RETURN node_count, count(r) as relationship_count
                 """).single()
-                # 置信度分布
+                # 置信度分布：用 toFloat 统一类型，避免 confidence 存成字符串时 <0.7 未被计入 low
                 conf = session.run("""
                 MATCH ()-[r]->()
                 WHERE r.confidence IS NOT NULL
+                WITH r, toFloat(r.confidence) as conf
+                WHERE conf IS NOT NULL
                 RETURN 
-                    count(CASE WHEN r.confidence >= 0.85 THEN 1 END) as high,
-                    count(CASE WHEN r.confidence >= 0.7 AND r.confidence < 0.85 THEN 1 END) as medium,
-                    count(CASE WHEN r.confidence < 0.7 THEN 1 END) as low,
+                    count(CASE WHEN conf >= 0.85 THEN 1 END) as high,
+                    count(CASE WHEN conf >= 0.7 AND conf < 0.85 THEN 1 END) as medium,
+                    count(CASE WHEN conf < 0.7 THEN 1 END) as low,
                     count(r) as total
                 """).single()
                 return {

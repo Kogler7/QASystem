@@ -9,7 +9,7 @@ from langchain_deepseek import ChatDeepSeek
 from pydantic import BaseModel, Field
 from config.config import Config
 from utils.search_intent import HybridSearch
-from langchain.agents import create_agent
+from intent_recognition.create_agent import create_agent
 
 
 # 配置日志

@@ -23,7 +23,7 @@ const handleComponentClick = (item) => {
         <span class="title-highlight">组件管理</span>
       </h1>
       <p class="page-desc">
-        系统核心组件说明与功能展示，包括多源数据预处理、意图识别、问题切分、知识图谱更新与知识抽取等模块。
+        系统核心组件说明与功能展示，包括意图识别、知识图谱更新、知识抽取、答案生成等模块。
       </p>
 
       <div class="component-grid">

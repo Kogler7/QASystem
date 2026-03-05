@@ -15,5 +15,9 @@ export {
   knowledgeQuery
 } from './modules/knowledge'
 
-// 组件管理：知识抽取等
+// 组件管理：知识抽取、知识图谱更新、自然语言转 Cypher 等
 export { knowledgeExtract, extractHealthCheck } from './modules/component'
+export { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } from './modules/component'
+export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
+export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
+export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './modules/component'

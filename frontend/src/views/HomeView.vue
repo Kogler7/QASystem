@@ -52,7 +52,7 @@ const features = [
   },
   {
     title: '组件管理',
-    desc: '意图识别、问题切分、知识图谱等组件统一管理',
+    desc: '意图识别、知识图谱、答案生成等组件统一管理',
     icon: MapLocation,
     path: '/component',
     gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)'
