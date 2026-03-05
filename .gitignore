@@ -101,3 +101,20 @@ Desktop.ini
 # Project-specific
 # =====================
 gitignore/
+# 忽略所有.ttl文件
+*.ttl
+# 忽略__pycache__目录
+__pycache__/
+*.pyc
+# 忽略tests目录
+tests/
+# 忽略examples目录
+examples/
+# 忽略docs目录
+docs/
+# 忽略api_service.py文件
+api_service.py
+# 忽略.lp文件
+*.lp
+# 忽略
+repair_result.txt
