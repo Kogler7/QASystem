@@ -19,7 +19,7 @@
 
 ### 2. 配置环境变量
 
-在项目根目录创建 `.env` 文件（可复制 `.env.example` 后修改）：
+在**项目根目录**创建 `.env` 文件（可复制根目录 `.env.example` 后修改）：
 
 ```bash
 cp .env.example .env
@@ -30,6 +30,8 @@ cp .env.example .env
 ```
 
 ### 3. 构建并启动
+
+在**项目根目录**执行（即包含 `backend/`、`frontend/`、`docker-compose.yml` 的目录）：
 
 ```bash
 cd /path/to/railway_assistant

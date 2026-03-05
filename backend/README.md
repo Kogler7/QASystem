@@ -11,24 +11,29 @@
 ```text
 backend/
 ├── app/
+│   ├── __init__.py
 │   ├── main.py          # FastAPI 入口
-│   ├── config.py        # 配置（含 Dify & JWT & DB）
-│   ├── db.py            # 数据库初始化与会话
-│   ├── routers/
-│   │   ├── chat.py      # 对话接口（转发到 Dify）
-│   │   ├── knowledge.py # 知识库相关接口
-│   │   └── users.py     # 用户管理与认证接口
+│   ├── config.py        # 配置（Dify / JWT / DB）
+│   ├── db.py            # 数据库引擎与会话
+│   ├── routers/         # API 路由
+│   │   ├── chat.py      # 对话接口（转发 Dify）
+│   │   ├── knowledge.py # 知识库：文档 CRUD、检索、同步 Dify
+│   │   └── users.py     # 注册 / 登录 / 当前用户
 │   ├── services/
 │   │   ├── dify_client.py # Dify API 封装
-│   │   └── auth.py        # 鉴权/密码哈希/JWT
+│   │   └── auth.py       # 密码哈希、JWT
 │   ├── models/
-│   │   └── user.py      # 用户数据模型（SQLAlchemy）
+│   │   ├── user.py      # 用户模型
+│   │   └── document.py  # 文档元数据模型
 │   └── deps/
-│       └── auth.py      # 获取当前用户依赖
+│       └── auth.py      # 依赖：get_current_user
 ├── data/
-│   └── documents/       # 本地存储上传文档
-├── .env.example         # 环境变量示例
-└── requirements.txt     # 依赖
+│   └── documents/       # 上传文档存储目录
+├── .env.example
+├── .dockerignore
+├── Dockerfile
+├── requirements.txt
+└── README.md
 ```
 
 ## 环境配置
@@ -87,4 +92,9 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - 注册：`POST /api/auth/register`
 - 登录：`POST /api/auth/login`
 - 当前用户：`GET /api/users/me`（需携带 `Authorization: Bearer <token>`）
+
+## Docker 与根目录
+
+- 全栈编排（MySQL + 本后端 + 前端）在**项目根目录**的 `docker-compose.yml`。
+- 根目录 `.env.example` 为 Docker 部署用；本目录 `.env.example` 为本地开发用。
 
