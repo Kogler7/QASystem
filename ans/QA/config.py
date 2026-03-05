@@ -9,7 +9,7 @@ class Config:
     """项目配置类"""
 
     # ===== Neo4j 配置 =====
-    NEO4J_URI: str = "bolt://10.126.62.88:7687"
+    NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "neo4j2025"
 
