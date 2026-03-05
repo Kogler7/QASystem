@@ -22,7 +22,7 @@ railway_assistant/
 │   └── README.md
 ├── docs/                     # 项目文档（Dify 配置、故障排查等）
 ├── docker-compose.yml        # 全栈 Docker 编排（MySQL + 后端 + 前端）
-├── .env.example              # 根目录环境变量示例（Docker 部署用）
+├── .env.example              # Docker 部署用（唯一）；本地开发用 backend/、frontend/ 下 .env.example
 ├── .gitignore
 └── README.md                 # 本文件
 ```

@@ -1,10 +1,17 @@
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore[reportMissingImports]
 
 
 class Settings(BaseSettings):
-    """Application configuration loaded from environment variables."""
+    """应用配置，由 pydantic-settings 从多源合并加载。
+
+    优先级（高 → 低）：
+    1. 构造函数传入
+    2. 环境变量（os.environ，含 Docker/Compose 注入的变量）
+    3. backend/.env 文件
+    4. 下方字段默认值
+    """
 
     # Dify
     DIFY_API_URL: str = "https://api.dify.ai/v1"
@@ -23,7 +30,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     # Database (default to MySQL style URL; can be overridden)
-    DATABASE_URL: str = "mysql+asyncmy://root:123456@localhost:3306/rail_assistant"
+    DATABASE_URL: str = "mysql+asyncmy://rail_user:123456@localhost:3306/rail_assistant"
 
     model_config = SettingsConfigDict(
         env_file=".env",
