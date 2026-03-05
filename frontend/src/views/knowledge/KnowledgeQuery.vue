@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Search, Loading } from '@element-plus/icons-vue'
-import { knowledgeQuery as queryApi } from '../../api/knowledge'
+import { knowledgeQuery as queryApi } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const queryText = ref('')

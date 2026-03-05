@@ -1,19 +1,6 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Dependencies
-node_modules
-dist
-dist-ssr
-*.local
-
+# =====================
 # Environment & secrets
+# =====================
 .env
 .env.*
 !.env.example
@@ -21,34 +8,25 @@ backend/.env
 backend/.env.*
 !backend/.env.example
 
-# gitignore 目录（内部提示词/文档，不纳入版本控制）
-gitignore/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Python (backend)
+# =====================
+# Python (backend & root)
+# =====================
+venv/
+.venv/
 backend/venv/
 backend/.venv/
-backend/data/documents/
 __pycache__/
+*/__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-eggs/
 *.egg
 *.egg-info/
+*.egg-info
+.eggs/
+build/
+develop-eggs/
 dist/
 *.manifest
 *.spec
@@ -66,17 +44,60 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
-# Cursor
+# Backend data (documents / uploads, optional)
+backend/data/documents/
+
+# =====================
+# Node / Frontend
+# =====================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# =====================
+# Logs
+# =====================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =====================
+# Editor & IDE
+# =====================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 .cursor/
 
+# =====================
 # OS
+# =====================
+.DS_Store
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Temporary
+# =====================
+# Temporary & backup
+# =====================
 *.tmp
 *.temp
 *.bak
 *.swp
 *~
+
+# =====================
+# Project-specific
+# =====================
+gitignore/

@@ -1,47 +1,58 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { componentRoutes } from '@/views/component/config'
 
 const routes = [
   {
     path: '/',
     name: 'home',
-    component: () => import('../views/HomeView.vue'),
+    component: () => import('@/views/HomeView.vue'),
     meta: { title: '首页' }
   },
   {
     path: '/chat',
     name: 'chat',
-    component: () => import('../views/ChatView.vue'),
+    component: () => import('@/views/ChatView.vue'),
     meta: { title: '智能问答' }
   },
   {
     path: '/component',
     name: 'component',
-    component: () => import('../views/ComponentView.vue'),
-    meta: { title: '组件管理' }
+    component: () => import('@/views/component/layout.vue'),
+    meta: { title: '组件管理' },
+    redirect: '/component/index',
+    children: [
+      {
+        path: 'index',
+        name: 'component-index',
+        component: () => import('@/views/component/index.vue'),
+        meta: { title: '组件管理' }
+      },
+      ...componentRoutes
+    ]
   },
   {
     path: '/knowledge',
     name: 'knowledge',
-    component: () => import('../views/knowledge/KnowledgeLayout.vue'),
+    component: () => import('@/views/knowledge/KnowledgeLayout.vue'),
     meta: { title: '知识库' },
     redirect: '/knowledge/index',
     children: [
       {
         path: 'index',
         name: 'knowledge-index',
-        component: () => import('../views/knowledge/KnowledgeIndex.vue'),
+        component: () => import('@/views/knowledge/KnowledgeIndex.vue'),
         meta: { title: '知识库概览' }
       },
       {
         path: 'documents',
         name: 'knowledge-documents',
-        component: () => import('../views/knowledge/DocumentManage.vue'),
+        component: () => import('@/views/knowledge/DocumentManage.vue'),
         meta: { title: '文档管理' }
       },
       {
         path: 'query',
         name: 'knowledge-query',
-        component: () => import('../views/knowledge/KnowledgeQuery.vue'),
+        component: () => import('@/views/knowledge/KnowledgeQuery.vue'),
         meta: { title: '知识检索' }
       }
     ]

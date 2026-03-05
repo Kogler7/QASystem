@@ -1,0 +1,60 @@
+# 轨道交通知识服务系统 - Docker Compose
+# 使用方式：在项目根目录执行 docker compose up -d
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: railway_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-rail_assistant}
+      MYSQL_USER: ${MYSQL_USER:-rail}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-rail123}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: railway_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-rail}:${MYSQL_PASSWORD:-rail123}@db:3306/${MYSQL_DATABASE:-rail_assistant}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DIFY_API_URL: ${DIFY_API_URL:-}
+      DIFY_API_KEY: ${DIFY_API_KEY:-}
+      DIFY_KNOWLEDGE_API_KEY: ${DIFY_KNOWLEDGE_API_KEY:-}
+      DIFY_USE_WORKFLOW: ${DIFY_USE_WORKFLOW:-false}
+      DIFY_WORKFLOW_API_KEY: ${DIFY_WORKFLOW_API_KEY:-}
+    volumes:
+      - backend_documents:/app/data/documents
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: railway_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  backend_documents:

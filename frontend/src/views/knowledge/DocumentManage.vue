@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Upload, Delete, Document, Loading } from '@element-plus/icons-vue'
-import { getDocuments, uploadDocument, deleteDocument } from '../../api/knowledge'
+import { getDocuments, uploadDocument, deleteDocument } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const fileList = ref([])

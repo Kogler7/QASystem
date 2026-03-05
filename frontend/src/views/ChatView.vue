@@ -1,8 +1,8 @@
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
 import { ChatDotRound, Delete, Loading, Promotion } from '@element-plus/icons-vue'
-import { sendChatMessage } from '../api/chat'
-import { renderMarkdown } from '../utils/markdown'
+import { sendChatMessage } from '@/api'
+import { renderMarkdown } from '@/utils/markdown'
 import { ElMessage } from 'element-plus'
 
 const messages = ref([])
