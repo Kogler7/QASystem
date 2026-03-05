@@ -2,6 +2,15 @@
  
 将自然语言文本（如规则说明、系统说明、术语表等）抽取为结构化 JSON，并可按需写入 Neo4j 图数据库，形成可查询的知识图谱。  
 
+## 说明
+需开启Neo4j服务： `bolt://localhost:7687`，用户名 `neo4j`，密码 `neo4j2025`。
+微调后模型路径：/mnt/data3/srr/saves/rule_v4
+需要安装的包：
+openai
+neo4j
+llamafactory 
+fastapi       # 如果需要跑 fastapi_app.py
+uvicorn       # 如果需要跑 fastapi_app.py
 
 ## 主要文件说明
 
