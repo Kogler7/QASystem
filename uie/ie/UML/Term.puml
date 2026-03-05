@@ -1,0 +1,92 @@
+@startuml
+skinparam groupInheritance 2
+
+' --- 类定义 ---
+
+class Glossary {
+    + 词汇表名称: String
+    + 词汇表描述: String
+    + 词汇表语言: String
+    + 词汇表版本: String
+    + 修改日期: Time
+}
+
+note top of Glossary: 术语集的元数据容器
+
+class Term {
+    + 术语名称: String <<主键>> // 自然语言或符号表示
+    + 英文对应词: String // 标准英文翻译
+    + 术语定义: String // 反映特征及相互关系
+    + 示例: String // 客体或实体样本
+    + 注释: String // 非区别特征或外延要素
+    + 来源类型: String
+    + 具体来源: String
+    + 版本: String
+    + 上下文语境: String // 辅助推导意义的引用文本
+    + 术语分类: String
+    + 所属词汇表: String
+}
+
+note right of Term
+  **约束条件**:
+  1. 概念对应性: 一个术语对应一个概念
+  2. 领域限定: 绑定到特定专业领域
+  3. 结构化定义: 必须包含 [上位概念] + [区别特征]
+  4. 存在性判定: 完整术语出现才有效
+end note
+
+class TermDefinition {
+    + 主题字段: String // <领域> 标注
+    + 开头格式: String // 按术语词性确定
+    + 上位概念: String // 直接超类词 (必需)
+    + 区别特征: String // 专属特征 (必需)
+}
+
+note right of TermDefinition
+  **术语定义规范**:
+  - 名词: <领域> 一种 [上位概念], [区别特征1] 且 [区别特征2]
+  - 动词: <领域> [动词] [上位概念], [区别特征1] 并 [区别特征2]
+  - 形容词: <领域> 具有 [特征1] 和 [特征2] 的 [上位概念]
+  **注释**：以上为内涵定义的通用结构和规则，外延定义：列举全部下位概念（属种关系用"或"，整体部分关系用"和"）。
+end note
+
+class Characteristic {
+    + 特征类型: String <<枚举: 功能特征 | 结构特征>>
+    + 特征描述: String
+}
+
+note bottom of Characteristic
+  **要求**:
+  - 必须包含功能特征(用途)
+  - 必须包含结构特征(组成)
+  - 禁止模糊表述(如"某种","相关")
+end note
+
+class Category {
+    + 类别名称: String
+    + 父类别: Category
+}
+
+note left of Category
+  **分类体系**:
+  - 树状层级结构
+  - 支持多级子类
+  - 术语可属于多个类别
+end note
+
+' --- 关系定义 ---
+
+Glossary "1" *-- "*" Term : 包含
+Glossary "1" *-- "*" Category : 包含
+Term "*" -- "0..1" Category : 属于类别
+Category "0..1" <-- "*" Category : 父类 (树状结构)
+Term "1" *-- "1" TermDefinition : 描述 (内涵定义)
+TermDefinition "1" *-- "1..*" Characteristic : 区别特征
+
+' 自关联关系 (术语间语义关系)
+Term "1" -- "*" Term : 同义词
+Term "1" -- "*" Term : 反义词
+Term "1" -- "*" Term : 层级关系
+Term "1" -- "*" Term : 关联关系
+
+@endum
