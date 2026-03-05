@@ -1,0 +1,7 @@
+[
+  {"subject": "列车A", "predicate": "发生故障", "object": "制动系统", "confidence": 0.92},
+  {"subject": "车站B", "predicate": "位于", "object": "北京", "confidence": 0.98},
+  {"subject": "信号系统", "predicate": "类型", "object": "CBTC", "confidence": 0.85},
+  {"subject": "轨道电路", "predicate": "状态", "object": "正常", "confidence": 0.77},
+  {"subject": "列车C", "predicate": "速度", "object": "80km/h", "confidence": 0.63}
+]
