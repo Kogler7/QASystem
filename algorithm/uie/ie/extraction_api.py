@@ -140,8 +140,8 @@ def extract_only(
     extractor = LLMExtractor(backend=backend)
     raw_data = extractor.extract(uml=uml_text, main_object=prompt_main_object, text=text)
 
-    # 将抽取结果进一步拆分为「节点 + 边」结构，但不写入 Neo4j
-    mapper = SchemaMapper()
+    # 将抽取结果进一步拆分为「节点 + 边」结构，但不写入 Neo4j（不连接 Neo4j）
+    mapper = SchemaMapper(uri=None)
     try:
         graph_struct = mapper.build_graph_structure(raw_data, top_level_class=top_level_class)
     finally:
@@ -278,8 +278,8 @@ def extract_with_templates_only(
         low=low_confidence,
     )
 
-    # 同样拆分为「节点 + 边」结构，但不写入 Neo4j
-    mapper = SchemaMapper()
+    # 同样拆分为「节点 + 边」结构，但不写入 Neo4j（不连接 Neo4j）
+    mapper = SchemaMapper(uri=None)
     try:
         graph_struct = mapper.build_graph_structure(data_with_conf, top_level_class=top_level_class)
     finally:

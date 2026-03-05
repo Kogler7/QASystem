@@ -68,7 +68,7 @@ def health_check():
 def extract(req: ExtractRequest):
     """
     调用本体驱动抽取：
-    - main_object: "RuleType" / "SystemElement" / "Term" / "Glossary"
+    - main_object: "RuleType" / "SystemElement" / "Term"
     - text: 待抽取文本
     - use_local: True 使用本地微调模型，False 使用外部 API
     - use_templates: True 时启用模板优先 + 置信度增强

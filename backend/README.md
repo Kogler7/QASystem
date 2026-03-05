@@ -4,6 +4,7 @@
 
 - 作为前端与 **Dify** 之间的中间层（对话与知识检索）
 - 本地 **知识库文档管理**（上传、列表、删除）
+- **知识抽取组件**（进程内调用 `algorithm/uie`，按函数封装，无需单独启动抽取服务）
 - 基础 **用户注册 / 登录 / 当前用户** 模块（JWT）
 
 ## 目录结构
@@ -58,6 +59,13 @@ cp .env.example .env
 ```bash
 cd backend
 pip install -r requirements.txt
+```
+
+若需使用 **知识抽取** 组件，还需安装 `algorithm/uie` 的依赖（如 openai、neo4j 等），见项目根目录下 [algorithm/uie/README.md](../algorithm/uie/README.md)。未安装时，抽取接口会返回“模块不可用”，其余接口不受影响。
+
+```bash
+# 仅使用知识抽取时按需安装，例如：
+pip install openai neo4j
 ```
 
 ## 启动后端

@@ -36,12 +36,16 @@ def normalize_sibling_type_keys(data, type_names, top_level_class):
 
 class SchemaMapper:
     def __init__(self, uri="bolt://localhost:7687", user="neo4j", password="neo4j2025"):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        if uri is None:
+            self.driver = None  # 仅用于 build_graph_structure，不连接 Neo4j
+        else:
+            self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.ontology_cache = {}  # 缓存已存在的本体节点 ID: class_name -> neo4j id
         self.ontology_missing_cache = set()  # 缓存不存在的本体类名，避免重复查询
 
     def close(self):
-        self.driver.close()
+        if self.driver is not None:
+            self.driver.close()
 
     def _get_ontology_id(self, class_name):
         """查找本体节点 :Class {name: 'xxx'} 的 ID，带本地缓存。匹配时忽略大小写。"""
@@ -102,6 +106,8 @@ class SchemaMapper:
                   str(hash(frozenset(properties.items())))
 
         # ---  写入节点 ---
+        if self.driver is None:
+            raise RuntimeError("SchemaMapper 未连接 Neo4j，仅支持 build_graph_structure")
         with self.driver.session() as session:
 
             session.run("MERGE (n:Element {uid: $uid}) SET n += $props", 
@@ -218,32 +224,27 @@ class SchemaMapper:
 
         _walk(data, parent_uid=None, rel_name=None, level_top=top_level_class)
 
-        # 额外构造与本体类的“虚拟边”信息，模拟 Neo4j 中的 INSTANCE_OF 关系。
-        # 为避免对每个节点都访问 Neo4j，这里分两步：
-        # 1) 收集所有出现过的 label（类名）
-        # 2) 对每个类名最多查询一次，并利用 ontology_cache / ontology_missing_cache
+        # 额外构造与本体类的“虚拟边”信息（仅当已连接 Neo4j 时查询本体）
         ontology_relations = []
-        # 步骤 1：收集所有 label
-        all_labels = {node.get("label") for node in nodes.values() if node.get("label")}
-        existing_labels = set()
-        for label in all_labels:
-            cid = self._get_ontology_id(label)
-            if cid is not None:
-                existing_labels.add(label)
-
-        # 步骤 2：仅对存在于本体中的类名，生成 INSTANCE_OF 结构描述
-        for node in nodes.values():
-            label = node.get("label")
-            uid = node.get("uid")
-            if not label or not uid or label not in existing_labels:
-                continue
-            ontology_relations.append(
-                {
-                    "from_uid": uid,
-                    "class_name": label,
-                    "type": "INSTANCE_OF",
-                }
-            )
+        if self.driver is not None:
+            all_labels = {node.get("label") for node in nodes.values() if node.get("label")}
+            existing_labels = set()
+            for label in all_labels:
+                cid = self._get_ontology_id(label)
+                if cid is not None:
+                    existing_labels.add(label)
+            for node in nodes.values():
+                label = node.get("label")
+                uid = node.get("uid")
+                if not label or not uid or label not in existing_labels:
+                    continue
+                ontology_relations.append(
+                    {
+                        "from_uid": uid,
+                        "class_name": label,
+                        "type": "INSTANCE_OF",
+                    }
+                )
 
         return {
             "nodes": list(nodes.values()),

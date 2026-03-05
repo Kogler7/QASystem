@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .db import init_db
 from .routers import chat, knowledge, users
+from .routers.component import extract
 
 # 配置日志
 logging.basicConfig(
@@ -75,6 +76,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
+app.include_router(extract.router)
 
 
 @app.get("/health")

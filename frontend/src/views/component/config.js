@@ -1,6 +1,12 @@
 /**
  * 组件管理 - 菜单与路由配置
- * 新增组件时：在此添加菜单项与路由，再在 views/component/ 下添加对应页面即可
+ *
+ * 目录约定：
+ * - views/component/{组件id}/index.vue  每个组件的页面（如 knowledge-extract、intent-recognition）
+ * - api/modules/component/{组件id}.js    每个组件的 API
+ *
+ * 新增组件时：1) 在 componentMenuItems 中增加一项并设置 route；2) 在 componentRoutes 中增加路由；
+ * 3) 在 views/component/ 下新建 {route}/index.vue；4) 在 api/modules/component/ 下新建 {route}.js 并在 index.js 中导出
  */
 import { Aim, Connection, RefreshRight, DataAnalysis, Reading } from '@element-plus/icons-vue'
 
@@ -50,9 +56,8 @@ export const componentRoutes = [
   {
     path: 'knowledge-extract',
     name: 'knowledge-extract',
-    component: () => import('./KnowledgeExtract.vue'),
+    component: () => import('./knowledge-extract/index.vue'),
     meta: { title: '知识抽取' }
   }
-  // 后续新增示例：
-  // { path: 'intent-recognition', name: 'intent-recognition', component: () => import('./IntentRecognition.vue'), meta: { title: '意图识别' } },
+  // 后续新增：{ path: 'intent-recognition', name: 'intent-recognition', component: () => import('./intent-recognition/index.vue'), meta: { title: '意图识别' } },
 ]

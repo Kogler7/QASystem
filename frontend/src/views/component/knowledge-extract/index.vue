@@ -1,17 +1,23 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search, Document, Connection, List } from '@element-plus/icons-vue'
+import { Search, Link } from '@element-plus/icons-vue'
 import { knowledgeExtract, extractHealthCheck } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
 const healthStatus = ref(null) // null | 'ok' | 'error'
+const mainObjectOptions = [
+  { value: 'Term', label: 'Term（术语）' },
+  { value: 'RuleType', label: 'RuleType（规约规则）' },
+  { value: 'SystemElement', label: 'SystemElement（系统元素）' }
+]
+
 const form = reactive({
   main_object: 'Term',
   text: '',
   use_local: true,
   use_templates: true,
-  store_to_neo4j: false
+  store_to_neo4j: true
 })
 
 const result = ref(null)
@@ -46,18 +52,29 @@ const submit = async () => {
   }
 }
 
-const rawList = () => result.value?.raw ?? []
-const graph = () => result.value?.graph ?? {}
+const NEO4J_BROWSER_URL = 'http://localhost:7474/browser/'
 
+const healthDetail = ref('')
 const checkHealth = async () => {
   healthStatus.value = null
+  healthDetail.value = ''
   try {
-    await extractHealthCheck()
-    healthStatus.value = 'ok'
+    const { data } = await extractHealthCheck()
+    if (data?.status === 'ok') {
+      healthStatus.value = 'ok'
+    } else {
+      healthStatus.value = 'error'
+      healthDetail.value = data?.detail || '抽取模块未就绪'
+    }
   } catch {
     healthStatus.value = 'error'
+    healthDetail.value = '请检查后端是否启动并安装 algorithm/uie 依赖'
   }
 }
+function openNeo4jBrowser() {
+  window.open(NEO4J_BROWSER_URL, '_blank')
+}
+
 onMounted(checkHealth)
 </script>
 
@@ -79,7 +96,9 @@ onMounted(checkHealth)
       <div v-if="healthStatus !== null" class="health-row">
         <span class="health-label">抽取服务：</span>
         <el-tag v-if="healthStatus === 'ok'" type="success" size="small">正常</el-tag>
-        <el-tag v-else type="danger" size="small">不可用</el-tag>
+        <el-tooltip v-else :content="healthDetail" placement="bottom" :show-after="300">
+          <el-tag type="danger" size="small">不可用</el-tag>
+        </el-tooltip>
         <el-button link type="primary" size="small" @click="checkHealth">重新检测</el-button>
       </div>
 
@@ -89,11 +108,18 @@ onMounted(checkHealth)
         </template>
         <el-form :model="form" label-width="120px" class="extract-form">
           <el-form-item label="主对象类型" required>
-            <el-input
+            <el-select
               v-model="form.main_object"
-              placeholder="如 Term、Fault、Rule 等"
-              clearable
-            />
+              placeholder="选择主对象类型"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="opt in mainObjectOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="待抽取文本" required>
             <el-input
@@ -105,7 +131,7 @@ onMounted(checkHealth)
           </el-form-item>
           <el-form-item label="使用本地模型">
             <el-switch v-model="form.use_local" />
-            <span class="form-hint">默认开启</span>
+            <span class="form-hint">关闭则走外部 API（需 OpenAI 兼容服务）；开启需安装 bitsandbytes 等依赖</span>
           </el-form-item>
           <el-form-item label="启用模板匹配">
             <el-switch v-model="form.use_templates" />
@@ -113,7 +139,7 @@ onMounted(checkHealth)
           </el-form-item>
           <el-form-item label="写入 Neo4j">
             <el-switch v-model="form.store_to_neo4j" />
-            <span class="form-hint">默认关闭</span>
+            <span class="form-hint">默认开启</span>
           </el-form-item>
           <el-form-item>
             <el-button
@@ -124,77 +150,15 @@ onMounted(checkHealth)
             >
               开始抽取
             </el-button>
+            <el-button
+              :icon="Link"
+              @click="openNeo4jBrowser"
+            >
+              查看图谱
+            </el-button>
           </el-form-item>
         </el-form>
       </el-card>
-
-      <template v-if="result">
-        <!-- 抽取结果 Raw -->
-        <el-card v-if="rawList().length > 0" class="result-card" shadow="hover">
-          <template #header>
-            <span><el-icon><Document /></el-icon> 抽取实体</span>
-          </template>
-          <el-table :data="rawList()" stripe border>
-            <el-table-column prop="id" label="ID" width="120" />
-            <el-table-column prop="name" label="名称" min-width="200" />
-            <el-table-column prop="confidence" label="置信度" width="120">
-              <template #default="{ row }">
-                <el-tag :type="row.confidence >= 0.8 ? 'success' : row.confidence >= 0.5 ? 'warning' : 'info'">
-                  {{ (row.confidence ?? 0).toFixed(2) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <!-- 图谱结构 Graph -->
-        <el-card v-if="graph().nodes?.length || graph().relationships?.length || graph().ontology_relations?.length" class="result-card" shadow="hover">
-          <template #header>
-            <span><el-icon><Connection /></el-icon> 图谱结构</span>
-          </template>
-          <el-collapse>
-            <el-collapse-item v-if="graph().nodes?.length" name="nodes">
-              <template #title>
-                <el-icon><List /></el-icon>
-                节点 ({{ graph().nodes.length }})
-              </template>
-              <el-table :data="graph().nodes" stripe size="small" max-height="280">
-                <el-table-column type="index" label="#" width="50" />
-                <el-table-column prop="id" label="id" min-width="100" />
-                <el-table-column prop="label" label="label" width="100" />
-                <el-table-column prop="name" label="name" min-width="120" />
-              </el-table>
-            </el-collapse-item>
-            <el-collapse-item v-if="graph().relationships?.length" name="rels">
-              <template #title>
-                关系 ({{ graph().relationships.length }})
-              </template>
-              <el-table :data="graph().relationships" stripe size="small" max-height="240">
-                <el-table-column type="index" label="#" width="50" />
-                <el-table-column prop="source" label="source" width="100" />
-                <el-table-column prop="target" label="target" width="100" />
-                <el-table-column prop="type" label="type" min-width="100" />
-              </el-table>
-            </el-collapse-item>
-            <el-collapse-item v-if="graph().ontology_relations?.length" name="onto">
-              <template #title>
-                本体关系 ({{ graph().ontology_relations.length }})
-              </template>
-              <el-table :data="graph().ontology_relations" stripe size="small" max-height="240">
-                <el-table-column type="index" label="#" width="50" />
-                <el-table-column prop="source" label="source" width="100" />
-                <el-table-column prop="target" label="target" width="100" />
-                <el-table-column prop="type" label="type" min-width="100" />
-              </el-table>
-            </el-collapse-item>
-          </el-collapse>
-        </el-card>
-
-        <el-empty
-          v-else-if="rawList().length === 0 && !graph().nodes?.length && !graph().relationships?.length && !graph().ontology_relations?.length"
-          description="未抽取到实体与图谱数据"
-        />
-      </template>
     </div>
   </div>
 </template>
@@ -270,8 +234,7 @@ onMounted(checkHealth)
   color: var(--gray-600);
 }
 
-.form-card,
-.result-card {
+.form-card {
   border-radius: var(--card-radius-lg);
 
   :deep(.el-card__header) {
@@ -291,10 +254,6 @@ onMounted(checkHealth)
   margin-left: 10px;
   font-size: 12px;
   color: var(--gray-500);
-}
-
-.result-card {
-  margin-top: 8px;
 }
 
 @media (max-width: 768px) {

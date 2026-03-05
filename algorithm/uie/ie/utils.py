@@ -2,7 +2,6 @@
 
 from openai import OpenAI
 from neo4j import GraphDatabase
-from llamafactory.chat import ChatModel
 
 import logging
 import time
@@ -37,6 +36,9 @@ class LocalLLM(BaseLLM):
         max_new_tokens: int = 2048,
         temperature: float = 0.1,
     ):
+        # 延迟导入，避免仅使用 ApiLLM（use_local=False）时触发 llamafactory/bitsandbytes 依赖
+        from llamafactory.chat import ChatModel
+
         args = dict(
             model_name_or_path=model_name_or_path,
             adapter_name_or_path=adapter_name_or_path,

@@ -11,3 +11,7 @@ SQLAlchemy
 asyncmy
 cryptography
 
+openai
+neo4j
+llamafactory
+bitsandbytes>=0.39.0

@@ -40,6 +40,9 @@ railway_assistant/
 3. **数据库**  
    需本地 MySQL（或 Docker 单独起 MySQL），在 `backend/.env` 中配置 `DATABASE_URL`。
 
+4. **知识抽取组件（可选）**  
+   组件管理中的「知识抽取」已集成在主后端进程内，按函数调用 `algorithm/uie`，无需单独启动抽取服务。使用前需安装 UIE 依赖（见 [algorithm/uie/README.md](algorithm/uie/README.md)）。若写入 Neo4j，需先启动 Neo4j 服务。
+
 ### Docker 一键部署
 
 在项目根目录配置 `.env`（可复制根目录 `.env.example`）后执行：
