@@ -23,7 +23,7 @@ uvicorn       # 如果需要跑 fastapi_app.py
     - `extraction_api.py`：**抽取流程与对外 Python 函数入口**（面向内部调用）。其中推荐主接口为：
       - `extract_with_templates_only(main_object, text, backend=None, use_local=True, high_confidence=0.9, low_confidence=0.6)`：
         - 在对应 UML 本体上解析示例模板；
-        - 先用正则模板在原文中做句式匹配，构造提示信息；
+        - 先用正则模板在原 文中做句式匹配，构造提示信息；
         - 调用 `LLMExtractor` 抽取结构化结果，并在顶层对象注入置信度字段；
         - 返回值为 `{"raw": ..., "graph": ...}`，只做抽取与图结构构建，不写入 Neo4j，适合作为上层系统/服务的主要调用入口。
 
