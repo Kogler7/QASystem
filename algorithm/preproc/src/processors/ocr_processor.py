@@ -31,8 +31,11 @@ class OCRProcessor:
         :param model_source: 模型源，可选 'local', 'modelscope', 'huggingface'。默认 'local' 表示使用本地已下载的模型。
         """
         if config_path:
-            os.environ["MINERU_CONFIG_PATH"] = config_path
-        os.environ["MINERU_MODEL_SOURCE"] = model_source
+            os.environ["MINERU_CONFIG_PATH"] = '/mnt/data3/srv/qasystem/models/mineru.json'
+        os.environ["MINERU_MODEL_SOURCE"] = 'local'
+        # if config_path:
+        #     os.environ["MINERU_CONFIG_PATH"] = config_path
+        # os.environ["MINERU_MODEL_SOURCE"] = model_source
         logger.info(f"MinerU initialized with config: {config_path}, model source: {model_source}")
 
     def process(
