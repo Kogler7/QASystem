@@ -89,8 +89,8 @@ onMounted(checkHealth)
       <h1 class="page-title">
         <span class="title-highlight">答案生成</span>
       </h1>
-      <p class="page-desc">
-        基于 Neo4j 知识图谱与问题求解器（问题定义→分解→方案获取），对自然语言问题生成答案，可选返回求解详情与路径可视化。
+        <p class="page-desc">
+        基于 Neo4j 知识图谱与问题求解器（问题定义→分解→方案获取），对自然语言问题生成答案。
       </p>
 
       <div v-if="healthStatus !== null" class="health-row">
@@ -115,7 +115,8 @@ onMounted(checkHealth)
               placeholder="输入基于知识图谱的自然语言问题，例如：列车制动系统常见故障有哪些？"
             />
           </el-form-item>
-          <el-form-item label="返回求解详情">
+          <!-- 暂不展示：返回求解详情、答案+可视化 -->
+          <el-form-item v-if="false" label="返回求解详情">
             <el-switch v-model="detailed" />
             <span class="form-hint">开启后返回问题模型、子问题、方案模型等</span>
           </el-form-item>
@@ -129,6 +130,7 @@ onMounted(checkHealth)
               获取答案
             </el-button>
             <el-button
+              v-if="false"
               :loading="loadingViz"
               :icon="PictureFilled"
               @click="submitWithVisualization"
@@ -151,7 +153,7 @@ onMounted(checkHealth)
           </el-collapse>
         </div>
 
-        <div v-if="resultWithViz" class="result-box">
+        <div v-if="false && resultWithViz" class="result-box">
           <p class="result-label">回答（含可视化）</p>
           <p class="result-answer" :class="{ 'is-error': !resultWithViz.success }">
             {{ resultWithViz.answer }}

@@ -2,7 +2,7 @@ import sys
 import time
 import os
 from ir_config.config import Config
-from utils.encoder import HybridEncoder
+from ir_utils.encoder import HybridEncoder
 from pymilvus import MilvusClient, AnnSearchRequest, RRFRanker, MilvusException
 import logging
 

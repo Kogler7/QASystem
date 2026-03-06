@@ -90,7 +90,7 @@ class DocumentProcessor:
                 )
 
                 # 解析结果目录为 output_dir/文件名/
-                file_output_dir = self.output_dir / path.stem
+                file_output_dir = self.output_dir / path.stem / "auto"
                 md_file = file_output_dir / f"{path.stem}.md"
                 if md_file.exists():
                     content = md_file.read_text(encoding='utf-8')

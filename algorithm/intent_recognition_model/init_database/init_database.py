@@ -7,7 +7,7 @@ import logging
 
 import numpy as np
 from ir_config.config import Config
-from utils.encoder import HybridEncoder
+from ir_utils.encoder import HybridEncoder
 from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
 
 # 配置日志

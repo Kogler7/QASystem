@@ -8,9 +8,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from pydantic import BaseModel, Field
 from ir_config.config import Config
-from utils.search_intent import HybridSearch
+from ir_utils.search_intent import HybridSearch
 from intent_recognition.create_agent import create_agent
-
+from langchain_openai import ChatOpenAI
 
 # 配置日志
 config = Config()
@@ -32,9 +32,16 @@ logger = logging.getLogger(__name__)
 # 加载api_key
 api_key = Config().api_key
 
-model = ChatDeepSeek(
-    model="deepseek-chat",
+# model = ChatDeepSeek(
+#     model="deepseek-chat",
+#     api_key=api_key,
+# )
+
+model = ChatOpenAI(
+    base_url="http://localhost:8888/v1",
     api_key=api_key,
+    model="Qwen/Qwen3-8B",
+    temperature=0,
 )
 
 class Intent(BaseModel):
@@ -52,12 +59,7 @@ class Intent(BaseModel):
     intent_summary: str = Field(..., description="意图精简摘要")
     user_goal: str = Field(..., description="用户核心目标")
 
-
-agent = create_agent(
-    model=model,
-    response_format=Intent,
-    system_prompt="你是一个意图识别的专家，需要你根据用户输入的询问以及相关的意图列表选取最合适的意图"
-)
+model = model.with_structured_output(Intent)
 
 
 class IntentRecognition:
@@ -65,7 +67,6 @@ class IntentRecognition:
         self.model = model
         self.prompt_template = self.init_prompt_template()
         self.search_tool = HybridSearch()
-        self.agent = agent
 
     def init_prompt_template(self):
         """初始化提示模板"""
@@ -115,21 +116,15 @@ class IntentRecognition:
             query=query,
             intent=retrival_result,
         )
+        print(prompt)
+        print(retrival_result)
 
         # 调用大模型
-        result = self.agent.invoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": f"我的问题是{query},请帮我筛选出最恰当的意图，并将它原封不动的输出,以下是意图列表：\n{retrival_result}"
-                    }
-                ]
-            }
-        )
+        result = model.invoke(prompt)
         print(type(result))
-        return result["structured_response"]
+        return result
 
+        
 if __name__ == "__main__":
     intent_recognition = IntentRecognition()
     query = "发现裂纹后应如何处理？"

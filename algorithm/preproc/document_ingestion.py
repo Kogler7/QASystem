@@ -164,14 +164,19 @@ class DocumentConversionInterface:
             logger.info(f"开始处理文件: {input_path}")
             processor_result = self.processor.process_file(input_path)
 
-            if not processor_result['success']:
+            if processor_result is None:
+                result['error'] = '处理失败：处理器未返回结果（可能为 PDF/MinerU 异常）'
+                logger.warning("process_file 返回 None: %s", input_path)
+                return result
+
+            if not processor_result.get('success'):
                 result['error'] = processor_result.get('error', '处理失败')
                 return result
 
-            # 获取内容和元数据
-            content = processor_result['content']
-            metadata = processor_result['metadata']
-            file_type = processor_result['file_type']
+            # 获取内容和元数据（防止 None 导致下游 .get() 报错）
+            content = processor_result.get('content')
+            metadata = processor_result.get('metadata') or {}
+            file_type = processor_result.get('file_type') or ''
 
             # 处理 Excel 特殊格式（如果是字典格式的 Excel 数据）
             if file_type == 'excel' and isinstance(content, dict):
@@ -482,6 +487,8 @@ class DocumentConversionInterface:
 
     def _store_to_databases(self, content: str, metadata: Dict, file_type: str):
         """存储到数据库（非 Excel 结构化存储时调用）"""
+        if metadata is None:
+            metadata = {}
         if not self.enable_db_storage:
             return
 
@@ -499,6 +506,8 @@ class DocumentConversionInterface:
         """存储文档到 Elasticsearch"""
         if not self.es_client:
             return
+        if metadata is None:
+            metadata = {}
 
         try:
             document = {
@@ -524,6 +533,8 @@ class DocumentConversionInterface:
         """仅存储 Excel 元数据到 MySQL（当 excel_to_mysql=False 时）"""
         if not self.mysql_client:
             return
+        if metadata is None:
+            metadata = {}
 
         try:
             doc_id = f"excel_{metadata.get('file_name', 'unknown')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"

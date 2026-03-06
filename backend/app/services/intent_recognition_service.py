@@ -33,19 +33,8 @@ def _get_intent_recognition():
     global _IntentRecognition, _recognizer_instance
     if _IntentRecognition is None:
         try:
-            # 确保意图识别根目录优先，避免其他 utils 遮蔽本模块的 utils 包
-            _intent_root_str = str(_INTENT_ROOT)
-            if _intent_root_str not in sys.path:
-                sys.path.insert(0, _intent_root_str)
-            else:
-                # 已存在则移到最前
-                sys.path.remove(_intent_root_str)
-                sys.path.insert(0, _intent_root_str)
-            # 若已有 utils 被当作模块（非包）加载，会触发 'utils is not a package'，先移除以使用本模块的 utils 包
-            if "utils" in sys.modules and not getattr(sys.modules["utils"], "__path__", None):
-                for key in list(sys.modules.keys()):
-                    if key == "utils" or key.startswith("utils."):
-                        del sys.modules[key]
+            if str(_INTENT_ROOT) not in sys.path:
+                sys.path.insert(0, str(_INTENT_ROOT))
             from intent_recognition.intent_app import IntentRecognition
             _IntentRecognition = IntentRecognition
         except Exception as e:

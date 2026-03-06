@@ -12,8 +12,13 @@ logger = logging.getLogger(__name__)
 _BACKEND_APP = Path(__file__).resolve().parent.parent
 _ROOT = _BACKEND_APP.parents[1]
 _ANS_ROOT = _ROOT / "algorithm" / "ans"
-if _ANS_ROOT.exists() and str(_ANS_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ANS_ROOT))
+_ANS_QA = _ANS_ROOT / "QA"
+if _ANS_ROOT.exists():
+    if str(_ANS_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ANS_ROOT))
+    # QA 包内使用 from utils import run_llm，需使 algorithm/ans/QA 在 path 上以便 utils 解析为 QA/utils.py
+    if _ANS_QA.exists() and str(_ANS_QA) not in sys.path:
+        sys.path.insert(0, str(_ANS_QA))
 
 # 算法内使用 from ToG.xxx，实际代码在 QA 包下，注册别名使 ToG 指向 QA
 def _register_tog_alias():

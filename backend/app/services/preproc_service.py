@@ -79,6 +79,12 @@ def convert_document(
         save_metadata=save_metadata,
         store_excel_raw=store_excel_raw,
     )
+    if result is None:
+        return {
+            "success": False,
+            "input_path": input_path,
+            "error": "文档预处理未返回结果",
+        }
     # 将 content 过长时只返回摘要，避免响应过大
     if result.get("content") and isinstance(result["content"], str) and len(result["content"]) > 20000:
         result["content_preview"] = result["content"][:20000] + "\n...(已截断)"

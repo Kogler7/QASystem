@@ -13,7 +13,7 @@ class TextInput(BaseModel):
 app = FastAPI(title="intent API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # 替换为你的前端地址
+    allow_origins=["*"],  # 替换为你的前端地址
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
