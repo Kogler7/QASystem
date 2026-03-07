@@ -17,7 +17,12 @@ frontend/
 │   ├── router/          # Vue Router 配置
 │   ├── utils/           # 工具函数（如 markdown 渲染）
 │   └── views/           # 页面视图
-│       ├── component/   # 组件管理（知识抽取等）
+│       ├── component/   # 组件管理（各子组件独立目录 + manifest 自动注册）
+│       │   ├── config.js     # 自动收集 manifest
+│       │   ├── document-preproc/
+│       │   │   ├── manifest.js
+│       │   │   └── index.vue
+│       │   └── ...（其他组件）
 │       └── knowledge/   # 知识库（概览、文档管理、检索）
 ├── .env.example
 ├── Dockerfile.frontend  # 多阶段构建 + Nginx

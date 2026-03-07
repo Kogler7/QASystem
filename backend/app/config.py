@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # 环境：development / production，生产环境要求 JWT_SECRET 非默认值
+    ENVIRONMENT: str = "development"
+
     # Database (default to MySQL style URL; can be overridden)
     DATABASE_URL: str = "mysql+asyncmy://rail_user:123456@localhost:3306/rail_assistant"
 

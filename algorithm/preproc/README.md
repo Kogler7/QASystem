@@ -32,4 +32,4 @@ pip install -r algorithm/preproc/requirements.txt
 
 ## 后端对接
 
-后端通过 `backend/app/services/preproc_service.py` 进程内调用本模块，接口见 `GET /api/component/document-preproc/health`、`POST /api/component/document-preproc/convert`（文件上传）。
+后端通过 `backend/app/modules/component/document_preproc/service.py` 进程内调用本模块，接口见 `GET /api/component/document-preproc/health`、`POST /api/component/document-preproc/convert`（文件上传）。

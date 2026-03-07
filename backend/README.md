@@ -21,10 +21,18 @@ backend/
 │   ├── main.py          # FastAPI 入口
 │   ├── config.py        # 配置（Dify / JWT / DB）
 │   ├── db.py            # 数据库引擎与会话
-│   ├── routers/         # API 路由
+│   ├── routers/         # 核心 API 路由
 │   │   ├── chat.py      # 对话接口（转发 Dify）
 │   │   ├── knowledge.py # 知识库：文档 CRUD、检索、同步 Dify
 │   │   └── users.py     # 注册 / 登录 / 当前用户
+│   ├── modules/
+│   │   └── component/   # 组件管理（按组件拆分，每个组件 router + service）
+│   │       ├── document_preproc/
+│   │       ├── knowledge_extract/
+│   │       ├── kg_update/
+│   │       ├── nl2cypher/
+│   │       ├── intent_recognition/
+│   │       └── answer_generation/
 │   ├── services/
 │   │   ├── dify_client.py # Dify API 封装
 │   │   └── auth.py       # 密码哈希、JWT
@@ -34,7 +42,8 @@ backend/
 │   └── deps/
 │       └── auth.py      # 依赖：get_current_user
 ├── data/
-│   └── documents/       # 上传文档存储目录
+│   ├── documents/       # 上传文档存储目录
+│   └── preproc_output/  # 文档预处理输出
 ├── .env.example
 ├── .dockerignore
 ├── Dockerfile
@@ -76,7 +85,7 @@ pip install -r requirements.txt
 
 若需使用 **答案生成** 组件，需安装 `algorithm/ans/QA/requirements.txt` 中的依赖（neo4j、openai、pyvis、networkx 等），并保证 Neo4j 可连通；Neo4j 与 LLM 参数见 `algorithm/ans/QA/answer_solve.py` 中默认配置或 `QA/config.py`。未配置或不可用时，该组件接口返回“模块不可用”。
 
-若需使用 **文档预处理** 组件，需安装 `algorithm/preproc` 所需依赖（见该目录 README/requirements）；可选配置 MinerU（`MINERU_CONFIG_PATH`、`MINERU_MODEL_SOURCE`）。转换结果输出至 `backend/data/preproc_output`。未安装或不可用时，该组件接口返回“模块不可用”。
+若需使用 **文档预处理** 组件，需安装 `algorithm/preproc` 所需依赖（见该目录 README/requirements）；可选配置 MinerU（`MINERU_CONFIG_PATH`、`MINERU_MODEL_SOURCE`）。转换结果输出至 `backend/data/preproc_output`。后端通过 `app/modules/component/document_preproc/service.py` 进程内调用。未安装或不可用时，该组件接口返回“模块不可用”。
 
 ```bash
 # 仅使用知识抽取时按需安装，例如：

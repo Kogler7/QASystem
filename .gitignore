@@ -44,8 +44,10 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
-# Backend data (documents / uploads, optional)
+# Backend data (documents / uploads, preproc output)
 backend/data/documents/
+backend/data/preproc_output/
+backend/data/preproc_upload/
 
 # =====================
 # Node / Frontend
@@ -106,12 +108,6 @@ gitignore/
 # 忽略__pycache__目录
 __pycache__/
 *.pyc
-# 忽略tests目录
-tests/
-# 忽略examples目录
-examples/
-# 忽略docs目录
-docs/
 # 忽略api_service.py文件
 api_service.py
 # 忽略.lp文件

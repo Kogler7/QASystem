@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .db import init_db
 from .routers import chat, knowledge, users
-from .routers.component import extract, kg_update, nl2cypher, intent_recognition, answer_generation, document_preproc
+from .modules.component import COMPONENT_ROUTERS
 
 # 配置日志
 logging.basicConfig(
@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用启动时初始化数据库，关闭时可选清理。"""
+    from .config import settings
+    if settings.ENVIRONMENT == "production" and settings.JWT_SECRET == "change-me":
+        raise RuntimeError(
+            "生产环境必须设置 JWT_SECRET 环境变量，不能使用默认值 'change-me'"
+        )
     try:
         await init_db()
     except Exception as e:
@@ -68,20 +73,17 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"未处理的异常: {request.method} {request.url.path}", exc_info=True)
+    # 记录完整异常到日志，对客户端只返回通用信息，避免泄露内部细节
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": f"内部服务器错误: {str(exc)}", "type": type(exc).__name__},
+        content={"detail": "内部服务器错误，请稍后重试", "type": type(exc).__name__},
     )
 
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
-app.include_router(extract.router)
-app.include_router(kg_update.router)
-app.include_router(nl2cypher.router)
-app.include_router(intent_recognition.router)
-app.include_router(answer_generation.router)
-app.include_router(document_preproc.router)
+for r in COMPONENT_ROUTERS:
+    app.include_router(r)
 
 
 @app.get("/health")

@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 import logging
 
-from config.settings import Settings
+from preproc_config.settings import Settings
 from src.main_processor import DocumentProcessor
 from src.database.es_client import ESClient
 from src.database.mysql_client import MySQLClient

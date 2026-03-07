@@ -30,8 +30,7 @@ class OCRProcessor:
         :param config_path: MinerU 配置文件路径（如 mineru.json），若提供则设置环境变量 MINERU_CONFIG_PATH
         :param model_source: 模型源，可选 'local', 'modelscope', 'huggingface'。默认 'local' 表示使用本地已下载的模型。
         """
-        if config_path:
-            os.environ["MINERU_CONFIG_PATH"] = '/mnt/data3/srv/qasystem/models/mineru.json'
+        os.environ["MINERU_CONFIG_PATH"] = '/mnt/data3/srv/qasystem/models/mineru.json'
         os.environ["MINERU_MODEL_SOURCE"] = 'local'
         # if config_path:
         #     os.environ["MINERU_CONFIG_PATH"] = config_path
