@@ -62,7 +62,7 @@ onMounted(checkHealth)
         <span class="title-highlight">意图识别</span>
       </h1>
       <p class="page-desc">
-        对用户输入进行意图分类，结合 Milvus 检索与 DeepSeek 大模型，输出最匹配的意图（查询、故障诊断、规范查询等）。
+        对用户输入进行意图分类，结合 Milvus 检索与 Qwen 大模型，输出最匹配的意图。
       </p>
 
       <div v-if="healthStatus !== null" class="health-row">

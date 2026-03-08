@@ -30,12 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # 加载api_key
-api_key = Config().api_key
-
-# model = ChatDeepSeek(
-#     model="deepseek-chat",
-#     api_key=api_key,
-# )
+api_key = "qwen"
 
 model = ChatOpenAI(
     base_url="http://localhost:8888/v1",
@@ -111,6 +106,9 @@ class IntentRecognition:
         """答案生成函数（改造后：content转字典）"""
         logger.info("正在进行答案生成...")
         retrival_result = self.retrival(query=query)
+
+        if not retrival_result:
+            return "没有检索到相关意图"
 
         prompt = self.prompt_template.format_messages(
             query=query,

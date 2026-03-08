@@ -45,12 +45,20 @@ class HybridSearch:
         """相似度查询"""
         dense_search_param = {
             "metric_type": "IP",
-            "params": {"nprobe": 16}
+            "params": {
+                "nprobe": 16,
+                "radius": 0.4,
+                "range_filter": 1
+                }
         }
 
         sparse_search_param = {
             "metric_type": "IP",
-            "params": {"topk": 100}
+            "params": {
+                "topk": 100,
+                "radius": 0.4,
+                "range_filter": 1
+                }
         }
 
         if self.collection_name is None or query is None:

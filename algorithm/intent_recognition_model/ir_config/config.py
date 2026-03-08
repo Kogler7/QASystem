@@ -21,7 +21,6 @@ class Config:
         self.drop_retry_delay = int(os.getenv("DROP_RETRY_DELAY", "2"))
         self.model_path = os.getenv("MODEL_PATH") or str(_default_model_dir / "bge_m3")
         self.log_path = os.getenv("LOG_PATH") or str(_project_root / "logs")
-        self.api_key = os.getenv("DEEPSEEK_API_KEY")
 
 
 if __name__ == "__main__":
