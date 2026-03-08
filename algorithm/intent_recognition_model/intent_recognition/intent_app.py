@@ -5,7 +5,6 @@ import os
 import sys
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_deepseek import ChatDeepSeek
 from pydantic import BaseModel, Field
 from ir_config.config import Config
 from ir_utils.search_intent import HybridSearch

@@ -41,6 +41,7 @@ class HybridSearch:
         self.milvus_client.load_collection(self.collection_name)
         print(f"Collection '{self.collection_name}' 已加载到内存")
 
+
     def search(self, query, top_k = 3):
         """相似度查询"""
         dense_search_param = {
