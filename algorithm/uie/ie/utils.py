@@ -1,16 +1,24 @@
 # utils.py
 
-from openai import OpenAI
+import json
+import logging
+import os
+import re
+import sys
+import time
+from pathlib import Path
+from typing import Optional
+
 from neo4j import GraphDatabase
 
-import logging
-import time
-import os
-import json
-import re
-
 logger = logging.getLogger(__name__)
-    
+
+# 统一大模型调用：ApiLLM 委托 algorithm/common/llm_client
+_ALGO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_ALGO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ALGO_ROOT))
+
+
 class BaseLLM:
     """
     统一的本体抽取后端接口：
@@ -65,36 +73,42 @@ class LocalLLM(BaseLLM):
 
 class ApiLLM(BaseLLM):
     """
-    使用外部 OpenAI 进行本体抽取。
-
-    默认参数与之前的 LLM 封装保持一致：
-    - base_url: 本地或远程 OpenAI 兼容服务地址
-    - model:    模型名称
+    使用统一接口 algorithm/common/llm_client 进行本体抽取。
+    支持环境变量 LLM_BASE_URL、LLM_MODEL、LLM_API_KEY、LLM_BACKEND；
+    构造参数可覆盖，与 common 配置一致。
     """
 
     def __init__(
         self,
-        api_key: str = "EMPTY",
-        base_url: str = "http://127.0.0.1:8000/v1",
-        model: str = "Qwen/Qwen3-8B",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = None,
     ):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self.model = model
+        from common.llm_client import LLMClient
+
+        self._client = LLMClient(
+            api_key=api_key or "",
+            base_url=base_url or "",
+            model=model or "",
+            backend=backend or "",
+        )
 
     def run(self, system_prompt: str, text: str) -> str:
-        logger.info("ApiLLM.run: text_len=%d prompt_len=%d model=%s", len(text), len(system_prompt), self.model)
-        t0 = time.perf_counter()
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text},
-        ]
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
+        logger.info(
+            "ApiLLM.run: text_len=%d prompt_len=%d model=%s",
+            len(text),
+            len(system_prompt),
+            getattr(self._client, "model", ""),
         )
-        content = response.choices[0].message.content
-        logger.info("ApiLLM.run done: elapsed=%.2fs output_len=%d", time.perf_counter() - t0, len(content or ""))
-        return content
+        t0 = time.perf_counter()
+        out = self._client.run(system_prompt, text, temperature=0.1, max_tokens=2048)
+        logger.info(
+            "ApiLLM.run done: elapsed=%.2fs output_len=%d",
+            time.perf_counter() - t0,
+            len(out or ""),
+        )
+        return out or ""
 
 
 def simple_post_process(text: str):

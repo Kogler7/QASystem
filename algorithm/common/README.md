@@ -57,9 +57,29 @@ reply = client.complete("你好")
 reply = client.chat([{"role": "user", "content": "你好"}])
 ```
 
-## 已接入的组件
+**方式三：run(system_prompt, text) 适配器（供 UIE/知识抽取等）**
 
-- **NL_to_cypher**：`llm_client.call_llm` 委托给本模块的 `complete`
-- **rag**：通过 `llm_client` 使用 `call_llm`、`extract_final_response`
+需要「系统提示 + 用户文本」、返回单次回复字符串的组件，可使用 `LLMRunAdapter` 或 `create_run_adapter`，与 UIE 的 `BaseLLM.run(system_prompt, text)` 接口一致：
 
-其他组件（如 ans/QA、uie）可将原有 `run_llm` / OpenAI 调用逐步替换为上述 `complete` / `chat` 或 `LLMClient`。
+```python
+from common.llm_client import create_run_adapter, LLMClient, LLMRunAdapter
+
+# 从环境变量创建
+adapter = create_run_adapter()
+text = adapter.run("你是抽取专家", "待抽取的原文...")
+
+# 或自定义配置
+client = LLMClient(base_url="http://localhost:8888", model="Qwen/Qwen3-8B")
+adapter = LLMRunAdapter(client)
+text = adapter.run("系统提示", "用户输入")
+```
+
+## 已接入的组件（统一接口）
+
+| 组件 | 用法 |
+|------|------|
+| **NL_to_cypher** | `complete` 作为 `call_llm` |
+| **rag** | `complete`、`extract_final_response` |
+| **ans/QA** | `utils.run_llm` 内部委托 `complete`（backend 按 engine 推断 openai/zhipu） |
+| **uie（知识抽取）** | `ApiLLM` 委托 `LLMClient.run(system_prompt, text)`；`LocalLLM` 仍为本地微调模型 |
+| **intent_recognition_model** | 配置与 common 统一：从 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY` 等读取，LangChain ChatOpenAI 使用同一套环境变量 |

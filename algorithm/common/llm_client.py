@@ -317,3 +317,44 @@ class LLMClient:
             timeout=timeout,
             backend=self.backend,
         )
+
+    def run(self, system_prompt: str, text: str, **kwargs: Any) -> str:
+        """
+        兼容 UIE 等组件的 run(system_prompt, text) 接口。
+        等价于 complete(text, system_prompt=system_prompt, ...)。
+        """
+        return self.complete(text, system_prompt=system_prompt, **kwargs)
+
+
+class LLMRunAdapter:
+    """
+    统一接口：run(system_prompt, text) -> str。
+    供 algorithm/uie、知识抽取等需要「系统提示 + 用户文本」的组件复用，
+    内部委托给 LLMClient.complete。
+    """
+
+    def __init__(self, client: Optional[LLMClient] = None, **client_kw: Any):
+        self._client = client or LLMClient(**client_kw)
+
+    def run(self, system_prompt: str, text: str, **kwargs: Any) -> str:
+        return self._client.run(system_prompt, text, **kwargs)
+
+
+def create_run_adapter(
+    *,
+    backend: Optional[str] = None,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+) -> LLMRunAdapter:
+    """
+    创建满足 run(system_prompt, text) -> str 的适配器，供 UIE/LLMExtractor 等使用。
+    配置与 LLMClient 一致，可从环境变量读取。
+    """
+    client = LLMClient(
+        backend=backend,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+    )
+    return LLMRunAdapter(client)

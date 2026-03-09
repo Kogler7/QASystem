@@ -29,18 +29,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# 加载api_key
-api_key = Config().api_key
-
-# model = ChatDeepSeek(
-#     model="deepseek-chat",
-#     api_key=api_key,
-# )
-
+# LLM 配置：与 algorithm/common 统一，从 Config 读取（Config 优先使用 LLM_* / OPENAI_* 环境变量）
+_config = Config()
+_base = _config.llm_base_url.rstrip("/")
+if not _base.endswith("/v1"):
+    _base = _base + "/v1"
 model = ChatOpenAI(
-    base_url="http://localhost:8888/v1",
-    api_key=api_key,
-    model="Qwen/Qwen3-8B",
+    base_url=_base,
+    api_key=_config.api_key or "none",
+    model=_config.llm_model,
     temperature=0,
 )
 

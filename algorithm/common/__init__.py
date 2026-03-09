@@ -4,6 +4,8 @@ from .llm_client import (
     chat,
     extract_final_response,
     LLMClient,
+    LLMRunAdapter,
+    create_run_adapter,
 )
 
 __all__ = [
@@ -11,4 +13,6 @@ __all__ = [
     "chat",
     "extract_final_response",
     "LLMClient",
+    "LLMRunAdapter",
+    "create_run_adapter",
 ]

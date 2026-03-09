@@ -21,7 +21,10 @@ class Config:
         self.drop_retry_delay = int(os.getenv("DROP_RETRY_DELAY", "2"))
         self.model_path = os.getenv("MODEL_PATH") or str(_default_model_dir / "bge_m3")
         self.log_path = os.getenv("LOG_PATH") or str(_project_root / "logs")
-        self.api_key = os.getenv("DEEPSEEK_API_KEY")
+        # LLM 配置：与 algorithm/common/llm_client 环境变量统一，便于一处配置多处生效
+        self.api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.llm_base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:8888"
+        self.llm_model = os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "Qwen/Qwen3-8B"
 
 
 if __name__ == "__main__":
