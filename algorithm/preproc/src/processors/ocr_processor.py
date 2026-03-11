@@ -1,8 +1,9 @@
 import os
 import json
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 from loguru import logger
+from . import BaseProcessor
 
 # MinerU 内部模块导入（确保 mineru 已安装且环境变量正确）
 from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
@@ -17,7 +18,7 @@ from mineru.utils.enum_class import MakeMode
 from mineru.utils.guess_suffix_or_lang import guess_suffix_by_path
 
 
-class OCRProcessor:
+class OCRProcessor(BaseProcessor):
     """
     MinerU PDF/图像解析处理器，封装了底层API调用。
     支持 pipeline 和 vlm 两种后端。
@@ -30,14 +31,69 @@ class OCRProcessor:
         :param config_path: MinerU 配置文件路径（如 mineru.json），若提供则设置环境变量 MINERU_CONFIG_PATH
         :param model_source: 模型源，可选 'local', 'modelscope', 'huggingface'。默认 'local' 表示使用本地已下载的模型。
         """
-        os.environ["MINERU_CONFIG_PATH"] = '/mnt/data3/srv/qasystem/models/mineru.json'
+        # os.environ["MINERU_CONFIG_PATH"] = '/home/admin_user_3/mineru.json'
+        os.environ["MINERU_CONFIG_PATH"] = '/mnt/data3/srv/vllm/models/'
         os.environ["MINERU_MODEL_SOURCE"] = 'local'
         # if config_path:
         #     os.environ["MINERU_CONFIG_PATH"] = config_path
         # os.environ["MINERU_MODEL_SOURCE"] = model_source
         logger.info(f"MinerU initialized with config: {config_path}, model source: {model_source}")
 
-    def process(
+    def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        """
+        处理单个文件，返回包含 content 和 metadata 的字典。
+        """
+        metadata = {
+            'file_type': 'pdf',
+            'processor': 'mineru',
+            'supported_formats': ['.pdf'],
+            'backend': kwargs.get('backend', 'pipeline'),
+            'method': kwargs.get('method', 'auto')
+        }
+        
+        try:
+            output_dir = kwargs.get('output_dir', '/tmp/mineru_output')
+            result_dirs = self._process_batch(
+                input_paths=[file_path],
+                output_dir=output_dir,
+                lang=kwargs.get('lang', 'ch'),
+                backend=kwargs.get('backend', 'pipeline'),
+                method=kwargs.get('method', 'auto'),
+                formula_enable=kwargs.get('formula_enable', True),
+                table_enable=kwargs.get('table_enable', True),
+                draw_layout_bbox=kwargs.get('draw_layout_bbox', False),
+                draw_span_bbox=kwargs.get('draw_span_bbox', False),
+                dump_md=kwargs.get('dump_md', True),
+                dump_middle_json=kwargs.get('dump_middle_json', False),
+                dump_model_output=kwargs.get('dump_model_output', False),
+                dump_orig_pdf=kwargs.get('dump_orig_pdf', False),
+                dump_content_list=kwargs.get('dump_content_list', False),
+                start_page_id=kwargs.get('start_page_id', 0),
+                end_page_id=kwargs.get('end_page_id', None)
+            )
+            
+            # 读取生成的 Markdown 文件
+            file_output_dir = Path(output_dir) / Path(file_path).stem / "auto"
+            md_file = file_output_dir / f"{Path(file_path).stem}.md"
+            if md_file.exists():
+                content = md_file.read_text(encoding='utf-8')
+            else:
+                content = ""
+                metadata['error'] = 'Markdown file not found'
+            
+            metadata['output_dir'] = str(file_output_dir)
+            
+            return {
+                'content': content,
+                'metadata': metadata
+            }
+        except Exception as e:
+            return {
+                'content': '',
+                'metadata': {**metadata, 'error': str(e)}
+            }
+
+    def _process_batch(
         self,
         input_paths: List[Union[str, Path]],
         output_dir: Union[str, Path],
@@ -58,9 +114,6 @@ class OCRProcessor:
         end_page_id: Optional[int] = None,
     ) -> List[Path]:
         """
-        批量解析文档（PDF或图像）。
-
-        :param input_paths: 待解析文件的路径列表
         :param output_dir: 输出根目录，每个文件的解析结果会放在 output_dir/文件名/ 下
         :param lang: 文档语言（仅 pipeline 后端有效），如 'ch', 'en' 等
         :param backend: 后端，可选 'pipeline', 'vlm-transformers', 'vlm-vllm-engine', 'vlm-http-client' 等

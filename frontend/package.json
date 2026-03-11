@@ -14,12 +14,15 @@
     "element-plus": "^2.4.4",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.27",
+    "mammoth": "^1.11.0",
     "marked": "^15.0.12",
     "marked-highlight": "^2.2.3",
     "marked-katex-extension": "^5.1.6",
+    "pdfjs-dist": "^5.5.207",
     "pinia": "^2.1.0",
     "vue": "^3.4.0",
-    "vue-router": "^4.2.0"
+    "vue-router": "^4.2.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

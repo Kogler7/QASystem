@@ -21,4 +21,4 @@ export { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } 
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './modules/component'
-export { documentPreprocHealthCheck, documentPreprocConvert } from './modules/component'
+export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels } from './modules/component'

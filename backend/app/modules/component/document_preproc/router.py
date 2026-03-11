@@ -28,7 +28,7 @@ async def convert(file: UploadFile = File(...)) -> dict[str, Any]:
     if not file.filename or not file.filename.strip():
         raise HTTPException(status_code=400, detail="请选择文件")
     suffix = Path(file.filename).suffix.lower()
-    allowed = {".pdf", ".docx", ".doc", ".xlsx", ".xls", ".html", ".htm"}
+    allowed = {".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv"}
     if suffix not in allowed:
         raise HTTPException(
             status_code=400,

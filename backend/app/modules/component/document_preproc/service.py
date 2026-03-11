@@ -91,6 +91,33 @@ def convert_document(
     return result
 
 
+def get_available_models() -> dict[str, Any]:
+    """获取可用的文档处理模型信息。"""
+    try:
+        iface = _get_interface()
+        processors = iface.processor.available_processors
+        
+        result = {}
+        for file_type, config in processors.items():
+            result[file_type] = {
+                "default": config["default"],
+                "models": {}
+            }
+            for model_name, model_data in config["models"].items():
+                metadata = model_data["metadata"]
+                result[file_type]["models"][model_name] = {
+                    "name": metadata["name"],
+                    "description": metadata["description"],
+                    "pros": [metadata["优点"]],
+                    "cons": [metadata["缺点"]],
+                    "scenario": metadata["适用场景"]
+                }
+        return result
+    except Exception as e:
+        logger.error("获取可用模型信息失败: %s", e)
+        return {}
+
+
 def get_upload_dir() -> Path:
     """返回上传临时目录，供路由保存文件。"""
     _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

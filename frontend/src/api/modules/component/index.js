@@ -7,4 +7,4 @@ export { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } 
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './nl2cypher'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './intent-recognition'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './answer-generation'
-export { documentPreprocHealthCheck, documentPreprocConvert } from './document-preproc'
+export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels } from './document-preproc'
