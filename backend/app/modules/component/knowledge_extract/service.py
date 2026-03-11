@@ -1,11 +1,10 @@
 """
-知识抽取：进程内调用 algorithm/uie 算法，按函数封装，不依赖独立 UIE 服务。
-使用前需安装 algorithm/uie 依赖（见 algorithm/uie/README.md）。
+知识抽取：进程内调用 algorithm/uie 算法。
 """
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,23 +29,6 @@ def _get_extraction_api():
     return _extraction_api
 
 
-def _normalize_graph(graph: dict[str, Any]) -> dict[str, Any]:
-    if not graph:
-        return graph
-    nodes = []
-    for n in graph.get("nodes") or []:
-        props = n.get("properties") or {}
-        name = props.get("RuleName") or props.get("TermId") or props.get("name") or n.get("uid") or ""
-        nodes.append({"id": n.get("uid"), "label": n.get("label"), "name": name, "properties": props})
-    rels = []
-    for r in graph.get("relationships") or []:
-        rels.append({"source": r.get("from_uid"), "target": r.get("to_uid"), "type": r.get("type")})
-    onto = []
-    for o in graph.get("ontology_relations") or []:
-        onto.append({"source": o.get("from_uid"), "target": o.get("class_name"), "type": o.get("type")})
-    return {"nodes": nodes, "relationships": rels, "ontology_relations": onto}
-
-
 def health() -> dict[str, Any]:
     try:
         _get_extraction_api()
@@ -54,39 +36,41 @@ def health() -> dict[str, Any]:
     except Exception as e:
         return {
             "status": "unavailable",
-            "detail": f"知识抽取模块不可用: {e}。请确认已安装 algorithm/uie 依赖（见 algorithm/uie/README.md）。",
+            "detail": f"知识抽取模块不可用: {e}。请确认已安装 algorithm/uie 依赖。",
         }
 
 
 def extract(
     main_object: str,
     text: str,
-    use_local: bool = True,
     use_templates: bool = True,
-    store_to_neo4j: bool = False,
+    llm_base_url: Optional[str] = None,
+    llm_model: Optional[str] = None,
+    llm_api_key: Optional[str] = None,
 ) -> dict[str, Any]:
     api = _get_extraction_api()
-    from ie.schema_mapper import SchemaMapper
+    result = api.extract(
+        main_object=main_object,
+        text=text,
+        use_templates=use_templates,
+        store_to_neo4j=False,
+        llm_base_url=llm_base_url,
+        llm_model=llm_model,
+        llm_api_key=llm_api_key,
+    )
+    return {"raw": result["raw"], "graph": result["graph"]}
 
-    if store_to_neo4j:
-        if use_templates:
-            raw_result = api.extract_with_templates_and_store(main_object=main_object, text=text, use_local=use_local)
-        else:
-            raw_result = api.extract_and_store(main_object=main_object, text=text, use_local=use_local)
-        raw_list = raw_result if isinstance(raw_result, list) else [raw_result]
-        mapper = SchemaMapper(uri=None)
-        try:
-            graph_struct = mapper.build_graph_structure(raw_list, top_level_class=main_object)
-        finally:
-            mapper.close()
-        data = {"raw": raw_list, "graph": _normalize_graph(graph_struct)}
-    else:
-        if use_templates:
-            result = api.extract_with_templates_only(main_object=main_object, text=text, use_local=use_local)
-        else:
-            result = api.extract_only(main_object=main_object, text=text, use_local=use_local)
-        data = {
-            "raw": result.get("raw", result) if isinstance(result, dict) else result,
-            "graph": _normalize_graph(result.get("graph", {})) if isinstance(result, dict) else _normalize_graph({}),
-        }
-    return {"data": data}
+
+def store_graph(
+    graph_struct: dict[str, Any],
+    neo4j_uri: str = "bolt://localhost:7687",
+    neo4j_user: str = "neo4j",
+    neo4j_password: str = "neo4j2025",
+) -> None:
+    api = _get_extraction_api()
+    api.store_graph_to_neo4j(
+        graph_struct=graph_struct,
+        neo4j_uri=neo4j_uri,
+        neo4j_user=neo4j_user,
+        neo4j_password=neo4j_password,
+    )

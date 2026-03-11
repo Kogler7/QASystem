@@ -22,61 +22,20 @@ class BaseLLM:
         raise NotImplementedError
 
 
-class LocalLLM(BaseLLM):
-    """
-    使用本地微调模型进行本体抽取。
-
-    可以在构造时传入自定义模型路径。
-    """
-
-    def __init__(
-        self,
-        model_name_or_path: str = "/mnt/data3/srr/Qwen2.5-7B-Instruct",
-        adapter_name_or_path: str = "/mnt/data3/srr/saves/rule_v4",
-        max_new_tokens: int = 2048,
-        temperature: float = 0.1,
-    ):
-        # 延迟导入，避免仅使用 ApiLLM（use_local=False）时触发 llamafactory/bitsandbytes 依赖
-        from llamafactory.chat import ChatModel
-
-        args = dict(
-            model_name_or_path=model_name_or_path,
-            adapter_name_or_path=adapter_name_or_path,
-            template="qwen",
-            finetuning_type="lora",
-            quantization_bit=4,
-            flash_attn="fa2",
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-        )
-        logger.info(f"加载本地本体微调模型: {args}")
-        self._chat_model = ChatModel(args)
-
-    def run(self, system_prompt: str, text: str) -> str:
-        logger.info("LocalLLM.run: text_len=%d prompt_len=%d", len(text), len(system_prompt))
-        t0 = time.perf_counter()
-        messages = [{"role": "user", "content": text}]
-        full_text = ""
-        for new_text in self._chat_model.stream_chat(messages, system=system_prompt):
-            full_text += new_text
-        logger.info("LocalLLM.run done: elapsed=%.2fs output_len=%d", time.perf_counter() - t0, len(full_text))
-        return full_text
-
-
 class ApiLLM(BaseLLM):
     """
-    使用外部 OpenAI 进行本体抽取。
+    使用 OpenAI 兼容 API 进行本体抽取（如 vLLM、OpenAI 等）。
 
-    默认参数与之前的 LLM 封装保持一致：
-    - base_url: 本地或远程 OpenAI 兼容服务地址
+    默认连接部署的微调模型服务（vLLM OpenAI API 兼容）：
+    - base_url: OpenAI 兼容服务地址
     - model:    模型名称
     """
 
     def __init__(
         self,
         api_key: str = "EMPTY",
-        base_url: str = "http://127.0.0.1:8000/v1",
-        model: str = "Qwen/Qwen3-8B",
+        base_url: str = "http://10.126.62.88:8003/v1",
+        model: str = "rule_v4",
     ):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model

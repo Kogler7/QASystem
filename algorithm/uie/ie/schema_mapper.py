@@ -1,37 +1,65 @@
 import json
+from typing import Any, Optional
+
 from neo4j import GraphDatabase
 
 
-def normalize_sibling_type_keys(data, type_names, top_level_class):
-    """
-    在 mapper 之前调用的 JSON 预处理：仅在最外层做「对象与属性同名则合并」。
-    - 当顶层是 list 时：对每个元素，若其同时含有 top_level_class 键与其它 type_names 键（兄弟键），
-      则合并为「以 top_level_class 对应值为实体，其余类型键作为嵌套属性」。
-    - 当顶层是 dict 时：若其同时含有 top_level_class 与其它 type_names 键，同样合并。
-    - 不向内部递归：内部嵌套（如 TermDefinition 里的 Characteristic）不做合并，避免循环/深层误合并。
-    type_names: 已知节点类型名集合（与 UML 类名一致），如 {"Rule", "Term", "TermDefinition", "Category", ...}
-    """
-    type_set = set(type_names) if type_names else set()
-    if not type_set or top_level_class not in type_set:
-        return data
+def _infer_top_level_class(data: Any) -> Optional[str]:
+    """从 raw 数据推断 top_level_class。训练数据格式为 {MainObject: [...]}，键即主对象类名。"""
+    if isinstance(data, dict) and len(data) == 1:
+        key, val = next(iter(data.items()))
+        if isinstance(val, list):
+            return key
+    return None
 
-    def merge_one(obj):
-        if not isinstance(obj, dict) or top_level_class not in obj or not isinstance(obj.get(top_level_class), dict):
-            return obj
-        type_keys = [k for k in obj if k in type_set]
-        if len(type_keys) <= 1:
-            return obj
-        merged = dict(obj[top_level_class])
-        for k in type_keys:
-            if k != top_level_class:
-                merged[k] = obj[k]
-        return merged
 
-    if isinstance(data, list):
-        return [merge_one(item) for item in data]
-    if isinstance(data, dict):
-        return merge_one(data)
-    return data
+def json_to_graph_structure(
+    data: Any,
+    top_level_class: Optional[str] = None,
+    neo4j_uri: Optional[str] = None,
+    neo4j_user: str = "neo4j",
+    neo4j_password: str = "neo4j2025",
+) -> dict:
+    """
+    将 JSON 抽取结果拆分为「节点 + 边」的图结构。
+
+    top_level_class: 可选，不传时从 data 的顶层键自动推断（格式 {MainObject: [...]}）。
+    neo4j_uri: 不为 None 时连接 Neo4j 查询 :Class 节点，填充 ontology_relations（实例-INSTANCE_OF-本体类）。
+    """
+    if top_level_class is None:
+        top_level_class = _infer_top_level_class(data)
+    if neo4j_uri:
+        try:
+            mapper = SchemaMapper(uri=neo4j_uri, user=neo4j_user, password=neo4j_password)
+            result = mapper.build_graph_structure(data, top_level_class=top_level_class)
+            mapper.close()
+            return result
+        except Exception:
+            pass
+    mapper = SchemaMapper(uri=None)
+    try:
+        return mapper.build_graph_structure(data, top_level_class=top_level_class)
+    finally:
+        mapper.close()
+
+
+def store_graph_to_neo4j(
+    graph_struct: dict,
+    uri: str = "bolt://localhost:7687",
+    user: str = "neo4j",
+    password: str = "neo4j2025",
+) -> None:
+    """
+    将 json_to_graph_structure 生成的图结构写入 Neo4j。
+    """
+    mapper = SchemaMapper(uri=uri, user=user, password=password)
+    try:
+        mapper.store_graph_structure(graph_struct)
+    finally:
+        mapper.close()
+
+
+__all__ = ["SchemaMapper", "json_to_graph_structure", "store_graph_to_neo4j"]
 
 
 class SchemaMapper:
@@ -357,10 +385,6 @@ if __name__ == "__main__":
         ]
     
     try:
-        # 若有「兄弟键」格式（如模型输出 {Term, TermDefinition, Category} 并列），
-        # 先做顶层合并再入库，仅最外层按 top_level_class 合并，内部不递归
-        # type_names = {"Rule", "Term", "TermDefinition", "Category", "Glossary", "Characteristic", ...}
-        # raw_json = normalize_sibling_type_keys(raw_json, type_names, top_level_class="Rule")
         mapper.map_to_graph(raw_json, top_level_class="Rule")
         print("入库成功！")
     except Exception as e:

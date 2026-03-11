@@ -16,8 +16,8 @@ abstract class SystemElement <<metaclass>> {
 note top of SystemElement: 系统的核心抽象元素，所有具体构件的基类
 
 class Attributes <<metaclass>> {
-    - attributeId: String
     - name: String
+    - description: String
 }
 
 class Features <<metaclass>> {

@@ -2,7 +2,7 @@
 
 import logging
 import time
-from ie.utils import BaseLLM, LocalLLM, ApiLLM, simple_post_process
+from ie.utils import BaseLLM, ApiLLM, simple_post_process
 
 
 logger = logging.getLogger(__name__)
@@ -15,15 +15,12 @@ class LLMExtractor:
     - 输出：提取后的 JSON（或解析失败时的原始字符串）
 
     可选 backend：
-    - 默认：LocalLLM（本地微调模型）
-    - 显式传入 ApiLLM 等其他实现
+    - 默认：ApiLLM（连接部署的 vLLM 服务）
+    - 显式传入其他 BaseLLM 实现
     """
 
-    def __init__(self, backend: BaseLLM | None = None, use_local: bool = True):
-        if backend is not None:
-            self.backend = backend
-        else:
-            self.backend = LocalLLM() if use_local else ApiLLM()
+    def __init__(self, backend: BaseLLM | None = None):
+        self.backend = backend if backend is not None else ApiLLM()
 
     @staticmethod
     def build_uml_system_prompt(uml: str, main_object: str) -> str:
@@ -47,9 +44,7 @@ class LLMExtractor:
 
 ### 主对象与输出格式
 - **主对象**：本规范的主对象为 UML 中的 **{main_object}** 类（根类）。
-- **输出结构**：顶层为 JSON 数组 `[{{
-  ...
-}}]`，每个数组元素对应一个主对象实例。
+- **输出结构**：顶层为 JSON 对象 `{{\"{main_object}\": [{{...}}, ...]}}`，键为主对象类名，值为该主对象实例的数组。
 - **字段归属**：元素内包含主对象的直接属性及组合关系下的子对象，其他均为该主对象的属性或子对象，无需额外包装键。
 
 ### 3. 抽取质量要求
@@ -58,9 +53,7 @@ class LLMExtractor:
 - **唯一性标识**：为每个实例化的顶级对象分配一个在当前上下文中唯一的 ID（若本体有定义 ID 字段）。
 
 ### 4. 输出约束
-- 仅输出一个纯净的 JSON 数组 `[{{
-  ...
-}}]`。
+- 仅输出一个纯净的 JSON 对象，形如 `{{\"{main_object}\": [...]}}`。
 - 不含任何解释性文字、Markdown 标签或推理过程。
 """
 

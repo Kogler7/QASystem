@@ -18,14 +18,10 @@ uvicorn       # 如果需要跑 fastapi_app.py
 - **主要文件说明**
   - `README.md`：本说明文档。
 - **`uie/`**：统一信息抽取（Unified Information Extraction）子模块
-  - `fastapi_app.py`：对外的 FastAPI 服务入口，提供 HTTP 抽取接口。
+  - `fastapi_app.py`：对外的 FastAPI 服务入口，提供两个 HTTP 接口：`POST /extract`（知识抽取统一接口）、`POST /store_graph`（将 graph 存储到 Neo4j）。
   - `ie/`：真正的“信息抽取引擎”实现
-    - `extraction_api.py`：**抽取流程与对外 Python 函数入口**（面向内部调用）。其中推荐主接口为：
-      - `extract_with_templates_only(main_object, text, backend=None, use_local=True, high_confidence=0.9, low_confidence=0.6)`：
-        - 在对应 UML 本体上解析示例模板；
-        - 先用正则模板在原 文中做句式匹配，构造提示信息；
-        - 调用 `LLMExtractor` 抽取结构化结果，并在顶层对象注入置信度字段；
-        - 返回值为 `{"raw": ..., "graph": ...}`，只做抽取与图结构构建，不写入 Neo4j，适合作为上层系统/服务的主要调用入口。
+    - `extraction_api.py`：**抽取流程与对外 Python 函数入口**。主接口：`extract(main_object, text, use_templates=True, store_to_neo4j=False, ...)` 返回 `{"raw": ..., "graph": ...}`；`store_graph_to_neo4j(graph_struct, ...)` 将 graph 存储到 Neo4j。
+    - `schema_mapper.py`：`json_to_graph_structure(data, top_level_class)` 将 JSON 拆分为图；`store_graph_to_neo4j(graph_struct, ...)` 将图写入 Neo4j。
 
 **使用示例**
 
@@ -33,24 +29,27 @@ uvicorn       # 如果需要跑 fastapi_app.py
 
 - 使用本地微调模型（`use_local=True`，默认）：
 ```python
-from ie.extraction_api import extract_with_templates_only
+from ie.extraction_api import extract, store_graph_to_neo4j
 
 text = "如果轮对轮径小于772mm，那么更新车轮、更换轴箱轴承。车轮必须满足轮缘厚度要求。"
-result = extract_with_templates_only(
+result = extract(
     main_object="RuleType",
     text=text,
-    use_local=True,
+    use_templates=True,
+    store_to_neo4j=False,
 )
 # result["raw"] 为抽取的 JSON 列表
-# result["graph"]["nodes"] / result["graph"]["relationships"] / result["graph"]["ontology_relations"] 为图结构
+# result["graph"]["nodes"] / result["graph"]["relationships"] 为图结构
+
+# 确认结果后可调用 store_graph_to_neo4j 存入 Neo4j
+# store_graph_to_neo4j(result["graph"])
 ```
 
 - 使用外部 API（`use_local=False`，需事先启动 OpenAI 兼容服务）：
 ```python
-from ie.extraction_api import extract_with_templates_only
+from ie.extraction_api import extract
 from ie.utils import ApiLLM
 
-# 可选：自定义 API 地址和模型
 backend = ApiLLM(
     api_key="EMPTY",
     base_url="http://127.0.0.1:8000/v1",
@@ -58,9 +57,11 @@ backend = ApiLLM(
 )
 
 text = "如果轮对轮径小于772mm，那么更新车轮、更换轴箱轴承。"
-result = extract_with_templates_only(
+result = extract(
     main_object="RuleType",
     text=text,
+    use_templates=True,
+    store_to_neo4j=False,
     backend=backend,
     use_local=False,
 )
