@@ -1,35 +1,73 @@
-# config.py
+import os
+from pathlib import Path
 
-from .store import VirtuosoClient
+# ==========================================
+# 1. 基础常量 (解决旧代码的 ImportError)
+# ==========================================
+MAX_BATCH_SIZE = 1000
+NODE_BATCH_SIZE = 500
+CLASS_BATCH_SIZE = 100
 
+# ==========================================
+# 2. Neo4j 数据库配置 (您之前的连接信息)
+# ==========================================
+NEO4J_URI = "neo4j+s://111bff2c.databases.neo4j.io"
+NEO4J_USER = "neo4j"
+NEO4J_PWD = "jSnELhrtpwdiM7Bg9YWv8cLtAI7s76up17swDQ64lR4"
 
-# Virtuoso endpoints and auth
-VIRTUOSO_QUERY_ENDPOINT = "http://localhost:8890/sparql"
-VIRTUOSO_UPDATE_ENDPOINT = "http://localhost:8890/sparql"
-VIRTUOSO_USERNAME = "dba"
-VIRTUOSO_PASSWORD = "dba"
+# ==========================================
+# 3. 本地 QWEN 大模型配置 (适配本地部署)
+# ==========================================
+# 本地部署通常不需要 Key，或者随便填一个字符串
+LOCAL_LLM_KEY = "sk-local-qwen" # 本地模型随便填
 
-DOCKER_CONTAINER_NAME = "upshacl-virtuoso" # Add docker container name
-DATA_DIR_IN_DOCKER = "/data"
-STORAGE_DIR = "" # Leave empty if storage should be within the project
-NODE_BATCH_SIZE   = 32  # was 1
-CLASS_BATCH_SIZE  = 64   # was 1
-MAX_BATCH_SIZE    = 500  # used for VALUES batching elsewhere
-PROP_BATCH_SIZE = 1
-INCOMING_PROP_BATCH_SIZE = 1
+LOCAL_LLM_URL = "http://localhost:11434/v1" # 你的本地接口地址
 
-# Shared client instance
-virtuoso = VirtuosoClient(
-    query_endpoint     = VIRTUOSO_QUERY_ENDPOINT,
-    update_endpoint    = VIRTUOSO_UPDATE_ENDPOINT,
-    username           = VIRTUOSO_USERNAME,
-    password           = VIRTUOSO_PASSWORD,
-    docker_container_name = DOCKER_CONTAINER_NAME,
-)
+LOCAL_MODEL_NAME = "qwen2.5-7b-instruct" # 你的 QWEN 模型名
 
-# ------------------------------------------------------------------
-# publish it to store.virtuoso  ➜ avoids circular import error
-# ------------------------------------------------------------------
-from . import store as _store  # local import to break the cycle
-_store.virtuoso = virtuoso
+TEMPERATURE = 0  # 设为 0 保证逻辑生成的确定性
+JSON_MODE = True  # 强制要求 QWEN 输出 JSON 格式
 
+# ==========================================
+# 4. 路径锁定 (基于项目根目录)
+# ==========================================
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+RESULT_DIR = BASE_DIR / "results"
+
+# 自动创建必要文件夹
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+RESULT_DIR.mkdir(parents=True, exist_ok=True)
+
+# 核心逻辑文件路径
+INSERT_TTL = DATA_DIR / "insert.ttl"
+DELETE_TTL = DATA_DIR / "delete.ttl"
+SHAPE_TTL = DATA_DIR / "shape.ttl"
+SHAPE_LP = DATA_DIR / "shape.lp"
+STRATEGY_LP = DATA_DIR / "repair_strategy.lp"
+
+# 审计与结果路径
+FACTS_LP = RESULT_DIR / "facts.lp"
+REPAIR_RESULT = RESULT_DIR / "repair_result.txt"
+
+# ==========================================
+# 5. 配置单例对象 (方便新模块调用)
+# ==========================================
+class Config:
+    def __init__(self):
+        # 批量把上面的变量塞进来
+        for key, value in globals().items():
+            if key.isupper():
+                setattr(self, key, value)
+
+# 实例化对象，让 from src.config import config 生效
+config = Config()
+
+# ==========================================
+# 6. 辅助工具：获取 Neo4j 客户端
+# ==========================================
+def get_neo4j_client():
+    from src.store.neo4j_client import Neo4jClient
+    return Neo4jClient(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PWD)
+
+print(f"✅ 配置文件加载成功 | 模式: 本地 QWEN ({MODEL_NAME}) | 数据库: {NEO4J_URI}")

@@ -1,282 +1,118 @@
 from __future__ import annotations
 
-from rdflib import RDF, Node, Graph
-from typing import Dict, List, Set, Tuple
-import collections
+"""Delta & Reduced Graph Logic for Neo4j.
+
+Calculates which (node, shape) pairs are affected by a delta update 
+and extracts the precise neighborhood (Reduced Graph) from Neo4j.
+"""
+
 import uuid
+import logging
+import collections
+from typing import Dict, List, Set, Tuple
 
-from ..config import NODE_BATCH_SIZE, virtuoso
-from ..pathexpr import path_to_sparql_pattern
-from ..utils.custom_types import Triple
-from ..utils.sanitizer import sanitize_uri, build_sparql_triples
-from ..config_dynamic import get_data_graph_uri
-
-from .crud import batch as chunker, insert_triples
+# 👉 核心替换：使用 neo4j_db
+from ..store import neo4j_db
+from ..config import NODE_BATCH_SIZE
+from .crud import batch as chunker
 from .traversal import expand_nodes
 from ..shacl_index import ShapeIndex
-from src.utils.path_processor import PathProcessor
 
-AffectedPair = Tuple[str, str]  # (nodeIRI, shapeIRI)
-RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-NODE_VAL_BATCH = 1_000
-CLASS_VAL_BATCH = 8_000
+logger = logging.getLogger(__name__)
 
-def _as_sparql(triples: List[str] | List[Tuple]) -> str:
-    if not triples:
-        return ""
-    if isinstance(triples[0], str):
-        return " ".join(triples)
-    return " ".join(build_sparql_triples(triples))
+AffectedPair = Tuple[str, str]  # (nodeID, shapeID)
 
-def _iri_list(items: Set[str] | List[str]) -> str:
-    return " ".join(f"<{sanitize_uri(i)}>" for i in items if i.startswith("http"))
+# ────────────────────────────────────────────────────────────────
+# helper: ID 提取
+# ────────────────────────────────────────────────────────────────
 
-def compute_affected_pairs(delta_insert: List[str], delta_delete: List[str]) -> List[AffectedPair]:
+def _extract_id(val: any) -> str:
+    """从 URI 或 rdflib 对象中提取纯 ID。"""
+    return str(val).split('#')[-1].split('/')[-1]
+
+# ────────────────────────────────────────────────────────────────
+# 核心函数 1: 计算受影响的 (节点, 形状) 对
+# ────────────────────────────────────────────────────────────────
+
+def compute_affected_pairs(delta_insert: List[Tuple], delta_delete: List[Tuple]) -> List[AffectedPair]:
+    """
+    UpSHACL 算法核心：根据数据增量，计算需要重新验证的节点及其对应的 SHACL 形状。
+    """
     idx = ShapeIndex()
-
-    delta_graph = f"http://temp.org/delta_{uuid.uuid4()}"
-    virtuoso.update(f"CREATE SILENT GRAPH <{delta_graph}>")
-
-    if delta_insert:
-        virtuoso.update(f"INSERT DATA {{ GRAPH <{delta_graph}> {{ {_as_sparql(delta_insert)} }} }}")
-    if delta_delete:
-        virtuoso.update(f"INSERT DATA {{ GRAPH <{delta_graph}> {{ {_as_sparql(delta_delete)} }} }}")
-
-    path_preds = {p for p in idx.path_predicates}
-    path_preds.add(RDF_TYPE)
-
-    object_preds = {p for tgt in idx.target_map.values() for p in tgt["objectsOf"]}
-    obj_sensitive_map = idx.prop_to_parent_shapes
-    obj_sensitive_preds = set(obj_sensitive_map.keys())
-    val_sensitive_map = idx.value_sensitive_paths
-    val_sensitive_preds = set(val_sensitive_map.keys())
-
-    subject_nodes = _select_iris(delta_graph, "s", set(), is_subject=True)
-    object_nodes = _select_iris(delta_graph, "o", object_preds, is_subject=False)
-    initial_nodes: Set[str] = subject_nodes | object_nodes
     affected_pairs: Set[AffectedPair] = set()
 
-    if val_sensitive_preds and object_nodes:
-        node_values = _iri_list(object_nodes)
-        val_hop_q = make_path_query(
-            path_nodes=val_sensitive_preds,
-            shapes_graph=idx.graph,
-            graph_uri=get_data_graph_uri(),
-            values_clause=node_values,
-            source_var="?s",
-            target_var="?o",
-            depth=3,
-        )
-        val_hop_res = virtuoso.query_select(val_hop_q)
-        val_subjects = {b["s"]["value"] for b in val_hop_res["results"]["bindings"]}
-        initial_nodes |= val_subjects
+    # 1. 提取变动涉及的初始节点
+    subject_nodes = set()
+    object_nodes = set()
+    for s, p, o in (delta_insert + delta_delete):
+        subject_nodes.add(_extract_id(s))
+        if isinstance(o, tuple) or str(o).startswith("http"):
+            object_nodes.add(_extract_id(o[0] if isinstance(o, tuple) else o))
 
-    if obj_sensitive_preds and initial_nodes:
-        node_values = _iri_list(initial_nodes)
-        obj_hop_q = make_path_query(
-            path_nodes=obj_sensitive_preds,
-            shapes_graph=idx.graph,
-            graph_uri=get_data_graph_uri(),
-            values_clause=node_values,
-            source_var="?s",
-            target_var="?o",
-            depth=3,
-        )
-        obj_hop_res = virtuoso.query_select(obj_hop_q)
-        hop_subjects = {b["s"]["value"] for b in obj_hop_res["results"]["bindings"]}
-        initial_nodes |= hop_subjects
+    initial_nodes = subject_nodes | object_nodes
 
-    properties = {
-        path_to_sparql_pattern(p, idx.graph)
-        for p in idx.node_properties
-    }
+    # 2. 模式匹配：哪些节点因为属性/关系变动而触发了特定的 Shape？
+    # 基于你之前生成的 ShapeIndex 进行内存匹配
+    properties = set(idx.node_properties)
+    
+    # 3. 图扩展：顺着 SHACL 路径找到关联节点
+    # 比如：修改了车轮，受影响的可能是整个轮对 (Wheelset)
     expanded_nodes = expand_nodes(initial_nodes, properties)
 
-    for shape, tgt in idx.target_map.items():
-        affected_pairs.update(_match_shape(
-            shape, tgt, expanded_nodes, subject_nodes, initial_nodes
-        ))
+    # 4. 最终对齐：将受影响节点映射到对应的 SHACL Shape 上
+    for shape, targets in idx.target_map.items():
+        shape_id = _extract_id(shape)
+        # 匹配 targetClass
+        for node in expanded_nodes:
+            # 简单的类匹配逻辑（在 Neo4j 中查询节点的 Label）
+            cypher = "MATCH (n {id: $nid}) RETURN labels(n) as labels"
+            res = neo4j_db.query(cypher, parameters={"nid": node})
+            if res:
+                node_labels = res[0]['labels']
+                target_classes = [_extract_id(c) for c in targets.get("classes", [])]
+                if any(lbl in target_classes for lbl in node_labels):
+                    affected_pairs.add((node, shape_id))
 
-    virtuoso.update(f"DROP SILENT GRAPH <{delta_graph}>")
+    logger.info(f"✨ [Delta] 识别到 {len(affected_pairs)} 个受影响的验证任务。")
     return list(affected_pairs)
 
+# ────────────────────────────────────────────────────────────────
+# 核心函数 2: 构建缩减子图 (Reduced Graph)
+# ────────────────────────────────────────────────────────────────
 
-def make_path_query(
-    path_nodes: Set[Node],
-    shapes_graph,
-    graph_uri: str,
-    values_clause: str,
-    source_var: str = "?s",
-    target_var: str = "?o",
-    depth: int = 3,
-) -> str:
-    patterns = "\n".join(
-        path_to_sparql_pattern(path_node, shapes_graph, source_var, target_var, depth)
-        for path_node in path_nodes
-    )
-
-
-    return f"""
-    SELECT DISTINCT {source_var}
-    WHERE {{
-      GRAPH <{graph_uri}> {{
-        VALUES {target_var} {{ {values_clause} }}
-        {patterns}
-      }}
-    }}"""
-
-def _select_iris(delta_graph: str, var: str, predicates: Set[str], *, is_subject: bool) -> Set[str]:
-    pattern = f"?{var} ?p ?o" if is_subject else f"?s ?p ?{var}"
-    pred_clause = f"FILTER (?p IN ({', '.join(f'<{sanitize_uri(p)}>' for p in predicates)}))" if predicates else ""
-    q = f"""
-    SELECT DISTINCT ?{var}
-    WHERE {{
-      GRAPH <{delta_graph}> {{
-        {pattern} .
-        FILTER isIRI(?{var})
-        {pred_clause}
-      }}
-    }}"""
-    res = virtuoso.query_select(q)
-    return {b[var]["value"] for b in res["results"]["bindings"]}
-
-def match_nodes_via_predicate(predicate_set: Set[str], var: str, check_nodes: Set[str], compare_nodes: Set[str], shape: str) -> Set[AffectedPair]:
-    if not predicate_set:
-        return set()
-    pred_filter = f"FILTER (?p IN ({', '.join(f'<{sanitize_uri(p)}>' for p in predicate_set)}))"
-    target = "?s" if var == "s" else "?o"
-    q = f"""
-    SELECT DISTINCT {target}
-    WHERE {{
-      GRAPH <{get_data_graph_uri()}> {{
-        ?s ?p ?o .
-        {pred_filter}
-      }}
-    }}"""
-    bindings = virtuoso.query_select(q)["results"]["bindings"]
-    found = {b[target[1:]]["value"] for b in bindings}
-    return {(n, shape) for n in check_nodes if n in found and n in compare_nodes}
-
-def match_class_instances(classes: Set[str], nodes: Set[str], initial_nodes: Set[str], shape: str) -> Set[AffectedPair]:
-    if not classes or not nodes:
-        return set()
-    matches = set()
-    for cls_slice in chunker(list(classes), CLASS_VAL_BATCH):
-        class_values = _iri_list(cls_slice)
-        for node_slice in chunker(list(nodes), NODE_VAL_BATCH):
-            node_values = _iri_list([n for n in node_slice if n.startswith("http")])
-            if not node_values:
-                continue
-            q = f"""
-            SELECT DISTINCT ?inst
-            WHERE {{
-              GRAPH <{get_data_graph_uri()}> {{
-                VALUES ?inst {{ {node_values} }}
-                VALUES ?cls  {{ {class_values} }}
-                ?inst a ?cls .
-              }}
-            }}"""
-            bindings = virtuoso.query_select(q)["results"]["bindings"]
-            for b in bindings:
-                inst = b["inst"]["value"]
-                if inst in initial_nodes:
-                    matches.add((inst, shape))
-    return matches
-
-def flatten_pairs(batch_pairs: List[AffectedPair], allowed_map: Dict[str, Set[str]]) -> Tuple[Set[str], Set[str]]:
-    """Extract nodes and patterns from affected pairs.
-    
-    Args:
-        batch_pairs: List of (node, shape) tuples
-        allowed_map: Dict mapping shape URI to set of SPARQL patterns
-    
-    Returns:
-        Tuple of (set of node URIs, set of SPARQL patterns)
+def build_reduced_graphs(affected_pairs: List[AffectedPair]) -> List[Tuple]:
     """
-    nodes = {n for n, _ in batch_pairs}
-    patterns = {p for _, shape in batch_pairs for p in allowed_map.get(shape, set())}
-    return nodes, patterns
-
-def _match_shape(shape: str, targets: Dict[str, Set[str]], expanded_nodes: Set[str], core_subject_nodes: Set[str], initial_nodes: Set[str]) -> Set[AffectedPair]:
-    matches: Set[AffectedPair] = set()
-    shape_str = str(shape)
-    matches |= {(n, shape_str) for n in expanded_nodes if n in targets["nodes"]}
-    matches |= match_class_instances(targets["classes"], expanded_nodes, initial_nodes, shape_str)
-    matches |= match_nodes_via_predicate(targets["subjectsOf"], "s", expanded_nodes, initial_nodes, shape_str)
-    matches |= match_nodes_via_predicate(targets["objectsOf"], "o", expanded_nodes, initial_nodes, shape_str)
-    return matches
-
-
-def build_reduced_graphs(affected_pairs: List[AffectedPair]) -> Tuple[str, List[(Node, Node, Node)]]:
-    idx = ShapeIndex()
-    temp_graph = f"http://temp.org/data_{uuid.uuid4()}"
-    virtuoso.update(f"CREATE SILENT GRAPH <{temp_graph}>")
-
+    从 Neo4j 中精准切取受影响节点周围的子图，作为 Clingo 的推演事实。
+    """
     if not affected_pairs:
-        print("[delta] no affected pairs -> empty reduced graph")
-        return temp_graph, []
-
-    allowed_props_map = idx.shape_triple_patterns
-    print(allowed_props_map)
-    visited: Set[AffectedPair] = set()
-    queue = collections.deque(affected_pairs)
-    inserted_total = 0
-    inserted_triples: List[(Node, Node, Node)] = []
-
-    while queue:
-        batch_pairs = _collect_batch(queue, visited)
-        start_nodes, patterns = flatten_pairs(batch_pairs, allowed_props_map)
-        print("  >> batch nodes:", start_nodes)
-        print("  >> allowed patterns:", patterns)
-
-        triples = traverse_all(start_nodes=start_nodes, patterns=patterns)
-
-        print(f"[fetch] got {len(triples)} triples")
-        inserted_triples.extend(triples)
-        insert_triples(temp_graph, triples)
-        inserted_total += len(triples)
-
-    print(f"[delta] reduced graph <{temp_graph}> <- {inserted_total} triples")
-    return temp_graph, inserted_triples
-
-
-def traverse_all(start_nodes: Set[str], patterns: Set[str], depth: int = 3) -> List[(Node, Node, Node)]:
-    if not start_nodes or not patterns:
         return []
 
+    idx = ShapeIndex()
+    # 映射：每个 Shape 关注哪些属性关系
+    allowed_props_map = idx.shape_triple_patterns
+    
+    visited_nodes = {p[0] for p in affected_pairs}
     all_triples = []
-    nodes_clause = _iri_list(start_nodes)
-    data_graph = get_data_graph_uri()
 
-    for pattern in patterns:
-        query = f"""
-            CONSTRUCT {{
-              {pattern}
-            }}
-            WHERE {{
-              GRAPH <{data_graph}> {{
-                VALUES ?s {{ {nodes_clause} }}
-                {pattern}
-              }}
-            }}
+    # 🚀 使用 Cypher 批量拉取子图
+    # 逻辑：对于受影响节点，只拉取 SHACL 规则里提到的那几种关系（最小影响子图）
+    for node_id in visited_nodes:
+        # 获取该节点涉及的所有 Shape 所关注的关系类型
+        relevant_shapes = [p[1] for p in affected_pairs if p[0] == node_id]
+        rel_types = set()
+        for s in relevant_shapes:
+            # 这里简化处理：获取所有可能的关系
+            rel_types.update([_extract_id(p) for p in idx.path_predicates])
+        
+        rel_filter = "|".join(rel_types) if rel_types else "*"
+
+        cypher = f"""
+        MATCH (s {{id: $sid}})-[r:{rel_filter}]-(o)
+        RETURN s.id AS s, type(r) AS p, o.id AS o
         """
-        result = virtuoso.query(query)
-        print(result)
-        g = Graph()
-        g.parse(data=result.decode("utf-8"), format="turtle")
-        for s, p, o in g:
-            all_triples.append((s, p, o))
-        # for b in bindings:
-        #     print(b)
-        #     all_triples.append((b["s"]["value"], b["p"]["value"], b["o"]["value"]))
+        results = neo4j_db.query(cypher, parameters={"sid": node_id})
+        for row in results:
+            all_triples.append((row['s'], row['p'], (row['o'], "uri", None)))
 
-    return all_triples
-
-def _collect_batch(queue: collections.deque, visited: Set[AffectedPair]) -> List[AffectedPair]:
-    batch: List[AffectedPair] = []
-    while queue and len(batch) < NODE_BATCH_SIZE:
-        pair = queue.popleft()
-        if pair not in visited:
-            visited.add(pair)
-            batch.append(pair)
-    return batch
+    logger.info(f"📦 [Delta] 子图构建完成，包含 {len(all_triples)} 条关键三元组。")
+    return list(set(all_triples))
