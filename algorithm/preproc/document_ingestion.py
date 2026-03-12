@@ -5,10 +5,10 @@ import json
 import logging
 
 from preproc_config.settings import Settings
-from src.main_processor import DocumentProcessor
-from src.database.es_client import ESClient
-from src.database.mysql_client import MySQLClient
-from src.processors.excel_processor import ExcelProcessor
+from preproc_src.main_processor import DocumentProcessor
+from preproc_src.database.es_client import ESClient
+from preproc_src.database.mysql_client import MySQLClient
+from preproc_src.processors.excel_processor import ExcelProcessor
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
