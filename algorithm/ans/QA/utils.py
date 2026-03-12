@@ -140,9 +140,9 @@ def run_zhipu_glm(prompt, temperature, max_tokens, api_key):
         print(f"GLM API调用失败: {e}")
         return "Error in GLM API call"
 
-def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="gpt-3.5-turbo"):
+def run_llm(prompt, temperature, max_tokens, api_key, engine="gpt-3.5-turbo"):
     if "glm" in engine.lower() or "zhipu" in engine.lower():
-        return run_zhipu_glm(prompt, temperature, max_tokens, opeani_api_keys)
+        return run_zhipu_glm(prompt, temperature, max_tokens, api_key)
 
     messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
     message_prompt = {"role":"user","content":prompt}
@@ -150,6 +150,9 @@ def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="gpt-3.5-tu
     f = 0
     while(f == 0):
         try:
+            # 设置OpenAI API密钥
+            import openai
+            openai.api_key = api_key
             response = openai.ChatCompletion.create(
                     model=engine,
                     messages = messages,
@@ -159,8 +162,8 @@ def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="gpt-3.5-tu
                     presence_penalty=0)
             result = response["choices"][0]['message']['content']
             f = 1
-        except:
-            print("openai error, retry")
+        except Exception as e:
+            print(f"openai error, retry: {e}")
             time.sleep(2)
     return result
 # def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="Qwen/Qwen3-8B"):
@@ -261,7 +264,7 @@ def if_true(prompt):
 
 def generate_without_explored_paths(question, args):
     prompt = cot_prompt + "\n\nQ: " + question + "\nA:"
-    response = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
+    response = run_llm(prompt, args.TEMPERATURE_REASONING, args.MAX_LENGTH, args.LLM_API_KEY, args.LLM_TYPE)
     return response
 
 

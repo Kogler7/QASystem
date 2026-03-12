@@ -3,7 +3,7 @@
 """
 import asyncio
 import logging
-from typing import Any
+from typing import Any, List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -22,6 +22,11 @@ class AskRequestBody(BaseModel):
 
 class AskVisualizeRequestBody(BaseModel):
     question: str
+
+
+class QueryGraphRequestBody(BaseModel):
+    node_labels: List[str]
+    limit: int = 20
 
 
 @router.get("/health")
@@ -50,4 +55,18 @@ async def ask_visualize(body: AskVisualizeRequestBody) -> dict[str, Any]:
         return result
     except Exception as e:
         logger.exception("答案生成（含可视化）失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/query-graph")
+async def query_graph(body: QueryGraphRequestBody) -> dict[str, Any]:
+    try:
+        result = await asyncio.to_thread(
+            service.query_graph_by_nodes,
+            node_labels=body.node_labels,
+            limit=body.limit
+        )
+        return {"success": True, "data": result}
+    except Exception as e:
+        logger.exception("查询知识图谱失败")
         raise HTTPException(status_code=500, detail=str(e)) from e

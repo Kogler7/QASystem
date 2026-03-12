@@ -28,3 +28,14 @@ export function answerGenerationAskVisualize(params) {
     question: params.question?.trim() ?? ''
   }, { timeout: 120000 })
 }
+
+/**
+ * 查询知识图谱
+ * @param {object} params - node_labels, limit?
+ */
+export function answerGenerationQueryGraph(params) {
+  return request.post('/component/answer-generation/query-graph', {
+    node_labels: params.node_labels ?? [],
+    limit: params.limit ?? 20
+  }, { timeout: 30000 })
+}
