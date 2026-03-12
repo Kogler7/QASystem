@@ -1,3 +1,4 @@
+import { request } from './request'
 /**
  * 前端 API 统一导出
  * 按模块划分：智能问答、知识库、组件管理
@@ -16,9 +17,59 @@ export {
 } from './modules/knowledge'
 
 // 组件管理：知识抽取、知识图谱更新、自然语言转 Cypher 等
-export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j } from './modules/component'
+export { knowledgeExtract, extractHealthCheck } from './modules/component'
 export { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } from './modules/component'
-export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
+export { nl2cypherHealthCheck, nl2cypherGenerate} from './modules/component'
+// export {nl2cypherSplitCharacter} from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
-export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize, answerGenerationQueryGraph } from './modules/component'
+export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './modules/component'
 export { documentPreprocHealthCheck, documentPreprocConvert } from './modules/component'
+// -----------------------------------------------------------------------------
+// 文本切片接口
+// -----------------------------------------------------------------------------
+
+/**
+ * 切片：递归字符
+ * @param {string} text
+ */
+export function nl2cypherSplitCharacter(text) {
+  return request.post('/component/nl2cypher/split/character', 
+    { text: text }, // 修复：增加空值安全处理和trim
+    { timeout: 120000 }
+  )
+}
+
+/**
+ * 切片：递归字符
+ * @param {string} text
+ */
+export function nl2cypherSplitRecursive(text) {
+  return request.post('/component/nl2cypher/split/recursive', { text: text }, { timeout: 120000 })
+}
+
+/**
+ * 切片：Markdown
+ * @param {string} text
+ */
+export function nl2cypherSplitMarkdown(text) {
+  return request.post('/component/nl2cypher/split/markdown', { text: text  }, { timeout: 120000 })
+}
+
+/**
+ * 切片：Python 代码
+ * @param {string} text
+ */
+export function nl2cypherSplitPython(text) {
+  return request.post('/component/nl2cypher/split/python', { text: text }, { timeout: 120000 })
+}
+
+/**
+ * 文本向量化并存储接口
+ * @param {string} text
+ */
+export function nl2cypherText2vector(text) {
+  return request.post('/component/nl2cypher/text2vector', { text: text }, { timeout: 120000 })
+}
+
+
+
