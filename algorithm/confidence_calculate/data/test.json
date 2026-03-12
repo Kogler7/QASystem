@@ -1,0 +1,82 @@
+[
+  {
+    "triple": {
+      "subject": "一等客车",
+      "predicate": "定义",
+      "object": "定员少、乘坐舒适度高的客车"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "宿营车",
+      "predicate": "定义",
+      "object": "供乘务或作业人员休息使用的车辆"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "家畜车",
+      "predicate": "定义",
+      "object": "设有适于运输活家畜装置的车辆"
+    },
+    "label": 0.95
+  },
+  {
+    "triple": {
+      "subject": "钳夹车",
+      "predicate": "定义",
+      "object": "车体分两个可分离的部分，货物被夹持和悬挂在其间的长大货物车"
+    },
+    "label": 0.93
+  },
+  {
+    "triple": {
+      "subject": "车辆换长",
+      "predicate": "定义",
+      "object": "车辆长度(m)除以11所得之值"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "自重系数",
+      "predicate": "定义",
+      "object": "车辆自重与标记载重之比值"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "平稳性指标",
+      "predicate": "定义",
+      "object": "评定车辆运行时旅客乘坐舒适度或货物完好性的程度"
+    },
+    "label": 0.96
+  },
+  {
+    "triple": {
+      "subject": "单车试验",
+      "predicate": "定义",
+      "object": "测定车辆制动机和整个车辆制动装置在静止状态的性能试验"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "吊",
+      "predicate": "定义",
+      "object": "上端与机体连接或固定，用于悬置其他器物的构件"
+    },
+    "label": 0.95
+  },
+  {
+    "triple": {
+      "subject": "隔热材料",
+      "predicate": "定义",
+      "object": "能减少隔热层两侧之间热交换的导热系数小的材料"
+    },
+    "label": 0.98
+  }
+]

@@ -1,0 +1,74 @@
+# 基础训练配置
+learning_rate: 0.001
+l2_lambda: 0.001
+batch_size: 16
+epochs: 100
+
+# 特征维度
+text_dim: 128               # SBERT模型输出维度
+kg_dim: 128                  # TransE嵌入维度
+path_dim: 64                 # 路径特征维度
+
+# 文本证据配置
+text:
+  es_hosts: ["https://10.126.62.88:9200"]
+  es_index: "documents"
+  es_timeout: 30
+  es_size: 50
+  text_top_k: 10
+  max_bm25_norm: 100.0
+  sbert_model_path: "/home/admin_user_8/sxm/confidence_calculate/sbert_model"  # 本地模型路径
+  es_username: "elastic"  
+  es_password: "123456"  
+  es_verify_certs: false  # 如果使用自签名证书
+
+# KG证据配置
+kg:
+  kg_embedding_dim: 100
+  entity_emb_path: "embeddings/entities.pt"
+  relation_emb_path: "embeddings/relations.pt"
+  use_pretrained: true
+  freeze_embeddings: true
+
+# 路径证据配置
+path:
+  max_path_length: 3
+  max_paths_per_triple: 20
+  path_embedding_dim: 64
+  neo4j:
+    uri: "bolt://127.0.0.1:7687"
+    username: "neo4j"
+    password: "neo4j2025"
+    database: "neo4j"
+
+# 模型融合配置
+fusion:
+  dropout_rate: 0.5
+  use_batch_norm: false
+  hidden_layers: [256, 128]
+
+# 训练配置
+training:
+  val_check_interval: 1.0
+  log_every_n_steps: 10
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+
+# 早停配置
+early_stopping:
+  monitor: "val_loss"
+  patience: 10
+  mode: "min"
+
+# 检查点配置
+checkpoint:
+  monitor: "val_loss"
+  save_top_k: 1
+  mode: "min"
+  filename: "best-{epoch:02d}-{val_loss:.3f}"
+
+# 硬件配置
+hardware:
+  accelerator: "auto"
+  devices: 1
+  precision: 32

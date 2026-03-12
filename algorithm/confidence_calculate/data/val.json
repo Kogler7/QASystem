@@ -1,0 +1,82 @@
+[
+  {
+    "triple": {
+      "subject": "软座车",
+      "predicate": "定义",
+      "object": "设有软席座椅设备的座车"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "行李车",
+      "predicate": "定义",
+      "object": "设有行李间及行李员办公室，供运输旅客行李及物品的车辆"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "邮政车",
+      "predicate": "定义",
+      "object": "设有邮政间及邮政员办公室，供运输邮件使用的车辆"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "平车",
+      "predicate": "定义",
+      "object": "底架承载面为一平面，通常两侧设有柱插的车辆"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "漏斗车",
+      "predicate": "定义",
+      "object": "设有一个或数个带盖或不带盖的具有一定斜坡装货斗的车辆"
+    },
+    "label": 0.96
+  },
+  {
+    "triple": {
+      "subject": "机械冷藏车",
+      "predicate": "定义",
+      "object": "设有机械制冷和/或加温设备的冷藏车"
+    },
+    "label": 0.95
+  },
+  {
+    "triple": {
+      "subject": "车辆定距",
+      "predicate": "定义",
+      "object": "车体支承在前后两走行部之间的距离"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "每延米重",
+      "predicate": "定义",
+      "object": "车辆总重与车辆长度之比值"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "动力学试验",
+      "predicate": "定义",
+      "object": "测定车辆在各种运行速度下的运行品质的试验"
+    },
+    "label": 0.96
+  },
+  {
+    "triple": {
+      "subject": "关节式车",
+      "predicate": "定义",
+      "object": "两个车体的相邻端用同一个转向架来支承的车辆"
+    },
+    "label": 0.94
+  }
+]
