@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 from .db import init_db
 from .routers import chat, knowledge, users
 from .modules.component import COMPONENT_ROUTERS
+from .modules.component.document_preproc import service as doc_preproc_service
 
 #冲突检测new
 from app.routers import conclictfix
@@ -92,6 +94,12 @@ app.include_router(users.router)
 app.include_router(conclictfix.router) #new
 for r in COMPONENT_ROUTERS:
     app.include_router(r)
+
+
+@app.get("/api/available_models")
+async def get_available_models() -> dict[str, Any]:
+    """获取可用的文档处理模型信息。"""
+    return doc_preproc_service.get_available_models()
 
 
 @app.get("/health")

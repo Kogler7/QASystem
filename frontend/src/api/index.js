@@ -23,7 +23,7 @@ export { nl2cypherHealthCheck, nl2cypherGenerate} from './modules/component'
 // export {nl2cypherSplitCharacter} from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './modules/component'
-export { documentPreprocHealthCheck, documentPreprocConvert } from './modules/component'
+export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels } from './modules/component'
 // -----------------------------------------------------------------------------
 // 文本切片接口
 // -----------------------------------------------------------------------------
@@ -70,6 +70,3 @@ export function nl2cypherSplitPython(text) {
 export function nl2cypherText2vector(text) {
   return request.post('/component/nl2cypher/text2vector', { text: text }, { timeout: 120000 })
 }
-
-
-

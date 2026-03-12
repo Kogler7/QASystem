@@ -48,6 +48,23 @@ dmypy.json
 backend/data/documents/
 backend/data/preproc_output/
 backend/data/preproc_upload/
+backend/processed/
+# Stray pip constraint file (e.g. from mis-typed pip install)
+backend/=3.12
+*=3.12
+# =====================
+# Local environment directories
+# =====================
+# frontend/frontend_venv 为历史本地 Python 虚拟环境目录，不纳入版本控制
+frontend/frontend_venv/
+
+# =====================
+# Cross-project Python envs
+# =====================
+# 避免在任意新目录中提交虚拟环境
+**/.venv/
+**/venv/
+**/env/
 
 # =====================
 # Node / Frontend
@@ -63,6 +80,10 @@ frontend/dist-ssr/
 # =====================
 logs/
 *.log
+*.out
+*.err
+*.pid
+*.pid.lock
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -93,6 +114,10 @@ Desktop.ini
 # =====================
 # Temporary & backup
 # =====================
+.cache/
+.tmp/
+tmp/
+temp/
 *.tmp
 *.temp
 *.bak

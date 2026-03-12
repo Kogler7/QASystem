@@ -178,8 +178,8 @@ class DocumentConversionInterface:
             metadata = processor_result.get('metadata') or {}
             file_type = processor_result.get('file_type') or ''
 
-            # 处理 Excel 特殊格式（如果是字典格式的 Excel 数据）
-            if file_type == 'excel' and isinstance(content, dict):
+            # 处理 Excel/CSV 特殊格式（如果是字典格式的结构化数据）
+            if file_type in ('excel', 'csv') and isinstance(content, dict):
                 # 如果启用了 Excel 到 MySQL 的结构化存储
                 if self.enable_db_storage and self.excel_to_mysql and self.mysql_client:
                     logger.info(f"开始将 Excel 数据存储到 MySQL: {metadata.get('file_name')}")
@@ -196,8 +196,11 @@ class DocumentConversionInterface:
                         })
                         return result
 
-                # 将 Excel 数据转换为文本格式（用于文件输出）
-                content = self._excel_to_text(content)
+                # 将 Excel/CSV 数据转换为 Markdown 表格（用于文件输出）
+                if self.output_format == 'md':
+                    content = self._excel_to_markdown(content)
+                else:
+                    content = self._excel_to_text(content)
 
             else:
                 # 非 Excel 文件，按输出格式转换
@@ -362,6 +365,62 @@ class DocumentConversionInterface:
             text_lines.append("-" * 30)
 
         return '\n'.join(text_lines)
+
+    def _to_md_cell(self, value: Any) -> str:
+        """将单元格值安全转换为 Markdown 表格文本。"""
+        text = '' if value is None else str(value)
+        text = text.replace('\n', '<br>')
+        text = text.replace('|', '\\|')
+        return text
+
+    def _excel_to_markdown(self, excel_data: Dict, preview_rows: int = 200) -> str:
+        """将 Excel/CSV 结构化数据转换为 Markdown 表格。"""
+        if not isinstance(excel_data, dict) or 'sheets' not in excel_data:
+            return str(excel_data)
+
+        lines = []
+        file_name = excel_data.get('file_name', 'Unknown')
+        total_sheets = excel_data.get('total_sheets', 0)
+        lines.append(f"# 文件：{file_name}")
+        lines.append(f"- 工作表数：{total_sheets}")
+        lines.append('')
+
+        for sheet in excel_data.get('sheets', []):
+            sheet_name = sheet.get('sheet_name', 'Unknown')
+            columns = [self._to_md_cell(col) for col in sheet.get('columns', [])]
+            data = sheet.get('data', []) or []
+            row_count = sheet.get('metadata', {}).get('row_count', len(data))
+            col_count = sheet.get('metadata', {}).get('col_count', len(columns))
+
+            lines.append(f"## 工作表：{sheet_name}")
+            lines.append(f"- 行数：{row_count}，列数：{col_count}")
+            lines.append('')
+
+            if not columns:
+                lines.append('_该工作表无有效列信息_')
+                lines.append('')
+                continue
+
+            header_line = '| ' + ' | '.join(columns) + ' |'
+            divider_line = '| ' + ' | '.join(['---'] * len(columns)) + ' |'
+            lines.append(header_line)
+            lines.append(divider_line)
+
+            preview_data = data[:preview_rows]
+            for row in preview_data:
+                row_values = [self._to_md_cell(cell) for cell in row]
+                if len(row_values) < len(columns):
+                    row_values.extend([''] * (len(columns) - len(row_values)))
+                if len(row_values) > len(columns):
+                    row_values = row_values[:len(columns)]
+                lines.append('| ' + ' | '.join(row_values) + ' |')
+
+            if len(data) > preview_rows:
+                lines.append(f"\n> 仅展示前 {preview_rows} 行，剩余 {len(data) - preview_rows} 行已省略。")
+
+            lines.append('')
+
+        return '\n'.join(lines).strip()
 
     def _store_excel_to_mysql_structured(self, excel_data: Dict, metadata: Dict) -> List[Dict]:
         """

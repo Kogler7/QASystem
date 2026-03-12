@@ -5,11 +5,13 @@ import numpy as np
 from datetime import datetime, date
 import logging
 import os
+import csv
+from . import BaseProcessor
 
 logger = logging.getLogger(__name__)
 
 
-class ExcelProcessor:
+class ExcelProcessor(BaseProcessor):
     def __init__(self):
         # 更新支持的文件格式
         self.supported_formats = ['.xlsx', '.xls', '.csv']
@@ -58,6 +60,18 @@ class ExcelProcessor:
         else:
             logger.error(f"不支持的文件格式: {file_ext}")
             return {'error': f'不支持的文件格式: {file_ext}'}
+        # 获取文件扩展名
+        _, file_ext = os.path.splitext(file_path)
+        file_ext = file_ext.lower()
+
+        # 根据文件类型选择处理方法
+        if file_ext == '.csv':
+            return self._process_csv(file_path)
+        elif file_ext in ['.xlsx', '.xls']:
+            return self._process_excel_file(file_path)
+        else:
+            logger.error(f"不支持的文件格式: {file_ext}")
+            return {'error': f'不支持的文件格式: {file_ext}'}
 
     def _process_excel_file(self, file_path: str) -> Dict[str, Any]:
         """处理Excel文件 (.xlsx, .xls)"""
@@ -89,6 +103,12 @@ class ExcelProcessor:
     def _process_csv(self, file_path: str) -> Dict[str, Any]:
         """处理CSV文件"""
         try:
+            with open(file_path, 'rb') as f:
+                header = f.read(8)
+            if header.startswith(b'PK\x03\x04') or header.startswith(b'\xD0\xCF\x11\xE0'):
+                logger.warning("文件扩展名为CSV但内容为Excel二进制，自动按Excel解析: %s", file_path)
+                return self._process_excel_file(file_path)
+
             # 尝试自动检测分隔符和编码
             result = {
                 'file_name': os.path.basename(file_path),
@@ -98,32 +118,51 @@ class ExcelProcessor:
                 'file_type': 'csv'
             }
 
-            # 首先尝试读取前几行来检测分隔符
-            try:
-                # 尝试常见分隔符
-                for delimiter in [',', ';', '\t', '|']:
+            encodings = ['utf-8-sig', 'utf-8', 'gb18030', 'gbk', 'gb2312', 'cp936', 'big5', 'latin1']
+            delimiters = [',', ';', '\t', '|']
+
+            best_df = None
+            best_score = -1
+
+            for encoding in encodings:
+                for delimiter in delimiters + [None]:
                     try:
-                        df = pd.read_csv(file_path, delimiter=delimiter, nrows=5, encoding='utf-8')
-                        if df.shape[1] > 1:  # 如果成功分割出多列
-                            # 重新读取整个文件
-                            df = pd.read_csv(file_path, delimiter=delimiter, encoding='utf-8')
-                            break
-                    except:
+                        read_kwargs = {
+                            'encoding': encoding,
+                            'on_bad_lines': 'skip'
+                        }
+                        if delimiter is None:
+                            read_kwargs.update({'sep': None, 'engine': 'python'})
+                        else:
+                            read_kwargs.update({'sep': delimiter})
+
+                        sample_df = pd.read_csv(file_path, nrows=100, **read_kwargs)
+                        if sample_df.empty and sample_df.shape[1] == 0:
+                            continue
+
+                        score = sample_df.shape[1]
+                        if delimiter == ',':
+                            score += 0.2
+                        if encoding in ('utf-8-sig', 'utf-8', 'gb18030', 'gbk'):
+                            score += 0.1
+
+                        if score > best_score:
+                            best_score = score
+                            best_df = pd.read_csv(file_path, **read_kwargs)
+                    except Exception:
                         continue
-                else:
-                    # 如果常见分隔符都不行，尝试自动检测
-                    df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8')
-            except UnicodeDecodeError:
-                # 尝试其他编码
-                for encoding in ['latin1', 'iso-8859-1', 'cp1252', 'gbk', 'gb2312']:
-                    try:
-                        df = pd.read_csv(file_path, encoding=encoding)
-                        break
-                    except:
-                        continue
-                else:
-                    # 所有编码都失败
-                    df = pd.read_csv(file_path, encoding='utf-8', errors='replace')
+
+            if best_df is None:
+                best_df = pd.read_csv(
+                    file_path,
+                    sep=None,
+                    engine='python',
+                    encoding='utf-8',
+                    encoding_errors='replace',
+                    on_bad_lines='skip'
+                )
+
+            df = best_df
 
             # 处理CSV数据（当作单个sheet）
             sheet_name = os.path.basename(file_path).replace('.csv', '')
@@ -218,8 +257,6 @@ class ExcelProcessor:
 
     def _fallback_csv_process(self, file_path: str) -> Dict[str, Any]:
         """使用Python内置csv模块作为CSV备选方案"""
-        import csv
-
         try:
             result = {
                 'file_name': os.path.basename(file_path),
@@ -231,7 +268,7 @@ class ExcelProcessor:
 
             data = []
             # 尝试不同编码
-            encodings = ['utf-8', 'latin1', 'iso-8859-1', 'cp1252', 'gbk']
+            encodings = ['utf-8-sig', 'utf-8', 'gb18030', 'gbk', 'gb2312', 'cp936', 'latin1']
 
             for encoding in encodings:
                 try:
@@ -312,3 +349,26 @@ class ExcelProcessor:
             })
 
         return schemas
+
+    def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        """
+        处理Excel或CSV文件，返回包含 content 和 metadata 的字典
+        """
+        metadata = {
+            'file_type': 'excel' if file_path.lower().endswith(('.xlsx', '.xls')) else 'csv',
+            'processor': 'pandas',
+            'supported_formats': ['.xlsx', '.xls', '.csv']
+        }
+        
+        result = self.process_excel(file_path)
+        if 'error' in result:
+            metadata['error'] = result['error']
+            return {
+                'content': '',
+                'metadata': metadata
+            }
+        
+        return {
+            'content': result,
+            'metadata': metadata
+        }

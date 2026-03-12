@@ -26,23 +26,119 @@ class DocumentProcessor:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.pdf_processor = PDFProcessor()      # 可能不再使用，但保留
-        self.docx_processor = DocxProcessor()
+        self.pdf_processor = PDFProcessor()      
+        self.docx_processor = DocxProcessor(libreoffice_path="/home/admin_user_3/cly/LibreOffice-fresh.full-x86_64.AppImage")
         self.excel_processor = ExcelProcessor()
         # self.html_processor = HTMLProcessor()
-        self.ocr_processor = OCRProcessor()      # 旧的 OCR 处理器（如果存在）
+        # self.ocr_processor = OCRProcessor()      # 旧的 OCR 处理器（如果存在）
 
         # 初始化 MinerU 处理器
         if mineru_config_path is None:
-            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "/mnt/data3/srv/qasystem/models/mineru.json")
-        self.mineru_processor = OCRProcessor(    # MinerU 封装（类名与上面相同，但实际已重构）
+            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "/home/admin_user_3/mineru.json")
+        self.mineru_processor = OCRProcessor(   
             config_path=mineru_config_path,
             model_source=mineru_model_source
         )
 
-    def process_file(self, file_path: str) -> Dict[str, Any]:
+        # 构建模型注册表（硬编码版）
+        self.available_processors = {
+            '.pdf': {
+                'default': 'mineru',
+                'models': {
+                    'mineru': {
+                        'processor': self.mineru_processor,
+                        'metadata': {
+                            'name': 'MinerU',
+                            'description': '基于深度学习的PDF文档解析工具',
+                            '适用场景': '扫描版PDF、复杂布局PDF、包含表格和公式的文档',
+                            '优点': '解析准确度高，支持多种元素识别，输出Markdown格式',
+                            '缺点': '处理速度较慢，需要GPU加速，对简单文本PDF可能过度'
+                        }
+                    }
+                }
+            },
+            '.docx': {
+                'default': 'docling',
+                'models': {
+                    'docling': {
+                        'processor': self.docx_processor,
+                        'metadata': {
+                            'name': 'Docling',
+                            'description': '基于Docling库的Word文档解析器',
+                            '适用场景': '现代Word文档(.docx)，包含文本、表格、图片',
+                            '优点': '解析速度快，保持文档结构，输出Markdown',
+                            '缺点': '不支持旧版.doc文件，需要LibreOffice转换'
+                        }
+                    }
+                }
+            },
+            '.doc': {
+                'default': 'docling',
+                'models': {
+                    'docling': {
+                        'processor': self.docx_processor,
+                        'metadata': {
+                            'name': 'Docling (DOC转换)',
+                            'description': '通过LibreOffice转换DOC为DOCX后使用Docling解析',
+                            '适用场景': '旧版Word文档(.doc)',
+                            '优点': '支持旧格式，保持结构',
+                            '缺点': '转换过程慢，可能丢失格式'
+                        }
+                    }
+                }
+            },
+            '.xlsx': {
+                'default': 'pandas',
+                'models': {
+                    'pandas': {
+                        'processor': self.excel_processor,
+                        'metadata': {
+                            'name': 'Pandas Excel',
+                            'description': '基于Pandas的Excel文件解析器',
+                            '适用场景': '结构化数据表格，多种格式支持',
+                            '优点': '快速处理，数据完整性好',
+                            '缺点': '不保留格式信息，仅提取数据'
+                        }
+                    }
+                }
+            },
+            '.xls': {
+                'default': 'pandas',
+                'models': {
+                    'pandas': {
+                        'processor': self.excel_processor,
+                        'metadata': {
+                            'name': 'Pandas Excel',
+                            'description': '基于Pandas的Excel文件解析器',
+                            '适用场景': '旧版Excel文件(.xls)',
+                            '优点': '兼容旧格式，数据提取准确',
+                            '缺点': '不保留视觉格式'
+                        }
+                    }
+                }
+            },
+            '.csv': {
+                'default': 'pandas',
+                'models': {
+                    'pandas': {
+                        'processor': self.excel_processor,
+                        'metadata': {
+                            'name': 'Pandas CSV',
+                            'description': '基于Pandas的CSV文件解析器',
+                            '适用场景': '纯文本数据文件，逗号分隔',
+                            '优点': '处理速度极快，自动检测分隔符',
+                            '缺点': '不支持复杂编码或多行记录'
+                        }
+                    }
+                }
+            }
+        }
+
+    def process_file(self, file_path: str, model_name: Optional[str] = None) -> Dict[str, Any]:
         """
-        处理单个文件
+        处理单个文件，支持指定模型
+        :param file_path: 文件路径
+        :param model_name: 可选的模型名称，如果为None则使用默认模型
         返回格式: {
             'success': bool,
             'file_type': str,
@@ -67,82 +163,66 @@ class DocumentProcessor:
                 'processed_at': datetime.now().isoformat()
             }
 
-            # PDF 处理（使用 MinerU）
+            # 检查文件类型是否支持
+            if file_type not in self.available_processors:
+                return {'success': False, 'error': f'不支持的文件类型: {file_type}'}
+
+            processor_config = self.available_processors[file_type]
+
+            # 确定使用的模型
+            if model_name is None:
+                model_name = processor_config['default']
+            if model_name not in processor_config['models']:
+                return {'success': False, 'error': f'不支持的模型: {model_name} 对于文件类型 {file_type}'}
+
+            processor = processor_config['models'][model_name]['processor']
+            model_info = processor_config['models'][model_name]['metadata']
+
+            # 准备处理器参数
+            kwargs = {}
             if file_type == '.pdf':
-                # 调用 MinerU 解析，输出到 self.output_dir / path.stem
-                result_dirs = self.mineru_processor.process(
-                    input_paths=[file_path],
-                    output_dir=str(self.output_dir),          # 使用类的输出目录
-                    lang="ch",
-                    backend="pipeline",
-                    method="auto",
-                    formula_enable=True,
-                    table_enable=True,
-                    draw_layout_bbox=False,
-                    draw_span_bbox=False,
-                    dump_md=True,
-                    dump_middle_json=False,
-                    dump_model_output=False,
-                    dump_orig_pdf=False,
-                    dump_content_list=False,
-                    start_page_id=0,
-                    end_page_id=None
-                )
-
-                # 解析结果目录为 output_dir/文件名/
-                file_output_dir = self.output_dir / path.stem / "auto"
-                md_file = file_output_dir / f"{path.stem}.md"
-                if md_file.exists():
-                    content = md_file.read_text(encoding='utf-8')
-                else:
-                    content = ""
-
-                metadata['mineru_output_dir'] = str(file_output_dir)
-                metadata['is_scanned'] = False
-
-                return {
-                    'success': True,
-                    'file_type': 'pdf',
-                    'content': content,
-                    'metadata': metadata
+                kwargs = {
+                    'output_dir': str(self.output_dir),
+                    'lang': "ch",
+                    'backend': "pipeline",
+                    'method': "auto",
+                    'formula_enable': True,
+                    'table_enable': True,
+                    'draw_layout_bbox': False,
+                    'draw_span_bbox': False,
+                    'dump_md': True,
+                    'dump_middle_json': False,
+                    'dump_model_output': False,
+                    'dump_orig_pdf': False,
+                    'dump_content_list': False,
+                    'start_page_id': 0,
+                    'end_page_id': None
                 }
 
-            # 修复：DOCX/DOC 判断
-            elif file_type in ['.docx', '.doc']:
-                content = self.docx_processor.process(file_path)
-                return {
-                    'success': True,
-                    'file_type': 'word',
-                    'content': content,
-                    'metadata': metadata
-                }
+            # 确定文件类型字符串
+            file_type_str = {
+                '.pdf': 'pdf',
+                '.docx': 'word',
+                '.doc': 'word',
+                '.xlsx': 'excel',
+                '.xls': 'excel',
+                '.csv': 'csv'
+            }.get(file_type, file_type.lstrip('.'))
 
-            # Excel 文件
-            elif file_type in ['.xlsx', '.xls']:
-                content = self.excel_processor.process_excel(file_path)
-                return {
-                    'success': True,
-                    'file_type': 'excel',
-                    'content': content,
-                    'metadata': metadata
-                }
+            # 调用处理器
+            result = processor.process(file_path, **kwargs)
 
-            # 修复：CSV 判断
-            elif file_type == '.csv':
-                content = self.excel_processor.process_excel(file_path)
-                return {
-                    'success': True,
-                    'file_type': 'csv',
-                    'content': content,
-                    'metadata': metadata
-                }
+            # 合并元数据
+            metadata.update(result['metadata'])
+            metadata['model_used'] = model_name
+            metadata['model_info'] = model_info
 
-            # 其他文件类型（如 HTML）可在此扩展
-            else:
-                return {
-                    'success': False,
-                    'error': f'不支持的文件类型: {file_type}'
-                }
+            return {
+                'success': True,
+                'file_type': file_type_str,
+                'content': result['content'],
+                'metadata': metadata
+            }
 
         except Exception as e:
             return {

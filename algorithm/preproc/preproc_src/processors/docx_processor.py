@@ -3,10 +3,10 @@ from docling.document_converter import DocumentConverter
 import os
 import tempfile
 import subprocess
-from typing import Optional
+from typing import Optional, Dict, Any
+from . import BaseProcessor
 
-
-class DocxProcessor:
+class DocxProcessor(BaseProcessor):
     def __init__(self, libreoffice_path: str = None):
         """
         初始化处理器
@@ -23,6 +23,7 @@ class DocxProcessor:
         """检测系统中的LibreOffice应用"""
         # 可能的执行文件路径
         candidates = [
+            '/home/admin_user_3/cly/LibreOffice-fresh.full-x86_64.AppImage',
             'soffice',  # LibreOffice (Linux)
             'libreoffice',  # LibreOffice (Linux)
             r'C:\Program Files\LibreOffice\program\soffice.exe'# Windows x86
@@ -47,19 +48,34 @@ class DocxProcessor:
         print("警告：未找到LibreOffice，DOC文件处理可能受限")
         return None
 
-    def process(self, file_path: str) -> str:
-        """统一处理文件，自动识别DOC/DOCX格式"""
+    def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        """统一处理文件，自动识别DOC/DOCX格式，返回包含 content 和 metadata 的字典"""
+        metadata = {
+            'file_type': 'word',
+            'processor': 'docling',
+            'supported_formats': ['.docx', '.doc']
+        }
+        
         if not os.path.exists(file_path):
-            return f"错误：文件不存在 - {file_path}"
+            return {
+                'content': '',
+                'metadata': {**metadata, 'error': f'文件不存在 - {file_path}'}
+            }
 
         _, ext = os.path.splitext(file_path.lower())
 
         if ext == '.docx':
-            return self._process_docx(file_path)
+            content = self._process_docx(file_path)
         elif ext == '.doc':
-            return self._process_doc(file_path)
+            content = self._process_doc(file_path)
         else:
-            return f"错误：不支持的文件格式 - {ext}"
+            content = f"错误：不支持的文件格式 - {ext}"
+            metadata['error'] = f'不支持的文件格式 - {ext}'
+
+        return {
+            'content': content,
+            'metadata': metadata
+        }
 
     def _process_docx(self, file_path: str) -> str:
         """处理DOCX文件"""
