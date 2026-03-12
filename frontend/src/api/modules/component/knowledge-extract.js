@@ -1,24 +1,38 @@
 /**
  * 组件管理 - 知识抽取 API
- * 请求主站后端 /api/component/extract
+ * 请求主站后端 /api/component/knowledge-extract
  */
 import { request } from '../../request'
 
-/** 健康检查：GET /api/component/extract/health */
+/** 健康检查：GET /api/component/knowledge-extract/health */
 export function extractHealthCheck() {
-  return request.get('/component/extract/health', { timeout: 5000 })
+  return request.get('/component/knowledge-extract/health', { timeout: 5000 })
 }
 
 /**
  * 知识抽取
- * @param {object} params - main_object, text, use_local, use_templates, store_to_neo4j
+ * @param {object} params - main_object, text, use_templates, llm_base_url, llm_model, llm_api_key
  */
 export function knowledgeExtract(params) {
-  return request.post('/component/extract', {
+  return request.post('/component/knowledge-extract/extract', {
     main_object: params.main_object.trim(),
     text: params.text.trim(),
-    use_local: params.use_local ?? true,
     use_templates: params.use_templates ?? true,
-    store_to_neo4j: params.store_to_neo4j ?? false
+    llm_base_url: params.llm_base_url || undefined,
+    llm_model: params.llm_model || undefined,
+    llm_api_key: params.llm_api_key || undefined
   }, { timeout: 90000 })
+}
+
+/**
+ * 将抽取结果图结构存储到 Neo4j
+ * @param {object} params - graph, neo4j_uri, neo4j_user, neo4j_password
+ */
+export function storeGraphToNeo4j(params) {
+  return request.post('/component/knowledge-extract/store-graph', {
+    graph: params.graph,
+    neo4j_uri: params.neo4j_uri || 'bolt://localhost:7687',
+    neo4j_user: params.neo4j_user || 'neo4j',
+    neo4j_password: params.neo4j_password || 'neo4j2025'
+  }, { timeout: 15000 })
 }

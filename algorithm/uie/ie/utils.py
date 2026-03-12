@@ -30,60 +30,20 @@ class BaseLLM:
         raise NotImplementedError
 
 
-class LocalLLM(BaseLLM):
-    """
-    使用本地微调模型进行本体抽取。
-
-    可以在构造时传入自定义模型路径。
-    """
-
-    def __init__(
-        self,
-        model_name_or_path: str = "/mnt/data3/srr/Qwen2.5-7B-Instruct",
-        adapter_name_or_path: str = "/mnt/data3/srr/saves/rule_v4",
-        max_new_tokens: int = 2048,
-        temperature: float = 0.1,
-    ):
-        # 延迟导入，避免仅使用 ApiLLM（use_local=False）时触发 llamafactory/bitsandbytes 依赖
-        from llamafactory.chat import ChatModel
-
-        args = dict(
-            model_name_or_path=model_name_or_path,
-            adapter_name_or_path=adapter_name_or_path,
-            template="qwen",
-            finetuning_type="lora",
-            quantization_bit=4,
-            flash_attn="fa2",
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-        )
-        logger.info(f"加载本地本体微调模型: {args}")
-        self._chat_model = ChatModel(args)
-
-    def run(self, system_prompt: str, text: str) -> str:
-        logger.info("LocalLLM.run: text_len=%d prompt_len=%d", len(text), len(system_prompt))
-        t0 = time.perf_counter()
-        messages = [{"role": "user", "content": text}]
-        full_text = ""
-        for new_text in self._chat_model.stream_chat(messages, system=system_prompt):
-            full_text += new_text
-        logger.info("LocalLLM.run done: elapsed=%.2fs output_len=%d", time.perf_counter() - t0, len(full_text))
-        return full_text
-
-
 class ApiLLM(BaseLLM):
     """
-    使用统一接口 algorithm/common/llm_client 进行本体抽取。
-    支持环境变量 LLM_BASE_URL、LLM_MODEL、LLM_API_KEY、LLM_BACKEND；
-    构造参数可覆盖，与 common 配置一致。
+    使用 OpenAI 兼容 API 进行本体抽取（如 vLLM、OpenAI 等）。
+
+    默认连接部署的微调模型服务（vLLM OpenAI API 兼容）：
+    - base_url: OpenAI 兼容服务地址
+    - model:    模型名称
     """
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model: Optional[str] = None,
-        backend: Optional[str] = None,
+        api_key: str = "EMPTY",
+        base_url: str = "http://10.126.62.88:8003/v1",
+        model: str = "rule_v4",
     ):
         from common.llm_client import LLMClient
 
