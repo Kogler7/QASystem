@@ -10,6 +10,9 @@ from .db import init_db
 from .routers import chat, knowledge, users
 from .modules.component import COMPONENT_ROUTERS
 
+#冲突检测new
+from app.routers import conclictfix
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -36,11 +39,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="轨道交通知识服务系统", lifespan=lifespan)
 
 # 允许的跨域来源（开发/生产按需收紧）
+# hhr自测修改端口
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5178",   # 👈 🎯 加上你现在前端用的端口
+    "http://127.0.0.1:5178",   # 👈 🎯 加上对应的 IP 形式
+    "http://192.168.x.x:5178", # 如果你用局域网IP访问页面，最好把局域网IP也加上
 ]
 
 app.add_middleware(
@@ -82,6 +89,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
+app.include_router(conclictfix.router) #new
 for r in COMPONENT_ROUTERS:
     app.include_router(r)
 

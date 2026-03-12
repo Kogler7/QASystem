@@ -8,12 +8,17 @@ MAX_BATCH_SIZE = 1000
 NODE_BATCH_SIZE = 500
 CLASS_BATCH_SIZE = 100
 
-# ==========================================
-# 2. Neo4j 数据库配置 (您之前的连接信息)
-# ==========================================
+# 1. 数据库配置
 NEO4J_URI = "neo4j+s://111bff2c.databases.neo4j.io"
 NEO4J_USER = "neo4j"
 NEO4J_PWD = "jSnELhrtpwdiM7Bg9YWv8cLtAI7s76up17swDQ64lR4"
+
+# 2.  就是这行！检查名字对不对，有没有漏掉 S
+COMMON_PREFIXES = """
+@prefix ex: <http://example.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+"""
 
 # ==========================================
 # 3. 本地 QWEN 大模型配置 (适配本地部署)
@@ -70,4 +75,4 @@ def get_neo4j_client():
     from src.store.neo4j_client import Neo4jClient
     return Neo4jClient(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PWD)
 
-print(f"✅ 配置文件加载成功 | 模式: 本地 QWEN ({MODEL_NAME}) | 数据库: {NEO4J_URI}")
+print(f"✅ 配置文件加载成功 | 模式: 本地 QWEN ({LOCAL_MODEL_NAME}) | 数据库: {NEO4J_URI}")
