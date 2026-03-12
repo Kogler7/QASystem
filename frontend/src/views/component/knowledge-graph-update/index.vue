@@ -1,10 +1,8 @@
 <script setup>
-import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue'//part new
-import { Link, Warning, MagicStick, Loading, Plus, Delete, DataLine, WarningFilled } from '@element-plus/icons-vue'//part new
-import { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } from '@/api'
+import { ref, reactive, onMounted } from 'vue'
+import { Plus, Delete, DataLine, Link } from '@element-plus/icons-vue'
+import { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics, kgCalculateConfidence } from '@/api'
 import { ElMessage } from 'element-plus'
-import axios from 'axios' // 🎯 这一行是你新加的new
-import { Network } from 'vis-network'
 
 const loadingAdd = ref(false)
 const loadingDelete = ref(false)
@@ -12,25 +10,17 @@ const loadingStats = ref(false)
 const healthStatus = ref(null)
 const healthDetail = ref('')
 
-// new
-const turtleInput = ref('')
-const conflictGroups = ref([]) // 存储冲突详情
-const activeGroupIndex = ref(null) // 当前选中的冲突项
-const loadingDetect = ref(false)
-const loadingRepair = ref(false)
-const visContainer = ref(null)
-let networkInstance = null
-
-// 添加：JSON 文本或默认示例
+// 添加：JSON 文本或默认示例（无置信度）
 const addTriplesJson = ref(`[
-  {"subject": "列车A", "predicate": "发生故障", "object": "制动系统", "confidence": 0.92},
-  {"subject": "车站B", "predicate": "位于", "object": "北京", "confidence": 0.98}
+  {"subject": "一等客车", "predicate": "定义", "object": "定员少、乘坐舒适度高的客车"},
+  {"subject": "宿营车", "predicate": "定义", "object": "供乘务或作业人员休息使用的车辆"}
 ]`)
+const calculatedTriplesJson = ref('')  // 新增：计算后的带置信度 JSON
 const addResult = ref(null)
 
 // 删除：JSON 文本
 const deleteTriplesJson = ref(`[
-  {"subject": "列车A", "predicate": "发生故障", "object": "制动系统"}
+  {"subject": "一等客车", "predicate": "定义", "object": "定员少、乘坐舒适度高的客车"}
 ]`)
 const deleteResult = ref(null)
 
@@ -41,6 +31,14 @@ const NEO4J_BROWSER_URL = 'http://localhost:7474/browser/'
 
 // 新增：侧边栏活动项
 const activeMenu = ref('confidence')
+
+// 新增：进度条状态
+const currentStep = ref(0)
+const resetSteps = () => { currentStep.value = 0 }
+const updateStep = (i) => { currentStep.value = i }
+
+// 新增：计算置信度加载状态
+const loadingCalculate = ref(false)
 
 const checkHealth = async () => {
   healthStatus.value = null
@@ -83,10 +81,42 @@ const parseTriplesJson = (str, needConfidence = false) => {
   return arr
 }
 
-const submitAdd = async () => {
+// 新增：计算置信度
+const submitCalculate = async () => {
+  resetSteps()
+  updateStep(1) // 输入
   let triples
   try {
-    triples = parseTriplesJson(addTriplesJson.value, true)
+    triples = parseTriplesJson(addTriplesJson.value, false)
+    updateStep(2) // 文本搜索
+  } catch (e) {
+    ElMessage.warning(e.message)
+    return
+  }
+  loadingCalculate.value = true
+  calculatedTriplesJson.value = ''
+  try {
+    updateStep(3) // 路径搜索
+    const { data } = await kgCalculateConfidence(triples)  // 调用算法，返回带置信度的三元组
+    updateStep(4) // 嵌入计算
+    updateStep(5) // 置信度计算
+    calculatedTriplesJson.value = JSON.stringify(data.triples, null, 2)  // 假设返回 { triples: [...] }
+    ElMessage.success('置信度计算完成')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '计算失败')
+  } finally {
+    loadingCalculate.value = false
+  }
+}
+
+const submitAdd = async () => {
+  if (!calculatedTriplesJson.value) {
+    ElMessage.warning('请先计算置信度')
+    return
+  }
+  let triples
+  try {
+    triples = parseTriplesJson(calculatedTriplesJson.value, true)
   } catch (e) {
     ElMessage.warning(e.message)
     return
@@ -95,6 +125,7 @@ const submitAdd = async () => {
   addResult.value = null
   try {
     const { data } = await kgUpdateAdd(triples)
+    updateStep(6) // 更新完成
     addResult.value = data
     ElMessage.success(data?.message || '添加完成')
   } catch (err) {
@@ -106,9 +137,12 @@ const submitAdd = async () => {
 }
 
 const submitDelete = async () => {
+  resetSteps()
+  updateStep(1) // 输入
   let triples
   try {
     triples = parseTriplesJson(deleteTriplesJson.value, false)
+    updateStep(2)
   } catch (e) {
     ElMessage.warning(e.message)
     return
@@ -116,7 +150,9 @@ const submitDelete = async () => {
   loadingDelete.value = true
   deleteResult.value = null
   try {
+    updateStep(3)
     const { data } = await kgUpdateDelete(triples)
+    updateStep(5)
     deleteResult.value = data
     ElMessage.success(data?.message || '删除完成')
   } catch (err) {
@@ -124,6 +160,7 @@ const submitDelete = async () => {
     deleteResult.value = null
   } finally {
     loadingDelete.value = false
+    updateStep(6)
   }
 }
 
@@ -147,250 +184,6 @@ function openNeo4jBrowser() {
 }
 
 onMounted(checkHealth)
-
-// 处理文件上传new
-const handleFileUpload = (file) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    turtleInput.value = e.target.result
-    ElMessage.success('文件加载成功')
-  }
-  reader.readAsText(file.raw)
-}
-const currentStep = ref(0)
-// 真实的冲突检测接口
-const handleConflictDetect = async () => {
-  if (!turtleInput.value.trim()) return ElMessage.warning('请先输入 Turtle 数据')
-  
-  loadingDetect.value = true
-  conflictGroups.value = [] 
-  currentStep.value = 1 
-  
-  try {
-    const { data } = await axios.post('/api/conflict/detect', {
-      insert_ttl: turtleInput.value,
-      delete_ttl: "" 
-    })
-    
-    if (data.success) {
-      conflictGroups.value = data.conflicts || []
-      
-      if (conflictGroups.value.length > 0) {
-        // 🎯 优化点 1：精准播报。哪怕后端 message 没传，前端也能报数
-        const msg = data.message || `冲突检测完成：发现 ${conflictGroups.value.length} 项违规数据。`
-        
-        activeGroupIndex.value = 0 
-        currentStep.value = 3 // 🎯 注意：根据你的 UI 图，第 3 步才是“展示与修复”
-        
-        ElMessage({
-          message: msg,
-          type: 'warning',
-          duration: 5000, // 多留一会儿，让用户看清楚
-          showClose: true
-        })
-      } else {
-        // 🎯 优化点 2：全线通过
-        activeGroupIndex.value = null
-        currentStep.value = 5 
-        ElMessage.success('🚀 冲突检测完成：未发现任何冲突，数据已自动同步！')
-      }
-    }
-  } catch (err) {
-    console.error('检测接口报错:', err)
-    currentStep.value = 0 
-    ElMessage.error(err?.response?.data?.detail || '检测失败，请检查后端服务')
-  } finally {
-    loadingDetect.value = false
-  }
-}
-
-// 真实的执行修复接口
-const handleSingleRepair = async () => {
-  if (activeGroupIndex.value === null) return
-  
-  const current = conflictGroups.value[activeGroupIndex.value]
-  loadingRepair.value = true
-  currentStep.value = 3 
-  
-  try {
-    const payload = {
-      actions: [{
-        subject: current.subject,
-        predicate: current.predicate,
-        operation: current.operation || 'add',
-        action_type: current.selectedResolution, 
-        value: current.selectedResolution === 'manual' ? current.customValue : current.newValue 
-      }]
-    }
-
-    const { data } = await axios.post('/api/conflict/repair', payload)
-    
-    if (data.success) {
-      ElMessage.success(`[${current.subject}] 修复成功，已同步至数据库`)
-      conflictGroups.value.splice(activeGroupIndex.value, 1)
-      
-      if (conflictGroups.value.length > 0) {
-        activeGroupIndex.value = 0
-        currentStep.value = 2 
-      } else {
-        activeGroupIndex.value = null
-        // 🎯 修改点：全部冲突修完后，跳到 5，让全流程变绿
-        currentStep.value = 5 
-      }
-    }
-  } catch (err) {
-    console.error('修复接口报错:', err)
-    currentStep.value = 2 
-    ElMessage.error(err?.response?.data?.detail || '修复执行失败')
-  } finally {
-    loadingRepair.value = false
-  }
-}
-
-
-// 监听步骤变化
-watch(currentStep, async (newVal) => {
-  if (newVal === 2 || newVal === 3) {
-    await nextTick()
-    renderConflictGraph()
-  }
-})
-
-const renderConflictGraph = () => {
-  if (!visContainer.value) return;
-
-  // 1. 清理旧图
-  if (networkInstance) {
-    networkInstance.destroy();
-    networkInstance = null;
-  }
-
-  const nodes = [];
-  const edges = [];
-
-  // 🎯 核心修复：把后端传回来的 conflictGroups 变成 Vis-network 能认出的圆圈
-  conflictGroups.value.forEach((conflict) => {
-    // A. 创建“冲突主体”节点 (比如 G006)
-    nodes.push({
-      id: conflict.subject,
-      label: `${conflict.subject}\n(违规主体)`,
-      color: { background: '#fef0f0', border: '#f56c6c' }, // 红色警告
-      shape: 'dot',
-      size: 35,
-      font: { multi: 'md', color: '#f56c6c', weight: 'bold' }
-    });
-
-    // B. 创建“现有值”节点 (如果数据库里有老数据)
-    if (conflict.oldValue !== '无记录') {
-      const oldNodeId = `old_${conflict.subject}`;
-      nodes.push({
-        id: oldNodeId,
-        label: `库内原值:\n${conflict.oldValue}`,
-        color: { background: '#f0f9eb', border: '#67c23a' }, // 绿色存量
-        shape: 'box',
-        size: 20
-      });
-      // 连一根实线表示“当前连接”
-      edges.push({ from: conflict.subject, to: oldNodeId, label: '当前属性', color: '#67c23a' });
-    }
-
-    // C. 创建“新输入值”节点
-    const newNodeId = `new_${conflict.subject}`;
-    nodes.push({
-      id: newNodeId,
-      label: `拟输入值:\n${conflict.newValue}`,
-      color: { background: '#fdf6ec', border: '#e6a23c' }, // 橙色拟变
-      shape: 'box',
-      size: 20
-    });
-    // 连一根虚线表示“冲突的拟更新”
-    edges.push({ from: conflict.subject, to: newNodeId, label: '冲突更新', dashes: true, color: '#e6a23c' });
-  });
-
-  // 2. 初始化图谱
-  const options = {
-    physics: {
-      enabled: true,
-      barnesHut: { gravitationalConstant: -3000, springLength: 150 } // 增加排斥力，防止重叠
-    },
-    interaction: { hover: true, tooltipDelay: 200 }
-  };
-
-  networkInstance = new Network(visContainer.value, { nodes, edges }, options);
-
-  // 3. 重新绑定联动逻辑 (确保点击圆圈能联动列表)
-  networkInstance.on("click", (params) => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0];
-      // 如果点的是主体或者是衍生节点，都尝试匹配列表
-      const subjectId = nodeId.replace('old_', '').replace('new_', '');
-      const index = conflictGroups.value.findIndex(c => c.subject === subjectId);
-      if (index !== -1) {
-        activeGroupIndex.value = index;
-      }
-    }
-  });
-};
-onUnmounted(() => {
-  if (networkInstance) networkInstance.destroy()
-})
-// --- 前端脚本部分 ---
-// ==========================================
-// 🎯 1. 核心修复逻辑 (对象结构化版)
-// ==========================================
-const handleApplyRepair = async () => {
-  const index = activeGroupIndex.value;
-  if (index === null || !conflictGroups.value[index]) return;
-
-  const current = conflictGroups.value[index];
-  const resolution = current.selectedResolution;
-
-  let finalValue = '';
-  if (resolution === 'manual') {
-    if (!current.customValue) return ElMessage.warning('请输入人工修正值');
-    finalValue = current.customValue;
-  } else if (resolution === 'overwrite') {
-    finalValue = current.newValue;
-  } else if (resolution === 'keep') {
-    return handleFinishOrNext();
-  }
-
-  // 构造结构化数据
-  const repairAction = {
-    subject: current.subject.replace(/^ex:/, ''),
-    predicate: current.predicate.replace(/^ex:/, ''),
-    value: finalValue,
-    operation: 'add'
-  };
-
-  try {
-    const { data } = await axios.post('/api/conflict/repair', {
-      actions: [repairAction]
-    });
-
-    if (data.success) {
-      ElMessage.success(`修正成功: ${finalValue}`);
-      handleFinishOrNext(); // 🎯 执行跳转逻辑
-    }
-  } catch (err) {
-    console.error('修复失败:', err);
-    ElMessage.error(err.response?.data?.detail || '数据库写入异常');
-  }
-};
-
-// ==========================================
-// 🎯 2. 辅助跳转逻辑 (确保逻辑不嵌套)
-// ==========================================
-const handleFinishOrNext = () => {
-  if (activeGroupIndex.value === conflictGroups.value.length - 1) {
-    // 最后一张卡片
-    currentStep.value = 5; 
-    ElMessage.success('🎉 所有冲突已处理完毕！');
-  } else {
-    // 切换到下一张
-    proceedToNext();
-  }
-};
 </script>
 
 <template>
@@ -425,12 +218,64 @@ const handleFinishOrNext = () => {
             <span>置信度计算与更新</span>
           </el-menu-item>
           <el-menu-item index="conflict">
-            <span>冲突检测更新</span>
+            <span>冲突检测与修复</span>
           </el-menu-item>
         </el-menu>
         <div class="main-content">
           <!-- 置信度计算与更新内容 -->
           <div v-if="activeMenu === 'confidence'">
+            <!-- 新增：算法介绍卡片 -->
+            <el-card class="algorithm-intro-card" shadow="hover">
+              <template #header>
+                <div class="card-header">
+                  <span>🧠 置信度算法：动态混合模型 (DynamicHybrid)</span>
+                </div>
+              </template>
+              <div class="algorithm-content">
+                <p class="algorithm-desc">
+                  本系统采用 <strong>DynamicHybrid 动态混合模型</strong> 计算三元组置信度，融合三大证据源：
+                </p>
+                <div class="evidence-grid">
+                  <div class="evidence-item">
+                    <span class="evidence-icon text">📄</span>
+                    <div class="evidence-info">
+                      <span class="evidence-name">文本证据</span>
+                      <span class="evidence-detail">从语料中提取的语义一致性 (128维)</span>
+                    </div>
+                  </div>
+                  <div class="evidence-item">
+                    <span class="evidence-icon kg">🔗</span>
+                    <div class="evidence-info">
+                      <span class="evidence-name">知识图谱嵌入</span>
+                      <span class="evidence-detail">实体关系的嵌入表示 (128维)</span>
+                    </div>
+                  </div>
+                  <div class="evidence-item">
+                    <span class="evidence-icon path">🛤️</span>
+                    <div class="evidence-info">
+                      <span class="evidence-name">路径证据</span>
+                      <span class="evidence-detail">多跳推理路径的聚合得分 (64维 + 最优路径)</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="algorithm-footer">
+                  <p class="fusion-info">
+                    <span class="badge">融合层</span> 三大特征 + 各组件得分 → 全连接网络 → 最终置信度 (0~1)
+                  </p>
+                </div>
+              </div>
+            </el-card>
+
+            <!-- 新增：进度条 -->
+            <el-steps :active="currentStep" finish-status="success" align-center class="process-steps">
+              <el-step title="输入"></el-step>
+              <el-step title="文本搜索"></el-step>
+              <el-step title="路径搜索"></el-step>
+              <el-step title="嵌入计算"></el-step>
+              <el-step title="置信度计算"></el-step>
+              <el-step title="更新完成"></el-step>
+            </el-steps>
+
             <!-- 统计 -->
             <el-card class="form-card" shadow="hover">
               <template #header>
@@ -440,15 +285,6 @@ const handleFinishOrNext = () => {
               <div v-if="statistics?.success && statistics?.statistics" class="stats-box">
                 <p>节点数：<strong>{{ statistics.statistics.node_count }}</strong></p>
                 <p>关系数：<strong>{{ statistics.statistics.relationship_count }}</strong></p>
-                <p v-if="statistics.statistics.confidence_distribution" class="confidence-row">
-                  置信度分布（有 confidence 的关系）：
-                  高(≥0.85) <strong>{{ statistics.statistics.confidence_distribution.high }}</strong>，
-                  中(0.7~&lt;0.85) <strong>{{ statistics.statistics.confidence_distribution.medium }}</strong>，
-                  低(&lt;0.7) <strong>{{ statistics.statistics.confidence_distribution.low }}</strong>
-                  <template v-if="statistics.statistics.confidence_distribution.total_with_confidence != null">
-                    ，合计 <strong>{{ statistics.statistics.confidence_distribution.total_with_confidence }}</strong>
-                  </template>
-                </p>
               </div>
               <p v-else-if="statistics && !statistics.success" class="stats-error">{{ statistics.error || '获取失败' }}</p>
               <p v-else class="stats-placeholder">点击「刷新」获取 Neo4j 图谱统计</p>
@@ -459,17 +295,35 @@ const handleFinishOrNext = () => {
               <template #header>
                 <span>添加三元组</span>
               </template>
-              <p class="form-hint-block">每行一条 JSON，需包含 subject、predicate、object、confidence（0~1）。</p>
-              <el-input
-                v-model="addTriplesJson"
-                type="textarea"
-                :rows="8"
-                placeholder='[{"subject":"...","predicate":"...","object":"...","confidence":0.9}]'
-                class="triples-textarea"
-              />
-              <el-button type="primary" :loading="loadingAdd" :icon="Plus" @click="submitAdd" style="margin-top: 12px">
-                执行添加
-              </el-button>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <p class="form-hint-block">输入三元组（无置信度），每行一条 JSON。</p>
+                  <el-input
+                    v-model="addTriplesJson"
+                    type="textarea"
+                    :rows="8"
+                    placeholder='[{"subject":"...","predicate":"...","object":"..."}]'
+                    class="triples-textarea"
+                  />
+                  <el-button type="primary" :loading="loadingCalculate" @click="submitCalculate" style="margin-top: 12px">
+                    计算置信度
+                  </el-button>
+                </el-col>
+                <el-col :span="12">
+                  <p class="form-hint-block">带置信度的三元组（计算后显示）。</p>
+                  <el-input
+                    v-model="calculatedTriplesJson"
+                    type="textarea"
+                    :rows="8"
+                    readonly
+                    placeholder="计算后显示带置信度的 JSON"
+                    class="triples-textarea"
+                  />
+                  <el-button type="primary" :loading="loadingAdd" :disabled="!calculatedTriplesJson" @click="submitAdd" style="margin-top: 12px">
+                    执行添加
+                  </el-button>
+                </el-col>
+              </el-row>
               <div v-if="addResult" class="result-box">
                 <p class="result-summary">{{ addResult.message }}</p>
                 <pre v-if="addResult.statistics" class="result-json">{{ JSON.stringify(addResult.statistics, null, 2) }}</pre>
@@ -504,139 +358,14 @@ const handleFinishOrNext = () => {
             </el-card>
           </div>
           <!-- 冲突检测与修复内容（空页面） -->
-          <div v-else-if="activeMenu === 'conflict'" class="conflict-split-view">
-  
-            <el-card shadow="never" style="margin-bottom: 20px; border: none; background: transparent;">
-              <el-steps :active="currentStep" finish-status="success" align-center>
-                <el-step title="数据输入" />
-                <el-step title="冲突检测" />
-                <el-step title="展示与修复" />
-                <el-step title="正在修复" />
-                <el-step title="更新完成" />
-              </el-steps>
+          <div v-else-if="activeMenu === 'conflict'">
+            <el-card class="form-card" shadow="hover">
+              <template #header>
+                <span>冲突检测与修复</span>
+              </template>
+              <p>此功能正在开发中。</p>
             </el-card>
-
-            <div class="conflict-wrapper">
-
-              <el-card class="form-card" shadow="hover" v-show="currentStep < 2">
-                <template #header>
-                  <div class="card-header-flex">
-                    <span>RDF Turtle 数据输入</span>
-                    <el-upload action="#" :auto-upload="false" :show-file-list="false" @change="handleFileUpload">
-                      <el-button type="primary" link :icon="Link">上传 .ttl 文件</el-button>
-                    </el-upload>
-                  </div>
-                </template>
-                <el-input
-                  v-model="turtleInput"
-                  type="textarea"
-                  :rows="8"
-                  placeholder="@prefix ex: <http://example.org/> ... "
-                  class="turtle-editor"
-                  @input="currentStep = 0"
-                />
-                <div style="margin-top: 12px; display: flex; gap: 10px;">
-                  <el-button type="primary" :loading="loadingDetect" @click="handleConflictDetect">
-                    开始冲突检测
-                  </el-button>
-                  <el-button @click="turtleInput = ''; currentStep = 0">清空</el-button>
-                </div>
-              </el-card>
-
-              <el-card class="graph-card" shadow="hover" v-show="currentStep === 2 || currentStep === 3" style="margin-bottom: 20px;">
-                <template #header>
-                  <div class="card-header-flex">
-                    <span style="font-weight: bold; color: #f56c6c;">
-                      <el-icon><Link /></el-icon> 最小冲突子图动态展示
-                    </span>
-                    <el-button type="primary" link @click="renderConflictGraph">重置布局</el-button>
-                  </div>
-                </template>
-                <div ref="visContainer" style="height: 350px; background: #ffffff; border-radius: 8px;"></div>
-              </el-card>
-
-              <el-row :gutter="20" v-show="(currentStep === 2 || currentStep === 3) && conflictGroups.length > 0" style="margin-top: 20px;">
-                <el-col :span="12">
-                  <h3 class="sub-title"><el-icon><Warning /></el-icon> 发现冲突项</h3>
-                  <div class="scroll-container">
-                    <el-card 
-                      v-for="(group, index) in conflictGroups" 
-                      :key="index" 
-                      class="conflict-item-card"
-                      :class="{ 'is-active': activeGroupIndex === index }"
-                      @click="activeGroupIndex = index"
-                    >
-                      <div class="conflict-header">
-                        <el-tag type="danger" size="small">{{ group.conflictType }}</el-tag>
-                        <span class="subject-text">{{ group.subject }}</span>
-                      </div>
-                      <p class="predicate-text">属性：<code>{{ group.predicate }}</code></p>
-                      <div class="comparison-grid">
-                        <div class="val-box old">
-                          <span class="label">数据库现有:</span>
-                          <span class="value">{{ group.oldValue }}</span>
-                        </div>
-                        <div class="val-box new">
-                          <span class="label">本次输入:</span>
-                          <span class="value">{{ group.newValue }}</span>
-                        </div>
-                      </div>
-                    </el-card>
-                  </div>
-                </el-col>
-
-                <el-col :span="12">
-                  <h3 class="sub-title"><el-icon><MagicStick /></el-icon> 修复建议</h3>
-                  <el-card v-if="activeGroupIndex !== null" shadow="never" class="repair-card">
-                    <div class="repair-info">
-                      <h4>针对 {{ conflictGroups[activeGroupIndex].subject }} 的方案</h4>
-                      <el-radio-group v-model="conflictGroups[activeGroupIndex].selectedResolution">
-                        <el-radio label="overwrite" border class="repair-radio">
-                          <strong>覆盖更新</strong>
-                          <p>采用新输入值 ({{ conflictGroups[activeGroupIndex].newValue }})</p>
-                        </el-radio>
-                        <el-radio label="keep" border class="repair-radio">
-                          <strong>保持现状</strong>
-                          <p>忽略本次输入，保留原库值 ({{ conflictGroups[activeGroupIndex].oldValue }})</p>
-                        </el-radio>
-                        <el-radio label="manual" border class="repair-radio">
-                          <strong>人工修正</strong>
-                          <el-input 
-                            size="small" 
-                            v-model="conflictGroups[activeGroupIndex].customValue" 
-                            placeholder="输入修正后的值"
-                            :disabled="conflictGroups[activeGroupIndex].selectedResolution !== 'manual'"
-                            @click.stop
-                            style="margin-top: 8px;"
-                          />
-                        </el-radio>
-                      </el-radio-group>
-                    </div>
-                    <div class="repair-actions" style="margin-top: 20px;">
-                      <el-button type="success" :loading="loadingRepair" @click="handleSingleRepair">
-                        确认并应用修复
-                      </el-button>
-                    </div>
-                  </el-card>
-                  <el-empty v-else description="请点击左侧冲突项查看方案" />
-                </el-col>
-              </el-row>
-              
-              <el-result
-                v-show="currentStep === 5"
-                icon="success"
-                title="图谱更新完成"
-                sub-title="所有合法数据及修复后的冲突数据，已安全同步至 Neo4j 数据库。"
-                style="background: #fff; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);"
-              >
-                <template #extra>
-                  <el-button type="primary" @click="turtleInput = ''; currentStep = 0; conflictGroups = []">
-                    继续添加新数据
-                  </el-button>
-                </template>
-              </el-result>
-
-          </div> </div>
+          </div>
         </div>
       </div>
     </div>
@@ -725,6 +454,103 @@ const handleFinishOrNext = () => {
   gap: 24px;
 }
 
+.algorithm-intro-card {
+  margin-bottom: 8px;
+  border-left: 4px solid var(--primary-color);
+  
+  :deep(.el-card__header) {
+    padding: 12px 20px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+  }
+  
+  .card-header {
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+}
+
+.algorithm-content {
+  padding: 8px 0;
+  
+  .algorithm-desc {
+    margin-bottom: 16px;
+    color: var(--gray-700);
+    font-size: 14px;
+  }
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evidence-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 8px;
+  
+  .evidence-icon {
+    font-size: 24px;
+    line-height: 1;
+    
+    &.text { color: #409EFF; }
+    &.kg { color: #67C23A; }
+    &.path { color: #E6A23C; }
+  }
+  
+  .evidence-info {
+    display: flex;
+    flex-direction: column;
+    
+    .evidence-name {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+    
+    .evidence-detail {
+      font-size: 12px;
+      color: var(--gray-600);
+    }
+  }
+}
+
+.algorithm-footer {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--gray-300);
+  
+  .fusion-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+}
+
 .form-card {
   border-radius: var(--card-radius-lg);
   :deep(.el-card__header) {
@@ -793,55 +619,5 @@ const handleFinishOrNext = () => {
   .sidebar-menu {
     width: 100%;
   }
-}
-.turtle-editor {
-  font-family: 'Fira Code', monospace;
-  :deep(.el-textarea__inner) {
-    background-color: #f8f9fa;
-    color: #333;
-  }
-}
-
-.conflict-item-card {
-  margin-bottom: 12px;
-  cursor: pointer;
-  border-left: 4px solid #f56c6c;
-  transition: all 0.3s;
-  &.is-active {
-    border-left-width: 8px;
-    background-color: #fef0f0;
-    transform: translateX(5px);
-  }
-}
-
-.comparison-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 10px;
-  .val-box {
-    padding: 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    .label { display: block; color: #909399; margin-bottom: 4px; }
-    &.old { background: #f4f4f5; }
-    &.new { background: #fef0f0; color: #f56c6c; font-weight: bold; }
-  }
-}
-
-.repair-radio {
-  display: block;
-  width: 100%;
-  margin-bottom: 10px;
-  height: auto !important;
-  padding: 12px !important;
-  strong { display: block; margin-bottom: 4px; }
-  p { margin: 0; font-size: 12px; color: #666; }
-}
-
-.scroll-container {
-  max-height: 600px;
-  overflow-y: auto;
-  padding-right: 5px;
 }
 </style>

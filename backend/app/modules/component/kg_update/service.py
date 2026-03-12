@@ -13,11 +13,15 @@ logger = logging.getLogger(__name__)
 _THIS = Path(__file__).resolve()
 _ROOT = _THIS.parents[5]
 _KG_UPDATE_ROOT = _ROOT / "algorithm" / "KGUpdate"
+_CONFIDENCE_CALCULATE_ROOT = _ROOT / "algorithm" / "confidence_calculate"
+
 if _KG_UPDATE_ROOT.exists() and str(_KG_UPDATE_ROOT) not in sys.path:
     sys.path.insert(0, str(_KG_UPDATE_ROOT))
+if _CONFIDENCE_CALCULATE_ROOT.exists() and str(_CONFIDENCE_CALCULATE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CONFIDENCE_CALCULATE_ROOT))
 
 _kg_updator_module = None
-
+_predictor = None
 
 def _get_kg_updator_module():
     global _kg_updator_module
@@ -31,6 +35,51 @@ def _get_kg_updator_module():
             raise
     return _kg_updator_module
 
+def _get_predictor():
+    global _predictor
+    if _predictor is None:
+        import os
+        original_cwd = os.getcwd()
+        try:
+            import sys
+            from pathlib import Path
+            
+            # 使用 _ROOT 构建置信度计算模块路径
+            confidence_root = _ROOT / "algorithm" / "confidence_calculate"
+            
+            # 确保路径存在
+            if not confidence_root.exists():
+                raise FileNotFoundError(f"置信度计算模块路径不存在: {confidence_root}")
+            
+            # 将路径添加到 sys.path
+            confidence_root_str = str(confidence_root)
+            if confidence_root_str not in sys.path:
+                sys.path.insert(0, confidence_root_str)
+            
+            # 改变工作目录到 confidence_calculate
+            os.chdir(confidence_root_str)
+            
+            # 打印调试信息
+            logger.info(f"当前工作目录: {os.getcwd()}")
+            logger.info(f"sys.path: {sys.path[:5]}")
+            
+            # 导入预测器
+            from predict import ConfidencePredictor
+            
+            model_path = confidence_root / "final_model.pt"
+            config_path = confidence_root / "config.yaml"
+            
+            _predictor = ConfidencePredictor(str(model_path), str(config_path))
+            logger.info("置信度预测器加载成功")
+            
+        except Exception as e:
+            logger.warning("加载置信度预测器失败: %s", e)
+            raise
+        finally:
+            # 无论成功还是失败，都恢复原始工作目录
+            os.chdir(original_cwd)
+            
+    return _predictor
 
 def _load_kg_config() -> dict[str, Any]:
     config_path = _KG_UPDATE_ROOT / "config.json"
@@ -49,7 +98,6 @@ def _load_kg_config() -> dict[str, Any]:
             "system": {"confidence_threshold": 0.7},
         }
 
-
 def _create_updator():
     mod = _get_kg_updator_module()
     config = _load_kg_config()
@@ -63,7 +111,6 @@ def _create_updator():
         confidence_threshold=float(system.get("confidence_threshold", 0.7)),
     )
 
-
 def health() -> dict[str, Any]:
     try:
         updator = _create_updator()
@@ -75,14 +122,12 @@ def health() -> dict[str, Any]:
             "detail": f"知识图谱更新模块不可用: {e}。请确认已安装 algorithm/KGUpdate 依赖并配置 algorithm/KGUpdate/config.json。",
         }
 
-
 def add_triples(triples: list[dict[str, Any]], context: str | None = None) -> dict[str, Any]:
     updator = _create_updator()
     try:
         return updator.add_triples(triples, context=context)
     finally:
         updator.close()
-
 
 def delete_triples(triples: list[dict[str, Any]]) -> dict[str, Any]:
     updator = _create_updator()
@@ -91,10 +136,16 @@ def delete_triples(triples: list[dict[str, Any]]) -> dict[str, Any]:
     finally:
         updator.close()
 
-
 def get_statistics() -> dict[str, Any]:
     updator = _create_updator()
     try:
         return updator.get_statistics()
     finally:
         updator.close()
+
+def calculate_confidence(triples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    predictor = _get_predictor()
+    predictions = predictor.predict_batch(triples)
+    for i, pred in enumerate(predictions):
+        triples[i]['confidence'] = pred['confidence']
+    return triples

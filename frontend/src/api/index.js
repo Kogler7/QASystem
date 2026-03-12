@@ -18,9 +18,14 @@ export {
 
 // 组件管理：知识抽取、知识图谱更新、自然语言转 Cypher 等
 export { knowledgeExtract, extractHealthCheck } from './modules/component'
-export { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } from './modules/component'
-export { nl2cypherHealthCheck, nl2cypherGenerate} from './modules/component'
-// export {nl2cypherSplitCharacter} from './modules/component'
+export {
+  kgUpdateHealthCheck,
+  kgUpdateAdd,
+  kgUpdateDelete,
+  kgUpdateStatistics,
+  kgCalculateConfidence
+} from './modules/component/kg-update'
+export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './modules/component'
 export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels } from './modules/component'
@@ -33,8 +38,8 @@ export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels 
  * @param {string} text
  */
 export function nl2cypherSplitCharacter(text) {
-  return request.post('/component/nl2cypher/split/character', 
-    { text: text }, // 修复：增加空值安全处理和trim
+  return request.post('/component/nl2cypher/split/character',
+    { text: text },
     { timeout: 120000 }
   )
 }
@@ -52,7 +57,7 @@ export function nl2cypherSplitRecursive(text) {
  * @param {string} text
  */
 export function nl2cypherSplitMarkdown(text) {
-  return request.post('/component/nl2cypher/split/markdown', { text: text  }, { timeout: 120000 })
+  return request.post('/component/nl2cypher/split/markdown', { text: text }, { timeout: 120000 })
 }
 
 /**

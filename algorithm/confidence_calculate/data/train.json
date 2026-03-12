@@ -1,0 +1,242 @@
+[
+  {
+    "triple": {
+      "subject": "铁道车辆",
+      "predicate": "定义",
+      "object": "在铁路轨道上用于运送旅客、货物和为此服务或原则上编组在旅客列车、货物列车中使用的单元载运工具"
+    },
+    "label": 1.0
+  },
+  {
+    "triple": {
+      "subject": "客车",
+      "predicate": "定义",
+      "object": "供运送旅客和为此服务的或原则上编组在旅客列车中使用的车辆"
+    },
+    "label": 1.0
+  },
+  {
+    "triple": {
+      "subject": "摆式客车",
+      "predicate": "定义",
+      "object": "设有倾摆装置，过曲线时车体能够倾斜以提高限速的客车"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "双层客车",
+      "predicate": "定义",
+      "object": "设有上、下两层客室的客车"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "高速客车",
+      "predicate": "定义",
+      "object": "指最高运行速度大于200km/h的客车"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "硬座车",
+      "predicate": "定义",
+      "object": "设有硬席座椅设备的座车"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "软卧车",
+      "predicate": "定义",
+      "object": "设有软席卧铺设备的卧车"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "餐车",
+      "predicate": "定义",
+      "object": "设有厨房、餐室及贮藏室(或有小卖部)和炊事设备，供旅客在旅行中饮食就餐使用的车辆"
+    },
+    "label": 1.0
+  },
+  {
+    "triple": {
+      "subject": "发电车",
+      "predicate": "定义",
+      "object": "设有动力机械驱动的发电设备的车辆"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "轻轨车辆",
+      "predicate": "定义",
+      "object": "设有驱动装置，用于城市轨道交通中的车辆"
+    },
+    "label": 0.96
+  },
+  {
+    "triple": {
+      "subject": "货车",
+      "predicate": "定义",
+      "object": "供运输货物和为此服务的或原则上编组在货物列车中使用的车辆"
+    },
+    "label": 1.0
+  },
+  {
+    "triple": {
+      "subject": "敞车",
+      "predicate": "定义",
+      "object": "不设车顶，车底为平底或浴盆型，供运输各种无需严格防止湿损、日晒的货物的车辆"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "棚车",
+      "predicate": "定义",
+      "object": "设有车顶和门、窗可防止雨水进入，供运输各种需防止湿损、日晒或散失的货物的车辆"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "罐车",
+      "predicate": "定义",
+      "object": "设有罐体，供运输液体、液化气体和粉状货物等介质的车辆"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "保温车",
+      "predicate": "定义",
+      "object": "车体设有隔热层，能减少车内外之间的热交换，供运输易腐或对温度有特殊要求的货物的车辆"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "冷藏车",
+      "predicate": "定义",
+      "object": "车体设有隔热层，并设制冷和/或加温设备的保温车"
+    },
+    "label": 0.96
+  },
+  {
+    "triple": {
+      "subject": "集装箱车",
+      "predicate": "定义",
+      "object": "设有固定集装箱的装置，供运输集装箱的专用车辆"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "凹底平车",
+      "predicate": "定义",
+      "object": "底架沿车辆纵向呈凹形面的长大货物车"
+    },
+    "label": 0.95
+  },
+  {
+    "triple": {
+      "subject": "车钩中心线高度",
+      "predicate": "定义",
+      "object": "空车时，车钩钩舌端面的中心线至轨面的垂直距离"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "车辆全长",
+      "predicate": "定义",
+      "object": "车辆不受纵向外力影响时，车辆两端钩舌内侧面间的距离"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "自重",
+      "predicate": "定义",
+      "object": "空车时，车辆自身具备的重量"
+    },
+    "label": 1.0
+  },
+  {
+    "triple": {
+      "subject": "载重",
+      "predicate": "定义",
+      "object": "车辆标记中所注明的允许装运货物或旅客和行李包裹的允许重量"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "构造速度",
+      "predicate": "定义",
+      "object": "安全及结构强度等条件限定的，车辆能够以该速度持续稳定地运行的最高行驶速度"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "通过最小曲线半径",
+      "predicate": "定义",
+      "object": "车辆在站场或厂、段内调车时所能安全通过的最小曲线半径"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "型式试验",
+      "predicate": "定义",
+      "object": "对车辆的基本参数、结构、性能等是否符合设计要求所做的全面考核试验"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "脱轨系数",
+      "predicate": "定义",
+      "object": "车辆运行时，在同一瞬间钢轨作用于车轮上的侧压力与车轮上的垂直载荷的比值"
+    },
+    "label": 0.96
+  },
+  {
+    "triple": {
+      "subject": "一位端",
+      "predicate": "定义",
+      "object": "车辆上，装手制动机的或制动缸活塞杆伸出方向的一端"
+    },
+    "label": 0.98
+  },
+  {
+    "triple": {
+      "subject": "轴位",
+      "predicate": "定义",
+      "object": "车轴在车辆中的位置，通常从一位端起至二位端止，以自然数顺次标注"
+    },
+    "label": 0.97
+  },
+  {
+    "triple": {
+      "subject": "动车组",
+      "predicate": "定义",
+      "object": "由动车与拖车组成固定编组使用的车组"
+    },
+    "label": 0.99
+  },
+  {
+    "triple": {
+      "subject": "全金属车",
+      "predicate": "定义",
+      "object": "车体的各主要承载梁、柱及外部的墙板、地板、顶板等均为金属制造的车辆"
+    },
+    "label": 0.98
+  }
+]
