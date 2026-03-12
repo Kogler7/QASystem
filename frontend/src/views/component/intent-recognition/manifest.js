@@ -13,5 +13,5 @@ export const route = {
   path: 'intent-recognition',
   name: 'intent-recognition',
   component: () => import('./index.vue'),
-  meta: { title: '意图识别' }
+  meta: { title: '意图识别' },
 }

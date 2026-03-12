@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel,Field
 import uvicorn
 
@@ -36,6 +37,22 @@ def intent_interface(user_input: TextInput):
     except HTTPException as e:
         raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
 
+@app.post("/intent-recognition-stream")
+async def stream_intent_recognition(user_input: TextInput):
+    """流式意图识别API"""
+    def generate():
+        for chunk in intent_recognition.generate_result_chunk(user_input.text):
+            yield f"data: {chunk}\n\n"  # SSE 格式
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=8006)
 

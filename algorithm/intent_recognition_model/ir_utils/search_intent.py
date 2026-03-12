@@ -45,12 +45,19 @@ class HybridSearch:
         """相似度查询"""
         dense_search_param = {
             "metric_type": "IP",
-            "params": {"nprobe": 16}
+            "params": {
+                "nprobe": 16,
+                "radius": 0.4,
+                "range_filter": 1
+                }
         }
+
 
         sparse_search_param = {
             "metric_type": "IP",
-            "params": {"topk": 100}
+            "params": {
+                "drop_ratio_search": 0.2
+                }
         }
 
         if self.collection_name is None or query is None:
@@ -83,8 +90,6 @@ class HybridSearch:
                            "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
                            "tags","core_keywords"]
         )[0]
-        print(results)
-        print(f"共找到{len(results)}条相关数据")
         return results
 
     def _init_milvus_client(self) -> MilvusClient | None:
@@ -110,13 +115,212 @@ class HybridSearch:
                 raise
         return None
 
+    def RRF_rank(self, results_1, results_2):
+        """对搜索结果进行RRF排名"""
+        # 建立 ID 到实体的映射
+        entity_map = {}
+        original_distances = {}
+
+        # results_1 和 results_2 是 Hits 对象
+        # 使用 ids 和 distances 属性访问数据
+        for i in range(len(results_1)):
+            entity_id = results_1.ids[i]
+            # 构建 entity 字典,包含所有 output_fields
+            entity_data = {}
+            for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
+                        "intent_name_text", "intent_description_text", "intent_summary_text", 
+                        "user_goal_text", "sample_utterances", "tags", "core_keywords"]:
+                entity_data[field] = results_1[i].get(field)
+            
+            entity_map[entity_id] = entity_data
+            original_distances[(entity_id, "dense_vector")] = results_1.distances[i]
+
+        for i in range(len(results_2)):
+            entity_id = results_2.ids[i]
+            if entity_id not in entity_map:
+                entity_data = {}
+                for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
+                            "intent_name_text", "intent_description_text", "intent_summary_text", 
+                            "user_goal_text", "sample_utterances", "tags", "core_keywords"]:
+                    entity_data[field] = results_2[i].get(field)
+                entity_map[entity_id] = entity_data
+            original_distances[(entity_id, "sparse_vector")] = results_2.distances[i]
+
+        # 手动实现 RRF
+        k = 60
+        rrf_scores = {}
+
+        # 遍历 IDs
+        for rank, entity_id in enumerate(results_1.ids):
+            rrf_scores[entity_id] = rrf_scores.get(entity_id, 0) + 1 / (k + rank + 1)
+
+        for rank, entity_id in enumerate(results_2.ids):
+            rrf_scores[entity_id] = rrf_scores.get(entity_id, 0) + 1 / (k + rank + 1)
+
+        # 按分数排序并构建完整结果
+        sorted_results = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+
+        # 构建包含完整信息的结果
+        final_results = []
+        for entity_id, rrf_score in sorted_results:
+            result = {
+                'id': entity_id,
+                'rrf_score': rrf_score,
+                'entity': entity_map.get(entity_id, {}),
+                'original_distances': {
+                    'dense_vector': original_distances.get((entity_id, "dense_vector")),
+                    'sparse_vector': original_distances.get((entity_id, "sparse_vector"))
+                }
+            }
+            final_results.append(result)
+        return final_results
+
+    def multi_search(self, query: str, top_k = 3):
+        """包含了query与每个意图的距离，以及RRF分数"""
+        dense_search_param = {
+            "metric_type": "IP",
+            "params": {
+                "nprobe": 16,
+                "radius": 0.4,
+                "range_filter": 1
+                }
+        }
+
+
+        sparse_search_param = {
+            "metric_type": "IP",
+            "params": {
+                "drop_ratio_search": 0.2
+                }
+        }
+
+        if self.collection_name is None or query is None:
+            return
+
+        #  问题编码
+        query_vector = self.encoder.encode_text_hybrid(query)
+        dense_vector = query_vector.get("dense")
+        sparse_vector = query_vector.get("sparse")
+
+        # 相似度查询
+        logging.info("正在进行相似度搜索...")
+        results_1 = self.milvus_client.search(
+            collection_name=self.collection_name,
+            data=[dense_vector],
+            anns_field="dense_vector",
+            limit=top_k,
+            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
+                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
+                           "tags","core_keywords"],
+            search_params=dense_search_param
+        )[0]
+
+        results_2 = self.milvus_client.search(
+            collection_name=self.collection_name,
+            data=[sparse_vector],
+            anns_field="sparse_vector",
+            limit=top_k,
+            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
+                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
+                           "tags","core_keywords"],
+            search_params=sparse_search_param
+        )[0]
+        logging.info("检索完成")
+        print("\n")
+        print("results_1:\n")
+        print(results_1)
+        print("results_2:\n")
+        print(results_2)
+        results = self.RRF_rank(results_1, results_2)
+        print("\n")
+        print(results)
+        return results
+
+    def HybridHits_to_dict(self, results):
+        """将HybridHits转换为字典"""
+        result_list = []
+        for hit in results:
+            result_dict = {
+                "intent_id":hit.id,
+                "distance": hit.distance,
+                "entity": {}
+            }
+            for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
+                            "intent_name_text", "intent_description_text", "intent_summary_text", 
+                            "user_goal_text", "sample_utterances", "tags", "core_keywords"]:
+                result_dict["entity"][field] = hit.get(field)
+            result_list.append(result_dict)
+
+        return result_list
+
+    def basic_search(self, query: str, top_k = 3):
+        """基础相似度查询"""
+        dense_search_param = {
+            "metric_type": "IP",
+            "params": {
+                "nprobe": 16,
+                "radius": 0.4,
+                "range_filter": 1
+                }
+        }
+
+
+        sparse_search_param = {
+            "metric_type": "IP",
+            "params": {
+                "drop_ratio_search": 0.2
+                }
+        }
+
+        if self.collection_name is None or query is None:
+            return
+
+        #  问题编码
+        query_vector = self.encoder.encode_text_hybrid(query)
+        dense_vector = query_vector.get("dense")
+        sparse_vector = query_vector.get("sparse")
+
+        # 相似度查询
+        logging.info("正在进行相似度搜索...")
+        results_1 = self.milvus_client.search(
+            collection_name=self.collection_name,
+            data=[dense_vector],
+            anns_field="dense_vector",
+            limit=top_k,
+            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
+                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
+                           "tags","core_keywords"],
+            search_params=dense_search_param
+        )[0]
+
+        results_2 = self.milvus_client.search(
+            collection_name=self.collection_name,
+            data=[sparse_vector],
+            anns_field="sparse_vector",
+            limit=top_k,
+            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
+                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
+                           "tags","core_keywords"],
+            search_params=sparse_search_param
+        )[0]
+        logging.info("检索完成")
+        print("\n")
+        print("results_1:\n")
+        print(results_1)
+        print("results_2:\n")
+        print(results_2)
+        print("\n")
+        return {
+            "密集向量检索结果": self.HybridHits_to_dict(results_1),
+            "稀疏向量检索结果": self.HybridHits_to_dict(results_2)
+        }
+
+
 
 if __name__ == "__main__":
-    query = "电机部分需要检查哪些关键部位？"
+    query = "轨道交通车辆的关键部件有哪些，怎么检查？"
     print(f"query: {query}")
     search = HybridSearch()
-    result = search.search(query=query)
-
-
-
-
+    result = search.basic_search(query=query)
+    print(type(result.get("密集向量检索结果")[0].get("entity").get("tags")))
+    print(type(result.get("稀疏向量检索结果")[0].get("entity").get("tags")))
