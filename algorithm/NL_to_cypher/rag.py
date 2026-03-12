@@ -143,15 +143,15 @@ def txt_split(documents: list[Document]) -> list[Document]:
         separators=["\n\n", "\n", "。", "！", "？", ".", "!", "?"]
     )
     split_docs = text_splitter.split_documents(documents)
-    for split_doc in split_docs:
-        print(split_doc)
-        print("#"*10)
+    # for split_doc in split_docs:
+        # print(split_doc)
+        # print("#"*10)
     return split_docs
 
 
 # 文本嵌入+向量存储
 def embedding(split_docs: list):
-    model_path = "models/bge-small-zh-v1.5"
+    model_path = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
     model = AutoModel.from_pretrained(model_path, local_files_only=True)
     custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
@@ -169,7 +169,7 @@ def embedding(split_docs: list):
 #加载数据
 def load_vector_store():
     """加载已存在的向量数据库"""
-    model_path = "models/bge-small-zh-v1.5"
+    model_path = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
     model = AutoModel.from_pretrained(model_path, local_files_only=True)
     custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
@@ -273,12 +273,12 @@ def interactive_qa(): #多轮问答
 def main():
     documents = load_txt("列车着火应急处置_extracted.txt")
     # RecursiveCharacterTextSplitter
-    # split_docs = txt_split(documents)
+    split_docs = txt_split(documents)
 
     #SemanticChunker
-    split_docs = txt_split_semantic(documents)
+    # split_docs = txt_split_semantic(documents)
 
-    # embedding(split_docs)
+    embedding(split_docs)
     # interactive_qa()
 
 if __name__ == "__main__":

@@ -19,12 +19,17 @@ class GenerateRequestBody(BaseModel):
     question: str
     graph_schema: str = ""
 
+class TextRequestBody(BaseModel):
+    text: str
+
+class TextVectorRequestBody(BaseModel):
+    text: str
 
 @router.get("/health")
 async def nl2cypher_health() -> dict[str, Any]:
     return service.health()
 
-
+#自然语言转cypher
 @router.post("/generate")
 async def generate_cypher(body: GenerateRequestBody) -> dict[str, Any]:
     if not (body.question or "").strip():
@@ -38,4 +43,76 @@ async def generate_cypher(body: GenerateRequestBody) -> dict[str, Any]:
         return result
     except Exception as e:
         logger.exception("自然语言转 Cypher 失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+# 文本转向量并存储
+@router.post("/text2vector")
+async def text2vector(body: TextVectorRequestBody) -> dict[str, Any]:
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    try:
+        result = await asyncio.to_thread(
+            service.text2vector,
+            text=body.text.strip(),
+        )
+        return result
+    except Exception as e:
+        logger.exception("文本向量化失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/split/character")
+async def split_character(body: TextRequestBody) -> dict[str, Any]:
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    try:
+        result = await asyncio.to_thread(
+            service.split_by_character,
+            text=body.text.strip(),
+        )
+        return result
+    except Exception as e:
+        logger.exception("字符切片失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.post("/split/recursive")
+async def split_recursive(body: TextRequestBody) -> dict[str, Any]:
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    try:
+        result = await asyncio.to_thread(
+            service.split_recursively,
+            text=body.text.strip(),
+        )
+        return result
+    except Exception as e:
+        logger.exception("递归字符切片失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.post("/split/markdown")
+async def split_markdown(body: TextRequestBody) -> dict[str, Any]:
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    try:
+        result = await asyncio.to_thread(
+            service.split_by_markdown,
+            text=body.text.strip(),
+        )
+        return result
+    except Exception as e:
+        logger.exception("Markdown切片失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.post("/split/python")
+async def split_python(body: TextRequestBody) -> dict[str, Any]:
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    try:
+        result = await asyncio.to_thread(
+            service.split_by_language_python,
+            text=body.text.strip(),
+        )
+        return result
+    except Exception as e:
+        logger.exception("Python语言切片失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
