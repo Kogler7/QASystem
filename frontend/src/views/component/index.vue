@@ -6,7 +6,7 @@ const router = useRouter()
 
 const handleComponentClick = (item) => {
   if (item.route) {
-    router.push(`/component/${item.route}`)
+    router.push({ name: item.route })
   }
 }
 </script>
