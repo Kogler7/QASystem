@@ -18,6 +18,7 @@
     "marked-highlight": "^2.2.3",
     "marked-katex-extension": "^5.1.6",
     "pinia": "^2.1.0",
+    "vis-network": "^10.0.2",
     "vue": "^3.4.0",
     "vue-router": "^4.2.0"
   },
