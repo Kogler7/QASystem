@@ -6,5 +6,5 @@ export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j } from './knowl
 export { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics } from './kg-update'
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './nl2cypher'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './intent-recognition'
-export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize } from './answer-generation'
+export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize, answerGenerationQueryGraph } from './answer-generation'
 export { documentPreprocHealthCheck, documentPreprocConvert } from './document-preproc'
