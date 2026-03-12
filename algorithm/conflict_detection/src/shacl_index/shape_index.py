@@ -1,184 +1,135 @@
 from __future__ import annotations
-
-from typing import Dict, Set, Tuple, Optional
+import logging
+from typing import Dict, Set, Tuple, Optional, Any
 from functools import cached_property
 from rdflib import Graph, URIRef, BNode, Namespace, RDF
 from rdflib.term import Node
 
-from ..config_dynamic import get_shapes_graph_uri
+from src.config import SHAPE_TTL
 from ..pathexpr import path_to_sparql_pattern
 
-__all__ = ["ShapeIndex"]
+logger = logging.getLogger(__name__)
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
 
+def strip_ns(uri_node: Any) -> str:
+    """彻底标准化：将 URIRef 或字符串统一转为短名称，如 'speed'"""
+    if not uri_node: return ""
+    return str(uri_node).split('/')[-1].split('#')[-1]
 
 class _LazySingleton(type):
-    _instances: Dict[str, "ShapeIndex"] = {}
-
+    _instance = None
     def __call__(cls, *args, **kwargs):
-        key = get_shapes_graph_uri()
-        if key is None:
-            raise RuntimeError("Shapes graph URI not initialised.")
-        if key not in cls._instances:
-            cls._instances[key] = super().__call__(key)
-            print(f"[ShapeIndex] built for <{key}>")
-        return cls._instances[key]
-
+        if cls._instance is None:
+            cls._instance = super().__call__(*args, **kwargs)
+        return cls._instance
 
 class ShapeIndex(metaclass=_LazySingleton):
-    _override_graph: Optional[Graph] = None
-
-    @classmethod
-    def override_with_graph(cls, g: Graph):
-        cls._override_graph = g
-
-    def __init__(self, shapes_graph_uri: str):
-        self._g = shapes_graph_uri
+    """
+    SHACL 规则索引中心。
+    负责建立 '属性 -> 形状' 的映射，是 Delta 引擎的心脏。
+    """
+    def __init__(self, shapes_path: str = str(SHAPE_TTL)):
+        self.shapes_path = shapes_path
 
     @cached_property
     def graph(self) -> Graph:
-        return self._load_shapes_graph()
+        g = Graph()
+        try:
+            p = str(self.shapes_path)
+            g.parse(p, format="turtle")
+            logger.info(f"🧠 [ShapeIndex] 规则图谱加载成功，三元组总数: {len(g)}")
+        except Exception as e:
+            logger.error(f"❌ 规则解析失败: {e}")
+        return g
 
-    def _load_shapes_graph(self) -> Graph:
-        if self._override_graph is not None:
-            return self._override_graph
-        raise RuntimeError("No SHACL graph override set. Use `ShapeIndex.override_with_graph(...)` before first call.")
+    # ────────────────────────────────────────────────────────────────
+    # 🎯 核心逻辑 1：建立属性到 Shape 的全量索引
+    # ────────────────────────────────────────────────────────────────
+    @cached_property
+    def prop_to_parent_shapes(self) -> Dict[str, Set[Node]]:
+        """
+        核心映射：'speed' -> {TrainSpeedShape, ...}
+        Delta 引擎根据此字典决定哪些三元组变更需要触发验证。
+        """
+        g = self.graph
+        mapping: Dict[str, Set[Node]] = {}
+        
+        for shape in g.subjects(RDF.type, SH.NodeShape):
+            # A. 处理显式目标：sh:targetSubjectsOf
+            for target in g.objects(shape, SH.targetSubjectsOf):
+                mapping.setdefault(strip_ns(target), set()).add(shape)
+            
+            # B. 处理显式目标：sh:targetObjectsOf
+            for target in g.objects(shape, SH.targetObjectsOf):
+                mapping.setdefault(strip_ns(target), set()).add(shape)
 
+            # C. 处理形状内部的所有路径属性 (sh:path)
+            # 这涵盖了 sh:property 及其嵌套的逻辑
+            for prop_uri in self._extract_all_path_predicates(g, shape):
+                mapping.setdefault(strip_ns(prop_uri), set()).add(shape)
+
+        logger.info(f"🔎 [ShapeIndex] 监控属性对齐完成: {list(mapping.keys())}")
+        return mapping
+
+    # ────────────────────────────────────────────────────────────────
+    # 🎯 核心逻辑 2：递归抓取所有受监控的谓词
+    # ────────────────────────────────────────────────────────────────
+    def _extract_all_path_predicates(self, g: Graph, node: Node) -> Set[Node]:
+        """递归遍历 SHACL 树，提取所有 sh:path 指向的谓词"""
+        preds = set()
+        visited = set()
+
+        def walk(current: Node):
+            if current in visited: return
+            visited.add(current)
+            
+            # 1. 提取直接路径
+            path = g.value(current, SH.path)
+            if path and isinstance(path, (URIRef, BNode)):
+                # 如果是复杂路径（BNode），这里需要更深的解析，目前暂取直接谓词
+                preds.add(path)
+            
+            # 2. 递归 property 块
+            for ps in g.objects(current, SH.property):
+                walk(ps)
+                
+            # 3. 递归逻辑块 (sh:or, sh:and, etc.)
+            for op in [SH.or_, SH.and_, SH.xone, SH.not_]:
+                for l_node in g.objects(current, op):
+                    # 处理 RDF List 结构
+                    for item in g.items(l_node):
+                        walk(item)
+                    # 处理单节点
+                    walk(l_node)
+
+        walk(node)
+        return preds
+
+    # ────────────────────────────────────────────────────────────────
+    # 🎯 核心逻辑 3：Target 地图
+    # ────────────────────────────────────────────────────────────────
     @cached_property
     def target_map(self) -> Dict[Node, Dict[str, Set[str]]]:
         g = self.graph
-        m: Dict[Node, Dict[str, Set[str]]] = {}
+        m = {}
         for shape in g.subjects(RDF.type, SH.NodeShape):
-            for pred, kind in [
-                (SH.targetNode, "nodes"),
-                (SH.targetClass, "classes"),
-                (SH.targetSubjectsOf, "subjectsOf"),
-                (SH.targetObjectsOf, "objectsOf"),
-            ]:
-                for target in g.objects(shape, pred):
-                    m.setdefault(shape, dict(nodes=set(), classes=set(), subjectsOf=set(), objectsOf=set()))
-                    m[shape][kind].add(str(target))
+            targets = {
+                "nodes": set(), "classes": set(), 
+                "subjectsOf": set(), "objectsOf": set()
+            }
+            # 转换 URI 到短字符串以对齐 delta_triple
+            for t in g.objects(shape, SH.targetNode): targets["nodes"].add(strip_ns(t))
+            for t in g.objects(shape, SH.targetClass): targets["classes"].add(strip_ns(t))
+            for t in g.objects(shape, SH.targetSubjectsOf): targets["subjectsOf"].add(strip_ns(t))
+            for t in g.objects(shape, SH.targetObjectsOf): targets["objectsOf"].add(strip_ns(t))
+            m[shape] = targets
         return m
 
-    @cached_property
-    def prop_to_parent_shapes(self) -> Dict[Node, Set[Node]]:
-        g = self.graph
-        mapping: Dict[Node, Set[Node]] = {}
-        for shape in g.subjects(RDF.type, SH.NodeShape):
-            for prop in self._extract_all_path_predicates(g, shape):
-                mapping.setdefault(prop, set()).add(shape)
-        return mapping
-
-    def _extract_all_path_predicates(self, g: Graph, shape_node: Node) -> Set[Node]:
-        visited = set()
-        result = set()
-
-        def recurse(node: Node):
-            if node in visited:
-                return
-            visited.add(node)
-            for p, o in g.predicate_objects(node):
-                if p == SH.path:
-                    result.add(o)
-                elif p in {SH.equals, SH.disjoint}:
-                    result.add(o)
-                elif p in {SH.or_, SH.and_, SH.xone}:
-                    for item in g.items(o):
-                        recurse(item)
-                elif p == SH.not_ or p == SH.property:
-                    recurse(o)
-
-        recurse(shape_node)
-        return result
-
-    @cached_property
-    def value_sensitive_paths(self) -> Dict[Node, Set[Node]]:
-        g = self.graph
-        value_constraints = {SH["class"], SH["datatype"], SH["in"], SH["hasValue"], SH["equals"], SH["disjoint"], SH["value"]}
-        mapping: Dict[Node, Set[Node]] = {}
-        for shape in g.subjects(RDF.type, SH.NodeShape):
-            for ps in g.objects(shape, SH.property):
-                path = g.value(ps, SH.path)
-                if path is not None:
-                    for val_prop in value_constraints:
-                        if (ps, val_prop, None) in g:
-                            mapping.setdefault(path, set()).add(shape)
-                            break
-        return mapping
-
-    @cached_property
-    def path_predicates(self) -> Set[Node]:
-        g = self.graph
-        return {
-            g.value(ps, SH.path)
-            for shape in g.subjects(RDF.type, SH.NodeShape)
-            for ps in g.objects(shape, SH.property)
-            if g.value(ps, SH.path) is not None
-        }
-
-    @cached_property
-    def shape_paths(self) -> Dict[Node, Set[Node]]:
-        g = self.graph
-        result: Dict[Node, Set[Node]] = {}
-        for shape in g.subjects(RDF.type, SH.NodeShape):
-            paths = self._extract_all_path_predicates(g, shape)
-            if paths:
-                result[shape] = paths
-        return result
-
-    @cached_property
-    def closed_shapes(self) -> Set[str]:
-        g = self.graph
-        return {
-            str(shape)
-            for shape in g.subjects(RDF.type, SH.NodeShape)
-            if (shape, SH.closed, None) in g
-            and str(g.value(shape, SH.closed)).lower() == "true"
-        }
-
-    @cached_property
-    def class_like_shapes(self) -> Set[str]:
-        g = self.graph
-        result = set()
-        for shape in g.subjects(RDF.type, SH.NodeShape):
-            if any((shape, pred, None) in g for pred in [SH["class"], SH["hasValue"], SH["in"]]):
-                result.add(str(shape))
-        return result
+    @property
+    def node_properties(self) -> Set[str]:
+        """Delta 引擎调用的接口：返回所有受监控的短属性名"""
+        return set(self.prop_to_parent_shapes.keys())
 
     def shape_targets(self):
         return self.target_map
-
-    @cached_property
-    def node_properties(self) -> Set[Node]:
-        return {p for p in self.prop_to_parent_shapes.keys()}
-
-    @cached_property
-    def shape_triple_patterns(self) -> Dict[str, Set[str]]:
-        """Return SPARQL triple patterns needed for each shape.
-        
-        Returns:
-            Dict mapping shape URI to set of SPARQL triple patterns.
-            Patterns include property paths and rdf:type for target classes.
-        """
-        shape_to_paths = self.shape_paths
-        triple_map: Dict[str, Set[str]] = {}
-        
-        for shape, targets in self.target_map.items():
-            shape_str = str(shape)
-            patterns = set()
-            
-            # Add rdf:type patterns for target classes
-            for cls in targets.get('classes', set()):
-                patterns.add(f"?s <{RDF.type}> <{cls}> .")
-            
-            # Add property path patterns
-            if shape in shape_to_paths:
-                for path_node in shape_to_paths[shape]:
-                    pattern = path_to_sparql_pattern(path_node, self.graph)
-                    patterns.add(pattern)
-            
-            if patterns:
-                triple_map[shape_str] = patterns
-        
-        return triple_map

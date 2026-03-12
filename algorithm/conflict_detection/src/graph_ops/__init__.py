@@ -10,18 +10,17 @@ re-structured yet) the fallback `ImportError` handler dynamically loads
 them so the import still works.
 """
 
-from importlib import import_module
-import sys as _sys
+"""
+Graph Operations Module for UpSHACL-Neo4j.
+Exposes CRUD, Traversal, and Delta calculation logic.
+"""
 
-_submods = ("crud", "traversal", "delta")
+# src/graph_ops/__init__.py
+"""
+Graph Operations Module for UpSHACL-Neo4j.
+"""
 
-for _name in _submods:
-    try:
-        globals()[_name] = import_module(f"{__name__}.{_name}")
-    except ImportError:  # fallback if files are still top-level
-        globals()[_name] = import_module(_name)
-
-# Re-export the most commonly used symbols ----------------------------------
+# 直接显式导入，拒绝动态加载的坑 [cite: 2026-03-09]
 from .crud import (
     batch,
     cleanup_temp_graphs,
@@ -34,18 +33,15 @@ from .traversal import is_valid_uri, expand_nodes, expand_shapes
 from .delta import compute_affected_pairs, build_reduced_graphs
 
 __all__ = [
-    # crud
     "batch",
     "cleanup_temp_graphs",
     "count_triples_in_graph",
     "sample_triples_from_graph",
     "insert_triples",
     "delete_triples",
-    # traversal
     "is_valid_uri",
     "expand_nodes",
     "expand_shapes",
-    # delta
     "compute_affected_pairs",
     "build_reduced_graphs",
 ]
