@@ -17,7 +17,7 @@ text:
   es_size: 50
   text_top_k: 10
   max_bm25_norm: 100.0
-  sbert_model_path: "/home/admin_user_8/sxm/confidence_calculate/sbert_model"  # 本地模型路径
+  sbert_model_path: "/home/ycheng/ZhCHRAG/qasystem/algorithm/confidence_calculate/sbert_model"  # 本地模型路径
   es_username: "elastic"  
   es_password: "123456"  
   es_verify_certs: false  # 如果使用自签名证书

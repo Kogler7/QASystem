@@ -20,7 +20,7 @@ except ImportError:
     sys.exit(1)
 
 # test.json 的路径
-TEST_JSON_PATH = "/home/admin_user_8/sxm/qasystem/algorithm/confidence_calculate/data/test.json"
+TEST_JSON_PATH = "algorithm/confidence_calculate/data/test.json"
 
 def main():
     # 加载测试数据

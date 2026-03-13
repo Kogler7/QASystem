@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
 
 # ===== MD 文件路径 =====
-MD_DIRECTORY = "/home/admin_user_8/sxm/qasystem/algorithm/confidence_calculate/scripts/"
+MD_DIRECTORY = "algorithm/confidence_calculate/scripts/"
 # ===================================
 
 def load_config(config_path: str = CONFIG_PATH):
