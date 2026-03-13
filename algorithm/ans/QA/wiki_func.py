@@ -62,12 +62,15 @@ def abandon_rels(relation):
     return False
 
 def construct_relation_prune_prompt(question, entity_name, total_relations, args):
-    relation_list_str = "\n".join([f"{i + 1}. {rel}" for i, rel in enumerate(total_relations)])
+    print(f"DEBUG: question type = {type(question)}, value = {question}")
+    print(f"DEBUG: entity_name type = {type(entity_name)}, value = {entity_name}")
+    print(f"DEBUG: total_relations type = {type(total_relations)}, value = {total_relations}")
+    print(f"DEBUG: total_relations length = {len(total_relations) if hasattr(total_relations, '__len__') else 'N/A'}")
+    
     prompt = extract_relation_prompt_wiki.format(
-        args.width, args.width,
-        question,  # 问题
-        entity_name,  # 主题实体
-        relation_list_str  # 关系列表
+        question=question,  # 问题
+        entity_name=entity_name,  # 主题实体
+        total_relations=total_relations  # 关系列表（已经包含编号）
     )
     return prompt
 
@@ -101,7 +104,7 @@ def relation_search_prune(entity_id, entity_name, pre_relations, pre_head, quest
             })
 
         # 过滤无用关系
-        if args.remove_unnecessary_rel:
+        if args.REMOVE_UNNECESSARY_REL:
             filtered_relations = []
             for rel_info in all_relations_with_direction:
                 if not abandon_rels_neo4j(rel_info['relation']):
@@ -144,18 +147,22 @@ def relation_search_prune(entity_id, entity_name, pre_relations, pre_head, quest
 # {{关系名称 (方向) (评分：分数)}}
 # 评分范围：0.0-1.0，1.0表示完全相关
 #
-# 请选择最多{args.width}个关系："""
+# 请选择最多{args.WIDTH}个关系："""
         prompt = construct_relation_prune_prompt(question, entity_name, relation_list_str, args)
 
-        result = run_llm(prompt, args.temperature_exploration, args.max_length,
-                         args.opeani_api_keys, args.LLM_type)
+        result = run_llm(prompt, args.TEMPERATURE_EXPLORATION, args.MAX_LENGTH,
+                         args.LLM_API_KEY, args.LLM_TYPE)
 
         print(f"LLM原始响应:\n{result}\n{'-' * 50}")
 
         # 解析LLM响应
         retrieve_relations_with_scores = parse_relations_with_direction(
-            result, all_relations_with_direction, args.width
+            result, all_relations_with_direction, args.WIDTH
         )
+
+        # 添加LLM原始响应到结果中
+        for rel in retrieve_relations_with_scores:
+            rel['llm_response'] = result
 
         if retrieve_relations_with_scores:
             # 验证分数
@@ -171,7 +178,7 @@ def relation_search_prune(entity_id, entity_name, pre_relations, pre_head, quest
 
         # 如果LLM选择失败，使用智能后备方案
         print(f"LLM关系选择失败，使用智能后备方案")
-        return get_fallback_relations_enhanced(all_relations_with_direction, args.width)
+        return get_fallback_relations_enhanced(all_relations_with_direction, args.WIDTH)
 
     except Exception as e:
         print(f"关系搜索异常: {e}")
@@ -409,7 +416,9 @@ def abandon_rels_neo4j(relation):
         "打电话给", "发消息给", "参与", "喜欢", "访问", "拥有", "使用",
         "穿着", "购买", "阅读",
         # 地点相关关系
-        "举办", "包含", "需要", "产生", "发生在", "放在", "相关于"
+        "举办", "包含", "需要", "产生", "发生在", "放在", "相关于",
+        # 交通相关关系
+        "连接", "相连", "连接到", "链接", "连通"
     ]
 
     # 如果是已知的有意义关系，保留
@@ -492,7 +501,7 @@ def entity_score(question, entity_candidates_id, entity_candidates, score, relat
 
     prompt = construct_entity_score_prompt(question, relation, entity_candidates)
 
-    result = run_llm(prompt, args.temperature_exploration, args.max_length, args.opeani_api_keys, args.LLM_type)
+    result = run_llm(prompt, args.TEMPERATURE_EXPLORATION, args.MAX_LENGTH, args.LLM_API_KEY, args.LLM_TYPE)
     entity_scores = clean_scores(result, entity_candidates)
     if all_zero(entity_scores):
         return [1/len(entity_candidates) * score] * len(entity_candidates), entity_candidates, entity_candidates_id
@@ -525,7 +534,7 @@ def generate_answer(question, cluster_chain_of_entities, args):
     prompt = answer_prompt_wiki + question + '\n'
     chain_prompt = '\n'.join([', '.join([str(x) for x in chain]) for sublist in cluster_chain_of_entities for chain in sublist])
     prompt += "\nKnowledge Triplets: " + chain_prompt + 'A: '
-    result = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
+    result = run_llm(prompt, args.TEMPERATURE_REASONING, args.MAX_LENGTH, args.LLM_API_KEY, args.LLM_TYPE)
     return result
 
 
@@ -537,7 +546,7 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
     sorted_zipped = sorted(zipped, key=lambda x: x[5], reverse=True)
     sorted_entities_id, sorted_relations, sorted_candidates, sorted_topic_entities, sorted_head, sorted_scores = [x[0] for x in sorted_zipped], [x[1] for x in sorted_zipped], [x[2] for x in sorted_zipped], [x[3] for x in sorted_zipped], [x[4] for x in sorted_zipped], [ x[5] for x in sorted_zipped]
 
-    entities_id, relations, candidates, topics, heads, scores = sorted_entities_id[:args.width], sorted_relations[:args.width], sorted_candidates[:args.width], sorted_topic_entities[ :args.width], sorted_head[:args.width], sorted_scores[:args.width]
+    entities_id, relations, candidates, topics, heads, scores = sorted_entities_id[:args.WIDTH], sorted_relations[:args.WIDTH], sorted_candidates[:args.WIDTH], sorted_topic_entities[ :args.WIDTH], sorted_head[:args.WIDTH], sorted_scores[:args.WIDTH]
     merged_list = list(zip(entities_id, relations, candidates, topics, heads, scores))
     filtered_list = [(id, rel, ent, top, hea, score) for id, rel, ent, top, hea, score in merged_list if score != 0]
 
@@ -564,11 +573,19 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
     triple_list = []
     for i in range(len(candidates)):
         try:
-            if i < len(tops_labels) and i < len(relations):
+            if i < len(tops_labels) and i < len(relations) and i < len(heads):
                 head = tops_labels[i] if i < len(tops_labels) else "未知实体"
                 rel = relations[i] if i < len(relations) else "未知关系"
                 tail = candidates[i] if i < len(candidates) else "未知实体"
-                triple = (head, rel, tail)
+                is_head = heads[i] if i < len(heads) else True
+                
+                # 根据关系方向正确构建三元组
+                # is_head=True 表示出度关系：head -> tail
+                # is_head=False 表示入度关系：tail -> head
+                if is_head:
+                    triple = (head, rel, tail)
+                else:
+                    triple = (tail, rel, head)
                 triple_list.append(triple)
         except Exception as e:
             print(f"构建三元组 {i} 时出错: {e}")
@@ -608,8 +625,8 @@ def reasoning(question, cluster_chain_of_entities, args):
         ""
     )
 
-    evaluate_answer = run_llm(evaluate_prompt, args.temperature_reasoning,
-                              args.max_length, args.opeani_api_keys, args.LLM_type)
+    evaluate_answer = run_llm(evaluate_prompt, args.TEMPERATURE_REASONING,
+                              args.MAX_LENGTH, args.LLM_API_KEY, args.LLM_TYPE)
 
     print(f"LLM评估回答: {evaluate_answer}")
 
@@ -618,11 +635,11 @@ def reasoning(question, cluster_chain_of_entities, args):
     answer = "信息不足"
     # 清理回答
     evaluate_answer_clean = evaluate_answer.strip()
-    # 模式1: 查找 {是否足够：是/否}
-    pattern1 = r'\{是否足够[：:]\s*([是否])\s*\}'
+    # 模式1: 查找 {是否足够：是/否} 或 {{是否足够：是/否}}
+    pattern1 = r'\{{?是否足够[：:]\s*([是否])\s*\}}?'
     match1 = re.search(pattern1, evaluate_answer_clean)
-    # 模式2: 查找 {是/否}
-    pattern2 = r'\{\s*([是否])\s*\}'
+    # 模式2: 查找 {是/否} 或 {{是/否}}
+    pattern2 = r'\{{?\s*([是否])\s*\}}?'
     match2 = re.search(pattern2, evaluate_answer_clean)
     # 模式3: 直接查找"是"或"否"关键词
     if match1:
@@ -639,9 +656,9 @@ def reasoning(question, cluster_chain_of_entities, args):
     # 4. 提取答案部分
     if is_sufficient:
         # 尝试提取简洁答案
-        # 查找 {答案：...} 或 {...} 格式
-        answer_pattern1 = r'\{答案[：:]\s*([^}]+)\}'
-        answer_pattern2 = r'\{(?!是否足够|是|否)([^}]+)\}'
+        # 查找 {答案：...} 或 {{答案：...}} 或 {...} 或 {{...}} 格式
+        answer_pattern1 = r'\{{?答案[：:]\s*([^\}]+)\}}?'
+        answer_pattern2 = r'\{{?(?!是否足够|是|否)([^\}]+)\}}?'
 
         answer_match1 = re.search(answer_pattern1, evaluate_answer_clean)
         answer_match2 = re.search(answer_pattern2, evaluate_answer_clean)

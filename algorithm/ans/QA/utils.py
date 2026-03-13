@@ -1,17 +1,12 @@
-import json
-import re
-import sys
-import time
-from pathlib import Path
-
+import openai
 import requests
 
 from prompt_list import *
-
-# 统一大模型调用：使用 algorithm/common/llm_client
-_ALGO_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_ALGO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ALGO_ROOT))
+import json
+import time
+from openai import OpenAI
+import re
+from prompt_list import *
 # from rank_bm25 import BM25Okapi
 # from sentence_transformers import util
 
@@ -111,23 +106,66 @@ def clean_relations_bm25_sent(topn_relations, topn_scores, entity_id, head_relat
         i+=1
     return True, relations
 
-def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="gpt-3.5-turbo"):
-    """
-    统一大模型调用入口，委托 algorithm/common/llm_client.complete。
-    支持 OpenAI 兼容接口与智谱（glm/zhipu）；配置可由环境变量 LLM_* 覆盖。
-    """
-    from common.llm_client import complete
+def run_zhipu_glm(prompt, temperature, max_tokens, api_key):
+    """调用智谱GLM API"""
+    import requests
+    import json
 
-    backend = "zhipu" if ("glm" in (engine or "").lower() or "zhipu" in (engine or "").lower()) else "openai"
-    return complete(
-        prompt,
-        system_prompt="You are an AI assistant that helps people find information.",
-        temperature=temperature,
-        max_tokens=max_tokens,
-        api_key=opeani_api_keys or None,
-        model=engine,
-        backend=backend,
-    )
+    url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    data = {
+        "model": "glm-3-turbo",  # 先用turbo测试，成功后可以换glm-4
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": False
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=60)
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except requests.exceptions.HTTPError as e:
+        print(f"GLM API HTTP错误: {e}")
+        print(f"响应内容: {response.text}")
+        return "Error in GLM API call"
+    except Exception as e:
+        print(f"GLM API调用失败: {e}")
+        return "Error in GLM API call"
+
+def run_llm(prompt, temperature, max_tokens, api_key, engine="gpt-3.5-turbo"):
+    if "glm" in engine.lower() or "zhipu" in engine.lower():
+        return run_zhipu_glm(prompt, temperature, max_tokens, api_key)
+
+    messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
+    message_prompt = {"role":"user","content":prompt}
+    messages.append(message_prompt)
+    f = 0
+    while(f == 0):
+        try:
+            # 设置OpenAI API密钥
+            import openai
+            openai.api_key = api_key
+            response = openai.ChatCompletion.create(
+                    model=engine,
+                    messages = messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    frequency_penalty=0,
+                    presence_penalty=0)
+            result = response["choices"][0]['message']['content']
+            f = 1
+        except Exception as e:
+            print(f"openai error, retry: {e}")
+            time.sleep(2)
+    return result
 # def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="Qwen/Qwen3-8B"):
 #     """使用OpenAI兼容的chat接口调用远程模型"""
 #     client = OpenAI(
@@ -226,7 +264,7 @@ def if_true(prompt):
 
 def generate_without_explored_paths(question, args):
     prompt = cot_prompt + "\n\nQ: " + question + "\nA:"
-    response = run_llm(prompt, args.temperature_reasoning, args.max_length, args.opeani_api_keys, args.LLM_type)
+    response = run_llm(prompt, args.TEMPERATURE_REASONING, args.MAX_LENGTH, args.LLM_API_KEY, args.LLM_TYPE)
     return response
 
 

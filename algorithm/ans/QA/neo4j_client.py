@@ -1,4 +1,4 @@
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, basic_auth
 import json
 import logging
 from datetime import datetime
@@ -13,7 +13,7 @@ class Neo4jClient:
     def __init__(self, uri: str = "bolt://localhost:7687",
                  username: str = "neo4j",
                  password: str = "password"):
-        self.driver = GraphDatabase.driver(uri, auth=(username, password))
+        self.driver = GraphDatabase.driver(uri, auth=basic_auth(username, password))
         self._test_connection()
 
     def _test_connection(self):

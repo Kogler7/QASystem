@@ -13,6 +13,7 @@ from problem_solver import ProblemSolver
 from neo4j_client import MultiServerWikidataQueryClient
 from entity_linker import EntityLinker
 from neo4j_visualizer import Neo4jPathVisualizer, EnhancedPathVisualizer
+from config import config as default_config
 
 
 class Neo4jQAService:
@@ -26,7 +27,7 @@ class Neo4jQAService:
             config: 配置参数，如果为None则使用默认配置
         """
         if config is None:
-            config = self.create_default_config()
+            config = default_config
         self.config = config
 
         # 初始化客户端
@@ -36,54 +37,26 @@ class Neo4jQAService:
         self.problem_solver = ProblemSolver(self.wiki_client, self.config)
         # 初始化可视化器
         self.path_visualizer = Neo4jPathVisualizer(
-            uri=config.neo4j_uri,
-            user=config.neo4j_user,
-            password=config.neo4j_password
+            uri=self.config.NEO4J_URI,
+            user=self.config.NEO4J_USER,
+            password=self.config.NEO4J_PASSWORD
         )
         self.enhanced_visualizer = EnhancedPathVisualizer(self.path_visualizer)
         print("问题求解器初始化成功")
         print("Neo4j知识图谱问答服务初始化完成")
 
-    @staticmethod
-    def create_default_config():
-        """创建默认配置"""
-
-        class Config:
-            pass
-
-        config = Config()
-        # 设置默认参数
-        config.max_length = 256
-        config.temperature_exploration = 0.4
-        config.temperature_reasoning = 0
-        config.width = 3
-        config.depth = 3
-        config.remove_unnecessary_rel = True
-        config.LLM_type = "glm-4.7"
-        config.opeani_api_keys = "92ede9374dca443485951a9b7396bb1a.0hoHMDMujZgXrgmk"
-        config.num_retain_entity = 5
-        config.prune_tools = "llm"
-        config.auto_entity_linking = True
-
-        # Neo4j连接参数
-        config.neo4j_uri = "bolt://localhost:7687"
-        config.neo4j_user = "neo4j"
-        config.neo4j_password = "neo4j2025"
-
-        return config
-
     def _initialize_clients(self):
         """初始化客户端"""
         try:
             self.wiki_client = MultiServerWikidataQueryClient(
-                neo4j_uri=self.config.neo4j_uri,
-                username=self.config.neo4j_user,
-                password=self.config.neo4j_password
+                neo4j_uri=self.config.NEO4J_URI,
+                username=self.config.NEO4J_USER,
+                password=self.config.NEO4J_PASSWORD
             )
             print("Neo4j客户端初始化成功")
 
             # 初始化实体链接器
-            if self.config.auto_entity_linking:
+            if self.config.AUTO_ENTITY_LINKING:
                 self.entity_linker = EntityLinker(self.wiki_client, self.config)
                 print("实体链接器初始化成功")
             else:
@@ -123,7 +96,8 @@ class Neo4jQAService:
                     "问题模型": solver_result.get("问题模型"),
                     "子问题": solver_result.get("子问题"),
                     "方案模型": solver_result.get("方案模型"),
-                    "问题-方案匹配": solver_result.get("问题-方案匹配")
+                    "问题-方案匹配": solver_result.get("问题-方案匹配"),
+                    "图谱路径": solver_result.get("图谱路径")
                 },
                 "timestamp": datetime.now().isoformat()
             }
@@ -140,9 +114,17 @@ class Neo4jQAService:
                 "timestamp": datetime.now().isoformat()
             }
 
-    def answer_question_with_visualization(self, question: str, visualize: bool = True) -> Dict:
+    def answer_question_with_visualization(self, question: str, visualize: bool = True, visualization_type="pyvis") -> Dict:
         """
         回答问题并生成可视化
+        
+        Args:
+            question: 问题
+            visualize: 是否生成可视化
+            visualization_type: 可视化类型，可选值: "pyvis", "networkx", "both"
+            
+        Returns:
+            包含答案和可视化结果的字典
         """
         print(f"\n{'=' * 50}")
         print(f"问题: {question}")
@@ -150,6 +132,15 @@ class Neo4jQAService:
         try:
             # 调用问题求解器
             solver_result = self.problem_solver.solve(question)
+            
+            # 打印求解结果的结构，以便调试
+            print(f"求解结果的键: {list(solver_result.keys())}")
+            if "图谱路径" in solver_result:
+                print(f"图谱路径存在: {solver_result['图谱路径']}")
+                if "answer_path" in solver_result["图谱路径"]:
+                    print(f"answer_path 存在，长度: {len(solver_result['图谱路径']['answer_path'])}")
+                    for i, path in enumerate(solver_result["图谱路径"]["answer_path"]):
+                        print(f"路径 {i+1}: {path}")
 
             # 提取答案
             answer = self._extract_answer_from_solver_result(solver_result)
@@ -158,24 +149,34 @@ class Neo4jQAService:
             visualization_html = None
             if visualize and answer and answer != "信息不足":
                 # 提取答案实体
-                answer_entities = self.enhanced_visualizer.extract_answer_entities_from_result(solver_result)
+                try:
+                    answer_entities = self.enhanced_visualizer.extract_answer_entities_from_result(solver_result)
+                    print(f"提取的答案实体: {answer_entities}")
 
-                if answer_entities:
-                    # 生成路径可视化
-                    visualization_html = self.enhanced_visualizer.highlight_answer_path(
-                        question, answer_entities
-                    )
+                    if answer_entities:
+                        # 生成路径可视化
+                        visualization_html = self.enhanced_visualizer.highlight_answer_path(
+                            question, answer_entities, visualization_type=visualization_type
+                        )
+                        print(f"可视化结果: {visualization_html}")
+                    else:
+                        print("未提取到答案实体")
+                        visualization_html = "未提取到答案实体"
+                except Exception as e:
+                    print(f"生成可视化失败: {e}")
+                    visualization_html = f"生成可视化失败: {str(e)}"
 
             # 构建返回结果
             return {
                 "success": True,
                 "question": question,
                 "answer": answer,
-                "visualization": visualization_html,  # HTML文件路径
+                "visualization": visualization_html,  # HTML文件路径或错误信息
                 "solver_result": {
                     "问题模型": solver_result.get("问题模型"),
                     "子问题": solver_result.get("子问题"),
                     "方案模型": solver_result.get("方案模型"),
+                    "问题-方案匹配": solver_result.get("问题-方案匹配"),
                     "图谱路径": solver_result.get("图谱路径")
                 },
                 "timestamp": datetime.now().isoformat()
