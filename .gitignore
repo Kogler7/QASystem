@@ -52,6 +52,9 @@ backend/processed/
 # Stray pip constraint file (e.g. from mis-typed pip install)
 backend/=3.12
 *=3.12
+backend/processed_files/
+backend/temp_files/
+
 # =====================
 # Local environment directories
 # =====================

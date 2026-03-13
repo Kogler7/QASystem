@@ -34,7 +34,7 @@ class DocumentProcessor:
 
         # 初始化 MinerU 处理器
         if mineru_config_path is None:
-            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "/home/admin_user_3/mineru.json")
+            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "/mnt/data3/srv/vllm/models/mineru.json")
         self.mineru_processor = OCRProcessor(   
             config_path=mineru_config_path,
             model_source=mineru_model_source
@@ -212,15 +212,45 @@ class DocumentProcessor:
             # 调用处理器
             result = processor.process(file_path, **kwargs)
 
+            processor_metadata = result.get('metadata') or {}
+            processor_content = result.get('content')
+            processor_error = processor_metadata.get('error')
+
+            if processor_error:
+                return {
+                    'success': False,
+                    'file_type': file_type_str,
+                    'error': str(processor_error),
+                    'metadata': {
+                        **metadata,
+                        **processor_metadata,
+                        'model_used': model_name,
+                        'model_info': model_info,
+                    }
+                }
+
+            if file_type == '.pdf' and (processor_content is None or not str(processor_content).strip()):
+                return {
+                    'success': False,
+                    'file_type': file_type_str,
+                    'error': 'PDF 解析未生成有效内容，请检查 MinerU 配置或输入文件质量',
+                    'metadata': {
+                        **metadata,
+                        **processor_metadata,
+                        'model_used': model_name,
+                        'model_info': model_info,
+                    }
+                }
+
             # 合并元数据
-            metadata.update(result['metadata'])
+            metadata.update(processor_metadata)
             metadata['model_used'] = model_name
             metadata['model_info'] = model_info
 
             return {
                 'success': True,
                 'file_type': file_type_str,
-                'content': result['content'],
+                'content': processor_content,
                 'metadata': metadata
             }
 

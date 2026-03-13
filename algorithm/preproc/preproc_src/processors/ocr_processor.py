@@ -1,21 +1,10 @@
 import os
 import json
+import importlib
 from pathlib import Path
 from typing import List, Optional, Union, Dict, Any
 from loguru import logger
 from . import BaseProcessor
-
-# MinerU 内部模块导入（确保 mineru 已安装且环境变量正确）
-from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
-from mineru.data.data_reader_writer import FileBasedDataWriter
-from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
-from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
-from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
-from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
-from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
-from mineru.utils.enum_class import MakeMode
-from mineru.utils.guess_suffix_or_lang import guess_suffix_by_path
 
 
 class OCRProcessor(BaseProcessor):
@@ -31,13 +20,59 @@ class OCRProcessor(BaseProcessor):
         :param config_path: MinerU 配置文件路径（如 mineru.json），若提供则设置环境变量 MINERU_CONFIG_PATH
         :param model_source: 模型源，可选 'local', 'modelscope', 'huggingface'。默认 'local' 表示使用本地已下载的模型。
         """
-        # os.environ["MINERU_CONFIG_PATH"] = '/home/admin_user_3/mineru.json'
-        os.environ["MINERU_CONFIG_PATH"] = '/mnt/data3/srv/vllm/models/'
-        os.environ["MINERU_MODEL_SOURCE"] = 'local'
-        # if config_path:
-        #     os.environ["MINERU_CONFIG_PATH"] = config_path
-        # os.environ["MINERU_MODEL_SOURCE"] = model_source
-        logger.info(f"MinerU initialized with config: {config_path}, model source: {model_source}")
+        effective_config_path = config_path or os.getenv("MINERU_CONFIG_PATH") or '/mnt/data3/srv/vllm/models/mineru.json'
+        effective_model_source = model_source or os.getenv("MINERU_MODEL_SOURCE") or 'local'
+
+        # MinerU 实际读取 MINERU_TOOLS_CONFIG_JSON，而不是 MINERU_CONFIG_PATH。
+        os.environ["MINERU_TOOLS_CONFIG_JSON"] = effective_config_path
+        os.environ["MINERU_CONFIG_PATH"] = effective_config_path
+        os.environ["MINERU_MODEL_SOURCE"] = effective_model_source
+
+        from mineru.utils import config_reader as mineru_config_reader
+        importlib.reload(mineru_config_reader)
+
+        if effective_model_source == 'local':
+            local_models_config = mineru_config_reader.get_local_models_dir()
+            if not isinstance(local_models_config, dict):
+                raise ValueError(
+                    "MinerU 本地模型配置无效：请在 mineru.json 中提供 'models-dir'，"
+                    "且其值为包含 pipeline/vlm 路径的对象"
+                )
+            missing_modes = [mode for mode in ("pipeline", "vlm") if not local_models_config.get(mode)]
+            if missing_modes:
+                raise ValueError(
+                    f"MinerU 本地模型配置缺失: {', '.join(missing_modes)}。"
+                    "请在 mineru.json 的 'models-dir' 中补全对应路径"
+                )
+
+        from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
+        from mineru.data.data_reader_writer import FileBasedDataWriter
+        from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
+        from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
+        from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
+        from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
+        from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
+        from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
+        from mineru.utils.enum_class import MakeMode
+
+        self._convert_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2
+        self._prepare_env = prepare_env
+        self._read_fn = read_fn
+        self._FileBasedDataWriter = FileBasedDataWriter
+        self._pipeline_doc_analyze = pipeline_doc_analyze
+        self._pipeline_union_make = pipeline_union_make
+        self._pipeline_result_to_middle_json = pipeline_result_to_middle_json
+        self._vlm_doc_analyze = vlm_doc_analyze
+        self._vlm_union_make = vlm_union_make
+        self._draw_layout_bbox = draw_layout_bbox
+        self._draw_span_bbox = draw_span_bbox
+        self._MakeMode = MakeMode
+
+        logger.info(
+            "MinerU initialized with effective config: {}, model source: {}",
+            os.environ.get("MINERU_TOOLS_CONFIG_JSON"),
+            os.environ.get("MINERU_MODEL_SOURCE"),
+        )
 
     def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """
@@ -147,7 +182,7 @@ class OCRProcessor(BaseProcessor):
                 logger.warning(f"文件不存在，跳过: {path}")
                 continue
             file_names.append(path.stem)          # 不含扩展名的文件名
-            pdf_bytes_list.append(read_fn(path))  # 读取文件为字节
+            pdf_bytes_list.append(self._read_fn(path))  # 读取文件为字节
             lang_list.append(lang)
 
         if not file_names:
@@ -159,11 +194,11 @@ class OCRProcessor(BaseProcessor):
             # 处理 pipeline 后端
             # 先对每个 PDF 进行页面裁剪（如果需要）
             for i, pdf_bytes in enumerate(pdf_bytes_list):
-                pdf_bytes_list[i] = convert_pdf_bytes_to_bytes_by_pypdfium2(
+                pdf_bytes_list[i] = self._convert_pdf_bytes(
                     pdf_bytes, start_page_id, end_page_id
                 )
 
-            infer_results, all_image_lists, all_pdf_docs, lang_list_out, ocr_enabled_list = pipeline_doc_analyze(
+            infer_results, all_image_lists, all_pdf_docs, lang_list_out, ocr_enabled_list = self._pipeline_doc_analyze(
                 pdf_bytes_list,
                 lang_list,
                 parse_method=method,
@@ -173,16 +208,16 @@ class OCRProcessor(BaseProcessor):
 
             for idx, model_list in enumerate(infer_results):
                 pdf_file_name = file_names[idx]
-                local_image_dir, local_md_dir = prepare_env(str(output_dir), pdf_file_name, method)
-                image_writer = FileBasedDataWriter(local_image_dir)
-                md_writer = FileBasedDataWriter(local_md_dir)
+                local_image_dir, local_md_dir = self._prepare_env(str(output_dir), pdf_file_name, method)
+                image_writer = self._FileBasedDataWriter(local_image_dir)
+                md_writer = self._FileBasedDataWriter(local_md_dir)
 
                 images_list = all_image_lists[idx]
                 pdf_doc = all_pdf_docs[idx]
                 _lang = lang_list_out[idx]
                 _ocr_enable = ocr_enabled_list[idx]
 
-                middle_json = pipeline_result_to_middle_json(
+                middle_json = self._pipeline_result_to_middle_json(
                     model_list, images_list, pdf_doc, image_writer,
                     _lang, _ocr_enable, formula_enable
                 )
@@ -201,7 +236,7 @@ class OCRProcessor(BaseProcessor):
                     f_dump_content_list=dump_content_list,
                     f_dump_middle_json=dump_middle_json,
                     f_dump_model_output=dump_model_output,
-                    f_make_md_mode=MakeMode.MM_MD,
+                    f_make_md_mode=self._MakeMode.MM_MD,
                     middle_json=middle_json,
                     model_output=model_list,
                     is_pipeline=True
@@ -215,12 +250,12 @@ class OCRProcessor(BaseProcessor):
             for idx, pdf_bytes in enumerate(pdf_bytes_list):
                 pdf_file_name = file_names[idx]
                 # VLM 也支持页面范围裁剪
-                pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)
-                local_image_dir, local_md_dir = prepare_env(str(output_dir), pdf_file_name, "vlm")
-                image_writer = FileBasedDataWriter(local_image_dir)
-                md_writer = FileBasedDataWriter(local_md_dir)
+                pdf_bytes = self._convert_pdf_bytes(pdf_bytes, start_page_id, end_page_id)
+                local_image_dir, local_md_dir = self._prepare_env(str(output_dir), pdf_file_name, "vlm")
+                image_writer = self._FileBasedDataWriter(local_image_dir)
+                md_writer = self._FileBasedDataWriter(local_md_dir)
 
-                middle_json, infer_result = vlm_doc_analyze(
+                middle_json, infer_result = self._vlm_doc_analyze(
                     pdf_bytes,
                     image_writer=image_writer,
                     backend=backend,
@@ -241,7 +276,7 @@ class OCRProcessor(BaseProcessor):
                     f_dump_content_list=dump_content_list,
                     f_dump_middle_json=dump_middle_json,
                     f_dump_model_output=dump_model_output,
-                    f_make_md_mode=MakeMode.MM_MD,
+                    f_make_md_mode=self._MakeMode.MM_MD,
                     middle_json=middle_json,
                     model_output=infer_result,
                     is_pipeline=False
@@ -272,22 +307,22 @@ class OCRProcessor(BaseProcessor):
         is_pipeline = kwargs.get("is_pipeline", True)
 
         if f_draw_layout_bbox:
-            draw_layout_bbox(pdf_info, pdf_bytes, local_md_dir, f"{pdf_file_name}_layout.pdf")
+            self._draw_layout_bbox(pdf_info, pdf_bytes, local_md_dir, f"{pdf_file_name}_layout.pdf")
         if f_draw_span_bbox:
-            draw_span_bbox(pdf_info, pdf_bytes, local_md_dir, f"{pdf_file_name}_span.pdf")
+            self._draw_span_bbox(pdf_info, pdf_bytes, local_md_dir, f"{pdf_file_name}_span.pdf")
         if f_dump_orig_pdf:
             md_writer.write(f"{pdf_file_name}_origin.pdf", pdf_bytes)
 
         image_dir = str(os.path.basename(local_image_dir))
 
         if f_dump_md:
-            make_func = pipeline_union_make if is_pipeline else vlm_union_make
+            make_func = self._pipeline_union_make if is_pipeline else self._vlm_union_make
             md_content = make_func(pdf_info, f_make_md_mode, image_dir)
             md_writer.write_string(f"{pdf_file_name}.md", md_content)
 
         if f_dump_content_list:
-            make_func = pipeline_union_make if is_pipeline else vlm_union_make
-            content_list = make_func(pdf_info, MakeMode.CONTENT_LIST, image_dir)
+            make_func = self._pipeline_union_make if is_pipeline else self._vlm_union_make
+            content_list = make_func(pdf_info, self._MakeMode.CONTENT_LIST, image_dir)
             md_writer.write_string(
                 f"{pdf_file_name}_content_list.json",
                 json.dumps(content_list, ensure_ascii=False, indent=4)
