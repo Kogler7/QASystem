@@ -48,11 +48,16 @@ def _norm_url(base: str, for_chat: bool = True) -> str:
     if for_chat:
         if "/v1/chat/completions" in base:
             return base
-        return f"{base}/v1/chat/completions" if base.endswith("/v1") else f"{base}/v1/chat/completions"
+        # base 已含 /v1 时只拼 /chat/completions，避免 .../v1/v1/chat/completions
+        if base.endswith("/v1"):
+            return f"{base}/chat/completions"
+        return f"{base}/v1/chat/completions"
     else:
         if "/completions" in base:
             return base
-        return f"{base}/v1/completions" if base.endswith("/v1") else f"{base}/v1/completions"
+        if base.endswith("/v1"):
+            return f"{base}/completions"
+        return f"{base}/v1/completions"
 
 
 def _headers(api_key: Optional[str] = None) -> dict:
