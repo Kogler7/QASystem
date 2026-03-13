@@ -1,0 +1,32 @@
+# 环境变量文件（包含敏感信息）
+.env
+
+# Python 字节码文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+venv/
+env/
+ENV/
+
+# IDE 配置文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 可视化输出目录
+visualizations/
+
+# 日志文件
+*.log
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# 临时文件
+*.tmp
+*.bak

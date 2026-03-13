@@ -24,7 +24,7 @@ class EntityLinker:
         prompt = self._build_entity_recognition_prompt(question)
 
         try:
-            response = run_llm(prompt, 0.1, 300, self.args.opeani_api_keys, self.args.LLM_type)
+            response = run_llm(prompt, 0.1, 300, self.args.LLM_API_KEY, self.args.LLM_TYPE)
 
             entities = self._parse_llm_response(question, response)
 
@@ -49,7 +49,7 @@ class EntityLinker:
     #     prompt = self._build_entity_recognition_prompt(question)
     #
     #     try:
-    #         response = run_llm(prompt, 0.1, 100, self.args.opeani_api_keys, self.args.LLM_type)
+    #         response = run_llm(prompt, 0.1, 100, self.args.LLM_API_KEY, self.args.LLM_TYPE)
     #
     #         # 清理响应
     #         response = self._clean_think_tags(response)

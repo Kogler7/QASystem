@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import networkx as nx
 from pyvis.network import Network
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, basic_auth
 import json
 from typing import List, Dict, Any, Optional
 import webbrowser
@@ -11,15 +11,34 @@ import os
 class Neo4jPathVisualizer:
     """Neo4j 路径可视化工具"""
 
-    def __init__(self, uri="bolt://localhost:7687", user="neo4j", password="neo4j2025"):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+    def __init__(self, uri="bolt://localhost:7687", user="neo4j", password=None):
+        """
+        初始化 Neo4j 路径可视化器
+        
+        Args:
+            uri: Neo4j 服务器 URI
+            user: Neo4j 用户名
+            password: Neo4j 密码，如果为 None，则从环境变量读取
+        """
+        if password is None:
+            password = os.getenv("NEO4J_PASSWORD", "neo4j2025")
+        try:
+            self.driver = GraphDatabase.driver(uri, auth=basic_auth(user, password))
+            print("Neo4j 可视化器初始化成功")
+        except Exception as e:
+            print(f"Neo4j 可视化器初始化失败: {e}")
+            self.driver = None
 
     def close(self):
         """关闭连接"""
         self.driver.close()
 
-    def get_answer_path(self, question: str, answer_entities: List[str]) -> Dict:
+    def get_answer_path(self, question: str, answer_entities: List[str], limit: int = 10) -> Dict:
         """获取答案相关的完整路径"""
+        if not self.driver:
+            print("Neo4j 可视化器未初始化")
+            return {"nodes": [], "relationships": []}
+            
         with self.driver.session() as session:
             # 构建查询 - 查找所有相关实体和关系
             query = """
@@ -38,9 +57,10 @@ class Neo4jPathVisualizer:
                 }] as relationships,
                 length(path) as depth
             ORDER BY depth
+            LIMIT $limit
             """
 
-            result = session.run(query, entities=answer_entities)
+            result = session.run(query, entities=answer_entities, limit=limit)
 
             paths = []
             for record in result:
@@ -138,8 +158,17 @@ class Neo4jPathVisualizer:
         plt.tight_layout()
         plt.show()
 
-    def visualize_with_pyvis(self, graph_data: Dict, output_file="neo4j_path.html"):
+    def visualize_with_pyvis(self, graph_data: Dict, output_file="neo4j_path.html", open_browser=False):
         """使用 Pyvis 创建交互式可视化"""
+        if not self.driver:
+            print("Neo4j 可视化器未初始化")
+            return None
+            
+        # 确保输出目录存在
+        output_dir = os.getenv("VISUALIZATION_DIR", "visualizations")
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, output_file)
+        
         net = Network(height="750px", width="100%",
                       bgcolor="#ffffff", font_color="black",
                       directed=True)
@@ -197,10 +226,14 @@ class Neo4jPathVisualizer:
         }
         """)
 
-        # 保存并打开
-        net.show(output_file)
-        webbrowser.open('file://' + os.path.realpath(output_file))
-        return output_file
+        # 保存
+        net.save_graph(output_path)
+        
+        # 打开浏览器
+        if open_browser:
+            webbrowser.open('file://' + os.path.realpath(output_path))
+            
+        return output_path
 
 
 class EnhancedPathVisualizer:
@@ -209,23 +242,36 @@ class EnhancedPathVisualizer:
     def __init__(self, neo4j_visualizer):
         self.visualizer = neo4j_visualizer
 
-    def highlight_answer_path(self, question: str, answer_entities: List[str]):
+    def highlight_answer_path(self, question: str, answer_entities: List[str], visualization_type="pyvis", limit: int = 10):
         """高亮答案路径"""
         # 获取图谱数据
-        graph_data = self.visualizer.get_answer_path(question, answer_entities)
+        try:
+            graph_data = self.visualizer.get_answer_path(question, answer_entities, limit=limit)
+        except Exception as e:
+            print(f"获取图谱数据失败: {e}")
+            return "获取图谱数据失败"
 
         if not graph_data["nodes"]:
             print("未找到相关路径")
-            return None
+            return "未找到相关路径"
 
         print(f"找到 {len(graph_data['nodes'])} 个节点，{len(graph_data['relationships'])} 条关系")
 
         # 使用 Pyvis 创建交互式可视化
-        html_file = self.visualizer.visualize_with_pyvis(graph_data,
-                                                         f"answer_path_{question[:10]}.html")
+        html_file = None
+        if visualization_type in ["pyvis", "both"]:
+            html_file = self.visualizer.visualize_with_pyvis(
+                graph_data,
+                f"answer_path_{question[:10]}.html",
+                open_browser=False
+            )
 
-        # 同时使用 NetworkX 创建静态图（可选）
-        self.visualizer.visualize_with_networkx(graph_data, answer_entities)
+        # 使用 NetworkX 创建静态图（可选）
+        if visualization_type in ["networkx", "both"]:
+            try:
+                self.visualizer.visualize_with_networkx(graph_data, answer_entities)
+            except Exception as e:
+                print(f"创建 NetworkX 可视化失败: {e}")
 
         return html_file
 
@@ -234,21 +280,46 @@ class EnhancedPathVisualizer:
         entities = []
 
         try:
-            # 从方案模型中提取
-            if "方案模型" in solver_result:
+            # 从图谱路径中提取实体（优先）
+            if "图谱路径" in solver_result and "answer_path" in solver_result["图谱路径"]:
+                for path in solver_result["图谱路径"]["answer_path"]:
+                    for node in path.get("nodes", []):
+                        if node.get("label") and node["label"] not in entities:
+                            entities.append(node["label"])
+                            print(f"从图谱路径中提取到实体: {node['label']}")
+
+            # 如果图谱路径中没有实体，从方案模型中提取
+            if not entities and "方案模型" in solver_result:
                 for solution in solver_result["方案模型"]:
                     if "输出" in solution:
                         for output in solution["输出"]:
                             if output and output != "信息不足":
-                                entities.append(output)
-
-            # 从图谱路径中提取
-            if "图谱路径" in solver_result and "答案路径" in solver_result["图谱路径"]:
-                for path in solver_result["图谱路径"]["答案路径"]:
-                    for node in path.get("nodes", []):
-                        if node.get("label") and node["label"] not in entities:
-                            entities.append(node["label"])
+                                # 从输出中提取实体
+                                extracted_entities = self._extract_entities_from_text(output)
+                                for entity in extracted_entities:
+                                    if entity not in entities:
+                                        entities.append(entity)
+                                        print(f"从答案文本中提取到实体: {entity}")
         except Exception as e:
             print(f"提取答案实体失败: {e}")
 
+        return entities
+
+    def _extract_entities_from_text(self, text: str) -> List[str]:
+        """从文本中提取实体"""
+        entities = []
+        
+        # 简单的实体提取逻辑
+        import re
+        
+        # 提取中文实体（2个或更多汉字）
+        chinese_entities = re.findall(r'[\u4e00-\u9fa5]{2,}', text)
+        
+        # 过滤常见虚词和无意义的短语
+        common_words = {"回答", "基于", "给定", "知识", "三元组", "可以", "视为", "一种", "情况", "发生", "异常"}
+        filtered_entities = [entity for entity in chinese_entities if entity not in common_words]
+        
+        # 去重
+        entities.extend(list(set(filtered_entities)))
+        
         return entities

@@ -13,11 +13,22 @@ class ProblemSolver:
         self.client = neo4j_client
         self.args = args
         self.entity_linker = EntityLinker(neo4j_client, args)
+        self.reasoning_logs = []  # 收集推理过程中的日志
+
+    def _log(self, step: str, message: str, data: any = None):
+        """记录推理日志"""
+        log_entry = {
+            "step": step,
+            "message": message,
+            "data": data
+        }
+        self.reasoning_logs.append(log_entry)
 
     def solve(self, user_input: str) -> Dict:
         """
         主求解流程 - 对应文档的四个步骤
         """
+        self.reasoning_logs = []  # 清空推理日志
         print(f"\n{'=' * 60}")
         print(f"开始问题求解: {user_input}")
 
@@ -36,11 +47,15 @@ class ProblemSolver:
         solutions = []
         matches = []
 
+        graph_paths = {"answer_path": [], "reasoning_chains": []}
         for i, subproblem in enumerate(subproblems):
             print(f"  处理子问题 {i + 1}/{len(subproblems)}: {subproblem.问题ID}")
-            solution, match = self._get_solution(subproblem)
+            solution, match, sub_graph_paths = self._get_solution(subproblem)
             solutions.append(solution)
             matches.append(match)
+            # 合并图谱路径
+            graph_paths["answer_path"].extend(sub_graph_paths.get("answer_path", []))
+            graph_paths["reasoning_chains"].extend(sub_graph_paths.get("reasoning_chains", []))
 
         # ===== 步骤4：物理组件匹配 =====
         print("\n物理组件匹配...")
@@ -54,7 +69,9 @@ class ProblemSolver:
             "方案模型": [s.dict() for s in solutions],
             "问题-方案匹配": [m.dict() for m in matches],
             "执行计划": [ep.dict() for ep in execution_plans],
-            "求解时间": datetime.now().isoformat()
+            "图谱路径": graph_paths,
+            "求解时间": datetime.now().isoformat(),
+            "推理日志": self.reasoning_logs
         }
 
         print(f"\n{'=' * 60}")
@@ -91,7 +108,13 @@ class ProblemSolver:
         请用JSON格式输出，只输出JSON，不要其他内容。
         """
 
-        response = run_llm(prompt, 0.2, 800, self.args.opeani_api_keys, self.args.LLM_type)
+        # 记录问题定义提示词
+        self._log("问题定义", "生成问题模型提示词", {"prompt": prompt})
+
+        response = run_llm(prompt, 0.2, 800, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+
+        # 记录LLM响应
+        self._log("问题定义", "LLM响应", {"response": response})
 
         try:
             data = self._extract_json(response)
@@ -104,9 +127,13 @@ class ProblemSolver:
                 if "创建时间" not in data:
                     data["创建时间"] = datetime.now().isoformat()
 
+                # 记录问题模型生成结果
+                self._log("问题定义", "生成问题模型结果", data)
+                
                 return ProblemModel(**data)
         except Exception as e:
             print(f"解析问题模型失败: {e}")
+            self._log("问题定义", f"生成问题模型失败: {e}")
 
         # # 后备方案：生成默认问题模型
         # return ProblemModel(
@@ -130,6 +157,9 @@ class ProblemSolver:
         """
         print(f"\n  问题分解：当前版本暂不分解，直接使用主问题 {problem.问题ID}")
 
+        # 记录问题分解过程
+        self._log("问题分解", f"当前版本暂不分解，直接使用主问题 {problem.问题ID}")
+
         # 确保返回的子问题中，问题类型是字符串，而不是枚举对象
         problem_dict = problem.dict()
         # 如果问题类型是枚举，转换为字符串
@@ -138,11 +168,11 @@ class ProblemSolver:
 
         return [ProblemModel(**problem_dict)]
 
-    def _get_solution(self, problem: ProblemModel) -> tuple[SolutionModel, ProblemSolutionMatch]:
+    def _get_solution(self, problem: ProblemModel) -> tuple[SolutionModel, ProblemSolutionMatch, Dict]:
         """
         步骤3：方案获取 - 使用 ToG 方法在知识图谱上检索
         输入：问题模型
-        输出：方案模型 + 匹配关系
+        输出：方案模型 + 匹配关系 + 图谱路径
         """
         print(f"\n  开始为问题 {problem.问题ID} 获取方案...")
         print(f"  问题描述: {problem.问题描述}")
@@ -171,6 +201,9 @@ class ProblemSolver:
             topic_entity = linked_entities
 
         print(f"  起始实体: {topic_entity}")
+        
+        # 记录实体识别与链接结果
+        self._log("实体识别与链接", f"识别到 {len(topic_entity)} 个实体", topic_entity)
 
         # 调用 ToG 方法在知识图谱上检索
         answer, reasoning_chains, search_result = self._run_tog_search(
@@ -195,7 +228,69 @@ class ProblemSolver:
             匹配理由="基于ToG知识图谱检索"
         )
 
-        return solution, match
+        # 构建图谱路径信息
+        graph_paths = {
+            "answer_path": [],
+            "reasoning_chains": reasoning_chains
+        }
+
+        # 从推理链中提取路径信息
+        for depth, chain in enumerate(reasoning_chains):
+            if chain:
+                # 直接处理 chain 中的元素
+                for item in chain:
+                    path = {
+                        "depth": depth + 1,
+                        "nodes": [],
+                        "relationships": []
+                    }
+                    
+                    # 检查 item 的类型
+                    if isinstance(item, tuple) and len(item) == 3:
+                        # 格式为 (实体1, 关系, 实体2)
+                        entity1, relation, entity2 = item
+                        path["nodes"].append({
+                            "id": entity1,
+                            "label": entity1
+                        })
+                        path["nodes"].append({
+                            "id": entity2,
+                            "label": entity2
+                        })
+                        path["relationships"].append({
+                            "from": entity1,
+                            "type": relation,
+                            "to": entity2
+                        })
+                    elif isinstance(item, list):
+                        # 格式为列表，可能包含多个实体和关系
+                        for i, sub_item in enumerate(item):
+                            if isinstance(sub_item, dict):
+                                # 处理实体
+                                if "entity" in sub_item:
+                                    entity_id = sub_item["entity"]
+                                    entity_name = sub_item.get("label", entity_id)
+                                    path["nodes"].append({
+                                        "id": entity_id,
+                                        "label": entity_name
+                                    })
+                                # 处理关系
+                                if "relation" in sub_item and i > 0:
+                                    relation_type = sub_item["relation"]
+                                    # 添加关系
+                                    path["relationships"].append({
+                                        "from": item[i-1].get("entity"),
+                                        "type": relation_type,
+                                        "to": entity_id
+                                    })
+                    
+                    if path["nodes"]:
+                        graph_paths["answer_path"].append(path)
+
+        # 打印提取的路径信息，以便调试
+        print(f"提取的 answer_path: {graph_paths['answer_path']}")
+
+        return solution, match, graph_paths
 
     def _match_physical_components(self, solutions: List[SolutionModel]) -> List:
         """
@@ -233,14 +328,13 @@ class ProblemSolver:
         运行 ToG 知识图谱检索
         复用你原有的 ToG 推理逻辑
         """
-
         cluster_chain_of_entities = []
         pre_relations = []
         pre_heads = [-1] * len(topic_entity)
         found_answer = False
         final_answer = "信息不足"
 
-        for depth in range(1, config.depth + 1):
+        for depth in range(1, config.DEPTH + 1):
             print(f"    ToG深度 {depth} 搜索...")
 
             current_entity_relations_list = []
@@ -259,6 +353,24 @@ class ProblemSolver:
             if not current_entity_relations_list:
                 print(f"    深度 {depth} 未找到关系")
                 break
+
+            # 记录大模型选择的关系和打分
+            # 获取第一个关系的LLM响应（所有关系都包含相同的LLM响应）
+            llm_response = current_entity_relations_list[0].get('llm_response', '') if current_entity_relations_list else ''
+            
+            self._log("知识图谱检索", f"深度 {depth} - 大模型关系选择", {
+                "深度": depth,
+                "大模型选择原因": llm_response,
+                "候选关系": [
+                    {
+                        "实体": rel.get('entity_name', rel.get('entity', '')),
+                        "关系": rel.get('relation', ''),
+                        "方向": "出度" if rel.get('head', True) else "入度",
+                        "评分": round(rel.get('score', 0), 2)
+                    }
+                    for rel in current_entity_relations_list[:5]
+                ]
+            })
 
             # 收集候选实体
             total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head = [], [], [], [], [], []
@@ -350,6 +462,14 @@ class ProblemSolver:
         if not found_answer:
             final_answer = generate_without_explored_paths(question, config)
 
+        # 记录最终推理结果
+        self._log("知识图谱检索", "检索完成", {
+            "是否找到答案": found_answer,
+            "搜索深度": depth,
+            "最终答案": final_answer,
+            "推理链数量": len(cluster_chain_of_entities)
+        })
+
         return final_answer, cluster_chain_of_entities, {
             "found_answer": found_answer,
             "depth_reached": depth,
@@ -412,5 +532,17 @@ class ProblemSolver:
             控制逻辑=control_logic,
             置信度=confidence
         )
-
+        
+        # 记录方案模型生成过程
+        self._log("方案规划", "生成方案模型", {
+            "方案ID": solution.方案ID,
+            "方案类别": solution.方案类别,
+            "方案目标": solution.方案目标,
+            "输入": solution.输入,
+            "输出": solution.输出,
+            "约束": solution.约束,
+            "控制逻辑": solution.控制逻辑,
+            "置信度": solution.置信度
+        })
+        
         return solution
