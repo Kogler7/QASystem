@@ -12,7 +12,7 @@ class Config:
     # ===== Neo4j 配置 =====
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = ""
+    NEO4J_PASSWORD: str = "neo4j2025"  # 默认与 .env.example 一致；生产请通过 .env 或环境变量覆盖
 
     # ===== LLM 配置 =====
     LLM_TYPE: str = "glm-4.7"

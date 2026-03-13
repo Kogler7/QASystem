@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import networkx as nx
 from pyvis.network import Network
-from neo4j import GraphDatabase, basic_auth
+from neo4j import GraphDatabase
 import json
 from typing import List, Dict, Any, Optional
 import webbrowser
@@ -23,7 +23,7 @@ class Neo4jPathVisualizer:
         if password is None:
             password = os.getenv("NEO4J_PASSWORD", "neo4j2025")
         try:
-            self.driver = GraphDatabase.driver(uri, auth=basic_auth(user, password))
+            self.driver = GraphDatabase.driver(uri, auth=(user, password))
             print("Neo4j 可视化器初始化成功")
         except Exception as e:
             print(f"Neo4j 可视化器初始化失败: {e}")
