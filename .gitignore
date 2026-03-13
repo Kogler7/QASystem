@@ -48,6 +48,9 @@ dmypy.json
 backend/data/documents/
 backend/data/preproc_output/
 backend/data/preproc_upload/
+backend/processed/
+backend/processed_files/
+backend/temp_files/
 
 # =====================
 # Local environment directories
