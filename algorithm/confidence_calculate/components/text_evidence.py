@@ -48,7 +48,8 @@ class TextEvidence(nn.Module):
             self.sbert = SentenceTransformer(model_path)
         except Exception as e:
             err_msg = str(e).lower()
-            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+            if ("deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg
+                    or "pytorchstreamreader" in err_msg or "central directory" in err_msg or "zip archive" in err_msg):
                 raise RuntimeError(
                     f"SBERT 模型文件不完整或损坏（{e}）。请删除目录 {model_path} 后重新下载："
                     " 在 algorithm/confidence_calculate 下执行 python temp_utils/download_sbert.py"

@@ -32,7 +32,8 @@ class KGEEvidence(nn.Module):
             return torch.load(path, map_location='cpu', weights_only=False)
         except Exception as e:
             err_msg = str(e).lower()
-            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+            if ("deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg
+                    or "pytorchstreamreader" in err_msg or "central directory" in err_msg or "zip archive" in err_msg):
                 raise RuntimeError(
                     f"实体嵌入文件不完整或损坏: {path}（{e}）。请重新训练 TransE 嵌入："
                     " 在 algorithm/confidence_calculate 下执行 python train_transe_embeddings.py"
@@ -46,7 +47,8 @@ class KGEEvidence(nn.Module):
             return torch.load(path, map_location='cpu', weights_only=False)
         except Exception as e:
             err_msg = str(e).lower()
-            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+            if ("deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg
+                    or "pytorchstreamreader" in err_msg or "central directory" in err_msg or "zip archive" in err_msg):
                 raise RuntimeError(
                     f"关系嵌入文件不完整或损坏: {path}（{e}）。请重新训练 TransE 嵌入："
                     " 在 algorithm/confidence_calculate 下执行 python train_transe_embeddings.py"

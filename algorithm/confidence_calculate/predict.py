@@ -69,7 +69,8 @@ class ConfidencePredictor:
             self.model.load_state_dict(state)
         except Exception as e:
             err_msg = str(e).lower()
-            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+            if ("deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg
+                    or "pytorchstreamreader" in err_msg or "central directory" in err_msg or "zip archive" in err_msg):
                 raise RuntimeError(
                     f"模型文件不完整或损坏: {model_path}（{e}）。请重新训练置信度模型并生成 final_model.pt。"
                 ) from e

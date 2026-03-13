@@ -75,7 +75,8 @@ def _get_predictor():
         except Exception as e:
             logger.warning("加载置信度预测器失败: %s", e)
             err_str = str(e)
-            if "incomplete metadata" in err_str or "file not fully covered" in err_str or "deserializ" in err_str.lower():
+            if ("incomplete metadata" in err_str or "file not fully covered" in err_str or "deserializ" in err_str.lower()
+                    or "pytorchstreamreader" in err_str.lower() or "central directory" in err_str.lower() or "zip archive" in err_str.lower()):
                 raise RuntimeError(
                     "置信度模型或依赖文件不完整/损坏（反序列化失败）。"
                     " 若为 SBERT：删除 algorithm/confidence_calculate/sbert_model 后执行 python temp_utils/download_sbert.py；"
