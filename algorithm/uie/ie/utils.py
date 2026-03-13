@@ -50,8 +50,7 @@ class ApiLLM(BaseLLM):
         self._client = LLMClient(
             api_key=api_key or "",
             base_url=base_url or "",
-            model=model or "",
-            backend=backend or "",
+            model=model or ""
         )
 
     def run(self, system_prompt: str, text: str) -> str:
