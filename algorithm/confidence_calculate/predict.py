@@ -61,8 +61,19 @@ class ConfidencePredictor:
         
         # 加载模型
         print("加载模型中...")
-        self.model = DynamicHybridModel(self.config)
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        try:
+            self.model = DynamicHybridModel(self.config)
+            state = torch.load(model_path, map_location=self.device, weights_only=False)
+            if isinstance(state, dict) and "state_dict" in state:
+                state = state["state_dict"]
+            self.model.load_state_dict(state)
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+                raise RuntimeError(
+                    f"模型文件不完整或损坏: {model_path}（{e}）。请重新训练置信度模型并生成 final_model.pt。"
+                ) from e
+            raise
         self.model = self.model.to(self.device)
         self.model.eval()
         print("模型加载完成")

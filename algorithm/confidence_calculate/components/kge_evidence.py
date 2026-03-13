@@ -29,16 +29,28 @@ class KGEEvidence(nn.Module):
         """加载实体嵌入"""
         path = config.get('entity_emb_path', 'embeddings/entities.pt')
         try:
-            return torch.load(path)
-        except:
+            return torch.load(path, map_location='cpu', weights_only=False)
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+                raise RuntimeError(
+                    f"实体嵌入文件不完整或损坏: {path}（{e}）。请重新训练 TransE 嵌入："
+                    " 在 algorithm/confidence_calculate 下执行 python train_transe_embeddings.py"
+                ) from e
             return None
-    
+
     def _load_relation_embeddings(self, config):
         """加载关系嵌入"""
         path = config.get('relation_emb_path', 'embeddings/relations.pt')
         try:
-            return torch.load(path)
-        except:
+            return torch.load(path, map_location='cpu', weights_only=False)
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg:
+                raise RuntimeError(
+                    f"关系嵌入文件不完整或损坏: {path}（{e}）。请重新训练 TransE 嵌入："
+                    " 在 algorithm/confidence_calculate 下执行 python train_transe_embeddings.py"
+                ) from e
             return None
     
     def _lookup_entity(self, entity_name: str) -> torch.Tensor:
