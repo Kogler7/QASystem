@@ -144,7 +144,5 @@ repair_result.txt
 # =====================
 # algorithm/confidence_calculate（模型、日志、大文件）
 # =====================
-algorithm/confidence_calculate/**/*.pt
-algorithm/confidence_calculate/**/*.ckpt
 algorithm/confidence_calculate/lightning_logs/
 algorithm/confidence_calculate/test_results.json
