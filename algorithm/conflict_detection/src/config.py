@@ -8,10 +8,12 @@ MAX_BATCH_SIZE = 1000
 NODE_BATCH_SIZE = 500
 CLASS_BATCH_SIZE = 100
 
-# 1. 数据库配置
-NEO4J_URI = "neo4j+s://111bff2c.databases.neo4j.io"
-NEO4J_USER = "neo4j"
-NEO4J_PWD = "jSnELhrtpwdiM7Bg9YWv8cLtAI7s76up17swDQ64lR4"
+# 1. 数据库配置（优先从环境变量读取，避免云地址无法解析时阻塞本地使用）
+# 本地 Neo4j 示例: bolt://localhost:7687 或 bolt://127.0.0.1:7687
+# Neo4j Aura 云: neo4j+s://xxxx.databases.neo4j.io（不写端口，驱动默认 7687）
+NEO4J_URI = os.getenv("CONFLICT_NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("CONFLICT_NEO4J_USER", "neo4j")
+NEO4J_PWD = os.getenv("CONFLICT_NEO4J_PWD", "neo4j2025")
 
 # 2.  就是这行！检查名字对不对，有没有漏掉 S
 COMMON_PREFIXES = """

@@ -14,11 +14,14 @@ _THIS = Path(__file__).resolve()
 _ROOT = _THIS.parents[5]
 _ANS_ROOT = _ROOT / "algorithm" / "ans"
 _ANS_QA = _ANS_ROOT / "QA"
+# 先插入 _ANS_ROOT 再插入 _ANS_QA，保证 "QA" 作为包从 algorithm/ans 解析，避免 config 被 confidence_calculate 等其它路径劫持
 if _ANS_ROOT.exists():
-    if str(_ANS_ROOT) not in sys.path:
-        sys.path.insert(0, str(_ANS_ROOT))
-    if _ANS_QA.exists() and str(_ANS_QA) not in sys.path:
-        sys.path.insert(0, str(_ANS_QA))
+    _ans_root_str = str(_ANS_ROOT)
+    _ans_qa_str = str(_ANS_QA) if _ANS_QA.exists() else None
+    if _ans_root_str not in sys.path:
+        sys.path.insert(0, _ans_root_str)
+    if _ans_qa_str and _ans_qa_str not in sys.path:
+        sys.path.insert(0, _ans_qa_str)
 
 
 def _register_tog_alias():

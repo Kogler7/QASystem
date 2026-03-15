@@ -13,7 +13,7 @@ from problem_solver import ProblemSolver
 from neo4j_client import MultiServerWikidataQueryClient
 from entity_linker import EntityLinker
 from neo4j_visualizer import Neo4jPathVisualizer, EnhancedPathVisualizer
-from config import config as default_config
+from .config import config as default_config
 
 
 class Neo4jQAService:
