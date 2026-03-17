@@ -1,101 +1,125 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, Link } from '@element-plus/icons-vue'
 
 const iframeLoading = ref(true)
 const iframeError = ref(false)
 const iframeSrc = ref('')
+const difyWorkspaceUrl = ref('')
 
-const handleIframeLoad = () => {
+const onLoad = () => {
   iframeLoading.value = false
   iframeError.value = false
 }
 
-const handleIframeError = () => {
+const onError = () => {
   iframeLoading.value = false
   iframeError.value = true
-  console.error('Iframe加载失败:', iframeSrc.value)
 }
 
+const openDify = () => difyWorkspaceUrl.value && window.open(difyWorkspaceUrl.value, '_blank', 'noopener,noreferrer')
+
 onMounted(() => {
-  // 使用相对路径，由用户访问网站时的同一域名/端口请求，需在 Nginx 等将 /chatbot 反向代理到 Dify
-iframeSrc.value = 'http://10.126.62.88:8007/chatbot/SbVdbOB0Y7vL3PyF'
-  iframeLoading.value = true
-  iframeError.value = false
+  iframeSrc.value = 'http://10.126.62.88:8007/chatbot/SbVdbOB0Y7vL3PyF'
+  try {
+    difyWorkspaceUrl.value = new URL(iframeSrc.value).origin
+  } catch {
+    difyWorkspaceUrl.value = ''
+  }
 })
 </script>
 
 <template>
-  <div class="chat-wrapper">
-    <div class="iframe-container">
-      <div v-if="iframeLoading && !iframeError" class="iframe-loading">
-        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+  <div class="chat-page">
+    <header class="chat-header">
+      <el-button type="primary" :disabled="!difyWorkspaceUrl" @click="openDify">
+        <el-icon><Link /></el-icon>
+        <span>打开 Dify 工作台</span>
+      </el-button>
+    </header>
+    <div class="chat-card">
+      <div v-if="iframeLoading && !iframeError" class="state-overlay">
+        <el-icon class="is-loading" :size="40"><Loading /></el-icon>
         <span>加载中...</span>
       </div>
-      <div v-else-if="iframeError" class="iframe-error">
-        <span>聊天界面加载失败，请检查网络或稍后重试</span>
+      <div v-else-if="iframeError" class="state-overlay">
+        <span>加载失败，请检查网络或稍后重试</span>
       </div>
       <iframe
         v-if="iframeSrc"
         :src="iframeSrc"
-        class="chatbot-iframe"
+        class="chat-iframe"
         frameborder="0"
         allow="microphone"
-        @load="handleIframeLoad"
-        @error="handleIframeError"
+        @load="onLoad"
+        @error="onError"
       />
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
-.chat-wrapper {
-  width: 100%;
-  min-height: calc(100vh - var(--nav-height));
-  position: relative;
-  background: var(--gray-50);
-}
-
-.iframe-container {
-  width: 100%;
+.chat-page {
   height: calc(100vh - var(--nav-height));
-  position: relative;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 16px var(--padding-inline) 0;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 24px;
-  box-sizing: border-box;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-primary);
 }
 
-.iframe-loading,
-.iframe-error {
+.chat-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-card {
+  flex: 1;
+  min-height: 0;
+  background: var(--white);
+  border-radius: var(--card-radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+  position: relative;
+}
+
+.state-overlay {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  color: var(--gray-500);
+  background: var(--bg-primary);
+  color: var(--gray-600);
   font-size: 14px;
   z-index: 2;
 }
 
-.chatbot-iframe {
-  width: 90%;
+.chat-iframe {
+  display: block;
+  width: 100%;
   height: 100%;
-  min-height: 700px;
   border: none;
 }
 
 @media (max-width: 768px) {
-  .iframe-container {
-    padding: 16px;
+  .chat-page {
+    padding: 12px 16px 0;
   }
-
-  .chatbot-iframe {
-    width: 100%;
+  .chat-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .chat-title {
+    font-size: 18px;
   }
 }
 </style>
