@@ -9,6 +9,7 @@ import numpy as np
 from ir_config.config import Config
 from ir_utils.encoder import HybridEncoder
 from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
+from ir_utils.database_utils import DatabaseUtils
 
 # 配置日志
 config = Config()
@@ -30,6 +31,7 @@ class DatabaseInit:
         self.data_dir = self.config.data_dir
         self.collection_name = self.config.collection_name
         self.milvus_uri = self.config.milvus_uri
+        self.database_utils = DatabaseUtils()
 
         # 初始化数据集以及编码器
         print("正在初始化数据集...")
@@ -43,7 +45,7 @@ class DatabaseInit:
 
         print(f"正在连接到 Milvus: {self.milvus_uri}")
         connections.connect(uri=self.milvus_uri)
-        self.milvus_client = self._init_milvus_client()
+        self.milvus_client = self.database_utils.init_milvus_client()
         self.collection = None
 
         self.consistency_level = getattr(self.config, "milvus_consistency_level", "Strong")
@@ -68,30 +70,6 @@ class DatabaseInit:
         except Exception as e:
             logger.error(f"加载数据集失败: {e}")
             raise
-
-
-    def _init_milvus_client(self)-> MilvusClient|None:
-        """初始化客户端MilvusClient"""
-        max_retries = 3
-        retry_delay = 2
-        for attempt in range(max_retries):
-            try:
-                client = MilvusClient(uri=self.milvus_uri)
-
-                # 测试链接
-                client.list_collections()
-                print("Milvus连接成功")
-                return client
-            except MilvusException as e:
-                logger.warning(f"Milvus 连接失败（尝试 {attempt + 1}/{max_retries}）: {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                else:
-                    logger.error("Milvus 连接重试次数耗尽，初始化失败")
-                    raise
-            except Exception as e:
-                logger.error(f"Milvus 客户端初始化异常: {e}")
-                raise
 
     def _safe_drop_collection(self) -> None:
         """安全删除集合"""
@@ -208,28 +186,6 @@ class DatabaseInit:
         coll_info = self.milvus_client.describe_collection(self.collection_name)
         print(f"集合创建完成，结构: {coll_info}")
 
-
-    def aggregate_utterances(self, utterances):
-        """差异化聚合：稠密用平均，稀疏用拼接"""
-        if utterances is None:
-            return {
-                "dense":[0.0] * self.dense_dim,
-                "sparse": {}
-            }
-
-        # 稠密向量使用平均聚合方法
-        dense_vectors = [self.encoder.encode_only_dense(text_content=utterance) for utterance in utterances]
-        dense_agg = np.mean(dense_vectors, axis=0).tolist()
-
-        # 稀疏向量采用拼接后使用单次编码
-        sparse_text = " ".join(utterances)
-        sparse_vectors = self.encoder.encode_text_hybrid(sparse_text).get("sparse")
-
-        return {
-            "dense": dense_agg,
-            "sparse": sparse_vectors
-        }
-
     def insert_data(self):
         """插入数据"""
         # 先加载集合（确保集合处于可操作状态）
@@ -264,7 +220,7 @@ class DatabaseInit:
                 single_data["user_goal_text"] = intent.get("user_goal", "")
 
                 # 向量编码
-                text = self.build_embedding_text(intent)
+                text = self.database_utils.build_embedding_text(intent)
                 encode_result = self.encoder.encode_text_hybrid(text)
                 dense_vectors = encode_result.get("dense")
                 sparse_vectors = encode_result.get("sparse")
@@ -299,33 +255,5 @@ class DatabaseInit:
 
         except Exception as e:
             print(f"插入失败: {type(e).__name__}: {e}")
-
-
-    def build_embedding_text(self,intent_data:dict)->str:
-        """构建用于向量编码的融合文本（保留业务语义权重）"""
-        parts = []
-
-        if intent_data.get("intent_name"):
-            parts.append(f"[核心]意图名称: {intent_data['intent_name']}")
-        if intent_data.get("user_goal"):
-            parts.append(f"[目标]用户目标: {intent_data['user_goal']}")
-        if intent_data.get("intent_summary"):
-            parts.append(f"[摘要]意图摘要: {intent_data['intent_summary']}")
-
-        # 补充语义（中权重）
-        if intent_data.get("intent_description"):
-            parts.append(f"[描述]详细说明: {intent_data['intent_description']}")
-        if intent_data.get("core_keywords"):
-            kw = "、".join(intent_data["core_keywords"])
-            parts.append(f"[关键词]: {kw}")
-
-        # 用户表达（高价值样本）
-        if intent_data.get("sample_utterances"):
-            # 选取最具代表性的3条（避免噪声）
-            samples = intent_data["sample_utterances"][:3]
-            samples_text = " | ".join([f"{s}" for s in samples])
-            parts.append(f"[示例]典型表述: {samples_text}")
-
-        return "\n".join(parts)
 
 
