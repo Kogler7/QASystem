@@ -122,6 +122,7 @@ Desktop.ini
 .tmp/
 tmp/
 temp/
+backup/
 *.tmp
 *.temp
 *.bak
