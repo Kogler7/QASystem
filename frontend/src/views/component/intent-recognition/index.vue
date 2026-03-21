@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Aim, Document, Plus, Refresh } from '@element-plus/icons-vue'
-import { intentRecognitionHealthCheck, intentRecognitionRecognize, intentRecognitionStream } from '@/api/modules/component/intent-recognition'
+import { intentRecognitionHealthCheck, intentRecognitionRecognize, intentRecognitionStream, intentRecognitionDeepRecognize } from '@/api/modules/component/intent-recognition'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -130,40 +130,20 @@ const submit = async () => {
       ElMessage.success('识别完成')
       isStreaming.value = false
     } else {
-      // 深度意图识别（流式）
+      // 深度意图识别
       isStreaming.value = true
-      const response = await intentRecognitionStream({ text })
-      
-      if (!response.ok) {
-        throw new Error('API 请求失败')
-      }
-      
-      // 处理流式响应
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        const chunk = decoder.decode(value, { stream: true })
-        // 解析 SSE 格式
-        const lines = chunk.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data) {
-              streamingResult.value += data
-            }
-          }
-        }
-      }
+      const { data } = await intentRecognitionDeepRecognize({ text })
+      result.value = data?.data ?? data
       ElMessage.success('识别完成')
+      isStreaming.value = false
     }
   } catch (error) {
     ElMessage.error(error?.message || '识别失败')
     if (recognitionType.value === 'deep') {
-      streamingResult.value = '识别失败：' + error.message
+      result.value = {
+        reasoning: '识别失败',
+        json_content: '识别失败：' + (error.message || '未知错误')
+      }
     }
   } finally {
     loading.value = false
@@ -245,7 +225,7 @@ onMounted(checkHealth)
           <p class="result-label">识别结果</p>
           <div class="result-fields">
             <!-- 相关意图 -->
-            <div v-if="result['相关意图']" class="result-section">
+            <div v-if="result['相关意图'] && result['相关意图'].length > 0" class="result-section">
               <h4 class="section-title">相关意图</h4>
               <div v-if="Array.isArray(result['相关意图'])" class="intent-list">
                 <div v-for="(intent, index) in result['相关意图']" :key="index" class="intent-item">
@@ -270,6 +250,12 @@ onMounted(checkHealth)
                 <p>{{ result['相关意图'] }}</p>
               </div>
             </div>
+            <div v-else class="result-section">
+              <h4 class="section-title">相关意图</h4>
+              <div class="intent-single">
+                <p>未识别到相关意图</p>
+              </div>
+            </div>
             
             <!-- 向量 -->
             <div v-if="result['向量']" class="result-section">
@@ -282,22 +268,37 @@ onMounted(checkHealth)
             <!-- 与原始文本的相似度 -->
             <div v-if="result['相似度']" class="result-section">
               <h4 class="section-title">相似度</h4>
-              <div v-if="Array.isArray(result['相似度'])" class="similarity-list">
-                <div v-for="(similarity, index) in result['相似度']" :key="index" class="similarity-item">
-                  <div class="similarity-header">
-                    <span class="similarity-badge">结果 {{ index + 1 }}</span>
-                  </div>
-                  <div class="similarity-content">
-                    <p v-if="similarity['意图ID']">意图 ID：{{ similarity['意图ID'] }}</p>
-                    <p v-if="similarity['稠密向量的相似度']">稠密向量的相似度：{{ similarity['稠密向量的相似度'] }}</p>
-                    <p v-if="similarity['稀疏向量的相似度']">稀疏向量的相似度：{{ similarity['稀疏向量的相似度'] }}</p>
-                    <p v-if="similarity['RRF分数']">RRF分数：{{ similarity['RRF分数'] }}</p>
-                  </div>
-                </div>
+              <div v-if="Array.isArray(result['相似度'])" class="similarity-table">
+                <el-table :data="result['相似度']" style="width: 100%" border stripe fit>
+                  <el-table-column prop="意图ID" label="意图 ID" align="center" header-align="center">
+                    <template #default="scope">
+                      {{ scope.row['意图ID'] || '/' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="稠密向量的相似度" label="稠密向量的相似度" align="center" header-align="center">
+                    <template #default="scope">
+                      {{ scope.row['稠密向量的相似度'] || '/' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="稀疏向量的相似度" label="稀疏向量的相似度" align="center" header-align="center">
+                    <template #default="scope">
+                      {{ scope.row['稀疏向量的相似度'] || '/' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="RRF分数" label="RRF分数" align="center" header-align="center">
+                    <template #default="scope">
+                      {{ scope.row['RRF分数'] || '/' }}
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
               <div v-else class="similarity-single">
                 <p>{{ result['与原始文本的相似度'] }}</p>
               </div>
+              <h4 class="section-title" style="margin-top: 8px;margin-bottom: 8px;">注：因为稠密向量和稀疏向量是独立检索的，所以检索到的意图结果不是完全一样，但是可能有一样的意图
+                <br>如果稠密向量相似度为空就代表该意图的语义与问题的语义相关性低
+                <br>如果稀疏向量相似度为空就代表该意图的关键词与问题的关键词相关性低
+              </h4>
             </div>
           </div>
           <el-collapse v-if="result['筛选的最终意图']">
@@ -308,9 +309,39 @@ onMounted(checkHealth)
         </div>
 
         <!-- 深度识别结果 -->
-        <div v-else-if="recognitionType === 'deep' && (streamingResult || isStreaming)" class="result-box">
+        <div v-else-if="recognitionType === 'deep' && result" class="result-box">
           <p class="result-label">识别结果</p>
-          <div class="streaming-output" v-html="streamingResult"></div>
+          
+          <!-- 工具调用结果 -->
+          <el-collapse v-if="result.tool_result && result.tool_result.length > 0">
+            <el-collapse-item title="工具调用结果" name="tool">
+              <div class="result-section">
+                <div v-for="(tool, index) in result.tool_result" :key="index" class="tool-item">
+                  <p><strong>工具名称：</strong>{{ tool.name }}</p>
+                  <p><strong>参数：</strong>{{ JSON.stringify(tool.arguments) }}</p>
+                  <div class="tool-result">
+                    <p><strong>结果：</strong></p>
+                    <pre class="result-json">{{ JSON.stringify(tool.result, null, 2) }}</pre>
+                  </div>
+                </div>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+          
+          <!-- 推理过程 -->
+          <el-collapse v-if="result.reasoning">
+            <el-collapse-item title="推理过程" name="reasoning">
+              <div class="result-section">
+                <pre class="result-json">{{ result.reasoning }}</pre>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+          
+          <!-- 最终意图 -->
+          <div v-if="result.json_content" class="result-section">
+            <h4 class="section-title">最终意图</h4>
+            <pre class="result-json">{{ typeof result.json_content === 'string' ? result.json_content : JSON.stringify(result.json_content, null, 2) }}</pre>
+          </div>
         </div>
       </el-card>
     </div>

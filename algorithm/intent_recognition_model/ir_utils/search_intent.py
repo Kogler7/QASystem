@@ -181,17 +181,13 @@ class HybridSearch:
             "metric_type": "IP",
             "params": {
                 "nprobe": 16,
-                "radius": 0.4,
-                "range_filter": 1
+                "radius":  0.4,
+                "range_filter" : 1
                 }
         }
 
-
         sparse_search_param = {
             "metric_type": "IP",
-            "params": {
-                "drop_ratio_search": 0.2
-                }
         }
 
         if self.collection_name is None or query is None:
@@ -242,7 +238,7 @@ class HybridSearch:
         for hit in results:
             result_dict = {
                 "intent_id":hit.id,
-                "distance": hit.distance,
+                "similarity": hit.distance,
                 "entity": {}
             }
             for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
@@ -254,22 +250,18 @@ class HybridSearch:
         return result_list
 
     def basic_search(self, query: str, top_k = 3):
-        """基础相似度查询"""
+        """基础相似度查询，不进行RRFRank重排"""
         dense_search_param = {
             "metric_type": "IP",
             "params": {
                 "nprobe": 16,
-                "radius": 0.4,
-                "range_filter": 1
+                "radius":  0.4,
+                "range_filter" : 1
                 }
         }
 
-
         sparse_search_param = {
             "metric_type": "IP",
-            "params": {
-                "drop_ratio_search": 0.2
-                }
         }
 
         if self.collection_name is None or query is None:
@@ -304,12 +296,12 @@ class HybridSearch:
             search_params=sparse_search_param
         )[0]
         logging.info("检索完成")
-        print("\n")
-        print("results_1:\n")
-        print(results_1)
-        print("results_2:\n")
-        print(results_2)
-        print("\n")
+        # print("\n")
+        # print("results_1:\n")
+        # print(results_1)
+        # print("results_2:\n")
+        # print(results_2)
+        # print("\n")
         return {
             "密集向量检索结果": self.HybridHits_to_dict(results_1),
             "稀疏向量检索结果": self.HybridHits_to_dict(results_2)
