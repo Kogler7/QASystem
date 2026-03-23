@@ -12,6 +12,7 @@ from ie.template_matcher import (
     match_templates,
     build_llm_hint_from_matches,
 )
+from ie.chunked_json import extract_from_chunked_payload, parse_chunked_json_bytes
 
 
 UML_DIR = os.path.join(os.path.dirname(__file__), "UML")
@@ -200,7 +201,33 @@ def store_graph_to_neo4j(
     logger.info("store_graph_to_neo4j: 已写入 Neo4j")
 
 
-__all__ = ["extract", "store_graph_to_neo4j"]
+def extract_from_chunked_json_bytes(
+    data: bytes,
+    main_object: str,
+    *,
+    use_templates: bool = True,
+    llm_base_url: Optional[str] = None,
+    llm_model: Optional[str] = None,
+    llm_api_key: Optional[str] = None,
+) -> dict:
+    """
+    解析切块 JSON 文件内容（UTF-8），对每段文本执行与 extract() 相同的抽取流程，合并为统一的 raw + graph。
+    返回格式与 extract() 一致：{"raw": ..., "graph": ...}。
+    """
+    payload = parse_chunked_json_bytes(data)
+    out = extract_from_chunked_payload(
+        payload,
+        extract,
+        main_object=main_object,
+        use_templates=use_templates,
+        llm_base_url=llm_base_url,
+        llm_model=llm_model,
+        llm_api_key=llm_api_key,
+    )
+    return {"raw": out["raw"], "graph": out["graph"]}
+
+
+__all__ = ["extract", "store_graph_to_neo4j", "extract_from_chunked_json_bytes"]
 
 
 def run_local_tests(

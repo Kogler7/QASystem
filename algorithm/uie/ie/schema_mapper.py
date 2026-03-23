@@ -1,4 +1,5 @@
 import json
+import hashlib
 from typing import Any, Optional
 
 from neo4j import GraphDatabase
@@ -95,6 +96,41 @@ class SchemaMapper:
             self.ontology_missing_cache.add(key)
         return None
 
+    @staticmethod
+    def _pick_name_like_value(properties: dict[str, Any]) -> Optional[str]:
+        """
+        优先选取字段名包含 name/名称 的字符串值（不区分大小写）作为稳定 UID 来源。
+        """
+        for k, v in properties.items():
+            if not isinstance(v, str):
+                continue
+            key = str(k).lower()
+            if "name" in key or "名称" in str(k):
+                val = v.strip()
+                if val:
+                    return val
+        return None
+
+    @staticmethod
+    def _stable_props_hash(label: str, properties: dict[str, Any]) -> str:
+        """
+        对全属性做稳定哈希：按键排序的 JSON 序列化后计算 sha256。
+        """
+        payload = {"label": label or "Element", "properties": properties or {}}
+        text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    def _build_node_uid(self, label: str, properties: dict[str, Any]) -> str:
+        """
+        UID 规则：
+        1) 优先用字段名含 name/名称 的值（大小写不敏感）；
+        2) 否则使用 label + 全属性稳定哈希。
+        """
+        name_val = self._pick_name_like_value(properties)
+        if name_val:
+            return f"{label or 'Element'}::{name_val.lower()}"
+        return f"{label or 'Element'}::{self._stable_props_hash(label, properties)}"
+
     def map_to_graph(self, data, parent_id=None, rel_name=None, top_level_class=None):
         if isinstance(data, list):
             if len(data) > 0 and isinstance(data[0], str):
@@ -129,9 +165,7 @@ class SchemaMapper:
 
         # --- 确定 ID 和 标签 ---
         current_label = rel_name if rel_name else (top_level_class if top_level_class else "Element")
-        node_id = properties.get("RuleId") or properties.get("TermId") or \
-                  properties.get("id") or properties.get("RuleName") or \
-                  str(hash(frozenset(properties.items())))
+        node_id = self._build_node_uid(current_label, properties)
 
         # ---  写入节点 ---
         if self.driver is None:
@@ -220,11 +254,7 @@ class SchemaMapper:
             # 确定当前节点 label 与 uid，与 map_to_graph 逻辑保持一致
             current_label = rel_name if rel_name else (level_top if level_top else "Element")
             node_id = (
-                properties.get("RuleId")
-                or properties.get("TermId")
-                or properties.get("id")
-                or properties.get("RuleName")
-                or str(hash(frozenset(properties.items())))
+                self._build_node_uid(current_label, properties)
             )
 
             if node_id not in nodes:

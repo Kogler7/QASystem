@@ -1,11 +1,13 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search, Link, Upload, DocumentCopy } from '@element-plus/icons-vue'
-import { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j } from '@/api'
+import { Search, Link, Upload, DocumentCopy, Download, FolderOpened } from '@element-plus/icons-vue'
+import { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j, parseChunkedJsonExtract } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
+const chunkJsonLoading = ref(false)
 const storeLoading = ref(false)
+const chunkJsonInputRef = ref(null)
 const healthStatus = ref(null)
 const mainObjectOptions = [
   { value: 'Term', label: 'Term（术语）' },
@@ -65,24 +67,68 @@ const storeToNeo4j = async () => {
   }
 }
 
+/** 与接口返回一致：{ raw, graph } */
+const buildResultPayload = () => {
+  if (!result.value) return null
+  return {
+    raw: result.value.raw,
+    graph: result.value.graph ?? {}
+  }
+}
+
 const copyResult = async () => {
-  if (!result.value) {
-    ElMessage.warning('请先完成知识抽取')
+  const payload = buildResultPayload()
+  if (!payload) {
+    ElMessage.warning('请先完成知识抽取或上传解析')
     return
   }
-  const parts = [
-    '// 结构化 JSON (raw)',
-    JSON.stringify(result.value.raw, null, 2),
-    '',
-    '// 图结构 ',
-    JSON.stringify(result.value.graph || {}, null, 2)
-  ]
-  const text = parts.join('\n')
   try {
-    await navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
     ElMessage.success('已复制到剪贴板')
   } catch (err) {
     ElMessage.error('复制失败，请手动复制')
+  }
+}
+
+const downloadResult = () => {
+  const payload = buildResultPayload()
+  if (!payload) {
+    ElMessage.warning('请先完成知识抽取或上传解析')
+    return
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `knowledge-extract-result.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const pickChunkJson = () => {
+  chunkJsonInputRef.value?.click()
+}
+
+const onChunkJsonFile = async (e) => {
+  const input = e.target
+  const file = input?.files?.[0]
+  if (!file) return
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('main_object', form.main_object.trim())
+  formData.append('use_templates', String(form.use_templates))
+  chunkJsonLoading.value = true
+  result.value = null
+  try {
+    const { data } = await parseChunkedJsonExtract(formData)
+    result.value = data
+    ElMessage.success('切块 JSON 已解析并完成抽取')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '切块 JSON 解析失败')
+    result.value = null
+  } finally {
+    chunkJsonLoading.value = false
+    input.value = ''
   }
 }
 
@@ -144,8 +190,8 @@ onMounted(checkHealth)
           <p><strong>使用流程：</strong></p>
           <ol>
             <li>选择主对象类型，输入待抽取文本</li>
-            <li>点击「开始抽取」执行抽取，下方展示抽取结果（raw JSON 与图结构）</li>
-            <li>可点击「复制结果」将 JSON 和图结构复制到剪贴板</li>
+            <li>点击「开始抽取」执行抽取，或「上传切块 JSON」对文件中每段文本分别抽取</li>
+            <li>「复制结果」「下载结果」导出与接口一致的 JSON</li>
             <li>确认结果无误后，点击「存储到 Neo4j」将图结构写入知识图谱</li>
             <li>可通过「查看图谱」跳转 Neo4j Browser 查看已存储的数据</li>
           </ol>
@@ -193,17 +239,47 @@ onMounted(checkHealth)
             <span class="form-hint">默认开启，可提升抽取准确度</span>
           </el-form-item>
           <el-form-item>
-            <el-button
-              type="primary"
-              :loading="loading"
-              :icon="Search"
-              @click="submit"
-            >
-              开始抽取
-            </el-button>
-            <el-button :icon="Link" @click="openNeo4jBrowser">
-              查看图谱
-            </el-button>
+            <div class="form-actions-row">
+              <el-button
+                type="primary"
+                :loading="loading"
+                :icon="Search"
+                @click="submit"
+              >
+                开始抽取
+              </el-button>
+              <el-button :icon="Link" @click="openNeo4jBrowser">
+                查看图谱
+              </el-button>
+              <input
+                ref="chunkJsonInputRef"
+                type="file"
+                accept=".json,application/json"
+                class="hidden-file-input"
+                @change="onChunkJsonFile"
+              >
+              <el-button
+                :loading="chunkJsonLoading"
+                :icon="FolderOpened"
+                @click="pickChunkJson"
+              >
+                上传切块 JSON
+              </el-button>
+              <el-button
+                v-if="result"
+                :icon="DocumentCopy"
+                @click="copyResult"
+              >
+                复制结果
+              </el-button>
+              <el-button
+                v-if="result"
+                :icon="Download"
+                @click="downloadResult"
+              >
+                下载结果
+              </el-button>
+            </div>
           </el-form-item>
         </el-form>
       </el-card>
@@ -214,13 +290,6 @@ onMounted(checkHealth)
           <div class="result-header">
             <span>抽取结果</span>
             <div class="result-actions">
-              <el-button
-                :icon="DocumentCopy"
-                size="small"
-                @click="copyResult"
-              >
-                复制结果
-              </el-button>
               <el-button
                 type="primary"
                 :loading="storeLoading"
@@ -383,6 +452,21 @@ onMounted(checkHealth)
   margin-left: 10px;
   font-size: 12px;
   color: var(--gray-500);
+}
+
+.form-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hidden-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .result-card {

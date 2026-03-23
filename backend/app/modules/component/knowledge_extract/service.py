@@ -74,3 +74,23 @@ def store_graph(
         neo4j_user=neo4j_user,
         neo4j_password=neo4j_password,
     )
+
+
+def extract_from_chunked_json_file(
+    data: bytes,
+    main_object: str,
+    use_templates: bool = True,
+    llm_base_url: Optional[str] = None,
+    llm_model: Optional[str] = None,
+    llm_api_key: Optional[str] = None,
+) -> dict[str, Any]:
+    """解析切块 JSON 字节内容，逐段抽取并合并，返回与 extract() 相同的 raw + graph。"""
+    api = _get_extraction_api()
+    return api.extract_from_chunked_json_bytes(
+        data,
+        main_object=main_object,
+        use_templates=use_templates,
+        llm_base_url=llm_base_url,
+        llm_model=llm_model,
+        llm_api_key=llm_api_key,
+    )
