@@ -135,13 +135,14 @@ class DocumentConversionInterface:
             logger.warning(f"MySQL 初始化失败: {e}")
             self.mysql_client = None
 
-    def convert_document(self, input_path: str, output_filename: Optional[str] = None,
+    def convert_document(self, input_path: str, model_name: Optional[str] = None, output_filename: Optional[str] = None,
                          save_metadata: bool = False, store_excel_raw: bool = False) -> Dict[str, Any]:
         """
         处理单个文档
 
         Args:
             input_path: 输入文件路径
+            model_name: 指定处理模型名称（可选）
             output_filename: 输出文件名（可选）
             save_metadata: 是否保存元数据
             store_excel_raw: 是否将 Excel 原始数据存储到 MySQL（结构化存储）
@@ -162,7 +163,7 @@ class DocumentConversionInterface:
         try:
             # 处理文件
             logger.info(f"开始处理文件: {input_path}")
-            processor_result = self.processor.process_file(input_path)
+            processor_result = self.processor.process_file(input_path, model_name=model_name)
 
             if processor_result is None:
                 result['error'] = '处理失败：处理器未返回结果（可能为 PDF/MinerU 异常）'

@@ -6,6 +6,9 @@ import subprocess
 from typing import Optional, Dict, Any
 from . import BaseProcessor
 
+# import os
+# os.environ["HF_HOME"] = "/home/admin_user_3/.cache/huggingface"
+
 class DocxProcessor(BaseProcessor):
     def __init__(self, libreoffice_path: str = None):
         """
@@ -16,6 +19,9 @@ class DocxProcessor(BaseProcessor):
         """
         self.converter = DocumentConverter(
             allowed_formats=[InputFormat.DOCX]
+        )
+        self.pdf_converter = DocumentConverter(
+            allowed_formats=[InputFormat.PDF]
         )
         self.libreoffice_path = libreoffice_path or self._detect_office_app()
 
@@ -53,7 +59,7 @@ class DocxProcessor(BaseProcessor):
         metadata = {
             'file_type': 'word',
             'processor': 'docling',
-            'supported_formats': ['.docx', '.doc']
+            'supported_formats': ['.pdf', '.docx', '.doc']
         }
         
         if not os.path.exists(file_path):
@@ -64,7 +70,10 @@ class DocxProcessor(BaseProcessor):
 
         _, ext = os.path.splitext(file_path.lower())
 
-        if ext == '.docx':
+        if ext == '.pdf':
+            metadata['file_type'] = 'pdf'
+            content = self._process_pdf(file_path)
+        elif ext == '.docx':
             content = self._process_docx(file_path)
         elif ext == '.doc':
             content = self._process_doc(file_path)
@@ -76,6 +85,15 @@ class DocxProcessor(BaseProcessor):
             'content': content,
             'metadata': metadata
         }
+
+    def _process_pdf(self, file_path: str) -> str:
+        """使用 Docling 处理 PDF 文件"""
+        try:
+            result = self.pdf_converter.convert(file_path)
+            return result.document.export_to_markdown()
+        except Exception as e:
+            print(f"使用docling处理PDF失败: {e}")
+            return f"处理失败：{str(e)}"
 
     def _process_docx(self, file_path: str) -> str:
         """处理DOCX文件"""
@@ -159,4 +177,43 @@ class DocxProcessor(BaseProcessor):
             return None
         except Exception as e:
             print(f"转换过程出错：{e}")
+            return None
+
+    def convert_to_pdf(self, file_path: str) -> Optional[str]:
+        """将 DOC/DOCX 文件转换为 PDF，返回生成的 PDF 路径"""
+        if not self.libreoffice_path:
+            return None
+
+        try:
+            temp_dir = tempfile.mkdtemp(prefix='doc_to_pdf_')
+            stem = os.path.splitext(os.path.basename(file_path))[0]
+            output_file = os.path.join(temp_dir, f"{stem}.pdf")
+
+            cmd = [
+                self.libreoffice_path,
+                '--headless',
+                '--convert-to', 'pdf',
+                '--outdir', temp_dir,
+                file_path
+            ]
+
+            process = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=90
+            )
+
+            if process.returncode == 0:
+                for file in os.listdir(temp_dir):
+                    if file.lower().endswith('.pdf'):
+                        return os.path.join(temp_dir, file)
+
+            print(f"DOC/DOCX 转 PDF 失败：{process.stderr}")
+            return None
+        except subprocess.TimeoutExpired:
+            print("DOC/DOCX 转 PDF 超时")
+            return None
+        except Exception as e:
+            print(f"DOC/DOCX 转 PDF 异常：{e}")
             return None

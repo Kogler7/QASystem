@@ -7,6 +7,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+import importlib.util
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ def health() -> dict[str, Any]:
 
 def convert_document(
     input_path: str,
+    model_name: str | None = None,
     output_filename: str | None = None,
     save_metadata: bool = False,
     store_excel_raw: bool = False,
@@ -75,6 +77,7 @@ def convert_document(
     iface = _get_interface()
     result = iface.convert_document(
         input_path=input_path,
+        model_name=model_name,
         output_filename=output_filename,
         save_metadata=save_metadata,
         store_excel_raw=store_excel_raw,
@@ -122,3 +125,36 @@ def get_upload_dir() -> Path:
     """返回上传临时目录，供路由保存文件。"""
     _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     return _UPLOAD_DIR
+
+
+def convert_to_pdf(input_path: str) -> str | None:
+    """
+    封装预处理模块中对 DOC/DOCX 转 PDF 的能力，优先使用 preproc 的 DocxProcessor.convert_to_pdf。
+    返回生成的 PDF 文件绝对路径，失败时返回 None 或抛出异常。
+    """
+    if not input_path or not Path(input_path).exists():
+        return None
+
+    try:
+        # 尝试以包路径导入（preproc 已被插入到 sys.path）
+        try:
+            from preproc_src.processors.docx_processor import DocxProcessor  # type: ignore
+        except Exception:
+            try:
+                from processors.docx_processor import DocxProcessor  # type: ignore
+            except Exception:
+                # 最后按文件路径动态加载模块
+                module_path = _PREPROC_ROOT / "preproc_src" / "processors" / "docx_processor.py"
+                if not module_path.exists():
+                    raise ImportError("找不到 docx_processor 模块")
+                spec = importlib.util.spec_from_file_location("docx_processor", str(module_path))
+                mod = importlib.util.module_from_spec(spec)
+                assert spec and spec.loader
+                spec.loader.exec_module(mod)  # type: ignore
+                DocxProcessor = getattr(mod, "DocxProcessor")
+
+        processor = DocxProcessor()
+        pdf_path = processor.convert_to_pdf(input_path)
+        return pdf_path
+    except Exception:
+        raise
