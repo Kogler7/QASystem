@@ -42,7 +42,7 @@ class TextEvidence(nn.Module):
         self.max_bm25 = config.get('max_bm25_norm', 100.0)
         
         # 加载 SBERT 模型
-        model_path = config.get('sbert_model_path', 'paraphrase-multilingual-MiniLM-L12-v2')
+        model_path = '/mnt/data3/srv/qasystem/models/sbert_model'
         print(f"加载SBERT模型从: {model_path}")
         try:
             self.sbert = SentenceTransformer(model_path)
@@ -51,7 +51,7 @@ class TextEvidence(nn.Module):
             if ("deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg
                     or "pytorchstreamreader" in err_msg or "central directory" in err_msg or "zip archive" in err_msg):
                 raise RuntimeError(
-                    f"SBERT 模型文件不完整或损坏（{e}）。请删除目录 {model_path} 后重新下载："
+                    f"SBERT 模型文件不完整或损坏（{e}）。请删除目录 {sbert_path} 后重新下载："
                     " 在 algorithm/confidence_calculate 下执行 python temp_utils/download_sbert.py"
                 ) from e
             raise

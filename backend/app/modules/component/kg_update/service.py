@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ if _CONFIDENCE_CALCULATE_ROOT.exists() and str(_CONFIDENCE_CALCULATE_ROOT) not i
 _kg_updator_module = None
 _predictor = None
 
+
 def _get_kg_updator_module():
     global _kg_updator_module
     if _kg_updator_module is None:
@@ -35,6 +36,7 @@ def _get_kg_updator_module():
             raise
     return _kg_updator_module
 
+
 def _get_predictor():
     global _predictor
     if _predictor is None:
@@ -44,26 +46,20 @@ def _get_predictor():
             import sys
             from pathlib import Path
             
-            # 使用 _ROOT 构建置信度计算模块路径
             confidence_root = _ROOT / "algorithm" / "confidence_calculate"
             
-            # 确保路径存在
             if not confidence_root.exists():
                 raise FileNotFoundError(f"置信度计算模块路径不存在: {confidence_root}")
             
-            # 将路径添加到 sys.path
             confidence_root_str = str(confidence_root)
             if confidence_root_str not in sys.path:
                 sys.path.insert(0, confidence_root_str)
             
-            # 改变工作目录到 confidence_calculate
             os.chdir(confidence_root_str)
             
-            # 打印调试信息
             logger.info(f"当前工作目录: {os.getcwd()}")
             logger.info(f"sys.path: {sys.path[:5]}")
             
-            # 导入预测器
             from predict import ConfidencePredictor
             
             model_path = confidence_root / "final_model.pt"
@@ -74,21 +70,12 @@ def _get_predictor():
             
         except Exception as e:
             logger.warning("加载置信度预测器失败: %s", e)
-            err_str = str(e)
-            if ("incomplete metadata" in err_str or "file not fully covered" in err_str or "deserializ" in err_str.lower()
-                    or "pytorchstreamreader" in err_str.lower() or "central directory" in err_str.lower() or "zip archive" in err_str.lower()):
-                raise RuntimeError(
-                    "置信度模型或依赖文件不完整/损坏（反序列化失败）。"
-                    " 若为 SBERT：删除 algorithm/confidence_calculate/sbert_model 后执行 python temp_utils/download_sbert.py；"
-                    " 若为 entities.pt/relations.pt：执行 python train_transe_embeddings.py；"
-                    " 若为 final_model.pt：请重新训练置信度模型。"
-                ) from e
             raise
         finally:
-            # 无论成功还是失败，都恢复原始工作目录
             os.chdir(original_cwd)
             
     return _predictor
+
 
 def _load_kg_config() -> dict[str, Any]:
     config_path = _KG_UPDATE_ROOT / "config.json"
@@ -107,6 +94,7 @@ def _load_kg_config() -> dict[str, Any]:
             "system": {"confidence_threshold": 0.7},
         }
 
+
 def _create_updator():
     mod = _get_kg_updator_module()
     config = _load_kg_config()
@@ -120,6 +108,7 @@ def _create_updator():
         confidence_threshold=float(system.get("confidence_threshold", 0.7)),
     )
 
+
 def health() -> dict[str, Any]:
     try:
         updator = _create_updator()
@@ -131,12 +120,14 @@ def health() -> dict[str, Any]:
             "detail": f"知识图谱更新模块不可用: {e}。请确认已安装 algorithm/KGUpdate 依赖并配置 algorithm/KGUpdate/config.json。",
         }
 
+
 def add_triples(triples: list[dict[str, Any]], context: str | None = None) -> dict[str, Any]:
     updator = _create_updator()
     try:
         return updator.add_triples(triples, context=context)
     finally:
         updator.close()
+
 
 def delete_triples(triples: list[dict[str, Any]]) -> dict[str, Any]:
     updator = _create_updator()
@@ -145,6 +136,7 @@ def delete_triples(triples: list[dict[str, Any]]) -> dict[str, Any]:
     finally:
         updator.close()
 
+
 def get_statistics() -> dict[str, Any]:
     updator = _create_updator()
     try:
@@ -152,9 +144,83 @@ def get_statistics() -> dict[str, Any]:
     finally:
         updator.close()
 
+
 def calculate_confidence(triples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     predictor = _get_predictor()
     predictions = predictor.predict_batch(triples)
-    for i, pred in enumerate(predictions):
-        triples[i]['confidence'] = pred['confidence']
-    return triples
+    return predictions
+
+
+def process_schema_output(data: dict, confidence_threshold: float = 0.7) -> dict[str, Any]:
+    """
+    处理 schema_mapper 输出的 JSON，只计算置信度，不入库
+    
+    Args:
+        data: schema_mapper 生成的 JSON（包含 raw 和 graph）
+        confidence_threshold: 置信度阈值，用于判断高低置信度（仅用于标记，不用于自动入库）
+    
+    Returns:
+        包含计算结果的字典，不含入库操作
+    """
+    logger.info("开始处理 schema_mapper 输出（仅计算，不入库）")
+    
+    predictor = _get_predictor()
+    return predictor.extract_from_schema_output(data, confidence_threshold)
+
+
+def add_relations_from_computed(
+    high_confidence_relations: list,
+    full_relations: list,
+    predictions: list,
+    confidence_threshold: float = 0.7
+) -> dict[str, Any]:
+    """
+    从计算结果中入库高置信度的关系（保留所有属性）
+    
+    Args:
+        high_confidence_relations: 高置信度的三元组列表
+        full_relations: 完整的关系信息（包含节点属性）
+        predictions: 预测结果（包含置信度和组件分数）
+        confidence_threshold: 置信度阈值
+    """
+    logger.info(f"开始从计算结果入库，共 {len(high_confidence_relations)} 个关系")
+    
+    # 构建完整的关系信息用于入库
+    relations_to_add = []
+    
+    # 建立索引映射
+    relation_map = {}
+    for i, rel in enumerate(full_relations):
+        key = f"{rel['subject']}|{rel['predicate']}|{rel['object']}"
+        relation_map[key] = {
+            'info': rel,
+            'confidence': predictions[i]['confidence'] if i < len(predictions) else 0.7
+        }
+    
+    for rel in high_confidence_relations:
+        key = f"{rel['subject']}|{rel['predicate']}|{rel['object']}"
+        if key in relation_map:
+            info = relation_map[key]['info']
+            relations_to_add.append({
+                'subject': rel['subject'],
+                'predicate': rel['predicate'],
+                'object': rel['object'],
+                'confidence': relation_map[key]['confidence'],
+                'source_node': info.get('source_node', {}),
+                'target_node': info.get('target_node', {})
+            })
+    
+    if not relations_to_add:
+        return {
+            "success": True,
+            "message": "没有需要入库的关系",
+            "statistics": {"total": 0, "added": 0, "failed": 0},
+            "details": []
+        }
+    
+    updator = _create_updator()
+    try:
+        result = updator.add_relationships_with_full_properties(relations_to_add)
+        return result
+    finally:
+        updator.close()

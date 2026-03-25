@@ -42,6 +42,130 @@ class KGUpdator:
         self.confidence_threshold = confidence_threshold
         logger.info(f"初始化完成，数据库: {database}，阈值: {confidence_threshold}")
 
+    def add_relationships_with_full_properties(self, 
+                                            relationships: List[Dict[str, Any]],
+                                            create_missing_nodes: bool = True) -> Dict[str, Any]:
+        """
+        批量添加关系，同时保留节点和关系的所有属性
+        
+        Args:
+            relationships: 关系列表，每个元素包含:
+                - subject: 主语名称
+                - predicate: 关系类型
+                - object: 宾语名称
+                - confidence: 置信度
+                - source_node: 源节点的完整属性
+                - target_node: 目标节点的完整属性
+                - relationship_type: 关系类型（可选）
+            create_missing_nodes: 是否创建不存在的节点
+        """
+        logger.info(f"开始入库 {len(relationships)} 个关系")
+        start_time = time.time()
+        
+        stats = {
+            "total": len(relationships),
+            "added": 0,
+            "updated": 0,
+            "failed": 0
+        }
+        details = []
+        
+        for rel in relationships:
+            subject = rel.get('subject')
+            predicate = rel.get('predicate')
+            obj = rel.get('object')
+            confidence = rel.get('confidence', 0.7)
+            source_node = rel.get('source_node', {})
+            target_node = rel.get('target_node', {})
+            
+            try:
+                with self.driver.session(database=self.database) as session:
+                    result = session.execute_write(
+                        self._add_relationship_with_properties_tx,
+                        subject, predicate, obj, confidence,
+                        source_node, target_node, create_missing_nodes
+                    )
+                
+                if result["success"]:
+                    if result["created"]:
+                        stats["added"] += 1
+                    else:
+                        stats["updated"] += 1
+                    details.append(result)
+                else:
+                    stats["failed"] += 1
+                    details.append(result)
+                    
+            except Exception as e:
+                stats["failed"] += 1
+                logger.error(f"入库失败: {e}")
+                details.append({"error": str(e)})
+        
+        elapsed = time.time() - start_time
+        stats["elapsed_time"] = round(elapsed, 2)
+        
+        return {
+            "success": stats["failed"] == 0,
+            "statistics": stats,
+            "details": details
+        }
+
+    @staticmethod
+    def _add_relationship_with_properties_tx(tx, subject, predicate, obj, confidence,
+                                            source_node, target_node, create_missing_nodes):
+        """事务：添加关系并保留所有属性"""
+        
+        # 创建或获取源节点
+        source_query = """
+        MERGE (s:Entity {name: $name})
+        """
+        if source_node.get('properties'):
+            # 如果有额外属性，设置它们
+            props = source_node.get('properties', {})
+            set_clause = ', '.join([f"s.{k} = ${k}" for k in props.keys() if k != 'name'])
+            if set_clause:
+                source_query += f" SET {set_clause}"
+        
+        tx.run(source_query, {"name": subject, **source_node.get('properties', {})})
+        
+        # 创建或获取目标节点
+        target_query = """
+        MERGE (o:Entity {name: $name})
+        """
+        if target_node.get('properties'):
+            props = target_node.get('properties', {})
+            set_clause = ', '.join([f"o.{k} = ${k}" for k in props.keys() if k != 'name'])
+            if set_clause:
+                target_query += f" SET {set_clause}"
+        
+        tx.run(target_query, {"name": obj, **target_node.get('properties', {})})
+        
+        # 创建或更新关系
+        rel_query = f"""
+        MATCH (s:Entity {{name: $subject}})
+        MATCH (o:Entity {{name: $object}})
+        MERGE (s)-[r:`{predicate}`]->(o)
+        SET r.confidence = $confidence,
+            r.last_updated = $timestamp
+        """
+        if not create_missing_nodes:
+            rel_query = f"""
+            MATCH (s:Entity {{name: $subject}})
+            MATCH (o:Entity {{name: $object}})
+            MERGE (s)-[r:`{predicate}`]->(o)
+            SET r.confidence = $confidence,
+                r.last_updated = $timestamp
+            """
+        
+        result = tx.run(rel_query, {
+            "subject": subject,
+            "object": obj,
+            "confidence": confidence,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        return {"success": True, "created": True}
+
     def add_triples(self,
                     triples: List[Dict[str, Any]],
                     context: Optional[str] = None) -> Dict[str, Any]:

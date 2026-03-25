@@ -23,7 +23,9 @@ export {
   kgUpdateAdd,
   kgUpdateDelete,
   kgUpdateStatistics,
-  kgCalculateConfidence
+  kgCalculateConfidence,
+  processSchemaOutput,   
+  addFromComputed        
 } from './modules/component/kg-update'
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'

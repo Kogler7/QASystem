@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue'
-import { Plus, Delete, DataLine, Link, Warning, MagicStick } from '@element-plus/icons-vue'
-import { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics, kgCalculateConfidence } from '@/api'
+import { Plus, Delete, DataLine, Link, Warning, MagicStick, Upload, Document } from '@element-plus/icons-vue'
+import { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics, kgCalculateConfidence, processSchemaOutput, addFromComputed } from '@/api'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { Network } from 'vis-network'
@@ -17,7 +17,7 @@ const addTriplesJson = ref(`[
   {"subject": "一等客车", "predicate": "定义", "object": "定员少、乘坐舒适度高的客车"},
   {"subject": "宿营车", "predicate": "定义", "object": "供乘务或作业人员休息使用的车辆"}
 ]`)
-const calculatedTriplesJson = ref('')  // 新增：计算后的带置信度 JSON
+const calculatedTriplesJson = ref('')
 const addResult = ref(null)
 
 // 删除：JSON 文本
@@ -31,7 +31,7 @@ const statistics = ref(null)
 
 const NEO4J_BROWSER_URL = 'http://localhost:7474/browser/'
 
-// 新增：侧边栏活动项
+// 侧边栏活动项
 const activeMenu = ref('confidence')
 
 // 置信度流程：进度条状态
@@ -39,8 +39,17 @@ const currentStep = ref(0)
 const resetSteps = () => { currentStep.value = 0 }
 const updateStep = (i) => { currentStep.value = i }
 
-// 新增：计算置信度加载状态
+// 计算置信度加载状态
 const loadingCalculate = ref(false)
+
+// 知识抽取结果处理相关变量
+const schemaJsonInput = ref('')
+const extractedTriplesJson = ref('')
+const loadingProcess = ref(false)
+const processResult = ref(null)
+const computedFullRelations = ref([])
+const computedPredictions = ref([])
+const computedHighRelations = ref([])
 
 // 冲突检测与修复
 const turtleInput = ref('')
@@ -52,6 +61,7 @@ const visContainer = ref(null)
 const conflictStep = ref(0)
 let networkInstance = null
 
+// 健康检查
 const checkHealth = async () => {
   healthStatus.value = null
   healthDetail.value = ''
@@ -69,6 +79,7 @@ const checkHealth = async () => {
   }
 }
 
+// 解析 JSON
 const parseTriplesJson = (str, needConfidence = false) => {
   let arr
   try {
@@ -93,14 +104,14 @@ const parseTriplesJson = (str, needConfidence = false) => {
   return arr
 }
 
-// 新增：计算置信度
+// 计算简单三元组的置信度
 const submitCalculate = async () => {
   resetSteps()
-  updateStep(1) // 输入
+  updateStep(1)
   let triples
   try {
     triples = parseTriplesJson(addTriplesJson.value, false)
-    updateStep(2) // 文本搜索
+    updateStep(2)
   } catch (e) {
     ElMessage.warning(e.message)
     return
@@ -108,11 +119,11 @@ const submitCalculate = async () => {
   loadingCalculate.value = true
   calculatedTriplesJson.value = ''
   try {
-    updateStep(3) // 路径搜索
-    const { data } = await kgCalculateConfidence(triples)  // 调用算法，返回带置信度的三元组
-    updateStep(4) // 嵌入计算
-    updateStep(5) // 置信度计算
-    calculatedTriplesJson.value = JSON.stringify(data.triples, null, 2)  // 假设返回 { triples: [...] }
+    updateStep(3)
+    const { data } = await kgCalculateConfidence(triples)
+    updateStep(4)
+    updateStep(5)
+    calculatedTriplesJson.value = JSON.stringify(data.triples, null, 2)
     ElMessage.success('置信度计算完成')
   } catch (err) {
     ElMessage.error(err?.response?.data?.detail || err?.message || '计算失败')
@@ -121,6 +132,7 @@ const submitCalculate = async () => {
   }
 }
 
+// 执行简单三元组添加
 const submitAdd = async () => {
   if (!calculatedTriplesJson.value) {
     ElMessage.warning('请先计算置信度')
@@ -137,7 +149,7 @@ const submitAdd = async () => {
   addResult.value = null
   try {
     const { data } = await kgUpdateAdd(triples)
-    updateStep(6) // 更新完成
+    updateStep(6)
     addResult.value = data
     ElMessage.success(data?.message || '添加完成')
   } catch (err) {
@@ -148,9 +160,10 @@ const submitAdd = async () => {
   }
 }
 
+// 删除三元组
 const submitDelete = async () => {
   resetSteps()
-  updateStep(1) // 输入
+  updateStep(1)
   let triples
   try {
     triples = parseTriplesJson(deleteTriplesJson.value, false)
@@ -176,6 +189,7 @@ const submitDelete = async () => {
   }
 }
 
+// 获取图谱统计
 const fetchStatistics = async () => {
   loadingStats.value = true
   statistics.value = null
@@ -195,7 +209,91 @@ function openNeo4jBrowser() {
   window.open(NEO4J_BROWSER_URL, '_blank')
 }
 
-// ---------- 冲突检测与修复 ----------
+// ========== 知识抽取结果处理 ==========
+// 解析并计算置信度（不入库）
+const processSchemaOutputOnly = async () => {
+  if (!schemaJsonInput.value.trim()) {
+    ElMessage.warning('请输入 JSON 数据')
+    return
+  }
+  
+  let data
+  try {
+    data = JSON.parse(schemaJsonInput.value)
+  } catch (e) {
+    ElMessage.error('JSON 格式错误: ' + e.message)
+    return
+  }
+  
+  loadingProcess.value = true
+  processResult.value = null
+  computedFullRelations.value = []
+  computedPredictions.value = []
+  computedHighRelations.value = []
+  
+  try {
+    const response = await processSchemaOutput(data, 0.7)
+    const result = response.data
+    
+    const allRelations = [...(result.relations_high || []), ...(result.relations_low || [])]
+    extractedTriplesJson.value = JSON.stringify(allRelations, null, 2)
+    
+    computedFullRelations.value = result.full_relations || []
+    computedPredictions.value = result.predictions || []
+    computedHighRelations.value = result.relations_high || []
+    
+    processResult.value = result
+    
+    if (result.success) {
+      ElMessage.success(result.message)
+    } else {
+      ElMessage.warning(result.message)
+    }
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '处理失败')
+  } finally {
+    loadingProcess.value = false
+  }
+}
+
+// 批量入库（从计算结果入库，保留完整属性）
+const submitAddExtracted = async () => {
+  if (computedHighRelations.value.length === 0) {
+    ElMessage.warning('没有高置信度的关系需要入库')
+    return
+  }
+  
+  loadingAdd.value = true
+  
+  try {
+    const response = await addFromComputed(
+      computedHighRelations.value,
+      computedFullRelations.value,
+      computedPredictions.value,
+      0.7
+    )
+    const data = response.data
+    
+    ElMessage.success(data?.message || '入库完成')
+    fetchStatistics()
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || '入库失败')
+  } finally {
+    loadingAdd.value = false
+  }
+}
+
+// 清空 schema 输入
+const clearSchemaInput = () => {
+  schemaJsonInput.value = ''
+  extractedTriplesJson.value = ''
+  processResult.value = null
+  computedFullRelations.value = []
+  computedPredictions.value = []
+  computedHighRelations.value = []
+}
+
+// ========== 冲突检测与修复 ==========
 const handleFileUpload = (file) => {
   const reader = new FileReader()
   reader.onload = (e) => {
@@ -230,7 +328,7 @@ const handleConflictDetect = async () => {
       } else {
         activeGroupIndex.value = null
         conflictStep.value = 5
-        ElMessage.success('🚀 冲突检测完成：未发现任何冲突，数据已自动同步！')
+        ElMessage.success('冲突检测完成：未发现任何冲突，数据已自动同步！')
       }
     }
   } catch (err) {
@@ -382,7 +480,7 @@ const proceedToNext = () => {
 const handleFinishOrNext = () => {
   if (activeGroupIndex.value === conflictGroups.value.length - 1) {
     conflictStep.value = 5
-    ElMessage.success('🎉 所有冲突已处理完毕！')
+    ElMessage.success('所有冲突已处理完毕！')
   } else {
     proceedToNext()
   }
@@ -404,7 +502,9 @@ const onConflictInput = () => {
   conflictStep.value = 0
 }
 
-onMounted(checkHealth)
+onMounted(() => {
+  checkHealth()
+})
 onUnmounted(() => {
   if (networkInstance) networkInstance.destroy()
 })
@@ -435,7 +535,7 @@ onUnmounted(() => {
         <el-button link type="primary" size="small" :icon="Link" @click="openNeo4jBrowser">查看图谱</el-button>
       </div>
 
-      <!-- 新增：侧边栏布局 -->
+      <!-- 侧边栏布局 -->
       <div class="content-layout">
         <el-menu :default-active="activeMenu" class="sidebar-menu" @select="(key) => activeMenu = key">
           <el-menu-item index="confidence">
@@ -448,11 +548,11 @@ onUnmounted(() => {
         <div class="main-content">
           <!-- 置信度计算与更新内容 -->
           <div v-if="activeMenu === 'confidence'">
-            <!-- 新增：算法介绍卡片 -->
+            <!-- 算法介绍卡片 -->
             <el-card class="algorithm-intro-card" shadow="hover">
               <template #header>
                 <div class="card-header">
-                  <span>🧠 置信度算法：动态混合模型 (DynamicHybrid)</span>
+                  <span>置信度算法：动态混合模型 (DynamicHybrid)</span>
                 </div>
               </template>
               <div class="algorithm-content">
@@ -490,7 +590,7 @@ onUnmounted(() => {
               </div>
             </el-card>
 
-            <!-- 新增：进度条 -->
+            <!-- 进度条 -->
             <el-steps :active="currentStep" finish-status="success" align-center class="process-steps">
               <el-step title="输入"></el-step>
               <el-step title="文本搜索"></el-step>
@@ -512,6 +612,88 @@ onUnmounted(() => {
               </div>
               <p v-else-if="statistics && !statistics.success" class="stats-error">{{ statistics.error || '获取失败' }}</p>
               <p v-else class="stats-placeholder">点击「刷新」获取 Neo4j 图谱统计</p>
+            </el-card>
+
+            <!-- 知识抽取结果处理（新增） -->
+            <el-card class="form-card" shadow="hover">
+              <template #header>
+                <div class="card-header-flex">
+                  <span>知识抽取结果处理</span>
+                  <el-button type="primary" link :icon="Document" @click="clearSchemaInput">清空</el-button>
+                </div>
+              </template>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <p class="form-hint-block">
+                    输入 schema_mapper 输出的 JSON（包含 raw 和 graph）
+                  </p>
+                  <el-input
+                    v-model="schemaJsonInput"
+                    type="textarea"
+                    :rows="12"
+                    placeholder='{
+  "raw": {
+    "Term": [...]
+  },
+  "graph": {
+    "nodes": [...],
+    "relationships": [...]
+  }
+}'
+                    class="json-textarea"
+                  />
+                  <el-button 
+                    type="primary" 
+                    :loading="loadingProcess"
+                    @click="processSchemaOutputOnly" 
+                    style="margin-top: 12px"
+                  >
+                    解析并计算置信度
+                  </el-button>
+                </el-col>
+                <el-col :span="12">
+                  <p class="form-hint-block">
+                    提取的关系及置信度（带置信度的三元组）
+                  </p>
+                  <el-input
+                    v-model="extractedTriplesJson"
+                    type="textarea"
+                    :rows="12"
+                    readonly
+                    placeholder="解析后将显示提取的关系及置信度"
+                    class="json-textarea"
+                  />
+                  <div class="action-buttons">
+                    <el-button 
+                      type="success" 
+                      :loading="loadingAdd"
+                      :disabled="computedHighRelations.length === 0"
+                      @click="submitAddExtracted"
+                      style="margin-top: 12px; margin-right: 12px"
+                    >
+                      批量入库（置信度≥阈值）
+                    </el-button>
+                    <el-tooltip content="当前阈值可在后端配置文件中修改" placement="top">
+                      <el-tag type="info" style="margin-top: 12px">阈值: 0.7</el-tag>
+                    </el-tooltip>
+                  </div>
+                  <div v-if="processResult?.statistics" class="stat-summary" style="margin-top: 12px">
+                    <el-tag type="success" size="small">高置信度: {{ processResult.statistics.high }}</el-tag>
+                    <el-tag type="danger" size="small" style="margin-left: 8px">低置信度: {{ processResult.statistics.low }}</el-tag>
+                  </div>
+                </el-col>
+              </el-row>
+              <div v-if="processResult" class="result-box">
+                <p class="result-summary">{{ processResult.message }}</p>
+                <el-collapse>
+                  <el-collapse-item title="查看高置信度关系详情" name="high-details">
+                    <pre class="result-details">{{ JSON.stringify(processResult.relations_high, null, 2) }}</pre>
+                  </el-collapse-item>
+                  <el-collapse-item v-if="processResult.relations_low?.length" title="查看低置信度关系详情" name="low-details">
+                    <pre class="result-details">{{ JSON.stringify(processResult.relations_low, null, 2) }}</pre>
+                  </el-collapse-item>
+                </el-collapse>
+              </div>
             </el-card>
 
             <!-- 添加三元组 -->
@@ -581,6 +763,7 @@ onUnmounted(() => {
               </div>
             </el-card>
           </div>
+
           <!-- 冲突检测与修复内容 -->
           <div v-else-if="activeMenu === 'conflict'" class="conflict-split-view">
             <el-card shadow="never" style="margin-bottom: 20px; border: none; background: transparent;">
@@ -599,7 +782,7 @@ onUnmounted(() => {
                   <div class="card-header-flex">
                     <span>RDF Turtle 数据输入</span>
                     <el-upload action="#" :auto-upload="false" :show-file-list="false" @change="handleFileUpload">
-                      <el-button type="primary" link :icon="Link">上传 .ttl 文件</el-button>
+                      <el-button type="primary" link :icon="Upload">上传 .ttl 文件</el-button>
                     </el-upload>
                   </div>
                 </template>
@@ -916,7 +1099,7 @@ onUnmounted(() => {
   margin-bottom: 8px;
 }
 
-.triples-textarea {
+.triples-textarea, .json-textarea {
   font-family: ui-monospace, monospace;
   font-size: 13px;
 }
@@ -1006,6 +1189,17 @@ onUnmounted(() => {
   max-height: 600px;
   overflow-y: auto;
   padding-right: 5px;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stat-summary {
+  display: flex;
+  align-items: center;
 }
 
 @media (max-width: 768px) {
