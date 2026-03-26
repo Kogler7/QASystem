@@ -3,13 +3,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Upload, Loading, Link, DocumentCopy, Files, Scissor, Connection, DataLine, CircleCheck, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { preprocAcceptAttr, preprocFormatHint, isPreprocExtension } from '@/constants/preprocFormats'
+import { normalizeToRawFiles } from '@/utils/preprocUploadLogic'
 import {
   SEDIMENT_STORAGE_KEY,
   SEDIMENT_STORAGE_VERSION,
   readSedimentStorage,
   writeSedimentStorage,
+  cancelCurrentSedimentRun,
   runKnowledgeSedimentPipeline,
-  fileToHint
+  runKnowledgeSedimentPipelineBatch,
+  fileToHint,
+  SedimentRunCancelledError
 } from '@/utils/knowledgeSedimentPipeline'
 
 const uploadLoading = ref(false)
@@ -33,6 +37,9 @@ const stepError = ref('')
 const availableModels = ref({})
 const modelsLoaded = ref(false)
 const kgConfidenceThreshold = 0.7
+const zipAcceptExt = '.zip'
+const uploadAcceptAttr = `${preprocAcceptAttr},${zipAcceptExt}`
+const uploadFormatHint = `${preprocFormatHint}；支持 ZIP（自动解压后顺序执行）`
 
 const convertedCharCount = computed(() => (convertedText.value ? convertedText.value.length : 0))
 
@@ -89,7 +96,7 @@ const preprocDebugJson = computed(() => {
 
 const steps = computed(() => [
   { title: '多源数据预处理', desc: '文档解析/清洗/统一为可处理文本', icon: Files },
-  { title: '文本切分', desc: '按段落/标题切分为片段，便于抽取与向量化', icon: Scissor },
+  { title: '文本切分', desc: '按Markdown切分为片段，便于抽取与向量化', icon: Scissor },
   { title: '知识抽取', desc: '抽取实体、关系与结构化图数据', icon: Connection },
   { title: '图谱更新', desc: '将抽取结果写入 Neo4j（或增量更新）', icon: DataLine }
 ])
@@ -168,6 +175,8 @@ function persistRefsToStorage() {
 }
 
 const resetPipeline = () => {
+  // 取消当前 run，会阻止后续步骤继续执行/回写状态。
+  cancelCurrentSedimentRun()
   pipelineRunning.value = false
   stepIndex.value = 0
   stepError.value = ''
@@ -184,6 +193,7 @@ const resetPipeline = () => {
 /** 清除本地缓存 + 文件 + 全部流程数据 */
 const clearAllSedimentState = () => {
   stopStoragePoll()
+  cancelCurrentSedimentRun()
   try {
     sessionStorage.removeItem(SEDIMENT_STORAGE_KEY)
   } catch (_) {
@@ -225,10 +235,11 @@ function startStoragePollIfRunning() {
 }
 
 const handlePick = (file) => {
-  if (!isPreprocExtension(file?.name)) {
+  const isZip = String(file?.name || '').toLowerCase().endsWith(zipAcceptExt)
+  if (!isPreprocExtension(file?.name) && !isZip) {
     const parts = (file?.name || '').split('.')
     const ext = parts.length > 1 ? '.' + parts.pop().toLowerCase() : ''
-    ElMessage.error(`不支持的格式「${ext || '无扩展名'}」。${preprocFormatHint}`)
+    ElMessage.error(`不支持的格式「${ext || '无扩展名'}」。${uploadFormatHint}`)
     return
   }
   selectedFile.value = file
@@ -237,7 +248,8 @@ const handlePick = (file) => {
 }
 
 const onFileChange = (file) => {
-  if (file?.raw) handlePick(file.raw)
+  const raws = normalizeToRawFiles(file ? [file] : [])
+  if (raws.length) handlePick(raws[0])
 }
 
 const runPipeline = async () => {
@@ -248,15 +260,23 @@ const runPipeline = async () => {
   stopStoragePoll()
   stepError.value = ''
   try {
-    await runKnowledgeSedimentPipeline({
-      file: selectedFile.value,
+    const summary = await runKnowledgeSedimentPipelineBatch({
+      files: selectedFile.value,
       availableModels: availableModels.value,
       modelsLoaded: modelsLoaded.value,
       kgConfidenceThreshold,
       onUpdate: (snap) => applySedimentFields(snap, { resetFile: false })
     })
-    ElMessage.success('流程完成：已更新知识图谱并入库文档列表')
+    if (summary.cancelled) return
+    if (summary.total <= 1 && summary.failed === 0) {
+      ElMessage.success('流程完成：已更新知识图谱并入库文档列表')
+    } else if (summary.failed === 0) {
+      ElMessage.success(`批量流程完成：成功 ${summary.success}/${summary.total}`)
+    } else {
+      ElMessage.warning(`批量流程完成：成功 ${summary.success}/${summary.total}，失败 ${summary.failed}`)
+    }
   } catch (err) {
+    if (err instanceof SedimentRunCancelledError) return
     const msg = err?.response?.data?.detail || err?.message || '执行失败'
     ElMessage.error(msg)
   } finally {
@@ -303,12 +323,12 @@ const openNeo4jBrowser = () => {
         :show-file-list="false"
         :disabled="uploadLoading || pipelineRunning"
         @change="onFileChange"
-        :accept="preprocAcceptAttr"
+        :accept="uploadAcceptAttr"
       >
         <el-icon class="upload-icon"><Upload /></el-icon>
         <div class="upload-text">将文件拖到此处，或<em>点击选择</em></div>
         <template #tip>
-          <div class="upload-tip">{{ preprocFormatHint }}</div>
+          <div class="upload-tip">{{ uploadFormatHint }}</div>
         </template>
       </el-upload>
 

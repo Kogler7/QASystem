@@ -41,7 +41,7 @@ export function storeGraphToNeo4j(params) {
  * 上传切块 JSON（multipart），与 /extract 返回相同结构 { raw, graph }
  * @param {FormData} formData - file, main_object, use_templates, llm_base_url?, llm_model?, llm_api_key?
  */
-export function parseChunkedJsonExtract(formData) {
+export function parseChunkedJsonExtract(formData, requestConfig = {}) {
   return request.post('/component/knowledge-extract/parse-chunked-json', formData, {
     timeout: 600000,
     transformRequest: [(data, headers) => {
@@ -49,6 +49,7 @@ export function parseChunkedJsonExtract(formData) {
         delete headers['Content-Type']
       }
       return data
-    }]
+    }],
+    ...requestConfig
   })
 }

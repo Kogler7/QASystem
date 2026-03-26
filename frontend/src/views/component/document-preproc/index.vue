@@ -7,13 +7,14 @@ import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import * as mammoth from 'mammoth/mammoth.browser'
 import * as XLSX from 'xlsx'
-import JSZip from 'jszip'
 import { marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { getLowerExtFromName, normalizeToRawFiles, pickDefaultModelForFile } from '@/utils/preprocUploadLogic'
+import { expandZipIfNeeded } from '@/utils/preprocZipLogic'
 
 // 设置PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -125,21 +126,12 @@ const resetPreviewState = () => {
 
 const handleChange = async (_uploadFile, uploadFiles) => {
   // 兼容 el-upload 和 input[type=file] 两种调用方式
-  const files = uploadFiles
-  if (files && files.length && files[0].raw) {
-    // el-upload 组件
-    fileList.value = [files[0].raw]
-  } else if (files && files.length) {
-    // input[type=file] 方式
-    // 支持通过单文件上传入口取第一个文件用于预览/单文件解析
-    fileList.value = [files[0]]
-  } else {
-    fileList.value = []
-  }
+  const raws = normalizeToRawFiles(uploadFiles)
+  fileList.value = raws.length ? [raws[0]] : []
   // 自动匹配数据类型
   if (fileList.value.length > 0) {
     const file = fileList.value[0]
-    const ext = '.' + file.name.split('.').pop().toLowerCase()
+    const ext = getLowerExtFromName(file.name)
     if (dataTypes.value.includes(ext)) {
       selectedDataType.value = ext
     }
@@ -151,60 +143,30 @@ const handleChange = async (_uploadFile, uploadFiles) => {
 
 const handleBatchChange = async (_uploadFile, uploadFiles) => {
   // 支持 input[type=file] 或 el-upload 多文件返回
-  const files = uploadFiles
-  let chosen = []
-  if (files && files.length && files[0].raw) {
-    chosen = files.map((f) => f.raw)
-  } else if (files && files.length) {
-    chosen = Array.from(files)
-  }
+  const chosen = normalizeToRawFiles(uploadFiles)
 
   // 建议最多 10 个，超出提示
   if (chosen.length > 10) {
     ElMessage.warning('建议一次最多选择 10 个文件，已选中过多文件可能导致请求拥堵')
   }
-  // 如果上传的是单个 ZIP 包，尝试解压并将内部文件加入队列
-  // 如果上传的是单个 ZIP 包，尝试解压并将内部文件加入队列
-  let filesToAppend = []
-  const firstFileName = String(chosen?.[0]?.name || '').toLowerCase()
-  const isZipUpload = chosen.length === 1 && firstFileName.endsWith('.zip')
 
-  if (isZipUpload) {
-    try {
-      const zipFile = chosen[0]
-      const arrayBuffer = await zipFile.arrayBuffer()
-      const zip = await JSZip.loadAsync(arrayBuffer)
-      const entries = Object.values(zip.files)
-      // 只接受的扩展
-      const allowedExts = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.csv', '.html', '.htm']
-      for (const entry of entries) {
-        if (entry.dir) continue
-        const entryName = entry.name || ''
-        // 跳过 macOS 元数据文件或隐藏文件
-        if (entryName.startsWith('__MACOSX') || entryName.split('/').some((p) => p.startsWith('.'))) continue
-        const lower = entryName.toLowerCase()
-        const ext = '.' + (lower.split('.').pop() || '')
-        if (!allowedExts.includes(ext)) continue
-        try {
-          const blob = await entry.async('blob')
-          const fileObj = new File([blob], entryName, { type: blob.type || '' })
-          filesToAppend.push(fileObj)
-        } catch (e) {
-          console.warn('ZIP 中项读取失败:', entryName, e)
-        }
-      }
-      if (filesToAppend.length === 0) {
+  let filesToAppend = chosen
+  // 只接受的扩展
+  const allowedExts = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.csv', '.html', '.htm']
+  try {
+    const expanded = await expandZipIfNeeded(chosen, allowedExts)
+    if (expanded.isZip) {
+      if (!expanded.files.length) {
         ElMessage.warning('ZIP 包内未找到可用文件')
         return
       }
-      ElMessage.success(`ZIP 解压完成：已添加 ${filesToAppend.length} 个文件到批量队列`)
-    } catch (e) {
-      console.error('ZIP 解压失败:', e)
-      ElMessage.error('ZIP 文件解压失败，请确认文件是否损坏')
-      return
+      ElMessage.success(`ZIP 解压完成：已添加 ${expanded.files.length} 个文件到批量队列`)
     }
-  } else {
-    filesToAppend = chosen
+    filesToAppend = expanded.files
+  } catch (e) {
+    console.error('ZIP 解压失败:', e)
+    ElMessage.error('ZIP 文件解压失败，请确认文件是否损坏')
+    return
   }
 
   // 不清空已有列表，追加到现有 batchFiles
@@ -246,12 +208,8 @@ const processBatchItem = async (item) => {
   item.status = 'processing'
   item.error = null
   try {
-    const ext = '.' + (item.name || '').split('.').pop().toLowerCase()
-    let modelName = ''
-    if (availableModels.value && availableModels.value[ext]) {
-      modelName = availableModels.value[ext].default || ''
-    }
-    const { data } = await documentPreprocConvert(item.file, modelName)
+    const modelName = pickDefaultModelForFile(item.file, availableModels.value, '')
+    const { data } = await documentPreprocConvert(item.file, modelName || '')
     item.result = data
     if (data?.success) {
       item.status = 'success'
@@ -632,10 +590,7 @@ const submit = async () => {
   if (selectedModel.value) {
     modelName = selectedModel.value
   } else {
-    const ext = '.' + (item.name || '').split('.').pop().toLowerCase()
-    if (availableModels.value && availableModels.value[ext]) {
-      modelName = availableModels.value[ext].default || ''
-    }
+    modelName = pickDefaultModelForFile(item.file, availableModels.value, '') || ''
   }
   // 调用解析并更新该项状态
   item.status = 'processing'

@@ -13,9 +13,10 @@ export function getDocuments(params = {}) {
  * 上传文档
  * @param {FormData} formData - 包含 file 等字段
  */
-export function uploadDocument(formData) {
+export function uploadDocument(formData, requestConfig = {}) {
   return request.post('/knowledge/documents', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...requestConfig
   })
 }
 

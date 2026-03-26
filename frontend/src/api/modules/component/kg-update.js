@@ -36,19 +36,19 @@ export function kgCalculateConfidence(triples) {
 }
 
 /** 处理 schema_mapper 输出的 JSON，提取关系并计算置信度（不入库） */
-export function processSchemaOutput(data, confidenceThreshold = 0.7) {
+export function processSchemaOutput(data, confidenceThreshold = 0.7, requestConfig = {}) {
   return request.post('/component/kg-update/process-schema-output', {
     data: data,
     confidence_threshold: confidenceThreshold
-  })
+  }, requestConfig)
 }
 
 /** 从计算结果入库 */
-export function addFromComputed(relationsHigh, fullRelations, predictions, confidenceThreshold = 0.7) {
+export function addFromComputed(relationsHigh, fullRelations, predictions, confidenceThreshold = 0.7, requestConfig = {}) {
   return request.post('/component/kg-update/add-from-computed', {
     relations_high: relationsHigh,
     full_relations: fullRelations,
     predictions: predictions,
     confidence_threshold: confidenceThreshold
-  })
+  }, requestConfig)
 }

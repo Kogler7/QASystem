@@ -59,8 +59,8 @@ export function nl2cypherSplitRecursive(text) {
  * 切片：Markdown
  * @param {string} text
  */
-export function nl2cypherSplitMarkdown(text) {
-  return request.post('/component/nl2cypher/split/markdown', { text: text }, { timeout: 120000 })
+export function nl2cypherSplitMarkdown(text, requestConfig = {}) {
+  return request.post('/component/nl2cypher/split/markdown', { text: text }, { timeout: 120000, ...requestConfig })
 }
 
 /**
