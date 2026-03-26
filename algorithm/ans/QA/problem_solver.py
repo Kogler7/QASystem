@@ -107,7 +107,7 @@ class ProblemSolver:
 
         请用JSON格式输出，只输出JSON，不要其他内容。
         """
-
+ 
         # 记录问题定义提示词
         self._log("问题定义", "生成问题模型提示词", {"prompt": prompt})
 
@@ -135,19 +135,7 @@ class ProblemSolver:
             print(f"解析问题模型失败: {e}")
             self._log("问题定义", f"生成问题模型失败: {e}")
 
-        # # 后备方案：生成默认问题模型
-        # return ProblemModel(
-        #     问题ID="PROB-001",
-        #     问题描述=user_input,
-        #     问题类型="描述型问题",
-        #     约束=["需要符合领域规范"],
-        #     目标对象=entity_texts[0] if entity_texts else "未知对象",
-        #     干系人=["用户"],
-        #     目标=["分析问题", "找到解决方案"],
-        #     当前状态="初始阶段",
-        #     相关实体=entity_texts,
-        #     创建时间=datetime.now().isoformat()
-        # )
+
 
     def _decompose_problem(self, problem: ProblemModel) -> List[ProblemModel]:
         """
