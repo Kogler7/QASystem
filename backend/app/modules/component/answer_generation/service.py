@@ -50,27 +50,17 @@ def _get_qa_service():
 
 
 def _load_neo4j_config() -> Dict[str, Any]:
-    config_path = _ROOT / "algorithm" / "ans" / "QA" / ".env.example"
-    if config_path.exists():
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        key, value = line.split("=", 1)
-                        if key.strip() == "NEO4J_PASSWORD":
-                            return {
-                                "uri": "bolt://localhost:7687",
-                                "user": "neo4j",
-                                "password": value.strip(),
-                            }
-        except Exception as e:
-            logger.warning("读取Neo4j配置失败: %s", e)
-    return {
-        "uri": "bolt://localhost:7687",
-        "user": "neo4j",
-        "password": "neo4j2025",
-    }
+    try:
+        # 导入QA模块的配置
+        from QA.config import config as qa_config
+        return {
+            "uri": qa_config.NEO4J_URI,
+            "user": qa_config.NEO4J_USER,
+            "password": qa_config.NEO4J_PASSWORD,
+        }
+    except Exception as e:
+        logger.warning("加载Neo4j配置失败: %s", e)
+        raise
 
 
 def _get_neo4j_driver():
