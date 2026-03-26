@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { Upload, Delete, Document, Loading } from '@element-plus/icons-vue'
 import { getDocuments, uploadDocument, deleteDocument } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { preprocAcceptAttr, preprocFormatHint, isPreprocExtension } from '@/constants/preprocFormats'
 
 const fileList = ref([])
 const loading = ref(false)
@@ -23,6 +24,10 @@ const fetchList = async () => {
 
 const handleUpload = async (options) => {
   const { file } = options
+  if (!isPreprocExtension(file?.name)) {
+    ElMessage.error(preprocFormatHint)
+    return
+  }
   const formData = new FormData()
   formData.append('file', file)
   uploadLoading.value = true
@@ -67,12 +72,12 @@ onMounted(() => {
         :show-file-list="false"
         :http-request="handleUpload"
         :disabled="uploadLoading"
-        accept=".pdf,.doc,.docx,.txt,.md"
+        :accept="preprocAcceptAttr"
       >
         <el-icon class="upload-icon"><Upload /></el-icon>
         <div class="upload-text">将文件拖到此处，或<em>点击上传</em></div>
         <template #tip>
-          <div class="upload-tip">支持 PDF、Word、TXT、Markdown</div>
+          <div class="upload-tip">{{ preprocFormatHint }}</div>
         </template>
       </el-upload>
       <div v-if="uploadLoading" class="upload-loading">

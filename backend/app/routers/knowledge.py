@@ -47,6 +47,9 @@ def get_file_type(filename: str) -> str:
         ".md": "markdown",
         ".xlsx": "excel",
         ".xls": "excel",
+        ".csv": "csv",
+        ".html": "html",
+        ".htm": "html",
     }
     return type_map.get(ext, "other")
 
@@ -416,7 +419,8 @@ async def knowledge_query(body: KnowledgeQueryRequest) -> dict[str, Any]:
 
 
 class DocumentProcessRequest(BaseModel):
-    main_object: str = "文档"
+    # UIE 仅支持 RuleType / SystemElement / Term / Glossary（见 algorithm/uie/ie/extraction_api）
+    main_object: str = "Term"
     use_templates: bool = True
     llm_base_url: Optional[str] = None
     llm_model: Optional[str] = None
@@ -430,12 +434,11 @@ async def process_document(
     session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
     """
-    处理文档并更新知识图谱的完整流水线。
-    
-    步骤：
-    1. 文档预处理（转换为Markdown）
-    2. 知识抽取（从文本中提取实体和关系）
-    3. 知识图谱更新（将提取的知识添加到图谱）
+    知识沉淀完整流水线（与前端上传页步骤一致）。
+    1. 文档预处理（algorithm/preproc）
+    2. 文本切分（Markdown 主切分 + 超长块递归细化）
+    3. 知识抽取（algorithm/uie，切块合并）
+    4. 图谱更新（confidence_calculate + KGUpdate 入库）
     """
     from ..services.knowledge_pipeline import process_document_pipeline
 

@@ -2,10 +2,12 @@
 向量转化存储与自然语言转 Cypher：进程内调用 algorithm/NL_to_cypher 算法。
 使用前需安装 algorithm/NL_to_cypher 依赖，并配置 Ollama。
 """
+import contextlib
+import io
 import logging
 import sys
 from pathlib import Path
-from typing import Any,Dict,List
+from typing import Any, Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -65,35 +67,50 @@ def _make_docs(text: str):
     # 避免在顶层引入 langchain 依赖，动态导入
     from langchain_core.documents import Document
 
-    return [Document(page_content=text)]
+    return [Document(page_content=text, metadata={"source": "nl2cypher"})]
+
+
+def _run_splitter(split_fn: Callable[..., Any], docs: list) -> list:
+    """algorithm/splitter.py 内含演示用 print，组件层统一屏蔽，避免污染 API 日志。"""
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        return split_fn(docs)
+
+
+def _chunks_from_split_docs(split_docs: list) -> list[str]:
+    return [
+        d.page_content.strip()
+        for d in split_docs
+        if getattr(d, "page_content", None) and str(d.page_content).strip()
+    ]
 
 
 def split_by_character(text: str) -> dict[str, Any]:
     mod = _get_splitter()
     docs = _make_docs(text)
-    split_docs = mod.split_by_character(docs)
-    return {"chunks": [d.page_content for d in split_docs]}
+    split_docs = _run_splitter(mod.split_by_character, docs)
+    return {"chunks": _chunks_from_split_docs(split_docs)}
 
 
 def split_recursively(text: str) -> dict[str, Any]:
     mod = _get_splitter()
     docs = _make_docs(text)
-    split_docs = mod.split_recursively(docs)
-    return {"chunks": [d.page_content for d in split_docs]}
+    split_docs = _run_splitter(mod.split_recursively, docs)
+    return {"chunks": _chunks_from_split_docs(split_docs)}
 
 
 def split_by_markdown(text: str) -> dict[str, Any]:
     mod = _get_splitter()
     docs = _make_docs(text)
-    split_docs = mod.split_by_markdown(docs)
-    return {"chunks": [d.page_content for d in split_docs]}
+    split_docs = _run_splitter(mod.split_by_markdown, docs)
+    return {"chunks": _chunks_from_split_docs(split_docs)}
 
 
 def split_by_language_python(text: str) -> dict[str, Any]:
     mod = _get_splitter()
     docs = _make_docs(text)
-    split_docs = mod.split_by_language_python(docs)
-    return {"chunks": [d.page_content for d in split_docs]}
+    split_docs = _run_splitter(mod.split_by_language_python, docs)
+    return {"chunks": _chunks_from_split_docs(split_docs)}
 
 def muti_retriever()->List[Dict[str, Any]]:
     try:

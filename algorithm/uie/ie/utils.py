@@ -72,8 +72,9 @@ class ApiLLM(BaseLLM):
         )
         t0 = time.perf_counter()
         
-        # rule_v4 上下文窗口较小；输出 max_tokens 过大将压缩可用输入窗口并触发 400。
-        out = self._client.run(system_prompt, text, temperature=0.1, max_tokens=2048)
+        # rule_v4 等 4k 上下文模型：max_tokens 过大时服务端会把可用输入压到 context-max_tokens，易触发 400。
+        max_out = int(os.getenv("UIE_MAX_OUTPUT_TOKENS", "768"))
+        out = self._client.run(system_prompt, text, temperature=0.1, max_tokens=max_out)
 
         logger.info(
             "ApiLLM.run done: elapsed=%.2fs output_len=%d",
