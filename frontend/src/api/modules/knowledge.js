@@ -24,6 +24,14 @@ export function deleteDocument(id) {
   return request.delete(`/knowledge/documents/${id}`)
 }
 
+/** 下载文档（返回 Blob） */
+export function downloadDocument(id) {
+  return request.get(`/knowledge/documents/${id}/download`, {
+    responseType: 'blob',
+    timeout: 120000
+  })
+}
+
 /**
  * 知识库检索
  * @param {string} query - 检索关键词

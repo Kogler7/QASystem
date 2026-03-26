@@ -3,6 +3,7 @@
 """
 import logging
 import sys
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -48,6 +49,8 @@ def extract(
     llm_model: Optional[str] = None,
     llm_api_key: Optional[str] = None,
 ) -> dict[str, Any]:
+    # UIE 抽取默认依赖远端微调模型；未显式传入时，兜底为 rule_v4，避免误用通用默认模型导致 404。
+    llm_model = llm_model or os.getenv("UIE_LLM_MODEL") or "rule_v4"
     api = _get_extraction_api()
     result = api.extract(
         main_object=main_object,

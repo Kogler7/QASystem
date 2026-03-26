@@ -41,16 +41,26 @@ class ApiLLM(BaseLLM):
 
     def __init__(
         self,
-        api_key: str = "EMPTY",
-        base_url: str = "http://10.126.62.88:8003/v1",
+        api_key: str = "",
+        base_url: str = "",
+        # uie 抽取默认依赖的微调模型
         model: str = "rule_v4",
     ):
         from common.llm_client import LLMClient
 
+        # 兼容：uie 历史上默认走远端微调服务；若调用方不传 base_url，则保留该默认值。
+        if not base_url:
+            base_url = (
+                os.getenv("LLM_BASE_URL")
+                or os.getenv("OPENAI_BASE_URL")
+                or os.getenv("VLLM_BASE_URL")
+                or "http://10.126.62.88:8003/v1"
+            )
+
         self._client = LLMClient(
             api_key=api_key or "",
             base_url=base_url or "",
-            model=model or ""
+            model=model or "",
         )
 
     def run(self, system_prompt: str, text: str) -> str:
@@ -61,7 +71,10 @@ class ApiLLM(BaseLLM):
             getattr(self._client, "model", ""),
         )
         t0 = time.perf_counter()
+        
+        # rule_v4 上下文窗口较小；输出 max_tokens 过大将压缩可用输入窗口并触发 400。
         out = self._client.run(system_prompt, text, temperature=0.1, max_tokens=2048)
+
         logger.info(
             "ApiLLM.run done: elapsed=%.2fs output_len=%d",
             time.perf_counter() - t0,

@@ -117,10 +117,28 @@ def _call_openai(
         "stream": False,
     }
     r = requests.post(url, json=payload, headers=_headers(api_key), timeout=timeout)
-    r.raise_for_status()
-    data = r.json()
-    text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
-    return extract_final_response(text)
+    try:
+        r.raise_for_status()
+        data = r.json()
+        text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+        return extract_final_response(text)
+    except Exception as e:
+        # 尽量把响应体打印出来，便于定位 400/401/403 的真实原因
+        resp_text = ""
+        try:
+            resp_text = (r.text or "").strip()[:500]
+        except Exception:
+            pass
+        import logging
+
+        logging.error(
+            "LLM openai request failed: url=%s status=%s err=%s body=%s",
+            url,
+            getattr(r, "status_code", None),
+            e,
+            resp_text,
+        )
+        return ""
 
 
 def _call_zhipu(

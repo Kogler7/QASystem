@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Delete, Document } from '@element-plus/icons-vue'
-import { getDocuments, deleteDocument } from '@/api'
+import { Delete, Document, Download } from '@element-plus/icons-vue'
+import { getDocuments, deleteDocument, downloadDocument } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const fileList = ref([])
@@ -30,6 +30,29 @@ const handleRemove = async (row) => {
     fetchList()
   } catch (e) {
     if (e !== 'cancel') ElMessage.error('删除失败')
+  }
+}
+
+const handleDownload = async (row) => {
+  const id = row.id ?? row.docId ?? row._id
+  const filename = row.name ?? row.fileName ?? row.title ?? 'document'
+  if (!id) {
+    ElMessage.error('缺少文档ID，无法下载')
+    return
+  }
+  try {
+    const resp = await downloadDocument(id)
+    const blob = resp?.data instanceof Blob ? resp.data : new Blob([resp?.data ?? ''])
+    const url = URL.createObjectURL(blob)
+    const a = window.document.createElement('a')
+    a.href = url
+    a.download = filename
+    window.document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('下载失败')
   }
 }
 
@@ -63,9 +86,12 @@ onMounted(fetchList)
             {{ row.createTime ?? row.uploadTime ?? row.createdAt ?? '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link :icon="Delete" @click="handleRemove(row)">删除</el-button>
+            <el-space class="action-space" :size="10" alignment="center" :wrap="false">
+              <el-button type="primary" link :icon="Download" @click="handleDownload(row)">下载</el-button>
+              <el-button type="danger" link :icon="Delete" @click="handleRemove(row)">删除</el-button>
+            </el-space>
           </template>
         </el-table-column>
       </el-table>
@@ -90,5 +116,10 @@ onMounted(fetchList)
   margin-right: 8px;
   vertical-align: middle;
   color: var(--gray-500);
+}
+
+.action-space {
+  display: inline-flex;
+  white-space: nowrap;
 }
 </style>

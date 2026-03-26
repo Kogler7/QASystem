@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -296,6 +297,35 @@ async def get_document(
         "createTime": doc.created_at.isoformat() if doc.created_at else None,
         "updateTime": doc.updated_at.isoformat() if doc.updated_at else None,
     }
+
+
+@router.get("/documents/{doc_id}/download")
+async def download_document(
+    doc_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    result = await session.execute(
+        select(Document).where(Document.id == doc_id)
+    )
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    file_path = Path(doc.file_path)
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文档文件不存在")
+
+    try:
+        file_path.resolve().relative_to(DOCUMENT_DIR.resolve())
+    except Exception:
+        raise HTTPException(status_code=400, detail="非法文件路径")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=doc.name or file_path.name,
+        media_type="application/octet-stream",
+    )
 
 
 @router.post("/documents/{doc_id}/sync-dify")

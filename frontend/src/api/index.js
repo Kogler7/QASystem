@@ -13,6 +13,7 @@ export {
   getDocuments,
   uploadDocument,
   deleteDocument,
+  downloadDocument,
   knowledgeQuery
 } from './modules/knowledge'
 
