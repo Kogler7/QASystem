@@ -383,3 +383,101 @@ async def knowledge_query(body: KnowledgeQueryRequest) -> dict[str, Any]:
             results.append({"title": "知识库回答", "content": answer_text})
 
     return {"results": results}
+
+
+class DocumentProcessRequest(BaseModel):
+    main_object: str = "文档"
+    use_templates: bool = True
+    llm_base_url: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_api_key: Optional[str] = None
+
+
+@router.post("/documents/{doc_id}/process")
+async def process_document(
+    doc_id: int,
+    body: DocumentProcessRequest,
+    session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """
+    处理文档并更新知识图谱的完整流水线。
+    
+    步骤：
+    1. 文档预处理（转换为Markdown）
+    2. 知识抽取（从文本中提取实体和关系）
+    3. 知识图谱更新（将提取的知识添加到图谱）
+    """
+    from ..services.knowledge_pipeline import process_document_pipeline
+
+    # 获取文档信息
+    result = await session.execute(
+        select(Document).where(Document.id == doc_id)
+    )
+    doc = result.scalar_one_or_none()
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    # 检查文件是否存在
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文档文件不存在")
+
+    try:
+        # 更新文档状态
+        doc.status = "processing"
+        await session.commit()
+        await session.refresh(doc)
+
+        # 执行知识沉淀流水线
+        pipeline_result = await process_document_pipeline(
+            file_path=str(file_path),
+            main_object=body.main_object,
+            use_templates=body.use_templates,
+            llm_base_url=body.llm_base_url,
+            llm_model=body.llm_model,
+            llm_api_key=body.llm_api_key
+        )
+
+        # 更新文档状态
+        if pipeline_result.get("success"):
+            doc.status = "processed"
+            # 保存处理后的内容（可选）
+            if pipeline_result.get("preproc_result", {}).get("content"):
+                doc.content = pipeline_result["preproc_result"]["content"]
+        else:
+            doc.status = "failed"
+        
+        await session.commit()
+        await session.refresh(doc)
+
+        return {
+            "success": pipeline_result.get("success"),
+            "document": {
+                "id": doc.id,
+                "name": doc.name,
+                "status": doc.status
+            },
+            "result": pipeline_result
+        }
+    
+    except Exception as e:
+        # 回滚事务
+        await session.rollback()
+        
+        # 更新文档状态为失败
+        if doc:
+            doc.status = "failed"
+            await session.commit()
+        
+        logger.error(f"处理文档失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"处理文档失败: {str(e)}") from e
+
+
+@router.get("/pipeline/health")
+async def pipeline_health() -> dict[str, Any]:
+    """
+    检查知识沉淀流水线的健康状态。
+    """
+    from ..services.knowledge_pipeline import health_check
+    return health_check()

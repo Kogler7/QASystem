@@ -209,7 +209,8 @@ def complete(
             return text
         return extract_final_response(text) if text else ""
     except Exception as e:
-        print(f"LLM 调用错误 [{backend}]: {e}")
+        import logging
+        logging.error(f"LLM 调用错误 [{backend}]: {e}")
         return ""
 
 

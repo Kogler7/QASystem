@@ -139,6 +139,15 @@ def extract(
         backend = ApiLLM(**kwargs)
     extractor = LLMExtractor(backend=backend)
     raw_data = extractor.extract(uml=uml_text, main_object=prompt_main_object, text=combined_text)
+    
+    # 检查LLM抽取结果
+    if not raw_data or (isinstance(raw_data, str) and not raw_data.strip()):
+        logger.warning("LLM抽取结果为空，可能是LLM调用失败")
+        # 返回空结果，避免后续处理出错
+        return {
+            "raw": {},
+            "graph": {"nodes": [], "relationships": [], "ontology_relations": []}
+        }
 
     # 3) 若使用模板，注入置信度
     if use_templates:

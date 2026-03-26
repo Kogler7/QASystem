@@ -9,7 +9,7 @@ const activeTab = ref('index')
 
 const tabs = [
   { name: 'index', label: '首页', icon: FolderOpened },
-  { name: 'upload', label: '文档上传', icon: Upload },
+  { name: 'upload', label: '知识沉淀', icon: Upload },
   { name: 'list', label: '文档列表', icon: Document },
   { name: 'query', label: '知识检索', icon: Search }
 ]
