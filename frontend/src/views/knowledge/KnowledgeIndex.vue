@@ -6,7 +6,7 @@ const router = useRouter()
 
 const shortcuts = [
   {
-    title: '文档上传',
+    title: '知识沉淀',
     desc: '上传文档，完成预处理、切分、抽取并更新知识图谱',
     icon: Upload,
     path: '/knowledge/upload',

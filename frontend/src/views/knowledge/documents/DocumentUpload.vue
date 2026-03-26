@@ -1,7 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Upload, Loading, Link, DocumentCopy, Files, Scissor, Connection, DataLine, CircleCheck } from '@element-plus/icons-vue'
-import { uploadDocument, documentPreprocConvert, knowledgeExtract, storeGraphToNeo4j, nl2cypherSplitMarkdown } from '@/api'
+import {
+  uploadDocument,
+  documentPreprocConvert,
+  knowledgeExtract,
+  nl2cypherSplitMarkdown,
+  getAvailableModels,
+  processSchemaOutput,
+  addFromComputed
+} from '@/api'
 import { ElMessage } from 'element-plus'
 
 const uploadLoading = ref(false)
@@ -16,6 +24,9 @@ const storedDocument = ref(null)
 
 const stepIndex = ref(0)
 const stepError = ref('')
+const availableModels = ref({})
+const modelsLoaded = ref(false)
+const kgConfidenceThreshold = 0.7
 
 const steps = computed(() => [
   { title: '多源数据预处理', desc: '文档解析/清洗/统一为可处理文本', icon: Files },
@@ -69,7 +80,22 @@ const runPipeline = async () => {
   stepIndex.value = 0
   try {
     // 1) 多源数据预处理
-    const { data: preproc } = await documentPreprocConvert(selectedFile.value)
+    if (!modelsLoaded.value) {
+      try {
+        const { data } = await getAvailableModels()
+        availableModels.value = data || {}
+      } catch {
+        // 模型选择是可选的：失败则回退到后端默认模型
+        availableModels.value = {}
+      } finally {
+        modelsLoaded.value = true
+      }
+    }
+
+    const ext = '.' + (selectedFile.value?.name || '').split('.').pop().toLowerCase()
+    const modelName = availableModels.value?.[ext]?.default || null
+
+    const { data: preproc } = await documentPreprocConvert(selectedFile.value, modelName)
     convertedText.value = preproc?.text ?? preproc?.markdown ?? preproc?.content ?? ''
     if (!convertedText.value?.trim()) throw new Error('预处理未返回有效文本')
     stepIndex.value = 1
@@ -94,8 +120,18 @@ const runPipeline = async () => {
 
     // 4) 图谱更新（预留：可改为三元组增量更新；当前直接写入 graph）
     if (!extractResult.value?.graph) throw new Error('抽取结果缺少 graph，无法更新图谱')
-    const { data: updateRes } = await storeGraphToNeo4j({ graph: extractResult.value.graph })
-    graphUpdateResult.value = updateRes ?? { status: 'ok' }
+
+    // 使用 KGUpdate 新置信度/筛选/入库流程替代直接 storeGraphToNeo4j
+    const { data: kgProcessRes } = await processSchemaOutput(extractResult.value, kgConfidenceThreshold)
+    if (!kgProcessRes?.success) throw new Error(kgProcessRes?.message || 'KG 置信度计算失败')
+
+    const { data: kgAddRes } = await addFromComputed(
+      kgProcessRes.relations_high,
+      kgProcessRes.full_relations,
+      kgProcessRes.predictions,
+      kgConfidenceThreshold
+    )
+    graphUpdateResult.value = kgAddRes ?? { status: 'ok' }
     stepIndex.value = 4
 
     // 完整流程成功后再写入“文档列表”（避免仅上传就出现在列表）

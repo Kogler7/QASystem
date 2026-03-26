@@ -54,9 +54,15 @@ async def process_document_pipeline(
                 "step": "preproc",
                 "error": preproc_result.get("error", "文档预处理失败")
             }
-        
-        content = preproc_result.get("content", "")
-        if not content:
+
+        # 预处理模块的输出字段可能随算法调整（content/text/markdown 等）
+        content = (
+            preproc_result.get("content")
+            or preproc_result.get("text")
+            or preproc_result.get("markdown")
+            or ""
+        )
+        if not str(content).strip():
             return {
                 "success": False,
                 "step": "preproc",
@@ -82,45 +88,42 @@ async def process_document_pipeline(
                 "step": "extract",
                 "error": "知识抽取结果为空"
             }
-        
-        # 3. 构建三元组
-        logger.info("构建知识图谱三元组")
-        triples = _convert_graph_to_triples(graph_struct)
-        if not triples:
+
+        # 3. 从 KGUpdate 的 schema/graph 提取关系并计算置信度
+        # 注意：这里的 graph 结构来自 uie 抽取，字段是 nodes/relationships（而不是 entities/relations）。
+        confidence_threshold = 0.7
+        logger.info("计算关系置信度并筛选高置信度")
+        kg_compute_result = await asyncio.to_thread(
+            kg_update_service.process_schema_output,
+            {"raw": extract_result.get("raw", {}), "graph": graph_struct},
+            confidence_threshold,
+        )
+
+        if not kg_compute_result or not kg_compute_result.get("success"):
             return {
                 "success": False,
-                "step": "convert",
-                "error": "无法从抽取结果构建三元组"
+                "step": "kg_compute",
+                "error": kg_compute_result.get("message") if isinstance(kg_compute_result, dict) else "KG 置信度计算失败",
             }
-        
-        # 4. 计算置信度
-        logger.info("计算三元组置信度")
-        try:
-            triples_with_confidence = await asyncio.to_thread(
-                kg_update_service.calculate_confidence,
-                triples=triples
-            )
-        except Exception as e:
-            logger.warning(f"计算置信度失败，使用默认置信度: {e}")
-            # 如果置信度计算失败，使用默认值
-            for triple in triples:
-                triple["confidence"] = 0.8
-            triples_with_confidence = triples
-        
-        # 5. 更新知识图谱
-        logger.info("更新知识图谱")
+
+        # 4. 将高置信度关系入库到知识图谱
+        logger.info("入库高置信度关系到知识图谱")
+        triples = kg_compute_result.get("relations_high", [])
         kg_result = await asyncio.to_thread(
-            kg_update_service.add_triples,
-            triples=triples_with_confidence,
-            context=preproc_result.get("name", Path(file_path).name)
+            kg_update_service.add_relations_from_computed,
+            kg_compute_result.get("relations_high", []),
+            kg_compute_result.get("full_relations", []),
+            kg_compute_result.get("predictions", []),
+            confidence_threshold,
         )
         
         return {
             "success": True,
             "preproc_result": preproc_result,
             "extract_result": extract_result,
-            "triples": triples_with_confidence,
+            "triples": triples,
             "kg_result": kg_result,
+            "kg_compute_result": kg_compute_result,
             "message": "知识沉淀流程完成"
         }
     

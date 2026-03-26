@@ -443,8 +443,14 @@ async def process_document(
         if pipeline_result.get("success"):
             doc.status = "processed"
             # 保存处理后的内容（可选）
-            if pipeline_result.get("preproc_result", {}).get("content"):
-                doc.content = pipeline_result["preproc_result"]["content"]
+            preproc_result = pipeline_result.get("preproc_result", {}) or {}
+            preproc_content = (
+                preproc_result.get("content")
+                or preproc_result.get("text")
+                or preproc_result.get("markdown")
+            )
+            if preproc_content:
+                doc.content = preproc_content
         else:
             doc.status = "failed"
         

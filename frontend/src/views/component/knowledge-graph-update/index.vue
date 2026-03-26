@@ -58,8 +58,9 @@ const activeGroupIndex = ref(null)
 const loadingDetect = ref(false)
 const loadingRepair = ref(false)
 const visContainer = ref(null)
-const conflictStep = ref(0)
 let networkInstance = null
+const conflictStep = ref(0)
+// vis-network instance (destroyed/recreated when rendering the graph)
 
 // 健康检查
 const checkHealth = async () => {

@@ -163,10 +163,13 @@ const handleBatchChange = async (_uploadFile, uploadFiles) => {
   if (chosen.length > 10) {
     ElMessage.warning('建议一次最多选择 10 个文件，已选中过多文件可能导致请求拥堵')
   }
-
+  // 如果上传的是单个 ZIP 包，尝试解压并将内部文件加入队列
   // 如果上传的是单个 ZIP 包，尝试解压并将内部文件加入队列
   let filesToAppend = []
-  if (chosen.length === 1 && /\.zip$/i.test((chosen[0].name || '').toLowerCase())) {
+  const firstFileName = String(chosen?.[0]?.name || '').toLowerCase()
+  const isZipUpload = chosen.length === 1 && firstFileName.endsWith('.zip')
+
+  if (isZipUpload) {
     try {
       const zipFile = chosen[0]
       const arrayBuffer = await zipFile.arrayBuffer()
