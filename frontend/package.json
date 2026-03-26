@@ -14,7 +14,7 @@
     "cytoscape": "^3.33.1",
     "element-plus": "^2.4.4",
     "highlight.js": "^11.11.1",
-    "katex": "^0.16.27",
+    "katex": "^0.16.38",
     "mammoth": "^1.11.0",
     "marked": "^15.0.12",
     "marked-highlight": "^2.2.3",

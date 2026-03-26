@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, Any, Optional
 import os
+import shutil
 from datetime import datetime
 
 
@@ -17,7 +18,7 @@ class DocumentProcessor:
         from .processors.pdf_processor import PDFProcessor
         from .processors.docx_processor import DocxProcessor
         from .processors.excel_processor import ExcelProcessor
-        # from .processors.html_processor import HTMLProcessor
+        from .processors.html_processor import HTMLProcessor
         from .processors.ocr_processor import OCRProcessor   # 这是 MinerU 封装
 
         # 设置输出目录（新增）
@@ -29,7 +30,7 @@ class DocumentProcessor:
         self.pdf_processor = PDFProcessor()      
         self.docx_processor = DocxProcessor(libreoffice_path="/home/admin_user_3/cly/LibreOffice-fresh.full-x86_64.AppImage")
         self.excel_processor = ExcelProcessor()
-        # self.html_processor = HTMLProcessor()
+        self.html_processor = HTMLProcessor()
         # self.ocr_processor = OCRProcessor()      # 旧的 OCR 处理器（如果存在）
 
         # 初始化 MinerU 处理器
@@ -54,6 +55,16 @@ class DocumentProcessor:
                             '优点': '解析准确度高，支持多种元素识别，输出Markdown格式',
                             '缺点': '处理速度较慢，需要GPU加速，对简单文本PDF可能过度'
                         }
+                    },
+                    'docling': {
+                        'processor': self.docx_processor,
+                        'metadata': {
+                            'name': 'Docling PDF',
+                            'description': '基于Docling库的PDF文档解析器',
+                            '适用场景': '文本型PDF、排版相对规整的文档',
+                            '优点': '处理速度快，输出结构清晰',
+                            '缺点': '对扫描版或复杂布局PDF效果可能弱于MinerU'
+                        }
                     }
                 }
             },
@@ -69,6 +80,16 @@ class DocumentProcessor:
                             '优点': '解析速度快，保持文档结构，输出Markdown',
                             '缺点': '不支持旧版.doc文件，需要LibreOffice转换'
                         }
+                    },
+                    'mineru': {
+                        'processor': self.mineru_processor,
+                        'metadata': {
+                            'name': 'MinerU (Word转PDF)',
+                            'description': '先将Word转换为PDF，再使用MinerU进行解析',
+                            '适用场景': '包含复杂排版、图文混排的Word文档',
+                            '优点': '对复杂版式鲁棒性更高',
+                            '缺点': '处理链路更长，转换和解析耗时较高'
+                        }
                     }
                 }
             },
@@ -83,6 +104,16 @@ class DocumentProcessor:
                             '适用场景': '旧版Word文档(.doc)',
                             '优点': '支持旧格式，保持结构',
                             '缺点': '转换过程慢，可能丢失格式'
+                        }
+                    },
+                    'mineru': {
+                        'processor': self.mineru_processor,
+                        'metadata': {
+                            'name': 'MinerU (DOC转PDF)',
+                            'description': '先将DOC转换为PDF，再使用MinerU进行解析',
+                            '适用场景': '旧版Word文档(.doc)且版式复杂',
+                            '优点': '复杂版式提取能力强',
+                            '缺点': '依赖LibreOffice转换，耗时较高'
                         }
                     }
                 }
@@ -131,6 +162,36 @@ class DocumentProcessor:
                         }
                     }
                 }
+            },
+            '.html': {
+                'default': 'bs4',
+                'models': {
+                    'bs4': {
+                        'processor': self.html_processor,
+                        'metadata': {
+                            'name': 'BeautifulSoup HTML',
+                            'description': '基于BeautifulSoup与lxml的HTML结构化解析器',
+                            '适用场景': '网页导出文档、说明文档、知识页面等HTML内容',
+                            '优点': '可清理脚本样式并提取结构化正文，支持表格转Markdown',
+                            '缺点': '复杂动态页面（JS渲染）内容可能不完整'
+                        }
+                    }
+                }
+            },
+            '.htm': {
+                'default': 'bs4',
+                'models': {
+                    'bs4': {
+                        'processor': self.html_processor,
+                        'metadata': {
+                            'name': 'BeautifulSoup HTML',
+                            'description': '基于BeautifulSoup与lxml的HTML结构化解析器',
+                            '适用场景': '网页导出文档、说明文档、知识页面等HTML内容',
+                            '优点': '可清理脚本样式并提取结构化正文，支持表格转Markdown',
+                            '缺点': '复杂动态页面（JS渲染）内容可能不完整'
+                        }
+                    }
+                }
             }
         }
 
@@ -147,6 +208,7 @@ class DocumentProcessor:
             'error': str
         }
         """
+        temp_pdf_path = None
         try:
             path = Path(file_path)
             if not path.exists():
@@ -180,7 +242,7 @@ class DocumentProcessor:
 
             # 准备处理器参数
             kwargs = {}
-            if file_type == '.pdf':
+            if file_type == '.pdf' or (file_type in {'.docx', '.doc'} and model_name == 'mineru'):
                 kwargs = {
                     'output_dir': str(self.output_dir),
                     'lang': "ch",
@@ -199,6 +261,17 @@ class DocumentProcessor:
                     'end_page_id': None
                 }
 
+            process_path = file_path
+            if file_type in {'.docx', '.doc'} and model_name == 'mineru':
+                temp_pdf_path = self.docx_processor.convert_to_pdf(file_path)
+                if not temp_pdf_path or not os.path.exists(temp_pdf_path):
+                    return {
+                        'success': False,
+                        'file_type': 'word',
+                        'error': 'Word 转 PDF 失败，无法使用 MinerU 解析（请检查 LibreOffice 配置）'
+                    }
+                process_path = temp_pdf_path
+
             # 确定文件类型字符串
             file_type_str = {
                 '.pdf': 'pdf',
@@ -206,11 +279,13 @@ class DocumentProcessor:
                 '.doc': 'word',
                 '.xlsx': 'excel',
                 '.xls': 'excel',
-                '.csv': 'csv'
+                '.csv': 'csv',
+                '.html': 'html',
+                '.htm': 'html'
             }.get(file_type, file_type.lstrip('.'))
 
             # 调用处理器
-            result = processor.process(file_path, **kwargs)
+            result = processor.process(process_path, **kwargs)
 
             processor_metadata = result.get('metadata') or {}
             processor_content = result.get('content')
@@ -229,11 +304,11 @@ class DocumentProcessor:
                     }
                 }
 
-            if file_type == '.pdf' and (processor_content is None or not str(processor_content).strip()):
+            if (file_type == '.pdf' or model_name == 'mineru') and (processor_content is None or not str(processor_content).strip()):
                 return {
                     'success': False,
                     'file_type': file_type_str,
-                    'error': 'PDF 解析未生成有效内容，请检查 MinerU 配置或输入文件质量',
+                    'error': f'{model_name} 解析未生成有效内容，请检查模型配置或输入文件质量',
                     'metadata': {
                         **metadata,
                         **processor_metadata,
@@ -259,6 +334,13 @@ class DocumentProcessor:
                 'success': False,
                 'error': str(e)
             }
+        finally:
+            if temp_pdf_path:
+                try:
+                    temp_dir = os.path.dirname(temp_pdf_path)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    pass
 
     def process_directory(self, directory: str) -> Dict[str, Any]:
         """

@@ -30,7 +30,7 @@ export {
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize, answerGenerationQueryGraph } from './modules/component'
-export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels } from './modules/component'
+export { documentPreprocHealthCheck, documentPreprocConvert, documentPreprocConvertToPdf, getAvailableModels } from './modules/component'
 // -----------------------------------------------------------------------------
 // 文本切片接口
 // -----------------------------------------------------------------------------

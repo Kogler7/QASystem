@@ -15,4 +15,4 @@ export {
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './nl2cypher'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './intent-recognition'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize, answerGenerationQueryGraph } from './answer-generation'
-export { documentPreprocHealthCheck, documentPreprocConvert, getAvailableModels } from './document-preproc'
+export { documentPreprocHealthCheck, documentPreprocConvert, documentPreprocConvertToPdf, getAvailableModels } from './document-preproc'

@@ -30,3 +30,18 @@ export function documentPreprocConvert(file, modelName = null) {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
+
+
+/**
+ * 上传并将 .doc/.docx 转为 PDF（返回 PDF 二进制流）
+ * @param {File} file
+ */
+export function documentPreprocConvertToPdf(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post('/component/document-preproc/convert-to-pdf', form, {
+    timeout: 300000,
+    responseType: 'blob',
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
