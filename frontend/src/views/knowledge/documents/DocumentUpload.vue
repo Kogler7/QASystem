@@ -40,6 +40,12 @@ const kgConfidenceThreshold = 0.7
 const zipAcceptExt = '.zip'
 const uploadAcceptAttr = `${preprocAcceptAttr},${zipAcceptExt}`
 const uploadFormatHint = `${preprocFormatHint}；支持 ZIP（自动解压后顺序执行）`
+const extractTypeOptions = [
+  { value: 'Term', label: '术语' },
+  { value: 'RuleType', label: '规约规则' },
+  { value: 'SystemElement', label: '系统元素' }
+]
+const selectedExtractTypes = ref(['Term'])
 
 const convertedCharCount = computed(() => (convertedText.value ? convertedText.value.length : 0))
 
@@ -133,6 +139,7 @@ function buildSedimentSnapshot() {
     availableModels: availableModels.value,
     pipelineRunning: pipelineRunning.value,
     uploadLoading: uploadLoading.value,
+    selectedExtractTypes: selectedExtractTypes.value,
     fileHint:
       f && f.name
         ? fileToHint(f)
@@ -161,6 +168,9 @@ function applySedimentFields(s, opts = {}) {
   availableModels.value = s.availableModels && typeof s.availableModels === 'object' ? s.availableModels : {}
   pipelineRunning.value = Boolean(s.pipelineRunning)
   uploadLoading.value = Boolean(s.uploadLoading)
+  selectedExtractTypes.value = Array.isArray(s.selectedExtractTypes) && s.selectedExtractTypes.length
+    ? s.selectedExtractTypes
+    : ['Term']
   if (resetFile) {
     selectedFile.value = null
     fileHint.value = s.fileHint && s.fileHint.name ? s.fileHint : null
@@ -257,6 +267,10 @@ const runPipeline = async () => {
     ElMessage.warning('请先选择文档')
     return
   }
+  if (!selectedExtractTypes.value.length) {
+    ElMessage.warning('请至少选择一个知识抽取类型')
+    return
+  }
   stopStoragePoll()
   stepError.value = ''
   try {
@@ -265,6 +279,7 @@ const runPipeline = async () => {
       availableModels: availableModels.value,
       modelsLoaded: modelsLoaded.value,
       kgConfidenceThreshold,
+      extractTypes: selectedExtractTypes.value,
       onUpdate: (snap) => applySedimentFields(snap, { resetFile: false })
     })
     if (summary.cancelled) return
@@ -359,6 +374,22 @@ const openNeo4jBrowser = () => {
           </div>
         </div>
       </template>
+
+      <div class="extract-type-row">
+        <span class="extract-type-label">抽取类型</span>
+        <el-checkbox-group v-model="selectedExtractTypes" :disabled="pipelineRunning">
+          <el-checkbox
+            v-for="opt in extractTypeOptions"
+            :key="opt.value"
+            :label="opt.value"
+          >
+            {{ opt.label }}
+          </el-checkbox>
+        </el-checkbox-group>
+      </div>
+      <p class="hint-text hint-text--top-space">
+        将按所选类型分别执行“知识抽取”并合并结果后写入图谱。
+      </p>
 
       <!-- 横向步骤进度可视化 -->
       <div class="step-progress-visual">
@@ -705,6 +736,23 @@ const openNeo4jBrowser = () => {
 
 .progress-row {
   margin-top: 16px;
+}
+
+.extract-type-row {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.extract-type-label {
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.hint-text--top-space {
+  margin-top: 8px;
 }
 .progress-meta {
   display: flex;

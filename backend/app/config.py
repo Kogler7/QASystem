@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     DIFY_WORKFLOW_API_KEY: str = ""
     DIFY_WORKFLOW_INPUT_VAR: str = "query"
     DIFY_WORKFLOW_OUTPUT_VAR: str = "text"
+    DIFY_WORKFLOW_RESPONSE_MODE: str = "blocking"
+    DIFY_WORKFLOW_TIMEOUT_SECONDS: int = 120
 
     # JWT & auth
     JWT_SECRET: str = "change-me"
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Database (default to MySQL style URL; can be overridden)
-    DATABASE_URL: str = "mysql+asyncmy://rail_user:123456@localhost:3306/rail_assistant"
+    DATABASE_URL: str = "mysql+asyncmy://rail_user:123456@127.0.0.1:3306/rail_assistant"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -18,6 +18,7 @@ import { expandZipIfNeeded } from '@/utils/preprocZipLogic'
 export const SEDIMENT_STORAGE_KEY = 'qasystem-knowledge-sediment-v1'
 export const SEDIMENT_STORAGE_VERSION = 1
 let _activeRunController = null
+const EXTRACT_TYPES = ['Term', 'RuleType', 'SystemElement']
 
 export class SedimentRunCancelledError extends Error {
   constructor(message = '知识沉淀流程已取消') {
@@ -78,6 +79,51 @@ export function cancelCurrentSedimentRun() {
   })
 }
 
+function normalizeExtractTypes(extractTypes) {
+  const types = Array.isArray(extractTypes) ? extractTypes : []
+  const normalized = types
+    .map((t) => String(t || '').trim())
+    .filter((t) => EXTRACT_TYPES.includes(t))
+  return normalized.length ? Array.from(new Set(normalized)) : ['Term']
+}
+
+function mergeGraphResults(results) {
+  const merged = {
+    nodes: [],
+    relationships: [],
+    ontology_relations: []
+  }
+  const nodeSeen = new Set()
+  const relSeen = new Set()
+  const ontoSeen = new Set()
+
+  for (const item of results) {
+    const graph = item?.graph || {}
+    for (const n of graph.nodes || []) {
+      const key = JSON.stringify(n)
+      if (!nodeSeen.has(key)) {
+        nodeSeen.add(key)
+        merged.nodes.push(n)
+      }
+    }
+    for (const r of graph.relationships || []) {
+      const key = JSON.stringify(r)
+      if (!relSeen.has(key)) {
+        relSeen.add(key)
+        merged.relationships.push(r)
+      }
+    }
+    for (const o of graph.ontology_relations || []) {
+      const key = JSON.stringify(o)
+      if (!ontoSeen.has(key)) {
+        ontoSeen.add(key)
+        merged.ontology_relations.push(o)
+      }
+    }
+  }
+  return merged
+}
+
 function mergePublish(prev, partial) {
   return {
     v: SEDIMENT_STORAGE_VERSION,
@@ -109,6 +155,7 @@ export async function resolveSedimentInputFiles(input) {
  * @param {object} opts.availableModels
  * @param {boolean} opts.modelsLoaded
  * @param {number} opts.kgConfidenceThreshold
+ * @param {string[]} [opts.extractTypes]
  * @param {(snap: object) => void} [opts.onUpdate] 每次落库后回调，用于同步 Vue 视图
  */
 export async function runKnowledgeSedimentPipeline({
@@ -116,6 +163,7 @@ export async function runKnowledgeSedimentPipeline({
   availableModels: initialModels,
   modelsLoaded: initialLoaded,
   kgConfidenceThreshold,
+  extractTypes,
   onUpdate
 }) {
   const runId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -205,13 +253,29 @@ export async function runKnowledgeSedimentPipeline({
     }
     publish({ chunks, stepIndex: 2 })
 
+    const selectedTypes = normalizeExtractTypes(extractTypes)
     const chunkPayload = JSON.stringify({ chunks }, null, 0)
-    const chunkBlob = new Blob([chunkPayload], { type: 'application/json;charset=utf-8' })
-    const extractForm = new FormData()
-    extractForm.append('file', chunkBlob, 'chunks.json')
-    extractForm.append('main_object', 'Term')
-    extractForm.append('use_templates', 'true')
-    const { data: extract } = await parseChunkedJsonExtract(extractForm, { signal: controller.signal })
+    const extracts = []
+    for (const mainObject of selectedTypes) {
+      const chunkBlob = new Blob([chunkPayload], { type: 'application/json;charset=utf-8' })
+      const extractForm = new FormData()
+      extractForm.append('file', chunkBlob, 'chunks.json')
+      extractForm.append('main_object', mainObject)
+      extractForm.append('use_templates', 'true')
+      const { data } = await parseChunkedJsonExtract(extractForm, { signal: controller.signal })
+      extracts.push({
+        type: mainObject,
+        raw: data?.raw ?? {},
+        graph: data?.graph ?? { nodes: [], relationships: [], ontology_relations: [] }
+      })
+      ensureActive()
+    }
+    const extract = {
+      raw: selectedTypes.length === 1 ? (extracts[0]?.raw ?? {}) : {},
+      graph: mergeGraphResults(extracts),
+      selected_types: selectedTypes,
+      result_by_type: extracts
+    }
     ensureActive()
     publish({ extractResult: extract, stepIndex: 3 })
 
@@ -292,6 +356,7 @@ export async function runKnowledgeSedimentPipelineBatch({
   availableModels,
   modelsLoaded,
   kgConfidenceThreshold,
+  extractTypes,
   onItemStart,
   onItemFinish,
   onUpdate
@@ -314,6 +379,7 @@ export async function runKnowledgeSedimentPipelineBatch({
         availableModels,
         modelsLoaded,
         kgConfidenceThreshold,
+        extractTypes,
         onUpdate
       })
       if (result?.cancelled) {
