@@ -216,16 +216,19 @@ const handleConflictDetect = async () => {
       delete_ttl: ''
     })
     if (data.success) {
-      const raw = data.conflicts || []
-      conflictGroups.value = raw.map((c) => ({
-        ...c,
-        selectedResolution: c.selectedResolution || 'overwrite',
-        customValue: c.customValue || ''
-      }))
+      const raw = data.conflicts || [];
+        conflictGroups.value = raw.map((c) => ({
+          ...c,
+          // 🚨 核心改动：显示的时候，直接脱壳！
+          subject: cleanId(c.subject), 
+          predicate: cleanId(c.predicate),
+          selectedResolution: c.selectedResolution || 'overwrite',
+          customValue: c.customValue || ''
+        }));
       if (conflictGroups.value.length > 0) {
         const msg = data.message || `冲突检测完成：发现 ${conflictGroups.value.length} 项违规数据。`
         activeGroupIndex.value = 0
-        conflictStep.value = 3
+        conflictStep.value = 2
         ElMessage({ message: msg, type: 'warning', duration: 5000, showClose: true })
       } else {
         activeGroupIndex.value = null
@@ -277,7 +280,11 @@ const handleSingleRepair = async () => {
     loadingRepair.value = false
   }
 }
-
+const cleanId = (str) => {
+  if (!str) return '';
+  // 过滤掉尖括号，取最后一段
+  return str.replace(/[<>]/g, '').split('/').pop();
+};
 watch(conflictStep, async (newVal) => {
   if (newVal === 2 || newVal === 3) {
     await nextTick()
@@ -293,17 +300,30 @@ const renderConflictGraph = () => {
   }
   const nodes = []
   const edges = []
-  conflictGroups.value.forEach((conflict) => {
-    nodes.push({
-      id: conflict.subject,
-      label: `${conflict.subject}\n(违规主体)`,
-      color: { background: '#fef0f0', border: '#f56c6c' },
-      shape: 'dot',
-      size: 35,
-      font: { multi: 'md', color: '#f56c6c', weight: 'bold' }
-    })
+  
+  // 🚨 关键修复 1：用一个 Set 记录已经画过的主语，防止红点重复画导致崩溃
+  const addedSubjects = new Set()
+
+  // 🚨 关键修复 2：加上 index 参数，给后续的连线和方块加上唯一编号
+  conflictGroups.value.forEach((conflict, index) => {
+    
+    // 1. 画主语节点（中心红点）
+    if (!addedSubjects.has(conflict.subject)) {
+      nodes.push({
+        id: conflict.subject, // 这里不用加 index，因为它是中心点
+        label: `${conflict.subject}\n(违规主体)`,
+        color: { background: '#fef0f0', border: '#f56c6c' },
+        shape: 'dot',
+        size: 35,
+        font: { multi: 'md', color: '#f56c6c', weight: 'bold' }
+      })
+      addedSubjects.add(conflict.subject)
+    }
+
+    // 2. 画旧值节点（绿色方块）
     if (conflict.oldValue !== '无记录') {
-      const oldNodeId = `old_${conflict.subject}`
+      // 🚨 关键修复 3：ID 加上 _${index}，确保绝对唯一
+      const oldNodeId = `old_${conflict.subject}_${index}`
       nodes.push({
         id: oldNodeId,
         label: `库内原值:\n${conflict.oldValue}`,
@@ -311,9 +331,13 @@ const renderConflictGraph = () => {
         shape: 'box',
         size: 20
       })
-      edges.push({ from: conflict.subject, to: oldNodeId, label: '当前属性', color: '#67c23a' })
+      // 💡 顺便优化：连线上显示具体的属性名（比如 speed），图表更好看
+      const edgeLabel = conflict.predicate ? conflict.predicate : '当前属性'
+      edges.push({ from: conflict.subject, to: oldNodeId, label: edgeLabel, color: '#67c23a' })
     }
-    const newNodeId = `new_${conflict.subject}`
+
+    // 3. 画新值节点（橙色方块）
+    const newNodeId = `new_${conflict.subject}_${index}` // 🚨 同理加 index
     nodes.push({
       id: newNodeId,
       label: `拟输入值:\n${conflict.newValue}`,
@@ -321,8 +345,11 @@ const renderConflictGraph = () => {
       shape: 'box',
       size: 20
     })
-    edges.push({ from: conflict.subject, to: newNodeId, label: '冲突更新', dashes: true, color: '#e6a23c' })
+    const newEdgeLabel = conflict.predicate ? `${conflict.predicate} 冲突` : '冲突更新'
+    edges.push({ from: conflict.subject, to: newNodeId, label: newEdgeLabel, dashes: true, color: '#e6a23c' })
   })
+
+  // --- 下面是实例化和点击事件 ---
   const options = {
     physics: {
       enabled: true,
@@ -330,11 +357,19 @@ const renderConflictGraph = () => {
     },
     interaction: { hover: true, tooltipDelay: 200 }
   }
+  
   networkInstance = new Network(visContainer.value, { nodes, edges }, options)
+  
+  // 🚨 关键修复 4：因为前面 ID 变了，这里的点击匹配逻辑也要微微调整
   networkInstance.on('click', (params) => {
     if (params.nodes.length > 0) {
       const nodeId = params.nodes[0]
-      const subjectId = nodeId.replace('old_', '').replace('new_', '')
+      // 用正则把前缀 old_ / new_ 和后缀 _0 去掉，还原出真正的 subjectId
+      let subjectId = nodeId
+      if (nodeId.startsWith('old_') || nodeId.startsWith('new_')) {
+         subjectId = nodeId.replace(/^(old|new)_/, '').replace(/_\d+$/, '')
+      }
+      
       const index = conflictGroups.value.findIndex((c) => c.subject === subjectId)
       if (index !== -1) activeGroupIndex.value = index
     }
@@ -584,6 +619,52 @@ onUnmounted(() => {
           <!-- 冲突检测与修复内容 -->
           <div v-else-if="activeMenu === 'conflict'" class="conflict-split-view">
             <el-card shadow="never" style="margin-bottom: 20px; border: none; background: transparent;">
+
+              <el-card class="algorithm-annotation-card" shadow="never">
+                <div class="card-header-wrapper">
+                  <span class="header-icon">🧠</span>
+                  <span class="header-title">冲突推演算法：基于 SHACL 的串行逻辑推演模型</span>
+                </div>
+
+                <p class="main-description">
+                  本系统采用“先约束过滤、后逻辑求解”的漏斗式架构定位图谱冲突，融合三大核心步骤：
+                </p>
+
+                <el-row :gutter="40" class="features-row">
+                  <el-col :span="8">
+                    <div class="feature-block">
+                      <div class="feature-icon">
+                      </div>
+                      <div class="feature-text">
+                        <div class="feature-title">查找最小冲突子图</div>
+                        <div class="feature-desc">利用约束规则，从全量图谱中提取最小候选子图</div>
+                      </div>
+                    </div>
+                  </el-col>
+
+                  <el-col :span="8">
+                    <div class="feature-block">
+                      <div class="feature-icon">
+                      </div>
+                      <div class="feature-text">
+                        <div class="feature-title">Clingo 精准求解</div>
+                        <div class="feature-desc">在剪枝后的子图空间内，根据约束规则计算冲突根因</div>
+                      </div>
+                    </div>
+                  </el-col>
+
+                  <el-col :span="8">
+                    <div class="feature-block">
+                      <div class="feature-icon">
+                      </div>
+                      <div class="feature-text">
+                        <div class="feature-title">修复三元组</div>
+                        <div class="feature-desc">根据逻辑推演结果，选择最优方案</div>
+                      </div>
+                    </div>
+                  </el-col>
+                </el-row>
+              </el-card>
               <el-steps :active="conflictStep" finish-status="success" align-center>
                 <el-step title="数据输入" />
                 <el-step title="冲突检测" />
@@ -597,9 +678,9 @@ onUnmounted(() => {
               <el-card class="form-card" shadow="hover" v-show="conflictStep < 2">
                 <template #header>
                   <div class="card-header-flex">
-                    <span>RDF Turtle 数据输入</span>
+                    <span>RDF Turtle 或 JSON 数据输入</span>
                     <el-upload action="#" :auto-upload="false" :show-file-list="false" @change="handleFileUpload">
-                      <el-button type="primary" link :icon="Link">上传 .ttl 文件</el-button>
+                      <el-button type="primary" link :icon="Link">请输入 Turtle 或 JSON 数据</el-button>
                     </el-upload>
                   </div>
                 </template>
@@ -640,13 +721,18 @@ onUnmounted(() => {
                       :key="index"
                       class="conflict-item-card"
                       :class="{ 'is-active': activeGroupIndex === index }"
-                      @click="activeGroupIndex = index"
-                    >
+                      @click="activeGroupIndex = index">
                       <div class="conflict-header">
                         <el-tag type="danger" size="small">{{ group.conflictType }}</el-tag>
-                        <span class="subject-text">{{ group.subject }}</span>
+                        <span class="subject-text">{{ group.subjectName || group.subject }}</span>
                       </div>
-                      <p class="predicate-text">属性：<code>{{ group.predicate }}</code></p>
+                      <p class="predicate-text">
+                        <span v-if="group.conflictType && group.conflictType.includes('关系')">关系：</span>
+                        <span v-else-if="group.conflictType && group.conflictType.includes('标签')">标签：</span>
+                        <span v-else>属性：</span>
+                        
+                        <code>{{ group.predicateName || group.predicate }}</code>
+                      </p>
                       <div class="comparison-grid">
                         <div class="val-box old">
                           <span class="label">数据库现有:</span>
@@ -665,15 +751,15 @@ onUnmounted(() => {
                   <h3 class="sub-title"><el-icon><MagicStick /></el-icon> 修复建议</h3>
                   <el-card v-if="activeGroupIndex !== null" shadow="never" class="repair-card">
                     <div class="repair-info">
-                      <h4>针对 {{ conflictGroups[activeGroupIndex].subject }} 的方案</h4>
+                      <h4>针对 {{ conflictGroups[activeGroupIndex]?.subject }} 的方案</h4>
                       <el-radio-group v-model="conflictGroups[activeGroupIndex].selectedResolution">
                         <el-radio label="overwrite" border class="repair-radio">
                           <strong>覆盖更新</strong>
-                          <p>采用新输入值 ({{ conflictGroups[activeGroupIndex].newValue }})</p>
+                          <p>采用新输入值 ({{ conflictGroups[activeGroupIndex]?.newValue }})</p>
                         </el-radio>
                         <el-radio label="keep" border class="repair-radio">
                           <strong>保持现状</strong>
-                          <p>忽略本次输入，保留原库值 ({{ conflictGroups[activeGroupIndex].oldValue }})</p>
+                          <p>忽略本次输入，保留原库值 ({{ conflictGroups[activeGroupIndex]?.oldValue }})</p>
                         </el-radio>
                         <el-radio label="manual" border class="repair-radio">
                           <strong>人工修正</strong>
@@ -1024,5 +1110,69 @@ onUnmounted(() => {
   .sidebar-menu {
     width: 100%;
   }
+}
+.algorithm-annotation-card {
+  margin-bottom: 24px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px; /* 如果想要截图那种稍微硬朗的直角，可以设为 2px 或 4px */
+  background-color: #ffffff;
+}
+
+/* 头部样式：粗体、大号字、带底边框 */
+.card-header-wrapper {
+  display: flex;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 16px;
+}
+
+.header-icon {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+}
+
+/* 简述文本 */
+.main-description {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+/* 特征块排版 */
+.features-row {
+  margin-bottom: 24px;
+}
+
+.feature-block {
+  display: flex;
+  align-items: flex-start;
+}
+
+.feature-icon {
+  font-size: 24px;
+  margin-right: 12px;
+  color: #909399; 
+
+}
+
+.feature-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.feature-desc {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>
