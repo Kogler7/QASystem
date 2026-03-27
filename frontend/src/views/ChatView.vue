@@ -1,7 +1,7 @@
 <script setup>
 import { nextTick, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Loading, Link } from '@element-plus/icons-vue'
+import { ChatLineRound, Loading, Link, Monitor } from '@element-plus/icons-vue'
 import { sendChatMessage } from '@/api'
 
 const activeTab = ref('native')
@@ -114,18 +114,20 @@ onMounted(() => {
 
 <template>
   <div class="chat-page">
-    <header class="chat-header">
-      <div class="chat-title">
-        智能问答
-      </div>
-      <div class="chat-status">
-        <span v-if="activeTab === 'native'">{{ sending ? '回答中...' : '在线' }}</span>
-        <span v-else>iframe 模式</span>
-      </div>
-    </header>
-    <div class="chat-card">
-      <el-tabs v-model="activeTab" class="chat-tabs">
-        <el-tab-pane label="workflow" name="native">
+    <div class="page-bg-deco" aria-hidden="true">
+      <span class="circle circle-1"></span>
+      <span class="circle circle-2"></span>
+    </div>
+
+    <el-card class="chat-card" shadow="hover">
+        <el-tabs v-model="activeTab" class="chat-tabs">
+          <el-tab-pane name="native">
+            <template #label>
+              <span class="tab-label">
+                <el-icon><ChatLineRound /></el-icon>
+                workflow
+              </span>
+            </template>
           <div class="native-tab-body">
             <el-scrollbar ref="chatScrollRef" class="messages-area">
               <div class="messages-list">
@@ -161,7 +163,13 @@ onMounted(() => {
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="chatflow(iframe)" name="iframe">
+        <el-tab-pane name="iframe">
+            <template #label>
+              <span class="tab-label">
+                <el-icon><Monitor /></el-icon>
+                agent
+              </span>
+            </template>
           <div class="iframe-tab-body">
             <div class="iframe-toolbar">
               <el-button type="primary" :disabled="!difyWorkspaceUrl" @click="openDify">
@@ -190,49 +198,73 @@ onMounted(() => {
           </div>
         </el-tab-pane>
       </el-tabs>
-    </div>
+    </el-card>
   </div>
 </template>
 
 <style scoped lang="scss">
 .chat-page {
+  position: relative;
   height: calc(100vh - var(--nav-height));
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: 16px var(--padding-inline) 0;
+  padding: 16px var(--padding-inline) 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   background: var(--bg-primary);
+  overflow: hidden;
 }
 
-.chat-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.page-bg-deco {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
 }
 
-.chat-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--gray-900);
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--primary-gradient);
+  opacity: 0.06;
+  animation: float 5s ease-in-out infinite;
 }
 
-.chat-status {
-  color: var(--gray-600);
-  font-size: 14px;
+.circle-1 {
+  width: 220px;
+  height: 220px;
+  top: 8%;
+  right: 4%;
+}
+
+.circle-2 {
+  width: 140px;
+  height: 140px;
+  bottom: 18%;
+  left: 6%;
+  animation-delay: 2s;
 }
 
 .chat-card {
+  position: relative;
+  z-index: 1;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
   flex: 1;
   min-height: 0;
-  background: var(--white);
   border-radius: var(--card-radius-lg);
-  box-shadow: var(--shadow-lg);
   border: 1px solid var(--gray-200);
-  display: flex;
+  transition: var(--transition-normal);
+
+  :deep(.el-card__body) {
+    padding: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  &:hover {
+    box-shadow: var(--shadow-hover);
+  }
 }
 
 .chat-tabs {
@@ -240,19 +272,70 @@ onMounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 0 4px;
+
+  /* 让 Tab 内容区占满卡片剩余高度，避免 iframe 被裁切 */
+  :deep(.el-tabs) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-tabs__header) {
+    margin: 0;
+    padding: 12px 16px 0;
+    flex-shrink: 0;
+  }
+
+  :deep(.el-tabs__content) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-tab-pane) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-tabs__nav-wrap::after) {
+    display: none;
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background: var(--primary-500);
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  :deep(.el-tabs__item.is-active) {
+    color: var(--primary-500);
+  }
+
+  :deep(.el-tabs__item:hover) {
+    color: var(--primary-500);
+  }
+}
+
+.tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 :deep(.chat-tabs .el-tabs__content) {
-  flex: 1;
-  min-height: 0;
-}
-
-:deep(.chat-tabs .el-tab-pane) {
-  height: 100%;
+  padding: 0 12px 12px;
 }
 
 .native-tab-body {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -260,8 +343,9 @@ onMounted(() => {
 .messages-area {
   flex: 1;
   min-height: 0;
-  padding: 16px;
-  background: var(--bg-primary);
+  padding: 16px 12px;
+  background: linear-gradient(180deg, var(--gray-100) 0%, var(--bg-primary) 48%);
+  border-radius: var(--card-radius);
 }
 
 .messages-list {
@@ -284,29 +368,42 @@ onMounted(() => {
 
 .message-bubble {
   max-width: min(760px, 85%);
-  padding: 10px 12px;
-  border-radius: 10px;
-  line-height: 1.6;
+  padding: 12px 14px;
+  border-radius: 14px;
+  line-height: 1.65;
   font-size: 14px;
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: var(--shadow-sm);
 }
 
 .message-row.user .message-bubble {
-  background: var(--el-color-primary);
+  background: var(--primary-gradient);
   color: #fff;
+  border: none;
 }
 
 .message-row.assistant .message-bubble {
-  background: #fff;
+  background: var(--white);
   color: var(--gray-900);
   border: 1px solid var(--gray-200);
+  border-left: 3px solid var(--primary-400);
 }
 
 .composer {
   border-top: 1px solid var(--gray-200);
-  padding: 12px;
-  background: #fff;
+  padding: 14px 4px 4px;
+  background: var(--white);
+
+  :deep(.el-textarea__inner) {
+    border-radius: var(--card-radius);
+    border-color: var(--gray-200);
+    transition: border-color var(--transition-fast);
+
+    &:focus {
+      border-color: var(--primary-400);
+    }
+  }
 }
 
 .composer-actions {
@@ -316,13 +413,15 @@ onMounted(() => {
 }
 
 .iframe-tab-body {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .iframe-toolbar {
-  padding: 0 16px 12px;
+  flex-shrink: 0;
+  padding: 4px 8px 12px;
 }
 
 .iframe-card {
@@ -331,6 +430,8 @@ onMounted(() => {
   border-top: 1px solid var(--gray-200);
   overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .state-overlay {
@@ -348,26 +449,21 @@ onMounted(() => {
 }
 
 .chat-iframe {
-  display: block;
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: 100%;
-  min-height: 700px;
   border: none;
 }
 
 @media (max-width: 768px) {
   .chat-page {
-    padding: 12px 16px 0;
-  }
-  .chat-header {
-    flex-direction: column;
-    align-items: stretch;
+    padding: 12px 16px 20px;
   }
   .messages-area {
-    padding: 12px;
+    padding: 12px 8px;
   }
   .iframe-toolbar {
-    padding: 0 12px 12px;
+    padding: 4px 4px 12px;
   }
 }
 </style>
