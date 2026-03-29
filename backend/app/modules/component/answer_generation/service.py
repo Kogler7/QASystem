@@ -49,6 +49,45 @@ def _get_qa_service():
     return _qa_service
 
 
+def _get_problem_definition_tool():
+    """获取问题定义工具"""
+    try:
+        _register_tog_alias()
+        from QA.answer_solve import Neo4jQAService
+        qa_service = Neo4jQAService()
+        from QA.tools import ProblemDefinitionTool
+        return ProblemDefinitionTool(qa_service.wiki_client, qa_service.config)
+    except Exception as e:
+        logger.warning("加载问题定义工具失败: %s", e)
+        raise
+
+
+def _get_solution_planning_tool():
+    """获取方案规划工具"""
+    try:
+        _register_tog_alias()
+        from QA.answer_solve import Neo4jQAService
+        qa_service = Neo4jQAService()
+        from QA.tools import SolutionPlanningTool
+        return SolutionPlanningTool(qa_service.wiki_client, qa_service.config)
+    except Exception as e:
+        logger.warning("加载方案规划工具失败: %s", e)
+        raise
+
+
+def _get_answer_generation_tool():
+    """获取答案生成工具"""
+    try:
+        _register_tog_alias()
+        from QA.answer_solve import Neo4jQAService
+        qa_service = Neo4jQAService()
+        from QA.tools import AnswerGenerationTool
+        return AnswerGenerationTool(qa_service.wiki_client, qa_service.config)
+    except Exception as e:
+        logger.warning("加载答案生成工具失败: %s", e)
+        raise
+
+
 def _load_neo4j_config() -> Dict[str, Any]:
     try:
         # 导入QA模块的配置
@@ -236,3 +275,24 @@ def ask_with_visualization(question: str) -> dict[str, Any]:
         "visualization_type": "html",
         "error": result.get("error"),
     }
+
+
+def define_problem(question: str) -> dict[str, Any]:
+    """问题定义工具"""
+    tool = _get_problem_definition_tool()
+    result = tool.define_problem(question)
+    return result
+
+
+def plan_solution(problem_model: Dict) -> dict[str, Any]:
+    """方案规划工具"""
+    tool = _get_solution_planning_tool()
+    result = tool.plan_solution(problem_model)
+    return result
+
+
+def generate_answer(solution: Dict, graph_paths: Dict, question: str) -> dict[str, Any]:
+    """答案生成工具"""
+    tool = _get_answer_generation_tool()
+    result = tool.generate_answer(solution, graph_paths, question)
+    return result
