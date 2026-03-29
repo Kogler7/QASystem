@@ -28,6 +28,9 @@ class Intent(BaseModel):
     core_keywords: list = Field(..., description="核心关键词")
     intent_summary: str = Field(..., description="意图精简摘要")
     user_goal: str = Field(..., description="用户核心目标")
+    tools: str = Field(..., description="意图技能描述")
+
+
 
 @tool(description="从意图向量数据库中检索相关意图")
 def retrival_tool(query: str):
@@ -37,7 +40,6 @@ def retrival_tool(query: str):
     dense_results = results.get("密集向量检索结果", [])
     sparse_results = results.get("稀疏向量检索结果", [])
     
-    # 修复：正确处理所有结果
     dense_processed = utils.handle_RepeatedScalarContainer(dense_results)
     sparse_processed = utils.handle_RepeatedScalarContainer(sparse_results)
     
@@ -76,7 +78,8 @@ retrival_tool(query: str): 从向量库检索意图
   "sample_utterances": ["典型用户表述1", "典型用户表述2"],
   "core_keywords": ["核心关键词1", "核心关键词2"],
   "intent_summary": "意图精简摘要",
-  "user_goal": "用户核心目标"
+  "user_goal": "用户核心目标",
+  "tools": "意图所需要的工具的列表"
 }
 ```
 
@@ -146,7 +149,7 @@ def run_tool_loop(query: str,max_loop: int = 2):
     return "达到最大步数"
         
 if __name__ == "__main__":
-    query = "发现裂纹应该如何处理？"
+    query = "公开采购与非公开采购金额构成如何？"
     # result = retrival_tool.invoke({"query": query})
     # print(result)
     # print(type(result.get("密集向量检索结果")))     # <class 'list'>

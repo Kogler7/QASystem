@@ -63,7 +63,7 @@ class ModifyIntent:
         }
 
         # 编码嵌入文本
-        text = self.database_utils.build_embedding_text(enbedding_data)
+        text = self.database_utils.build_dense_embedding_text(enbedding_data)
         encode_result = self.encoder.encode_text_hybrid(text)
         dense_vectors = encode_result.get("dense")
         sparse_vectors = encode_result.get("sparse")

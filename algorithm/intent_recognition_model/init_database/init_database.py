@@ -147,6 +147,7 @@ class DatabaseInit:
             FieldSchema(name="intent_description_text", dtype=DataType.VARCHAR, max_length=1024),
             FieldSchema(name="intent_summary_text", dtype=DataType.VARCHAR, max_length=1024),
             FieldSchema(name="user_goal_text", dtype=DataType.VARCHAR, max_length=1024),
+            FieldSchema(name="tools", dtype=DataType.VARCHAR, max_length=5000),
 
             # 稠密向量字段
             FieldSchema(name="dense_vector", dtype=DataType.FLOAT_VECTOR, dim=self.dense_dim, description="BGE-M3 全字段融合 dense 向量"),
@@ -218,12 +219,19 @@ class DatabaseInit:
                 single_data["intent_description_text"] = intent.get("intent_description", "")
                 single_data["intent_summary_text"] = intent.get("intent_summary", "")
                 single_data["user_goal_text"] = intent.get("user_goal", "")
+                # 将tools转换为JSON字符串
+                tools = intent.get("tools", [])
+                single_data["tools"] = json.dumps(tools) if isinstance(tools, (list, dict)) else str(tools)
 
                 # 向量编码
-                text = self.database_utils.build_embedding_text(intent)
-                encode_result = self.encoder.encode_text_hybrid(text)
-                dense_vectors = encode_result.get("dense")
-                sparse_vectors = encode_result.get("sparse")
+                dense_text = self.database_utils.build_dense_embedding_text(intent)
+                sparse_text = self.database_utils.build_sparse_embedding_text(intent)
+
+                dense_encode_result = self.encoder.encode_text_hybrid(dense_text)
+                sparse_encode_result = self.encoder.encode_text_hybrid(sparse_text)
+                
+                dense_vectors = dense_encode_result.get("dense")
+                sparse_vectors = sparse_encode_result.get("sparse")
                 print(f"dense_vectors: {dense_vectors} | sparse_vectors: {sparse_vectors}")
 
                 # 稠密向量字段
