@@ -4,6 +4,7 @@ import { Upload, Loading, Link, DocumentCopy, Files, Scissor, Connection, DataLi
 import { ElMessage } from 'element-plus'
 import { preprocAcceptAttr, preprocFormatHint, isPreprocExtension } from '@/constants/preprocFormats'
 import { normalizeToRawFiles } from '@/utils/preprocUploadLogic'
+import { checkDocumentNameExists } from '@/api'
 import {
   SEDIMENT_STORAGE_KEY,
   SEDIMENT_STORAGE_VERSION,
@@ -244,13 +245,25 @@ function startStoragePollIfRunning() {
   }, 500)
 }
 
-const handlePick = (file) => {
+const handlePick = async (file) => {
   const isZip = String(file?.name || '').toLowerCase().endsWith(zipAcceptExt)
   if (!isPreprocExtension(file?.name) && !isZip) {
     const parts = (file?.name || '').split('.')
     const ext = parts.length > 1 ? '.' + parts.pop().toLowerCase() : ''
     ElMessage.error(`不支持的格式「${ext || '无扩展名'}」。${uploadFormatHint}`)
     return
+  }
+  // ZIP 内文件名在解压后由流水线逐文件校验；此处仅对直接选中的单文件提前查重
+  if (!isZip && file?.name) {
+    try {
+      const { data } = await checkDocumentNameExists(file.name)
+      if (data?.exists) {
+        ElMessage.error(`文件「${file.name}」已在知识库中存在，请勿重复沉淀`)
+        return
+      }
+    } catch {
+      ElMessage.warning('无法预检文件名是否重复，开始执行后将在入库步骤校验')
+    }
   }
   selectedFile.value = file
   fileHint.value = null

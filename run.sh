@@ -11,6 +11,5 @@ else
 fi
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# 启动前端服务（可选，取消下面注释以同时启动前端）
-# echo "启动前端服务..."
-# npm run dev
+# 后台启动后端服务
+# nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &

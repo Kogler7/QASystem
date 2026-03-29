@@ -9,6 +9,14 @@ export function getDocuments(params = {}) {
   return request.get('/knowledge/documents', { params })
 }
 
+/** 检查文档文件名是否已在知识库中存在（与上传接口查重规则一致） */
+export function checkDocumentNameExists(name, requestConfig = {}) {
+  return request.get('/knowledge/documents/exists', {
+    params: { name },
+    ...requestConfig
+  })
+}
+
 /**
  * 上传文档
  * @param {FormData} formData - 包含 file 等字段

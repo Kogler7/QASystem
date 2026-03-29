@@ -4,6 +4,7 @@
  */
 import {
   uploadDocument,
+  checkDocumentNameExists,
   documentPreprocConvert,
   parseChunkedJsonExtract,
   nl2cypherSplitMarkdown,
@@ -221,6 +222,13 @@ export async function runKnowledgeSedimentPipeline({
     }
     ensureActive()
 
+    // 仅查重、不入库：避免跑完全流程前写入文档表；重复则立即结束，不跑预处理
+    const { data: existsRes } = await checkDocumentNameExists(file.name, { signal: controller.signal })
+    ensureActive()
+    if (existsRes?.exists) {
+      throw new Error(`文件 '${file.name}' 已存在`)
+    }
+
     const modelName = pickDefaultModelForFile(file, availableModels)
 
     const { data: preproc } = await documentPreprocConvert(file, modelName, { signal: controller.signal })
@@ -296,9 +304,17 @@ export async function runKnowledgeSedimentPipeline({
     ensureActive()
     publish({ graphUpdateResult: kgAddRes ?? { status: 'ok' }, stepIndex: 4 })
 
+    // 全流程成功后再入库；上传前再查一次，避免流程期间他处已占用同名
     publish({ uploadLoading: true })
     let stored
     try {
+      const { data: existsLate } = await checkDocumentNameExists(file.name, { signal: controller.signal })
+      ensureActive()
+      if (existsLate?.exists) {
+        throw new Error(
+          `文件 '${file.name}' 已存在（可能在流程进行期间已被其他操作入库）`
+        )
+      }
       const formData = new FormData()
       formData.append('file', file)
       const res = await uploadDocument(formData, { signal: controller.signal })

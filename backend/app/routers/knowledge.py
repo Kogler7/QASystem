@@ -77,6 +77,20 @@ async def list_documents(session: AsyncSession = Depends(get_session)) -> List[d
     return items
 
 
+@router.get("/documents/exists")
+async def document_name_exists(
+    name: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """按展示文件名检查是否已入库，供知识沉淀选文件时提前提示。"""
+    trimmed = (name or "").strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="缺少参数 name")
+    result = await session.execute(select(Document).where(Document.name == trimmed))
+    existing = result.scalar_one_or_none()
+    return {"exists": bool(existing), "name": trimmed}
+
+
 @router.post("/documents")
 async def upload_document(
     file: UploadFile = File(...),

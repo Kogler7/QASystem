@@ -11,6 +11,7 @@ export { sendChatMessage } from './modules/chat'
 // 知识库：文档管理、检索
 export {
   getDocuments,
+  checkDocumentNameExists,
   uploadDocument,
   deleteDocument,
   downloadDocument,
