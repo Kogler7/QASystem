@@ -200,7 +200,7 @@ onMounted(checkHealth)
               v-model="inputText"
               type="textarea"
               :rows="4"
-              placeholder="例如：发现裂纹后应如何处理？电机部分需要检查哪些关键部位？"
+              placeholder="例如：公开采购与非公开采购金额构成如何？"
             />
           </el-form-item>
           <el-form-item>
@@ -243,6 +243,7 @@ onMounted(checkHealth)
                     <p v-if="intent.tags"><strong>标签：</strong>{{ formatArrayField(intent.tags) }}</p>
                     <p v-if="intent.core_keywords"><strong>关键词：</strong>{{ formatArrayField(intent.core_keywords) }}</p>
                     <p v-if="intent.sample_utterances"><strong>典型表述：</strong>{{ formatArrayField(intent.sample_utterances, 2, '；') }}</p>
+                    <p v-if="intent.tools"><strong>可能使用的工具：</strong>{{ intent.tools }}</p>
                   </div>
                 </div>
               </div>
@@ -295,7 +296,7 @@ onMounted(checkHealth)
               <div v-else class="similarity-single">
                 <p>{{ result['与原始文本的相似度'] }}</p>
               </div>
-              <h4 class="section-title" style="margin-top: 8px;margin-bottom: 8px;">注：因为稠密向量和稀疏向量是独立检索的，所以检索到的意图结果不是完全一样，但是可能有一样的意图
+              <h4 class="section-title" style="margin-top: 8px;margin-bottom: 8px;font-weight: normal;font-size: 14px;">注：因为稠密向量和稀疏向量是独立检索的，所以检索到的意图结果不是完全一样，但是可能有一样的意图
                 <br>如果稠密向量相似度为空就代表该意图的语义与问题的语义相关性低
                 <br>如果稀疏向量相似度为空就代表该意图的关键词与问题的关键词相关性低
               </h4>
