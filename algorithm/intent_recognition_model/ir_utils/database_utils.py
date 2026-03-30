@@ -15,53 +15,56 @@ class DatabaseUtils:
         self.dense_dim = self.encoder.dense_dim
         self.sparse_dim = self.encoder.sparse_dim
 
-    def build_embedding_text(self,intent_data:dict)->str:
+    def build_dense_embedding_text(self,intent_data:dict)->str:
         """构建用于向量编码的融合文本（保留业务语义权重）"""
         parts = []
 
         if intent_data.get("intent_name"):
-            parts.append(f"[核心]意图名称: {intent_data['intent_name']}")
+            parts.append(f"意图名称: {intent_data['intent_name']}")
         if intent_data.get("user_goal"):
-            parts.append(f"[目标]用户目标: {intent_data['user_goal']}")
+            parts.append(f"用户目标: {intent_data['user_goal']}")
         if intent_data.get("intent_summary"):
-            parts.append(f"[摘要]意图摘要: {intent_data['intent_summary']}")
+            parts.append(f"意图摘要: {intent_data['intent_summary']}")
 
         # 补充语义（中权重）
         if intent_data.get("intent_description"):
-            parts.append(f"[描述]详细说明: {intent_data['intent_description']}")
-        if intent_data.get("core_keywords"):
-            kw = "、".join(intent_data["core_keywords"])
-            parts.append(f"[关键词]: {kw}")
+            parts.append(f"详细说明: {intent_data['intent_description']}")
 
         # 用户表达（高价值样本）
         if intent_data.get("sample_utterances"):
             # 选取最具代表性的3条（避免噪声）
             samples = intent_data["sample_utterances"][:3]
             samples_text = " | ".join([f"{s}" for s in samples])
-            parts.append(f"[示例]典型表述: {samples_text}")
+            parts.append(f"典型表述: {samples_text}")   
 
         return "\n".join(parts)
 
-    def aggregate_utterances(self, utterances):
-        """差异化聚合：稠密用平均，稀疏用拼接"""
-        if utterances is None:
-            return {
-                "dense":[0.0] * self.dense_dim,
-                "sparse": {}
-            }
+    def build_sparse_embedding_text(self,intent_data:dict)->str:
+        """构建用于向量编码的融合文本（保留业务语义权重）"""
+        parts = []
 
-        # 稠密向量使用平均聚合方法
-        dense_vectors = [self.encoder.encode_only_dense(text_content=utterance) for utterance in utterances]
-        dense_agg = np.mean(dense_vectors, axis=0).tolist()
+        if intent_data.get("intent_name"):
+            parts.append(f"意图名称: {intent_data['intent_name']}")
 
-        # 稀疏向量采用拼接后使用单次编码
-        sparse_text = " ".join(utterances)
-        sparse_vectors = self.encoder.encode_text_hybrid(sparse_text).get("sparse")
+        # 用户表达（高价值样本）
+        if intent_data.get("sample_utterances"):
+            # 选取最具代表性的3条（避免噪声）
+            samples = intent_data["sample_utterances"][:3]
+            samples_text = " | ".join([f"{s}" for s in samples])
+            parts.append(f"典型表述: {samples_text}")   
 
-        return {
-            "dense": dense_agg,
-            "sparse": sparse_vectors
-        }
+        if intent_data.get("tags"):
+            # 选取最具代表性的3条（避免噪声）
+            tags = intent_data["tags"]
+            tags_text = " | ".join([f"{s}" for s in tags])
+            parts.append(f"标签: {tags_text}") 
+        
+        if intent_data.get("core_keywords"):
+            # 选取最具代表性的3条（避免噪声）
+            core_keywords = intent_data["core_keywords"]
+            core_keywords_text = " | ".join([f"{s}" for s in core_keywords])
+            parts.append(f"核心关键词: {core_keywords_text}") 
+        return "\n".join(parts)
 
     def init_milvus_client(self)-> MilvusClient|None:
         """初始化客户端MilvusClient"""

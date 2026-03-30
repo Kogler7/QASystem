@@ -3,10 +3,12 @@ import os
 import sys
 
 from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Union
 from ir_config.config import Config
 from ir_utils.search_intent import HybridSearch
 from langchain_openai import ChatOpenAI
 from ir_utils.handle_data import utils
+import json
 
 # 配置日志
 config = Config()
@@ -53,76 +55,15 @@ class Intent(BaseModel):
     core_keywords: list = Field(..., description="核心关键词")
     intent_summary: str = Field(..., description="意图精简摘要")
     user_goal: str = Field(..., description="用户核心目标")
+    tools: Union[str, list, dict] = Field(..., description="意图技能描述")
+
+
 
 class IntentRecognition:
     def __init__(self):
         self.model = model
         self.search_tool = HybridSearch()
         self.utils = utils()
-
-    def retrival(self, query: str):
-        """检索函数,不展示距离相似度"""
-        results = self.search_tool.search(query=query)
-
-        logger.info(f"检索到的意图数量: {len(results)}")
-        result = []
-        distance = []
-        filter_result = []
-        logger.info("正在处理搜索结果...")
-        
-        for r in results:
-            # 直接提取entity字典，避免protobuf对象
-            entity = r.get("entity")
-            
-            # 处理数组字符串字段
-            if entity:
-                # 处理 tags 字段
-                if "tags" in entity and isinstance(entity["tags"], str):
-                    try:
-                        import ast
-                        entity["tags"] = ast.literal_eval(entity["tags"])
-                    except (ValueError, SyntaxError):
-                        pass
-                
-                # 处理 core_keywords 字段
-                if "core_keywords" in entity and isinstance(entity["core_keywords"], str):
-                    try:
-                        import ast
-                        entity["core_keywords"] = ast.literal_eval(entity["core_keywords"])
-                    except (ValueError, SyntaxError):
-                        pass
-                
-                # 处理 sample_utterances 字段
-                if "sample_utterances" in entity and isinstance(entity["sample_utterances"], str):
-                    try:
-                        import ast
-                        entity["sample_utterances"] = ast.literal_eval(entity["sample_utterances"])
-                    except (ValueError, SyntaxError):
-                        pass
-            
-            # 确保所有字段都是JSON可序列化的
-            serializable_entity = self.utils._make_serializable(entity)
-            result.append(serializable_entity)
-            # 提取距离
-            dist = r.get("distance")
-            distance.append(
-                {
-                    "意图ID": serializable_entity.get("intent_id"),
-                    "与原始文本的相似度": float(dist) if dist is not None else None
-                }
-            )
-        
-        logger.info("完成处理搜索结果")
-        print(result)
-        print(distance)
-
-        filter_result = result[0]
-        print("filter_result", filter_result)
-        return {
-            "相关意图": result,
-            "与原始文本的相似度": distance,
-            "筛选的最终意图": filter_result
-        }
 
     def show_distance_retrieval(self, query: str):
         """展示距离检索结果"""
@@ -139,34 +80,44 @@ class IntentRecognition:
             # 直接提取entity字典，避免protobuf对象
             entity = r.get("entity")
             
-            # 处理数组字符串字段
+            serializable_entity = None
             if entity:
-                # 处理 tags 字段
-                if "tags" in entity and isinstance(entity["tags"], str):
+                # 映射字段名，将数据库字段名映射到Intent模型字段名
+                # 处理 tools 字段，解析 Unicode 转义字符
+                tools = entity.get("tools")
+                if tools:
                     try:
-                        import ast
-                        entity["tags"] = ast.literal_eval(entity["tags"])
-                    except (ValueError, SyntaxError):
+                        # 尝试解析 JSON 字符串
+                        import json
+                        tools = json.loads(tools)
+                    except:
                         pass
                 
-                # 处理 core_keywords 字段
-                if "core_keywords" in entity and isinstance(entity["core_keywords"], str):
-                    try:
-                        import ast
-                        entity["core_keywords"] = ast.literal_eval(entity["core_keywords"])
-                    except (ValueError, SyntaxError):
-                        pass
+                mapped_data = {
+                    "intent_id": entity.get("intent_id"),
+                    "version": entity.get("version"),
+                    "domain": entity.get("domain"),
+                    "create_time": entity.get("create_time"),
+                    "update_time": entity.get("update_time"),
+                    "status": entity.get("status"),
+                    "tags": entity.get("tags"),
+                    "core_keywords": entity.get("core_keywords"),
+                    "sample_utterances": entity.get("sample_utterances"),
+                    "intent_name": entity.get("intent_name_text"),
+                    "intent_description": entity.get("intent_description_text"),
+                    "intent_summary": entity.get("intent_summary_text"),
+                    "user_goal": entity.get("user_goal_text"),
+                    "tools": tools
+                }
                 
-                # 处理 sample_utterances 字段
-                if "sample_utterances" in entity and isinstance(entity["sample_utterances"], str):
-                    try:
-                        import ast
-                        entity["sample_utterances"] = ast.literal_eval(entity["sample_utterances"])
-                    except (ValueError, SyntaxError):
-                        pass
-            
-            # 确保所有字段都是JSON可序列化的
-            serializable_entity = self.utils._make_serializable(entity)
+                # 使用Intent模型处理数据，利用Pydantic的自动类型转换
+                try:
+                    intent_obj = Intent(**mapped_data)
+                    serializable_entity = intent_obj.model_dump()
+                except Exception as e:
+                    logger.info(f"使用Intent模型处理数据失败: {e}")
+            else:
+                serializable_entity = None
             result.append(serializable_entity)
             # 提取距离
             rrf_score = r.get("rrf_score")
@@ -227,13 +178,8 @@ class IntentRecognition:
 
 if __name__ == "__main__":
     intent_recognition = IntentRecognition()
-    query = "发现裂纹后应如何处理？"
+    query = "公开采购与非公开采购金额构成如何？"
     
     # 直接调用 show_distance_retrieval 方法查看搜索结果
-    result = intent_recognition.show_distance_retrieval(query)
+    result = intent_recognition.generate_result(query)
     print("result:", result)
-    
-    # response = agent.invoke({
-    #     "messages": [{"role": "user", "content": "发现裂纹后应如何处理？"}]
-    # })
-    # print(response['messages'][-1])
