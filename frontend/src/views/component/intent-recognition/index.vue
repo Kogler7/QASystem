@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Aim, Document, Plus, Refresh } from '@element-plus/icons-vue'
-import { intentRecognitionHealthCheck, intentRecognitionRecognize, intentRecognitionStream, intentRecognitionDeepRecognize } from '@/api/modules/component/intent-recognition'
+import { intentRecognitionHealthCheck, intentRecognitionRecognize, intentRecognitionStream, intentRecognitionDeepRecognize, intentRecognitionGetPlan } from '@/api/modules/component/intent-recognition'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -34,7 +34,7 @@ const subMenuItems = [
   },
 ]
 
-const recognitionType = ref('basic') // 'basic' 或 'deep'
+const recognitionType = ref('basic') // 'basic' 或 'deep' 或 'plan'
 const inputText = ref('')
 const loading = ref(false)
 const result = ref(null)
@@ -129,12 +129,19 @@ const submit = async () => {
       result.value = data?.data ?? data
       ElMessage.success('识别完成')
       isStreaming.value = false
-    } else {
+    } else if (recognitionType.value === 'deep') {
       // 深度意图识别
       isStreaming.value = true
       const { data } = await intentRecognitionDeepRecognize({ text })
       result.value = data?.data ?? data
       ElMessage.success('识别完成')
+      isStreaming.value = false
+    } else if (recognitionType.value === 'plan') {
+      // 获取计划
+      isStreaming.value = true
+      const { data } = await intentRecognitionGetPlan({ text })
+      result.value = data?.data ?? data
+      ElMessage.success('获取计划完成')
       isStreaming.value = false
     }
   } catch (error) {
@@ -193,6 +200,7 @@ onMounted(checkHealth)
             <el-select v-model="recognitionType" class="w-full">
               <el-option label="基础意图识别" value="basic" />
               <el-option label="深度意图识别" value="deep" />
+              <el-option label="获取计划" value="plan" />
             </el-select>
           </el-form-item>
           <el-form-item label="用户输入" required>
@@ -342,6 +350,20 @@ onMounted(checkHealth)
           <div v-if="result.json_content" class="result-section">
             <h4 class="section-title">最终意图</h4>
             <pre class="result-json">{{ typeof result.json_content === 'string' ? result.json_content : JSON.stringify(result.json_content, null, 2) }}</pre>
+          </div>
+        </div>
+
+        <!-- 计划结果 -->
+        <div v-else-if="recognitionType === 'plan' && result" class="result-box">
+          <p class="result-label">计划结果</p>
+          <div class="result-section">
+            <h4 class="section-title">执行计划</h4>
+            <div v-if="typeof result === 'string'">
+              <pre class="result-json">{{ result }}</pre>
+            </div>
+            <div v-else>
+              <pre class="result-json">{{ JSON.stringify(result, null, 2) }}</pre>
+            </div>
           </div>
         </div>
       </el-card>

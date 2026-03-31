@@ -7,7 +7,7 @@ from pymilvus import MilvusClient, MilvusException, Collection, connections
 
 from ir_config.config import Config
 from ir_utils.encoder import HybridEncoder
-from intent_recognition.intent_app import Intent
+from data.intent_model import Intent
 from init_database.init_database import DatabaseInit
 from ir_utils.database_utils import DatabaseUtils
 
@@ -50,8 +50,8 @@ class ModifyIntent:
                 "intent_id": intent.intent_id,
                 "version": "1.0",
                 "domain": intent.domain,
-                "create_time": intent.create_time or current_time,
-                "update_time": intent.update_time or current_time,
+                "create_time": current_time,
+                "update_time": current_time,
                 "status": intent.status or "active",
                 "tags": intent.tags,
                 "core_keywords": intent.core_keywords,
@@ -60,13 +60,18 @@ class ModifyIntent:
                 "intent_name": intent.intent_name,
                 "intent_summary": intent.intent_summary,
                 "user_goal": intent.user_goal,
+                "tool": intent.tools,
         }
-
+        
         # 编码嵌入文本
-        text = self.database_utils.build_dense_embedding_text(enbedding_data)
-        encode_result = self.encoder.encode_text_hybrid(text)
-        dense_vectors = encode_result.get("dense")
-        sparse_vectors = encode_result.get("sparse")
+        dense_text = self.database_utils.build_dense_embedding_text(enbedding_data)
+        sparse_text = self.database_utils.build_sparse_embedding_text(enbedding_data)
+
+        dense_encode_result = self.encoder.encode_text_hybrid(dense_text)
+        sparse_encode_result = self.encoder.encode_text_hybrid(sparse_text)
+
+        dense_vectors = dense_encode_result.get("dense")
+        sparse_vectors = sparse_encode_result.get("sparse")
         print(f"dense_vectors: {dense_vectors} | sparse_vectors: {sparse_vectors}")
 
         data = [
@@ -74,8 +79,8 @@ class ModifyIntent:
                 "intent_id": intent.intent_id,
                 "version": "1.0",
                 "domain": intent.domain,
-                "create_time": intent.create_time or current_time,
-                "update_time": intent.update_time or current_time,
+                "create_time": current_time,
+                "update_time": current_time,
                 "status": intent.status or "active",
                 "tags": intent.tags,
                 "core_keywords": intent.core_keywords,
@@ -86,6 +91,7 @@ class ModifyIntent:
                 "user_goal_text": intent.user_goal,
                 "dense_vector": dense_vectors,
                 "sparse_vector": sparse_vectors,
+                "tool": intent.tools,
             }
         ]
 

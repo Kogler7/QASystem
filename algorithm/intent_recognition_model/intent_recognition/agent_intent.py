@@ -6,31 +6,14 @@ from ir_utils.handle_data import utils
 from langchain_core.tools import tool
 from langchain.agents import create_agent
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from data.intent_model import Intent
+import json
 
 #初始化工具类
 utils = utils()
 
 # 加载api_key
 api_key = "qwen"
-
-class Intent(BaseModel):
-    intent_id: str = Field(..., description="意图唯一标识，如业务自定义ID，用于数据库主键/索引")
-    version: str = Field(..., description="意图版本号，用于迭代管理")
-    domain: str = Field(..., description="意图所属业务域，用于分类筛选")
-    create_time: str = Field(..., description="意图创建时间（ISO8601格式），溯源用")
-    update_time: str = Field(..., description="意图更新时间，版本管理用")
-    status: str = Field(..., description="意图状态（active/archive/draft）")
-    tags: list = Field(..., description="业务标签，用于分类检索（非语义检索）")
-    intent_name: str = Field(..., description="意图名称（简洁描述），核心语义字段")
-    intent_description: str = Field(..., description="意图详细描述，补充语义")
-    sample_utterances: list = Field(..., description="意图的典型用户表述样本，多维度语义载体")
-    core_keywords: list = Field(..., description="核心关键词")
-    intent_summary: str = Field(..., description="意图精简摘要")
-    user_goal: str = Field(..., description="用户核心目标")
-    tools: str = Field(..., description="意图技能描述")
-
-
 
 @tool(description="从意图向量数据库中检索相关意图")
 def retrival_tool(query: str):
@@ -150,13 +133,9 @@ def run_tool_loop(query: str,max_loop: int = 2):
         
 if __name__ == "__main__":
     query = "公开采购与非公开采购金额构成如何？"
-    # result = retrival_tool.invoke({"query": query})
-    # print(result)
-    # print(type(result.get("密集向量检索结果")))     # <class 'list'>
-    # print(type(result.get("密集向量检索结果")[0]))      # <class 'dict'>
-    # print(type(result.get("密集向量检索结果")[0].get("entity")))     # <class 'dict'>
-    # print(type(result.get("密集向量检索结果")[0].get("entity").get("sample_utterances")))     # <class 'str'>
     final_answer = run_tool_loop(query)
     print(f"tool_result: {final_answer.get('tool_result')}")
     print(f"reasoning: {final_answer.get('reasoning')}")
     print(f"json_content: {final_answer.get('json_content')}")
+    print(type(final_answer.get('json_content')))   # <class 'str'>
+    print(type(json.loads(final_answer.get('json_content'))))

@@ -102,232 +102,509 @@
   {
     "intent_id": "INT20260211002",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:05:00",
-    "update_time": "2026-02-11 11:35:00",
+    "domain": "销售分析域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "技术参数",
-      "标准值",
-      "尺寸间隙"
+      "趋势分析",
+      "时间序列",
+      "销售额趋势",
+      "渠道对比"
     ],
-    "intent_name": "轨道交通设备参数标准查询",
-    "intent_description": "用于查询轨道交通各类设备（车辆、信号、供电、轨道、通信等）的技术参数、标准数值、尺寸间隙要求，为设备调试、检修、验收提供精准的参数依据。",
+    "intent_name": "看趋势",
+    "intent_description": "用于分析销售数据随时间的变化趋势，支持按月、日等周期查看不同渠道或门店的销售走势，支撑业务预测与策略调整。",
     "sample_utterances": [
-      "轨道交通车辆转向架的技术参数标准是什么？",
-      "信号机的标准值及尺寸间隙要求请提供一下",
-      "轨道线路的尺寸间隙标准是多少？",
-      "供电系统的核心技术参数有哪些标准？",
-      "通信设备的技术参数及合格标准是什么"
+      "最近12个月的销售额趋势如何？",
+      "8月不同渠道的分天销量情况是怎样的？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "技术参数",
-      "标准值",
-      "尺寸间隙",
-      "设备标准"
+      "趋势分析",
+      "销售额趋势",
+      "时间序列",
+      "分天销量",
+      "渠道趋势"
     ],
-    "intent_summary": "查询轨道交通各类设备的技术参数、标准值及尺寸间隙，支撑设备调试检修。",
-    "user_goal": "获取轨道交通设备的各项技术参数、标准数值和尺寸间隙要求，确保设备调试、检修、验收符合规范。",
-    "tools": []
+    "intent_summary": "分析销售数据在时间维度上的变化趋势，识别增长或下降规律。",
+    "user_goal": "了解销售额的时间变化趋势",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Get Table Schema",
+        "tool_description": "从数据库中获取表结构。",
+        "args": [
+          {
+            "name": "table",
+            "description": "指定想要哪些表的结构，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   },
   {
     "intent_id": "INT20260211003",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:10:00",
-    "update_time": "2026-02-11 11:40:00",
+    "domain": "销售分析域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "维修限度",
-      "维修标准",
-      "使用限制"
+      "对比分析",
+      "环比同比",
+      "门店对比",
+      "基准值差异"
     ],
-    "intent_name": "轨道交通设备维修限度查询",
-    "intent_description": "用于查询轨道交通各类设备的维修标准、维修阈值及使用限制条件，明确设备维修的合格边界和使用禁忌，保障维修质量和设备运行安全。",
+    "intent_name": "做对比",
+    "intent_description": "用于比较不同实体（如门店、品牌、区域）之间的销售表现，支持环比、同比、与全国均值对比等场景，辅助绩效评估与异常发现。",
     "sample_utterances": [
-      "轨道交通车辆制动系统的维修限度是什么？",
-      "轨道设备的维修标准及使用限制有哪些？",
-      "信号设备维修的合格限度要求请说明",
-      "供电设备的维修限度及使用禁忌是什么？",
-      "设备维修后需要满足哪些限度标准"
+      "A门店本月销售额、环比率、同比是多少？",
+      "A门店销售额与全国平均值的差异有多大？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "维修限度",
-      "维修标准",
-      "使用限制",
-      "维修阈值"
+      "对比分析",
+      "环比",
+      "同比",
+      "门店对比",
+      "全国均值"
     ],
-    "intent_summary": "查询轨道交通设备的维修标准、维修限度及使用限制，规范维修操作。",
-    "user_goal": "明确轨道交通设备的维修合格标准、维修限度和使用限制，确保维修工作合规，保障设备安全运行。",
-    "tools": []
+    "intent_summary": "通过横向或纵向对比，揭示销售表现的差异性与波动特征。",
+    "user_goal": "比较门店或区域间的销售表现",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   },
   {
     "intent_id": "INT20260211004",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:15:00",
-    "update_time": "2026-02-11 11:45:00",
+    "domain": "销售分析域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "故障处理",
-      "故障诊断",
-      "维修方法"
+      "排行榜",
+      "TOP N",
+      "销量排名",
+      "品牌表现"
     ],
-    "intent_name": "轨道交通设备故障处理",
-    "intent_description": "用于查询轨道交通各类设备（车辆、信号、供电、轨道等）的常见故障诊断方法、故障原因分析及对应维修方法，支撑一线人员快速处置设备故障。",
+    "intent_name": "看排名",
+    "intent_description": "用于查询特定维度下的排名信息，例如品牌商品销量TOP10、单月畅销产品等，帮助识别头部贡献者。",
     "sample_utterances": [
-      "轨道交通车辆牵引系统故障怎么诊断和维修？",
-      "信号机故障的处理方法有哪些？",
-      "轨道线路出现异响故障如何诊断？",
-      "供电中断故障的应急维修方法是什么？",
-      "如何排查通信设备的常见故障并修复"
+      "XX品牌2024年的商品销量TOP10是哪些？",
+      "本月哪个产品销售额最高？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "故障诊断",
-      "维修方法",
-      "故障处理",
-      "设备故障"
+      "排名",
+      "TOP10",
+      "销量排行",
+      "销售额最高",
+      "品牌排名"
     ],
-    "intent_summary": "查询轨道交通设备的故障诊断方法和对应维修措施，快速处置设备故障。",
-    "user_goal": "掌握轨道交通设备常见故障的诊断技巧和维修方法，快速排查并解决设备故障，恢复设备正常运行。",
-    "tools": []
+    "intent_summary": "展示关键指标的排名分布，聚焦高价值对象。",
+    "user_goal": "获取销量或销售额的Top榜单",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   },
   {
     "intent_id": "INT20260211005",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:20:00",
-    "update_time": "2026-02-11 11:50:00",
+    "domain": "门店运营域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "试验要求",
-      "性能测试",
-      "验证标准"
+      "极值分析",
+      "最大最小值",
+      "统计摘要",
+      "门店面积"
     ],
-    "intent_name": "轨道交通设备试验要求查询",
-    "intent_description": "用于查询轨道交通各类设备的性能测试标准、试验流程、验证方法及合格判定要求，为设备出厂验收、定期检测、维修后验证提供依据。",
+    "intent_name": "问极值",
+    "intent_description": "用于获取某类指标的最大值、最小值、平均值等统计极值，常用于门店资源评估、异常检测等场景。",
     "sample_utterances": [
-      "轨道交通车辆性能测试的试验要求是什么？",
-      "信号设备的验证试验流程及标准有哪些？",
-      "供电系统性能测试的试验方法请说明",
-      "轨道设备维修后如何进行验证试验？",
-      "设备出厂验收的试验要求及合格标准是什么"
+      "按照门店类型分组，统计门店营业面积的最大值、最小值、平均值",
+      "各城市门店数量最多的前三个城市是哪些？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "试验要求",
-      "性能测试",
-      "验证方法",
-      "合格判定"
+      "最大值",
+      "最小值",
+      "平均值",
+      "极值分析",
+      "门店面积"
     ],
-    "intent_summary": "查询轨道交通设备的性能测试、试验流程及验证要求，支撑设备验收检测。",
-    "user_goal": "获取轨道交通设备试验的相关要求、流程和验证方法，确保设备检测、验收工作合规，保障设备性能达标。",
-    "tools": []
+    "intent_summary": "提取关键指标的统计极值，支持决策边界判断。",
+    "user_goal": "获取指标的统计极值",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   },
   {
     "intent_id": "INT20260211006",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:25:00",
-    "update_time": "2026-02-11 11:55:00",
+    "domain": "销售分析域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "安装要求",
-      "装配标准",
-      "安装规范"
+      "明细查询",
+      "筛选条件",
+      "高销售额门店",
+      "高售罄率SKU"
     ],
-    "intent_name": "轨道交通设备安装要求查询",
-    "intent_description": "用于查询轨道交通各类设备（车辆部件、信号设备、供电设备、轨道构件等）的装配流程、安装标准、安装精度及注意事项，规范设备安装操作，保障安装质量。",
+    "intent_name": "问明细",
+    "intent_description": "用于查询满足特定条件的具体记录列表，例如销售额大于500万的门店、售罄率超过50%的SKU，支持精细化运营分析。",
     "sample_utterances": [
-      "轨道交通信号机的安装要求及装配标准是什么？",
-      "车辆转向架的安装精度要求有哪些？",
-      "供电设备的安装流程及注意事项请说明",
-      "轨道构件的安装标准及验收要求是什么？",
-      "如何按照规范安装轨道交通通信设备"
+      "8月销售额大于500万的门店有哪些？",
+      "售罄率超过50%的SKU有哪些？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "安装要求",
-      "装配标准",
-      "安装精度",
-      "安装流程"
+      "明细",
+      "筛选",
+      "高销售额",
+      "高售罄率",
+      "具体名单"
     ],
-    "intent_summary": "查询轨道交通设备的装配流程、安装标准及注意事项，规范安装操作。",
-    "user_goal": "掌握轨道交通设备的安装要求、装配标准和安装精度，确保设备安装合规、质量达标。",
-    "tools": []
+    "intent_summary": "返回符合特定条件的数据明细，用于深入核查与行动落地。",
+    "user_goal": "获取符合条件的详细数据列表",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   },
   {
     "intent_id": "INT20260211007",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:30:00",
-    "update_time": "2026-02-11 12:00:00",
+    "domain": "商品分析域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "操作规程",
-      "操作流程",
-      "操作规范"
+      "探查分析",
+      "颜色偏好",
+      "退货分析",
+      "单品表现"
     ],
-    "intent_name": "轨道交通设备操作规程查询",
-    "intent_description": "用于查询轨道交通各类设备（运维设备、运营设备、检测设备等）的操作流程、操作规范、安全操作要点及禁忌事项，规范人员操作行为，保障操作安全和设备完好。",
+    "intent_name": "做探查",
+    "intent_description": "用于探索特定商品或品类在某一维度下的表现，例如本周哪个颜色的产品卖得最好，某产品在特定门店的销售与退货情况，支撑精细化商品管理。",
     "sample_utterances": [
-      "轨道交通检测设备的操作规程是什么？",
-      "车辆运维设备的操作流程及安全规范有哪些？",
-      "信号设备的正确操作方法及禁忌事项请说明",
-      "供电设备的操作规程及注意事项是什么？",
-      "如何按照规范操作轨道交通运营设备"
+      "本周哪个颜色的产品卖得最好？",
+      "A产品在XX门店的销售量和退货数量分别是多少？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "操作规程",
-      "操作流程",
-      "操作规范",
-      "安全操作"
+      "探查",
+      "颜色销售",
+      "退货数量",
+      "单品表现",
+      "门店表现"
     ],
-    "intent_summary": "查询轨道交通各类设备的操作规程、操作流程及安全要点，规范操作行为。",
-    "user_goal": "掌握轨道交通设备的操作流程、规范和安全要点，避免违规操作，保障人员安全和设备完好。",
-    "tools": []
+    "intent_summary": "深入挖掘单一商品或属性在特定场景下的表现细节。",
+    "user_goal": "探查某个商品或属性的表现情况",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   },
   {
     "intent_id": "INT20260211008",
     "version": "1.0",
-    "domain": "轨道交通设备运维",
-    "create_time": "2026-02-11 10:35:00",
-    "update_time": "2026-02-11 12:05:00",
+    "domain": "销售分析域",
+    "create_time": "2026-02-11 10:00:00",
+    "update_time": "2026-02-11 11:30:00",
     "status": "active",
     "tags": [
-      "轨道交通",
-      "通用知识",
-      "基础常识",
-      "运维知识"
+      "归因分析",
+      "增长原因",
+      "对比原因",
+      "业务洞察"
     ],
-    "intent_name": "轨道交通设备通用知识查询",
-    "intent_description": "用于查询轨道交通设备运维相关的一般性知识、基础常识、行业规范、术语解释等内容，为一线人员、新人提供基础认知支撑，普及运维基础常识。",
+    "intent_name": "问归因",
+    "intent_description": "用于探究某一现象背后的原因，例如销售额环比增长的原因、某门店销量高于另一门店的原因，支持深度业务洞察与策略优化。",
     "sample_utterances": [
-      "轨道交通设备运维的基础常识有哪些？",
-      "轨道交通设备相关的专业术语怎么解释？",
-      "轨道交通设备运维的行业规范是什么？",
-      "新手入门需要掌握哪些轨道交通设备通用知识？",
-      "轨道交通设备的日常维护基础常识请说明"
+      "8月销售额环比增长的原因是什么？",
+      "A门店比B门店销量高的原因是什么？"
     ],
     "core_keywords": [
-      "轨道交通",
-      "通用知识",
-      "基础常识",
-      "术语解释",
-      "运维基础"
+      "归因",
+      "增长原因",
+      "销量差异",
+      "业务洞察",
+      "原因分析"
     ],
-    "intent_summary": "查询轨道交通设备运维相关的一般性知识、基础常识和术语解释，普及基础认知。",
-    "user_goal": "获取轨道交通设备运维的通用知识、基础常识和专业术语解释，提升基础认知水平。",
-    "tools": []
+    "intent_summary": "分析指标变化或差异的根本驱动因素，提升决策质量。",
+    "user_goal": "理解销售变化或差异的根本原因",
+    "tools": [
+      {
+        "tool_name": "SQL Execute",
+        "tool_description": "此工具用于在已存在的数据库中执行 SQL 查询。",
+        "args": [
+          {
+            "name": "sql",
+            "description": "要执行的 SQL 查询语句",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Text to SQL",
+        "tool_description": "提供数据库上下文和用户的问题，来得到一个 SQL 语句。",
+        "args": [
+          {
+            "name": "query",
+            "description": "用户的问题",
+            "type": "string"
+          },
+          {
+            "name": "table",
+            "description": "指定哪些表用于提供给LLM作为上下文，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "tool_name": "Get Table Schema",
+        "tool_description": "从数据库中获取表结构。",
+        "args": [
+          {
+            "name": "table",
+            "description": "指定想要哪些表的结构，如不指定，则使用所有表。多张表用半角逗号隔开。",
+            "type": "string"
+          },
+          {
+            "name": "DB URI",
+            "description": "数据库的 URI 地址",
+            "type": "string"
+          }
+        ]
+      }
+    ]
   }
 ]

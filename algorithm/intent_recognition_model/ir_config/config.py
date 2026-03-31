@@ -25,8 +25,12 @@ class Config:
         self.api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
         self.llm_base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:8888"
         self.llm_model = os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "Qwen/Qwen3-8B"
+        # Neo4j 配置
+        self.neo4j_uri = os.getenv("NEO4J_URI") or "neo4j://localhost:7687"
+        self.neo4j_username = os.getenv("NEO4J_USERNAME") or "neo4j"
+        self.neo4j_password = os.getenv("NEO4J_PASSWORD") or "neo4j2025"
 
 
 if __name__ == "__main__":
     c = Config()
-    print(c.milvus_uri, c.collection_name, c.model_path, c.log_path)
+    print(c.milvus_uri, c.collection_name, c.model_path, c.log_path, c.graph_uri)
