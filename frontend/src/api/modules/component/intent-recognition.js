@@ -43,3 +43,13 @@ export function intentRecognitionDeepRecognize(params) {
     text: params.text?.trim() ?? ''
   }, { timeout: 300000 })
 }
+
+/**
+ * 获取计划
+ * @param {object} params - { text }
+ */
+export function intentRecognitionGetPlan(params) {
+  return request.post('/component/intent-recognition/get-plan', {
+    text: params.text?.trim() ?? ''
+  }, { timeout: 300000 })
+}

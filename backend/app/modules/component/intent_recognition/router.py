@@ -47,3 +47,15 @@ async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
     except Exception as e:
         logger.exception("深度意图识别失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/get-plan")
+async def get_plan(body: RecognizeRequestBody) -> dict[str, Any]:
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="输入文本不能为空")
+    try:
+        result = await asyncio.to_thread(service.get_plan, text=body.text.strip())
+        return result
+    except Exception as e:
+        logger.exception("获取计划失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
