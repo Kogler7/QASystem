@@ -22,13 +22,19 @@ class PlanApp:
             intent = json.loads(results.get("json_content"))
             intent_name = intent.get("intent_name")
             domain = intent.get("domain")
+            tools = intent.get("tools")
             intent_domain = f"{intent_name}_{domain}"
             plan = self.search_plan.search_plan(intent_domain)[0]
             # 去掉计划内容中的换行符
             if "p.plan" in plan:
                 plan["p.plan"] = plan["p.plan"].replace('\n', '')
                 plan["p.plan"] = plan["p.plan"].replace(' ', '')
-            return json.dumps(plan, ensure_ascii=False, indent=2)
+            final_plan = json.dumps(plan, ensure_ascii=False, indent=2)
+            final_results = {
+                "可能执行的工具列表": tools,
+                "计划方案":final_plan
+            }
+            return json.dumps(final_results, ensure_ascii=False, indent=2)
         return json.dumps({"message": "未识别到意图,所以无法获取计划信息"}, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
