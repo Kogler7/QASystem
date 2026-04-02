@@ -14,13 +14,20 @@ _THIS = Path(__file__).resolve()
 _ROOT = _THIS.parents[5]
 _ANS_ROOT = _ROOT / "algorithm" / "ans"
 _ANS_QA = _ANS_ROOT / "QA"
-# 先插入 _ANS_ROOT 再插入 _ANS_QA，保证 "QA" 作为包从 algorithm/ans 解析，避免 config 被 confidence_calculate 等其它路径劫持
+# 插入 _ROOT 到 sys.path，这样 Python 就能找到 algorithm 模块
+if _ROOT.exists():
+    _root_str = str(_ROOT)
+    if _root_str not in sys.path:
+        sys.path.insert(0, _root_str)
+# 插入 _ANS_ROOT 到 sys.path，这样 Python 就能找到 QA 模块
 if _ANS_ROOT.exists():
     _ans_root_str = str(_ANS_ROOT)
-    _ans_qa_str = str(_ANS_QA) if _ANS_QA.exists() else None
     if _ans_root_str not in sys.path:
         sys.path.insert(0, _ans_root_str)
-    if _ans_qa_str and _ans_qa_str not in sys.path:
+# 插入 _ANS_QA 到 sys.path，保证 QA 模块能被正确加载
+if _ANS_QA.exists():
+    _ans_qa_str = str(_ANS_QA)
+    if _ans_qa_str not in sys.path:
         sys.path.insert(0, _ans_qa_str)
 
 
@@ -128,70 +135,6 @@ def close_neo4j_driver():
             logger.warning("关闭Neo4j驱动失败: %s", e)
 
 
-def query_graph_by_nodes(node_labels: List[str], limit: int = 20) -> Dict[str, Any]:
-    """根据节点标签查询知识图谱"""
-    logger.info("查询知识图谱，输入节点标签: %s", node_labels)
-    if not node_labels:
-        logger.info("没有输入节点标签，返回空结果")
-        return {"nodes": [], "relationships": []}
-    
-    try:
-        driver = _get_neo4j_driver()
-        with driver.session() as session:
-            query = """
-            MATCH path = (start)-[r*1..2]-(end)
-            WHERE any(label IN labels(start) WHERE label IN $node_labels) 
-               OR any(label IN labels(end) WHERE label IN $node_labels)
-               OR start.name IN $node_labels
-               OR end.name IN $node_labels
-            RETURN 
-                [node IN nodes(path) | {
-                    id: id(node),
-                    name: node.name,
-                    labels: labels(node),
-                    properties: properties(node)
-                }] as nodes,
-                [rel IN relationships(path) | {
-                    id: id(rel),
-                    from: id(startNode(rel)),
-                    to: id(endNode(rel)),
-                    type: type(rel),
-                    properties: properties(rel)
-                }] as relationships
-            LIMIT $limit
-            """
-            
-            result = session.run(query, node_labels=node_labels, limit=limit)
-            
-            merged_nodes = {}
-            merged_rels_dict = {}
-            
-            for record in result:
-                logger.info("处理一条记录: %s", record)
-                for node in record["nodes"]:
-                    node_id = node["id"]
-                    if node_id not in merged_nodes:
-                        merged_nodes[node_id] = node
-                
-                for rel in record["relationships"]:
-                    rel_key = f"{rel['from']}-{rel['type']}-{rel['to']}"
-                    if rel_key not in merged_rels_dict:
-                        merged_rels_dict[rel_key] = rel
-            
-            nodes_list = list(merged_nodes.values())
-            rels_list = list(merged_rels_dict.values())
-            
-            logger.info("查询结果: 节点数=%d, 关系数=%d", len(nodes_list), len(rels_list))
-            
-            return {
-                "nodes": nodes_list,
-                "relationships": rels_list
-            }
-    except Exception as e:
-        logger.error("查询知识图谱失败: %s", e)
-        raise
-
-
 def health() -> dict[str, Any]:
     try:
         _get_qa_service()
@@ -228,51 +171,6 @@ def ask(question: str, detailed: bool = False) -> dict[str, Any]:
         "answer": answer,
         "timestamp": result.get("timestamp", ""),
         "raw_details": solver_result if result.get("success") else None,
-        "error": result.get("error"),
-    }
-
-
-def ask_with_visualization(question: str) -> dict[str, Any]:
-    svc = _get_qa_service()
-    result = svc.answer_question_with_visualization(question, visualize=True)
-    
-    visualization_html = None
-    raw_details = None
-    
-    if result.get("success"):
-        solver_result = result.get("solver_result", {})
-        raw_details = solver_result
-        
-        answer = "无答案"
-        try:
-            方案模型列表 = solver_result.get("方案模型", [])
-            if 方案模型列表:
-                outputs = 方案模型列表[0].get("输出", [])
-                if outputs:
-                    answer = outputs[0]
-        except Exception:
-            pass
-        
-        visualization_path = result.get("visualization")
-        if visualization_path and isinstance(visualization_path, str):
-            try:
-                viz_file = _ROOT / visualization_path
-                if viz_file.exists():
-                    with open(viz_file, 'r', encoding='utf-8') as f:
-                        visualization_html = f.read()
-            except Exception as e:
-                logger.warning(f"读取可视化文件失败: {e}")
-    else:
-        answer = result.get("answer", "无答案")
-    
-    return {
-        "success": result.get("success", False),
-        "question": result.get("question", question),
-        "answer": answer if result.get("success") else result.get("answer", "无答案"),
-        "timestamp": result.get("timestamp", ""),
-        "raw_details": raw_details,
-        "visualization": visualization_html,
-        "visualization_type": "html",
         "error": result.get("error"),
     }
 

@@ -1,5 +1,5 @@
-from prompt_list import *
-from utils import *
+from algorithm.ans.QA.prompt_list import *
+from algorithm.ans.QA.utils import *
 
 def clean_relations_neo4j(string, entity_id, available_relations, direction="outgoing"):
     pattern = r'\{([^（]+)（评分：([0-9.]+)）\}'

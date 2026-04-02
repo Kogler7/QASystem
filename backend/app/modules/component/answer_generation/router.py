@@ -20,15 +20,6 @@ class AskRequestBody(BaseModel):
     detailed: bool = False
 
 
-class AskVisualizeRequestBody(BaseModel):
-    question: str
-
-
-class QueryGraphRequestBody(BaseModel):
-    node_labels: List[str]
-    limit: int = 20
-
-
 @router.get("/health")
 async def answer_generation_health() -> dict[str, Any]:
     return service.health()
@@ -43,32 +34,6 @@ async def ask(body: AskRequestBody) -> dict[str, Any]:
         return result
     except Exception as e:
         logger.exception("答案生成失败")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/ask/visualize")
-async def ask_visualize(body: AskVisualizeRequestBody) -> dict[str, Any]:
-    if not (body.question or "").strip():
-        raise HTTPException(status_code=400, detail="问题不能为空")
-    try:
-        result = await asyncio.to_thread(service.ask_with_visualization, question=body.question.strip())
-        return result
-    except Exception as e:
-        logger.exception("答案生成（含可视化）失败")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/query-graph")
-async def query_graph(body: QueryGraphRequestBody) -> dict[str, Any]:
-    try:
-        result = await asyncio.to_thread(
-            service.query_graph_by_nodes,
-            node_labels=body.node_labels,
-            limit=body.limit
-        )
-        return {"success": True, "data": result}
-    except Exception as e:
-        logger.exception("查询知识图谱失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
