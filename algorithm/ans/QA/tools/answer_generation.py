@@ -1,3 +1,15 @@
+import sys
+import os
+
+# 添加项目根目录到Python路径
+current_file = os.path.abspath(__file__)
+tools_dir = os.path.dirname(current_file)
+qa_dir = os.path.dirname(tools_dir)
+ans_dir = os.path.dirname(qa_dir)
+algorithm_dir = os.path.dirname(ans_dir)
+project_root = os.path.dirname(algorithm_dir)
+sys.path.insert(0, project_root)
+
 from typing import Dict, List
 from datetime import datetime
 

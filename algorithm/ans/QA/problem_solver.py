@@ -183,22 +183,66 @@ class ProblemSolver:
                     print(f"    实体 '{entity_text}' 转换失败: {e}")
                     continue
 
-        # 如果没有找到实体，使用原有的实体链接器
-        if not topic_entity and hasattr(self, 'entity_linker'):
-            linked_entities = self.entity_linker.link_entities_in_question(problem.问题描述)
-            topic_entity = linked_entities
+        # 使用智能实体链接（带大模型判断）
+        best_match = None
+        if hasattr(self, 'entity_linker'):
+            # 首先尝试智能实体链接
+            link_result = self.entity_linker.link_entities_with_llm_judge(problem.问题描述)
+            
+            # 检查是否有最佳匹配且可以直接回答
+            best_match = link_result.get("best_match")
+            if best_match and best_match.get("can_answer"):
+                print(f"  找到可直接回答的实体: {best_match['qid']}")
+                # 检查是否有计算SQL
+                sql = best_match['properties'].get('计算SQL')
+                if sql:
+                    print(f"  发现计算SQL，直接使用生成答案")
+                    # 直接使用SQL生成答案
+                    answer = self._generate_answer_from_sql(sql, problem.问题描述)
+                    reasoning_chains = []
+                    search_result = {
+                        "found_answer": True,
+                        "depth_reached": 0,
+                        "topic_entity": link_result["linked_entities"],
+                        "best_match": best_match
+                    }
+                else:
+                    # 没有SQL但实体可以直接回答
+                    answer = self._generate_answer_from_entity(best_match, problem.问题描述)
+                    reasoning_chains = []
+                    search_result = {
+                        "found_answer": True,
+                        "depth_reached": 0,
+                        "topic_entity": link_result["linked_entities"],
+                        "best_match": best_match
+                    }
+            else:
+                # 没有找到可直接回答的实体，使用链接结果作为起始实体
+                topic_entity = link_result["linked_entities"]
+                print(f"  起始实体: {topic_entity}")
+                
+                # 记录实体识别与链接结果
+                self._log("实体识别与链接", f"识别到 {len(topic_entity)} 个实体", topic_entity)
 
-        print(f"  起始实体: {topic_entity}")
-        
-        # 记录实体识别与链接结果
-        self._log("实体识别与链接", f"识别到 {len(topic_entity)} 个实体", topic_entity)
+                # 调用 ToG 方法在知识图谱上检索
+                answer, reasoning_chains, search_result = self._run_tog_search(
+                    question=problem.问题描述,
+                    topic_entity=topic_entity,
+                    config=self.args
+                )
+        else:
+            # 没有实体链接器，使用原有的方法
+            print(f"  起始实体: {topic_entity}")
+            
+            # 记录实体识别与链接结果
+            self._log("实体识别与链接", f"识别到 {len(topic_entity)} 个实体", topic_entity)
 
-        # 调用 ToG 方法在知识图谱上检索
-        answer, reasoning_chains, search_result = self._run_tog_search(
-            question=problem.问题描述,
-            topic_entity=topic_entity,
-            config=self.args
-        )
+            # 调用 ToG 方法在知识图谱上检索
+            answer, reasoning_chains, search_result = self._run_tog_search(
+                question=problem.问题描述,
+                topic_entity=topic_entity,
+                config=self.args
+            )
 
         # 3. 将 ToG 的检索结果转换为方案模型
         solution = self._convert_tog_result_to_solution(
@@ -313,8 +357,8 @@ class ProblemSolver:
 
     def _run_tog_search(self, question: str, topic_entity: Dict, config) -> tuple:
         """
-        运行 ToG 知识图谱检索
-        复用你原有的 ToG 推理逻辑
+        运行 ToG 知识图谱检索（增强版）
+        在检索过程中获取节点的完整属性，并让大模型判断是否可以直接回答
         """
         cluster_chain_of_entities = []
         pre_relations = []
@@ -343,7 +387,6 @@ class ProblemSolver:
                 break
 
             # 记录大模型选择的关系和打分
-            # 获取第一个关系的LLM响应（所有关系都包含相同的LLM响应）
             llm_response = current_entity_relations_list[0].get('llm_response', '') if current_entity_relations_list else ''
             
             self._log("知识图谱检索", f"深度 {depth} - 大模型关系选择", {
@@ -396,6 +439,63 @@ class ProblemSolver:
 
                 if len(entity_candidates_id) == 0:
                     continue
+
+                # ===== 增强：获取候选实体的完整属性并进行智能判断 =====
+                enriched_candidates = []
+                for idx, candidate_id in enumerate(entity_candidates_id):
+                    if candidate_id != "[FINISH_ID]":
+                        # 获取候选实体的完整信息
+                        candidate_info = self.entity_linker.get_node_full_info(candidate_id)
+                        if candidate_info:
+                            enriched_candidates.append({
+                                "id": candidate_id,
+                                "name": entity_candidates_name[idx],
+                                "properties": candidate_info["properties"]
+                            })
+                        else:
+                            enriched_candidates.append({
+                                "id": candidate_id,
+                                "name": entity_candidates_name[idx],
+                                "properties": {}
+                            })
+                    else:
+                        enriched_candidates.append({
+                            "id": candidate_id,
+                            "name": entity_candidates_name[idx],
+                            "properties": {}
+                        })
+
+                # 使用大模型对候选实体进行智能判断
+                if enriched_candidates:
+                    can_answer, answer_from_entity = self._check_if_entity_can_answer(
+                        question, enriched_candidates
+                    )
+                    
+                    if can_answer and answer_from_entity:
+                        print(f"    深度 {depth} - 从实体属性中直接找到答案！")
+                        final_answer = answer_from_entity
+                        found_answer = True
+                        
+                        # 记录找到答案的实体信息
+                        self._log("知识图谱检索", f"深度 {depth} - 从实体属性直接回答", {
+                            "找到答案": True,
+                            "答案": answer_from_entity,
+                            "候选实体": [
+                                {
+                                    "id": c["id"],
+                                    "name": c["name"],
+                                    "属性数": len(c["properties"])
+                                }
+                                for c in enriched_candidates[:3]
+                            ]
+                        })
+                        
+                        return final_answer, cluster_chain_of_entities, {
+                            "found_answer": True,
+                            "depth_reached": depth,
+                            "topic_entity": topic_entity,
+                            "answer_source": "entity_properties"
+                        }
 
                 # 评分和更新
                 scores, entity_candidates, entity_candidates_id = entity_score(
@@ -464,11 +564,155 @@ class ProblemSolver:
             "topic_entity": topic_entity
         }
 
+    def _check_if_entity_can_answer(self, question: str, candidates: List[Dict]) -> tuple:
+        """
+        检查候选实体是否可以直接回答问题
+        返回: (是否可以回答, 答案)
+        """
+        if not candidates:
+            return False, None
+
+        # 构建提示词
+        prompt = self._build_entity_answer_check_prompt(question, candidates)
+
+        try:
+            from utils import run_llm
+            response = run_llm(prompt, 0.1, 800, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            
+            # 解析响应
+            result = self._parse_entity_answer_check(response)
+            
+            if result.get("can_answer", False):
+                return True, result.get("answer", "")
+            
+            return False, None
+            
+        except Exception as e:
+            print(f"实体回答检查异常: {e}")
+            return False, None
+
+    def _build_entity_answer_check_prompt(self, question: str, candidates: List[Dict]) -> str:
+        """构建实体回答检查提示词"""
+        
+        candidates_text = ""
+        for i, cand in enumerate(candidates[:5], 1):  # 最多检查前5个
+            candidates_text += f"\n【候选实体 {i}】\n"
+            candidates_text += f"名称: {cand['name']}\n"
+            candidates_text += f"属性:\n"
+            for key, value in cand['properties'].items():
+                value_str = str(value)
+                if len(value_str) > 300:
+                    value_str = value_str[:300] + "..."
+                candidates_text += f"  - {key}: {value_str}\n"
+
+        prompt = f"""你是一个智能问答助手。请根据用户的问题和候选实体的完整属性信息，判断是否可以直接从实体属性中找到答案。
+
+用户问题："{question}"
+
+候选实体信息：
+{candidates_text}
+
+请分析：
+1. 候选实体的属性中是否包含回答问题的关键信息？
+2. 如果有，请直接生成答案
+3. 如果没有，请说明原因
+
+输出格式（严格的JSON）：
+{{
+  "can_answer": true/false,
+  "answer": "如果可以回答，请提供答案；如果不能，请填null",
+  "reason": "判断理由"
+}}
+
+注意：
+- 如果实体的属性中包含户籍、出生地、年龄等可以直接回答问题的信息，请设置 can_answer 为 true
+- 答案应该直接、准确地回答用户的问题
+- 如果信息不足以回答问题，请设置 can_answer 为 false"""
+
+        return prompt
+
+    def _parse_entity_answer_check(self, response: str) -> Dict:
+        """解析实体回答检查的响应"""
+        try:
+            # 尝试提取JSON
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                return {
+                    "can_answer": data.get("can_answer", False),
+                    "answer": data.get("answer"),
+                    "reason": data.get("reason", "")
+                }
+        except Exception as e:
+            print(f"解析实体回答检查响应异常: {e}")
+        
+        return {"can_answer": False, "answer": None, "reason": "解析失败"}
+
+    def _generate_answer_from_sql(self, sql: str, question: str) -> str:
+        """
+        根据SQL生成答案
+        """
+        try:
+            # 这里可以根据实际情况执行SQL或生成描述性答案
+            # 例如：执行SQL获取数据，然后生成自然语言答案
+            # 或者直接根据SQL的含义生成答案
+            
+            # 简单实现：基于SQL生成描述性答案
+            if 'SELECT' in sql and 'FROM' in sql:
+                if 'GROUP BY' in sql:
+                    return f"根据计算SQL，按照指定维度对数据进行分组统计，可以得到所需的答案。"
+                else:
+                    return f"根据计算SQL，可以查询到所需的数据，用于回答问题。"
+            return f"根据计算SQL：{sql}，可以获取到回答问题所需的数据。"
+        except Exception as e:
+            print(f"生成SQL答案异常: {e}")
+            return f"根据计算SQL可以获取相关数据，但处理过程中出现异常。"
+
+    def _generate_answer_from_entity(self, entity: Dict, question: str) -> str:
+        """
+        根据实体信息生成答案
+        """
+        try:
+            properties = entity.get('properties', {})
+            
+            # 构建答案
+            answer_parts = []
+            
+            # 动态处理所有属性，不硬编码特定属性名
+            for key, value in properties.items():
+                # 跳过空值和技术性属性
+                if not value:
+                    continue
+                if key.startswith('_') or key.lower() in ['id', 'qid', 'node_id']:
+                    continue
+                
+                # 处理不同类型的属性
+                if isinstance(value, (str, int, float, bool)):
+                    # 对于SQL语句，保留完整内容
+                    if "sql" in key.lower() or "计算" in key:
+                        answer_parts.append(f"{key}：{value}")
+                    # 对于其他属性，限制长度
+                    elif len(str(value)) <= 500:
+                        answer_parts.append(f"{key}：{value}")
+            
+            # 限制答案长度，避免过长
+            if len(answer_parts) > 10:
+                answer_parts = answer_parts[:10]
+            
+            if answer_parts:
+                return '；'.join(answer_parts) + '。'
+            else:
+                return "根据实体信息可以回答您的问题。"
+        except Exception as e:
+            print(f"生成实体答案异常: {e}")
+            return "根据实体信息可以回答您的问题，但处理过程中出现异常。"
+
     def _convert_tog_result_to_solution(self, problem: ProblemModel, answer: str,
                                         reasoning_chains: List, search_result: Dict) -> SolutionModel:
         """
         将 ToG 检索结果转换为方案模型
         """
+
 
         # 将问题类型转换为对应的方案类别
         problem_type_value = problem.问题类型
