@@ -17,3 +17,13 @@ class Intent(BaseModel):
     intent_summary: str = Field(..., description="意图精简摘要")
     user_goal: str = Field(..., description="用户核心目标")
     tools: Union[str, list, dict] = Field(..., description="意图技能描述")
+
+
+class Intent_Base_Recognition(BaseModel):
+    intent_id: str = Field(..., description="意图唯一标识，如业务自定义ID，用于数据库主键/索引")
+    domain: str = Field(..., description="意图所属业务域，用于分类筛选")
+    scenario: str = Field(..., description="意图所属场景")
+    object: str = Field(..., description="意图对象")
+    intent_name: str = Field(..., description="意图名称（简洁描述），核心语义字段")
+    user_goal: str = Field(..., description="用户核心目标")
+    tools: Union[str, list, dict] = Field(..., description="意图技能描述")

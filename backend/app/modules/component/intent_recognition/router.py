@@ -50,11 +50,13 @@ async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
 
 
 @router.post("/get-plan")
-async def get_plan(body: RecognizeRequestBody) -> dict[str, Any]:
-    if not (body.text or "").strip():
-        raise HTTPException(status_code=400, detail="输入文本不能为空")
+async def get_plan(body: dict) -> dict[str, Any]:
+    intent_name = (body.get("intent_name") or "").strip()
+    domain = (body.get("domain") or "").strip()
+    if not intent_name or not domain:
+        raise HTTPException(status_code=400, detail="意图名称和域名称不能为空")
     try:
-        result = await asyncio.to_thread(service.get_plan, text=body.text.strip())
+        result = await asyncio.to_thread(service.get_plan, intent_name=intent_name, domain=domain)
         return result
     except Exception as e:
         logger.exception("获取计划失败")

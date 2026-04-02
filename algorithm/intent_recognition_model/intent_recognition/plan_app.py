@@ -12,26 +12,19 @@ class PlanApp:
         """根据域名称获取计划"""
         return self.search_plan.search_plan(domain_name)
 
-    def get_plan_from_query(self, query):
-        """根据询问获取计划"""
+    def get_plan_from_intent(self, intent_name, domain):
+        """根据意图名称和域名称获取计划"""
         # results = self.intent_app.generate_result(query)
-        results = run_tool_loop(query)
 
-        if results:
-            # intent = results.get("最终筛选的意图")
-            intent = json.loads(results.get("json_content"))
-            intent_name = intent.get("intent_name")
-            domain = intent.get("domain")
-            tools = intent.get("tools")
+        if intent_name and domain:
             intent_domain = f"{intent_name}_{domain}"
             plan = self.search_plan.search_plan(intent_domain)[0]
             # 去掉计划内容中的换行符
             if "p.plan" in plan:
                 plan["p.plan"] = plan["p.plan"].replace('\n', '')
                 plan["p.plan"] = plan["p.plan"].replace(' ', '')
-            final_plan = json.dumps(plan, ensure_ascii=False, indent=2)
+            final_plan = json.dumps(plan.get("p.plan"), ensure_ascii=False, indent=2)
             final_results = {
-                "可能执行的工具列表": tools,
                 "计划方案":final_plan
             }
             return json.dumps(final_results, ensure_ascii=False, indent=2)
@@ -39,7 +32,8 @@ class PlanApp:
 
 if __name__ == "__main__":
     plan_app = PlanApp()
-    plan = plan_app.get_plan_from_query("公开采购与非公开采购金额构成如何？")
-    print("公开采购与非公开采购金额构成如何？")
+    # plan = plan_app.get_plan_from_intent("看构成", "采购管理域")
+    plan = plan_app.get_plan_from_intent("看趋势", "销售分析域")
+    print("看趋势销售分析域的计划")
     print(plan)
     print(type(plan))

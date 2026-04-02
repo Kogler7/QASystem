@@ -73,8 +73,8 @@ def deep_recognize(text: str) -> dict[str, Any]:
     result = run_tool_loop(text)
     return {"data": result}
 
-def get_plan(text: str) -> dict[str, Any]:
+def get_plan(intent_name: str, domain: str) -> dict[str, Any]:
     from intent_recognition.plan_app import PlanApp
     plan_app = PlanApp()
-    result = plan_app.get_plan_from_query(text)
+    result = plan_app.get_plan_from_intent(intent_name, domain)
     return {"data": result}
