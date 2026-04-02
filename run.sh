@@ -13,3 +13,6 @@ fi
 
 # 后台启动后端服务
 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
+
+# lsof -i :8000
+# kill -9 
