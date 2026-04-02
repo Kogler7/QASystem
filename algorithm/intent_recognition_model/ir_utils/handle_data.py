@@ -9,7 +9,7 @@ import re
 from ir_config.config import Config
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
-from data.intent_model import Intent
+from data.intent_model import Intent_Base_Recognition
 
 # 配置日志
 config = Config()
@@ -37,9 +37,10 @@ class utils:
         for r in results:
             # 直接提取entity字典，避免protobuf对象
             entity = r.get("entity")
+            serializable_entity = None
             
             if entity:
-                # 映射字段名，将数据库字段名映射到Intent模型字段名
+                # 映射字段名，将数据库字段名映射到Intent_Base_Recognition模型字段名
                 # 处理 tools 字段，解析 Unicode 转义字符
                 tools = entity.get("tools")
                 if tools:
@@ -50,29 +51,25 @@ class utils:
                     except:
                         pass
                 
+                # 为scenario和object字段提供默认值，避免None值
                 mapped_data = {
                     "intent_id": entity.get("intent_id"),
-                    "version": entity.get("version"),
                     "domain": entity.get("domain"),
-                    "create_time": entity.get("create_time"),
-                    "update_time": entity.get("update_time"),
-                    "status": entity.get("status"),
-                    "tags": entity.get("tags"),
-                    "core_keywords": entity.get("core_keywords"),
-                    "sample_utterances": entity.get("sample_utterances"),
-                    "intent_name": entity.get("intent_name_text"),
-                    "intent_description": entity.get("intent_description_text"),
-                    "intent_summary": entity.get("intent_summary_text"),
-                    "user_goal": entity.get("user_goal_text"),
+                    "scenario": entity.get("scenario") or "",
+                    "object": entity.get("object") or "",
+                    "intent_name": entity.get("intent_name"),
+                    "user_goal": entity.get("user_goal"),
                     "tools": tools
                 }
                 
-                # 使用Intent模型处理数据，利用Pydantic的自动类型转换
+                # 使用Intent_Base_Recognition模型处理数据，利用Pydantic的自动类型转换
                 try:
-                    intent_obj = Intent(**mapped_data)
+                    intent_obj = Intent_Base_Recognition(**mapped_data)
                     serializable_entity = intent_obj.model_dump()
                 except Exception as e:
-                    logger.info(f"使用Intent模型处理数据失败: {e}")
+                    logger.info(f"使用Intent_Base_Recognition模型处理数据失败: {e}")
+                    # 即使失败，也要确保serializable_entity有值
+                    serializable_entity = mapped_data
             else:
                 serializable_entity = None
 

@@ -88,21 +88,24 @@ class InitGraph:
         """创建 Domain 和 Plan 之间的关系"""
         self.gc.create_domain_plan_relationship(domain_name, plan)
 
-    def delete_all_intent_domain_data(self):
-        """删除所有 Intent 和 Domain 数据"""
-        self.gc.delete_all_intent_domain_data()
+    def delete_all_intent_domain_plan_data(self):
+        """删除所有 Intent、Domain 和 Plan 数据"""
+        self.gc.delete_all_intent_domain_plan_data()
 
 if __name__ == "__main__":
     gc = Neo4jConnection()
     init_graph = InitGraph()
     # init_graph.batch_create_intent_structs()
-    # gc.delete_all_intent_domain_data()
-    plan = """
-    1.上下文获取与指标匹配：输入结构化意图，输出用指标描述的业务；
-    2.SQL转换：输入指标描述的业务，输出SQL描述的业务；
-    3.SQL执行：输入SQL，输出指标计算结果；
-    4.图表可视化与答案生成：输入计算结果，输出图表+文字内容描述。
-    """
-    init_graph.create_domain_plan_struct("看构成_采购管理域", plan, rel_type="域_计划")
-
+    # gc.delete_all_intent_domain_plan_data()
+    plan = {
+        "plan": "销售分析域的看趋势计划方案",
+        "plan_content": """
+        1.上下文获取与指标匹配：输入结构化意图，输出用指标描述的业务；
+        2.SQL转换：输入指标描述的业务，输出SQL描述的业务；
+        3.SQL执行：输入SQL，输出指标计算结果；
+        4.图表可视化与答案生成：输入计算结果，输出图表+文字内容描述。
+        """
+    }
+    init_graph.create_domain_plan_struct("看趋势_销售分析域", plan, rel_type="域_计划")
+    
     gc.close()

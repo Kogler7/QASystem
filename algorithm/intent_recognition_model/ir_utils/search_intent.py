@@ -87,7 +87,7 @@ class HybridSearch:
             ranker=reranker,
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
+                           "intent_name", "intent_description", "intent_summary", "user_goal", "sample_utterances",
                            "tags","core_keywords","tools"]
         )[0]
         return results
@@ -128,8 +128,8 @@ class HybridSearch:
             # 构建 entity 字典,包含所有 output_fields
             entity_data = {}
             for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
-                        "intent_name_text", "intent_description_text", "intent_summary_text", 
-                        "user_goal_text", "sample_utterances", "tags", "core_keywords","tools"]:
+                        "intent_name", "intent_description", "intent_summary", 
+                        "user_goal", "sample_utterances", "tags", "core_keywords","tools"]:
                 entity_data[field] = results_1[i].get(field)
             
             entity_map[entity_id] = entity_data
@@ -241,9 +241,7 @@ class HybridSearch:
                 "similarity": hit.distance,
                 "entity": {}
             }
-            for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
-                            "intent_name_text", "intent_description_text", "intent_summary_text", 
-                            "user_goal_text", "sample_utterances", "tags", "core_keywords","tools"]:
+            for field in ["intent_id", "domain", "scenario", "object","intent_name", "user_goal", "tools",]:
                 result_dict["entity"][field] = hit.get(field)
             result_list.append(result_dict)
 
@@ -253,19 +251,10 @@ class HybridSearch:
         """基础相似度查询，不进行RRFRank重排"""
         dense_search_param = {
             "metric_type": "IP",
-            "params": {
-                "nprobe": 16,
-                "radius":  0.4,
-                "range_filter" : 1
-                }
         }
 
         sparse_search_param = {
             "metric_type": "IP",
-            "params": {
-                "radius": 0.1,
-                "range_filter" : 1
-                }
         }
 
         if self.collection_name is None or query is None:
@@ -283,9 +272,8 @@ class HybridSearch:
             data=[dense_vector],
             anns_field="dense_vector",
             limit=top_k,
-            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords","tools"],
+            output_fields=["intent_id", "domain", "scenario", "object",
+                           "intent_name","user_goal","tools"],
             search_params=dense_search_param
         )[0]
 
@@ -294,9 +282,8 @@ class HybridSearch:
             data=[sparse_vector],
             anns_field="sparse_vector",
             limit=top_k,
-            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords","tools"],
+            output_fields=["intent_id", "domain", "scenario", "object",
+                           "intent_name","user_goal","tools"],
             search_params=sparse_search_param
         )[0]
         logging.info("检索完成")

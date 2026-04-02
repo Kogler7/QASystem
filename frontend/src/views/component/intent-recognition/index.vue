@@ -36,6 +36,8 @@ const subMenuItems = [
 
 const recognitionType = ref('basic') // 'basic' 或 'deep' 或 'plan'
 const inputText = ref('')
+const intentName = ref('')
+const domainName = ref('')
 const loading = ref(false)
 const result = ref(null)
 const streamingResult = ref('')
@@ -111,35 +113,43 @@ const checkHealth = async () => {
 }
 
 const submit = async () => {
-  const text = inputText.value?.trim()
-  if (!text) {
-    ElMessage.warning('请输入待识别文本')
-    return
-  }
-  
   loading.value = true
   result.value = null
   streamingResult.value = ''
   
   try {
-    if (recognitionType.value === 'basic') {
-      // 基础意图识别
-      isStreaming.value = true
-      const { data } = await intentRecognitionRecognize({ text })
-      result.value = data?.data ?? data
-      ElMessage.success('识别完成')
-      isStreaming.value = false
-    } else if (recognitionType.value === 'deep') {
-      // 深度意图识别
-      isStreaming.value = true
-      const { data } = await intentRecognitionDeepRecognize({ text })
-      result.value = data?.data ?? data
-      ElMessage.success('识别完成')
-      isStreaming.value = false
+    if (recognitionType.value === 'basic' || recognitionType.value === 'deep') {
+      const text = inputText.value?.trim()
+      if (!text) {
+        ElMessage.warning('请输入待识别文本')
+        loading.value = false
+        return
+      }
+      
+      if (recognitionType.value === 'basic') {
+        // 基础意图识别
+        isStreaming.value = true
+        const { data } = await intentRecognitionRecognize({ text })
+        result.value = data?.data ?? data
+        ElMessage.success('识别完成')
+        isStreaming.value = false
+      } else if (recognitionType.value === 'deep') {
+        // 深度意图识别
+        isStreaming.value = true
+        const { data } = await intentRecognitionDeepRecognize({ text })
+        result.value = data?.data ?? data
+        ElMessage.success('识别完成')
+        isStreaming.value = false
+      }
     } else if (recognitionType.value === 'plan') {
       // 获取计划
+      if (!intentName.value.trim() || !domainName.value.trim()) {
+        ElMessage.warning('请输入意图名称和域名称')
+        loading.value = false
+        return
+      }
       isStreaming.value = true
-      const { data } = await intentRecognitionGetPlan({ text })
+      const { data } = await intentRecognitionGetPlan({ intent_name: intentName.value.trim(), domain: domainName.value.trim() })
       result.value = data?.data ?? data
       ElMessage.success('获取计划完成')
       isStreaming.value = false
@@ -177,7 +187,8 @@ onMounted(checkHealth)
       <p class="page-desc">
         意图识别相关子组件列表，包括基础意图识别，深度意图识别等。<br>
         基础意图识别：直接对用户输入进行意图识别，返回简单的答案。<br>
-        深度意图识别：对用户输入进行详细的意图识别，展示推理过程和答案。
+        深度意图识别：对用户输入进行详细的意图识别，展示推理过程和答案。<br>
+        获取计划：根据意图名称和域名称获取对应的计划。<br>
       </p>
 
       <!-- 意图识别功能 -->
@@ -203,7 +214,8 @@ onMounted(checkHealth)
               <el-option label="获取计划" value="plan" />
             </el-select>
           </el-form-item>
-          <el-form-item label="用户输入" required>
+          <!-- 基础和深度识别的输入 -->
+          <el-form-item v-if="recognitionType !== 'plan'" label="用户输入" required>
             <el-input
               v-model="inputText"
               type="textarea"
@@ -211,13 +223,28 @@ onMounted(checkHealth)
               placeholder="例如：公开采购与非公开采购金额构成如何？"
             />
           </el-form-item>
+          <!-- 计划识别的输入 -->
+          <template v-else>
+            <el-form-item label="意图名称" required>
+              <el-input
+                v-model="intentName"
+                placeholder="例如：看构成"
+              />
+            </el-form-item>
+            <el-form-item label="域名称" required>
+              <el-input
+                v-model="domainName"
+                placeholder="例如：采购管理域"
+              />
+            </el-form-item>
+          </template>
           <el-form-item>
             <el-button
               type="primary"
               :icon="Aim"
               @click="submit"
             >
-              识别意图
+              {{ recognitionType === 'plan' ? '获取计划' : '识别意图' }}
             </el-button>
           </el-form-item>
         </el-form>
@@ -322,7 +349,7 @@ onMounted(checkHealth)
           <p class="result-label">识别结果</p>
           
           <!-- 工具调用结果 -->
-          <el-collapse v-if="result.tool_result && result.tool_result.length > 0">
+          <!-- <el-collapse v-if="result.tool_result && result.tool_result.length > 0">
             <el-collapse-item title="工具调用结果" name="tool">
               <div class="result-section">
                 <div v-for="(tool, index) in result.tool_result" :key="index" class="tool-item">
@@ -335,16 +362,16 @@ onMounted(checkHealth)
                 </div>
               </div>
             </el-collapse-item>
-          </el-collapse>
+          </el-collapse> -->
           
           <!-- 推理过程 -->
-          <el-collapse v-if="result.reasoning">
+          <!-- <el-collapse v-if="result.reasoning">
             <el-collapse-item title="推理过程" name="reasoning">
               <div class="result-section">
                 <pre class="result-json">{{ result.reasoning }}</pre>
               </div>
             </el-collapse-item>
-          </el-collapse>
+          </el-collapse> -->
           
           <!-- 最终意图 -->
           <div v-if="result.json_content" class="result-section">

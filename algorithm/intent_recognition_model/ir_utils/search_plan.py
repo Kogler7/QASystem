@@ -25,5 +25,5 @@ class SearchPlan:
 if __name__ == "__main__":
     search_plan = SearchPlan()
     plans = search_plan.search_plan("看构成_采购管理域")
-    print(plans[0].get("p.plan"))
+    print(plans[0].get("plan"))
     search_plan.gc.close()

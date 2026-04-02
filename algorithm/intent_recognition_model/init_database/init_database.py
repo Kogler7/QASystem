@@ -143,11 +143,13 @@ class DatabaseInit:
             FieldSchema(name="status", dtype=DataType.VARCHAR, max_length=10),
 
             # 原始文本保留
-            FieldSchema(name="intent_name_text", dtype=DataType.VARCHAR, max_length=256),
-            FieldSchema(name="intent_description_text", dtype=DataType.VARCHAR, max_length=1024),
-            FieldSchema(name="intent_summary_text", dtype=DataType.VARCHAR, max_length=1024),
-            FieldSchema(name="user_goal_text", dtype=DataType.VARCHAR, max_length=1024),
+            FieldSchema(name="intent_name", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="intent_description", dtype=DataType.VARCHAR, max_length=1024),
+            FieldSchema(name="intent_summary", dtype=DataType.VARCHAR, max_length=1024),
+            FieldSchema(name="user_goal", dtype=DataType.VARCHAR, max_length=1024),
             FieldSchema(name="tools", dtype=DataType.VARCHAR, max_length=5000),
+            FieldSchema(name="scenario", dtype=DataType.VARCHAR, max_length=256),
+            FieldSchema(name="object", dtype=DataType.VARCHAR, max_length=256),
 
             # 稠密向量字段
             FieldSchema(name="dense_vector", dtype=DataType.FLOAT_VECTOR, dim=self.dense_dim, description="BGE-M3 全字段融合 dense 向量"),
@@ -213,12 +215,14 @@ class DatabaseInit:
                 single_data["create_time"] = intent.get("create_time", "")
                 single_data["update_time"] = intent.get("update_time", "")
                 single_data["status"] = intent.get("status", "active")
+                single_data["scenario"] = intent.get("scenario", "")
+                single_data["object"] = intent.get("object", "")
 
                 # 原始文本字段
-                single_data["intent_name_text"] = intent.get("intent_name", "")
-                single_data["intent_description_text"] = intent.get("intent_description", "")
-                single_data["intent_summary_text"] = intent.get("intent_summary", "")
-                single_data["user_goal_text"] = intent.get("user_goal", "")
+                single_data["intent_name"] = intent.get("intent_name", "")
+                single_data["intent_description"] = intent.get("intent_description", "")
+                single_data["intent_summary"] = intent.get("intent_summary", "")
+                single_data["user_goal"] = intent.get("user_goal", "")
                 # 将tools转换为JSON字符串
                 tools = intent.get("tools", [])
                 single_data["tools"] = json.dumps(tools) if isinstance(tools, (list, dict)) else str(tools)
