@@ -74,32 +74,38 @@ class AnswerGenerationTool:
         """
         生成最终答案
         """
+        # 使用大模型生成的答案
         if outputs:
-            # 如果有输出，使用第一个输出作为答案
             main_answer = outputs[0]
         else:
             main_answer = "抱歉，无法生成答案"
         
-        # 构建最终答案
-        final_answer = f"针对问题：{question}\n\n"
-        final_answer += f"答案：{main_answer}\n\n"
-        
-        if steps:
-            final_answer += "解决步骤：\n"
-            for i, step in enumerate(steps, 1):
-                final_answer += f"{i}. {step}\n"
-        
+        # 提取数据来源信息
+        data_sources = []
         if answer_path:
-            final_answer += "\n知识图谱路径：\n"
+            # 从大模型生成的答案中提取关键实体名称
+            # 通过检查答案中提到的实体来判断哪些是相关的
             for path in answer_path:
-                depth = path.get("depth", 1)
                 nodes = path.get("nodes", [])
-                relationships = path.get("relationships", [])
-                
-                final_answer += f"深度 {depth}：\n"
+                # 提取所有节点的数据来源（不仅仅是最后一个节点）
                 for node in nodes:
-                    final_answer += f"  - {node.get('label', node.get('id', ''))}\n"
-                for rel in relationships:
-                    final_answer += f"  - {rel.get('from')} → {rel.get('type')} → {rel.get('to')}\n"
+                    node_label = node.get('label', node.get('id', ''))
+                    # 检查节点标签的任何部分是否在答案中被提到
+                    # 例如："CG_003 公开采购中标金额" -> 检查"CG_003"或"公开采购中标金额"
+                    label_parts = node_label.replace('_', ' ').split()
+                    is_mentioned = any(part in main_answer for part in label_parts if len(part) > 2)
+                    
+                    if is_mentioned or node_label in main_answer:
+                        properties = node.get('properties', {})
+                        if properties:
+                            data_source = properties.get('数据来源表')
+                            if data_source and data_source not in data_sources:
+                                data_sources.append(data_source)
         
-        return final_answer
+        # 如果有数据来源，添加到答案中
+        if data_sources:
+            data_source_str = "、".join(data_sources)
+            main_answer += f" 数据来源于：{data_source_str}。"
+        
+        # 只返回答案部分，不包含其他信息
+        return main_answer

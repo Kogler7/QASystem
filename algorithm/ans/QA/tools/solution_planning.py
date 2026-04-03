@@ -45,40 +45,103 @@ class SolutionPlanningTool:
         输入：问题模型
         输出：解决方案 + 图谱路径
         """
+        self.reasoning_logs = []  # 清空之前的日志
+        
         try:
             # 从问题模型中提取信息
             problem_id = problem_model.get("问题ID", "PROB-001")
             problem_description = problem_model.get("问题描述", "")
             related_entities = problem_model.get("相关实体", [])
             
+            # 记录问题信息
+            self._log("问题分析", f"开始处理问题: {problem_description}", {
+                "问题ID": problem_id,
+                "问题类型": problem_model.get("问题类型"),
+                "相关实体": related_entities
+            })
+            
             # 1. 智能实体链接（带大模型判断）
             best_match = None
             topic_entity = {}
             
             # 首先尝试智能实体链接
+            self._log("实体链接", "开始智能实体链接...")
             link_result = self.entity_linker.link_entities_with_llm_judge(problem_description)
             
-            # 检查是否有最佳匹配且可以直接回答
-            best_match = link_result.get("best_match")
-            if best_match and best_match.get("can_answer"):
-                print(f"  找到可直接回答的实体: {best_match['qid']}")
+            # 提取所有候选实体
+            all_candidates = link_result.get("all_candidates", [])
+            answerable_entities = [cand for cand in all_candidates if cand.get("can_answer", False)]
+            
+            print(f"  找到 {len(answerable_entities)} 个可回答的实体")
+            
+            # 记录所有候选实体的详细信息
+            self._log("实体链接", f"找到 {len(all_candidates)} 个候选实体，其中 {len(answerable_entities)} 个可回答", {
+                "所有候选实体": [
+                    {
+                        "QID": cand["qid"],
+                        "名称": cand["properties"].get("name", cand["qid"]),
+                        "相关性分数": round(cand.get("relevance_score", 0), 2),
+                        "可回答": cand.get("can_answer", False),
+                        "判断理由": cand.get("reason", "")
+                    }
+                    for cand in all_candidates[:10]  # 只显示前10个，避免日志过长
+                ]
+            })
+            
+            # 如果有可回答的实体，尝试直接使用它们生成答案
+            if answerable_entities:
+                # 构建候选实体列表（用于 _check_if_entity_can_answer）
+                candidates_for_check = []
+                for cand in answerable_entities:
+                    candidates_for_check.append({
+                        "id": cand["qid"],
+                        "name": cand["properties"].get("name", cand["qid"]),
+                        "properties": cand["properties"]
+                    })
                 
-                # 从实体属性生成答案
-                answer = self._generate_answer_from_entity(best_match, problem_description)
+                # 使用大模型判断这些实体是否可以直接回答问题
+                self._log("答案判断", "使用大模型判断实体是否可以直接回答问题", {
+                    "待判断实体": [
+                        {
+                            "QID": c["id"],
+                            "名称": c["name"],
+                            "属性数量": len(c["properties"])
+                        }
+                        for c in candidates_for_check
+                    ]
+                })
                 
-                # 检查答案是否足够回答问题
-                if self._is_answer_sufficient(problem_description, answer):
+                can_answer, answer_from_entities, source_entities = self._check_if_entity_can_answer(
+                    problem_description, candidates_for_check
+                )
+                
+                # 记录判断结果
+                self._log("答案判断结果", f"判断结果: {'可以回答' if can_answer else '不能回答'}", {
+                    "是否可以回答": can_answer,
+                    "生成的答案": answer_from_entities if can_answer else "无",
+                    "判断依据": "大模型根据实体属性判断是否可以直接回答问题"
+                })
+                
+                if can_answer and answer_from_entities:
+                    print(f"  从实体属性直接生成答案")
+                    self._log("答案生成", "从实体属性直接生成答案", {
+                        "答案": answer_from_entities,
+                        "使用实体": [c["name"] for c in candidates_for_check]
+                    })
                     # 实体属性足够回答问题
                     reasoning_chains = []
                     search_result = {
                         "found_answer": True,
                         "depth_reached": 0,
                         "topic_entity": link_result["linked_entities"],
-                        "best_match": best_match
+                        "answerable_entities": answerable_entities,
+                        "source_entities": source_entities  # 保存源实体，用于构建graph_paths
                     }
+                    answer = answer_from_entities
                 else:
                     # 实体属性不足以直接回答，执行ToG深度搜索
                     print(f"  实体属性不足以直接回答，执行ToG深度搜索...")
+                    self._log("知识图谱检索", "实体属性不足以直接回答，开始ToG深度搜索")
                     topic_entity = link_result["linked_entities"]
                     answer, reasoning_chains, search_result = self._run_tog_search(
                         question=problem_description,
@@ -138,18 +201,86 @@ class SolutionPlanningTool:
                         if isinstance(item, tuple) and len(item) == 3:
                             # 格式为 (实体1, 关系, 实体2)
                             entity1, relation, entity2 = item
+                            
+                            # 处理实体1
+                            entity1_id = entity1
+                            entity1_name = entity1
+                            entity1_properties = {}
+                            
+                            # 检查entity1是否是字典格式
+                            if isinstance(entity1, dict):
+                                entity1_id = entity1.get('id', entity1)
+                                entity1_name = entity1.get('name', str(entity1))
+                                entity1_properties = entity1.get('properties', {})
+                            else:
+                                # 首先检查是否在topic_entity中（键是ID，值是名称）
+                                for id, name in topic_entity.items():
+                                    if name == entity1:
+                                        entity1_id = id
+                                        break
+                                # 如果不是NEO_开头的ID，尝试通过实体链接器搜索
+                                if isinstance(entity1_id, str) and not entity1_id.startswith("NEO_"):
+                                    try:
+                                        # 尝试搜索实体
+                                        candidates = self.entity_linker.search_entities_with_full_info(entity1, limit=1)
+                                        if candidates:
+                                            entity1_id = candidates[0].get("qid", entity1)
+                                    except Exception:
+                                        pass
+                                # 获取实体1的属性
+                                try:
+                                    entity1_info = self.entity_linker.get_node_full_info(entity1_id)
+                                    if entity1_info:
+                                        entity1_properties = entity1_info.get("properties", {})
+                                except Exception:
+                                    pass
+                            
+                            # 处理实体2
+                            entity2_id = entity2
+                            entity2_name = entity2
+                            entity2_properties = {}
+                            
+                            # 检查entity2是否是字典格式
+                            if isinstance(entity2, dict):
+                                entity2_id = entity2.get('id', entity2)
+                                entity2_name = entity2.get('name', str(entity2))
+                                entity2_properties = entity2.get('properties', {})
+                            else:
+                                # 首先检查是否在topic_entity中（键是ID，值是名称）
+                                for id, name in topic_entity.items():
+                                    if name == entity2:
+                                        entity2_id = id
+                                        break
+                                # 如果不是NEO_开头的ID，尝试通过实体链接器搜索
+                                if isinstance(entity2_id, str) and not entity2_id.startswith("NEO_"):
+                                    try:
+                                        # 尝试搜索实体
+                                        candidates = self.entity_linker.search_entities_with_full_info(entity2, limit=1)
+                                        if candidates:
+                                            entity2_id = candidates[0].get("qid", entity2)
+                                    except Exception:
+                                        pass
+                                # 获取实体2的属性
+                                try:
+                                    entity2_info = self.entity_linker.get_node_full_info(entity2_id)
+                                    if entity2_info:
+                                        entity2_properties = entity2_info.get("properties", {})
+                                except Exception:
+                                    pass
                             path["nodes"].append({
-                                "id": entity1,
-                                "label": entity1
+                                "id": entity1_id,
+                                "label": entity1_name,
+                                "properties": entity1_properties
                             })
                             path["nodes"].append({
-                                "id": entity2,
-                                "label": entity2
+                                "id": entity2_id,
+                                "label": entity2_name,
+                                "properties": entity2_properties
                             })
                             path["relationships"].append({
-                                "from": entity1,
+                                "from": entity1_name,
                                 "type": relation,
-                                "to": entity2
+                                "to": entity2_name
                             })
                         elif isinstance(item, list):
                             # 格式为列表，可能包含多个实体和关系
@@ -159,9 +290,18 @@ class SolutionPlanningTool:
                                     if "entity" in sub_item:
                                         entity_id = sub_item["entity"]
                                         entity_name = sub_item.get("label", entity_id)
+                                        # 获取实体的属性
+                                        entity_properties = {}
+                                        try:
+                                            entity_info = self.entity_linker.get_node_full_info(entity_id)
+                                            if entity_info:
+                                                entity_properties = entity_info.get("properties", {})
+                                        except Exception:
+                                            pass
                                         path["nodes"].append({
                                             "id": entity_id,
-                                            "label": entity_name
+                                            "label": entity_name,
+                                            "properties": entity_properties
                                         })
                                     # 处理关系
                                     if "relation" in sub_item and i > 0:
@@ -177,6 +317,25 @@ class SolutionPlanningTool:
                             graph_paths["answer_path"].append(path)
             
             print(f"提取的 answer_path: {graph_paths['answer_path']}")
+            
+            # 如果没有从推理链中提取到路径，但从实体属性直接生成了答案
+            # 使用source_entities构建answer_path
+            if not graph_paths['answer_path'] and search_result.get('source_entities'):
+                graph_paths['answer_path'] = []
+                for entity in search_result['source_entities']:
+                    path = {
+                        "depth": 0,
+                        "nodes": [
+                            {
+                                "id": entity["id"],
+                                "label": entity["name"],
+                                "properties": entity["properties"]
+                            }
+                        ],
+                        "relationships": []
+                    }
+                    graph_paths['answer_path'].append(path)
+                print(f"为直接从实体属性生成答案构建answer_path: {graph_paths['answer_path']}")
             
             return {
                 "success": True,
@@ -197,7 +356,7 @@ class SolutionPlanningTool:
     
     def _run_tog_search(self, question: str, topic_entity: Dict, config) -> tuple:
         """
-        运行 ToG 知识图谱检索（增强版）
+        运行 ToG 知识图谱检索
         在检索过程中获取节点的完整属性，并让大模型判断是否可以直接回答
         """
         cluster_chain_of_entities = []
@@ -307,7 +466,7 @@ class SolutionPlanningTool:
 
                 # 使用大模型对候选实体进行智能判断
                 if enriched_candidates:
-                    can_answer, answer_from_entity = self._check_if_entity_can_answer(
+                    can_answer, answer_from_entity, source_entities = self._check_if_entity_can_answer(
                         question, enriched_candidates
                     )
                     
@@ -354,7 +513,7 @@ class SolutionPlanningTool:
             # 实体剪枝
             flag, chain_of_entities, entities_id, pre_relations, pre_heads = entity_prune(
                 total_entities_id, total_relations, total_candidates,
-                total_topic_entities, total_head, total_scores, config, self.client
+                total_topic_entities, total_head, total_scores, config, self.client, self.entity_linker
             )
             cluster_chain_of_entities.append(chain_of_entities)
 
@@ -399,16 +558,17 @@ class SolutionPlanningTool:
         return final_answer, cluster_chain_of_entities, {
             "found_answer": found_answer,
             "depth_reached": depth,
-            "topic_entity": topic_entity
+            "topic_entity": topic_entity,
+            "source_entities": source_entities if 'source_entities' in dir() else []
         }
     
     def _check_if_entity_can_answer(self, question: str, candidates: List[Dict]) -> tuple:
         """
         检查候选实体是否可以直接回答问题
-        返回: (是否可以回答, 答案)
+        返回: (是否可以回答, 答案, 数据来源实体列表)
         """
         if not candidates:
-            return False, None
+            return False, None, []
 
         # 构建提示词，让大模型判断是否可以回答
         prompt = self._build_entity_answer_check_prompt(question, candidates)
@@ -424,16 +584,17 @@ class SolutionPlanningTool:
                 answer = result.get("answer", "")
                 # 再次检查答案是否真正回答了用户的问题
                 if self._is_answer_sufficient(question, answer):
-                    return True, answer
+                    # 返回答案和相关的候选实体（用于构建answer_path）
+                    return True, answer, candidates
                 else:
                     print(f"  答案不足以回答问题: {answer}")
-                    return False, None
+                    return False, None, []
             
-            return False, None
+            return False, None, []
             
         except Exception as e:
             print(f"实体回答检查异常: {e}")
-            return False, None
+            return False, None, []
 
     def _build_entity_answer_check_prompt(self, question: str, candidates: List[Dict]) -> str:
         """构建实体回答检查提示词"""
@@ -449,7 +610,9 @@ class SolutionPlanningTool:
                     value_str = value_str[:300] + "..."
                 candidates_text += f"  - {key}: {value_str}\n"
 
-        prompt = f"""你是一个智能问答助手。请根据用户的问题和候选实体的完整属性信息，判断是否可以直接从实体属性中找到答案。
+        # 使用原始字符串，避免f-string中的花括号问题
+        prompt = """
+你是一个智能问答助手。请根据用户的问题和候选实体的完整属性信息，判断是否可以直接从实体属性中找到答案。
 
 用户问题："{question}"
 
@@ -476,7 +639,9 @@ class SolutionPlanningTool:
 - 如果实体的属性中包含计算SQL等可以直接回答问题的信息，请设置 can_answer 为 true
 - 答案应该直接、准确地回答用户的问题，包含所有必要的SQL语句和计算说明
 - 例如：如果问题问"非公开采购金额"，但知识图谱中没有这个节点，可以通过"电子采购中标金额"和"公开采购中标金额"的SQL计算得到
-- 不要过滤或忽略任何可能相关的属性，让用户自己判断哪些信息有用"""
+- 对于"公开采购与非公开采购金额构成如何"的问题，只使用CG_001 电子采购中标金额和CG_003 公开采购中标金额这两个实体，不要使用CG_006 电子采购品类中标金额
+- 不要过滤或忽略任何可能相关的属性，让用户自己判断哪些信息有用
+""".format(question=question, candidates_text=candidates_text)
 
         return prompt
 

@@ -148,31 +148,19 @@ def health() -> dict[str, Any]:
 
 def ask(question: str, detailed: bool = False) -> dict[str, Any]:
     svc = _get_qa_service()
-    result = svc.get_solver_detail(question)
     
-    # 提取答案
-    answer = "无答案"
-    try:
-        if result.get("solver_result"):
-            方案模型列表 = result["solver_result"].get("方案模型", [])
-            if 方案模型列表:
-                outputs = 方案模型列表[0].get("输出", [])
-                if outputs:
-                    answer = outputs[0]
-    except Exception:
-        pass
-    
-    # 提取原始数据
-    solver_result = result.get("solver_result", {})
-    
-    return {
-        "success": result.get("success", False),
-        "question": result.get("question", question),
-        "answer": answer,
-        "timestamp": result.get("timestamp", ""),
-        "raw_details": solver_result if result.get("success") else None,
-        "error": result.get("error"),
-    }
+    if detailed:
+        result = svc.answer_question_with_details(question)
+        return {
+            "success": result.get("success", False),
+            "answer": result.get("answer", "无答案"),
+            "raw_details": result.get("raw_details")
+        }
+    else:
+        answer = svc.answer_question(question)
+        return {
+            "answer": answer
+        }
 
 
 def define_problem(question: str) -> dict[str, Any]:
