@@ -539,7 +539,7 @@ def generate_answer(question, cluster_chain_of_entities, args):
 
 
 def entity_prune(total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, total_scores,
-                 args, wiki_client):
+                 args, wiki_client, entity_linker=None):
 
     zipped = list(
         zip(total_entities_id, total_relations, total_candidates, total_topic_entities, total_head, total_scores))
@@ -557,17 +557,42 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
 
     entities_id, relations, candidates, tops, heads, scores = map(list, zip(*filtered_list))
     tops_labels = []
+    tops_with_properties = []
     for entity_id in tops:
         label_result = wiki_client.query_all("qid2label", entity_id)
         if label_result and label_result != "Not Found!" and len(label_result) > 0:
             try:
                 label = next(iter(label_result))
                 tops_labels.append(label)
+                # 获取实体的完整属性信息
+                properties = {}
+                try:
+                    if entity_linker:
+                        entity_info = entity_linker.get_node_full_info(entity_id)
+                        if entity_info:
+                            properties = entity_info.get("properties", {})
+                except:
+                    pass
+                tops_with_properties.append({
+                    "name": label,
+                    "id": entity_id,
+                    "properties": properties
+                })
             except:
                 tops_labels.append("Unname_Entity")
+                tops_with_properties.append({
+                    "name": "Unname_Entity",
+                    "id": entity_id,
+                    "properties": {}
+                })
                 print(f"实体 {entity_id} 标签获取失败，使用默认")
         else:
             tops_labels.append("Unname_Entity")
+            tops_with_properties.append({
+                "name": "Unname_Entity",
+                "id": entity_id,
+                "properties": {}
+            })
             print(f"实体 {entity_id} 没有标签")
     # 构建三元组链
     triple_list = []
@@ -579,13 +604,32 @@ def entity_prune(total_entities_id, total_relations, total_candidates, total_top
                 tail = candidates[i] if i < len(candidates) else "未知实体"
                 is_head = heads[i] if i < len(heads) else True
                 
+                # 获取候选实体的属性信息
+                tail_id = entities_id[i] if i < len(entities_id) else None
+                tail_properties = {}
+                if tail_id and tail_id != "[FINISH_ID]":
+                    try:
+                        if entity_linker:
+                            entity_info = entity_linker.get_node_full_info(tail_id)
+                            if entity_info:
+                                tail_properties = entity_info.get("properties", {})
+                    except:
+                        pass
+                
+                # 构建候选实体的完整信息
+                tail_entity = {
+                    "name": tail,
+                    "id": tail_id if tail_id else "未知ID",
+                    "properties": tail_properties
+                }
+                
                 # 根据关系方向正确构建三元组
-                # is_head=True 表示出度关系：head -> tail
-                # is_head=False 表示入度关系：tail -> head
+                # is_head=True 表示出度关系：主题实体 -> 候选实体
+                # is_head=False 表示入度关系：候选实体 -> 主题实体
                 if is_head:
-                    triple = (head, rel, tail)
+                    triple = (tops_with_properties[i] if i < len(tops_with_properties) else {"name": "未知实体", "properties": {}}, rel, tail_entity)
                 else:
-                    triple = (tail, rel, head)
+                    triple = (tail_entity, rel, tops_with_properties[i] if i < len(tops_with_properties) else {"name": "未知实体", "properties": {}})
                 triple_list.append(triple)
         except Exception as e:
             print(f"构建三元组 {i} 时出错: {e}")
@@ -607,7 +651,43 @@ def reasoning(question, cluster_chain_of_entities, args):
             for item in sublist:
                 if isinstance(item, (list, tuple)) and len(item) >= 3:
                     head, rel, tail = item[0], item[1], item[2]
-                    triples_text.append(f"{head}，{rel}，{tail}")
+                    
+                    # 检查head是否是字典格式（包含属性信息）
+                    head_name = head
+                    head_properties = {}
+                    if isinstance(head, dict):
+                        head_name = head.get('name', str(head))
+                        head_properties = head.get('properties', {})
+                    
+                    # 检查tail是否是字典格式（包含属性信息）
+                    tail_name = tail
+                    tail_properties = {}
+                    if isinstance(tail, dict):
+                        tail_name = tail.get('name', str(tail))
+                        tail_properties = tail.get('properties', {})
+                    
+                    # 构建包含属性信息的三元组
+                    triple_info = f"{head_name}，{rel}，{tail_name}"
+                    
+                    # 添加head的属性信息
+                    if head_properties:
+                        data_source = head_properties.get('数据来源表', '')
+                        calc_sql = head_properties.get('计算SQL', '')
+                        if data_source:
+                            triple_info += f"（{head_name}数据来源表：{data_source}）"
+                        if calc_sql:
+                            triple_info += f"（{head_name}计算SQL：{calc_sql}）"
+                    
+                    # 添加tail的属性信息
+                    if tail_properties:
+                        data_source = tail_properties.get('数据来源表', '')
+                        calc_sql = tail_properties.get('计算SQL', '')
+                        if data_source:
+                            triple_info += f"（{tail_name}数据来源表：{data_source}）"
+                        if calc_sql:
+                            triple_info += f"（{tail_name}计算SQL：{calc_sql}）"
+                    
+                    triples_text.append(triple_info)
                 else:
                     print(f"无法处理的项目: 类型={type(item)}, 值={item}")
 
@@ -656,35 +736,34 @@ def reasoning(question, cluster_chain_of_entities, args):
     # 4. 提取答案部分
     if is_sufficient:
         # 尝试提取简洁答案
-        # 查找 {答案：...} 或 {{答案：...}} 或 {...} 或 {{...}} 格式
-        answer_pattern1 = r'\{{?答案[：:]\s*([^\}]+)\}}?'
-        answer_pattern2 = r'\{{?(?!是否足够|是|否)([^\}]+)\}}?'
-
-        answer_match1 = re.search(answer_pattern1, evaluate_answer_clean)
-        answer_match2 = re.search(answer_pattern2, evaluate_answer_clean)
-
-        if answer_match1:
-            answer = answer_match1.group(1).strip()
+        # 首先尝试匹配"回答："或"答案："后面的内容
+        answer_pattern0 = r'(?:回答|答案)[：:]\s*(.+?)(?:\n\n|$)'
+        answer_match0 = re.search(answer_pattern0, evaluate_answer_clean, re.DOTALL)
+        
+        if answer_match0:
+            answer = answer_match0.group(1).strip()
             print(f"提取到答案: {answer}")
-        elif answer_match2:
-            answer = answer_match2.group(1).strip()
-            # 检查是否是真正的答案（不是"是"或"否"）
-            if answer not in ["是", "否", "是否足够"]:
+        else:
+            # 尝试匹配花括号格式
+            # 查找 {答案：...} 或 {{答案：...}} 或 {...} 或 {{...}} 格式
+            answer_pattern1 = r'\{{?答案[：:]\s*([^\}]+)\}}?'
+            answer_pattern2 = r'\{{?\s*是\s*\}}?\s*[,，。]?\s*(.+)'
+
+            answer_match1 = re.search(answer_pattern1, evaluate_answer_clean)
+            answer_match2 = re.search(answer_pattern2, evaluate_answer_clean, re.DOTALL)
+
+            if answer_match1:
+                answer = answer_match1.group(1).strip()
+                print(f"提取到答案: {answer}")
+            elif answer_match2:
+                answer = answer_match2.group(1).strip()
                 print(f"提取到简洁答案: {answer}")
             else:
-                # 如果没有明确的答案，使用完整文本
-                answer = evaluate_answer_clean
-        else:
-            # 如果没有找到括号格式，使用完整文本
-            lines = evaluate_answer_clean.split('\n')
-            answer_lines = []
-            for line in lines:
-                if not any(keyword in line for keyword in ["是否足够", "评估", "信息"]):
-                    answer_lines.append(line)
-            answer = "\n".join(answer_lines).strip()
-
-            if not answer:
-                answer = "根据提供的信息，答案是：" + evaluate_answer_clean
+                # 如果没有找到括号格式，使用完整文本（去除"是"或"否"等标记）
+                # 移除开头的{是}或{否}标记
+                answer = re.sub(r'^\{{?\s*[是否]\s*\}}?\s*[,，。]?\s*', '', evaluate_answer_clean)
+                if not answer:
+                    answer = evaluate_answer_clean
 
         return True, answer
 

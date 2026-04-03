@@ -405,7 +405,16 @@ class EntityLinker:
         让大模型根据完整信息判断相关性
         """
         try:
-            with self.wiki_client.client.driver.session() as session:
+            # 检查wiki_client的类型
+            driver = None
+            if hasattr(self.wiki_client, 'client'):
+                # 如果是MultiServerWikidataQueryClient包装类
+                driver = self.wiki_client.client.driver
+            else:
+                # 如果是直接的Neo4jClient
+                driver = self.wiki_client.driver
+            
+            with driver.session() as session:
                 # 策略1：首先搜索name属性
                 query_name = """
                 MATCH (n)
@@ -485,7 +494,16 @@ class EntityLinker:
             
             node_id = int(qid.replace("NEO_", ""))
             
-            with self.wiki_client.client.driver.session() as session:
+            # 检查wiki_client的类型
+            driver = None
+            if hasattr(self.wiki_client, 'client'):
+                # 如果是MultiServerWikidataQueryClient包装类
+                driver = self.wiki_client.client.driver
+            else:
+                # 如果是直接的Neo4jClient
+                driver = self.wiki_client.driver
+            
+            with driver.session() as session:
                 query = """
                 MATCH (n)
                 WHERE id(n) = $node_id
