@@ -14,22 +14,6 @@ const healthDetail = ref('')
 const activeFeature = ref('cypher')
 const activeSubFeature = ref('')
 
-// 向量可视化
-const loadingVectors = ref(false)
-const vectors = ref([])
-const hoveredVector = ref(null)
-const hoverPosition = ref({ x: 0, y: 0 })
-const hoverTimeout = ref(null)
-const vectorStats = ref(null)
-const visualizationConfig = ref({
-  pointSize: 8,
-  showLabels: true
-})
-
-// Canvas 引用
-const canvasWrapper = ref(null)
-const vectorCanvas = ref(null)
-
 // 表单数据
 const form = ref({
   question: '',
@@ -71,7 +55,6 @@ const menuItems = [
     ],
   },
   { key: 'vector', label: '文本向量化与存储', tooltip: '将文本向量化并写入数据库以备后续检索' },
-  { key: 'visualize', label: '向量可视化', tooltip: '查看向量数据库的可视化展示' },
   { key: 'multi-retrieve', label: '多源数据检索', tooltip: '从JSON文件中检索节点对应的向量内容' },
 ]
 
@@ -368,7 +351,18 @@ const submitVector = async () => {
   loading.value = true
   vectorResult.value = null
   try {
-    const { data } = await nl2cypherText2vector(text)
+    let source
+    if (fileName.value) {
+      source = fileName.value
+    } else {
+      // 取文本前8个字符，如果文本长度超过8则加省略号
+      if (text.length > 8) {
+        source = text.substring(0, 8) + '...'
+      } else {
+        source = text
+      }
+    }
+    const { data } = await nl2cypherText2vector(text,source)
     vectorResult.value = '存储完成'
     ElMessage.success('向量化存储完成')
   } catch (err) {
@@ -378,332 +372,6 @@ const submitVector = async () => {
     loading.value = false
   }
 }
-
-// 向量可视化相关函数
-const loadVectors = async () => {
-  loadingVectors.value = true
-  vectors.value = []
-  hoveredVector.value = null
-  
-  try {
-    const { data } = await nl2cypherGetVectors()
-    
-    if (data?.vectors && Array.isArray(data.vectors) && data.vectors.length > 0) {
-      vectors.value = data.vectors
-      vectorStats.value = data.stats || null
-      
-      // 加载完成后自动绘制
-      await nextTick()
-      visualizeVectors()
-      ElMessage.success(`已加载 ${vectors.value.length} 个向量`)
-    } else {
-      // 生成模拟数据用于演示
-      vectors.value = generateMockVectors()
-      vectorStats.value = computeVectorStats()
-      await nextTick()
-      visualizeVectors()
-      ElMessage.success(`已加载模拟数据 (${vectors.value.length} 个向量)`)
-    }
-  } catch (err) {
-    console.error('加载向量数据失败:', err)
-    // 开发模式下使用模拟数据
-    vectors.value = generateMockVectors()
-    vectorStats.value = computeVectorStats()
-    await nextTick()
-    visualizeVectors()
-    ElMessage.success(`已加载模拟数据 (${vectors.value.length} 个向量)`)
-  } finally {
-    loadingVectors.value = false
-  }
-}
-
-// 生成模拟向量数据
-const generateMockVectors = () => {
-  const mockVectors = []
-  const sampleTexts = [
-    "这是第一个文本片段，用于测试向量可视化功能。",
-    "自然语言处理是人工智能的重要分支。",
-    "向量数据库可以高效存储和检索文本嵌入。",
-    "深度学习模型能够理解语言的语义信息。",
-    "RAG架构结合了检索和生成的优势。",
-    "文本切片是构建知识库的基础步骤。",
-    "语义搜索可以找到最相关的文档。",
-    "向量化表示使得计算机能够理解文本。",
-    "可视化帮助理解高维数据的结构。",
-    "聚类算法可以发现数据中的自然分组。"
-  ]
-  
-  for (let i = 0; i < 20; i++) {
-    mockVectors.push({
-      id: i,
-      embedding: new Array(384).fill(0).map(() => Math.random() * 2 - 1),
-      text: sampleTexts[i % sampleTexts.length] + ` 这是第${i + 1}个片段。`,
-      metadata: { source: 'mock', index: i },
-      dimension: 384,
-      position: { 
-        x: (Math.random() - 0.5) * 1.6,  // 限制在 [-0.8, 0.8] 范围内
-        y: (Math.random() - 0.5) * 1.6
-      },
-      cluster: Math.floor(Math.random() * 3),
-      similarity: 0.5 + Math.random() * 0.3
-    })
-  }
-  return mockVectors
-}
-
-// 计算向量位置的范围
-const calculatePositionRange = () => {
-  if (vectors.value.length === 0) return { minX: 0, maxX: 1, minY: 0, maxY: 1 }
-  
-  let minX = Infinity, maxX = -Infinity
-  let minY = Infinity, maxY = -Infinity
-  
-  vectors.value.forEach(vector => {
-    if (vector.position) {
-      minX = Math.min(minX, vector.position.x)
-      maxX = Math.max(maxX, vector.position.x)
-      minY = Math.min(minY, vector.position.y)
-      maxY = Math.max(maxY, vector.position.y)
-    }
-  })
-  
-   if (minX === Infinity || maxX === -Infinity) {
-    return { minX: -1, maxX: 1, minY: -1, maxY: 1 }
-  }
-  
-  // 添加 20% 的边距，确保所有点都在可视范围内
-  let paddingX = (maxX - minX) * 0.2
-  let paddingY = (maxY - minY) * 0.2
-  
-  // 确保有最小范围
-  if (maxX - minX < 0.1) {
-    paddingX = 0.5
-  }
-  if (maxY - minY < 0.1) {
-    paddingY = 0.5
-  }
-  
-  return {
-    minX: minX - paddingX,
-    maxX: maxX + paddingX,
-    minY: minY - paddingY,
-    maxY: maxY + paddingY
-  }
-}
-
-// 可视化向量
-const visualizeVectors = () => {
-  if (!vectorCanvas.value || vectors.value.length === 0) return
-  
-  const canvas = vectorCanvas.value
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-  
-  // 设置 canvas 尺寸
-  if (canvasWrapper.value) {
-    const rect = canvasWrapper.value.getBoundingClientRect()
-    canvas.width = rect.width
-    canvas.height = 450
-  } else {
-    canvas.width = 800
-    canvas.height = 450
-  }
-  
-  const width = canvas.width
-  const height = canvas.height
-  
-  // 清空画布
-  ctx.clearRect(0, 0, width, height)
-  
-  // 计算位置范围
-  const { minX, maxX, minY, maxY } = calculatePositionRange()
-  
-  // 计算缩放和平移，确保所有点都在可视范围内
-  const rangeX = Math.max(maxX - minX, 0.1)  // 避免除零
-  const rangeY = Math.max(maxY - minY, 0.1)
-  
-  // 计算边距（10%的边距）
-  const margin = 0.1
-  const scaleX = width * (1 - 2 * margin) / rangeX
-  const scaleY = height * (1 - 2 * margin) / rangeY
-  
-  // 使用较小的缩放比例以确保所有点都在可视范围内
-  const scale = Math.min(scaleX, scaleY)
-  
-  // 绘制向量点
-  vectors.value.forEach((vector, index) => {
-    let x, y
-    
-    if (vector.position) {
-      // 归一化坐标到 [0, 1] 范围内
-      const normalizedX = (vector.position.x - minX) / rangeX
-      const normalizedY = (vector.position.y - minY) / rangeY
-      
-      // 应用边距
-      x = margin * width + normalizedX * (width * (1 - 2 * margin))
-      y = margin * height + normalizedY * (height * (1 - 2 * margin))
-    } else {
-      x = Math.random() * width
-      y = Math.random() * height
-    }
-    
-    // 确保点在画布内
-    x = Math.max(10, Math.min(width - 10, x))
-    y = Math.max(10, Math.min(height - 10, y))
-    
-    // 根据聚类着色
-    ctx.fillStyle = getVectorColor(vector)
-    ctx.beginPath()
-    ctx.arc(x, y, visualizationConfig.value.pointSize, 0, Math.PI * 2)
-    ctx.fill()
-    
-    // 添加白色边框
-    ctx.strokeStyle = 'white'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    
-    // 添加标签
-    if (visualizationConfig.value.showLabels) {
-      ctx.fillStyle = '#333'
-      ctx.font = 'bold 12px Arial'
-      ctx.textAlign = 'center'
-      ctx.fillText((index + 1).toString(), x, y + 4)
-    }
-  })
-}
-
-// 获取向量颜色
-const getVectorColor = (vector) => {
-  if (vector.cluster !== undefined) {
-    return getClusterColor(vector.cluster)
-  }
-  
-  // 根据相似度着色
-  const similarity = vector.similarity || 0.5
-  const hue = 240 - (similarity * 120)
-  return `hsl(${hue}, 70%, 60%)`
-}
-
-// 获取聚类颜色
-const getClusterColor = (cluster) => {
-  const colors = [
-    '#FF6B6B', '#4ECDC4', '#FFD166', '#06D6A0',
-    '#118AB2', '#EF476F'
-  ]
-  return colors[cluster % colors.length] || '#999'
-}
-
-// 处理画布悬停
-const handleCanvasHover = (event) => {
-  if (!vectorCanvas.value || vectors.value.length === 0) return
-  
-  clearTimeout(hoverTimeout.value)
-  
-  const rect = vectorCanvas.value.getBoundingClientRect()
-  const canvas = vectorCanvas.value
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-  
-  const hoverRadius = visualizationConfig.value.pointSize + 5
-  
-  // 计算位置范围（与绘制时保持一致）
-  const { minX, maxX, minY, maxY } = calculatePositionRange()
-  const rangeX = Math.max(maxX - minX, 0.1)
-  const rangeY = Math.max(maxY - minY, 0.1)
-  const margin = 0.1
-  
-  // 查找悬停的向量
-  for (let i = 0; i < vectors.value.length; i++) {
-    const vector = vectors.value[i]
-    
-    if (!vector.position) continue
-    
-    // 计算点在画布上的位置（与绘制时使用相同的计算方式）
-    const normalizedX = (vector.position.x - minX) / rangeX
-    const normalizedY = (vector.position.y - minY) / rangeY
-    const pointX = margin * canvas.width + normalizedX * (canvas.width * (1 - 2 * margin))
-    const pointY = margin * canvas.height + normalizedY * (canvas.height * (1 - 2 * margin))
-    
-    const distance = Math.sqrt(Math.pow(x - pointX, 2) + Math.pow(y - pointY, 2))
-    
-    if (distance <= hoverRadius) {
-      hoverTimeout.value = setTimeout(() => {
-        hoveredVector.value = {
-          ...vector,
-          index: i,
-          textPreview: vector.text?.substring(0, 150) + (vector.text?.length > 150 ? '...' : '')
-        }
-        hoverPosition.value = { 
-          x: Math.min(event.clientX + 20, window.innerWidth - 320),
-          y: Math.max(event.clientY - 10, 20)
-        }
-      }, 100)  // 减少延迟时间
-      return
-    }
-  }
-  
-  hoveredVector.value = null
-}
-
-// 处理画布离开
-const handleCanvasLeave = () => {
-  clearTimeout(hoverTimeout.value)
-  hoveredVector.value = null
-}
-
-// 计算统计信息
-const computeVectorStats = () => {
-  if (vectors.value.length === 0) return null
-  
-  const clusters = new Set(vectors.value.map(v => v.cluster).filter(c => c !== undefined))
-  const dimensions = vectors.value[0]?.dimension || 384
-  
-  // 计算平均相似度
-  const similarities = vectors.value.map(v => v.similarity || 0.5)
-  const avgSimilarity = similarities.reduce((sum, val) => sum + val, 0) / similarities.length
-  
-  // 计算聚类计数
-  const clusterCounts = {}
-  vectors.value.forEach(v => {
-    if (v.cluster !== undefined) {
-      clusterCounts[v.cluster] = (clusterCounts[v.cluster] || 0) + 1
-    }
-  })
-  
-  return {
-    total: vectors.value.length,
-    dimensions,
-    clusters: clusters.size,
-    avgSimilarity,
-    clusterCounts
-  }
-}
-
-// 复制到剪贴板
-const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
-  } catch (err) {
-    console.error('复制失败:', err)
-    ElMessage.error('复制失败')
-  }
-}
-
-// 重新绘制可视化
-const redrawVisualization = () => {
-  if (vectors.value.length > 0) {
-    visualizeVectors()
-  }
-}
-
-// 监听配置变化
-watch(
-  () => [visualizationConfig.value.pointSize, visualizationConfig.value.showLabels],
-  redrawVisualization,
-  { deep: true, immediate: false }
-)
-
 // 组件挂载
 onMounted(() => {
   checkHealth()
@@ -713,29 +381,36 @@ onMounted(() => {
 const loadMultiRetrieve = async () => {
   loadingMuti.value = true
   multiResults.value = []
-  multiStats.value = null
   
   try {
     const { data } = await mutiRetriever()
     
-    if (data) {
-      // 如果接口直接返回数组
-      if (Array.isArray(data)) {
-        multiResults.value = data
-        multiStats.value = {
-          total_nodes: data.length,
-          nodes_with_vector_address: data.filter(item => item.vector_address).length,
-          successful_retrievals: data.length,
-          success_rate: '100%'
-        }
-      }
+    if (data && Array.isArray(data)) {
+      // 处理数据，添加必要的字段
+      multiResults.value = data.map(item => ({
+        database_id: item.database_id || 'N/A',
+        index: item.index || 0,
+        content: item.content || '无内容',
+        source: item.source || '未知来源',
+        metadata: item.metadata || {},
+        // 可以添加其他处理后的字段
+        content_preview: item.content ? item.content.substring(0, 200) + (item.content.length > 200 ? '...' : '') : '无内容'
+      }))
       
-      ElMessage.success(`检索完成，共找到 ${multiResults.value.length} 条数据`)
+      ElMessage.success({
+        message: `向量检索完成，共找到 ${data.length} 条数据`,
+        type: 'success',
+        duration: 3000
+      })
     } else {
       ElMessage.error('检索失败，无数据返回')
     }
   } catch (err) {
-    ElMessage.error(err?.response?.data?.detail || err?.message || '检索失败')
+    ElMessage.error({
+      message: err?.response?.data?.detail || err?.message || '检索失败',
+      type: 'error',
+      duration: 5000
+    })
   } finally {
     loadingMuti.value = false
   }
@@ -1417,262 +1092,115 @@ const loadMultiRetrieve = async () => {
             </div>
           </div>
         </el-card>
-
-        <!-- 向量可视化功能（保持不变） -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'visualize'">
-          <template #header>
-            <span>向量可视化</span>
-          </template>
-          <div class="visualization-container">
-            <div class="visualization-controls">
-              <el-button
-                type="primary"
-                :loading="loadingVectors"
-                @click="loadVectors"
-                :disabled="!vectorDataAvailable"
-              >
-                加载向量数据
-              </el-button>
-              <div class="control-group">
-                <div class="slider-with-label">
-                  <span class="slider-label">点大小: {{ visualizationConfig.pointSize }}</span>
-                  <el-slider
-                    v-model="visualizationConfig.pointSize"
-                    :min="2"
-                    :max="20"
-                    :step="1"
-                    show-stops
-                    style="width: 200px;"
-                    @input="redrawVisualization"
-                  />
-                </div>
-                <el-tag type="info" size="small">使用 PCA 降维</el-tag>
-              </div>
-            </div>
-
-            <div class="visualization-main">
-              <div v-if="loadingVectors" class="loading-container">
-                <el-icon class="is-loading" :size="30"><Loading /></el-icon>
-                <p>正在加载向量数据...</p>
-              </div>
-              
-              <div v-else-if="vectors.length > 0" class="visualization-canvas-container">
-                <div class="canvas-wrapper" ref="canvasWrapper">
-                  <canvas 
-                    ref="vectorCanvas" 
-                    class="vector-canvas"
-                    @mousemove="handleCanvasHover"
-                    @mouseleave="handleCanvasLeave"
-                  ></canvas>
-                  
-                  <!-- 悬停提示框 -->
-                  <div
-                    v-if="hoveredVector"
-                    class="tooltip"
-                    :style="{
-                      left: hoverPosition.x + 'px',
-                      top: hoverPosition.y + 'px'
-                    }"
-                  >
-                    <div class="tooltip-content">
-                      <h4>文本片段 {{ hoveredVector.index + 1 }}</h4>
-                      <div class="tooltip-text">
-                        {{ hoveredVector.textPreview }}
-                      </div>
-                      <div class="tooltip-meta">
-                        <span>向量维度: {{ hoveredVector.dimension }}</span>
-                        <span>相似度: {{ (hoveredVector.similarity || 0).toFixed(3) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="visualization-legend" v-if="uniqueClusters.length > 0">
-                  <div class="legend-item" v-for="cluster in uniqueClusters" :key="cluster">
-                    <span class="legend-color" :style="{ backgroundColor: getClusterColor(cluster) }"></span>
-                    <span class="legend-label">簇 {{ cluster }}</span>
-                    <span class="legend-count">({{ clusterCounts[cluster] || 0 }})</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-else class="empty-state">
-                <el-empty description="暂无向量数据">
-                  <p>请先加载向量数据库</p>
-                </el-empty>
-              </div>
-            </div>
-
-            <div v-if="vectorStats" class="vector-stats">
-              <el-row :gutter="20">
-                <el-col :span="6">
-                  <div class="stat-card">
-                    <div class="stat-value">{{ vectorStats.total }}</div>
-                    <div class="stat-label">总向量数</div>
-                  </div>
-                </el-col>
-                <el-col :span="6">
-                  <div class="stat-card">
-                    <div class="stat-value">{{ vectorStats.dimensions }}</div>
-                    <div class="stat-label">向量维度</div>
-                  </div>
-                </el-col>
-                <el-col :span="6">
-                  <div class="stat-card">
-                    <div class="stat-value">{{ vectorStats.clusters }}</div>
-                    <div class="stat-label">聚类数</div>
-                  </div>
-                </el-col>
-                <el-col :span="6">
-                  <div class="stat-card">
-                    <div class="stat-value">{{ vectorStats.avgSimilarity.toFixed(3) }}</div>
-                    <div class="stat-label">平均相似度</div>
-                  </div>
-                </el-col>
-              </el-row>
-            </div>
-          </div>
-        </el-card>
         <!--多源数据检索-->
         <el-card class="form-card" shadow="hover" v-if="activeFeature === 'multi-retrieve'">
-        <template #header>
-          <span>多源数据检索</span>
-        </template>
-        <!-- 新增链接区域 -->
-        <div style="margin-bottom: 20px; text-align: center;">
-          <div style="margin-bottom: 15px; display: flex; gap: 20px; justify-content: center;">
-            <el-link 
-              type="primary" 
-              :underline="false" 
-              href="http://localhost:7474/browser/" 
-              target="_blank"
-              style="padding: 8px 16px; border: 1px solid #409eff; border-radius: 4px;"
-            >
-              图数据库管理
-            </el-link>
-            <el-link 
-              type="success" 
-              :underline="false" 
-              href="http://10.126.62.88:5601/app/enterprise_search/elasticsearch" 
-              target="_blank"
-              style="padding: 8px 16px; border: 1px solid #67c23a; border-radius: 4px;"
-            >
-              文档数据库管理
-            </el-link>
+          <template #header>
+            <span>多源数据检索</span>
+          </template>
+          <!-- 新增链接区域 -->
+          <div style="margin-bottom: 20px; text-align: center;">
+            <div style="margin-bottom: 15px; display: flex; gap: 20px; justify-content: center;">
+              <el-link 
+                type="primary" 
+                :underline="false" 
+                href="http://localhost:7474/browser/" 
+                target="_blank"
+                style="padding: 8px 16px; border: 1px solid #409eff; border-radius: 4px;"
+              >
+                图数据库管理
+              </el-link>
+              <el-link 
+                type="success" 
+                :underline="false" 
+                href="http://10.126.62.88:5601/app/enterprise_search/elasticsearch" 
+                target="_blank"
+                style="padding: 8px 16px; border: 1px solid #67c23a; border-radius: 4px;"
+              >
+                文档数据库管理
+              </el-link>
+              <el-link 
+                type="primary" 
+                :underline="false" 
+                href="http://10.126.62.88:8787/#/databases/default" 
+                target="_blank"
+                style="padding: 8px 16px; border: 1px solid #409eff; border-radius: 4px;"
+              >
+                向量数据库管理
+              </el-link>
+            </div>
           </div>
-        </div>
-        <!-- 控制按钮 -->
-        <div style="margin-bottom: 20px; text-align: center;">
-          <el-button
-            type="primary"
-            :loading="loadingMuti"
-            :icon="MagicStick"
-            @click="loadMultiRetrieve"
-          >
-            查找向量库
-          </el-button>
-        </div>
-        
-        <!-- 加载状态 -->
-        <div v-if="loadingMuti" class="loading-container" style="text-align: center; padding: 20px;">
-          <el-icon class="is-loading" :size="30"><Loading /></el-icon>
-          <p>正在检索数据...</p>
-        </div>
-        
-        <!-- 结果展示 -->
-        <div v-if="multiResults.length > 0">
-          <!-- 统计信息 -->
-          <div v-if="multiStats" style="margin-bottom: 20px; background: #f5f7fa; padding: 15px; border-radius: 4px;">
-            <h4 style="margin: 0 0 10px 0; color: #333;">统计信息</h4>
-            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-              <div>
-                <span style="color: #666;">总节点数: </span>
-                <strong style="color: #409eff;">{{ multiStats.total_nodes }}</strong>
+          <!-- 控制按钮 -->
+          <div style="margin-bottom: 20px; text-align: center;">
+            <el-button
+              type="primary"
+              :loading="loadingMuti"
+              :icon="MagicStick"
+              @click="loadMultiRetrieve"
+            >
+              查找向量库
+            </el-button>
+          </div>
+          
+          <!-- 加载状态 -->
+          <div v-if="loadingMuti" class="loading-container" style="text-align: center; padding: 20px;">
+            <el-icon class="is-loading" :size="30"><Loading /></el-icon>
+            <p>正在检索数据...</p>
+          </div>
+          
+          <!-- 搜索结果展示 -->
+          <div v-else-if="multiResults && multiResults.length > 0" style="margin-top: 20px;">
+            <!-- 统计信息 -->
+            <el-alert 
+              :title="`检索完成，共找到 ${multiResults.length} 条数据`" 
+              type="success" 
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            
+            <!-- 数据列表 -->
+            <div v-for="(item, index) in multiResults" :key="index" class="result-item" style="margin-bottom: 20px; padding: 15px; border: 1px solid #ebeef5; border-radius: 4px;">
+              <!-- 头部信息 -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                  <el-tag type="info" size="small">ID: {{ item.database_id }}</el-tag>
+                  <el-tag type="primary" size="small" style="margin-left: 8px;">索引: {{ item.index }}</el-tag>
+                </div>
+                <el-tag type="success" size="small">{{ item.source }}</el-tag>
               </div>
-              <div>
-                <span style="color: #666;">有向量地址: </span>
-                <strong style="color: #409eff;">{{ multiStats.nodes_with_vector_address }}</strong>
+              
+              <!-- 内容展示 -->
+              <div style="margin-bottom: 10px;">
+                <div style="color: #606266; font-size: 12px; margin-bottom: 5px;">内容：</div>
+                <div style="background-color: #f5f7fa; padding: 10px; border-radius: 4px; max-height: 150px; overflow-y: auto;">
+                  {{ item.content }}
+                </div>
               </div>
-              <div>
-                <span style="color: #666;">成功检索: </span>
-                <strong style="color: #67c23a;">{{ multiStats.successful_retrievals }}</strong>
-              </div>
-              <div>
-                <span style="color: #666;">成功率: </span>
-                <strong style="color: #e6a23c;">{{ multiStats.success_rate }}</strong>
+              
+              <!-- 元数据信息 -->
+              <div v-if="item.metadata && Object.keys(item.metadata).length > 0" style="margin-top: 10px;">
+                <el-collapse>
+                  <el-collapse-item title="查看更多元数据">
+                    <div style="font-size: 12px; color: #909399;">
+                      <div v-for="(value, key) in item.metadata" :key="key" style="margin-bottom: 5px;">
+                        <span style="color: #606266;">{{ key }}: </span>
+                        <span>{{ typeof value === 'object' ? JSON.stringify(value) : value }}</span>
+                      </div>
+                    </div>
+                  </el-collapse-item>
+                </el-collapse>
               </div>
             </div>
           </div>
           
-          <!-- 结果列表 -->
-          <div class="result-box" style="margin-top: 20px;">
-            <div class="result-header">
-              <p class="result-label">检索结果 (共 {{ multiResults.length }} 个):</p>
-            </div>
-            
-            <div class="results-list">
-              <div v-for="(result, index) in multiResults" :key="index" class="result-item">
-                <div style="margin-bottom: 10px;">
-                  <span style="color: #409eff; font-weight: bold;">节点 {{ result.node_id }}</span>
-                  <span v-if="result.node_name" style="color: #333; margin-left: 10px;">
-                    ({{ result.node_name }})
-                  </span>
-                </div>
-                
-                <div style="margin: 8px 0;">
-                  <span style="color: #666;">标签: </span>
-                  <span style="color: #333;">
-                    {{ result.labels.join(', ') }}
-                  </span>
-                </div>
-                
-                <div style="margin: 8px 0;">
-                  <span style="color: #666;">向量地址: </span>
-                  <span style="color: #e6a23c; font-family: monospace;">
-                    {{ result.vector_address }}
-                  </span>
-                </div>
-                
-                <div style="margin: 8px 0;">
-                  <span style="color: #666;">切片编号: </span>
-                  <span style="color: #333; font-weight: bold;">
-                    {{ result.slice_number }}
-                  </span>
-                </div>
-                
-                <div style="margin: 8px 0;">
-                  <span style="color: #666;">向量内容: </span>
-                  <div style="color: #333; background: #f8f9fa; padding: 10px; 
-                           border-radius: 4px; margin-top: 5px; border-left: 3px solid #409eff;">
-                    {{ result.vector_content.length > 200 ? result.vector_content.substring(0, 200) + '...' : result.vector_content }}
-                    <span v-if="result.vector_content.length > 200" style="color: #909399; font-size: 12px;">
-                      (共 {{ result.vector_content.length }} 字符)
-                    </span>
-                  </div>
-                </div>
-                
-                <div v-if="result.content_length" style="margin: 8px 0; text-align: right;">
-                  <span style="color: #909399; font-size: 12px;">
-                    内容长度: {{ result.content_length }} 字符
-                  </span>
-                </div>
-                
-                <!-- 分隔线 -->
-                <el-divider v-if="index < multiResults.length - 1" style="margin: 20px 0;" />
-              </div>
-            </div>
+          <!-- 无数据状态 -->
+          <div v-else-if="!loadingMuti" style="text-align: center; padding: 40px 0;">
+            <el-empty description="点击上方按钮开始检索" />
           </div>
-        </div>
-        
-        <!-- 无数据状态 -->
-        <div v-else-if="!loadingMuti" style="text-align: center; padding: 40px 0;">
-          <el-empty description="点击上方按钮开始检索" />
-        </div>
-      </el-card>
+        </el-card>
         <!-- 其他功能保持占位或说明 -->
         <el-card class="form-card" shadow="hover" v-if="
           activeFeature === 'split' && !activeSubFeature ||
-          (activeFeature !== 'cypher' && activeFeature !== 'split' && activeFeature !== 'vector' && activeFeature !== 'visualize'&& activeFeature !== 'multi-retrieve')
+          (activeFeature !== 'cypher' && activeFeature !== 'split' && activeFeature !== 'vector' && activeFeature !== 'multi-retrieve')
         ">
           <template #header>
             <span v-if="activeFeature === 'split'">

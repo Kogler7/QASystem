@@ -24,6 +24,7 @@ class TextRequestBody(BaseModel):
 
 class TextVectorRequestBody(BaseModel):
     text: str
+    source: str = "default_file_name"  # 默认值
 
 @router.get("/health")
 async def nl2cypher_health() -> dict[str, Any]:
@@ -54,6 +55,7 @@ async def text2vector(body: TextVectorRequestBody) -> dict[str, Any]:
         result = await asyncio.to_thread(
             service.text2vector,
             text=body.text.strip(),
+            source=body.source
         )
         return result
     except Exception as e:
