@@ -2,6 +2,7 @@ import os
 import re
 import json
 from typing import Optional, List, Dict, Any
+from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
 
 import torch
 import requests
@@ -9,10 +10,10 @@ from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
-from langchain_chroma import Chroma
 from transformers import AutoTokenizer, AutoModel
 from langchain.embeddings.base import Embeddings
 from langchain_experimental.text_splitter import SemanticChunker
+from langchain_community.vectorstores import Milvus
 # from langchain.memory import ConversationBufferMemory #处理多轮对话的记忆功能
 
 # 使用统一 LLM 接口（algorithm/common）
@@ -23,35 +24,11 @@ if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 from common.llm_client import complete, extract_final_response
 
-_NL2CYPHER_ROOT = Path(__file__).resolve().parent
-
-
-def _resolve_under_root(env_key: str, default_relative: str) -> str:
-    """路径相对 algorithm/NL_to_cypher；绝对路径或 ~/ 原样解析。"""
-    raw = os.environ.get(env_key, "").strip()
-    if raw:
-        p = Path(raw).expanduser()
-        return str(p.resolve() if p.is_absolute() else (_NL2CYPHER_ROOT / raw).resolve())
-    return str((_NL2CYPHER_ROOT / default_relative).resolve())
-
-
-# Chroma 与嵌入模型目录默认在 NL_to_cypher 目录下，避免依赖 cwd；可用环境变量覆盖
-CHROMA_DB_PATH = _resolve_under_root("NL2CYPHER_CHROMA_DB_PATH", "chroma_db")
-EMBEDDING_MODEL_DIR = _resolve_under_root(
-    "NL2CYPHER_EMBEDDING_MODEL_PATH", "models/bge-small-zh-v1.5"
-)
-
-
-def records_json_path() -> str:
-    raw = os.environ.get("NL2CYPHER_RECORDS_JSON", "").strip()
-    if raw:
-        p = Path(raw).expanduser()
-        return str(p.resolve() if p.is_absolute() else (_NL2CYPHER_ROOT / raw).resolve())
-    return str((_NL2CYPHER_ROOT / "records.json").resolve())
-
-
 def call_llm(prompt: str, timeout: int = 500) -> str:
     return complete(prompt, timeout=timeout)
+
+MILVUS_DB_PATH="http://localhost:19530"
+MODEL_PATH = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
 
 class CustomHuggingFaceEmbeddings(Embeddings):
     def __init__(self, model, tokenizer):
@@ -76,7 +53,7 @@ def load_txt(filepath: str) -> list[Document]:
     # print(documents)
     return documents
 
-
+#语义切分
 def txt_split_semantic(
         documents: list[Document],
         threshold: float = 0.5,
@@ -96,8 +73,8 @@ def txt_split_semantic(
     Returns:
         分割后的文档列表
     """
-    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
-    model = AutoModel.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
+    model = AutoModel.from_pretrained(MODEL_PATH, local_files_only=True)
     custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
 
     # 创建语义分割器
@@ -172,36 +149,75 @@ def txt_split(documents: list[Document]) -> list[Document]:
         # print("#"*10)
     return split_docs
 
-
 # 文本嵌入+向量存储
 def embedding(split_docs: list):
-    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
-    model = AutoModel.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
-    custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
-    print("模型加载成功")
-    # 存储到Chroma数据库
-    vector_store = Chroma.from_documents(
-        documents=split_docs,
-        embedding=custom_embedding,
-        persist_directory=CHROMA_DB_PATH,  # 指定存储路径
-        collection_name="emergency_procedures"
-    )
-    print("向量存储成功")
-    return vector_store
-
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
+        model = AutoModel.from_pretrained(MODEL_PATH, local_files_only=True)
+        custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
+        print("模型加载成功")
+        # 存储到milvus数据库
+        vector_store = Milvus.from_documents(
+                documents=split_docs,
+                embedding=custom_embedding,
+                connection_args={
+                    "host": "localhost",
+                    "port": "19530"
+                },
+                collection_name="vector_info",  # 集合名称
+                drop_old=False,  # 是否覆盖现有集合
+            )
+        print("向量存储成功")
+        return vector_store
+    except Exception as e:
+        print(f"向量存储失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 #加载数据
 def load_vector_store():
-    """加载已存在的向量数据库"""
-    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
-    model = AutoModel.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
-    custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
+    try:
+        """加载已存在的向量数据库"""
+        
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
+        model = AutoModel.from_pretrained(MODEL_PATH, local_files_only=True)
+        custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
+        collection_name="vector_info"
+        connections.connect(host="localhost", port="19530")
+        print(f"连接到 Milvus")
+        
+        # 2. 加载集合
+        collection = Collection(collection_name)
+        collection.load()
+        print(f"加载集合: {collection_name}")
+        print(f"数据量: {collection.num_entities} 条")
+        
+        # 3. 查询所有数据
+        all_data = collection.query(
+            expr="",  # 空表达式 = 获取所有
+            output_fields=["*"],  # 所有字段
+            limit=collection.num_entities  # 获取全部
+        )
+        parsed_data = []
+        for item in all_data:
+            parsed_item = {}
+            for key, value in item.items():
+                if isinstance(value, str) and value.startswith('{') and value.endswith('}'):
+                    try:
+                        parsed_item[key] = json.loads(value)
+                    except:
+                        parsed_item[key] = value
+                else:
+                    parsed_item[key] = value
+            parsed_data.append(parsed_item)
+        
+        connections.disconnect("default")
+        print("Milvus 向量数据库加载成功")
 
-    vector_store = Chroma(
-        persist_directory=CHROMA_DB_PATH,
-        embedding_function=custom_embedding,
-        collection_name="emergency_procedures"
-    )
-    return vector_store
+        return parsed_data
+    except Exception as e:
+        print(f"加载 Milvus 向量数据库失败: {e}")
+        raise
 #构建prompt
 def create_rag_prompt():
     """创建RAG提示词模板"""
@@ -287,118 +303,40 @@ def interactive_qa(): #多轮问答
             print("=" * 50)
         except Exception as e:
             print(f"查询过程中出现错误: {e}")
-def get_vector_by_index(index: int) -> Optional[Dict[str, Any]]:
-    """
-    根据索引返回特定的向量片段（原文本内容）
-    
-    Args:
-        index: 索引位置（从0开始）
-    
-    Returns:
-        包含向量片段信息的字典，如果找不到返回None
-        格式: {
-            'id': 向量ID,
-            'index': 索引位置,
-            'content': 文本内容,
-            'metadata': 元数据,
-            'content_length': 内容长度
-        }
-    """
-    vector_store = load_vector_store()
-    if vector_store is None:
-        print("向量数据库加载失败")
-        return None
-    
-    # 获取所有数据
-    collection = vector_store.get()
-    if collection is None:
-        print("无法获取向量集合")
-        return None
-    
-    # 获取各个字段
-    ids = collection.get('ids', [])
-    documents = collection.get('documents', [])
-    metadatas = collection.get('metadatas', [])
-    
-    # 检查索引是否有效
-    if index < 0 or index >= len(ids):
-        print(f"索引 {index} 超出范围，有效范围: 0-{len(ids)-1}")
-        return None
-    
-    # 构建返回结果
-    result = {
-        'id': ids[index],
-        'index': index,
-        'slice_number': index + 1,  # 切片编号（从1开始）
-        'content': documents[index] if index < len(documents) else '',
-        'metadata': metadatas[index] if index < len(metadatas) and metadatas[index] else {},
-        'content_length': len(documents[index]) if index < len(documents) else 0
-    }
-    
-    return result
 
-# 新增函数：根据多个索引返回向量片段
-def get_vectors_by_indices(indices: List[int]) -> List[Dict[str, Any]]:
-    """
-    根据多个索引返回向量片段
-    
-    Args:
-        indices: 索引列表（从0开始）
-    
-    Returns:
-        向量片段列表
-    """
-    results = []
-    for index in indices:
-        vector_data = get_vector_by_index(index)
-        if vector_data:
-            results.append(vector_data)
-    return results
 def get_vector_by_database_id(database_id: str) -> Optional[Dict[str, Any]]:
-    """
-    根据数据库ID返回向量片段
-    
-    Args:
-        database_id: 数据库中的向量ID，如 "fcc262e9-2baa-4260-bf18-6ac0c75f470a"
-    
-    Returns:
-        包含向量片段信息的字典，如果找不到返回None
-    """
-    vector_store = load_vector_store()
-    if vector_store is None:
-        print("向量数据库加载失败")
+    all_data = load_vector_store()
+    if not all_data:
+        print("向量数据库加载失败或为空")
         return None
-    
-    # 获取所有数据
-    collection = vector_store.get()
-    if collection is None:
-        print("无法获取向量集合")
-        return None
-    
-    # 获取各个字段
-    ids = collection.get('ids', [])
-    documents = collection.get('documents', [])
-    metadatas = collection.get('metadatas', [])
     
     # 查找指定数据库ID
     target_id = str(database_id).strip()
-    for i, db_id in enumerate(ids):
-        if str(db_id) == target_id:
+    
+    for i, item in enumerate(all_data):
+        # 检查各种可能的ID字段
+        item_id = item.get('pk') or item.get('id') or item.get('_id')
+        
+        if item_id is not None and str(item_id) == target_id:
+            # 获取文本内容
+            text_content = item.get('text', '')
+            if isinstance(text_content, dict):
+                # 如果text是字典，提取实际文本
+                text_content = text_content.get('text', '') or str(text_content)
+            
             # 构建返回结果
             result = {
-                'database_id': db_id,
+                'database_id': item_id,
                 'index': i,
-                'slice_number': i + 1,  # 切片编号（从1开始）
-                'content': documents[i] if i < len(documents) else '',
-                'metadata': metadatas[i] if i < len(metadatas) and metadatas[i] else {},
-                'content_length': len(documents[i]) if i < len(documents) else 0
+                'content': text_content,
+                'source': item.get('source', ''),
             }
             return result
     
     print(f"未找到数据库ID为 '{database_id}' 的向量片段")
     return None
 
-# 新增函数：根据多个数据库ID返回向量片段
+#根据多个数据库ID返回向量片段（实际用）
 def get_vectors_by_database_ids(database_ids: List[str]) -> List[Dict[str, Any]]:
     """
     根据多个数据库ID返回向量片段
@@ -415,7 +353,7 @@ def get_vectors_by_database_ids(database_ids: List[str]) -> List[Dict[str, Any]]
         if vector_data:
             results.append(vector_data)
     return results
-
+#测试函数 暂时从json文件中读取内容
 def load_json_nodes(json_file: str) -> List[Dict[str, Any]]:
     """
     从JSON文件中加载节点数据
@@ -464,18 +402,7 @@ def get_vectors_for_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             vector_content = get_vector_by_database_id(vector_id)
             
             if vector_content:
-                result = {
-                    'node_id': node.get('identity'),
-                    'element_id': node.get('elementId'),
-                    'node_name': properties.get('name', ''),
-                    'labels': node.get('labels', []),
-                    'vector_address': vector_id,
-                    'vector_content': vector_content.get('content', ''),
-                    'slice_number': vector_content.get('slice_number', 0),
-                    'vector_index': vector_content.get('index', 0),
-                    'other_properties': {k: v for k, v in properties.items() if k != 'VectorAddress'}
-                }
-                results.append(result)
+                results.append(vector_content)
     
     print(f"找到 {len(results)} 个有VectorAddress的节点")
     return results
@@ -484,89 +411,32 @@ def get_vectors_for_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def main():
-    nodes = load_json_nodes(records_json_path())
-    results = get_vectors_for_nodes(nodes)
-    for result in results:
-        print(f"节点 {result['node_id']} ({result['node_name']})")
-        print(f"标签: {', '.join(result['labels'])}")
-        print(f"向量地址: {result['vector_address']}")
-        print(f"切片编号: {result['slice_number']}")
-        print(f"向量内容: {result['vector_content'][:200]}...")
-        print("-" * 50)
-    
-    print(f"\n共处理 {len(results)} 个节点")
+    # nodes = load_json_nodes("/home/admin_user_5/wangshuo/copy/algorithm/NL_to_cypher/records.json")
     # results = get_vectors_for_nodes(nodes)
-    # vector_store = load_vector_store()
-    # print(vector_store)
-    # # documents = load_txt("列车着火应急处置_extracted.txt")
+    # for result in results:
+    #     print(f"节点 {result['node_id']} ({result['node_name']})")
+    #     print(f"标签: {', '.join(result['labels'])}")
+    #     print(f"向量地址: {result['vector_address']}")
+    #     print(f"切片编号: {result['slice_number']}")
+    #     print(f"向量内容: {result['vector_content'][:200]}...")
+    #     print("-" * 50)
+    
+    # print(f"\n共处理 {len(results)} 个节点")
+
+
+    # results = get_vectors_for_nodes(nodes)
+
+    # documents = load_txt("列车着火应急处置_extracted.txt")
     # # RecursiveCharacterTextSplitter
-    # # split_docs = txt_split(documents)
+    # split_docs = txt_split(documents)
 
     # #SemanticChunker
     # # split_docs = txt_split_semantic(documents)
 
-    # # embedding(split_docs)
-    # # interactive_qa()
-    # if vector_store is None:
-    #         print("vector_store 为 None")
-    #         return
-        
-    # print(f"Chroma 对象: {vector_store}")
-        
-    # # 尝试获取数据
-    # print("\n尝试获取 collection...")
-    # collection = vector_store.get()
-        
-    # if collection is None:
-    #     print("collection 为 None")
-    #     return
-        
-    # print(f"collection 类型: {type(collection)}")
-    # print(f"collection 键: {collection.keys() if hasattr(collection, 'keys') else 'No keys attribute'}")
-    # print("\n2. 各字段详细信息:")
-    # for key in collection.keys():
-    #     value = collection[key]
-    #     print(f"\n=== {key} ===")
-    #     print(f"类型: {type(value)}")
-            
-    #     if hasattr(value, '__len__'):
-    #         print(f"长度: {len(value)}")
-                
-    #         if len(value) > 0:
-    #             first_item = value[0]
-    #             print(f"第一个元素类型: {type(first_item)}")
-                    
-    #             if key == 'documents':
-    #                 print(f"内容示例: {str(first_item)[:100]}...")
-    #             elif key == 'embeddings':
-    #                 if isinstance(first_item, list):
-    #                     print(f"向量维度: {len(first_item)}")
-    #                     print(f"前5个值: {first_item[:5]}")
-    #                 elif hasattr(first_item, 'shape'):
-    #                     print(f"形状: {first_item.shape}")
-    #                     print(f"类型: {first_item.dtype}")
-    #                 else:
-    #                     print(f"值: {first_item}")
-    #             elif key == 'metadatas':
-    #                 print(f"元数据: {first_item}")
-    #             elif key == 'ids':
-    #                 print(f"ID: {first_item}")
-            
-    #     # 特殊处理 embeddings
-    #     if key == 'embeddings':
-    #         print(f"\nembeddings 的具体检查:")
-    #         print(f"是否为 None: {value is None}")
-    #         print(f"是否为 bool: {isinstance(value, bool)}")
-    #         print(f"值: {value}")
-                
-    # # 检查是否存在其他可能的键
-    # print("\n3. 检查可能的替代键名:")
-    # possible_embedding_keys = ['embeddings', 'embedding', 'vectors', 'vector']
-    # for key in possible_embedding_keys:
-    #     if key in collection:
-    #         print(f"找到 '{key}': {type(collection[key])}, 长度: {len(collection[key]) if hasattr(collection[key], '__len__') else 'N/A'}")
-    #     else:
-    #         print(f"未找到 '{key}'")
+    #embedding(split_docs)
+    vector = get_vector_by_database_id("464971672050206437")
+    print(vector)
+    
         
 
 if __name__ == "__main__":
