@@ -25,8 +25,25 @@ class OCRProcessor(BaseProcessor):
         effective_config_path = (
             config_path
             or os.getenv("MINERU_CONFIG_PATH")
+            or os.getenv("MINERU_TOOLS_CONFIG_JSON")
             or (str(_default_json) if _default_json.is_file() else str(_default_json))
         )
+
+        # If a relative path (not absolute) is provided (e.g. repo-relative in backend/.env),
+        # resolve it relative to the algorithm/preproc root so downstream libraries can find it.
+        try:
+            if effective_config_path and not Path(effective_config_path).is_absolute():
+                candidate = _preproc_root / effective_config_path
+                if candidate.exists():
+                    effective_config_path = str(candidate)
+                else:
+                    # fallback: try repo root
+                    repo_root = _preproc_root.parent
+                    cand2 = repo_root / effective_config_path
+                    if cand2.exists():
+                        effective_config_path = str(cand2)
+        except Exception:
+            pass
         effective_model_source = model_source or os.getenv("MINERU_MODEL_SOURCE") or 'local'
 
         # MinerU 实际读取 MINERU_TOOLS_CONFIG_JSON，而不是 MINERU_CONFIG_PATH。
@@ -114,15 +131,34 @@ class OCRProcessor(BaseProcessor):
             )
             
             # 读取生成的 Markdown 文件
-            file_output_dir = Path(output_dir) / Path(file_path).stem / "auto"
-            md_file = file_output_dir / f"{Path(file_path).stem}.md"
-            if md_file.exists():
+            # pipeline 后端通常使用 method（如 'auto'）作为子目录，VLM 后端使用 'vlm' 子目录
+            method_used = kwargs.get('method', 'auto')
+            backend_used = kwargs.get('backend', 'pipeline')
+
+            if backend_used.startswith('pipeline'):
+                preferred_dir = method_used
+            else:
+                preferred_dir = 'vlm'
+
+            candidates = [preferred_dir, 'auto', 'vlm', backend_used]
+            file_output_dir = None
+            md_file = None
+            stem = Path(file_path).stem
+            for cand in candidates:
+                try_dir = Path(output_dir) / stem / str(cand)
+                candidate_md = try_dir / f"{stem}.md"
+                if candidate_md.exists():
+                    file_output_dir = try_dir
+                    md_file = candidate_md
+                    break
+
+            if md_file is not None:
                 content = md_file.read_text(encoding='utf-8')
             else:
                 content = ""
                 metadata['error'] = 'Markdown file not found'
-            
-            metadata['output_dir'] = str(file_output_dir)
+
+            metadata['output_dir'] = str(file_output_dir) if file_output_dir is not None else str(Path(output_dir) / stem)
             
             return {
                 'content': content,
@@ -250,7 +286,11 @@ class OCRProcessor(BaseProcessor):
                 logger.success(f"解析完成: {pdf_file_name} -> {local_md_dir}")
 
         else:  # vlm 系列后端
-            # VLM 后端目前不支持表格/公式开关？这里按原始逻辑处理
+            # 规范化 backend 值：支持简写 'vlm' 映射到 'vlm-transformers'
+            # VLM 后端可能的完整值示例: 'vlm-transformers', 'vlm-vllm-engine', 'vlm-http-client'
+            if backend == 'vlm':
+                logger.info("Received shorthand backend 'vlm', mapping to 'vlm-transformers'")
+                backend = 'vlm-transformers'
             if backend.startswith("vlm-"):
                 backend = backend[4:]  # 去掉 'vlm-' 前缀
             for idx, pdf_bytes in enumerate(pdf_bytes_list):

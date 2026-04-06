@@ -30,7 +30,8 @@ class DocumentConversionInterface:
                  db_config: Optional[Dict] = None,
                  excel_to_mysql: bool = True,
                  mineru_config_path: Optional[str] = None,
-                 mineru_model_source: str = "local"):
+                 mineru_model_source: str = "local",
+                 libreoffice_path: Optional[str] = None):
         """
         初始化接口
 
@@ -66,6 +67,7 @@ class DocumentConversionInterface:
         self.processor = DocumentProcessor(
             mineru_config_path=mineru_config_path,
             mineru_model_source=mineru_model_source
+            ,libreoffice_path=libreoffice_path
         )
 
         # 数据库相关
@@ -91,14 +93,34 @@ class DocumentConversionInterface:
             es_port = db_config.get('es_port', Settings.ES_PORT)
 
             logger.info(f"正在连接 Elasticsearch: {es_host}:{es_port}")
-            self.es_client = ESClient(host=es_host, port=es_port)
+            # 支持可选的 username/password（用于 ES8 或启用认证的集群）
+            es_username = db_config.get('es_username') if isinstance(db_config, dict) else None
+            es_password = db_config.get('es_password') if isinstance(db_config, dict) else None
+            es_scheme = db_config.get('es_scheme', 'http') if isinstance(db_config, dict) else 'http'
+            es_verify_cert = db_config.get('es_verify_cert', True) if isinstance(db_config, dict) else True
+            self.es_client = ESClient(
+                host=es_host,
+                port=es_port,
+                username=es_username,
+                password=es_password,
+                scheme=es_scheme,
+                verify_cert=es_verify_cert
+            )
 
             if self.es_client and self.es_client.session:
                 health = self.es_client.health_check()
-                if health.get('status') == 'connected':
+                # 健康检查结果可能为 dict，也可能携带错误信息字符串，先做类型检查
+                if isinstance(health, dict) and health.get('status') == 'connected':
                     logger.info(f"Elasticsearch 连接成功，集群: {health.get('cluster_name')}")
-                    if self.es_client.create_index(Settings.ES_INDEX_NAME):
-                        logger.info(f"索引 {Settings.ES_INDEX_NAME} 创建成功")
+                    # 尝试创建索引，但不应因索引创建失败而关闭 ES 客户端（容错）
+                    try:
+                        created = self.es_client.create_index(Settings.ES_INDEX_NAME)
+                        if created:
+                            logger.info(f"索引 {Settings.ES_INDEX_NAME} 创建或已存在")
+                        else:
+                            logger.warning(f"索引 {Settings.ES_INDEX_NAME} 创建失败或返回未知结果")
+                    except Exception as ie:
+                        logger.warning(f"创建索引时发生异常（已忽略）: {ie}")
                 else:
                     logger.warning(f"Elasticsearch 连接异常: {health}")
                     self.es_client = None
@@ -112,17 +134,10 @@ class DocumentConversionInterface:
         # 初始化 MySQL
         try:
             mysql_host = db_config.get('mysql_host', Settings.MYSQL_HOST)
-            # 强制端口为整数，容错处理字符串或 None
-            try:
-                mysql_port = int(db_config.get('mysql_port', Settings.MYSQL_PORT) or Settings.MYSQL_PORT)
-            except Exception:
-                mysql_port = Settings.MYSQL_PORT
+            mysql_port = db_config.get('mysql_port', Settings.MYSQL_PORT)
             mysql_db = db_config.get('mysql_database', Settings.MYSQL_DATABASE)
-            mysql_user = db_config.get('mysql_username', 'root')
-            mysql_pass = db_config.get('mysql_password', '')
-
-            # 记录将要使用的 DB 配置（不输出密码），便于排查
-            logger.info("使用 MySQL 配置: %s:%s/%s (user=%s)", mysql_host, mysql_port, mysql_db, mysql_user)
+            mysql_user = db_config.get('mysql_username', 'rail_user')
+            mysql_pass = db_config.get('mysql_password', '123456')
 
             self.mysql_client = MySQLClient(
                 host=mysql_host,
@@ -162,11 +177,11 @@ class DocumentConversionInterface:
             'input_path': input_path,
             'output_path': None,
             'content': None,
+            'metadata': None,
             'error': None,
             'mysql_tables': []   # 存储创建的 MySQL 表信息
         }
 
-        # （已在初始化时处理 MySQL 端口）这里无需再次处理 db_config
         try:
             # 处理文件
             logger.info(f"开始处理文件: {input_path}")
@@ -223,10 +238,74 @@ class DocumentConversionInterface:
                     output_filename
                 )
                 result['output_path'] = str(output_path)
+                # 将已保存的 Markdown 路径写入 metadata，便于后续存储/检索
+                try:
+                    if isinstance(metadata, dict):
+                        metadata['output_md_path'] = str(output_path)
+                except Exception:
+                    pass
+
+            # 如果已保存到文件且是 md，优先从文件读取内容作为要存入数据库的正文
+            content_for_storage = content
+            try:
+                if self.save_to_file and result.get('output_path') and self.output_format == 'md':
+                    out_path = Path(result.get('output_path'))
+                    if out_path.exists():
+                        try:
+                            content_for_storage = out_path.read_text(encoding='utf-8')
+                            logger.info(f"使用已保存的 Markdown 作为索引内容: {out_path}")
+                        except Exception as e:
+                            logger.warning(f"读取已保存 Markdown 失败，回退使用解析器返回的 content: {e}")
+            except Exception:
+                pass
+
+            # 确保要存入数据库的内容为 Markdown 文本：如果是 bytes/路径则尝试读取或解码
+            try:
+                cfs = content_for_storage
+                # 如果是 bytes，则解码
+                if isinstance(cfs, (bytes, bytearray)):
+                    try:
+                        cfs = cfs.decode('utf-8')
+                    except Exception:
+                        cfs = cfs.decode('latin-1', errors='ignore')
+                # 如果是一个看起来像路径的字符串且文件存在，优先读取该文件
+                if isinstance(cfs, str) and cfs.startswith('/') and Path(cfs).exists():
+                    try:
+                        # 如果是目录或非-md，尝试读取同名 .md
+                        pth = Path(cfs)
+                        if pth.is_file() and pth.suffix.lower() == '.md':
+                            cfs = pth.read_text(encoding='utf-8')
+                        else:
+                            # 尝试对应输出目录查找 md
+                            md_candidate = pth.with_suffix('.md')
+                            if md_candidate.exists():
+                                cfs = md_candidate.read_text(encoding='utf-8')
+                            else:
+                                # 如果 metadata 中包含 output_md_path，也优先使用
+                                if isinstance(metadata, dict) and metadata.get('output_md_path'):
+                                    try:
+                                        mdp = Path(metadata.get('output_md_path'))
+                                        if mdp.exists():
+                                            cfs = mdp.read_text(encoding='utf-8')
+                                    except Exception:
+                                        pass
+                    except Exception as e:
+                        logger.warning(f"尝试从路径读取要索引内容失败: {e}")
+
+                # 最终确保为字符串
+                if not isinstance(cfs, str):
+                    cfs = str(cfs)
+
+                # 限制长度以免一次性索引过大
+                preview = cfs[:200].replace('\n', ' ') if isinstance(cfs, str) else ''
+                logger.info(f"准备索引到 ES，文件: {metadata.get('file_name')}，类型: {file_type}，内容预览: {preview}")
+            except Exception as e:
+                logger.warning(f"准备索引内容时发生异常: {e}")
+                cfs = str(content_for_storage)
 
             # 存储到数据库（非 Excel 或 Excel 元数据存储）
             if self.enable_db_storage:
-                self._store_to_databases(content, metadata, file_type)
+                self._store_to_databases(cfs, metadata, file_type)
 
             # 保存元数据文件
             if save_metadata and metadata:
@@ -459,50 +538,6 @@ class DocumentConversionInterface:
             logger.info(f"\n处理工作表: {schema['sheet_name']}")
             logger.info(f"表名: {schema['table_name']}")
 
-            # 生成一个安全的表名，MySQL 标识符最大长度为 64
-            # 使用短哈希后缀以保证唯一性，并移除非法字符
-            try:
-                import hashlib
-
-                orig_name = str(schema.get('table_name', 'excel_table'))
-                # 保留字母、数字和下划线，其他字符替换为下划线
-                safe_base = ''.join(c if (c.isalnum() or c == '_') else '_' for c in orig_name)
-                # 确保不以数字开头
-                if safe_base and safe_base[0].isdigit():
-                    safe_base = f"t_{safe_base}"
-
-                # 计算短哈希
-                h = hashlib.sha1(orig_name.encode('utf-8')).hexdigest()[:10]
-                # 组成目标名，尽量保留末尾的 sheet 名短描述
-                max_total = 63  # MySQL 最大标识符长度为 64，包括结束符，这里保守使用 63
-                candidate = f"excel_{h}_{safe_base}"
-                if len(candidate) > max_total:
-                    # 截断 safe_base 部分以适配长度
-                    keep = max_total - len(f"excel_{h}_")
-                    safe_base_trunc = safe_base[:max(1, keep)]
-                    candidate = f"excel_{h}_{safe_base_trunc}"
-
-                safe_table_name = candidate
-
-                # 用 safe_table_name 替换 SQL 中的原表名（处理带反引号和不带反引号两种情况）
-                sql = schema.get('sql', '')
-                if sql:
-                    # 尝试替换第一个出现的表名（带反引号或不带）
-                    import re
-
-                    # 匹配可能的 `orig_name` 或 orig_name（考虑回引号）
-                    pattern = re.compile(r"(`?%s`?)" % re.escape(schema.get('table_name', orig_name)))
-                    new_sql, n = pattern.subn(f"`{safe_table_name}`", sql, count=1)
-                    if n == 0:
-                        # 兜底：直接在开头的 CREATE TABLE 后替换第一个反引号包名
-                        new_sql = re.sub(r"CREATE\s+TABLE\s+`[^`]+`", f"CREATE TABLE `{safe_table_name}`", sql, count=1, flags=re.IGNORECASE)
-                    schema['sql'] = new_sql
-
-                # 将 table_name 字段指向安全名称，供后续 insert 使用
-                schema['table_name'] = safe_table_name
-            except Exception as e:
-                logger.warning(f"生成安全表名失败，使用原名: {e}")
-
             table_info = {
                 'sheet_name': schema['sheet_name'],
                 'table_name': schema['table_name'],
@@ -616,6 +651,7 @@ class DocumentConversionInterface:
     def _store_document_to_es(self, content: str, metadata: Dict, file_type: str):
         """存储文档到 Elasticsearch"""
         if not self.es_client:
+            logger.warning("ES 客户端未初始化，跳过索引存储")
             return
         if metadata is None:
             metadata = {}
@@ -623,9 +659,11 @@ class DocumentConversionInterface:
         try:
             document = {
                 'title': metadata.get('file_name', 'Unknown'),
-                'content': content[:10000],
+                    'content': content[:10000],
                 'file_type': file_type,
-                'file_path': metadata.get('file_path', ''),
+                    'file_path': metadata.get('file_path', ''),
+                    # 如果存在解析后保存的 Markdown 路径，则一并记录
+                    'md_path': metadata.get('output_md_path', ''),
                 'file_size': metadata.get('file_size', 0),
                 'is_scanned': metadata.get('is_scanned', False),
                 'metadata': metadata,
