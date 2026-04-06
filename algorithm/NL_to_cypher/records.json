@@ -1,0 +1,84 @@
+﻿[
+  {
+    "n": {
+      "identity": 22,
+      "labels": [
+        "Class",
+        "Ontology"
+      ],
+      "properties": {
+        "generalClass": "{\"type\":\"String\"}",
+        "VectorAddress": "464971672050206437",
+        "terminology": "{\"type\":\"String\"}",
+        "name": "SystemElement",
+        "description": "{\"type\":\"String\"}",
+        "source": "{\"type\":\"String\"}",
+        "creationDate": "{\"type\":\"Date\"}",
+        "version": "{\"type\":\"String\"}"
+      },
+      "elementId": "22"
+    }
+  },
+  {
+    "n": {
+      "identity": 23,
+      "labels": [
+        "Attributes",
+        "Class",
+        "Ontology"
+      ],
+      "properties": {
+        "attributeId": "{\"type\":\"String\"}",
+        "dataType": "{\"type\":\"DataType\"}",
+        "name": "Attributes"
+      },
+      "elementId": "23"
+    }
+  },
+  {
+    "n": {
+      "identity": 24,
+      "labels": [
+        "Class",
+        "Features",
+        "Ontology"
+      ],
+      "properties": {
+        "name": "Features",
+        "characteristicId": "{\"type\":\"String\"}"
+      },
+      "elementId": "24"
+    }
+  },
+  {
+    "n": {
+      "identity": 25,
+      "labels": [
+        "Class",
+        "Constraints",
+        "Ontology"
+      ],
+      "properties": {
+        "constraintId": "{\"type\":\"String\"}",
+        "name": "Constraints",
+        "description": "{\"type\":\"String\"}"
+      },
+      "elementId": "25"
+    }
+  },
+  {
+    "n": {
+      "identity": 26,
+      "labels": [
+        "Class",
+        "Ontology",
+        "Operations"
+      ],
+      "properties": {
+        "name": "Operations",
+        "operationId": "{\"type\":\"String\"}"
+      },
+      "elementId": "26"
+    }
+  }
+]
