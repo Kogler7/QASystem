@@ -1,33 +1,38 @@
-# =====================
-# Environment & secrets
-# =====================
+# =============================================================================
+# 密钥与本地环境（允许 *.example）
+# =============================================================================
 .env
 .env.*
 !.env.example
 backend/.env
 backend/.env.*
 !backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+algorithm/**/.env
+!algorithm/**/.env.example
 
-# =====================
-# Python (backend & root)
-# =====================
+# =============================================================================
+# Python
+# =============================================================================
 venv/
 .venv/
-backend/venv/
-backend/.venv/
+**/.venv/
+**/venv/
+**/env/
 __pycache__/
 */__pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 *.egg
 *.egg-info/
-*.egg-info
 .eggs/
 build/
 develop-eggs/
-dist/
 *.manifest
 *.spec
 pip-log.txt
@@ -43,45 +48,43 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+.ruff_cache/
 
-# Backend data (documents / uploads, preproc output)
-backend/data/documents/
-backend/data/preproc_output/
-backend/data/preproc_upload/
-backend/processed/
-# Stray pip constraint file (e.g. from mis-typed pip install)
+# 误生成的 pip 约束文件
 backend/=3.12
 *=3.12
-backend/processed_files/
-backend/temp_files/
 
-# =====================
-# Local environment directories
-# =====================
-# frontend/frontend_venv 为历史本地 Python 虚拟环境目录，不纳入版本控制
-frontend/frontend_venv/
-
-# =====================
-# Cross-project Python envs
-# =====================
-# 避免在任意新目录中提交虚拟环境
-**/.venv/
-**/venv/
-**/env/
-
-# =====================
-# Node / Frontend
-# =====================
+# =============================================================================
+# Node / 前端构建
+# =============================================================================
 node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
+frontend/.vite/
 *.local
-frontend/.vite/deps
 
-# =====================
-# Logs
-# =====================
+# =============================================================================
+# 后端运行时数据与缓存（勿提交）
+# =============================================================================
+backend/data/documents/
+backend/data/preproc_output/
+backend/data/preproc_upload/
+backend/processed/
+backend/processed_files/
+backend/temp_files/
+backend/chroma_db/
+backend/app.log
+backend/*.log
+
+# =============================================================================
+# Docker / Milvus 本地数据
+# =============================================================================
+volumes/
+
+# =============================================================================
+# 日志
+# =============================================================================
 logs/
 *.log
 *.out
@@ -94,11 +97,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# =====================
-# Editor & IDE
-# =====================
+# =============================================================================
+# 编辑器与 IDE
+# =============================================================================
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
 .idea/
 *.suo
 *.ntvs*
@@ -107,17 +111,17 @@ lerna-debug.log*
 *.sw?
 .cursor/
 
-# =====================
-# OS
-# =====================
+# =============================================================================
+# 操作系统
+# =============================================================================
 .DS_Store
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# =====================
-# Temporary & backup
-# =====================
+# =============================================================================
+# 临时与备份
+# =============================================================================
 .cache/
 .tmp/
 tmp/
@@ -129,24 +133,25 @@ backup/
 *.swp
 *~
 
-# =====================
-# Project-specific
-# =====================
-gitignore/
-# 忽略所有.ttl文件
-*.ttl
-# 忽略__pycache__目录
-__pycache__/
-*.pyc
-# 忽略api_service.py文件
-api_service.py
-# 忽略.lp文件
-*.lp
-# 忽略
-repair_result.txt
-
-# =====================
-# algorithm/confidence_calculate（模型、日志、大文件）
-# =====================
+# =============================================================================
+# 算法侧：训练日志与本地大结果（仓库内已跟踪的模型文件除外）
+# =============================================================================
 algorithm/confidence_calculate/lightning_logs/
 algorithm/confidence_calculate/test_results.json
+
+# 冲突检测：忽略生成物，保留 data/ 下示例 TTL（见下方否定规则）
+algorithm/conflict_detection/results/
+*.lp
+repair_result.txt
+
+# 生成的 TTL；保留 conflict_detection 示例数据
+*.ttl
+!algorithm/conflict_detection/data/insert.ttl
+!algorithm/conflict_detection/data/delete.ttl
+!algorithm/conflict_detection/data/shape.ttl
+
+# =============================================================================
+# 杂项
+# =============================================================================
+gitignore/
+frontend/frontend_venv/

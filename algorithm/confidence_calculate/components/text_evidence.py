@@ -1,9 +1,12 @@
 import numpy as np
+from pathlib import Path
 from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 from typing import Dict
 import torch
 import torch.nn as nn
+
+_CC_ROOT = Path(__file__).resolve().parent.parent
 
 
 class TextEvidence(nn.Module):
@@ -14,7 +17,7 @@ class TextEvidence(nn.Module):
         super().__init__()
         
         # 获取 ES 配置
-        es_hosts = config.get('es_hosts', ['https://10.126.62.88:9200'])
+        es_hosts = config.get("es_hosts", ["http://127.0.0.1:9200"])
         es_timeout = config.get('es_timeout', 30)
         es_username = config.get('es_username', None)
         es_password = config.get('es_password', None)
@@ -41,8 +44,16 @@ class TextEvidence(nn.Module):
         self.top_k = config.get('text_top_k', 10)
         self.max_bm25 = config.get('max_bm25_norm', 100.0)
         
-        # 加载 SBERT 模型
-        model_path = '/mnt/data3/srv/qasystem/models/sbert_model'
+        raw_path = config.get("sbert_model_path") or "sbert_model"
+        cand = Path(raw_path).expanduser()
+        if cand.is_file() or cand.is_dir():
+            model_path = str(cand.resolve())
+        else:
+            rel = (_CC_ROOT / raw_path).resolve()
+            if rel.is_file() or rel.is_dir():
+                model_path = str(rel)
+            else:
+                model_path = raw_path
         print(f"加载SBERT模型从: {model_path}")
         try:
             self.sbert = SentenceTransformer(model_path)
@@ -51,8 +62,8 @@ class TextEvidence(nn.Module):
             if ("deserializ" in err_msg or "incomplete metadata" in err_msg or "file not fully covered" in err_msg
                     or "pytorchstreamreader" in err_msg or "central directory" in err_msg or "zip archive" in err_msg):
                 raise RuntimeError(
-                    f"SBERT 模型文件不完整或损坏（{e}）。请删除目录 {sbert_path} 后重新下载："
-                    " 在 algorithm/confidence_calculate 下执行 python temp_utils/download_sbert.py"
+                    f"SBERT 模型文件不完整或损坏（{e}）。请检查 CONFIDENCE_SBERT_MODEL_PATH 或 config.yaml 中 text.sbert_model_path；"
+                    " 可在 algorithm/confidence_calculate 下执行 python temp_utils/download_sbert.py"
                 ) from e
             raise
         self.embed_dim = self.sbert.get_sentence_embedding_dimension()

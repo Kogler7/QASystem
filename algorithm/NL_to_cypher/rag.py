@@ -23,11 +23,35 @@ if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 from common.llm_client import complete, extract_final_response
 
+_NL2CYPHER_ROOT = Path(__file__).resolve().parent
+
+
+def _resolve_under_root(env_key: str, default_relative: str) -> str:
+    """路径相对 algorithm/NL_to_cypher；绝对路径或 ~/ 原样解析。"""
+    raw = os.environ.get(env_key, "").strip()
+    if raw:
+        p = Path(raw).expanduser()
+        return str(p.resolve() if p.is_absolute() else (_NL2CYPHER_ROOT / raw).resolve())
+    return str((_NL2CYPHER_ROOT / default_relative).resolve())
+
+
+# Chroma 与嵌入模型目录默认在 NL_to_cypher 目录下，避免依赖 cwd；可用环境变量覆盖
+CHROMA_DB_PATH = _resolve_under_root("NL2CYPHER_CHROMA_DB_PATH", "chroma_db")
+EMBEDDING_MODEL_DIR = _resolve_under_root(
+    "NL2CYPHER_EMBEDDING_MODEL_PATH", "models/bge-small-zh-v1.5"
+)
+
+
+def records_json_path() -> str:
+    raw = os.environ.get("NL2CYPHER_RECORDS_JSON", "").strip()
+    if raw:
+        p = Path(raw).expanduser()
+        return str(p.resolve() if p.is_absolute() else (_NL2CYPHER_ROOT / raw).resolve())
+    return str((_NL2CYPHER_ROOT / "records.json").resolve())
+
+
 def call_llm(prompt: str, timeout: int = 500) -> str:
     return complete(prompt, timeout=timeout)
-
-# 修改：使用Chroma本地存储路径，可由环境变量覆盖
-CHROMA_DB_PATH = os.environ.get("NL2CYPHER_CHROMA_DB_PATH", "./chroma_db")
 
 class CustomHuggingFaceEmbeddings(Embeddings):
     def __init__(self, model, tokenizer):
@@ -72,9 +96,8 @@ def txt_split_semantic(
     Returns:
         分割后的文档列表
     """
-    model_path = "models/bge-small-zh-v1.5"
-    tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = AutoModel.from_pretrained(model_path, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
+    model = AutoModel.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
     custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
 
     # 创建语义分割器
@@ -152,9 +175,8 @@ def txt_split(documents: list[Document]) -> list[Document]:
 
 # 文本嵌入+向量存储
 def embedding(split_docs: list):
-    model_path = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
-    tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = AutoModel.from_pretrained(model_path, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
+    model = AutoModel.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
     custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
     print("模型加载成功")
     # 存储到Chroma数据库
@@ -170,9 +192,8 @@ def embedding(split_docs: list):
 #加载数据
 def load_vector_store():
     """加载已存在的向量数据库"""
-    model_path = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
-    tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-    model = AutoModel.from_pretrained(model_path, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
+    model = AutoModel.from_pretrained(EMBEDDING_MODEL_DIR, local_files_only=True)
     custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
 
     vector_store = Chroma(
@@ -463,7 +484,7 @@ def get_vectors_for_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def main():
-    nodes = load_json_nodes("/home/admin_user_5/wangshuo/copy/algorithm/NL_to_cypher/records.json")
+    nodes = load_json_nodes(records_json_path())
     results = get_vectors_for_nodes(nodes)
     for result in results:
         print(f"节点 {result['node_id']} ({result['node_name']})")

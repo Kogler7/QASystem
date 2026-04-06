@@ -1,14 +1,10 @@
+# 注意：全栈构建已改为「仓库根目录为 context」，以使用根目录 .dockerignore
+# 与 docker/backend.Dockerfile。单独在 backend/ 目录 docker build 已不再支持。
+
 __pycache__
 *.pyc
-*.pyo
-.pytest_cache
-.coverage
-htmlcov
-venv
 .venv
+venv
 .env
 .env.*
 *.log
-.git
-.gitignore
-*.md

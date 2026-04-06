@@ -1,0 +1,14 @@
+@prefix ex: <http://example.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:G005 rdf:type ex:FuxingTrain ;
+    ex:speed 200 ;
+    ex:MANUFACTURED_BY "中国中车(CRRC)" ;
+    ex:HAS_STATUS "运行正常" .
+
+ex:G006 rdf:type ex:FuxingTrain ;
+    ex:speed 600 ;
+    ex:MANUFACTURED_BY "中国中车(CRRC)" ;
+    ex:HAS_STATUS "运行正常" .
+    

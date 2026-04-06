@@ -1,0 +1,12 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix ex: <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:TrainSpeedShape
+    a sh:NodeShape ;
+    sh:targetSubjectsOf ex:speed ;  # 监控所有拥有 speed 属性的实体
+    sh:property [
+        sh:path ex:speed ;
+        sh:maxInclusive 350 ;       # 阈值：350
+        sh:datatype xsd:integer ;
+    ] .

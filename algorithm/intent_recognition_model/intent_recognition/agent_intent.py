@@ -12,8 +12,18 @@ import json
 #初始化工具类
 utils = utils()
 
-# 加载api_key
-api_key = "qwen"
+# 加载配置
+cfg = Config()
+api_key = cfg.api_key or "qwen"
+
+
+def _normalize_openai_base_url(base_url: str) -> str:
+    base_url = (base_url or "").rstrip("/")
+    if not base_url:
+        return "http://localhost:9999/v1"
+    if base_url.endswith("/v1"):
+        return base_url
+    return f"{base_url}/v1"
 
 @tool(description="从意图向量数据库中检索相关意图")
 def retrival_tool(query: str):
@@ -68,9 +78,9 @@ retrival_tool(query: str): 从向量库检索意图
 
 
 model = ChatOpenAI(
-    base_url="http://localhost:8888/v1",
+    base_url=_normalize_openai_base_url(cfg.llm_base_url),
     api_key=api_key,
-    model="Qwen/Qwen3-8B",
+    model=cfg.llm_model,
     temperature=0,
 )
 

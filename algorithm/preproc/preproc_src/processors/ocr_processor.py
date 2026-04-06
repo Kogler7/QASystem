@@ -20,7 +20,13 @@ class OCRProcessor(BaseProcessor):
         :param config_path: MinerU 配置文件路径（如 mineru.json），若提供则设置环境变量 MINERU_CONFIG_PATH
         :param model_source: 模型源，可选 'local', 'modelscope', 'huggingface'。默认 'local' 表示使用本地已下载的模型。
         """
-        effective_config_path = config_path or os.getenv("MINERU_CONFIG_PATH") or '/mnt/data3/srv/vllm/models/mineru.json'
+        _preproc_root = Path(__file__).resolve().parents[2]
+        _default_json = _preproc_root / "mineru.json"
+        effective_config_path = (
+            config_path
+            or os.getenv("MINERU_CONFIG_PATH")
+            or (str(_default_json) if _default_json.is_file() else str(_default_json))
+        )
         effective_model_source = model_source or os.getenv("MINERU_MODEL_SOURCE") or 'local'
 
         # MinerU 实际读取 MINERU_TOOLS_CONFIG_JSON，而不是 MINERU_CONFIG_PATH。

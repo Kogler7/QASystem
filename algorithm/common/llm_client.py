@@ -23,7 +23,7 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
 # 后端类型: ollama | openai | zhipu（本地 vLLM 使用 openai 兼容接口）
 LLM_BACKEND = _env("LLM_BACKEND", "OLLAMA_BACKEND", default="openai")
 # 请求地址：默认本地 vLLM；可覆盖为 OLLAMA_URL / OPENAI_BASE_URL 等
-LLM_BASE_URL = _env("LLM_BASE_URL", "OLLAMA_URL", "OPENAI_BASE_URL", "VLLM_BASE_URL", default="http://localhost:8888")
+LLM_BASE_URL = _env("LLM_BASE_URL", "OLLAMA_URL", "OPENAI_BASE_URL", "VLLM_BASE_URL", default="http://localhost:9999")
 # 模型名（vLLM 服务端加载的模型名；空时发 default 供本地 vLLM 使用）
 LLM_MODEL = _env("LLM_MODEL", "OLLAMA_MODEL_NAME", "OPENAI_MODEL", "VLLM_MODEL", default="Qwen/Qwen3-8B")
 # API Key（本地 vLLM 通常不需要；不写死，仅从环境读取）
@@ -266,7 +266,7 @@ def chat(
         )
     url = _norm_url(base_url or LLM_BASE_URL, for_chat=True)
     if backend == "zhipu":
-        url = "http://localhost:8888"
+        url = _norm_url(base_url or LLM_BASE_URL, for_chat=True)
     payload = {
         "model": _model_name(model),
         "messages": messages,

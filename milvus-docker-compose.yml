@@ -1,4 +1,9 @@
-version: '3.5'
+# 可选：本地 Milvus（意图识别等依赖）
+# 在仓库根目录执行：
+#   export DOCKER_VOLUME_DIRECTORY=.   # 数据目录前缀，默认当前目录下 ./volumes/
+#   docker compose -f milvus-docker-compose.yml up -d
+# 然后在 .env / algorithm/intent_recognition_model/.env 中设置 MILVUS_URI=http://localhost:19530
+# 停止：docker compose -f milvus-docker-compose.yml down
 
 services:
   etcd:

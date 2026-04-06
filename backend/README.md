@@ -46,7 +46,6 @@ backend/
 │   └── preproc_output/  # 文档预处理输出
 ├── .env.example
 ├── .dockerignore
-├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
@@ -60,11 +59,10 @@ cd backend
 cp .env.example .env
 ```
 
-根据实际情况填入：
+`app/config.py` 会依次加载仓库根目录 `.env`（若存在）与本目录 `.env`（后者优先覆盖同名键）。变量说明以 `.env.example` 内注释为准，至少配置：
 
-- `DIFY_API_URL` / `DIFY_API_KEY` / `DIFY_KNOWLEDGE_API_KEY`
-- `JWT_SECRET` / `JWT_ALGORITHM` / `ACCESS_TOKEN_EXPIRE_MINUTES`
-- `DATABASE_URL`（默认示例为 MySQL + asyncmy）
+- `DATABASE_URL`、`DIFY_*`、`JWT_*`
+- 使用组件时再配置 `NEO4J_*`、`LLM_*`、`MILVUS_*`、`UIE_*` 等
 
 ## 安装依赖
 
@@ -129,5 +127,6 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ## Docker 与根目录
 
 - 全栈编排（MySQL + 本后端 + 前端）在**项目根目录**的 `docker-compose.yml`。
-- 根目录 `.env.example` 为 Docker 部署用；本目录 `.env.example` 为本地开发用。
+- 后端镜像定义在 **`docker/backend.Dockerfile`**，构建上下文为**仓库根目录**（包含 `algorithm/`，以支持组件管理中的算法进程内调用）。在根目录执行：`docker compose build backend`。
+- 根目录 `.env` 供 `docker compose` 的 `env_file` 使用；本目录 `.env` 供本机 Uvicorn 使用，二者模板分别见根目录与 `backend/.env.example`。
 

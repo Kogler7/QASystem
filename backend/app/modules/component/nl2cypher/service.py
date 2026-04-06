@@ -118,9 +118,12 @@ def muti_retriever()->List[Dict[str, Any]]:
     except Exception as e:
         logger.warning("加载 RAG 模块失败: %s", e)
         raise
-    nodes = rag.load_json_nodes("/home/admin_user_5/wangshuo/copy/algorithm/NL_to_cypher/records.json")
-    results = rag.get_vectors_for_nodes(nodes)
-    return results
+    records_path = rag.records_json_path()
+    if not Path(records_path).is_file():
+        logger.warning("NL2Cypher 节点 JSON 不存在: %s（设置 NL2CYPHER_RECORDS_JSON）", records_path)
+        return []
+    nodes = rag.load_json_nodes(records_path)
+    return rag.get_vectors_for_nodes(nodes)
 
 
 def text2vector(text: str) -> dict[str, Any]:
@@ -171,8 +174,7 @@ def get_all_vectors() -> dict[str, Any]:
         logger.info(f"找到 {len(documents)} 个文档")
         
         try:
-            # 获取嵌入模型
-            model_path = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
+            model_path = rag.EMBEDDING_MODEL_DIR
             tokenizer = rag.AutoTokenizer.from_pretrained(model_path, local_files_only=True)
             model = rag.AutoModel.from_pretrained(model_path, local_files_only=True)
             

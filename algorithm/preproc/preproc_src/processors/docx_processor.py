@@ -28,12 +28,18 @@ class DocxProcessor(BaseProcessor):
     def _detect_office_app(self) -> Optional[str]:
         """检测系统中的LibreOffice应用"""
         # 可能的执行文件路径
-        candidates = [
-            '/home/admin_user_3/cly/LibreOffice-fresh.full-x86_64.AppImage',
-            'soffice',  # LibreOffice (Linux)
-            'libreoffice',  # LibreOffice (Linux)
-            r'C:\Program Files\LibreOffice\program\soffice.exe'# Windows x86
-        ]
+        candidates = []
+        for key in ("LIBREOFFICE_PATH", "SOFFICE_PATH"):
+            v = os.getenv(key)
+            if v:
+                candidates.append(v)
+        candidates.extend(
+            [
+                "soffice",
+                "libreoffice",
+                r"C:\Program Files\LibreOffice\program\soffice.exe",
+            ]
+        )
 
         for candidate in candidates:
             try:

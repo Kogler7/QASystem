@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -40,17 +41,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="轨道交通知识服务系统", lifespan=lifespan)
 
-# 允许的跨域来源（开发/生产按需收紧）
-# hhr自测修改端口
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5178",   # 👈 🎯 加上你现在前端用的端口
-    "http://127.0.0.1:5178",   # 👈 🎯 加上对应的 IP 形式
-    "http://192.168.x.x:5178", # 如果你用局域网IP访问页面，最好把局域网IP也加上
-]
+def _cors_origins() -> list[str]:
+    """CORS_ORIGINS 逗号分隔，例如: http://localhost:5173,http://192.168.1.10:5173"""
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if raw:
+        return [x.strip() for x in raw.split(",") if x.strip()]
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5178",
+        "http://127.0.0.1:5178",
+    ]
+
+
+origins = _cors_origins()
 
 app.add_middleware(
     CORSMiddleware,

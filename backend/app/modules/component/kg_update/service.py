@@ -1,9 +1,10 @@
 """
 知识图谱更新：进程内调用 algorithm/KGUpdate 算法，按函数封装。
-使用前需安装 algorithm/KGUpdate 依赖，配置见 algorithm/KGUpdate/config.json。
+使用前需安装 algorithm/KGUpdate 依赖；Neo4j 等优先读环境变量，其次 algorithm/KGUpdate/config.json。
 """
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -77,22 +78,48 @@ def _get_predictor():
     return _predictor
 
 
+def _default_kg_config() -> dict[str, Any]:
+    return {
+        "neo4j": {
+            "uri": "bolt://127.0.0.1:7687",
+            "username": "neo4j",
+            "password": "neo4j2025",
+            "database": "neo4j",
+        },
+        "system": {"confidence_threshold": 0.7},
+    }
+
+
 def _load_kg_config() -> dict[str, Any]:
     config_path = _KG_UPDATE_ROOT / "config.json"
-    if not config_path.exists():
-        return {
-            "neo4j": {"uri": "bolt://127.0.0.1:7687", "username": "neo4j", "password": "neo4j", "database": "neo4j"},
-            "system": {"confidence_threshold": 0.7},
-        }
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.warning("读取 KGUpdate 配置失败，使用默认: %s", e)
-        return {
-            "neo4j": {"uri": "bolt://127.0.0.1:7687", "username": "neo4j", "password": "neo4j", "database": "neo4j"},
-            "system": {"confidence_threshold": 0.7},
-        }
+    cfg = _default_kg_config()
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                merged = json.load(f)
+            if isinstance(merged, dict):
+                neo = {**cfg.get("neo4j", {}), **(merged.get("neo4j") or {})}
+                sys_ = {**cfg.get("system", {}), **(merged.get("system") or {})}
+                cfg = {**merged, "neo4j": neo, "system": sys_}
+        except Exception as e:
+            logger.warning("读取 KGUpdate 配置失败，使用默认: %s", e)
+
+    neo = cfg.setdefault("neo4j", {})
+    if os.environ.get("NEO4J_URI"):
+        neo["uri"] = os.environ["NEO4J_URI"]
+    if os.environ.get("NEO4J_USER"):
+        neo["username"] = os.environ["NEO4J_USER"]
+    if os.environ.get("NEO4J_PASSWORD"):
+        neo["password"] = os.environ["NEO4J_PASSWORD"]
+    if os.environ.get("NEO4J_DATABASE"):
+        neo["database"] = os.environ["NEO4J_DATABASE"]
+    sys_c = cfg.setdefault("system", {})
+    if os.environ.get("KG_CONFIDENCE_THRESHOLD"):
+        try:
+            sys_c["confidence_threshold"] = float(os.environ["KG_CONFIDENCE_THRESHOLD"])
+        except ValueError:
+            pass
+    return cfg
 
 
 def _create_updator():
@@ -117,7 +144,7 @@ def health() -> dict[str, Any]:
     except Exception as e:
         return {
             "status": "unavailable",
-            "detail": f"知识图谱更新模块不可用: {e}。请确认已安装 algorithm/KGUpdate 依赖并配置 algorithm/KGUpdate/config.json。",
+            "detail": f"知识图谱更新模块不可用: {e}。请确认已安装 algorithm/KGUpdate 依赖，并配置 NEO4J_* 环境变量或 algorithm/KGUpdate/config.json。",
         }
 
 
