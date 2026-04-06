@@ -11,19 +11,23 @@ export { sendChatMessage } from './modules/chat'
 // 知识库：文档管理、检索
 export {
   getDocuments,
+  checkDocumentNameExists,
   uploadDocument,
   deleteDocument,
+  downloadDocument,
   knowledgeQuery
 } from './modules/knowledge'
 
 // 组件管理：知识抽取、知识图谱更新、自然语言转 Cypher 等
-export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j } from './modules/component'
+export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j, parseChunkedJsonExtract } from './modules/component'
 export {
   kgUpdateHealthCheck,
   kgUpdateAdd,
   kgUpdateDelete,
   kgUpdateStatistics,
-  kgCalculateConfidence
+  kgCalculateConfidence,
+  processSchemaOutput,   
+  addFromComputed        
 } from './modules/component/kg-update'
 export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
 export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
@@ -56,8 +60,8 @@ export function nl2cypherSplitRecursive(text) {
  * 切片：Markdown
  * @param {string} text
  */
-export function nl2cypherSplitMarkdown(text) {
-  return request.post('/component/nl2cypher/split/markdown', { text: text }, { timeout: 120000 })
+export function nl2cypherSplitMarkdown(text, requestConfig = {}) {
+  return request.post('/component/nl2cypher/split/markdown', { text: text }, { timeout: 120000, ...requestConfig })
 }
 
 /**
@@ -74,4 +78,18 @@ export function nl2cypherSplitPython(text) {
  */
 export function nl2cypherText2vector(text) {
   return request.post('/component/nl2cypher/text2vector', { text: text }, { timeout: 120000 })
+}
+
+export const nl2cypherGetVectors = () => {
+  return request({
+    url: '/component/nl2cypher/vectors',
+    method: 'get'
+  })
+}
+
+export const mutiRetriever = () => {
+  return request({
+    url: '/component/nl2cypher/mutiRetriever',
+    method: 'get'
+  })
 }

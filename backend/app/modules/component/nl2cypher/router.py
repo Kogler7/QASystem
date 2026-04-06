@@ -3,7 +3,7 @@
 """
 import asyncio
 import logging
-from typing import Any
+from typing import Any,Dict,List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -116,3 +116,23 @@ async def split_python(body: TextRequestBody) -> dict[str, Any]:
     except Exception as e:
         logger.exception("Python语言切片失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
+    
+# 在router.py中增加
+@router.get("/vectors")
+async def get_all_vectors() -> dict[str, Any]:
+    try:
+        result = await asyncio.to_thread(service.get_all_vectors)
+        return result
+    except Exception as e:
+        logger.exception("获取向量数据失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.get("/mutiRetriever")
+async def get_all_info() -> List[Dict[str, Any]]:
+    try:
+        results = await asyncio.to_thread(service.muti_retriever)
+        return results
+    except Exception as e:
+        logger.exception("获取向量数据失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+

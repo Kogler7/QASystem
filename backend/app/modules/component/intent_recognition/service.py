@@ -7,11 +7,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+
+
 logger = logging.getLogger(__name__)
 
 _THIS = Path(__file__).resolve()
 _ROOT = _THIS.parents[5]
 _INTENT_ROOT = _ROOT / "algorithm" / "intent_recognition_model"
+
 
 if _INTENT_ROOT.exists():
     _env_file = _INTENT_ROOT / ".env"
@@ -62,4 +65,16 @@ def recognize(text: str) -> dict[str, Any]:
         result = result.model_dump()
     elif not isinstance(result, dict):
         result = {"raw": str(result)}
+    return {"data": result}
+
+
+def deep_recognize(text: str) -> dict[str, Any]:
+    from intent_recognition.agent_intent import run_tool_loop
+    result = run_tool_loop(text)
+    return {"data": result}
+
+def get_plan(intent_name: str, domain: str) -> dict[str, Any]:
+    from intent_recognition.plan_app import PlanApp
+    plan_app = PlanApp()
+    result = plan_app.get_plan_from_intent(intent_name, domain)
     return {"data": result}

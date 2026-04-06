@@ -33,30 +33,31 @@ async def recognize(body: RecognizeRequestBody) -> dict[str, Any]:
         result = await asyncio.to_thread(service.recognize, text=body.text.strip())
         return result
     except Exception as e:
-        logger.exception("意图识别失败")
+        logger.exception("基础意图识别失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/intent-recognition-stream")
-async def stream_intent_recognition(body: RecognizeRequestBody):
-    """流式意图识别API"""
+@router.post("/deep-recognize")
+async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
     if not (body.text or "").strip():
         raise HTTPException(status_code=400, detail="输入文本不能为空")
-    
     try:
-        def generate():
-            recognizer = service._get_intent_recognition()
-            for chunk in recognizer.generate_result_chunk(body.text.strip()):
-                yield f"data: {chunk}\n\n"  # SSE 格式
-        
-        return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive"
-            }
-        )
+        result = await asyncio.to_thread(service.deep_recognize, text=body.text.strip())
+        return result
     except Exception as e:
-        logger.exception("流式意图识别失败")
+        logger.exception("深度意图识别失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/get-plan")
+async def get_plan(body: dict) -> dict[str, Any]:
+    intent_name = (body.get("intent_name") or "").strip()
+    domain = (body.get("domain") or "").strip()
+    if not intent_name or not domain:
+        raise HTTPException(status_code=400, detail="意图名称和域名称不能为空")
+    try:
+        result = await asyncio.to_thread(service.get_plan, intent_name=intent_name, domain=domain)
+        return result
+    except Exception as e:
+        logger.exception("获取计划失败")
         raise HTTPException(status_code=500, detail=str(e)) from e

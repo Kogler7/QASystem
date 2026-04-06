@@ -194,8 +194,8 @@ watch(activeTab, (newTab) => {
     queryAndRenderGraph()
   }
 })
-const graphData = ref(null)
 const cyInstance = ref(null)
+const graphData = ref(null)
 const graphContainerRef = ref(null)
 
 const checkHealth = async () => {
@@ -344,6 +344,7 @@ const queryAndRenderGraph = async () => {
     console.log('没有节点标签，尝试从推理路径构建')
     const fallbackGraph = buildGraphFromReasoningPath(result.value)
     if (fallbackGraph.nodes.length > 0) {
+      renderGraph(fallbackGraph)
       graphData.value = fallbackGraph
       await nextTick()
       renderGraph(fallbackGraph)
@@ -361,12 +362,15 @@ const queryAndRenderGraph = async () => {
     console.log('响应数据:', data)
     
     if (data?.success && data?.data && data.data.nodes?.length > 0) {
+      console.log('准备调用 renderGraph')
+      renderGraph(data.data)
       console.log('设置图谱数据:', data.data)
       graphData.value = data.data
       await nextTick()
       console.log('准备调用 renderGraph')
       renderGraph(data.data)
     } else {
+        renderGraph(fallbackGraph)
       console.log('API 没有返回足够的数据，尝试从推理路径构建')
       const fallbackGraph = buildGraphFromReasoningPath(result.value)
       if (fallbackGraph.nodes.length > 0) {
@@ -376,6 +380,7 @@ const queryAndRenderGraph = async () => {
       }
     }
   } catch (err) {
+      renderGraph(fallbackGraph)
     console.error('查询图谱失败:', err)
     console.log('查询失败，尝试从推理路径构建')
     const fallbackGraph = buildGraphFromReasoningPath(result.value)
@@ -391,50 +396,36 @@ const queryAndRenderGraph = async () => {
 
 const renderGraph = (graphData) => {
   console.log('renderGraph 被调用，数据:', graphData)
-  if (!graphContainerRef.value) {
-    console.log('graphContainerRef 为空')
-    return
-  }
-  
-  console.log('graphContainerRef 存在:', graphContainerRef.value)
-  
+
   if (cyInstance.value) {
-    console.log('销毁旧的 cyInstance')
     cyInstance.value.destroy()
+    cyInstance.value = null
   }
-  
-  if (!graphData.nodes || graphData.nodes.length === 0) {
-    console.log('没有节点数据')
-    return
-  }
-  
-  console.log('节点数量:', graphData.nodes.length)
-  console.log('关系数量:', graphData.relationships?.length || 0)
-  
+
+  if (!graphContainerRef.value) return
+
   const elements = {
-    nodes: graphData.nodes.map(node => ({
+    nodes: (graphData?.nodes || []).map((node) => ({
       data: {
-        id: String(node.id),
+        id: String(node.id ?? node.name ?? ''),
         label: node.name || String(node.id),
         ...node
       }
     })),
-    edges: (graphData.relationships || []).map(rel => ({
+    edges: (graphData?.relationships || []).map((rel, idx) => ({
       data: {
-        id: String(rel.id),
-        source: String(rel.from),
-        target: String(rel.to),
-        label: rel.type,
+        id: String(rel.id ?? idx),
+        source: String(rel.from ?? rel.source ?? ''),
+        target: String(rel.to ?? rel.target ?? ''),
+        label: rel.type || rel.label || '',
         ...rel
       }
     }))
   }
-  
-  console.log('准备创建 cytoscape，elements:', elements)
-  
+
   cyInstance.value = cytoscape({
     container: graphContainerRef.value,
-    elements: elements,
+    elements,
     style: [
       {
         selector: 'node',
@@ -472,10 +463,11 @@ const renderGraph = (graphData) => {
       fit: true,
       padding: 30
     },
-    ready: function() {
+    ready: function () {
       console.log('cytoscape 准备就绪')
     }
   })
+
   console.log('cytoscape 实例已创建:', cyInstance.value)
 }
 
@@ -1156,37 +1148,6 @@ onMounted(checkHealth)
         color: var(--gray-800);
       }
     }
-    
-    .log-data {
-      padding: 12px 16px;
-      background: white;
-      
-      pre {
-        margin: 0;
-        padding: 12px;
-        background: #f8fafc;
-        border-radius: 6px;
-        font-size: 12px;
-        line-height: 1.6;
-        overflow-x: auto;
-        color: var(--gray-700);
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      }
-    }
-  }
-}
-
-.graph-loading {
-  margin-top: 20px;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-
-.graph-container-wrapper {
-  margin-top: 20px;
-  padding: 16px;
   background: white;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
@@ -1199,6 +1160,7 @@ onMounted(checkHealth)
     padding-bottom: 8px;
     border-bottom: 2px solid #0ea5e9;
   }
+}
 }
 
 .graph-container {

@@ -4,14 +4,14 @@
 
 ## 默认行为
 
-**默认使用本地 vLLM**：`LLM_BASE_URL=http://localhost:8888`，走 OpenAI 兼容的 chat 接口，无需 API Key。若 vLLM 只加载了一个模型，可不设 `LLM_MODEL`（会发 `default`）。
+**默认使用本地 vLLM**：`LLM_BASE_URL=http://localhost:9999`，走 OpenAI 兼容的 chat 接口，无需 API Key。若 vLLM 只加载了一个模型，可不设 `LLM_MODEL`（会发 `default`）。
 
 ## 环境变量（任选其一，统一优先）
 
 | 变量 | 说明 | 默认 |
 |------|------|------|
 | `LLM_BACKEND` | 后端：`ollama` / `openai` / `zhipu` | `openai` |
-| `LLM_BASE_URL` / `VLLM_BASE_URL` | 请求地址 | `http://localhost:8888` |
+| `LLM_BASE_URL` / `VLLM_BASE_URL` | 请求地址 | `http://localhost:9999` |
 | `LLM_MODEL` / `VLLM_MODEL` | 模型名（vLLM 加载的模型） | 空则发 `default` |
 | `LLM_API_KEY` | API Key（本地 vLLM 可不设） | 空 |
 
@@ -69,7 +69,7 @@ adapter = create_run_adapter()
 text = adapter.run("你是抽取专家", "待抽取的原文...")
 
 # 或自定义配置
-client = LLMClient(base_url="http://localhost:8888", model="Qwen/Qwen3-8B")
+client = LLMClient(base_url="http://localhost:9999", model="Qwen/Qwen3-8B")
 adapter = LLMRunAdapter(client)
 text = adapter.run("系统提示", "用户输入")
 ```

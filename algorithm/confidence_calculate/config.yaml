@@ -5,22 +5,23 @@ batch_size: 16
 epochs: 100
 
 # 特征维度
-text_dim: 128               # SBERT模型输出维度
-kg_dim: 128                  # TransE嵌入维度
-path_dim: 64                 # 路径特征维度
+text_dim: 128
+kg_dim: 128
+path_dim: 64
 
-# 文本证据配置
+# 文本证据（可用环境变量覆盖：CONFIDENCE_ES_HOSTS、CONFIDENCE_SBERT_MODEL_PATH、CONFIDENCE_ES_*）
 text:
-  es_hosts: ["https://10.126.62.88:9200"]
+  es_hosts: ["http://127.0.0.1:9200"]
   es_index: "documents"
   es_timeout: 30
   es_size: 50
   text_top_k: 10
   max_bm25_norm: 100.0
-  sbert_model_path: "/home/ycheng/ZhCHRAG/qasystem/algorithm/confidence_calculate/sbert_model"  # 本地模型路径
-  es_username: "elastic"  
-  es_password: "123456"  
-  es_verify_certs: false  # 如果使用自签名证书
+  # 相对 algorithm/confidence_calculate 目录；也可用 HuggingFace 模型名
+  sbert_model_path: "sbert_model"
+  es_username: ""
+  es_password: ""
+  es_verify_certs: false
 
 # KG证据配置
 kg:
@@ -30,7 +31,7 @@ kg:
   use_pretrained: true
   freeze_embeddings: true
 
-# 路径证据配置
+# 路径证据（Neo4j 可用 NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD / NEO4J_DATABASE 覆盖）
 path:
   max_path_length: 3
   max_paths_per_triple: 20

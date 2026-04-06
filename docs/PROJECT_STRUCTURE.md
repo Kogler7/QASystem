@@ -9,8 +9,9 @@ qasystem/
 ├── frontend/           # 前端（Vue 3 + Vite）
 ├── backend/            # 后端（FastAPI）
 ├── algorithm/          # 算法模块（Python，进程内调用）
+├── docker/             # 后端 Dockerfile 等（Compose 构建上下文为仓库根）
 ├── docs/               # 项目文档
-├── docker-compose.yml  # 全栈编排
+├── docker-compose.yml  # 全栈编排（MySQL + backend + frontend，可选 profile neo4j）
 └── README.md
 ```
 
@@ -94,7 +95,7 @@ backend/
 │   ├── documents/
 │   └── preproc_output/
 ├── requirements.txt
-└── Dockerfile
+└── （Docker 镜像定义在仓库 docker/backend.Dockerfile，构建上下文为仓库根目录）
 ```
 
 **后端组件模块约定**：每个组件在 `app/modules/component/{组件名}/` 下拥有 `router.py` 与 `service.py`，`__init__.py` 导出 `router`。`modules/component/__init__.py` 汇总所有组件路由供 `main.py` 注册。

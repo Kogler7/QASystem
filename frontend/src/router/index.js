@@ -45,10 +45,28 @@ const routes = [
         meta: { title: '知识库概览' }
       },
       {
+        path: 'list',
+        name: 'knowledge-documents-list',
+        component: () => import('@/views/knowledge/documents/DocumentList.vue'),
+        meta: { title: '文档列表' }
+      },
+      {
+        path: 'upload',
+        name: 'knowledge-documents-upload',
+        component: () => import('@/views/knowledge/documents/DocumentUpload.vue'),
+        meta: { title: '文档上传' }
+      },
+      {
         path: 'documents',
-        name: 'knowledge-documents',
-        component: () => import('@/views/knowledge/DocumentManage.vue'),
-        meta: { title: '文档管理' }
+        redirect: '/knowledge/list'
+      },
+      {
+        path: 'documents/list',
+        redirect: '/knowledge/list'
+      },
+      {
+        path: 'documents/upload',
+        redirect: '/knowledge/upload'
       },
       {
         path: 'query',

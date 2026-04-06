@@ -1,0 +1,6 @@
+@prefix ex: <http://example.org/railway#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+# 如果需要删除某些三元组，在这里定义
+# 例如：删除某个旧的列车记录
+# ex:G000 ex:speed 100 .

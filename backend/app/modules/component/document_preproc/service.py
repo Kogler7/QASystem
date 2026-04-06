@@ -129,22 +129,32 @@ def convert_document(
             "error": "文件不存在或路径为空",
         }
     iface = _get_interface()
-    result = iface.convert_document(
-        input_path=input_path,
-        model_name=model_name,
-        output_filename=output_filename,
-        save_metadata=save_metadata,
-        store_excel_raw=store_excel_raw,
-    )
+    try:
+        result = iface.convert_document(
+            input_path=input_path,
+            model_name=model_name,
+            output_filename=output_filename,
+            save_metadata=save_metadata,
+            store_excel_raw=store_excel_raw,
+        )
+    except Exception as e:
+        logger.error("文档预处理异常: %s", e, exc_info=True)
+        return {
+            "success": False,
+            "input_path": input_path,
+            "error": f"{type(e).__name__}: {e}",
+        }
     if result is None:
         return {
             "success": False,
             "input_path": input_path,
             "error": "文档预处理未返回结果",
         }
-    if result.get("content") and isinstance(result["content"], str) and len(result["content"]) > 20000:
-        result["content_preview"] = result["content"][:20000] + "\n...(已截断)"
-        result["content"] = result["content"][:20000]
+    # 不要截断 content：知识沉淀链路需要完整文本；仅提供 preview 供前端展示/日志排查。
+    if result.get("content") and isinstance(result["content"], str):
+        content_str = result["content"]
+        if len(content_str) > 20000:
+            result["content_preview"] = content_str[:20000] + "\n...(预览截断)"
     return result
 
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +47,9 @@ def get_file_type(filename: str) -> str:
         ".md": "markdown",
         ".xlsx": "excel",
         ".xls": "excel",
+        ".csv": "csv",
+        ".html": "html",
+        ".htm": "html",
     }
     return type_map.get(ext, "other")
 
@@ -71,6 +75,20 @@ async def list_documents(session: AsyncSession = Depends(get_session)) -> List[d
             "updateTime": doc.updated_at.isoformat() if doc.updated_at else None,
         })
     return items
+
+
+@router.get("/documents/exists")
+async def document_name_exists(
+    name: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """按展示文件名检查是否已入库，供知识沉淀选文件时提前提示。"""
+    trimmed = (name or "").strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="缺少参数 name")
+    result = await session.execute(select(Document).where(Document.name == trimmed))
+    existing = result.scalar_one_or_none()
+    return {"exists": bool(existing), "name": trimmed}
 
 
 @router.post("/documents")
@@ -298,6 +316,35 @@ async def get_document(
     }
 
 
+@router.get("/documents/{doc_id}/download")
+async def download_document(
+    doc_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    result = await session.execute(
+        select(Document).where(Document.id == doc_id)
+    )
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    file_path = Path(doc.file_path)
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文档文件不存在")
+
+    try:
+        file_path.resolve().relative_to(DOCUMENT_DIR.resolve())
+    except Exception:
+        raise HTTPException(status_code=400, detail="非法文件路径")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=doc.name or file_path.name,
+        media_type="application/octet-stream",
+    )
+
+
 @router.post("/documents/{doc_id}/sync-dify")
 async def sync_to_dify(
     doc_id: int,
@@ -383,3 +430,107 @@ async def knowledge_query(body: KnowledgeQueryRequest) -> dict[str, Any]:
             results.append({"title": "知识库回答", "content": answer_text})
 
     return {"results": results}
+
+
+class DocumentProcessRequest(BaseModel):
+    # UIE 仅支持 RuleType / SystemElement / Term / Glossary（见 algorithm/uie/ie/extraction_api）
+    main_object: str = "Term"
+    use_templates: bool = True
+    llm_base_url: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_api_key: Optional[str] = None
+
+
+@router.post("/documents/{doc_id}/process")
+async def process_document(
+    doc_id: int,
+    body: DocumentProcessRequest,
+    session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """
+    知识沉淀完整流水线（与前端上传页步骤一致）。
+    1. 文档预处理（algorithm/preproc）
+    2. 文本切分（Markdown 主切分 + 超长块递归细化）
+    3. 知识抽取（algorithm/uie，切块合并）
+    4. 图谱更新（confidence_calculate + KGUpdate 入库）
+    """
+    from ..services.knowledge_pipeline import process_document_pipeline
+
+    # 获取文档信息
+    result = await session.execute(
+        select(Document).where(Document.id == doc_id)
+    )
+    doc = result.scalar_one_or_none()
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    # 检查文件是否存在
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文档文件不存在")
+
+    try:
+        # 更新文档状态
+        doc.status = "processing"
+        await session.commit()
+        await session.refresh(doc)
+
+        # 执行知识沉淀流水线
+        pipeline_result = await process_document_pipeline(
+            file_path=str(file_path),
+            main_object=body.main_object,
+            use_templates=body.use_templates,
+            llm_base_url=body.llm_base_url,
+            llm_model=body.llm_model,
+            llm_api_key=body.llm_api_key
+        )
+
+        # 更新文档状态
+        if pipeline_result.get("success"):
+            doc.status = "processed"
+            # 保存处理后的内容（可选）
+            preproc_result = pipeline_result.get("preproc_result", {}) or {}
+            preproc_content = (
+                preproc_result.get("content")
+                or preproc_result.get("text")
+                or preproc_result.get("markdown")
+            )
+            if preproc_content:
+                doc.content = preproc_content
+        else:
+            doc.status = "failed"
+        
+        await session.commit()
+        await session.refresh(doc)
+
+        return {
+            "success": pipeline_result.get("success"),
+            "document": {
+                "id": doc.id,
+                "name": doc.name,
+                "status": doc.status
+            },
+            "result": pipeline_result
+        }
+    
+    except Exception as e:
+        # 回滚事务
+        await session.rollback()
+        
+        # 更新文档状态为失败
+        if doc:
+            doc.status = "failed"
+            await session.commit()
+        
+        logger.error(f"处理文档失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"处理文档失败: {str(e)}") from e
+
+
+@router.get("/pipeline/health")
+async def pipeline_health() -> dict[str, Any]:
+    """
+    检查知识沉淀流水线的健康状态。
+    """
+    from ..services.knowledge_pipeline import health_check
+    return health_check()

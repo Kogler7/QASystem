@@ -1,62 +1,45 @@
 @startuml
 
-' --- 枚举与模板定义 ---
-
-enum UserDefinedType {
-    Concept
-    Attribute
-    Event
-    Rule
-    Equation
-}
-
-note right of UserDefinedType: 规则涉及的用户自定义对象类型
-
-class ExamplesTemplate <<static>> {
-    + ConstraintRuleTypeTemplate: "[对象]必须/应当满足[约束条件]"
-    + ConstraintRuleTypeTemplate: "[对象]的[属性]应当/必须为[允许取值/范围]"
-    + ImplicationRuleTypeTemplate: "如果[antecedent]，那么[consequent]"
-    + CompositeRuleType: "如果同时满足[条件1]和[条件2]，那么[综合结论]"
-    + CompositeRuleType: "如果满足[条件1]或[条件2]，那么[综合结论]"
-    + CompositeRuleType: "当先发生[条件1]，并且随后出现[条件2]时，那么[综合结论]"
-}
-
 ' --- 核心类定义 ---
 
 abstract class RuleType {
     - RuleId: String
     - RuleName: String
-    - Terminology: Terminology // 引用术语本体
-    - RuleTypeBody: RuleTypeBody // 逻辑主体 ConstraintRuleType|ImplicationRuleType|CompositeRuleType
-    - KnowledgeSource: String // 知识来源，包括来源名称与置信水平
-    - Credibility: Double // 可信度值
-    - VersionInformation: String // 知识的版本信息，包括知识实体版本的编号与知识实体版本的上一次更新时间
-    - Examples: ExamplesTemplate
+    - Terminology: List<String>
+    - RuleTypeBody: RuleTypeBody // 核心逻辑容器
+}
+
+' 定义这个“容器”类，它是一个多态组合
+abstract class RuleTypeBody {
 }
 
 class ConstraintRuleType {
-    - constraint: UserDefinedType [1..*]
+    - subject: String
+    - constraint: String
 }
 
 class ImplicationRuleType {
-    - antecedent: UserDefinedType [1..*]
-    - consequent: UserDefinedType [1..*]
+    - antecedent: String
+    - consequent: String
     - connectionSymbol: String
 }
 
 class CompositeRuleType {
-    - CombinationType: String // 组合方式: AND / OR / SEQUENCE 等
+    - CombinationType: String // AND / OR / SEQUENCE
+    - SubRules: List<RuleTypeBody> // 这里递归指向逻辑体
 }
 
 ' --- 关系定义 ---
 
-' 继承关系
-RuleType <|-- ConstraintRuleType
-RuleType <|-- ImplicationRuleType
-RuleType <|-- CompositeRuleType
+' RuleType 包含一个 RuleTypeBody
+RuleType *-- RuleTypeBody
 
-' 组合/子规则关系
-CompositeRuleType "1" o-- "0..*" ConstraintRuleType : SubRules >
-CompositeRuleType "1" o-- "0..*" ImplicationRuleType : SubRules >
+' 三种具体的逻辑类型继承自 RuleTypeBody
+RuleTypeBody <|-- ConstraintRuleType
+RuleTypeBody <|-- ImplicationRuleType
+RuleTypeBody <|-- CompositeRuleType
 
-@endum
+' 复合规则递归包含多个逻辑体
+CompositeRuleType "1" o-- "0..*" RuleTypeBody : SubRules
+
+@enduml

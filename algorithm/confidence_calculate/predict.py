@@ -26,6 +26,7 @@ for path in required_paths:
 base_model_path = CURRENT_DIR / "models" / "base_model.py"
 dynamic_hybrid_path = CURRENT_DIR / "models" / "dynamic_hybrid.py"
 config_path = CURRENT_DIR / "utils" / "config.py"
+extractor_path = CURRENT_DIR / "utils" / "extractor.py"
 
 def load_module(module_name, file_path):
     """从指定文件路径加载模块"""
@@ -42,10 +43,16 @@ sys.modules["base_model"] = base_module
 dynamic_hybrid_module = load_module("dynamic_hybrid", dynamic_hybrid_path)
 # 加载 config
 config_module = load_module("config", config_path)
+# 加载 extractor（如果存在）
+if extractor_path.exists():
+    extractor_module = load_module("extractor", extractor_path)
+else:
+    extractor_module = None
 
 # 从加载的模块中获取类
 DynamicHybridModel = dynamic_hybrid_module.DynamicHybridModel
 Config = config_module.Config
+Extractor = extractor_module if extractor_module else None
 
 
 class ConfidencePredictor:
@@ -100,6 +107,91 @@ class ConfidencePredictor:
         for triple in triples:
             results.append(self.predict(triple))
         return results
+    
+    def extract_from_schema_output(self, data: dict, confidence_threshold: float = 0.7) -> dict:
+        """
+        从 schema_mapper 输出中提取关系并计算置信度
+        
+        Args:
+            data: schema_mapper 输出的 JSON（包含 raw 和 graph）
+            confidence_threshold: 置信度阈值
+        
+        Returns:
+            包含计算结果的字典
+        """
+        if Extractor is None:
+            return {
+                "success": False,
+                "message": "extractor 模块未加载，请检查 utils/extractor.py 是否存在",
+                "statistics": {"total": 0, "high": 0, "low": 0},
+                "relations_high": [],
+                "relations_low": [],
+                "full_relations": [],
+                "predictions": []
+            }
+        
+        graph = data.get('graph', {})
+        
+        # 使用 extractor 提取关系
+        relations_to_evaluate, relation_info = Extractor.extract_relations_from_graph(graph)
+        
+        if not relations_to_evaluate:
+            return {
+                "success": True,
+                "message": "未发现任何关系",
+                "statistics": {"total": 0, "high": 0, "low": 0},
+                "relations_high": [],
+                "relations_low": [],
+                "full_relations": [],
+                "predictions": []
+            }
+        
+        # 计算置信度
+        predictions = self.predict_batch(relations_to_evaluate)
+        
+        # 构建完整预测结果
+        full_predictions = []
+        high_confidence_relations = []
+        low_confidence_relations = []
+        
+        for i, (pred, info) in enumerate(zip(predictions, relation_info)):
+            confidence = pred['confidence']
+            
+            display_triple = {
+                'subject': info['subject'],
+                'predicate': info['predicate'],
+                'object': info['object'],
+                'confidence': confidence
+            }
+            
+            full_predictions.append({
+                'subject': info['subject'],
+                'predicate': info['predicate'],
+                'object': info['object'],
+                'confidence': confidence,
+                'component_scores': pred['component_scores']
+            })
+            
+            if confidence >= confidence_threshold:
+                high_confidence_relations.append(display_triple)
+            else:
+                low_confidence_relations.append(display_triple)
+        
+        stats = {
+            "total": len(relations_to_evaluate),
+            "high": len(high_confidence_relations),
+            "low": len(low_confidence_relations)
+        }
+        
+        return {
+            "success": True,
+            "message": f"计算完成: 总计{stats['total']}个关系, 高置信度(≥{confidence_threshold}){stats['high']}个, 低置信度{stats['low']}个",
+            "statistics": stats,
+            "relations_high": high_confidence_relations,
+            "relations_low": low_confidence_relations,
+            "full_relations": relation_info,
+            "predictions": full_predictions
+        }
     
     def load_test_data(self, json_path: str):
         """加载测试数据"""

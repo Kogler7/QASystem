@@ -97,8 +97,14 @@ async def chat_endpoint(body: ChatRequest) -> ChatResponse:
     
     try:
         if use_workflow:
-            inputs = {dify_client.workflow_input_var: query_text}
-            dify_resp = await dify_client.workflow_run(inputs=inputs, user_id=user_id)
+            inputs = {}
+            if dify_client.workflow_input_var and dify_client.workflow_input_var.strip():
+                inputs[dify_client.workflow_input_var.strip()] = query_text
+            dify_resp = await dify_client.workflow_run(
+                inputs=inputs,
+                user_id=user_id,
+                response_mode="blocking",
+            )
             data = dify_resp.get("data") or {}
             if data.get("status") == "failed":
                 err_msg = data.get("error") or "工作流执行失败"

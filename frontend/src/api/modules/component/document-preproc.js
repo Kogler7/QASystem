@@ -10,8 +10,8 @@ export function documentPreprocHealthCheck() {
 }
 
 /** 获取可用模型：GET /api/available_models */
-export function getAvailableModels() {
-  return request.get('/available_models')
+export function getAvailableModels(requestConfig = {}) {
+  return request.get('/available_models', requestConfig)
 }
 
 /**
@@ -19,7 +19,7 @@ export function getAvailableModels() {
  * @param {File} file - 文件对象
  * @param {string} modelName - 可选的模型名称
  */
-export function documentPreprocConvert(file, modelName = null) {
+export function documentPreprocConvert(file, modelName = null, requestConfig = {}) {
   const form = new FormData()
   form.append('file', file)
   if (modelName) {
@@ -27,7 +27,8 @@ export function documentPreprocConvert(file, modelName = null) {
   }
   return request.post('/component/document-preproc/convert', form, {
     timeout: 300000,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...requestConfig
   })
 }
 

@@ -33,3 +33,24 @@ export function intentRecognitionStream(params) {
     body: JSON.stringify({ text: params.text?.trim() ?? '' })
   })
 }
+
+/**
+ * 深度意图识别
+ * @param {object} params - { text }
+ */
+export function intentRecognitionDeepRecognize(params) {
+  return request.post('/component/intent-recognition/deep-recognize', { 
+    text: params.text?.trim() ?? ''
+  }, { timeout: 300000 })
+}
+
+/**
+ * 获取计划
+ * @param {object} params - { intent_name, domain }
+ */
+export function intentRecognitionGetPlan(params) {
+  return request.post('/component/intent-recognition/get-plan', {
+    intent_name: params.intent_name?.trim() ?? '',
+    domain: params.domain?.trim() ?? ''
+  }, { timeout: 30000000 })
+}

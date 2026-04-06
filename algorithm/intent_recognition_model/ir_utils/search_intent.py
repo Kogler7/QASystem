@@ -87,8 +87,8 @@ class HybridSearch:
             ranker=reranker,
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords"]
+                           "intent_name", "intent_description", "intent_summary", "user_goal", "sample_utterances",
+                           "tags","core_keywords","tools"]
         )[0]
         return results
 
@@ -128,8 +128,8 @@ class HybridSearch:
             # 构建 entity 字典,包含所有 output_fields
             entity_data = {}
             for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
-                        "intent_name_text", "intent_description_text", "intent_summary_text", 
-                        "user_goal_text", "sample_utterances", "tags", "core_keywords"]:
+                        "intent_name", "intent_description", "intent_summary", 
+                        "user_goal", "sample_utterances", "tags", "core_keywords","tools"]:
                 entity_data[field] = results_1[i].get(field)
             
             entity_map[entity_id] = entity_data
@@ -141,7 +141,7 @@ class HybridSearch:
                 entity_data = {}
                 for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
                             "intent_name_text", "intent_description_text", "intent_summary_text", 
-                            "user_goal_text", "sample_utterances", "tags", "core_keywords"]:
+                            "user_goal_text", "sample_utterances", "tags", "core_keywords","tools"]:
                     entity_data[field] = results_2[i].get(field)
                 entity_map[entity_id] = entity_data
             original_distances[(entity_id, "sparse_vector")] = results_2.distances[i]
@@ -181,16 +181,16 @@ class HybridSearch:
             "metric_type": "IP",
             "params": {
                 "nprobe": 16,
-                "radius": 0.4,
-                "range_filter": 1
+                "radius":  0.4,
+                "range_filter" : 1
                 }
         }
-
 
         sparse_search_param = {
             "metric_type": "IP",
             "params": {
-                "drop_ratio_search": 0.2
+                "radius": 0.1,
+                "range_filter" : 1
                 }
         }
 
@@ -211,7 +211,7 @@ class HybridSearch:
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
                            "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords"],
+                           "tags","core_keywords","tools"],
             search_params=dense_search_param
         )[0]
 
@@ -222,15 +222,11 @@ class HybridSearch:
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
                            "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords"],
+                           "tags","core_keywords","tools"],
             search_params=sparse_search_param
         )[0]
         logging.info("检索完成")
         print("\n")
-        print("results_1:\n")
-        print(results_1)
-        print("results_2:\n")
-        print(results_2)
         results = self.RRF_rank(results_1, results_2)
         print("\n")
         print(results)
@@ -242,34 +238,23 @@ class HybridSearch:
         for hit in results:
             result_dict = {
                 "intent_id":hit.id,
-                "distance": hit.distance,
+                "similarity": hit.distance,
                 "entity": {}
             }
-            for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
-                            "intent_name_text", "intent_description_text", "intent_summary_text", 
-                            "user_goal_text", "sample_utterances", "tags", "core_keywords"]:
+            for field in ["intent_id", "domain", "scenario", "object","intent_name", "user_goal", "tools",]:
                 result_dict["entity"][field] = hit.get(field)
             result_list.append(result_dict)
 
         return result_list
 
     def basic_search(self, query: str, top_k = 3):
-        """基础相似度查询"""
+        """基础相似度查询，不进行RRFRank重排"""
         dense_search_param = {
             "metric_type": "IP",
-            "params": {
-                "nprobe": 16,
-                "radius": 0.4,
-                "range_filter": 1
-                }
         }
-
 
         sparse_search_param = {
             "metric_type": "IP",
-            "params": {
-                "drop_ratio_search": 0.2
-                }
         }
 
         if self.collection_name is None or query is None:
@@ -287,9 +272,8 @@ class HybridSearch:
             data=[dense_vector],
             anns_field="dense_vector",
             limit=top_k,
-            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords"],
+            output_fields=["intent_id", "domain", "scenario", "object",
+                           "intent_name","user_goal","tools"],
             search_params=dense_search_param
         )[0]
 
@@ -298,18 +282,17 @@ class HybridSearch:
             data=[sparse_vector],
             anns_field="sparse_vector",
             limit=top_k,
-            output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords"],
+            output_fields=["intent_id", "domain", "scenario", "object",
+                           "intent_name","user_goal","tools"],
             search_params=sparse_search_param
         )[0]
         logging.info("检索完成")
-        print("\n")
-        print("results_1:\n")
-        print(results_1)
-        print("results_2:\n")
-        print(results_2)
-        print("\n")
+        # print("\n")
+        # print("results_1:\n")
+        # print(results_1)
+        # print("results_2:\n")
+        # print(results_2)
+        # print("\n")
         return {
             "密集向量检索结果": self.HybridHits_to_dict(results_1),
             "稀疏向量检索结果": self.HybridHits_to_dict(results_2)
@@ -318,9 +301,8 @@ class HybridSearch:
 
 
 if __name__ == "__main__":
-    query = "轨道交通车辆的关键部件有哪些，怎么检查？"
+    query = "公开采购与非公开采购金额构成如何？"
     print(f"query: {query}")
     search = HybridSearch()
-    result = search.basic_search(query=query)
-    print(type(result.get("密集向量检索结果")[0].get("entity").get("tags")))
-    print(type(result.get("稀疏向量检索结果")[0].get("entity").get("tags")))
+    result = search.multi_search(query=query)
+    print(result)

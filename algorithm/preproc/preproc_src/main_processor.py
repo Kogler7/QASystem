@@ -27,18 +27,22 @@ class DocumentProcessor:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.pdf_processor = PDFProcessor()      
-        self.docx_processor = DocxProcessor(libreoffice_path="/home/admin_user_3/cly/LibreOffice-fresh.full-x86_64.AppImage")
+        self.pdf_processor = PDFProcessor()
+        _lo = os.getenv("LIBREOFFICE_PATH") or os.getenv("SOFFICE_PATH")
+        self.docx_processor = DocxProcessor(libreoffice_path=_lo or None)
         self.excel_processor = ExcelProcessor()
         self.html_processor = HTMLProcessor()
         # self.ocr_processor = OCRProcessor()      # 旧的 OCR 处理器（如果存在）
 
-        # 初始化 MinerU 处理器
+        _preproc_root = Path(__file__).resolve().parent.parent
+        _default_mineru = _preproc_root / "mineru.json"
         if mineru_config_path is None:
-            mineru_config_path = os.getenv("MINERU_CONFIG_PATH", "/mnt/data3/srv/vllm/models/mineru.json")
-        self.mineru_processor = OCRProcessor(   
+            mineru_config_path = os.getenv("MINERU_CONFIG_PATH")
+        if mineru_config_path is None and _default_mineru.is_file():
+            mineru_config_path = str(_default_mineru)
+        self.mineru_processor = OCRProcessor(
             config_path=mineru_config_path,
-            model_source=mineru_model_source
+            model_source=mineru_model_source,
         )
 
         # 构建模型注册表（硬编码版）

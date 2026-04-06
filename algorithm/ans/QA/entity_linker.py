@@ -1,7 +1,7 @@
 import re
 import json
 from typing import Dict, List, Tuple, Any
-from utils import run_llm
+from algorithm.ans.QA.utils import run_llm
 
 
 class EntityLinker:
@@ -111,12 +111,16 @@ class EntityLinker:
         2. 识别问题中提到的所有具体事物、概念、人物、地点等
         3. 对于模糊的实体，根据上下文确定最可能的含义
         4. 特别注意物品、工具、设备等具体事物
+        5. **重要**：对于需要计算或对比的问题，请根据业务逻辑推断可能需要的实体
 
         实体提取标准：
         - 名词性短语（如"瑜伽垫"、"跑步机"）
         - 专有名词（如"姚明"、"北京"）
         - 概念术语（如"人工智能"、"量子力学"）
         - 事件活动（如"奥运会"、"春节"）
+        - **业务逻辑推断**：如果问题需要计算或对比，请推断可能需要的实体
+          - 例如：如果问题包含"非公开采购金额"，请推断需要"电子采购中标金额"和"公开采购中标金额"
+          - 例如：如果问题包含"A和B的对比"，请提取A和B相关的所有实体
 
         输出格式：请用严格的JSON格式输出：
         {{
@@ -131,20 +135,9 @@ class EntityLinker:
           ]
         }}
 
-        示例：
-        问题："谁使用瑜伽垫？"
-        输出：
-        {{
-          "analysis": "这个问题询问瑜伽垫的使用者，需要找到使用瑜伽垫的人或群体",
-          "entities": [
-            {{
-              "text": "瑜伽垫",
-              "type": "物品/产品",
-              "importance": "高",
-              "reason": "这是问题的核心对象，所有回答都围绕瑜伽垫展开"
-            }}
-          ]
-        }}
+        注意：
+        - 只提取问题中实际提到的实体或根据业务逻辑推断的实体
+        - 确保JSON格式正确，不要有多余的逗号或括号
         """
 
     def _parse_llm_response(self, question: str, response: str) -> List[str]:
@@ -174,6 +167,7 @@ class EntityLinker:
                 r'```json\n(.*?)\n```',  # 代码块
                 r'```\n(.*?)\n```',  # 通用代码块
                 r'\{.*"entities".*\}',  # 包含entities的JSON
+                r'\{.*"rankings".*\}',  # 包含rankings的JSON
                 r'\{[\s\S]*\}',  # 任何JSON对象
             ]
 
@@ -185,8 +179,10 @@ class EntityLinker:
                     json_str = json_str.strip()
                     # 尝试解析
                     data = json.loads(json_str)
-                    if isinstance(data, dict) and "entities" in data:
-                        return data
+                    if isinstance(data, dict):
+                        # 支持多种字段名
+                        if "entities" in data or "rankings" in data:
+                            return data
         except Exception as e:
             print(f"JSON提取失败: {e}")
 
@@ -403,6 +399,128 @@ class EntityLinker:
 
         return next(iter(qids)) if qids else None
 
+    def search_entities_with_full_info(self, keyword: str, limit: int = 10) -> List[Dict]:
+        """
+        灵活搜索：遍历所有属性，返回匹配的节点及其完整信息
+        让大模型根据完整信息判断相关性
+        """
+        try:
+            # 检查wiki_client的类型
+            driver = None
+            if hasattr(self.wiki_client, 'client'):
+                # 如果是MultiServerWikidataQueryClient包装类
+                driver = self.wiki_client.client.driver
+            else:
+                # 如果是直接的Neo4jClient
+                driver = self.wiki_client.driver
+            
+            with driver.session() as session:
+                # 策略1：首先搜索name属性
+                query_name = """
+                MATCH (n)
+                WHERE n.name IS NOT NULL AND toLower(n.name) CONTAINS toLower($keyword)
+                RETURN id(n) as node_id, n as node
+                LIMIT $limit
+                """
+                
+                result = session.run(query_name, keyword=keyword, limit=limit)
+                
+                matches = []
+                for record in result:
+                    node_data = dict(record["node"])
+                    node_id = record["node_id"]
+                    
+                    # 找出哪些属性匹配了关键词
+                    matched_properties = {}
+                    for key, value in node_data.items():
+                        if isinstance(value, str) and keyword.lower() in value.lower():
+                            matched_properties[key] = value
+                    
+                    matches.append({
+                        "qid": f"NEO_{node_id}",
+                        "properties": node_data,
+                        "matched_properties": matched_properties,
+                        "matched_keyword": keyword
+                    })
+                
+                # 如果name属性搜索结果不足，搜索其他属性
+                if len(matches) < 3:
+                    query_other = """
+                    MATCH (n)
+                    WHERE n.name IS NULL OR NOT toLower(n.name) CONTAINS toLower($keyword)
+                    RETURN id(n) as node_id, n as node
+                    LIMIT 50
+                    """
+                    
+                    result2 = session.run(query_other, keyword=keyword)
+                    seen_ids = {m['qid'] for m in matches}
+                    
+                    for record in result2:
+                        node_data = dict(record["node"])
+                        node_id = record["node_id"]
+                        qid = f"NEO_{node_id}"
+                        
+                        if qid in seen_ids:
+                            continue
+                        
+                        # 检查其他属性
+                        matched_properties = {}
+                        for key, value in node_data.items():
+                            if isinstance(value, str) and keyword.lower() in value.lower():
+                                matched_properties[key] = value
+                        
+                        if matched_properties:
+                            matches.append({
+                                "qid": qid,
+                                "properties": node_data,
+                                "matched_properties": matched_properties,
+                                "matched_keyword": keyword
+                            })
+                            seen_ids.add(qid)
+                        
+                        if len(matches) >= limit:
+                            break
+                
+                return matches
+        except Exception as e:
+            print(f"灵活搜索异常: {e}")
+            return []
+
+    def get_node_full_info(self, qid: str) -> Dict:
+        """根据QID获取节点的完整信息"""
+        try:
+            if not qid.startswith("NEO_"):
+                return None
+            
+            node_id = int(qid.replace("NEO_", ""))
+            
+            # 检查wiki_client的类型
+            driver = None
+            if hasattr(self.wiki_client, 'client'):
+                # 如果是MultiServerWikidataQueryClient包装类
+                driver = self.wiki_client.client.driver
+            else:
+                # 如果是直接的Neo4jClient
+                driver = self.wiki_client.driver
+            
+            with driver.session() as session:
+                query = """
+                MATCH (n)
+                WHERE id(n) = $node_id
+                RETURN id(n) as node_id, n as node
+                """
+                
+                result = session.run(query, node_id=node_id)
+                for record in result:
+                    return {
+                        "qid": qid,
+                        "properties": dict(record["node"])
+                    }
+        except Exception as e:
+            print(f"获取节点信息异常: {e}")
+        
+        return None
+
     def _get_entity_label(self, qid: str, default: str) -> str:
         """获取实体标签"""
         try:
@@ -413,3 +531,182 @@ class EntityLinker:
             pass
 
         return default
+
+    def rank_entities_by_llm(self, question: str, candidates: List[Dict]) -> List[Dict]:
+        """
+        使用大模型根据问题对候选实体进行相关性排序
+        返回排序后的实体列表，包含相关度分数和理由
+        """
+        if not candidates:
+            return []
+        
+        # 构建提示词
+        prompt = self._build_entity_ranking_prompt(question, candidates)
+        
+        try:
+            response = run_llm(prompt, 0.1, 1000, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            
+            # 解析大模型的响应
+            ranked_results = self._parse_ranking_response(response, candidates)
+            
+            return ranked_results
+            
+        except Exception as e:
+            print(f"大模型排序异常: {e}")
+            # 如果大模型失败，返回原始列表，默认分数为0.5
+            return [{**cand, "relevance_score": 0.5, "reason": "默认分数"} for cand in candidates]
+    
+    def _build_entity_ranking_prompt(self, question: str, candidates: List[Dict]) -> str:
+        """构建实体排序提示词"""
+        
+        # 格式化候选实体信息
+        candidates_text = ""
+        for i, cand in enumerate(candidates, 1):
+            candidates_text += f"\n【候选{i}】\n"
+            candidates_text += f"QID: {cand['qid']}\n"
+            for key, value in cand['properties'].items():
+                # 截断过长的值
+                value_str = str(value)
+                if len(value_str) > 500:
+                    value_str = value_str[:500] + "..."
+                candidates_text += f"  {key}: {value_str}\n"
+        
+        prompt = f"""你是一个专业的信息检索专家。请根据用户的问题，评估以下候选实体的相关程度。
+
+用户问题："{question}"
+
+候选实体信息：
+{candidates_text}
+
+请对每个候选实体进行评估：
+1. 相关度分数（0-1之间，1表示最相关）
+2. 判断理由（简要说明为什么相关或不相关）
+3. 是否能直接回答用户问题（是/否）
+
+输出格式（严格的JSON）：
+{{
+  "rankings": [
+    {{
+      "qid": "实体的QID",
+      "relevance_score": 0.95,
+      "can_answer": true,
+      "reason": "判断理由"
+    }}
+  ]
+}}
+
+重要判断原则：
+1. 识别用户问题的核心关键词（如"金额"、"构成"、"标段数"、"比例"等）
+2. 优先选择与核心关键词完全匹配的实体
+3. 对于不匹配的实体类型，应该给出低分数（如0.1-0.2）
+   - 例如：如果问题问"金额构成"，则"标段数"、"比例"等实体相关性很低（0.1-0.2）
+   - 例如：如果问题问"金额构成"，则"金额"类实体相关性很高（0.8-1.0）
+4. 请仔细分析实体的所有属性，特别关注能够帮助回答用户问题的属性
+5. 相关度分数要严格区分，不要给所有实体相似的分数
+6. **业务逻辑推断**：如果问题需要计算或对比，请根据业务逻辑判断真正需要的实体
+   - 例如：如果问题问"非公开采购金额"，虽然问题中没有直接提到"电子采购"，但根据业务逻辑"非公开采购金额 = 电子采购中标金额 - 公开采购中标金额"，需要"电子采购中标金额"和"公开采购中标金额"两个实体
+   - 例如：如果问题问"A和B的金额构成"，只需要A和B相关的金额类实体，不需要比例、标段数等其他类型实体
+   - 例如：如果问题需要"总金额"，应该选择聚合查询（如SUM），而不是分组查询（如GROUP BY）
+7. **严格过滤**：对于问题不需要的实体类型，请给出很低的相关度分数（0.1-0.2）
+8. **精确匹配**：仔细分析实体的计算SQL，判断SQL的查询类型是否符合问题需求
+   - 如果问题需要总金额，应该选择聚合查询（如SUM），而不是分组查询（如GROUP BY）
+   - 如果问题需要构成分析，应该选择能够提供构成数据的实体，而不是细分数据的实体"""
+        
+        return prompt
+    
+    def _parse_ranking_response(self, response: str, candidates: List[Dict]) -> List[Dict]:
+        """解析大模型的排序响应"""
+        try:
+            # 尝试提取JSON
+            json_data = self._extract_json_from_response(response)
+            
+            if json_data and "rankings" in json_data:
+                # 构建QID到候选实体的映射
+                cand_map = {c['qid']: c for c in candidates}
+                
+                ranked = []
+                for ranking in json_data["rankings"]:
+                    qid = ranking.get("qid")
+                    if qid in cand_map:
+                        ranked.append({
+                            **cand_map[qid],
+                            "relevance_score": ranking.get("relevance_score", 0.5),
+                            "can_answer": ranking.get("can_answer", False),
+                            "reason": ranking.get("reason", "")
+                        })
+                
+                # 按相关度排序
+                ranked.sort(key=lambda x: x["relevance_score"], reverse=True)
+                return ranked
+                
+        except Exception as e:
+            print(f"解析排序响应异常: {e}")
+        
+        # 解析失败，返回默认分数
+        return [{**cand, "relevance_score": 0.5, "can_answer": False, "reason": "解析失败，默认分数"} for cand in candidates]
+
+    def link_entities_with_llm_judge(self, question: str) -> Dict[str, Any]:
+        """
+        完整的实体链接流程：
+        1. 从问题中提取关键词
+        2. 搜索匹配的节点（所有属性）
+        3. 使用大模型判断相关性
+        4. 返回最相关的实体及其完整信息
+        """
+        print(f"\n=== 开始实体链接（带大模型判断）===")
+        print(f"问题: {question}")
+        
+        # 1. 提取实体/关键词
+        keywords = self.recognize_entities(question)
+        if not keywords:
+            # 如果没有提取到实体，使用整个问题作为关键词
+            keywords = [question]
+        
+        print(f"提取的关键词: {keywords}")
+        
+        # 2. 搜索所有关键词，收集候选
+        all_candidates = []
+        seen_qids = set()
+        
+        for keyword in keywords:
+            candidates = self.search_entities_with_full_info(keyword, limit=5)
+            for cand in candidates:
+                if cand['qid'] not in seen_qids:
+                    all_candidates.append(cand)
+                    seen_qids.add(cand['qid'])
+        
+        print(f"找到 {len(all_candidates)} 个候选实体")
+        
+        if not all_candidates:
+            print("未找到任何候选实体")
+            return {
+                "linked_entities": {},
+                "best_match": None,
+                "all_candidates": []
+            }
+        
+        # 3. 使用大模型进行相关性排序
+        ranked_candidates = self.rank_entities_by_llm(question, all_candidates)
+        
+        print(f"\n大模型排序结果（前3）：")
+        for i, cand in enumerate(ranked_candidates[:3], 1):
+            print(f"  {i}. QID: {cand['qid']}, 分数: {cand['relevance_score']:.2f}, 可回答: {cand['can_answer']}")
+            print(f"     理由: {cand['reason']}")
+        
+        # 4. 构建返回结果
+        linked_entities = {}
+        for cand in ranked_candidates:
+            # 只包含相关度分数高于0.5的实体
+            if cand.get('relevance_score', 0) >= 0.5:
+                # 直接使用实体的name属性作为标签，如果没有则使用QID
+                # 大模型已经在排序过程中看到了所有属性，不需要在这里做额外处理
+                label = cand['properties'].get('name', cand['qid'])
+                linked_entities[cand['qid']] = label
+        
+        best_match = ranked_candidates[0] if ranked_candidates else None
+        
+        return {
+            "linked_entities": linked_entities,
+            "best_match": best_match,
+            "all_candidates": ranked_candidates
+        }

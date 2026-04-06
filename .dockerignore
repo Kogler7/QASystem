@@ -1,0 +1,47 @@
+# Docker build context = 仓库根目录（见 docker-compose.yml）
+.git
+.github
+.idea
+.cursor
+.vscode
+
+# 前端不参与后端镜像
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Python 缓存与虚拟环境
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/env
+
+# 密钥与本地配置（运行时由 compose env / 挂载注入）
+.env
+.env.*
+!**/.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# 本地数据与缓存（运行时用命名卷挂载）
+backend/data/documents/**
+backend/data/preproc_output/**
+backend/data/preproc_upload/**
+backend/chroma_db/**
+backend/app.log
+backend/*.log
+
+# 文档（不参与运行）
+docs/
+
+# Milvus / 本地编排产生的数据目录
+volumes
+**/lightning_logs
+
+# 大文件缓存（若需在镜像内置模型，请从 .dockerignore 中移除对应行）
+# algorithm/**/.cache

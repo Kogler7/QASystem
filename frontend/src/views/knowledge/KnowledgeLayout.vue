@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Document, FolderOpened, Search } from '@element-plus/icons-vue'
+import { Document, FolderOpened, Search, Upload } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -9,7 +9,8 @@ const activeTab = ref('index')
 
 const tabs = [
   { name: 'index', label: '首页', icon: FolderOpened },
-  { name: 'documents', label: '文档管理', icon: Document },
+  { name: 'upload', label: '知识沉淀', icon: Upload },
+  { name: 'list', label: '文档列表', icon: Document },
   { name: 'query', label: '知识检索', icon: Search }
 ]
 
