@@ -72,12 +72,11 @@ export function nl2cypherSplitPython(text) {
   return request.post('/component/nl2cypher/split/python', { text: text }, { timeout: 120000 })
 }
 
-/**
- * 文本向量化并存储接口
- * @param {string} text
- */
-export function nl2cypherText2vector(text) {
-  return request.post('/component/nl2cypher/text2vector', { text: text }, { timeout: 120000 })
+export function nl2cypherText2vector(text, fileName = '') {
+  return request.post('/component/nl2cypher/text2vector', { 
+    text: text,
+    source: fileName  // 添加文件名作为source
+  }, { timeout: 120000 })
 }
 
 export const nl2cypherGetVectors = () => {

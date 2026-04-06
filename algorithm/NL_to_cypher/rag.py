@@ -28,7 +28,7 @@ def call_llm(prompt: str, timeout: int = 500) -> str:
     return complete(prompt, timeout=timeout)
 
 MILVUS_DB_PATH="http://localhost:19530"
-MODEL_PATH = "/mnt/data3/srv/qasystem/models/bge-small-zh-v1.5"
+MODEL_PATH = _root / "NL_to_cypher" / "bge-small-zh-v1.5"
 
 class CustomHuggingFaceEmbeddings(Embeddings):
     def __init__(self, model, tokenizer):
@@ -426,16 +426,17 @@ def main():
 
     # results = get_vectors_for_nodes(nodes)
 
-    # documents = load_txt("列车着火应急处置_extracted.txt")
-    # # RecursiveCharacterTextSplitter
-    # split_docs = txt_split(documents)
+    documents = load_txt("列车着火应急处置_extracted.txt")
+    # RecursiveCharacterTextSplitter
+    split_docs = txt_split(documents)
+    print(split_docs)
 
     # #SemanticChunker
     # # split_docs = txt_split_semantic(documents)
 
-    #embedding(split_docs)
-    vector = get_vector_by_database_id("464971672050206437")
-    print(vector)
+    # embedding(split_docs)
+    # vector = get_vector_by_database_id("464971672050206437")
+    # print(vector)
     
         
 

@@ -61,11 +61,10 @@ def _get_splitter():
         raise
 
 
-def _make_docs(text: str):
-    # 避免在顶层引入 langchain 依赖，动态导入
+def _make_docs(text: str, source: str):
+    """创建文档并添加 metadata"""
     from langchain_core.documents import Document
-
-    return [Document(page_content=text)]
+    return [Document(page_content=text, metadata={"source": source})]
 
 
 def split_by_character(text: str) -> dict[str, Any]:
@@ -107,7 +106,7 @@ def muti_retriever()->List[Dict[str, Any]]:
     return results
 
 
-def text2vector(text: str) -> dict[str, Any]:
+def text2vector(text: str,source:str) -> dict[str, Any]:
     """将用户输入的文本切片、向量化并存入数据库。
 
     返回内容包含状态和生成的片段列表，可用于前端调试。
@@ -118,9 +117,10 @@ def text2vector(text: str) -> dict[str, Any]:
         logger.warning("加载 RAG 模块失败: %s", e)
         raise
 
-    docs = _make_docs(text)
+    docs = _make_docs(text,source)
     # 使用默认的递归字符切分作为基础
     split_docs = rag.txt_split(docs)
+    print(split_docs)
 
     # 嵌入并写入 Chroma 数据库，函数内部已负责持久化
     rag.embedding(split_docs)
