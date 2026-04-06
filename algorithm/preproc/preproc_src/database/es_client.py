@@ -9,27 +9,46 @@ logger = logging.getLogger(__name__)
 
 
 class ESClient:
-    def __init__(self, host: str = "localhost", port: int = 9200):
+    def __init__(self, host: str = "localhost", port: int = 9200,
+                 username: Optional[str] = None, password: Optional[str] = None,
+                 scheme: str = 'http', verify_cert: bool = True):
         """
-        初始化Elasticsearch客户端，使用Requests库确保兼容性
+        初始化Elasticsearch客户端，使用Requests库确保兼容性，并支持 basic auth
+        :param host: ES host
+        :param port: ES port
+        :param username: 可选，basic auth 用户名
+        :param password: 可选，basic auth 密码
+        :param scheme: 'http' 或 'https'
         """
-        self.base_url = f"http://{host}:{port}"
+        self.base_url = f"{scheme}://{host}:{port}"
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         })
+        # 如果提供了认证信息，配置 session.auth
+        if username is not None:
+            self.session.auth = (username, password or '')
+
+        # HTTPS 证书验证控制（开发环境下可以关闭 self-signed 验证）
+        if scheme == 'https' and not verify_cert:
+            self.session.verify = False
+
         self.timeout = 30
 
-        # 测试连接
+        # 测试连接（带 auth）
         try:
             response = self.session.get(f"{self.base_url}/", timeout=5)
-            if response.status_code == 200:
-                info = response.json()
-                es_version = info.get('version', {}).get('number', 'unknown')
-                logger.info(f"✓ Elasticsearch连接成功，版本: {es_version}")
+            if response.status_code in (200, 201):
+                try:
+                    info = response.json()
+                    es_version = info.get('version', {}).get('number', 'unknown')
+                    logger.info(f"✓ Elasticsearch连接成功，版本: {es_version}")
+                except Exception:
+                    # 有时 Elasticsearch 在 HEAD/GET 返回无 body（或受保护），仍然认为连接成功
+                    logger.info(f"✓ Elasticsearch 主机可达: {self.base_url} (code={response.status_code})")
             else:
-                logger.error(f"Elasticsearch连接失败，状态码: {response.status_code}")
+                logger.error(f"Elasticsearch连接失败，状态码: {response.status_code} 内容: {response.text}")
                 self.session = None
         except Exception as e:
             logger.error(f"Elasticsearch连接失败: {e}")
@@ -64,11 +83,16 @@ class ESClient:
         """
         创建索引 - 兼容Elasticsearch 7.10.2
         """
-        # 首先检查索引是否存在
-        check_result = self._make_request('HEAD', f"/{index_name}")
-        if not isinstance(check_result, dict) or 'error' not in check_result:
-            logger.info(f"索引 {index_name} 已存在")
-            return True
+        # 首先检查索引是否存在（使用 HEAD 更稳健地判断）
+        try:
+            head_resp = self.session.request('HEAD', f"{self.base_url}/{index_name}", timeout=self.timeout)
+            if head_resp.status_code == 200:
+                logger.info(f"索引 {index_name} 已存在 (HEAD) ")
+                return True
+            if head_resp.status_code not in (404,):
+                logger.debug(f"HEAD {index_name} 返回状态: {head_resp.status_code}")
+        except Exception as e:
+            logger.debug(f"检查索引存在时发生异常: {e}")
 
         # 创建索引的映射
         mapping = {
@@ -106,11 +130,16 @@ class ESClient:
             if result.get('acknowledged') is True:
                 logger.info(f"索引 {index_name} 创建成功")
                 return True
-            elif 'error' in result:
-                error_type = result.get('error', {}).get('type', '')
-                if 'resource_already_exists_exception' in str(error_type):
-                    logger.info(f"索引 {index_name} 已存在")
-                    return True
+            if 'error' in result:
+                # 处理索引已存在的情况
+                try:
+                    error_obj = result.get('error', {})
+                    error_type = error_obj.get('type', '') if isinstance(error_obj, dict) else ''
+                    if 'resource_already_exists_exception' in str(error_type) or 'resource_already_exists_exception' in str(result):
+                        logger.info(f"索引 {index_name} 已存在 (from error response)")
+                        return True
+                except Exception:
+                    pass
 
         logger.error(f"创建索引 {index_name} 失败: {result}")
         return False

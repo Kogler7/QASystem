@@ -8,7 +8,8 @@ from datetime import datetime
 class DocumentProcessor:
     def __init__(self, output_dir: Optional[str] = None,
                  mineru_config_path: Optional[str] = None,
-                 mineru_model_source: str = "local"):
+                 mineru_model_source: str = "local",
+                 libreoffice_path: Optional[str] = None):
         """
         初始化文档处理器
         :param output_dir: MinerU 输出的基础目录，如果为 None 则使用当前目录下的 'processed' 文件夹
@@ -28,18 +29,23 @@ class DocumentProcessor:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.pdf_processor = PDFProcessor()
-        _lo = os.getenv("LIBREOFFICE_PATH") or os.getenv("SOFFICE_PATH")
+        # LibreOffice/soffice path precedence: explicit parameter > environment vars > auto-detect in DocxProcessor
+        _lo = libreoffice_path or os.getenv("LIBREOFFICE_PATH") or os.getenv("SOFFICE_PATH")
         self.docx_processor = DocxProcessor(libreoffice_path=_lo or None)
         self.excel_processor = ExcelProcessor()
         self.html_processor = HTMLProcessor()
         # self.ocr_processor = OCRProcessor()      # 旧的 OCR 处理器（如果存在）
 
+        # Determine MinerU config path precedence:
+        # 1) explicit mineru_config_path argument
+        # 2) local algorithm/preproc/mineru.json if it exists
+        # 3) environment variable MINERU_CONFIG_PATH
         _preproc_root = Path(__file__).resolve().parent.parent
         _default_mineru = _preproc_root / "mineru.json"
-        if mineru_config_path is None:
-            mineru_config_path = os.getenv("MINERU_CONFIG_PATH")
         if mineru_config_path is None and _default_mineru.is_file():
             mineru_config_path = str(_default_mineru)
+        if mineru_config_path is None:
+            mineru_config_path = os.getenv("MINERU_CONFIG_PATH")
         self.mineru_processor = OCRProcessor(
             config_path=mineru_config_path,
             model_source=mineru_model_source,
@@ -247,10 +253,12 @@ class DocumentProcessor:
             # 准备处理器参数
             kwargs = {}
             if file_type == '.pdf' or (file_type in {'.docx', '.doc'} and model_name == 'mineru'):
+                # 后端选择：优先使用环境变量 MINERU_BACKEND，否则默认使用 'vlm'（可改回 'pipeline'）
+                backend_choice = os.getenv('MINERU_BACKEND') or 'vlm'
                 kwargs = {
                     'output_dir': str(self.output_dir),
                     'lang': "ch",
-                    'backend': "pipeline",
+                    'backend': backend_choice,
                     'method': "auto",
                     'formula_enable': True,
                     'table_enable': True,

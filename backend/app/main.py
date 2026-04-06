@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """应用启动时初始化数据库，关闭时可选清理。"""
     from .config import settings
+    
     if settings.ENVIRONMENT == "production" and settings.JWT_SECRET == "change-me":
         raise RuntimeError(
             "生产环境必须设置 JWT_SECRET 环境变量，不能使用默认值 'change-me'"
