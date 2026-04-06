@@ -1,28 +1,18 @@
-import os
-import re
-import json
-from typing import Optional, List, Dict, Any
-from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
+<script setup>
+import { ref, onMounted, watch, computed, nextTick } from 'vue'
+import { MagicStick, Loading, UploadFilled, Download } from '@element-plus/icons-vue'
+import { nl2cypherHealthCheck, nl2cypherGenerate } from '@/api'
+import { nl2cypherSplitCharacter, nl2cypherSplitRecursive, nl2cypherSplitMarkdown, nl2cypherSplitPython, nl2cypherText2vector, nl2cypherGetVectors } from '@/api'
+import { mutiRetriever } from '@/api'
+import { ElMessage } from 'element-plus'
 
-import torch
-import requests
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
-from langchain_core.prompts import PromptTemplate
-from transformers import AutoTokenizer, AutoModel
-from langchain.embeddings.base import Embeddings
-from langchain_experimental.text_splitter import SemanticChunker
-from langchain_community.vectorstores import Milvus
-# from langchain.memory import ConversationBufferMemory #处理多轮对话的记忆功能
+const loading = ref(false)
+const healthStatus = ref(null)
+const healthDetail = ref('')
 
-# 使用统一 LLM 接口（algorithm/common）
-import sys
-from pathlib import Path
-_root = Path(__file__).resolve().parent.parent
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
-from common.llm_client import complete, extract_final_response
+// 当前选中的主菜单与子菜单
+const activeFeature = ref('cypher')
+const activeSubFeature = ref('')
 
 // 表单数据
 const form = ref({
@@ -35,66 +25,19 @@ Entity`,
   splitText: ''
 })
 
-    def embed_documents(self, texts):
-        # 实现文档嵌入逻辑
-        inputs = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=512)
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-        embeddings = outputs.last_hidden_state.mean(dim=1)
-        return embeddings.tolist()
+// 文件上传相关
+const fileInput = ref(null)
+const currentFile = ref(null)
+const fileName = ref('')
 
-    def embed_query(self, text):
-        return self.embed_documents([text])[0]
-
-# 加载数据
-def load_txt(filepath: str) -> list[Document]:
-    loader = TextLoader(filepath, encoding='utf-8')
-    documents = loader.load()
-    # print(documents)
-    return documents
-
-#语义切分
-def txt_split_semantic(
-        documents: list[Document],
-        threshold: float = 0.5,
-        chunk_size: Optional[int] = None,
-        breakpoint_threshold_type: str = "percentile"
-) -> list[Document]:
-    """
-    使用语义分割文本
-
-    Args:
-        documents: 输入的文档列表
-        embedding_model: 嵌入模型，如果为None则使用默认
-        threshold: 分割阈值，越高分割越少
-        chunk_size: 可选，用于控制块大小
-        breakpoint_threshold_type: 断点阈值类型，可选 "percentile", "standard_deviation", "interquartile"
-
-    Returns:
-        分割后的文档列表
-    """
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
-    model = AutoModel.from_pretrained(MODEL_PATH, local_files_only=True)
-    custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
-
-    # 创建语义分割器
-    text_splitter = SemanticChunker(
-        embeddings=custom_embedding,
-        breakpoint_threshold_type=breakpoint_threshold_type,
-        breakpoint_threshold_amount=threshold,
-        sentence_split_regex="[。！？.!?\n\n\n]+",  # 初步句子分割
-    )
-
-    # 分割文档
-    split_docs = text_splitter.split_documents(documents)
-
-    # 如果指定了chunk_size，可以进一步合并小段
-    if chunk_size:
-        split_docs = merge_small_chunks(split_docs, min_size=500)
-    for split_doc in split_docs:
-        print(split_doc)
-        print("#"*10)
-    return split_docs
+// 结果数据
+const resultCypher = ref('')
+const splitResult = ref(null)
+const vectorResult = ref('')
+//多源数据检索
+const loadingMuti = ref(false)
+const multiResults = ref([])
+const multiStats = ref(null)
 
 
 // 菜单项
@@ -115,48 +58,51 @@ const menuItems = [
   { key: 'multi-retrieve', label: '多源数据检索', tooltip: '从JSON文件中检索节点对应的向量内容' },
 ]
 
-    for doc in documents:
-        if not current_metadata:
-            current_metadata = doc.metadata
+// 工具提示映射
+const tooltips = {}
+menuItems.forEach(item => {
+  tooltips[item.key] = item.tooltip
+  if (item.children) {
+    item.children.forEach(c => {
+      tooltips[c.key] = c.tooltip
+    })
+  }
+})
 
-        if len(current_chunk) + len(doc.page_content) <= min_size * 2:
-            # 合并到当前块
-            if current_chunk:
-                current_chunk += "\n\n" + doc.page_content
-            else:
-                current_chunk = doc.page_content
-        else:
-            # 保存当前块
-            if current_chunk:
-                merged_docs.append(Document(
-                    page_content=current_chunk,
-                    metadata=current_metadata
-                ))
-            # 开始新块
-            current_chunk = doc.page_content
-            current_metadata = doc.metadata
+// 计算属性
+const vectorDataAvailable = computed(() => {
+  return healthStatus.value === 'ok'
+})
 
-    # 添加最后一个块
-    if current_chunk:
-        merged_docs.append(Document(
-            page_content=current_chunk,
-            metadata=current_metadata
-        ))
+const uniqueClusters = computed(() => {
+  if (!vectorStats.value?.clusterCounts) return []
+  return Object.keys(vectorStats.value.clusterCounts)
+})
 
-    return merged_docs
+const clusterCounts = computed(() => {
+  return vectorStats.value?.clusterCounts || {}
+})
 
-# 数据切片
-def txt_split(documents: list[Document]) -> list[Document]:
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=200,  #文本块最大字符数
-        chunk_overlap=50,  #块之间的重叠字数
-        separators=["\n\n", "\n", "。", "！", "？", ".", "!", "?"]
-    )
-    split_docs = text_splitter.split_documents(documents)
-    # for split_doc in split_docs:
-        # print(split_doc)
-        # print("#"*10)
-    return split_docs
+// 监听功能切换
+watch(activeFeature, (newVal) => {
+  form.value.splitText = ''
+  splitResult.value = null
+  vectorResult.value = null
+  resultCypher.value = ''
+  currentFile.value = null
+  fileName.value = ''
+  if (newVal !== 'split') {
+    activeSubFeature.value = ''
+  } else {
+    if (!activeSubFeature.value) {
+      activeSubFeature.value = menuItems.find(i => i.key === 'split')?.children?.[0]?.key || ''
+    }
+  }
+  if (newVal !== 'multi-retrieve') {
+    multiResults.value = []
+    multiStats.value = null
+  }
+})
 
 // 健康检查
 const checkHealth = async () => {
@@ -1742,113 +1688,99 @@ const loadMultiRetrieve = async () => {
               display: inline-block;
               margin-right: 8px;
             }
-            return result
+          }
+        }
+      }
+    }
     
-    print(f"未找到数据库ID为 '{database_id}' 的向量片段")
-    return None
-
-#根据多个数据库ID返回向量片段（实际用）
-def get_vectors_by_database_ids(database_ids: List[str]) -> List[Dict[str, Any]]:
-    """
-    根据多个数据库ID返回向量片段
-    
-    Args:
-        database_ids: 数据库ID列表
-    
-    Returns:
-        向量片段列表
-    """
-    results = []
-    for db_id in database_ids:
-        vector_data = get_vector_by_database_id(db_id)
-        if vector_data:
-            results.append(vector_data)
-    return results
-#测试函数 暂时从json文件中读取内容
-def load_json_nodes(json_file: str) -> List[Dict[str, Any]]:
-    """
-    从JSON文件中加载节点数据
-    
-    Args:
-        json_file: JSON文件路径
-    
-    Returns:
-        节点数据列表
-    """
-    try:
-        with open(json_file, 'r', encoding='utf-8-sig') as f:
-            data = json.load(f)
+    .visualization-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px;
+      border-top: 1px solid var(--gray-200);
+      background: var(--gray-50);
+      
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
         
-        nodes = []
-        for item in data:
-            if 'n' in item:
-                nodes.append(item['n'])
+        .legend-color {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+        }
         
-        print(f"从 {json_file} 加载了 {len(nodes)} 个节点")
-        return nodes
-    except Exception as e:
-        print(f"加载JSON文件失败: {e}")
-        return []
-
-def get_vectors_for_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    从节点数据中提取有VectorAddress的节点，并从向量数据库获取内容
+        .legend-count {
+          color: var(--gray-500);
+        }
+      }
+    }
     
-    Args:
-        nodes: 节点数据列表
-    
-    Returns:
-        包含节点和向量内容的列表
-    """
-    results = []
-    
-    for node in nodes:
-        properties = node.get('properties', {})
-        
-        # 检查是否有VectorAddress字段
-        if 'VectorAddress' in properties:
-            vector_id = properties['VectorAddress']
-            
-            # 从向量数据库获取内容
-            vector_content = get_vector_by_database_id(vector_id)
-            
-            if vector_content:
-                results.append(vector_content)
-    
-    print(f"找到 {len(results)} 个有VectorAddress的节点")
-    return results
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 500px;
+      color: var(--gray-600);
+      
+      .el-empty {
+        .el-empty__description {
+          p {
+            margin-top: 8px;
+            color: var(--gray-500);
+            font-size: 13px;
+          }
+        }
+      }
+    }
+  }
+  
+  .vector-stats {
+    .stat-card {
+      text-align: center;
+      padding: 16px;
+      background: var(--gray-50);
+      border-radius: 6px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: default;
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      
+      .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--primary);
+        margin-bottom: 4px;
+        transition: color 0.2s;
+      }
+      
+      &:hover .stat-value {
+        color: var(--primary-dark);
+      }
+      
+      .stat-label {
+        font-size: 12px;
+        color: var(--gray-600);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    }
+  }
+}
+.results-list {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
 
-# extract_final_response 已由 llm_client 提供
-
-
-def main():
-    # nodes = load_json_nodes("/home/admin_user_5/wangshuo/copy/algorithm/NL_to_cypher/records.json")
-    # results = get_vectors_for_nodes(nodes)
-    # for result in results:
-    #     print(f"节点 {result['node_id']} ({result['node_name']})")
-    #     print(f"标签: {', '.join(result['labels'])}")
-    #     print(f"向量地址: {result['vector_address']}")
-    #     print(f"切片编号: {result['slice_number']}")
-    #     print(f"向量内容: {result['vector_content'][:200]}...")
-    #     print("-" * 50)
-    
-    # print(f"\n共处理 {len(results)} 个节点")
-
-
-    # results = get_vectors_for_nodes(nodes)
-
-    # documents = load_txt("列车着火应急处置_extracted.txt")
-    # # RecursiveCharacterTextSplitter
-    # split_docs = txt_split(documents)
-
-    # #SemanticChunker
-    # # split_docs = txt_split_semantic(documents)
-
-    #embedding(split_docs)
-    vector = get_vector_by_database_id("464971672050206437")
-    print(vector)
-    
-        
-
-if __name__ == "__main__":
-    main()
+.result-item {
+  margin-bottom: 20px;
+}
+</style>
