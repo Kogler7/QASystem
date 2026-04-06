@@ -79,7 +79,7 @@ class MySQLClient:
         create_sql = """
         CREATE TABLE IF NOT EXISTS document_metadata (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            doc_id VARCHAR(64) UNIQUE,
+            doc_id VARCHAR(255) UNIQUE,
             file_name VARCHAR(255),
             file_type VARCHAR(20),
             file_path VARCHAR(500),
@@ -95,6 +95,40 @@ class MySQLClient:
         """
 
         return self.create_table(create_sql)
+
+    def insert_document_metadata(self, doc_id: str, file_name: str, file_type: str,
+                                 file_path: str, file_size: int, processed_at: str,
+                                 mysql_stored: bool = False, tables_info: Optional[str] = None,
+                                 rows_inserted: int = 0) -> bool:
+        """
+        插入或更新 document_metadata 表的一条记录。
+        """
+        try:
+            cursor = self.connection.cursor()
+            insert_sql = (
+                "INSERT INTO document_metadata (doc_id, file_name, file_type, file_path, file_size, processed_at, mysql_stored, created_at)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)"
+                " ON DUPLICATE KEY UPDATE file_name=VALUES(file_name), file_type=VALUES(file_type), file_path=VALUES(file_path),"
+                " file_size=VALUES(file_size), processed_at=VALUES(processed_at), mysql_stored=VALUES(mysql_stored)"
+            )
+
+            cursor.execute(insert_sql, (
+                doc_id,
+                file_name,
+                file_type,
+                file_path,
+                file_size,
+                processed_at,
+                1 if mysql_stored else 0,
+            ))
+
+            # 如果需要，我们也可以把 tables_info 和 rows_inserted 存到另一个表或日志；此处保持简洁。
+            self.connection.commit()
+            cursor.close()
+            return True
+        except Error as e:
+            print(f"插入文档元数据失败: {e}")
+            return False
 
     def close(self):
         """关闭连接"""

@@ -20,18 +20,11 @@ class ExcelProcessor(BaseProcessor):
         """转换单元格值，确保适合MySQL插入"""
         if pd.isna(value):  # 处理NaN值
             return ''
-        elif isinstance(value, (pd.Timestamp, datetime)):
-            # 转换日期时间类型为字符串
-            return value.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(value, date):
-            # 转换日期类型为字符串
-            return value.strftime('%Y-%m-%d')
-        elif isinstance(value, (int, float, np.integer, np.floating)):
-            # 转换数值类型为字符串
+        # 为了尽量保留 Excel 原始显示内容，默认将单元格值转换为字符串而不是对日期做统一格式化
+        try:
             return str(value)
-        else:
-            # 其他类型直接转换为字符串
-            return str(value)
+        except Exception:
+            return ''
 
     def process_excel(self, file_path: str) -> Dict[str, Any]:
         """
@@ -87,8 +80,18 @@ class ExcelProcessor(BaseProcessor):
             }
 
             for sheet_name in excel_data.sheet_names:
-                # 读取每个sheet
-                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                # 读取每个sheet，强制按字符串读取以保留原始单元格文本（避免日期被统一格式化）
+                try:
+                    df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, keep_default_na=False)
+                except Exception:
+                    # 回退到默认读取方式
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+
+                # 确保所有单元格都为字符串，缺失值为空字符串
+                try:
+                    df = df.astype(str).fillna('')
+                except Exception:
+                    pass
 
                 # 处理当前sheet
                 sheet_info = self._process_dataframe(df, sheet_name)
@@ -163,6 +166,11 @@ class ExcelProcessor(BaseProcessor):
                 )
 
             df = best_df
+            # 将所有列转换为字符串以尽量保留原始文本表示
+            try:
+                df = df.astype(str).fillna('')
+            except Exception:
+                pass
 
             # 处理CSV数据（当作单个sheet）
             sheet_name = os.path.basename(file_path).replace('.csv', '')

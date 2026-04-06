@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Database (default to MySQL style URL; can be overridden)
-    DATABASE_URL: str = "mysql+asyncmy://rail_user:123456@localhost:3306/rail_assistant"
+    DATABASE_URL: str = "mysql+asyncmy://rail_user:localhost@127.0.0.1:3306/rail_assistant"
 
     model_config = SettingsConfigDict(
         env_file=".env",

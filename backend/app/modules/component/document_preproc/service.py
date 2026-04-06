@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 import importlib.util
+from sqlalchemy.engine import make_url
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,64 @@ def _get_interface():
         try:
             from document_ingestion import DocumentConversionInterface
             _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            # 解析后端 DATABASE_URL（如果可用），将 MySQL 参数传递给 preproc 的 DocumentConversionInterface
+            db_config = None
+            url = None
+            try:
+                env_db = os.environ.get('DATABASE_URL') or os.environ.get('DATABASE') or os.environ.get('DB_URL')
+                if env_db:
+                    url = make_url(env_db)
+            except Exception:
+                url = None
+
+            if url is None:
+                try:
+                    # 尝试使用 backend 配置中的 settings
+                    from ...config import settings as backend_settings  # type: ignore
+                    url = make_url(backend_settings.DATABASE_URL)
+                except Exception:
+                    url = None
+
+            if url is not None:
+                try:
+                    db_config = {
+                        'mysql_host': url.host,
+                        'mysql_port': url.port or 3306,
+                        'mysql_database': url.database,
+                        'mysql_username': url.username or '',
+                        'mysql_password': url.password or ''
+                    }
+                except Exception:
+                    db_config = None
+
+            # 先检查环境变量 PREPROC_ENABLE_DB；如果未设置，回退到 backend/.env 中的配置（便于本地 .env 启动场景）
+            env_val = os.environ.get('PREPROC_ENABLE_DB')
+            if env_val is None:
+                # 读取 backend/.env（如果存在）寻找 PREPROC_ENABLE_DB
+                try:
+                    env_path = _BACKEND / '.env'
+                    if env_path.exists():
+                        for ln in env_path.read_text(encoding='utf-8').splitlines():
+                            if ln.strip().startswith('PREPROC_ENABLE_DB'):
+                                parts = ln.split('=', 1)
+                                if len(parts) == 2:
+                                    env_val = parts[1].strip()
+                                break
+                except Exception:
+                    env_val = None
+
+            enable_db_storage = False
+            if env_val is not None:
+                enable_db_storage = str(env_val).lower() in ('1', 'true', 'yes')
+
+            logger.info(f"PREPROC_ENABLE_DB 生效值: {enable_db_storage}")
+
             _interface = DocumentConversionInterface(
                 output_format="md",
                 save_to_file=True,
                 output_dir=str(_OUTPUT_DIR),
-                enable_db_storage=False,
+                enable_db_storage=enable_db_storage,
+                db_config=db_config,
                 excel_to_mysql=True,
                 mineru_config_path=None,
                 mineru_model_source=os.environ.get("MINERU_MODEL_SOURCE", "local"),

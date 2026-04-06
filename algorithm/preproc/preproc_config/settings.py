@@ -19,7 +19,7 @@ class Settings:
 
     # 数据库设置
     ES_INDEX_NAME = "documents"
-    ES_HOST = "localhost"
+    ES_HOST = "10.126.62.88"
     ES_PORT = 9200
 
     MYSQL_HOST = "localhost"

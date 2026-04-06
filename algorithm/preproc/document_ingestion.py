@@ -26,7 +26,7 @@ class DocumentConversionInterface:
                  output_format: str = 'md',  # 默认输出md
                  save_to_file: bool = True,
                  output_dir: Optional[str] = None,
-                 enable_db_storage: bool = False,
+                 enable_db_storage: bool = True,
                  db_config: Optional[Dict] = None,
                  excel_to_mysql: bool = True,
                  mineru_config_path: Optional[str] = None,
@@ -49,8 +49,8 @@ class DocumentConversionInterface:
 
         # 设置输出格式
         self.output_format = output_format.lower()
-        if self.output_format not in ['md', 'txt']:
-            raise ValueError("output_format 必须是 'md' 或 'txt'")
+        if self.output_format not in ['md']:
+            raise ValueError("output_format 必须是 'md' ")
 
         self.save_to_file = save_to_file
 
@@ -112,10 +112,17 @@ class DocumentConversionInterface:
         # 初始化 MySQL
         try:
             mysql_host = db_config.get('mysql_host', Settings.MYSQL_HOST)
-            mysql_port = db_config.get('mysql_port', Settings.MYSQL_PORT)
+            # 强制端口为整数，容错处理字符串或 None
+            try:
+                mysql_port = int(db_config.get('mysql_port', Settings.MYSQL_PORT) or Settings.MYSQL_PORT)
+            except Exception:
+                mysql_port = Settings.MYSQL_PORT
             mysql_db = db_config.get('mysql_database', Settings.MYSQL_DATABASE)
             mysql_user = db_config.get('mysql_username', 'root')
             mysql_pass = db_config.get('mysql_password', '')
+
+            # 记录将要使用的 DB 配置（不输出密码），便于排查
+            logger.info("使用 MySQL 配置: %s:%s/%s (user=%s)", mysql_host, mysql_port, mysql_db, mysql_user)
 
             self.mysql_client = MySQLClient(
                 host=mysql_host,
@@ -155,11 +162,11 @@ class DocumentConversionInterface:
             'input_path': input_path,
             'output_path': None,
             'content': None,
-            'metadata': None,
             'error': None,
             'mysql_tables': []   # 存储创建的 MySQL 表信息
         }
 
+        # （已在初始化时处理 MySQL 端口）这里无需再次处理 db_config
         try:
             # 处理文件
             logger.info(f"开始处理文件: {input_path}")
@@ -451,6 +458,50 @@ class DocumentConversionInterface:
         for schema in schemas:
             logger.info(f"\n处理工作表: {schema['sheet_name']}")
             logger.info(f"表名: {schema['table_name']}")
+
+            # 生成一个安全的表名，MySQL 标识符最大长度为 64
+            # 使用短哈希后缀以保证唯一性，并移除非法字符
+            try:
+                import hashlib
+
+                orig_name = str(schema.get('table_name', 'excel_table'))
+                # 保留字母、数字和下划线，其他字符替换为下划线
+                safe_base = ''.join(c if (c.isalnum() or c == '_') else '_' for c in orig_name)
+                # 确保不以数字开头
+                if safe_base and safe_base[0].isdigit():
+                    safe_base = f"t_{safe_base}"
+
+                # 计算短哈希
+                h = hashlib.sha1(orig_name.encode('utf-8')).hexdigest()[:10]
+                # 组成目标名，尽量保留末尾的 sheet 名短描述
+                max_total = 63  # MySQL 最大标识符长度为 64，包括结束符，这里保守使用 63
+                candidate = f"excel_{h}_{safe_base}"
+                if len(candidate) > max_total:
+                    # 截断 safe_base 部分以适配长度
+                    keep = max_total - len(f"excel_{h}_")
+                    safe_base_trunc = safe_base[:max(1, keep)]
+                    candidate = f"excel_{h}_{safe_base_trunc}"
+
+                safe_table_name = candidate
+
+                # 用 safe_table_name 替换 SQL 中的原表名（处理带反引号和不带反引号两种情况）
+                sql = schema.get('sql', '')
+                if sql:
+                    # 尝试替换第一个出现的表名（带反引号或不带）
+                    import re
+
+                    # 匹配可能的 `orig_name` 或 orig_name（考虑回引号）
+                    pattern = re.compile(r"(`?%s`?)" % re.escape(schema.get('table_name', orig_name)))
+                    new_sql, n = pattern.subn(f"`{safe_table_name}`", sql, count=1)
+                    if n == 0:
+                        # 兜底：直接在开头的 CREATE TABLE 后替换第一个反引号包名
+                        new_sql = re.sub(r"CREATE\s+TABLE\s+`[^`]+`", f"CREATE TABLE `{safe_table_name}`", sql, count=1, flags=re.IGNORECASE)
+                    schema['sql'] = new_sql
+
+                # 将 table_name 字段指向安全名称，供后续 insert 使用
+                schema['table_name'] = safe_table_name
+            except Exception as e:
+                logger.warning(f"生成安全表名失败，使用原名: {e}")
 
             table_info = {
                 'sheet_name': schema['sheet_name'],
