@@ -77,36 +77,9 @@ def _get_predictor():
     return _predictor
 
 
-def _load_kg_config() -> dict[str, Any]:
-    config_path = _KG_UPDATE_ROOT / "config.json"
-    if not config_path.exists():
-        return {
-            "neo4j": {"uri": "bolt://127.0.0.1:7687", "username": "neo4j", "password": "neo4j", "database": "neo4j"},
-            "system": {"confidence_threshold": 0.7},
-        }
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.warning("读取 KGUpdate 配置失败，使用默认: %s", e)
-        return {
-            "neo4j": {"uri": "bolt://127.0.0.1:7687", "username": "neo4j", "password": "neo4j", "database": "neo4j"},
-            "system": {"confidence_threshold": 0.7},
-        }
-
-
 def _create_updator():
     mod = _get_kg_updator_module()
-    config = _load_kg_config()
-    neo4j = config.get("neo4j", {})
-    system = config.get("system", {})
-    return mod["create_kg_updator"](
-        neo4j_uri=neo4j.get("uri", "bolt://127.0.0.1:7687"),
-        neo4j_username=neo4j.get("username", "neo4j"),
-        neo4j_password=neo4j.get("password", "neo4j"),
-        database=neo4j.get("database", "neo4j"),
-        confidence_threshold=float(system.get("confidence_threshold", 0.7)),
-    )
+    return mod["create_kg_updator"]()
 
 
 def health() -> dict[str, Any]:

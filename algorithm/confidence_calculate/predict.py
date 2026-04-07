@@ -6,16 +6,22 @@ import torch
 import json
 import numpy as np
 import time
+import yaml
+from dotenv import load_dotenv
+
+# 加载 backend/.env
+env_path = Path(__file__).parent.parent.parent / 'backend' / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
 
 # 获取当前文件所在目录
 CURRENT_DIR = Path(__file__).resolve().parent
 
-# 将所有必要的目录添加到 sys.path，以便包导入能工作
+# 将所有必要的目录添加到 sys.path
 required_paths = [
-    str(CURRENT_DIR),                          # 根目录
-    str(CURRENT_DIR / "models"),                # models目录
-    str(CURRENT_DIR / "utils"),                 # utils目录
-    str(CURRENT_DIR / "components"),            # components目录
+    str(CURRENT_DIR),
+    str(CURRENT_DIR / "models"),
+    str(CURRENT_DIR / "components"),
 ]
 
 for path in required_paths:
@@ -25,24 +31,34 @@ for path in required_paths:
 # 定义各个模块的绝对路径
 base_model_path = CURRENT_DIR / "models" / "base_model.py"
 dynamic_hybrid_path = CURRENT_DIR / "models" / "dynamic_hybrid.py"
-config_path = CURRENT_DIR / "utils" / "config.py"
+config_yaml_path = CURRENT_DIR / "config.yaml"
 extractor_path = CURRENT_DIR / "utils" / "extractor.py"
+
 
 def load_module(module_name, file_path):
     """从指定文件路径加载模块"""
+    if not file_path.exists():
+        print(f"警告: 模块文件不存在: {file_path}")
+        return None
+    
     spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        print(f"警告: 无法从 {file_path} 创建模块规范")
+        return None
+    
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
-# 先加载 base_model 并注册到 sys.modules，供 dynamic_hybrid 内部导入使用
+
+# 加载 base_model
 base_module = load_module("base_model", base_model_path)
-sys.modules["base_model"] = base_module
+if base_module:
+    sys.modules["base_model"] = base_module
 
 # 加载 dynamic_hybrid
 dynamic_hybrid_module = load_module("dynamic_hybrid", dynamic_hybrid_path)
-# 加载 config
-config_module = load_module("config", config_path)
+
 # 加载 extractor（如果存在）
 if extractor_path.exists():
     extractor_module = load_module("extractor", extractor_path)
@@ -50,21 +66,55 @@ else:
     extractor_module = None
 
 # 从加载的模块中获取类
-DynamicHybridModel = dynamic_hybrid_module.DynamicHybridModel
-Config = config_module.Config
+DynamicHybridModel = dynamic_hybrid_module.DynamicHybridModel if dynamic_hybrid_module else None
 Extractor = extractor_module if extractor_module else None
+
+
+class Config:
+    """简单的配置类，直接从 YAML 读取"""
+    def __init__(self, config_path: str):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            self.config = yaml.safe_load(f)
+    
+    def get(self, key: str, default=None):
+        """支持点号分隔的键，如 'text.es_size'"""
+        keys = key.split('.')
+        value = self.config
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+            else:
+                return default
+            if value is None:
+                return default
+        return value
 
 
 class ConfidencePredictor:
     """置信度预测器"""
     
-    def __init__(self, model_path: str, config_path: str = 'config.yaml'):
+    def __init__(self, model_path: str, config_path: str = None):
         """初始化预测器"""
+        if config_path is None:
+            config_path = str(CURRENT_DIR / 'config.yaml')
+        
+        # 检查配置文件是否存在
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"配置文件不存在: {config_path}")
+        
         self.config = Config(config_path)
         
         # 自动选择设备
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"使用设备: {self.device}")
+        
+        # 检查 DynamicHybridModel 是否可用
+        if DynamicHybridModel is None:
+            raise ImportError("无法加载 DynamicHybridModel，请检查 models/dynamic_hybrid.py")
+        
+        # 检查模型文件是否存在
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"模型文件不存在: {model_path}")
         
         # 加载模型
         print("加载模型中...")
@@ -98,7 +148,7 @@ class ConfidencePredictor:
                 'kg': round(float(component_scores['kg_score']), 2),
                 'path': round(float(component_scores['path_score']), 2)
             },
-            'best_path': component_scores['best_path']
+            'best_path': component_scores.get('best_path', None)
         }
     
     def predict_batch(self, triples: list) -> list:
@@ -108,17 +158,13 @@ class ConfidencePredictor:
             results.append(self.predict(triple))
         return results
     
-    def extract_from_schema_output(self, data: dict, confidence_threshold: float = 0.7) -> dict:
+    def extract_from_schema_output(self, data: dict, confidence_threshold: float = None) -> dict:
         """
         从 schema_mapper 输出中提取关系并计算置信度
-        
-        Args:
-            data: schema_mapper 输出的 JSON（包含 raw 和 graph）
-            confidence_threshold: 置信度阈值
-        
-        Returns:
-            包含计算结果的字典
         """
+        if confidence_threshold is None:
+            confidence_threshold = float(os.getenv('KG_CONFIDENCE_THRESHOLD', '0.7'))
+        
         if Extractor is None:
             return {
                 "success": False,
@@ -133,7 +179,18 @@ class ConfidencePredictor:
         graph = data.get('graph', {})
         
         # 使用 extractor 提取关系
-        relations_to_evaluate, relation_info = Extractor.extract_relations_from_graph(graph)
+        try:
+            relations_to_evaluate, relation_info = Extractor.extract_relations_from_graph(graph)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"提取关系失败: {e}",
+                "statistics": {"total": 0, "high": 0, "low": 0},
+                "relations_high": [],
+                "relations_low": [],
+                "full_relations": [],
+                "predictions": []
+            }
         
         if not relations_to_evaluate:
             return {
@@ -206,10 +263,8 @@ class ConfidencePredictor:
     
     def test_all(self, json_path: str):
         """测试所有样本"""
-        # 加载数据
         triples, true_values = self.load_test_data(json_path)
         
-        # 存储结果
         predictions = []
         component_scores_list = []
         best_paths = []
@@ -218,7 +273,6 @@ class ConfidencePredictor:
         print("\n开始批量测试...")
         print("-" * 60)
         
-        # 逐个测试所有样本
         start_total = time.time()
         
         for i, triple in enumerate(triples):
@@ -230,17 +284,15 @@ class ConfidencePredictor:
             end_time = time.time()
             sample_time = end_time - start_time
             
-            # 保存结果
             predictions.append(component_scores['final_confidence'])
             component_scores_list.append({
                 'text': component_scores['text_score'],
                 'kg': component_scores['kg_score'],
                 'path': component_scores['path_score']
             })
-            best_paths.append(component_scores['best_path'])
+            best_paths.append(component_scores.get('best_path', None))
             times.append(sample_time)
             
-            # 打印每个样本的结果
             print(f"样本 {i+1:3d}/{len(triples)} | "
                   f"真实: {true_values[i]:.2f} | "
                   f"预测: {component_scores['final_confidence']:.2f} | "
@@ -253,7 +305,6 @@ class ConfidencePredictor:
         print(f"测试完成! 总耗时: {end_total - start_total:.2f}秒")
         print(f"平均每个样本: {np.mean(times)*1000:.2f}毫秒")
         
-        # 保存详细结果到文件
         self.save_results(
             triples, true_values, predictions, 
             component_scores_list, best_paths,
@@ -291,12 +342,24 @@ class ConfidencePredictor:
         print(f"\n详细结果已保存到 {filename}")
 
 
-if __name__ == '__main__':
-    # 创建预测器
-    predictor = ConfidencePredictor('final_model.pt')
+def get_predictor(model_path: str = None, config_path: str = None):
+    """获取预测器实例"""
+    if model_path is None:
+        model_path = str(CURRENT_DIR / 'final_model.pt')
+    if config_path is None:
+        config_path = str(CURRENT_DIR / 'config.yaml')
     
-    # 测试所有样本
-    results = predictor.test_all('data/test.json')
+    return ConfidencePredictor(model_path, config_path)
+
+
+if __name__ == '__main__':
+    predictor = get_predictor()
+    
+    test_data_path = CURRENT_DIR / 'data' / 'test.json'
+    if test_data_path.exists():
+        results = predictor.test_all(str(test_data_path))
+    else:
+        print(f"测试数据不存在: {test_data_path}")
     
     print("\n" + "="*60)
     print("测试完成！")

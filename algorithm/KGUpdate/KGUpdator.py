@@ -1,8 +1,19 @@
+import os
 import time
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from neo4j import GraphDatabase
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载 backend/.env - 使用相对路径
+env_path = Path(__file__).parent.parent.parent / 'backend' / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"已加载环境变量: {env_path}")
+else:
+    print(f"环境变量文件不存在: {env_path}")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,11 +28,11 @@ class KGUpdator:
     """
 
     def __init__(self,
-                 neo4j_uri: str,
-                 neo4j_username: str,
-                 neo4j_password: str,
-                 database: str = "openkg",
-                 confidence_threshold: float = 0.7):
+                 neo4j_uri: Optional[str] = None,
+                 neo4j_username: Optional[str] = None,
+                 neo4j_password: Optional[str] = None,
+                 database: Optional[str] = None,
+                 confidence_threshold: Optional[float] = None):
         """
         初始化
         Args:
@@ -32,15 +43,39 @@ class KGUpdator:
             confidence_threshold: 置信度阈值
         """
         logger.info("初始化知识图谱更新器...")
-        self.driver = GraphDatabase.driver(
-            neo4j_uri,
-            auth=(neo4j_username, neo4j_password),
-            max_connection_pool_size=20,
-            connection_timeout=30
-        )
-        self.database = database
-        self.confidence_threshold = confidence_threshold
-        logger.info(f"初始化完成，数据库: {database}，阈值: {confidence_threshold}")
+        
+        # 打印环境变量值（调试用）
+        logger.info(f"环境变量 NEO4J_URI: {os.getenv('NEO4J_URI')}")
+        logger.info(f"环境变量 NEO4J_USER: {os.getenv('NEO4J_USER')}")
+        logger.info(f"环境变量 NEO4J_DATABASE: {os.getenv('NEO4J_DATABASE')}")
+        
+        # 从环境变量或参数获取配置
+        self.neo4j_uri = neo4j_uri or os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        self.neo4j_username = neo4j_username or os.getenv('NEO4J_USER', 'neo4j')
+        self.neo4j_password = neo4j_password or os.getenv('NEO4J_PASSWORD', 'neo4j2025')
+        self.database = database or os.getenv('NEO4J_DATABASE', 'neo4j')
+        self.confidence_threshold = confidence_threshold if confidence_threshold is not None else float(os.getenv('KG_CONFIDENCE_THRESHOLD', '0.7'))
+        
+        logger.info(f"使用的 Neo4j URI: {self.neo4j_uri}")
+        logger.info(f"使用的用户名: {self.neo4j_username}")
+        logger.info(f"Database: {self.database}")
+        logger.info(f"Confidence threshold: {self.confidence_threshold}")
+        
+        try:
+            self.driver = GraphDatabase.driver(
+                self.neo4j_uri,
+                auth=(self.neo4j_username, self.neo4j_password),
+                max_connection_pool_size=20,
+                connection_timeout=30
+            )
+            # 测试连接
+            with self.driver.session(database=self.database) as session:
+                result = session.run("RETURN 1 as test")
+                result.single()
+            logger.info("Neo4j 连接成功")
+        except Exception as e:
+            logger.error(f"Neo4j 连接失败: {e}")
+            raise
 
     def add_relationships_with_full_properties(self, 
                                             relationships: List[Dict[str, Any]],
@@ -54,8 +89,8 @@ class KGUpdator:
                 - predicate: 关系类型
                 - object: 宾语名称
                 - confidence: 置信度
-                - source_node: 源节点的完整属性
-                - target_node: 目标节点的完整属性
+                - source_node: 源节点的完整属性（可选）
+                - target_node: 目标节点的完整属性（可选）
                 - relationship_type: 关系类型（可选）
             create_missing_nodes: 是否创建不存在的节点
         """
@@ -74,7 +109,7 @@ class KGUpdator:
             subject = rel.get('subject')
             predicate = rel.get('predicate')
             obj = rel.get('object')
-            confidence = rel.get('confidence', 0.7)
+            confidence = rel.get('confidence', self.confidence_threshold)
             source_node = rel.get('source_node', {})
             target_node = rel.get('target_node', {})
             
@@ -157,7 +192,7 @@ class KGUpdator:
                 r.last_updated = $timestamp
             """
         
-        result = tx.run(rel_query, {
+        tx.run(rel_query, {
             "subject": subject,
             "object": obj,
             "confidence": confidence,
@@ -271,7 +306,7 @@ class KGUpdator:
             conf = d.get("final_confidence", 0)
             if conf >= 0.85:
                 high += 1
-            elif conf >= 0.7:
+            elif conf >= self.confidence_threshold:
                 medium += 1
             else:
                 low += 1
@@ -514,10 +549,10 @@ class KGUpdator:
                 WHERE conf IS NOT NULL
                 RETURN 
                     count(CASE WHEN conf >= 0.85 THEN 1 END) as high,
-                    count(CASE WHEN conf >= 0.7 AND conf < 0.85 THEN 1 END) as medium,
-                    count(CASE WHEN conf < 0.7 THEN 1 END) as low,
+                    count(CASE WHEN conf >= $threshold AND conf < 0.85 THEN 1 END) as medium,
+                    count(CASE WHEN conf < $threshold THEN 1 END) as low,
                     count(r) as total
-                """).single()
+                """, {"threshold": self.confidence_threshold}).single()
                 return {
                     "success": True,
                     "statistics": {
@@ -548,12 +583,12 @@ class KGUpdator:
                 f"耗时{stats['elapsed_time']}秒")
 
 
-def create_kg_updator(neo4j_uri: str,
-                      neo4j_username: str,
-                      neo4j_password: str,
-                      database: str = "openkg",
-                      confidence_threshold: float = 0.7) -> KGUpdator:
-    """封装函数"""
+def create_kg_updator(neo4j_uri: Optional[str] = None,
+                      neo4j_username: Optional[str] = None,
+                      neo4j_password: Optional[str] = None,
+                      database: Optional[str] = None,
+                      confidence_threshold: Optional[float] = None) -> KGUpdator:
+    """创建知识图谱更新器"""
     return KGUpdator(
         neo4j_uri=neo4j_uri,
         neo4j_username=neo4j_username,

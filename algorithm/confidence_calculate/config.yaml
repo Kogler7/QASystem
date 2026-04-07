@@ -9,18 +9,12 @@ text_dim: 128               # SBERT模型输出维度
 kg_dim: 128                  # TransE嵌入维度
 path_dim: 64                 # 路径特征维度
 
-# 文本证据配置
+# 文本证据配置（业务参数，连接配置在 .env）
 text:
-  es_hosts: ["https://10.126.62.88:9200"]
-  es_index: "documents"
   es_timeout: 30
   es_size: 50
   text_top_k: 10
   max_bm25_norm: 100.0
-  sbert_model_path: "/home/ycheng/ZhCHRAG/qasystem/algorithm/confidence_calculate/sbert_model"  # 本地模型路径
-  es_username: "elastic"  
-  es_password: "123456"  
-  es_verify_certs: false  # 如果使用自签名证书
 
 # KG证据配置
 kg:
@@ -35,11 +29,6 @@ path:
   max_path_length: 3
   max_paths_per_triple: 20
   path_embedding_dim: 64
-  neo4j:
-    uri: "bolt://127.0.0.1:7687"
-    username: "neo4j"
-    password: "neo4j2025"
-    database: "neo4j"
 
 # 模型融合配置
 fusion:
