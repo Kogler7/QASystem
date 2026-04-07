@@ -1,6 +1,7 @@
 """
 意图识别组件：进程内调用 algorithm/intent_recognition_model 算法。
-使用前需安装依赖并配置 .env（Milvus、DeepSeek API Key、模型路径等）。
+环境变量与后端其它模块一致，在 backend/.env（或 Docker 根目录 .env）中配置即可；
+见 backend/.env.example 中「意图识别 / Milvus」相关项。单独跑 algorithm 下脚本时可用该目录 .env。
 """
 import logging
 import sys
@@ -17,13 +18,6 @@ _INTENT_ROOT = _ROOT / "algorithm" / "intent_recognition_model"
 
 
 if _INTENT_ROOT.exists():
-    _env_file = _INTENT_ROOT / ".env"
-    if _env_file.exists():
-        try:
-            from dotenv import load_dotenv
-            load_dotenv(dotenv_path=_env_file, override=False)
-        except Exception as e:
-            logger.debug("加载意图识别 .env 跳过: %s", e)
     if str(_INTENT_ROOT) not in sys.path:
         sys.path.insert(0, str(_INTENT_ROOT))
 
@@ -54,7 +48,7 @@ def health() -> dict[str, Any]:
     except Exception as e:
         return {
             "status": "unavailable",
-            "detail": f"意图识别模块不可用: {e}。请确认已安装 algorithm/intent_recognition_model 依赖并配置 .env。",
+            "detail": f"意图识别模块不可用: {e}。请确认已安装 algorithm/intent_recognition_model 依赖，并在 backend/.env 中配置 Milvus / 模型路径 / LLM 等。",
         }
 
 

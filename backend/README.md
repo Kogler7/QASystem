@@ -7,7 +7,7 @@
 - **知识抽取组件**（进程内调用 `algorithm/uie`，按函数封装，无需单独启动抽取服务）
 - **知识图谱更新组件**（进程内调用 `algorithm/KGUpdate`，支持三元组批量添加/删除与图谱统计，配置见 `algorithm/KGUpdate/config.json`）
 - **向量转化存储与自然语言转 Cypher 组件**（进程内调用 `algorithm/NL_to_cypher`，根据自然语言问题与图谱 Schema 生成 Cypher，依赖 Ollama，见 `algorithm/NL_to_cypher`）
-- **意图识别组件**（进程内调用 `algorithm/intent_recognition_model`，Milvus 混合检索 + DeepSeek 结构化输出，配置见 `algorithm/intent_recognition_model/.env`）
+- **意图识别组件**（进程内调用 `algorithm/intent_recognition_model`，Milvus 混合检索 + LLM 结构化输出；配置写在 **`backend/.env`**，见 `.env.example`）
 - **答案生成组件**（进程内调用 `algorithm/ans`，Neo4j 知识图谱问答与问题求解器，配置见 `algorithm/ans/QA/config.py` 或算法内默认）
 - **文档预处理组件**（进程内调用 `algorithm/preproc`，PDF/DOCX/Excel/HTML 转 Markdown/文本，支持 MinerU，配置见 `algorithm/preproc/config/settings.py`）
 - 基础 **用户注册 / 登录 / 当前用户** 模块（JWT）
@@ -59,7 +59,7 @@ cd backend
 cp .env.example .env
 ```
 
-`app/config.py` 会依次加载仓库根目录 `.env`（若存在）与本目录 `.env`（后者优先覆盖同名键）。变量说明以 `.env.example` 内注释为准，至少配置：
+`app/config.py` 会依次加载**本目录 `.env`**（`override=True`）与**仓库根目录 `.env`**（`override=False`，仅补充未设置的键）。变量说明以 `.env.example` 为准，至少配置：
 
 - `DATABASE_URL`、`DIFY_*`、`JWT_*`
 - 使用组件时再配置 `NEO4J_*`、`LLM_*`、`MILVUS_*`、`UIE_*` 等
@@ -79,7 +79,7 @@ pip install -r requirements.txt
 
 若需使用 **向量转化存储与自然语言转 Cypher** 组件，需安装 `algorithm/NL_to_cypher/requirements.txt` 中的依赖（如 langchain、requests 等），并启动 Ollama 服务。可通过环境变量 `OLLAMA_URL`、`OLLAMA_MODEL_NAME` 覆盖默认 Ollama 地址与模型。未安装时，该组件接口返回“模块不可用”。
 
-若需使用 **意图识别** 组件，需安装 `algorithm/intent_recognition_model` 所需依赖（如 langchain-deepseek、pymilvus、milvus-model 等），并配置 `algorithm/intent_recognition_model/.env`（`MILVUS_URI`、`DEEPSEEK_API_KEY`、`MODEL_PATH`、`DATA_DIR`、`COLLECTION_NAME` 等），且 Milvus 已启动、意图集合已初始化。未配置或不可用时，该组件接口返回“模块不可用”。
+若需使用 **意图识别** 组件，需安装 `algorithm/intent_recognition_model` 所需依赖（如 pymilvus、milvus-model 等），并在 **`backend/.env`** 中配置 `MILVUS_URI`、`MODEL_PATH` / `INTENT_MODEL_BASE_DIR`、`LLM_*` 或 `DEEPSEEK_API_KEY`、`DATA_DIR`、`COLLECTION_NAME` 等（与 `backend/.env.example` 一致）；单独跑该算法目录脚本时可另用 `algorithm/intent_recognition_model/.env`。Milvus 需已启动且意图集合已初始化。未配置或不可用时，该组件接口返回“模块不可用”。
 
 若需使用 **答案生成** 组件，需安装 `algorithm/ans/QA/requirements.txt` 中的依赖（neo4j、openai、pyvis、networkx 等），并保证 Neo4j 可连通；Neo4j 与 LLM 参数见 `algorithm/ans/QA/answer_solve.py` 中默认配置或 `QA/config.py`。未配置或不可用时，该组件接口返回“模块不可用”。
 
@@ -128,5 +128,5 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 - 全栈编排（MySQL + 本后端 + 前端）在**项目根目录**的 `docker-compose.yml`。
 - 后端镜像定义在 **`docker/backend.Dockerfile`**，构建上下文为**仓库根目录**（包含 `algorithm/`，以支持组件管理中的算法进程内调用）。在根目录执行：`docker compose build backend`。
-- 根目录 `.env` 供 `docker compose` 的 `env_file` 使用；本目录 `.env` 供本机 Uvicorn 使用，二者模板分别见根目录与 `backend/.env.example`。
+- 根目录 `.env` 供 `docker compose` 的 `env_file` 使用；本目录 `.env` 为本机 Uvicorn **主配置**。本机启动时本目录配置优先于根目录同名键；Docker 仅依赖 compose 注入的环境变量（模板见根目录 `.env.example`）。
 

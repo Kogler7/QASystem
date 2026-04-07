@@ -67,11 +67,11 @@ cd frontend && npm install && npm run dev
 
 | 场景 | 文件 |
 |------|------|
-| `docker compose` | **必须**有仓库根目录 `.env`（由 `env_file` 注入后端容器）；模板见根目录 `.env.example` |
-| 本机 `uvicorn` | `backend/.env`（模板见 `backend/.env.example`） |
-| 加载顺序 | 先根目录 `.env`，再 `backend/.env`（后者覆盖同名变量）；算法子目录 `.env` 多为 `override=False`，不覆盖已注入的变量 |
+| 本机 `uvicorn` | **`backend/.env`**（主配置，模板 `backend/.env.example`） |
+| `docker compose` | 仓库根目录 **`.env`**（`env_file` 注入后端容器；模板根目录 `.env.example`） |
+| 后端内加载顺序 | `backend/app/config.py`：**先** `backend/.env`（`override=True`）**再** 仓库根 `.env`（`override=False`，只补缺） |
 
-可选：`algorithm/ans/QA/.env`、`algorithm/intent_recognition_model/.env`（与 `backend/.env` 二选一或补充；详见各目录 `.env.example`）。
+算法子目录下的 `.env`（如 `algorithm/intent_recognition_model/.env`）**仅建议在单独跑该目录脚本时使用**；走后端 API 时请在 **`backend/.env`**（或 Docker 根 `.env`）写同一批变量。`algorithm/ans/QA/.env` 等同理，见各目录 `.env.example`。
 
 ---
 

@@ -79,4 +79,4 @@ from .router import router
 
 - 后端：`backend/requirements.txt` 放置通用依赖；算法专属依赖见各算法目录。
 - 前端：`frontend/package.json`
-- 环境变量：`backend/.env`、各算法模块的 `.env`（见对应 README）
+- 环境变量：业务配置以 **`backend/.env`** 为主；各算法目录下的 `.env` 仅用于单独跑脚本（见根目录 `README.md` 与对应 README）

@@ -98,7 +98,7 @@ export DOCKER_VOLUME_DIRECTORY=.
 docker compose -f milvus-docker-compose.yml up -d
 ```
 
-数据默认落在仓库下 `volumes/`（已在 `.gitignore` 中忽略）。在 `.env` 或 `algorithm/intent_recognition_model/.env` 中配置 `MILVUS_URI=http://host.docker.internal:19530`（后端容器访问宿主机）或按实际网络填写。
+数据默认落在仓库下 `volumes/`（已在 `.gitignore` 中忽略）。在仓库根 `.env`（compose 注入）中配置 `MILVUS_URI=http://host.docker.internal:19530`（后端容器访问宿主机）或按实际网络填写；与本机一致时也可在 `backend/.env` 维护，勿在多处填写冲突值。
 
 ## 生产环境建议
 
