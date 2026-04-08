@@ -9,19 +9,12 @@ text_dim: 128
 kg_dim: 128
 path_dim: 64
 
-# 文本证据（可用环境变量覆盖：CONFIDENCE_ES_HOSTS、CONFIDENCE_SBERT_MODEL_PATH、CONFIDENCE_ES_*）
+# 文本证据配置（业务参数，连接配置在 .env）
 text:
-  es_hosts: ["http://127.0.0.1:9200"]
-  es_index: "documents"
   es_timeout: 30
   es_size: 50
   text_top_k: 10
   max_bm25_norm: 100.0
-  # 相对 algorithm/confidence_calculate 目录；也可用 HuggingFace 模型名
-  sbert_model_path: "sbert_model"
-  es_username: ""
-  es_password: ""
-  es_verify_certs: false
 
 # KG证据配置
 kg:
@@ -36,11 +29,6 @@ path:
   max_path_length: 3
   max_paths_per_triple: 20
   path_embedding_dim: 64
-  neo4j:
-    uri: "bolt://127.0.0.1:7687"
-    username: "neo4j"
-    password: "neo4j2025"
-    database: "neo4j"
 
 # 模型融合配置
 fusion:

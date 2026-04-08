@@ -78,62 +78,9 @@ def _get_predictor():
     return _predictor
 
 
-def _default_kg_config() -> dict[str, Any]:
-    return {
-        "neo4j": {
-            "uri": "bolt://127.0.0.1:7687",
-            "username": "neo4j",
-            "password": "neo4j2025",
-            "database": "neo4j",
-        },
-        "system": {"confidence_threshold": 0.7},
-    }
-
-
-def _load_kg_config() -> dict[str, Any]:
-    config_path = _KG_UPDATE_ROOT / "config.json"
-    cfg = _default_kg_config()
-    if config_path.exists():
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                merged = json.load(f)
-            if isinstance(merged, dict):
-                neo = {**cfg.get("neo4j", {}), **(merged.get("neo4j") or {})}
-                sys_ = {**cfg.get("system", {}), **(merged.get("system") or {})}
-                cfg = {**merged, "neo4j": neo, "system": sys_}
-        except Exception as e:
-            logger.warning("读取 KGUpdate 配置失败，使用默认: %s", e)
-
-    neo = cfg.setdefault("neo4j", {})
-    if os.environ.get("NEO4J_URI"):
-        neo["uri"] = os.environ["NEO4J_URI"]
-    if os.environ.get("NEO4J_USER"):
-        neo["username"] = os.environ["NEO4J_USER"]
-    if os.environ.get("NEO4J_PASSWORD"):
-        neo["password"] = os.environ["NEO4J_PASSWORD"]
-    if os.environ.get("NEO4J_DATABASE"):
-        neo["database"] = os.environ["NEO4J_DATABASE"]
-    sys_c = cfg.setdefault("system", {})
-    if os.environ.get("KG_CONFIDENCE_THRESHOLD"):
-        try:
-            sys_c["confidence_threshold"] = float(os.environ["KG_CONFIDENCE_THRESHOLD"])
-        except ValueError:
-            pass
-    return cfg
-
-
 def _create_updator():
     mod = _get_kg_updator_module()
-    config = _load_kg_config()
-    neo4j = config.get("neo4j", {})
-    system = config.get("system", {})
-    return mod["create_kg_updator"](
-        neo4j_uri=neo4j.get("uri", "bolt://127.0.0.1:7687"),
-        neo4j_username=neo4j.get("username", "neo4j"),
-        neo4j_password=neo4j.get("password", "neo4j"),
-        database=neo4j.get("database", "neo4j"),
-        confidence_threshold=float(system.get("confidence_threshold", 0.7)),
-    )
+    return mod["create_kg_updator"]()
 
 
 def health() -> dict[str, Any]:

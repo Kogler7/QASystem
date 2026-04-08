@@ -1,9 +1,17 @@
+import os
+import yaml
 import torch
 import torch.nn as nn
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from neo4j import GraphDatabase
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载 backend/.env
+env_path = Path(__file__).parent.parent.parent.parent / 'backend' / '.env'
+load_dotenv(env_path)
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -12,23 +20,35 @@ logger = logging.getLogger(__name__)
 
 class PathEvidence(nn.Module):
     """
-    基于Neo4j的路径证据组件
+    基于Neo4j的路径证据组件 - 从 backend/.env 读取连接配置，从 config.yaml 读取模型参数
     """
     
-    def __init__(self, config):
+    def __init__(self, config: Optional[Dict] = None, config_path: Optional[str] = None):
         super().__init__()
         
-        # Neo4j连接配置
-        neo4j_config = config.get('neo4j', {})
-        self.uri = neo4j_config.get('uri', 'bolt://127.0.0.1:7687')
-        self.username = neo4j_config.get('username', 'neo4j')
-        self.password = neo4j_config.get('password', 'neo4j2025')
-        self.database = neo4j_config.get('database', 'neo4j')
+        # 加载 config.yaml
+        if config_path is None:
+            config_path = Path(__file__).parent.parent / 'config.yaml'
         
-        # 路径参数
-        self.max_path_length = config.get('max_path_length', 3)
-        self.max_paths = config.get('max_paths_per_triple', 20)
-        self.path_embedding_dim = config.get('path_embedding_dim', 64)
+        with open(config_path, 'r', encoding='utf-8') as f:
+            yaml_config = yaml.safe_load(f)
+        
+        path_config = yaml_config.get('path', {})
+        
+        # 合并传入的 config（如果有）
+        if config:
+            path_config.update(config)
+        
+        # 从环境变量读取 Neo4j 连接配置
+        self.uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        self.username = os.getenv('NEO4J_USER', 'neo4j')
+        self.password = os.getenv('NEO4J_PASSWORD', 'neo4j2025')
+        self.database = os.getenv('NEO4J_DATABASE', 'neo4j')
+        
+        # 从 config.yaml 读取路径参数
+        self.max_path_length = path_config.get('max_path_length', 3)
+        self.max_paths = path_config.get('max_paths_per_triple', 20)
+        self.path_embedding_dim = path_config.get('path_embedding_dim', 64)
         
         # 建立Neo4j连接
         self.driver = None
@@ -72,7 +92,6 @@ class PathEvidence(nn.Module):
                 logger.info(f"✅ Neo4j连接成功: {self.uri}")
         except Exception as e:
             logger.error(f"❌ Neo4j连接失败: {e}")
-            logger.error("请确保Neo4j服务已启动，并检查连接信息")
             self.driver = None
     
     def _ensure_connected(self):
@@ -90,19 +109,24 @@ class PathEvidence(nn.Module):
         
         try:
             with self.driver.session(database=self.database) as session:
-                # 修复：将参数拼接进查询字符串
-                query = f"""
-                MATCH path = (start:Entity)-[rels*1..{self.max_path_length}]-(end:Entity)
-                WHERE start.name = '{start}' AND end.name = '{end}'
+                # 使用参数化查询避免注入
+                query = """
+                MATCH path = (start:Entity)-[rels*1..$max_length]-(end:Entity)
+                WHERE start.name = $start AND end.name = $end
                 AND ALL(n IN nodes(path) WHERE SINGLE(m IN nodes(path) WHERE m = n))
                 RETURN [r IN rels | type(r)] AS relations,
                     [n IN nodes(path)[1..] | n.name] AS nodes,
                     length(path) AS path_length
                 ORDER BY path_length
-                LIMIT {self.max_paths}
+                LIMIT $max_paths
                 """
                 
-                result = session.run(query)
+                result = session.run(query, {
+                    'start': start,
+                    'end': end,
+                    'max_length': self.max_path_length,
+                    'max_paths': self.max_paths
+                })
                 
                 paths = []
                 for record in result:
@@ -130,12 +154,16 @@ class PathEvidence(nn.Module):
         
         try:
             with self.driver.session(database=self.database) as session:
-                # 查询特定关系的数量
+                # 使用参数化查询
+                query = """
+                MATCH ()-[r:$rel]->()
+                RETURN count(r) as freq
+                """
+                # 由于参数不能用于关系类型，需要特殊处理
                 query = f"""
                 MATCH ()-[r:{relation}]->()
                 RETURN count(r) as freq
                 """
-                
                 result = session.run(query)
                 freq = result.single()['freq']
                 
