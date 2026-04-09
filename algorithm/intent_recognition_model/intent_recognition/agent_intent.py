@@ -7,6 +7,7 @@ from langchain_core.tools import tool
 from langchain.agents import create_agent
 from langchain_core.prompts import ChatPromptTemplate
 from data.intent_model import Intent_Base_Recognition
+from ir_utils.database_utils import DatabaseUtils
 import json
 
 #初始化工具类
@@ -29,7 +30,7 @@ def _normalize_openai_base_url(base_url: str) -> str:
 def retrival_tool(query: str):
     """从意图向量数据库中检索相关意图"""
     results = HybridSearch().basic_search(query=query)
-    
+     
     dense_results = results.get("密集向量检索结果", [])
     sparse_results = results.get("稀疏向量检索结果", [])
     
@@ -65,7 +66,6 @@ retrival_tool(query: str): 从向量库检索意图
   "object": "意图对象",
   "intent_name": "意图名称",
   "user_goal": "用户核心目标",
-  "tools": "意图所需要的工具的列表"
 }
 ```
 
@@ -84,8 +84,19 @@ model = ChatOpenAI(
     temperature=0,
 )
 
-def run_tool_loop(query: str,max_loop: int = 2):
+
+def run_tool_loop(query: str, max_loop: int = 2):
     """循环调用工具直到不再需要继续"""
+    # 检查输入是否为 JSON 字符串
+    try:
+        json_input = json.loads(query)
+        # 如果是 JSON 格式，构建查询文本
+        if isinstance(json_input, dict) and "problem_model" in json_input:
+            query = DatabaseUtils().build_query_from_json(json_input)
+    except (json.JSONDecodeError, TypeError):
+        # 如果不是 JSON 格式，直接使用原始查询
+        pass
+
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": query}
@@ -135,10 +146,40 @@ def run_tool_loop(query: str,max_loop: int = 2):
     return "达到最大步数"
         
 if __name__ == "__main__":
-    query = "最近 12 个月的采购金额月度走势是怎样的？"
-    final_answer = run_tool_loop(query)
+    # 测试普通文本输入
+    # query = "最近 12 个月的采购金额月度走势是怎样的？"
+    
+    # 测试 JSON 格式输入
+    json_input = '''
+    {
+      "success": true,
+      "problem_model": {
+        "问题ID": "QKB-001",
+        "问题描述": "公开采购与非公开采购金额构成如何？",
+        "问题类型": "描述型问题",
+        "约束": ["需基于公开数据源"],
+        "目标对象": "采购金额构成",
+        "干系人": ["采购部门", "财务部门"],
+        "目标": ["明确金额分配比例"],
+        "当前状态": "分析阶段",
+        "创建时间": "2026-04-09T00:54:30.393365",
+        "相关实体": ["公开采购", "非公开采购", "金额构成"]
+      },
+      "link_result": {
+        "linked_entities": {
+          "NEO_390": "CG_003 公开采购中标金额"
+        }
+      }
+    }
+    '''
+    
+    final_answer = run_tool_loop(json_input)
     print(f"tool_result: {final_answer.get('tool_result')}")
     print(f"reasoning: {final_answer.get('reasoning')}")
     print(f"json_content: {final_answer.get('json_content')}")
     print(type(final_answer.get('json_content')))   # <class 'str'>
-    print(type(json.loads(final_answer.get('json_content'))))
+    if isinstance(final_answer.get('json_content'), str):
+        try:
+            print(type(json.loads(final_answer.get('json_content'))))
+        except json.JSONDecodeError:
+            print("json_content 不是有效的 JSON 字符串")

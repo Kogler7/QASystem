@@ -13,14 +13,18 @@ class SearchPlan:
             domain_name: 域名称
             
         Returns:
-            计划列表
+            计划对象
         """
         query = """
         MATCH (d:Domain {domain_name: $domain_name})
         MATCH (d)-[:域_计划]->(p:Plan)
         RETURN p.plan
         """
-        return self.gc.run_query(query, {"domain_name": domain_name})
+        results = self.gc.run_query(query, {"domain_name": domain_name})
+        if results:
+            return results
+        else:
+            return None
 
 if __name__ == "__main__":
     search_plan = SearchPlan()

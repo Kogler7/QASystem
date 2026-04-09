@@ -12,28 +12,68 @@ class PlanApp:
         """根据域名称获取计划"""
         return self.search_plan.search_plan(domain_name)
 
-    def get_plan_from_intent(self, intent_name, domain):
+    def get_plan_from_intent(self, intent_name="", domain=""):
         """根据意图名称和域名称获取计划"""
         # results = self.intent_app.generate_result(query)
 
         if intent_name and domain:
             intent_domain = f"{intent_name}_{domain}"
-            plan = self.search_plan.search_plan(intent_domain)[0]
+            plan = self.search_plan.search_plan(intent_domain)
+            # 没有找到计划
+            if not plan:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "data": {
+                            "understanding": "未找到计划",
+                            "pass": False
+                            }
+                    }, 
+                    ensure_ascii=False, 
+                    indent=2
+                )
             # 去掉计划内容中的换行符
+
+            plan = plan[0]
             if "p.plan" in plan:
                 plan["p.plan"] = plan["p.plan"].replace('\n', '')
                 plan["p.plan"] = plan["p.plan"].replace(' ', '')
             final_plan = json.dumps(plan.get("p.plan"), ensure_ascii=False, indent=2)
+
+            # 评估计划是否存在
+            if not self.is_plan_exist(final_plan):
+                return json.dumps(
+                    {
+                        "success": False,
+                        "data": {
+                            "understanding": "计划不存在",
+                            "pass": False
+                            }
+                    }, 
+                    ensure_ascii=False, 
+                    indent=2
+                )
+            
             final_results = {
-                "计划方案":final_plan
+                "success": True,
+                "data": {
+                    "understanding": "计划存在",
+                    "pass": True,
+                    "plan": final_plan
+                }
             }
             return json.dumps(final_results, ensure_ascii=False, indent=2)
-        return json.dumps({"message": "未识别到意图,所以无法获取计划信息"}, ensure_ascii=False, indent=2)
+        # 没有找到意图和域
+        return json.dumps({"success": False, "data": {"understanding": "未找到意图或域", "pass": False}}, ensure_ascii=False, indent=2)
+
+    def is_plan_exist(self, plan):
+        """评估计划是否存在"""
+        return plan is not None
 
 if __name__ == "__main__":
     plan_app = PlanApp()
-    # plan = plan_app.get_plan_from_intent("看构成", "采购管理域")
-    plan = plan_app.get_plan_from_intent("看趋势", "销售分析域")
-    print("看趋势销售分析域的计划")
+    plan = plan_app.get_plan_from_intent("看构成", "采购管理域")
+    # plan = plan_app.get_plan_from_intent("看趋势", "销售分析域")
+    print("看构成采购管理域的计划")
     print(plan)
     print(type(plan))
