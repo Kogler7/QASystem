@@ -59,7 +59,6 @@ class utils:
                     "object": entity.get("object") or "",
                     "intent_name": entity.get("intent_name"),
                     "user_goal": entity.get("user_goal"),
-                    "tools": tools
                 }
                 
                 # 使用Intent_Base_Recognition模型处理数据，利用Pydantic的自动类型转换

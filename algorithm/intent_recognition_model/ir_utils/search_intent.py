@@ -88,7 +88,7 @@ class HybridSearch:
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
                            "intent_name", "intent_description", "intent_summary", "user_goal", "sample_utterances",
-                           "tags","core_keywords","tools"]
+                           "tags","core_keywords"]
         )[0]
         return results
 
@@ -129,7 +129,7 @@ class HybridSearch:
             entity_data = {}
             for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
                         "intent_name", "intent_description", "intent_summary", 
-                        "user_goal", "sample_utterances", "tags", "core_keywords","tools"]:
+                        "user_goal", "sample_utterances", "tags", "core_keywords"]:
                 entity_data[field] = results_1[i].get(field)
             
             entity_map[entity_id] = entity_data
@@ -140,8 +140,8 @@ class HybridSearch:
             if entity_id not in entity_map:
                 entity_data = {}
                 for field in ["intent_id", "version", "domain", "create_time", "update_time", "status",
-                            "intent_name_text", "intent_description_text", "intent_summary_text", 
-                            "user_goal_text", "sample_utterances", "tags", "core_keywords","tools"]:
+                            "intent_name", "intent_description", "intent_summary", 
+                            "user_goal", "sample_utterances", "tags", "core_keywords"]:
                     entity_data[field] = results_2[i].get(field)
                 entity_map[entity_id] = entity_data
             original_distances[(entity_id, "sparse_vector")] = results_2.distances[i]
@@ -210,8 +210,8 @@ class HybridSearch:
             anns_field="dense_vector",
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords","tools"],
+                           "intent_name", "intent_description", "intent_summary", "user_goal", "sample_utterances",
+                           "tags","core_keywords"],
             search_params=dense_search_param
         )[0]
 
@@ -221,8 +221,8 @@ class HybridSearch:
             anns_field="sparse_vector",
             limit=top_k,
             output_fields=["intent_id", "version", "domain", "create_time", "update_time", "status",
-                           "intent_name_text", "intent_description_text", "intent_summary_text", "user_goal_text", "sample_utterances",
-                           "tags","core_keywords","tools"],
+                           "intent_name", "intent_description", "intent_summary", "user_goal", "sample_utterances",
+                           "tags","core_keywords"],
             search_params=sparse_search_param
         )[0]
         logging.info("检索完成")
@@ -241,7 +241,7 @@ class HybridSearch:
                 "similarity": hit.distance,
                 "entity": {}
             }
-            for field in ["intent_id", "domain", "scenario", "object","intent_name", "user_goal", "tools",]:
+            for field in ["intent_id", "domain", "scenario", "object","intent_name", "user_goal"]:
                 result_dict["entity"][field] = hit.get(field)
             result_list.append(result_dict)
 
@@ -273,7 +273,7 @@ class HybridSearch:
             anns_field="dense_vector",
             limit=top_k,
             output_fields=["intent_id", "domain", "scenario", "object",
-                           "intent_name","user_goal","tools"],
+                           "intent_name","user_goal"],
             search_params=dense_search_param
         )[0]
 
@@ -283,16 +283,10 @@ class HybridSearch:
             anns_field="sparse_vector",
             limit=top_k,
             output_fields=["intent_id", "domain", "scenario", "object",
-                           "intent_name","user_goal","tools"],
+                           "intent_name","user_goal"],
             search_params=sparse_search_param
         )[0]
         logging.info("检索完成")
-        # print("\n")
-        # print("results_1:\n")
-        # print(results_1)
-        # print("results_2:\n")
-        # print(results_2)
-        # print("\n")
         return {
             "密集向量检索结果": self.HybridHits_to_dict(results_1),
             "稀疏向量检索结果": self.HybridHits_to_dict(results_2)

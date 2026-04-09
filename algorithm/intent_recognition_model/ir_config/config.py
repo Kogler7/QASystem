@@ -21,7 +21,8 @@ class Config:
         self.milvus_consistency_level = os.getenv("MILVUS_CONSISTENCY_LEVEL", "Strong")
         self.max_drop_retries = int(os.getenv("MAX_DROP_RETRIES", "3"))
         self.drop_retry_delay = int(os.getenv("DROP_RETRY_DELAY", "2"))
-        self.model_path = os.getenv("MODEL_PATH") or str(_default_model_dir / "bge_m3_model")
+        self.model_path = os.getenv("MODEL_PATH")
+
         self.log_path = os.getenv("LOG_PATH") or str(_project_root / "logs")
         # LLM 配置：与 algorithm/common/llm_client 环境变量统一，便于一处配置多处生效
         self.api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "qwen"

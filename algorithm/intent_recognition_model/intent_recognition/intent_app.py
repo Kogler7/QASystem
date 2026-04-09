@@ -66,15 +66,6 @@ class IntentRecognition:
             serializable_entity = None
             if entity:
                 # 映射字段名，将数据库字段名映射到Intent模型字段名
-                # 处理 tools 字段，解析 Unicode 转义字符
-                tools = entity.get("tools")
-                if tools:
-                    try:
-                        # 尝试解析 JSON 字符串
-                        import json
-                        tools = json.loads(tools)
-                    except:
-                        pass
                 
                 mapped_data = {
                     "intent_id": entity.get("intent_id"),
@@ -86,11 +77,10 @@ class IntentRecognition:
                     "tags": entity.get("tags"),
                     "core_keywords": entity.get("core_keywords"),
                     "sample_utterances": entity.get("sample_utterances"),
-                    "intent_name": entity.get("intent_name_text"),
-                    "intent_description": entity.get("intent_description_text"),
-                    "intent_summary": entity.get("intent_summary_text"),
-                    "user_goal": entity.get("user_goal_text"),
-                    "tools": tools
+                    "intent_name": entity.get("intent_name"),
+                    "intent_description": entity.get("intent_description"),
+                    "intent_summary": entity.get("intent_summary"),
+                    "user_goal": entity.get("user_goal"),
                 }
                 
                 # 使用Intent模型处理数据，利用Pydantic的自动类型转换

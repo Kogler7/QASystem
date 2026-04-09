@@ -45,13 +45,12 @@ class DatabaseUtils:
 
         if intent_data.get("intent_name"):
             parts.append(f"意图名称: {intent_data['intent_name']}")
+        
+        if intent_data.get("scenario"):
+            parts.append(f"场景: {intent_data['scenario']}")
 
-        # 用户表达（高价值样本）
-        if intent_data.get("sample_utterances"):
-            # 选取最具代表性的3条（避免噪声）
-            samples = intent_data["sample_utterances"][:3]
-            samples_text = " | ".join([f"{s}" for s in samples])
-            parts.append(f"典型表述: {samples_text}")   
+        if intent_data.get("object"):
+            parts.append(f"目标对象: {intent_data['object']}")
 
         if intent_data.get("tags"):
             # 选取最具代表性的3条（避免噪声）
@@ -63,7 +62,7 @@ class DatabaseUtils:
             # 选取最具代表性的3条（避免噪声）
             core_keywords = intent_data["core_keywords"]
             core_keywords_text = " | ".join([f"{s}" for s in core_keywords])
-            parts.append(f"核心关键词: {core_keywords_text}") 
+            parts.append(f"核心关键词: {core_keywords_text}")
         return "\n".join(parts)
 
     def init_milvus_client(self)-> MilvusClient|None:
@@ -88,6 +87,35 @@ class DatabaseUtils:
             except Exception as e:
                 print(f"Milvus 客户端初始化异常: {e}")
                 raise
+
+    def build_query_from_json(json_input: dict) -> str:
+        """从 JSON 输入构建查询文本"""
+        problem_model = json_input.get("problem_model", {})
+        parts = []
+
+        # 问题描述（高权重）
+        if problem_model.get("问题描述"):
+            parts.append(f"问题描述: {problem_model['问题描述']}")
+
+        # 目标对象（中权重）
+        if problem_model.get("目标对象"):
+            parts.append(f"目标对象: {problem_model['目标对象']}")
+
+        # 目标（中权重）
+        if problem_model.get("目标"):
+            goals = problem_model["目标"]
+            if goals:
+                goals_text = " | ".join(goals)
+                parts.append(f"目标: {goals_text}")
+
+        # 相关实体（高价值样本）
+        if problem_model.get("相关实体"):
+            entities = problem_model["相关实体"]
+            if entities:
+                entities_text = " | ".join(entities)
+                parts.append(f"相关实体: {entities_text}")
+
+        return "\n".join(parts)
 
     def get_current_time_str(self) -> str:
         """生成当前时间的字符串格式"""

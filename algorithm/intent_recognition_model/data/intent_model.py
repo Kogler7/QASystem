@@ -16,7 +16,6 @@ class Intent(BaseModel):
     core_keywords: list = Field(..., description="核心关键词")
     intent_summary: str = Field(..., description="意图精简摘要")
     user_goal: str = Field(..., description="用户核心目标")
-    tools: Union[str, list, dict] = Field(..., description="意图技能描述")
 
 
 class Intent_Base_Recognition(BaseModel):
@@ -26,4 +25,3 @@ class Intent_Base_Recognition(BaseModel):
     object: str = Field(..., description="意图对象")
     intent_name: str = Field(..., description="意图名称（简洁描述），核心语义字段")
     user_goal: str = Field(..., description="用户核心目标")
-    tools: Union[str, list, dict] = Field(..., description="意图技能描述")
