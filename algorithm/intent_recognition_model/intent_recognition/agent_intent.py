@@ -138,8 +138,6 @@ def run_tool_loop(query: str, max_loop: int = 2):
                 json_content = "最终意图识别失败，未识别到相关意图"
 
             return {
-                # "tool_result": tool_results,
-                # "reasoning": reasoning,
                 "json_content": json_content,
             }   #< class 'str'>
 

@@ -19,6 +19,10 @@ router = APIRouter(prefix="/api/component/intent-recognition", tags=["component"
 class RecognizeRequestBody(BaseModel):
     text: str
 
+class GetToolsRequestBody(BaseModel):
+    plan: str
+
+
 
 @router.get("/health")
 async def intent_recognition_health() -> dict[str, Any]:
@@ -60,4 +64,15 @@ async def get_plan(body: dict) -> dict[str, Any]:
         return result
     except Exception as e:
         logger.exception("获取计划失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.post("/get-tools")
+async def get_tools(body: GetToolsRequestBody) -> dict[str, Any]:
+    if not (body.plan or "").strip():
+        raise HTTPException(status_code=400, detail="计划不能为空")
+    try:
+        result = await asyncio.to_thread(service.get_tools, plan=body.plan.strip())
+        return result
+    except Exception as e:
+        logger.exception("获取工具列表失败")
         raise HTTPException(status_code=500, detail=str(e)) from e

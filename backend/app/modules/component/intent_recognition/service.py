@@ -72,3 +72,8 @@ def get_plan(intent_name: str, domain: str) -> dict[str, Any]:
     plan_app = PlanApp()
     result = plan_app.get_plan_from_intent(intent_name, domain)
     return {"data": result}
+
+def get_tools(plan: str) -> dict[str, Any]:
+    from intent_recognition.plan_to_tools import plan_tool
+    result = plan_tool(plan)
+    return {"data": result}

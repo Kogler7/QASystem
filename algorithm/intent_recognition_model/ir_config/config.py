@@ -112,4 +112,3 @@ class Config:
 if __name__ == "__main__":
     c = Config()
     print(c.milvus_uri, c.collection_name, c.model_path, c.log_path)
-
