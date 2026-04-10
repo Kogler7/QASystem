@@ -54,3 +54,13 @@ export function intentRecognitionGetPlan(params) {
     domain: params.domain?.trim() ?? ''
   }, { timeout: 30000000 })
 }
+
+/**
+ * 获取工具列表
+ * @param {object} params - { plan }
+ */
+export function intentRecognitionGetTools(params) {
+  return request.post('/component/intent-recognition/get-tools', {
+    plan: params.plan?.trim() ?? ''
+  }, { timeout: 30000000 })
+}
