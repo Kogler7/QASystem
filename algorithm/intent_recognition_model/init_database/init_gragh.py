@@ -7,16 +7,15 @@ class InitGraph:
         self.gc = Neo4jConnection()
         self.gc.connect()
 
-    def create_intent_struct(self, intent_id, intent_name, domain_name, rel_type):
+    def create_intent_struct(self, intent_id, intent_name, domain, plan):
         """创建 Intent 结构"""
         self.gc.create_intent_node(intent_id, intent_name)
-        self.gc.create_domain_node(domain_name)
-        self.gc.create_intent_domain_relationship(intent_id, domain_name, rel_type)
+        self.gc.create_intent_plan_relationship(intent_id, plan, domain)
 
-    def create_domain_plan_struct(self, domain_name, plan, rel_type):
+    def create_intent_plan_struct(self, intent_id, plan, domain):
         """先创建计划节点，再创建关系节点"""
         self.gc.create_plan_node(plan)
-        self.gc.create_domain_plan_relationship(domain_name, plan, rel_type)
+        self.gc.create_intent_plan_relationship(intent_id, plan, domain)
 
     def get_intent_struct_from_json(self):
         """获取 Intent 图谱结构
@@ -84,10 +83,6 @@ class InitGraph:
         
         print(f"批量创建完成，共处理 {len(intent_structs)} 个意图")
 
-    def create_domain_plan_relationship(self, domain_name, plan):
-        """创建 Domain 和 Plan 之间的关系"""
-        self.gc.create_domain_plan_relationship(domain_name, plan)
-
     def delete_all_intent_domain_plan_data(self):
         """删除所有 Intent、Domain 和 Plan 数据"""
         self.gc.delete_all_intent_domain_plan_data()
@@ -97,15 +92,58 @@ if __name__ == "__main__":
     init_graph = InitGraph()
     # init_graph.batch_create_intent_structs()
     # gc.delete_all_intent_domain_plan_data()
+    
+    # 方案模型数据
+    plan_models = [
+        {
+            "方案ID": "SOL-001",
+            "方案类别": "分析类问题解决方案",
+            "方案目标": "将结构化意图转换为指标描述的业务逻辑",
+            "输入": ["结构化意图"],
+            "输出": ["指标描述的业务逻辑"],
+            "约束": ["基于业务指标体系匹配", "意图语义准确解析", "指标定义无歧义"],
+            "控制逻辑": None,
+            "置信度": 0.9
+        },
+        {
+            "方案ID": "SOL-002",
+            "方案类别": "分析类问题解决方案",
+            "方案目标": "将指标描述的业务逻辑转换为可执行SQL语句",
+            "输入": ["指标描述的业务逻辑"],
+            "输出": ["SQL描述的业务查询语句"],
+            "约束": ["SQL语法规范合法", "表字段与指标一一对应", "避免逻辑错误与性能风险"],
+            "控制逻辑": None,
+            "置信度": 0.9
+        },
+        {
+            "方案ID": "SOL-003",
+            "方案类别": "分析类问题解决方案",
+            "方案目标": "执行SQL语句并完成指标数值计算",
+            "输入": ["SQL查询语句"],
+            "输出": ["指标计算结果数据集"],
+            "约束": ["数据源权限合法", "计算结果准确无误", "执行超时控制"],
+            "控制逻辑": None,
+            "置信度": 0.9
+        },
+        {
+            "方案ID": "SOL-004",
+            "方案类别": "分析类问题解决方案",
+            "方案目标": "基于指标计算结果生成可视化图表与自然语言答案",
+            "输入": ["指标计算结果数据集"],
+            "输出": ["可视化图表", "自然语言文字描述内容"],
+            "约束": ["图表类型与数据匹配", "描述语言简洁易懂", "结果与计算数据一致"],
+            "控制逻辑": None,
+            "置信度": 0.9
+        }
+    ]
+    
+    # 创建计划字典
     plan = {
         "plan": "销售分析域的看趋势计划方案",
-        "plan_content": """
-        1.上下文获取与指标匹配：输入结构化意图，输出用指标描述的业务；
-        2.SQL转换：输入指标描述的业务，输出SQL描述的业务；
-        3.SQL执行：输入SQL，输出指标计算结果；
-        4.图表可视化与答案生成：输入计算结果，输出图表+文字内容描述。
-        """
+        "plan_content": json.dumps(plan_models, ensure_ascii=False, indent=2)
     }
-    init_graph.create_domain_plan_struct("看趋势_销售分析域", plan, rel_type="域_计划")
+    
+    # 添加到图谱
+    init_graph.create_intent_plan_struct("INT20260211002", plan, "销售分析域")
     
     gc.close()

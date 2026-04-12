@@ -30,10 +30,10 @@ model = ChatOpenAI(
 )
 
 system_prompt = """
-你是一个计划工具,你需要先调用获取所有工具的tool,再根据用户输入的计划生成所需要的工具。
+你是一个计划工具,你需要先调用获取所有工具的tool,再根据用户输入的计划步骤生成所需要的工具。
 注：
 1,你只能调用获取所有工具的tool,不能调用其他tool。
-2,你只能根据用户输入的计划生成所需要的工具,不能生成其他内容。
+2,你只能根据用户输入的计划步骤生成所需要的工具,不能生成其他内容。
 3,你只能生成所需要的工具,不能生成其他内容。
 """
 
@@ -51,7 +51,7 @@ def get_all_tools():
 class ToolParameter(BaseModel):
     """工具参数模型"""
     name: str = Field(description="参数名称")
-    value: str = Field(description="参数值")
+    description: str = Field(description="参数描述")
 
 
 class ToolInfo(BaseModel):
@@ -60,34 +60,41 @@ class ToolInfo(BaseModel):
     parameters: list[ToolParameter] = Field(description="工具参数列表")
 
 
-class ToolList(BaseModel):
+class ToolMatch(BaseModel):
     """工具列表模型"""
+    plan_id: str = Field(description="方案ID，从用户输入的方案里面获取")
     tools: list[ToolInfo] = Field(description="选择的工具信息列表")
 
+class ToolList(BaseModel):
+    """工具列表模型"""
+    matches: list[ToolMatch] = Field(description="方案到工具的匹配列表")
+
+
 def plan_tool(plan: str):
-    """根据用户输入的计划生成所需要的工具"""
+    """根据用户输入的方案生成所需要的工具"""
     # 首先获取所有工具列表
     tools_content = get_all_tools()
     
     # 使用 with_structured_output 来约束模型输出
     structured_model = model.with_structured_output(ToolList)
     
-    # 构建提示词，让模型根据计划选择合适的工具和参数
+    # 构建提示词，让模型根据方案选择合适的工具和参数
     prompt = f"""
-    你是一个工具选择专家，任务是根据用户的计划从提供的工具列表中选择最适合的工具，并为每个工具指定必要的参数值。
+    你是一个工具选择专家，任务是根据用户的方案列表从提供的工具列表中为每一个方案都选择最适合的工具，并为每个工具指定必要的参数描述。  
     
     工具列表：
     {tools_content}
     
-    用户计划：{plan}
+    用户方案：{plan}
     
     要求：
-    1. 仔细分析用户计划，理解其核心需求
-    2. 从工具列表中选择最适合完成该计划的工具
-    3. 为每个选择的工具指定必要的参数值
-    4. 参数值应基于用户计划中的信息，如果信息不足，可以使用合理的默认值
+    1. 仔细分析用户方案，理解其核心需求
+    2. 对于用户传入的每一个方案，选择最适合的工具
+    3. 为每个选择的工具指定必要的参数描述
+    4. 参数描述应基于用户方案中的信息
     5. 确保返回的工具名称与工具列表中的完全一致
     6. 确保返回的参数名称与工具列表中的完全一致
+    7. 确保工具都是从工具列表中选择的，不能是其他工具
     
     请以结构化格式返回工具信息及其参数。
     """
@@ -95,27 +102,36 @@ def plan_tool(plan: str):
     # 调用模型生成工具列表
     try:
         result = structured_model.invoke([{"role": "user", "content": prompt}])
-        # 将 ToolInfo 对象转换为字典
-        tools_dict = []
-        for tool_info in result.tools:
-            tool_dict = {
-                "name": tool_info.name,
-                "parameters": [
-                    {"name": param.name, "value": param.value}
-                    for param in tool_info.parameters
-                ]
-            }
-            tools_dict.append(tool_dict)
+        # 将 ToolList 对象转换为正确的字典结构
+        matches_dict = []
+        # 处理 matches 字段（模型定义的字段）
+        if hasattr(result, 'matches'):
+            for tool_match in result.matches:
+                match_dict = {
+                    "plan_id": tool_match.plan_id,
+                    "tools": []
+                }
+                if hasattr(tool_match, 'tools'):
+                    for tool_info in tool_match.tools:
+                        tool_dict = {
+                            "name": tool_info.name,
+                            "parameters": [
+                                {"name": param.name, "value": param.description}
+                                for param in tool_info.parameters
+                            ]
+                        }
+                        match_dict["tools"].append(tool_dict)
+                matches_dict.append(match_dict)
         # 构建成功响应
         final_results = {
             "success": True,
             "data": {
                 "understanding": "工具生成成功",
                 "pass": True,
-                "tools": tools_dict
+                "matches": matches_dict
             }
         }
-        return json.dumps(final_results, ensure_ascii=False, indent=2)
+        return final_results
     except Exception as e:
         # 构建失败响应
         error_response = {
@@ -125,19 +141,89 @@ def plan_tool(plan: str):
                 "pass": False
             }
         }
-        return json.dumps(error_response, ensure_ascii=False, indent=2)
+        return error_response
 
 if __name__ == "__main__":
     # 采购管理域的看构成计划方案
-    test_plan = """
-    采购管理域的看构成计划方案：
-    1.上下文获取与指标匹配：输入结构化意图，输出用指标描述的业务；
-    2.SQL转换：输入指标描述的业务，输出SQL描述的业务；
-    3.SQL执行：输入SQL，输出指标计算结果；
-    4.图表可视化与答案生成：输入计算结果，输出图表+文字内容描述。
-    """
+    test_plan = {
+        "plan": [
+                {
+                    "方案ID": "SOL-001",
+                    "方案类别": "分析类问题解决方案",
+                    "方案目标": "将结构化意图转换为指标描述的业务逻辑",
+                    "输入": [
+                        "结构化意图"
+                    ],
+                    "输出": [
+                        "指标描述的业务逻辑"
+                    ],
+                    "约束": [
+                        "基于业务指标体系匹配",
+                        "意图语义准确解析",
+                        "指标定义无歧义"
+                    ],
+                    "控制逻辑": null,
+                    "置信度": 0.9
+                },
+                {
+                    "方案ID": "SOL-002",
+                    "方案类别": "分析类问题解决方案",
+                    "方案目标": "将指标描述的业务逻辑转换为可执行SQL语句",
+                    "输入": [
+                        "指标描述的业务逻辑"
+                    ],
+                    "输出": [
+                        "SQL描述的业务查询语句"
+                    ],
+                    "约束": [
+                        "SQL语法规范合法",
+                        "表字段与指标一一对应",
+                        "避免逻辑错误与性能风险"
+                    ],
+                    "控制逻辑": null,
+                    "置信度": 0.9
+                },
+                {
+                    "方案ID": "SOL-003",
+                    "方案类别": "分析类问题解决方案",
+                    "方案目标": "执行SQL语句并完成指标数值计算",
+                    "输入": [
+                        "SQL查询语句"
+                    ],
+                    "输出": [
+                        "指标计算结果数据集"
+                    ],
+                    "约束": [
+                        "数据源权限合法",
+                        "计算结果准确无误",
+                        "执行超时控制"
+                    ],
+                    "控制逻辑": null,
+                    "置信度": 0.9
+                },
+                {
+                    "方案ID": "SOL-004",
+                    "方案类别": "分析类问题解决方案",
+                    "方案目标": "基于指标计算结果生成可视化图表与自然语言答案",
+                    "输入": [
+                        "指标计算结果数据集"
+                    ],
+                    "输出": [
+                        "可视化图表",
+                        "自然语言文字描述内容"
+                    ],
+                    "约束": [
+                        "图表类型与数据匹配",
+                        "描述语言简洁易懂",
+                        "结果与计算数据一致"
+                    ],
+                    "控制逻辑": null,
+                    "置信度": 0.9
+                }
+    ]
+}
     
-    plan_result = plan_tool(test_plan)
+    plan_result = plan_tool(json.dumps(test_plan))
     print("测试计划：")
     print(test_plan)
     print("\n生成结果：")

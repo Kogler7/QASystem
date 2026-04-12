@@ -46,21 +46,20 @@ export function intentRecognitionDeepRecognize(params) {
 
 /**
  * 获取计划
- * @param {object} params - { intent_name, domain }
+ * @param {object} params - { problem_model }
  */
 export function intentRecognitionGetPlan(params) {
   return request.post('/component/intent-recognition/get-plan', {
-    intent_name: params.intent_name?.trim() ?? '',
-    domain: params.domain?.trim() ?? ''
+    problem_model: params.problem_model  // 直接传递对象
   }, { timeout: 30000000 })
 }
 
 /**
  * 获取工具列表
- * @param {object} params - { plan }
+ * @param {object} params - { plan: list[dict] }
  */
 export function intentRecognitionGetTools(params) {
   return request.post('/component/intent-recognition/get-tools', {
-    plan: params.plan?.trim() ?? ''
+    plan: params.plan
   }, { timeout: 30000000 })
 }

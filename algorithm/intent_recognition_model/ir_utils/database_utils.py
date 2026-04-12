@@ -88,9 +88,14 @@ class DatabaseUtils:
                 print(f"Milvus 客户端初始化异常: {e}")
                 raise
 
-    def build_query_from_json(json_input: dict) -> str:
+    def build_query_from_json(self, json_input: dict) -> str:
         """从 JSON 输入构建查询文本"""
-        problem_model = json_input.get("problem_model", {})
+        # 检查是否有 problem_model 字段
+        if "problem_model" in json_input:
+            problem_model = json_input["problem_model"]
+        else:
+            problem_model = json_input
+        
         parts = []
 
         # 问题描述（高权重）

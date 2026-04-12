@@ -26,10 +26,9 @@ def _normalize_openai_base_url(base_url: str) -> str:
         return base_url
     return f"{base_url}/v1"
 
-@tool(description="从意图向量数据库中检索相关意图")
-def retrival_tool(query: str):
+def retrival_tool(problem_model: str):
     """从意图向量数据库中检索相关意图"""
-    results = HybridSearch().basic_search(query=query)
+    results = HybridSearch().basic_search(query=problem_model)
      
     dense_results = results.get("密集向量检索结果", [])
     sparse_results = results.get("稀疏向量检索结果", [])
@@ -43,16 +42,7 @@ def retrival_tool(query: str):
     }
 
 system_prompt = """
-你是一个意图识别专家，你需要用(retrival_tool)工具从意图向量数据库中检索相关意图。并返回与用户输入的内容最合适的意图
-
-你有工具：
-retrival_tool(query: str): 从向量库检索意图
-
-**工具调用格式**：一定要输出以下内容，arguments中的：具体查询替换为用户的查询
-<tool_call>{"name": "retrival_tool", "arguments": {"query": "具体查询"}}</tool_call>
-
-**你的推理格式**：一定要输出以下内容，替换为你自己的推理
-<think>你的推理</think>
+你是一个意图识别专家，返回与用户输入的内容最合适的意图
 
 **最终输出格式**：
 
@@ -85,63 +75,41 @@ model = ChatOpenAI(
 )
 
 
-def run_tool_loop(query: str, max_loop: int = 2):
-    """循环调用工具直到不再需要继续"""
+def run_tool_loop(problem_model: str):
+    """直接调用retrival_tool获取意图列表，然后注入给大模型判断"""
     # 检查输入是否为 JSON 字符串
     try:
-        json_input = json.loads(query)
+        json_input = json.loads(problem_model)
         # 如果是 JSON 格式，构建查询文本
-        if isinstance(json_input, dict) and "problem_model" in json_input:
-            query = DatabaseUtils().build_query_from_json(json_input)
+        if isinstance(json_input, dict):
+            problem_model = DatabaseUtils().build_query_from_json(json_input)
     except (json.JSONDecodeError, TypeError):
         # 如果不是 JSON 格式，直接使用原始查询
         pass
 
+    # 直接调用retrival_tool获取意图列表
+    intent_results = retrival_tool(problem_model)
+    
+    # 构建包含意图列表的提示词
+    enhanced_system_prompt = system_prompt + f"\n\n检索到的意图列表：\n{str(intent_results)}"
+
     messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": query}
+        {"role": "system", "content": enhanced_system_prompt},
+        {"role": "user", "content": problem_model}
     ]
-    # 定义工具结果列表
-    tool_results = []
 
-    # 循环调用工具
-    for step in range(max_loop):
-        # 调用模型
-        response = model.invoke(messages)
-        content = response.content
-        tool_call = utils.parse_multi_tool_calls(content)
+    # 调用模型进行意图判断
+    response = model.invoke(messages)
+    content = response.content
+    
+    json_content = utils.extract_json_content(content)
+    
+    if json_content == "":
+        json_content = "最终意图识别失败，未识别到相关意图"
 
-        if tool_call:
-             #执行tool
-            for tool in tool_call:
-                tool_result = retrival_tool.invoke(tool['arguments'])
-                tool_results.append(
-                    {
-                        "name": tool['name'],
-                        "arguments": tool['arguments'],
-                        "result": tool_result,
-                    }
-                )
-
-                #添加tool结果到messages
-                messages.append({"role": "assistant", "content": content})
-                messages.append({"role": "tool", "content": str(tool_result), "tool_call_id": "call_1"})
-        else:
-            # 提取推理过程和JSON内容
-            reasoning = utils.extract_reasoning(content)
-            json_content = utils.extract_json_content(content)
-            
-            if reasoning == "":
-                reasoning = "模型推理失败"
-            
-            if json_content == "":
-                json_content = "最终意图识别失败，未识别到相关意图"
-
-            return {
-                "json_content": json_content,
-            }   #< class 'str'>
-
-    return "达到最大步数"
+    return {
+        "json_content": json_content,
+    }   #< class 'str'>
         
 if __name__ == "__main__":
     # 测试普通文本输入
@@ -150,7 +118,6 @@ if __name__ == "__main__":
     # 测试 JSON 格式输入
     json_input = '''
     {
-      "success": true,
       "problem_model": {
         "问题ID": "QKB-001",
         "问题描述": "公开采购与非公开采购金额构成如何？",
@@ -162,18 +129,11 @@ if __name__ == "__main__":
         "当前状态": "分析阶段",
         "创建时间": "2026-04-09T00:54:30.393365",
         "相关实体": ["公开采购", "非公开采购", "金额构成"]
-      },
-      "link_result": {
-        "linked_entities": {
-          "NEO_390": "CG_003 公开采购中标金额"
-        }
       }
     }
     '''
     
     final_answer = run_tool_loop(json_input)
-    print(f"tool_result: {final_answer.get('tool_result')}")
-    print(f"reasoning: {final_answer.get('reasoning')}")
     print(f"json_content: {final_answer.get('json_content')}")
     print(type(final_answer.get('json_content')))   # <class 'str'>
     if isinstance(final_answer.get('json_content'), str):
