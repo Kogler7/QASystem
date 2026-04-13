@@ -1,11 +1,13 @@
 import json
 import logging
-from typing import Any, List, Optional
+from typing import Annotated, Any, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..config import settings
+from ..deps.auth import get_current_user
+from ..models.user import User
 from ..services.dify_client import dify_client
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -76,12 +78,15 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(body: ChatRequest) -> ChatResponse:
+async def chat_endpoint(
+    body: ChatRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> ChatResponse:
     query_text = (body.message or body.content or "").strip()
     if not query_text:
         raise HTTPException(status_code=400, detail="message or content is required")
 
-    user_id = body.userId or "default"
+    user_id = body.userId or current_user.id
     use_workflow = settings.DIFY_USE_WORKFLOW and dify_client.workflow_api_key
     use_chat = dify_client.chat_api_key
     

@@ -5,15 +5,21 @@ import asyncio
 import logging
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel, Field
 import json
 
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
+
+from ....deps.auth import require_admin
 from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/kg-update", tags=["component", "kg-update"])
+router = APIRouter(
+    prefix="/api/component/kg-update",
+    tags=["component", "kg-update"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 class TripleAddItem(BaseModel):

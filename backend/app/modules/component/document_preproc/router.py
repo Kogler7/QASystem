@@ -7,14 +7,19 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
+from ....deps.auth import require_admin
 from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/document-preproc", tags=["component", "document-preproc"])
+router = APIRouter(
+    prefix="/api/component/document-preproc",
+    tags=["component", "document-preproc"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @router.get("/health")

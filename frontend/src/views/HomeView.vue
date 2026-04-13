@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ChatDotRound,
@@ -7,8 +8,10 @@ import {
   Collection,
   ArrowRight
 } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const goConsult = () => router.push('/chat')
 const goKnowledge = () => router.push('/knowledge')
@@ -35,36 +38,44 @@ const floatingCards = [
   { icon: '🔧', text: '故障诊断', delay: 1.5 }
 ]
 
-const features = [
+const allFeatures = [
   {
     title: '智能问答',
     desc: '基于大模型与RAG技术，快速解答轨道交通专业问题',
     icon: ChatDotRound,
     path: '/chat',
-    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)'
+    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)',
+    requiresAdmin: false
   },
   {
     title: '知识检索',
     desc: '全文检索与语义检索，精准定位行业标准与文档',
     icon: Document,
     path: '/knowledge/query',
-    gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)'
+    gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+    requiresAdmin: true
   },
   {
     title: '组件管理',
     desc: '意图识别、知识图谱、答案生成等组件统一管理',
     icon: MapLocation,
     path: '/component',
-    gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)'
+    gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
+    requiresAdmin: true
   },
   {
     title: '文档查询',
     desc: '国标、行标与设计规范一站式查询与引用',
     icon: Collection,
     path: '/knowledge',
-    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)'
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
+    requiresAdmin: true
   }
 ]
+
+const features = computed(() =>
+  allFeatures.filter((f) => !f.requiresAdmin || auth.isAdmin)
+)
 </script>
 
 <template>
@@ -86,7 +97,7 @@ const features = [
               <el-icon><ChatDotRound /></el-icon>
               开始提问
             </el-button>
-            <el-button class="action-button secondary" @click="goKnowledge">
+            <el-button v-if="auth.isAdmin" class="action-button secondary" @click="goKnowledge">
               知识库管理
             </el-button>
           </div>

@@ -120,3 +120,50 @@ body {
   border-color: var(--primary-400);
   color: var(--primary-500);
 }
+
+/* 顶栏、移动抽屉、登录/注册页脚 — 登录·注册·退出 共用尺寸与描边风格 */
+.header-auth-btn.el-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.header-auth-btn.el-button .el-icon {
+  font-size: 16px;
+}
+
+.header-auth-btn.is-block.el-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.header-auth-btn.el-button.is-plain:not(.el-button--danger) {
+  --el-button-bg-color: #ffffff;
+  --el-button-text-color: var(--gray-800);
+  --el-button-border-color: var(--gray-200);
+}
+
+.header-auth-btn.el-button.is-plain:not(.el-button--danger):hover {
+  --el-button-hover-text-color: var(--primary-600);
+  --el-button-hover-border-color: var(--primary-400);
+  --el-button-hover-bg-color: rgba(14, 165, 233, 0.06);
+}
+
+.header-auth-btn.el-button.is-plain.el-button--danger {
+  --el-button-bg-color: rgba(254, 242, 242, 0.95);
+  --el-button-text-color: #b91c1c;
+  --el-button-border-color: rgba(239, 68, 68, 0.4);
+}
+
+.header-auth-btn.el-button.is-plain.el-button--danger:hover {
+  --el-button-hover-bg-color: #fef2f2;
+  --el-button-hover-border-color: #f87171;
+  --el-button-hover-text-color: #991b1b;
+}

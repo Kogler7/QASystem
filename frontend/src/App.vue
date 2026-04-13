@@ -1,18 +1,25 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Menu, Close, ChatDotRound } from '@element-plus/icons-vue'
+import { Menu, Close, ChatDotRound, Key, SwitchButton, Plus } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 const menuVisible = ref(false)
 
-const navItems = [
+const allNavItems = [
   { path: '/', name: '首页' },
   { path: '/chat', name: '智能问答' },
-  { path: '/component', name: '组件管理' },
-  { path: '/knowledge', name: '知识库' }
+  { path: '/component', name: '组件管理', requiresAdmin: true },
+  { path: '/knowledge', name: '知识库', requiresAdmin: true },
+  { path: '/admin/users', name: '用户管理', requiresAdmin: true }
 ]
+
+const navItems = computed(() =>
+  allNavItems.filter((item) => !item.requiresAdmin || auth.isAdmin)
+)
 
 const isActive = (path) => {
   if (path === '/') return route.path === '/'
@@ -27,6 +34,22 @@ const goConsult = () => {
 const goTo = (path) => {
   menuVisible.value = false
   router.push(path)
+}
+
+const goLogin = () => {
+  menuVisible.value = false
+  router.push({ path: '/login', query: { redirect: route.fullPath } })
+}
+
+const goRegister = () => {
+  menuVisible.value = false
+  router.push('/register')
+}
+
+const onLogout = () => {
+  menuVisible.value = false
+  auth.logout()
+  router.push('/')
 }
 
 const isMobile = computed(() => {
@@ -68,9 +91,54 @@ const isMobile = computed(() => {
           >
             {{ item.name }}
           </a>
+          <div v-if="isMobile" class="nav-auth-mobile">
+            <div class="nav-auth-divider" />
+            <template v-if="auth.isAuthenticated">
+              <div class="nav-user-row">
+                <span class="user-avatar-sm">{{ (auth.user?.username || '?').charAt(0).toUpperCase() }}</span>
+                <span class="nav-user-name">{{ auth.user?.username }}</span>
+              </div>
+              <el-button class="header-auth-btn is-block" plain type="danger" @click="onLogout">
+                <el-icon><SwitchButton /></el-icon>
+                退出登录
+              </el-button>
+            </template>
+            <template v-else>
+              <el-button class="header-auth-btn is-block" plain @click="goLogin">
+                <el-icon><Key /></el-icon>
+                登录
+              </el-button>
+              <el-button class="header-auth-btn is-block" plain @click="goRegister">
+                <el-icon><Plus /></el-icon>
+                注册
+              </el-button>
+            </template>
+          </div>
         </nav>
 
         <div class="header-actions">
+          <div class="auth-cluster" :class="{ 'auth-cluster--hidden-mobile': isMobile }">
+            <template v-if="auth.isAuthenticated">
+              <div class="user-pill" :title="auth.user?.username">
+                <span class="user-avatar">{{ (auth.user?.username || '?').charAt(0).toUpperCase() }}</span>
+                <span class="user-pill-name">{{ auth.user?.username }}</span>
+              </div>
+              <el-button class="header-auth-btn" plain type="danger" @click="onLogout">
+                <el-icon><SwitchButton /></el-icon>
+                退出
+              </el-button>
+            </template>
+            <template v-else>
+              <el-button class="header-auth-btn" plain @click="goLogin">
+                <el-icon><Key /></el-icon>
+                登录
+              </el-button>
+              <el-button class="header-auth-btn" plain @click="goRegister">
+                <el-icon><Plus /></el-icon>
+                注册
+              </el-button>
+            </template>
+          </div>
           <el-button type="primary" class="action-button primary" @click="goConsult">
             <el-icon><ChatDotRound /></el-icon>
             <span>开始提问</span>
@@ -192,7 +260,101 @@ const isMobile = computed(() => {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.auth-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-cluster--hidden-mobile {
+  display: none !important;
+}
+
+.user-pill {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  max-width: 200px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+@media (min-width: 900px) {
+  .user-pill {
+    display: inline-flex;
+  }
+}
+
+.user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary-gradient);
+  flex-shrink: 0;
+}
+
+.user-pill-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-button.ghost {
+  border: 1px solid var(--gray-200);
+  background: transparent;
+  color: var(--gray-700);
+}
+
+.nav-auth-mobile {
+  display: none;
+}
+
+.nav-auth-divider {
+  height: 1px;
+  margin: 8px 0 4px;
+  background: var(--gray-200);
+}
+
+.nav-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px 4px;
+}
+
+.user-avatar-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary-gradient);
+}
+
+.nav-user-name {
+  font-weight: 600;
+  color: var(--gray-900);
+  font-size: 15px;
 }
 
 .hamburger {
@@ -259,6 +421,14 @@ const isMobile = computed(() => {
     width: 100%;
     padding: 12px 16px;
     text-align: left;
+  }
+
+  .nav-auth-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding-top: 4px;
   }
 
   .hamburger {
