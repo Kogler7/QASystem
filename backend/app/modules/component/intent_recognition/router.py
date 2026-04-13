@@ -17,10 +17,13 @@ router = APIRouter(prefix="/api/component/intent-recognition", tags=["component"
 
 
 class RecognizeRequestBody(BaseModel):
-    text: str
+    problem_model: dict  # 直接接受字典类型
+
+class GetPlanRequestBody(BaseModel):
+    problem_model: dict  # 直接接受字典类型
 
 class GetToolsRequestBody(BaseModel):
-    plan: str
+    plan: list[dict]
 
 
 
@@ -43,10 +46,10 @@ async def recognize(body: RecognizeRequestBody) -> dict[str, Any]:
 
 @router.post("/deep-recognize")
 async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
-    if not (body.text or "").strip():
-        raise HTTPException(status_code=400, detail="输入文本不能为空")
+    if not body.problem_model:
+        raise HTTPException(status_code=400, detail="问题模型不能为空")
     try:
-        result = await asyncio.to_thread(service.deep_recognize, text=body.text.strip())
+        result = await asyncio.to_thread(service.deep_recognize, problem_model=body.problem_model)
         return result
     except Exception as e:
         logger.exception("深度意图识别失败")
@@ -54,13 +57,11 @@ async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
 
 
 @router.post("/get-plan")
-async def get_plan(body: dict) -> dict[str, Any]:
-    intent_name = (body.get("intent_name") or "").strip()
-    domain = (body.get("domain") or "").strip()
-    if not intent_name or not domain:
-        raise HTTPException(status_code=400, detail="意图名称和域名称不能为空")
+async def get_plan(body: GetPlanRequestBody) -> dict[str, Any]:
+    if not body.problem_model:
+        raise HTTPException(status_code=400, detail="问题模型不能为空")
     try:
-        result = await asyncio.to_thread(service.get_plan, intent_name=intent_name, domain=domain)
+        result = await asyncio.to_thread(service.get_plan, problem_model=body.problem_model)
         return result
     except Exception as e:
         logger.exception("获取计划失败")
@@ -68,11 +69,13 @@ async def get_plan(body: dict) -> dict[str, Any]:
 
 @router.post("/get-tools")
 async def get_tools(body: GetToolsRequestBody) -> dict[str, Any]:
-    if not (body.plan or "").strip():
-        raise HTTPException(status_code=400, detail="计划不能为空")
+    if not body.plan:
+        raise HTTPException(status_code=400, detail="方案不能为空")
     try:
-        result = await asyncio.to_thread(service.get_tools, plan=body.plan.strip())
+        import json
+        plan = json.dumps(body.plan)
+        result = await asyncio.to_thread(service.get_tools, plan=plan)
         return result
-    except Exception as e:
+    except Exception as e:  
         logger.exception("获取工具列表失败")
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -107,6 +107,8 @@ class Config:
         self.neo4j_uri = os.getenv("NEO4J_URI") or "neo4j://localhost:7687"
         self.neo4j_username = os.getenv("NEO4J_USERNAME") or "neo4j"
         self.neo4j_password = os.getenv("NEO4J_PASSWORD") or "neo4j2025"
+        # Tools file path
+        self.tools_file = os.getenv("TOOLS_FILE") or str(_root / "data" / "tools.md")
 
 
 if __name__ == "__main__":
