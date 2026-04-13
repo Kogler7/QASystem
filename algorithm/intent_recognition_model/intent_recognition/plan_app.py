@@ -1,6 +1,6 @@
 from ir_utils.search_plan import SearchPlan
 from intent_recognition.intent_app import IntentRecognition
-from intent_recognition.agent_intent import run_tool_loop
+from intent_recognition.agent_intent import intent_recognition
 import json
 
 class PlanApp:
@@ -49,14 +49,14 @@ class PlanApp:
         # 没有找到意图和域
         return {"success": False, "data": {"understanding": "未找到意图或域", "pass": False}}
 
-    def get_plan_from_query(self, query):
+    def get_plan_from_model(self, problem_model):
         """根据用户查询获取计划（先调用意图识别，再生成计划）"""
         try:
             # 第一步：调用意图识别
-            intent_result = run_tool_loop(query)
-            json_content = intent_result.get('json_content')
+            intent_result = intent_recognition(problem_model)
+            intent_data = intent_result.get('data', {}).get('intent')
             
-            if not json_content:
+            if not intent_data:
                 return {
                         "success": False,
                         "data": {
@@ -66,7 +66,6 @@ class PlanApp:
                     }
             
             # 解析意图识别结果
-            intent_data = json.loads(json_content)
             intent_id = intent_data.get('intent_id')
             domain = intent_data.get('domain')
             
@@ -101,8 +100,7 @@ class PlanApp:
 
 if __name__ == "__main__":
     plan_app = PlanApp()
-    json_input = '''
-        {
+    json_input = {
             "problem_model":     
                 {
                     "问题ID": "QKB-001",
@@ -117,8 +115,8 @@ if __name__ == "__main__":
                     "相关实体": ["公开采购", "非公开采购", "金额构成"]
                 }
         }
-    '''
-    plan = plan_app.get_plan_from_query(json_input)
+    problem_model = json.loads(json_input)["problem_model"]
+    plan = plan_app.get_plan_from_model(problem_model)
     print("采购管理域的计划")
     print(plan)
     print(type(plan))

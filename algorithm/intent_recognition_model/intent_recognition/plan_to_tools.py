@@ -29,20 +29,11 @@ model = ChatOpenAI(
     temperature=0,
 )
 
-system_prompt = """
-你是一个计划工具,你需要先调用获取所有工具的tool,再根据用户输入的计划步骤生成所需要的工具。
-注：
-1,你只能调用获取所有工具的tool,不能调用其他tool。
-2,你只能根据用户输入的计划步骤生成所需要的工具,不能生成其他内容。
-3,你只能生成所需要的工具,不能生成其他内容。
-"""
-
 
 def get_all_tools():
     """获取所有可用工具列表，从 tools.md 文件中读取"""
-    tools_file_path = Path(__file__).resolve().parent.parent / "data" / "tools.md"
     try:
-        with open(tools_file_path, 'r', encoding='utf-8') as f:
+        with open(cfg.tools_file, 'r', encoding='utf-8') as f:
             return f.read()
     except Exception as e:
         return f"读取工具文件失败: {str(e)}"
@@ -68,6 +59,43 @@ class ToolMatch(BaseModel):
 class ToolList(BaseModel):
     """工具列表模型"""
     matches: list[ToolMatch] = Field(description="方案到工具的匹配列表")
+
+def evaluation_tool_list(matches_list: list) -> dict:
+    """评估工具列表"""
+    l = len(matches_list)
+    #如果所有的步骤都没找到工具
+    count=0
+    for match_dict in matches_list:
+        if not match_dict["tools"]:
+            count+=1
+        
+    if count==l:
+        return {
+            "success": False,
+            "data": {
+                "understanding": "工具生成失败,所有步骤都没有找到合适的工具",
+                "pass": False,
+                "matches": matches_list
+            }
+        }
+    elif count>0:
+        return {
+            "success": True,
+            "data": {
+                "understanding": "工具生成成功,部分步骤没有找到合适的工具",
+                "pass": True,
+                "matches": matches_list
+            }
+        }
+    else:
+        return {
+            "success": True,
+            "data": {
+                "understanding": "工具生成成功,所有步骤都有合适的工具",
+                "pass": True,
+                "matches": matches_list
+            }
+        }
 
 
 def plan_tool(plan: str):
@@ -103,7 +131,7 @@ def plan_tool(plan: str):
     try:
         result = structured_model.invoke([{"role": "user", "content": prompt}])
         # 将 ToolList 对象转换为正确的字典结构
-        matches_dict = []
+        matches_list = []
         # 处理 matches 字段（模型定义的字段）
         if hasattr(result, 'matches'):
             for tool_match in result.matches:
@@ -121,16 +149,11 @@ def plan_tool(plan: str):
                             ]
                         }
                         match_dict["tools"].append(tool_dict)
-                matches_dict.append(match_dict)
+                matches_list.append(match_dict)
         # 构建成功响应
-        final_results = {
-            "success": True,
-            "data": {
-                "understanding": "工具生成成功",
-                "pass": True,
-                "matches": matches_dict
-            }
-        }
+        # 调用评估函数处理 ToolList 对象
+        final_results = evaluation_tool_list(matches_list)  
+        
         return final_results
     except Exception as e:
         # 构建失败响应
@@ -162,7 +185,7 @@ if __name__ == "__main__":
                         "意图语义准确解析",
                         "指标定义无歧义"
                     ],
-                    "控制逻辑": null,
+                    "控制逻辑": None,
                     "置信度": 0.9
                 },
                 {
@@ -180,7 +203,7 @@ if __name__ == "__main__":
                         "表字段与指标一一对应",
                         "避免逻辑错误与性能风险"
                     ],
-                    "控制逻辑": null,
+                    "控制逻辑": None,
                     "置信度": 0.9
                 },
                 {
@@ -198,7 +221,7 @@ if __name__ == "__main__":
                         "计算结果准确无误",
                         "执行超时控制"
                     ],
-                    "控制逻辑": null,
+                    "控制逻辑": None,
                     "置信度": 0.9
                 },
                 {
@@ -217,7 +240,7 @@ if __name__ == "__main__":
                         "描述语言简洁易懂",
                         "结果与计算数据一致"
                     ],
-                    "控制逻辑": null,
+                    "控制逻辑": None,
                     "置信度": 0.9
                 }
     ]
