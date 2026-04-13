@@ -4,7 +4,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from rdflib import Graph, URIRef
@@ -35,8 +35,13 @@ except ImportError as e:
     logger.critical(f"❌ 关键配置导入失败，请检查 sys.path 或路径: {ALGO_ROOT}")
     raise e
 
+from ..deps.auth import require_admin
 
-router = APIRouter(prefix="/api/conflict", tags=["冲突检测与修复"])
+router = APIRouter(
+    prefix="/api/conflict",
+    tags=["冲突检测与修复"],
+    dependencies=[Depends(require_admin)],
+)
 manager = UpSHACLRepairManager()
 
 class DetectRequest(BaseModel):

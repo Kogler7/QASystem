@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { APP_TITLE } from '@/constants'
+import { useAuthStore } from '@/stores/auth'
 import { componentRoutes } from '@/views/component/config'
 
 const routes = [
@@ -10,16 +11,28 @@ const routes = [
     meta: { title: '首页' }
   },
   {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/LoginView.vue'),
+    meta: { title: '登录', guestOnly: true }
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { title: '注册', guestOnly: true }
+  },
+  {
     path: '/chat',
     name: 'chat',
     component: () => import('@/views/ChatView.vue'),
-    meta: { title: '智能问答' }
+    meta: { title: '智能问答', requiresAuth: true }
   },
   {
     path: '/component',
     name: 'component',
     component: () => import('@/views/component/layout.vue'),
-    meta: { title: '组件管理' },
+    meta: { title: '组件管理', requiresAuth: true, requiresAdmin: true },
     redirect: '/component/index',
     children: [
       {
@@ -35,7 +48,7 @@ const routes = [
     path: '/knowledge',
     name: 'knowledge',
     component: () => import('@/views/knowledge/KnowledgeLayout.vue'),
-    meta: { title: '知识库' },
+    meta: { title: '知识库', requiresAuth: true, requiresAdmin: true },
     redirect: '/knowledge/index',
     children: [
       {
@@ -75,6 +88,12 @@ const routes = [
         meta: { title: '知识检索' }
       }
     ]
+  },
+  {
+    path: '/admin/users',
+    name: 'admin-users',
+    component: () => import('@/views/admin/UserManageView.vue'),
+    meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true }
   }
 ]
 
@@ -83,10 +102,36 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   if (to.meta?.title) {
     document.title = `${to.meta.title} - ${APP_TITLE}`
   }
+
+  const auth = useAuthStore()
+  auth.syncTokenWithStorage()
+
+  if (to.meta?.guestOnly && auth.isAuthenticated) {
+    return next(auth.isAdmin ? '/component' : '/chat')
+  }
+
+  try {
+    if (auth.token && !auth.user) {
+      await auth.fetchMe()
+    }
+  } catch {
+    auth.logout()
+  }
+
+  const needsAuth = to.matched.some((r) => r.meta?.requiresAuth)
+  if (needsAuth && !auth.isAuthenticated) {
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  const needsAdmin = to.matched.some((r) => r.meta?.requiresAdmin)
+  if (needsAdmin && !auth.isAdmin) {
+    return next({ path: '/chat', query: { denied: '1' } })
+  }
+
   next()
 })
 

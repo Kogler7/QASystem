@@ -2,24 +2,27 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
+from ..config import settings
+from ..core.roles import ROLE_ADMIN, ROLE_USER
 from ..db import get_session
 from ..deps.auth import get_current_user
 from ..models.user import User
-from ..services.auth import create_access_token, get_password_hash, verify_password
+from ..core.passwords import PasswordPlain, hash_password, verify_password
+from ..services.auth import create_access_token
 
 router = APIRouter(prefix="/api", tags=["users", "auth"])
 
 
 class UserCreate(BaseModel):
     username: str
-    password: str
+    password: PasswordPlain
 
 
 class UserRead(BaseModel):
-    id: int
+    id: str
     username: str
     role: str
     created_at: str
@@ -35,15 +38,23 @@ async def register(
     body: UserCreate,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserRead:
+    if not settings.PUBLIC_REGISTRATION_ENABLED:
+        raise HTTPException(status_code=403, detail="公开注册已关闭，请联系管理员开通账号")
+
     stmt = select(User).where(User.username == body.username)
     result = await db.execute(stmt)
     existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="用户名已存在")
 
+    cnt_r = await db.execute(select(func.count(User.id)))
+    user_count = int(cnt_r.scalar_one() or 0)
+    role = ROLE_ADMIN if user_count == 0 else ROLE_USER
+
     user = User(
         username=body.username,
-        hashed_password=get_password_hash(body.password),
+        hashed_password=hash_password(body.password),
+        role=role,
     )
     db.add(user)
     await db.commit()
@@ -71,7 +82,7 @@ async def login(
             detail="用户名或密码错误",
         )
 
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({"sub": user.id, "role": user.role})
     return Token(access_token=token)
 
 
