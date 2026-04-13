@@ -1,8 +1,12 @@
 <script setup>
 import { nextTick, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatLineRound, Loading, Link, Monitor } from '@element-plus/icons-vue'
 import { sendChatMessage } from '@/api'
+
+const route = useRoute()
+const router = useRouter()
 
 const activeTab = ref('native')
 const inputText = ref('')
@@ -103,6 +107,10 @@ const onError = () => {
 const openDify = () => difyWorkspaceUrl.value && window.open(difyWorkspaceUrl.value, '_blank', 'noopener,noreferrer')
 
 onMounted(() => {
+  if (route.query.denied === '1') {
+    ElMessage.warning('您没有权限访问该功能')
+    router.replace({ query: {} })
+  }
   iframeSrc.value = 'http://10.126.62.88:8007/chatbot/83KOUCt19CPrpLZ6'
   try {
     difyWorkspaceUrl.value = new URL(iframeSrc.value).origin

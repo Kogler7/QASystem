@@ -194,7 +194,6 @@ packaging==26.0
 pandas==2.3.3
 pandocfilters==1.5.1
 parso==0.8.6
-passlib==1.7.4
 pdfminer.six==20260107
 pdftext==0.6.3
 peft==0.17.1

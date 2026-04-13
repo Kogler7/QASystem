@@ -11,9 +11,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_session
-from ..models.document import Document
 from ..config import settings
+from ..db import get_session
+from ..deps.auth import require_admin
+from ..models.document import Document
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,11 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 DOCUMENT_DIR = BASE_DIR / "data" / "documents"
 DOCUMENT_DIR.mkdir(parents=True, exist_ok=True)
 
-router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+router = APIRouter(
+    prefix="/api/knowledge",
+    tags=["knowledge"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 class KnowledgeQueryRequest(BaseModel):
