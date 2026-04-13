@@ -52,9 +52,9 @@ def health() -> dict[str, Any]:
         }
 
 
-def recognize(text: str) -> dict[str, Any]:
+def recognize(problem_model: dict) -> dict[str, Any]:
     recognizer = _get_intent_recognition()
-    result = recognizer.generate_result(text)
+    result = recognizer.generate_result(problem_model)
     if hasattr(result, "model_dump"):
         result = result.model_dump()
     elif not isinstance(result, dict):
@@ -62,15 +62,15 @@ def recognize(text: str) -> dict[str, Any]:
     return {"data": result}
 
 
-def deep_recognize(text: str) -> dict[str, Any]:
-    from intent_recognition.agent_intent import run_tool_loop
-    result = run_tool_loop(text)
+def deep_recognize(problem_model: dict) -> dict[str, Any]:
+    from intent_recognition.agent_intent import intent_recognition
+    result = intent_recognition(problem_model)
     return {"data": result}
 
-def get_plan(query: str) -> dict[str, Any]:
+def get_plan(problem_model: dict) -> dict[str, Any]:
     from intent_recognition.plan_app import PlanApp
     plan_app = PlanApp()
-    result = plan_app.get_plan_from_query(query)
+    result = plan_app.get_plan_from_model(problem_model)
     return {"data": result}
 
 def get_tools(plan: str) -> dict[str, Any]:

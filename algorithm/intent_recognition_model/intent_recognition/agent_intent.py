@@ -44,21 +44,6 @@ def retrival_tool(problem_model: str):
 system_prompt = """
 你是一个意图识别专家，返回与用户输入的内容最合适的意图
 
-**最终输出格式**：
-
-你需要从检索结果中选择最合适的意图，并按照以下 JSON 格式返回，确保字段名与 Intent_Base_Recognition 模型完全一致：
-
-```json
-{
-  "intent_id": "意图唯一标识",
-  "domain": "意图所属业务域",
-  "scenario": "意图所属场景",
-  "object": "意图对象",
-  "intent_name": "意图名称",
-  "user_goal": "用户核心目标",
-}
-```
-
 **重要提示**：
 1. 从检索结果中选择一个最合适的意图，如果你觉得都不匹配用户的查询，就返回"没有匹配的意图"，Intent_Base_Recognition字段全部为空。
 2. 如果你觉得有适合的意图，就输出，不过一定要确保输出的 JSON 必须与 Intent_Base_Recognition 模型的字段名完全一致
@@ -74,15 +59,16 @@ model = ChatOpenAI(
     temperature=0,
 )
 
+model = model.with_structured_output(Intent_Base_Recognition)
 
-def run_tool_loop(problem_model: str):
+def intent_recognition(problem_model: dict):
     """直接调用retrival_tool获取意图列表，然后注入给大模型判断"""
+
     # 检查输入是否为 JSON 字符串
     try:
-        json_input = json.loads(problem_model)
         # 如果是 JSON 格式，构建查询文本
-        if isinstance(json_input, dict):
-            problem_model = DatabaseUtils().build_query_from_json(json_input)
+        if isinstance(problem_model, dict):
+            problem_model = DatabaseUtils().build_query_from_json(problem_model)
     except (json.JSONDecodeError, TypeError):
         # 如果不是 JSON 格式，直接使用原始查询
         pass
@@ -100,24 +86,28 @@ def run_tool_loop(problem_model: str):
 
     # 调用模型进行意图判断
     response = model.invoke(messages)
-    content = response.content
     
-    json_content = utils.extract_json_content(content)
+    # json_content = utils.extract_json_content(content)
     
-    if json_content == "":
-        json_content = "最终意图识别失败，未识别到相关意图"
+    # if json_content == "":
+    #     json_content = "最终意图识别失败，未识别到相关意图"
 
+    response = response.model_dump()
     return {
-        "json_content": json_content,
-    }   #< class 'str'>
+        "success": True,
+        "data": {
+            "understanding": "最终意图识别成功",
+            "pass": True,
+            "intent": response
+        }
+    }
         
 if __name__ == "__main__":
     # 测试普通文本输入
     # query = "最近 12 个月的采购金额月度走势是怎样的？"
     
     # 测试 JSON 格式输入
-    json_input = '''
-    {
+    json_input = {
       "problem_model": {
         "问题ID": "QKB-001",
         "问题描述": "公开采购与非公开采购金额构成如何？",
@@ -131,13 +121,7 @@ if __name__ == "__main__":
         "相关实体": ["公开采购", "非公开采购", "金额构成"]
       }
     }
-    '''
     
-    final_answer = run_tool_loop(json_input)
-    print(f"json_content: {final_answer.get('json_content')}")
-    print(type(final_answer.get('json_content')))   # <class 'str'>
-    if isinstance(final_answer.get('json_content'), str):
-        try:
-            print(type(json.loads(final_answer.get('json_content'))))
-        except json.JSONDecodeError:
-            print("json_content 不是有效的 JSON 字符串")
+    final_answer = intent_recognition(json_input)
+    print(final_answer)
+    print(type(final_answer))   # <class 'dict'>
