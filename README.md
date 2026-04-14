@@ -90,6 +90,7 @@ cd frontend && npm install && npm run dev
 ## 文档索引
 
 - [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)  
+- [docs/DEPLOYMENT_BY_MODULE.md](docs/DEPLOYMENT_BY_MODULE.md)  
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)  
 - [docs/DIFY_WORKFLOW_SETUP.md](docs/DIFY_WORKFLOW_SETUP.md)  
 - [docs/TIMEOUT_DIAGNOSIS.md](docs/TIMEOUT_DIAGNOSIS.md)  
