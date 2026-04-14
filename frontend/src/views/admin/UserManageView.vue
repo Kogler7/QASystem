@@ -100,71 +100,66 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="user-manage-layout">
-    <div class="home-bg-deco" aria-hidden="true">
-      <span class="circle circle-1" />
-      <span class="circle circle-2" />
+  <div class="user-manage">
+    <div class="page-hero">
+      <div class="hero-text">
+        <p class="hero-eyebrow">系统管理</p>
+        <h1 class="hero-title">用户管理</h1>
+        <p class="hero-desc">创建账号、分配角色与重置密码。请谨慎删除管理员。</p>
+      </div>
+      <div class="hero-stat">
+        <span class="stat-value">{{ userCount }}</span>
+        <span class="stat-label">用户总数</span>
+      </div>
     </div>
 
-    <div class="layout-inner">
-      <h1 class="page-title">
-        <span class="title-highlight">用户管理</span>
-      </h1>
-      <p class="page-desc">
-        管理系统账号与角色：创建用户、分配管理员或普通用户、重置密码。删除操作不可恢复，请谨慎处理管理员账号。
-      </p>
-      <p class="page-meta">当前共 <strong>{{ userCount }}</strong> 个用户</p>
+    <el-card class="table-card" shadow="never">
+      <div class="card-toolbar">
+        <div class="toolbar-left">
+          <el-icon class="toolbar-icon" :size="20"><UserFilled /></el-icon>
+          <span class="toolbar-title">用户列表</span>
+        </div>
+        <el-button type="primary" class="btn-new" @click="createOpen = true">
+          <el-icon class="btn-icon"><Plus /></el-icon>
+          新建用户
+        </el-button>
+      </div>
 
-      <el-card class="list-card" shadow="hover">
-        <template #header>
-          <div class="header-row">
-            <span class="header-title">用户列表</span>
-            <div class="header-actions">
-              <el-button link type="primary" :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
-              <el-button type="primary" :icon="Plus" @click="createOpen = true">新建用户</el-button>
-            </div>
-          </div>
-        </template>
-
-        <el-table
-          v-loading="loading"
-          :data="rows"
-          stripe
-          class="user-table"
-          :empty-text="loading ? '加载中…' : '暂无用户'"
-        >
-          <el-table-column type="index" label="#" width="56" />
-          <el-table-column prop="id" label="用户 ID" min-width="280">
-            <template #default="{ row }">
-              <span class="cell-id" :title="row.id">{{ row.id }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="username" label="用户名" min-width="140">
-            <template #default="{ row }">
-              <el-icon class="name-icon"><User /></el-icon>
-              {{ row.username }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="role" label="角色" width="120" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" effect="light" size="small">
-                {{ row.role === 'admin' ? '管理员' : '普通用户' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" min-width="180" />
-          <el-table-column label="操作" width="168" fixed="right">
-            <template #default="{ row }">
-              <el-space class="action-space" :size="10" alignment="center" :wrap="false">
-                <el-button type="primary" link :icon="EditPen" @click="openEdit(row)">编辑</el-button>
-                <el-button type="danger" link :icon="Delete" @click="onDelete(row)">删除</el-button>
-              </el-space>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-empty v-if="!loading && rows.length === 0" description="暂无用户" />
-      </el-card>
-    </div>
+      <el-table
+        v-loading="loading"
+        class="user-table"
+        :data="rows"
+        stripe
+        :empty-text="loading ? '加载中…' : '暂无用户数据'"
+      >
+        <el-table-column prop="id" label="用户 ID" min-width="300">
+          <template #default="{ row }">
+            <span class="cell-id" :title="row.id">{{ row.id }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="role" label="角色" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" effect="light" round size="small">
+              {{ row.role === 'admin' ? '管理员' : '普通用户' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" min-width="180" />
+        <el-table-column label="操作" width="168" fixed="right" align="right">
+          <template #default="{ row }">
+            <el-button class="op-btn" text type="primary" @click="openEdit(row)">
+              <el-icon><EditPen /></el-icon>
+              编辑
+            </el-button>
+            <el-button class="op-btn" text type="danger" @click="onDelete(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
     <el-dialog
       v-model="createOpen"
@@ -242,120 +237,134 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-/* 与知识库 KnowledgeLayout / KnowledgeIndex 一致的外层与装饰 */
-.user-manage-layout {
-  min-height: calc(100vh - var(--nav-height));
-  padding: 24px var(--padding-inline) 60px;
-  position: relative;
-  overflow: hidden;
-}
-
-.home-bg-deco {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-}
-
-.circle {
-  position: absolute;
-  border-radius: 50%;
-  background: var(--primary-gradient);
-  opacity: 0.06;
-  animation: float 5s ease-in-out infinite;
-}
-
-.circle-1 {
-  width: 240px;
-  height: 240px;
-  top: 8%;
-  right: 6%;
-}
-
-.circle-2 {
-  width: 160px;
-  height: 160px;
-  bottom: 18%;
-  left: 4%;
-  animation-delay: 2s;
-}
-
-.layout-inner {
-  max-width: var(--content-max-width);
+.user-manage {
+  max-width: 1080px;
   margin: 0 auto;
-  position: relative;
-  z-index: 1;
+  padding: 28px var(--padding-inline, 20px) 48px;
 }
 
-.page-title {
+.page-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 28px 28px 26px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(56, 189, 248, 0.08) 100%);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  box-shadow: 0 4px 24px rgba(14, 165, 233, 0.08);
+}
+
+.hero-eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--primary-600);
+  text-transform: uppercase;
+}
+
+.hero-title {
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  letter-spacing: -0.02em;
+}
+
+.hero-desc {
+  margin: 0;
+  max-width: 520px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--gray-600);
+}
+
+.hero-stat {
+  flex-shrink: 0;
+  text-align: right;
+  padding: 8px 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+.stat-value {
+  display: block;
   font-size: 32px;
   font-weight: 700;
-  margin-bottom: 12px;
-  color: var(--gray-900);
+  color: var(--primary-600);
+  line-height: 1.1;
 }
 
-.page-desc {
-  font-size: 16px;
-  color: var(--gray-600);
-  margin-bottom: 12px;
-  max-width: 1000px;
-  line-height: 1.6;
-}
-
-.page-meta {
-  font-size: 14px;
+.stat-label {
+  font-size: 12px;
   color: var(--gray-500);
-  margin-bottom: 28px;
+  font-weight: 500;
+}
 
-  strong {
-    color: var(--primary-600);
-    font-weight: 700;
+.table-card {
+  border-radius: 20px;
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+
+  :deep(.el-card__body) {
+    padding: 0;
   }
 }
 
-/* 与 DocumentList list-card 一致 */
-.list-card {
-  border-radius: var(--card-radius);
-  transition: var(--transition-normal);
-
-  &:hover {
-    box-shadow: var(--shadow-hover);
-  }
-}
-
-.header-row {
+.card-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--gray-200);
+  background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
 }
 
-.header-title {
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbar-icon {
+  color: var(--primary-500);
+}
+
+.toolbar-title {
   font-size: 16px;
   font-weight: 600;
   color: var(--gray-900);
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.btn-new {
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 10px 18px;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+}
+
+.btn-icon {
+  margin-right: 6px;
 }
 
 .user-table {
-  width: 100%;
+  padding: 0 4px 12px;
 
   :deep(.el-table__header th) {
+    background: #f8fafc !important;
     font-weight: 600;
     color: var(--gray-600);
     font-size: 13px;
   }
-}
 
-.name-icon {
-  margin-right: 8px;
-  vertical-align: middle;
-  color: var(--gray-500);
+  :deep(.el-table__row) {
+    transition: background var(--transition-fast);
+  }
 }
 
 .cell-id {
@@ -365,8 +374,13 @@ onMounted(() => {
   word-break: break-all;
 }
 
-.action-space {
-  flex-wrap: nowrap;
+.op-btn {
+  font-weight: 500;
+
+  .el-icon {
+    margin-right: 4px;
+    vertical-align: middle;
+  }
 }
 
 .um-form {
@@ -376,7 +390,7 @@ onMounted(() => {
   }
 
   :deep(.el-input__wrapper) {
-    border-radius: var(--button-radius);
+    border-radius: 10px;
   }
 }
 
@@ -392,11 +406,12 @@ onMounted(() => {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--card-radius);
-  background: var(--gray-100);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(56, 189, 248, 0.12));
   color: var(--primary-600);
 
   &.muted {
+    background: var(--gray-100);
     color: var(--gray-600);
   }
 }
@@ -407,24 +422,22 @@ onMounted(() => {
   color: var(--gray-900);
 }
 
-@media (max-width: 768px) {
-  .user-manage-layout {
-    padding: 24px 20px 60px;
+@media (max-width: 640px) {
+  .page-hero {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
-  .page-title {
-    font-size: 24px;
-  }
-
-  .page-desc {
-    font-size: 14px;
+  .hero-stat {
+    text-align: left;
   }
 }
 </style>
 
 <style lang="scss">
+/* 对话框标题由 slot 接管时隐藏默认 title 区域重复 — Element Plus 仍占一行，用深度样式压扁默认 header 若需 */
 .um-dialog.el-dialog {
-  border-radius: var(--card-radius-lg);
+  border-radius: 16px;
   overflow: hidden;
 }
 
@@ -440,6 +453,6 @@ onMounted(() => {
 .um-dialog .el-dialog__footer {
   padding: 12px 20px 20px;
   border-top: 1px solid var(--gray-200);
-  background: var(--gray-100);
+  background: #fafbfc;
 }
 </style>
