@@ -15,52 +15,37 @@ export function intentRecognitionHealthCheck() {
  */
 export function intentRecognitionRecognize(params) {
   return request.post('/component/intent-recognition/recognize', {
-    text: params.text?.trim() ?? ''
+    problem_model: params.problem_model  // 直接传递对象
   }, { timeout: 6000 })
 }
 
-/**
- * 流式意图识别
- * @param {object} params - { text }
- * @returns {Promise<Response>} - 流式响应
- */
-export function intentRecognitionStream(params) {
-  return fetch('/api/component/intent-recognition/intent-recognition-stream', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ text: params.text?.trim() ?? '' })
-  })
-}
 
 /**
  * 深度意图识别
- * @param {object} params - { text }
+ * @param {object} params - { problem_model }
  */
 export function intentRecognitionDeepRecognize(params) {
   return request.post('/component/intent-recognition/deep-recognize', { 
-    text: params.text?.trim() ?? ''
+    problem_model: params.problem_model  // 直接传递对象
   }, { timeout: 300000 })
 }
 
 /**
  * 获取计划
- * @param {object} params - { intent_name, domain }
+ * @param {object} params - { problem_model }
  */
 export function intentRecognitionGetPlan(params) {
   return request.post('/component/intent-recognition/get-plan', {
-    intent_name: params.intent_name?.trim() ?? '',
-    domain: params.domain?.trim() ?? ''
+    problem_model: params.problem_model  // 直接传递对象
   }, { timeout: 30000000 })
 }
 
 /**
  * 获取工具列表
- * @param {object} params - { plan }
+ * @param {object} params - { plan: list[dict] }
  */
 export function intentRecognitionGetTools(params) {
   return request.post('/component/intent-recognition/get-tools', {
-    plan: params.plan?.trim() ?? ''
+    plan: params.plan
   }, { timeout: 30000000 })
 }

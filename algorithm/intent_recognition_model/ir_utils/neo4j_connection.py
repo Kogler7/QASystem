@@ -84,7 +84,7 @@ class Neo4jConnection:
             logging.error(f"不支持的节点标签: {label}")
             return None
 
-    def create_relationship(self, start_label, start_id, end_label, end_id, rel_type, properties=None):
+    def create_relationship(self, start_label, start_id, end_label, end_id, domain, properties=None):
         """创建关系（只查询已存在的节点，不创建新节点）
         
         Args:
@@ -92,7 +92,7 @@ class Neo4jConnection:
             start_id: 起始节点标识
             end_label: 结束节点标签（如 Domain、Plan）
             end_id: 结束节点标识
-            rel_type: 关系类型（如 意图_域，域_计划等）
+            domain: 域名称
             properties: 关系属性
             
         Returns:
@@ -102,8 +102,6 @@ class Neo4jConnection:
         # 处理起始节点匹配条件
         if start_label == "Intent":
             start_match = "id: $start_id"
-        elif start_label == "Domain":
-            start_match = "domain_name: $start_id"
         elif start_label == "Plan":
             start_match = "plan: $start_id"
         else:
@@ -113,8 +111,6 @@ class Neo4jConnection:
         # 处理结束节点匹配条件
         if end_label == "Intent":
             end_match = "id: $end_id"
-        elif end_label == "Domain":
-            end_match = "domain_name: $end_id"
         elif end_label == "Plan":
             end_match = "plan: $end_id"
         else:
@@ -125,7 +121,7 @@ class Neo4jConnection:
         query = f"""
         MATCH (a:{start_label} {{{start_match}}})
         MATCH (b:{end_label} {{{end_match}}})
-        CREATE (a)-[r:{rel_type}]->(b)
+        CREATE (a)-[r:{domain}]->(b)
         {"SET r = $properties" if properties else ""}
         RETURN r
         """
@@ -133,7 +129,7 @@ class Neo4jConnection:
         # 构建参数
         params = {
             "start_id": start_id,
-            "end_id": end_id
+            "end_id": end_id,
         }
         if properties:
             params["properties"] = properties
@@ -164,21 +160,6 @@ class Neo4jConnection:
         }
         return self.create_node("Intent", properties)
 
-    def create_domain_node(self, domain_name):
-        """创建 Domain 标签的节点
-        
-        Args:
-            domain_name: 域名称
-            **kwargs: 其他属性
-            
-        Returns:
-            创建结果
-        """
-        properties = {
-            "domain_name": domain_name,
-        }
-        return self.create_node("Domain", properties)
-
     def create_plan_node(self, plan):
         """创建 Plan 标签的节点
         
@@ -190,35 +171,18 @@ class Neo4jConnection:
         """
         properties = {
             "plan": plan["plan"],
-            "plan_content": plan["plan_content"],
+            "description": plan["description"],
+            "steps": plan["steps"],
         }
         return self.create_node("Plan", properties)
 
-    def create_intent_domain_relationship(self, intent_id, domain_name, rel_type="意图_域", **kwargs):
-        """创建意图和域的关系（只查询已存在的节点，不创建新节点）
+    def create_intent_plan_relationship(self, intent_id, plan, domain, **kwargs):
+        """创建意图和计划的关系（只查询已存在的节点，不创建新节点）
         
         Args:
             intent_id: 意图 ID
-            domain_name: 域名称
-            rel_type: 关系类型（默认 BELONGS_TO）
-            **kwargs: 关系属性
-            
-        Returns:
-            创建结果，如果节点不存在则返回 None
-        """
-
-        properties = kwargs if kwargs else None
-        return self.create_relationship(
-            "Intent", intent_id, "Domain", domain_name, rel_type, properties
-        )
-
-    def create_domain_plan_relationship(self, domain_name, plan, rel_type="域_计划", **kwargs):
-        """创建域和计划的关系（只查询已存在的节点，不创建新节点）
-        
-        Args:
-            domain_name: 域名称
             plan: 包含计划名称以及计划内容的字典，格式为 {"plan": "计划名称", "plan_content": "计划内容"}
-            rel_type: 关系类型
+            domain: 域名称
             **kwargs: 关系属性
             
         Returns:
@@ -227,7 +191,7 @@ class Neo4jConnection:
 
         properties = kwargs if kwargs else None
         return self.create_relationship(
-            "Domain", domain_name, "Plan", plan["plan"], rel_type, properties
+            "Intent", intent_id, "Plan", plan["plan"], domain, properties
         )
 
     def get_nodes(self, label, limit=100):
@@ -260,23 +224,6 @@ class Neo4jConnection:
         query2 = f"MATCH (n:Intent {{id: $intent_id}}) DELETE n"
         return self.run_query(query2, {"intent_id": intent_id})
 
-    def delete_domain_node(self, domain_name):
-        """删除指定的 Domain 节点
-        
-        Args:
-            domain_name: 域名称
-            
-        Returns:
-            删除结果
-        """
-        # 先删除与该节点相关的所有关系
-        query1 = f"MATCH (n:Domain {{domain_name: $domain_name}})-[r]-() DELETE r"
-        self.run_query(query1, {"domain_name": domain_name})
-        
-        # 再删除节点
-        query2 = f"MATCH (n:Domain {{domain_name: $domain_name}}) DELETE n"
-        return self.run_query(query2, {"domain_name": domain_name})
-
     def delete_plan_node(self, plan):
         """删除指定的 Plan 节点
         
@@ -287,46 +234,12 @@ class Neo4jConnection:
             删除结果
         """
         # 先删除与该节点相关的所有关系
-        query1 = f"MATCH (n:Plan {{plan: $plan}})-[r]-() DELETE r"
-        self.run_query(query1, {"plan": plan["plan"]})
+        query1 = f"MATCH ()-[r]-(n:Plan {{plan: $plan}}) DELETE r"
+        self.run_query(query1, {"plan": plan})
         
         # 再删除节点
         query2 = f"MATCH (n:Plan {{plan: $plan}}) DELETE n"
-        return self.run_query(query2, {"plan": plan["plan"]})
-
-    def delete_intent_domain_relationship(self, intent_id, domain_name):
-        """删除意图和域之间的关系
-        
-        Args:
-            intent_id: 意图 ID
-            domain_name: 域名称
-            
-        Returns:
-            删除结果
-        """
-        query = f"""
-        MATCH (a:Intent {{id: $intent_id}})-[r]->(b:Domain {{domain_name: $domain_name}})
-        DELETE r
-        RETURN r
-        """
-        return self.run_query(query, {"intent_id": intent_id, "domain_name": domain_name})
-
-    def delete_domain_plan_relationship(self, domain_name, plan):
-        """删除域和计划之间的关系
-        
-        Args:
-            domain_name: 域名称
-            plan: 包含计划名称以及计划内容的字典，格式为 {"plan": "计划名称", "plan_content": "计划内容"}
-            
-        Returns:
-            删除结果
-        """
-        query = f"""
-        MATCH (a:Domain {{domain_name: $domain_name}})-[r]->(b:Plan {{plan: $plan}})
-        DELETE r
-        RETURN r
-        """
-        return self.run_query(query, {"domain_name": domain_name, "plan": plan["plan"]})
+        return self.run_query(query2, {"plan": plan})
 
     def delete_all_intent_domain_plan_data(self):
         """删除所有 Intent、Domain 和 Plan 节点及其关系
@@ -353,13 +266,21 @@ class Neo4jConnection:
         query5 = "MATCH (n:Plan) DELETE n"
         return self.run_query(query5)
 
+    def delete_intent_plan_relationship(self, intent_id, plan):
+        """删除指定的 Intent 和 Plan 关系
+        
+        Args:
+            intent_id: 意图 ID
+            plan: 计划名称
+            
+        Returns:
+            删除结果
+        """
+        query = f"MATCH (a:Intent {{id: $intent_id}})-[r]->(b:Plan {{plan: $plan}}) DELETE r"
+        return self.run_query(query, {"intent_id": intent_id, "plan": plan})
+
 if __name__ == "__main__":
     gc = Neo4jConnection()
     gc.connect()
-    plan = """
-    1.上下文获取与指标匹配：输入结构化意图，输出用指标描述的业务；
-    2.SQL转换：输入指标描述的业务，输出SQL描述的业务；
-    3.SQL执行：输入SQL，输出指标计算结果；
-    4.图表可视化与答案生成：输入计算结果，输出图表+文字内容描述。
-    """
-    # gc.delete_domain_plan_relationship("看趋势_销售分析域", plan)
+    gc.delete_plan_node("采购管理域的看构成计划方案")
+    gc.close()
