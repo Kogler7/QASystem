@@ -15,7 +15,7 @@
 |------|------|------|------------|
 | **MILVUS_URI** | 是 | Milvus 服务地址 | `http://localhost:19530` |
 | **COLLECTION_NAME** | 是 | Milvus 集合名 | `intent_rag` |
-| **MODEL_PATH** | 是 | BGE-M3 模型目录（含模型文件） | `/mnt/data3/srv/qasystem/models` 或 `.../models/bge_m3` |
+| **MODEL_PATH** | 是 | BGE-M3 模型目录（含模型文件） | `models/bge_m3_model` 或 `models/bge_m3` |
 | `LLM_*` / `DEEPSEEK_API_KEY` | 是 | 意图识别 LLM（与 `algorithm/common` 一致） | 见 `backend/.env.example` |
 | **DATA_DIR** | 建议 | 意图数据 JSON 路径 | `../data/intent.json` 或绝对路径 |
 | **LOG_PATH** | 否 | 日志目录 | 不设则用项目根下 `logs` |

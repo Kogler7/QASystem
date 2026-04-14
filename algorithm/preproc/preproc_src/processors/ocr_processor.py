@@ -46,6 +46,35 @@ class OCRProcessor(BaseProcessor):
             pass
         effective_model_source = model_source or os.getenv("MINERU_MODEL_SOURCE") or 'local'
 
+        # 允许通过环境变量覆盖 mineru.json 中 models-dir 的路径，便于不同环境部署。
+        # 覆盖变量：
+        # - MINERU_MODEL_PIPELINE_PATH
+        # - MINERU_MODEL_VLM_PATH
+        pipeline_override = os.getenv("MINERU_MODEL_PIPELINE_PATH")
+        vlm_override = os.getenv("MINERU_MODEL_VLM_PATH")
+        if pipeline_override or vlm_override:
+            try:
+                with open(effective_config_path, "r", encoding="utf-8") as f:
+                    runtime_cfg = json.load(f)
+                models_dir = runtime_cfg.get("models-dir")
+                if not isinstance(models_dir, dict):
+                    models_dir = {}
+                if pipeline_override:
+                    models_dir["pipeline"] = pipeline_override
+                if vlm_override:
+                    models_dir["vlm"] = vlm_override
+                runtime_cfg["models-dir"] = models_dir
+
+                runtime_path = Path("/tmp") / f"mineru.runtime.{os.getpid()}.json"
+                with open(runtime_path, "w", encoding="utf-8") as f:
+                    json.dump(runtime_cfg, f, ensure_ascii=False, indent=4)
+                effective_config_path = str(runtime_path)
+            except Exception as e:
+                logger.warning(
+                    "Failed to apply MinerU model path overrides from env, fallback to original config. error={}",
+                    e,
+                )
+
         # MinerU 实际读取 MINERU_TOOLS_CONFIG_JSON，而不是 MINERU_CONFIG_PATH。
         os.environ["MINERU_TOOLS_CONFIG_JSON"] = effective_config_path
         os.environ["MINERU_CONFIG_PATH"] = effective_config_path

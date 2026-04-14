@@ -78,8 +78,8 @@ class TextEvidence(nn.Module):
             print(f"Elasticsearch 连接异常: {e}")
             self.es = None
         
-        # 从环境变量读取 SBERT 模型路径
-        model_path = os.getenv('SBERT_MODEL_PATH', '/mnt/data3/srv/qasystem/models/sbert_model')
+        # 从环境变量读取 SBERT 模型路径（默认指向仓库根 models 目录）
+        model_path = os.getenv('SBERT_MODEL_PATH', str(_CC_ROOT.parent.parent / 'models' / 'sbert_model'))
         
         print(f"加载 SBERT 模型: {model_path}")
         

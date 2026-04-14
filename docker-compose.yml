@@ -56,7 +56,8 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-rail}:${MYSQL_PASSWORD:-rail123}@db:3306/${MYSQL_DATABASE:-rail_assistant}
+      # 默认连 compose 内 db；若使用外部 MySQL，可在 .env 覆盖 DATABASE_HOST / DATABASE_PORT
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-rail}:${MYSQL_PASSWORD:-rail123}@${DATABASE_HOST:-db}:${DATABASE_PORT:-3306}/${MYSQL_DATABASE:-rail_assistant}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
@@ -84,6 +85,8 @@ services:
     volumes:
       - backend_documents:/app/backend/data/documents
       - backend_preproc_output:/app/backend/data/preproc_output
+      # 挂载宿主机模型目录到容器内 /models（只读，避免模型被容器进程修改）
+      - ${HOST_MODELS_DIR:-/opt/qasystem-models}:/models:ro
     depends_on:
       db:
         condition: service_healthy
