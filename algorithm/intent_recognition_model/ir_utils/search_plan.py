@@ -14,7 +14,7 @@ class SearchPlan:
             domain: 域名称，作为关系类型
             
         Returns:
-            包含 plan_content（JSON 对象）和 plan 的字典
+            包含 description（字符串）和 steps（列表）的字典
         """
         # 构建查询，查找 Intent 节点通过 domain 关系连接到 Plan 节点的路径
         query = f"""
@@ -32,7 +32,8 @@ class SearchPlan:
                 if "plan_content" in plan_data:
                     import json
                     try:
-                        plan_data["plan_content"] = json.loads(plan_data["plan_content"])
+                        plan_data["description"] = plan_data["description"]
+                        plan_data["steps"] = json.loads(plan_data["steps"])
                     except json.JSONDecodeError:
                         # 如果解析失败，保持原始字符串
                         pass
@@ -45,6 +46,7 @@ if __name__ == "__main__":
     plans = search_plan.search_plan("INT20260211001", "采购管理域")
     if plans:
         print(type(plans))  #<class 'dict'>
-        print(type(plans.get("plan_content")))  #<class 'list'>
+        print(type(plans.get("description")))  #<class 'str'>
+        print(type(plans.get("steps")))  #<class 'list'>
         print(plans)
     search_plan.gc.close()

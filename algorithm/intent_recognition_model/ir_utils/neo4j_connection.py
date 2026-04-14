@@ -171,7 +171,8 @@ class Neo4jConnection:
         """
         properties = {
             "plan": plan["plan"],
-            "plan_content": plan["plan_content"],
+            "description": plan["description"],
+            "steps": plan["steps"],
         }
         return self.create_node("Plan", properties)
 
@@ -233,7 +234,7 @@ class Neo4jConnection:
             删除结果
         """
         # 先删除与该节点相关的所有关系
-        query1 = f"MATCH (n:Plan {{plan: $plan}})-[r]-() DELETE r"
+        query1 = f"MATCH ()-[r]-(n:Plan {{plan: $plan}}) DELETE r"
         self.run_query(query1, {"plan": plan})
         
         # 再删除节点
@@ -265,10 +266,21 @@ class Neo4jConnection:
         query5 = "MATCH (n:Plan) DELETE n"
         return self.run_query(query5)
 
+    def delete_intent_plan_relationship(self, intent_id, plan):
+        """删除指定的 Intent 和 Plan 关系
+        
+        Args:
+            intent_id: 意图 ID
+            plan: 计划名称
+            
+        Returns:
+            删除结果
+        """
+        query = f"MATCH (a:Intent {{id: $intent_id}})-[r]->(b:Plan {{plan: $plan}}) DELETE r"
+        return self.run_query(query, {"intent_id": intent_id, "plan": plan})
 
 if __name__ == "__main__":
     gc = Neo4jConnection()
     gc.connect()
-    domain_name = ["看构成_采购管理域","看趋势_销售分析域","做对比_销售分析域","看排名_销售分析域","问极值_门店运营域","问明细_销售分析域","做探查_商品分析域","问归因_销售分析域"]
-    for domain in domain_name:
-        gc.delete_domain_node(domain)
+    gc.delete_plan_node("采购管理域的看构成计划方案")
+    gc.close()

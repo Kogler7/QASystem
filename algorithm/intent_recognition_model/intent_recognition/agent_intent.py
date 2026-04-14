@@ -93,14 +93,15 @@ def intent_recognition(problem_model: dict):
     #     json_content = "最终意图识别失败，未识别到相关意图"
 
     response = response.model_dump()
-    return {
-        "success": True,
-        "data": {
+
+    result = {
             "understanding": "最终意图识别成功",
             "pass": True,
-            "intent": response
+            "intent": response,
+            "detail": {}
         }
-    }
+
+    return result
         
 if __name__ == "__main__":
     # 测试普通文本输入
@@ -109,16 +110,17 @@ if __name__ == "__main__":
     # 测试 JSON 格式输入
     json_input = {
       "problem_model": {
-        "问题ID": "QKB-001",
-        "问题描述": "公开采购与非公开采购金额构成如何？",
-        "问题类型": "描述型问题",
-        "约束": ["需基于公开数据源"],
-        "目标对象": "采购金额构成",
-        "干系人": ["采购部门", "财务部门"],
-        "目标": ["明确金额分配比例"],
-        "当前状态": "分析阶段",
-        "创建时间": "2026-04-09T00:54:30.393365",
-        "相关实体": ["公开采购", "非公开采购", "金额构成"]
+        "problem_id": "QKB-001",
+        "description": "公开采购与非公开采购金额构成如何？",
+        "problem_type": "描述型问题",
+        "constraints": ["需基于公开数据源"],
+        "target_object": "采购金额构成",
+        "stakeholders": ["采购部门", "财务部门"],
+        "goals": ["明确金额分配比例"],
+        "status": "分析阶段",
+        "created_at": "2026-04-09T00:54:30.393365",
+        "related_entities": ["公开采购", "非公开采购", "金额构成"],
+        "children": []
       }
     }
     

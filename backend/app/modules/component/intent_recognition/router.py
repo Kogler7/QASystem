@@ -23,7 +23,7 @@ class GetPlanRequestBody(BaseModel):
     problem_model: dict  # 直接接受字典类型
 
 class GetToolsRequestBody(BaseModel):
-    plan: list[dict]
+    step: dict  # 直接接受字典类型
 
 
 
@@ -69,12 +69,10 @@ async def get_plan(body: GetPlanRequestBody) -> dict[str, Any]:
 
 @router.post("/get-tools")
 async def get_tools(body: GetToolsRequestBody) -> dict[str, Any]:
-    if not body.plan:
-        raise HTTPException(status_code=400, detail="方案不能为空")
+    if not body.step:
+        raise HTTPException(status_code=400, detail="步骤不能为空")
     try:
-        import json
-        plan = json.dumps(body.plan)
-        result = await asyncio.to_thread(service.get_tools, plan=plan)
+        result = await asyncio.to_thread(service.get_tools, step=body.step)
         return result
     except Exception as e:  
         logger.exception("获取工具列表失败")

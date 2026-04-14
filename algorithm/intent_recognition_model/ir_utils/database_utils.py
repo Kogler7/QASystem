@@ -49,8 +49,8 @@ class DatabaseUtils:
         if intent_data.get("scenario"):
             parts.append(f"场景: {intent_data['scenario']}")
 
-        if intent_data.get("object"):
-            parts.append(f"目标对象: {intent_data['object']}")
+        if intent_data.get("target_object"):
+            parts.append(f"目标对象: {intent_data['target_object']}")
 
         if intent_data.get("tags"):
             # 选取最具代表性的3条（避免噪声）
@@ -99,23 +99,23 @@ class DatabaseUtils:
         parts = []
 
         # 问题描述（高权重）
-        if problem_model.get("问题描述"):
-            parts.append(f"问题描述: {problem_model['问题描述']}")
+        if problem_model.get("description"):
+            parts.append(f"问题描述: {problem_model['description']}")
 
         # 目标对象（中权重）
-        if problem_model.get("目标对象"):
-            parts.append(f"目标对象: {problem_model['目标对象']}")
+        if problem_model.get("target_object"):
+            parts.append(f"目标对象: {problem_model['target_object']}")
 
         # 目标（中权重）
-        if problem_model.get("目标"):
-            goals = problem_model["目标"]
+        if problem_model.get("goals"):
+            goals = problem_model["goals"]
             if goals:
                 goals_text = " | ".join(goals)
                 parts.append(f"目标: {goals_text}")
 
         # 相关实体（高价值样本）
-        if problem_model.get("相关实体"):
-            entities = problem_model["相关实体"]
+        if problem_model.get("related_entities"):
+            entities = problem_model["related_entities"]
             if entities:
                 entities_text = " | ".join(entities)
                 parts.append(f"相关实体: {entities_text}")
