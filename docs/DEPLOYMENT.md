@@ -74,6 +74,7 @@ sudo mkdir -p /opt/qasystem-models
 ## 3.1 流水线 A：目标机在线拉代码并本地构建（推荐）
 
 适用场景：
+
 - 目标机能访问 Git 仓库与镜像源
 - 希望流程简单、后续升级方便（`git pull`）
 
@@ -82,6 +83,7 @@ sudo mkdir -p /opt/qasystem-models
 ```bash
 cd /srv
 git clone <your-repo-url> qasystem
+# git clone git@10.126.62.88:qasystem/qasystem.git qasystem
 cd /srv/qasystem
 ```
 
@@ -109,6 +111,7 @@ docker compose --profile neo4j up -d --build
 ## 3.2 流水线 B：源机预构建镜像，目标机离线加载
 
 适用场景：
+
 - 目标机不能访问外网或拉依赖慢
 - 希望固定镜像版本进行交付
 
@@ -426,13 +429,13 @@ docker compose up -d --build
 
 ## 12. 一份可参考的部署顺序（建议）
 
-1. 准备目标机 Docker 环境  
-2. 同步代码到 `/srv/qasystem`  
-3. 准备模型到 `/opt/qasystem-models`  
-4. 配置 `.env`（含 `HOST_MODELS_DIR` 与各类服务地址）  
-5. `docker compose up -d --build`（或加 `--profile neo4j`）  
-6. 完成验收清单并记录版本  
-7. 建立备份和监控策略  
+1. 准备目标机 Docker 环境
+2. 同步代码到 `/srv/qasystem`
+3. 准备模型到 `/opt/qasystem-models`
+4. 配置 `.env`（含 `HOST_MODELS_DIR` 与各类服务地址）
+5. `docker compose up -d --build`（或加 `--profile neo4j`）
+6. 完成验收清单并记录版本
+7. 建立备份和监控策略
 
 ---
 
@@ -441,3 +444,4 @@ docker compose up -d --build
 - `prod.env.example`（生产模板）
 - `staging.env.example`（预发模板）
 - 一键检查脚本（启动前验证模型目录、端口连通性、关键变量完整性）
+
