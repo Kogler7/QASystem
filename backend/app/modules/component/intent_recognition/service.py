@@ -62,7 +62,7 @@ def recognize(problem_model: dict) -> dict[str, Any]:
     return {"data": result}
 
 
-def deep_recognize(problem_model: dict) -> dict[str, Any]:
+def deep_recognize(problem_model: dict|str) -> dict[str, Any]:
     from intent_recognition.agent_intent import intent_recognition
     result = intent_recognition(problem_model)
     return {
