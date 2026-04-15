@@ -8,6 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     default-libmysqlclient-dev \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libreoffice-core \
+    libreoffice-writer \
+    fonts-dejavu-core \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

@@ -6,7 +6,10 @@ from ir_utils.handle_data import utils
 from langchain_core.tools import tool
 from langchain.agents import create_agent
 from langchain_core.prompts import ChatPromptTemplate
-from data.intent_model import Intent_Base_Recognition
+try:
+    from algorithm.intent_recognition_model.data.intent_model import Intent_Base_Recognition
+except ModuleNotFoundError:
+    from data.intent_model import Intent_Base_Recognition
 from ir_utils.database_utils import DatabaseUtils
 import json
 

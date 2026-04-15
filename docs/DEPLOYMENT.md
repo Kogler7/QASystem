@@ -29,7 +29,7 @@
 
 ### 1.2 最佳实践
 
-- 模型文件放宿主机目录，例如 `/opt/qasystem-models`
+- 模型文件放宿主机目录（建议与交付包同根），例如 `/srv/models`
 - 通过 volume 只读挂载到 backend 容器 `/models`
 - 使用环境变量配置模型路径（不在代码里写机器绝对路径）
 - 代码与数据分离：镜像只放代码和依赖，不放模型与业务数据
@@ -54,15 +54,62 @@ docker compose version
 
 若未安装，请先按官方文档安装 Docker Engine 和 Compose Plugin。
 
-## 2.3 目录规划（推荐）
+## 2.3 配置 Docker 镜像加速（国内环境建议）
+
+在网络受限或拉取 Docker Hub 较慢时，建议先为 Docker Engine 配置镜像加速源，再进行后续部署。
+
+1) 编辑或创建 Docker 守护进程配置文件：
+
+```bash
+sudo mkdir -p /etc/docker
+sudo nano /etc/docker/daemon.json
+```
+
+2) 写入 `registry-mirrors`（示例，按你实际可用镜像源替换）：
+
+```json
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://hub-mirror.c.163.com"
+  ]
+}
+```
+
+3) 重载并重启 Docker：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+4) 验证是否生效：
+
+```bash
+docker info | rg "Registry Mirrors" -A 5
+```
+
+> 说明：`registry-mirrors` 只影响镜像拉取速度，不改变 `docker-compose.yml` 中镜像名称写法。
+
+## 2.4 目录规划（推荐）
 
 ```bash
 sudo mkdir -p /srv/qasystem
-sudo mkdir -p /opt/qasystem-models
+sudo mkdir -p /srv/models
 ```
 
 - `/srv/qasystem`：代码与 compose 目录
-- `/opt/qasystem-models`：外置模型目录（挂载到容器 `/models`）
+- `/srv/models`：外置模型目录（挂载到容器 `/models`）
+- `/srv/qasystem-images.tar`：离线镜像包（流水线 B 使用）
+
+目录可参考：
+
+```text
+/srv
+├── qasystem/
+├── models/
+└── qasystem-images.tar
+```
 
 ---
 
@@ -91,7 +138,7 @@ cd /srv/qasystem
 
 ```bash
 cp .env.example .env
-mkdir -p /opt/qasystem-models
+mkdir -p /srv/models
 ```
 
 按第 5 节编辑 `.env`（尤其是 `JWT_SECRET`、`DIFY_*`、`HOST_MODELS_DIR` 等）。
@@ -169,7 +216,7 @@ docker compose --profile neo4j up -d
 ## 4.1 宿主机模型目录结构示例
 
 ```text
-/opt/qasystem-models
+/srv/models
 ├── bge_m3_model
 ├── sbert_model
 ├── bge-small-zh-v1.5
@@ -184,7 +231,7 @@ docker compose --profile neo4j up -d
 
 `docker-compose.yml` 已配置：
 
-- `${HOST_MODELS_DIR:-/opt/qasystem-models}:/models:ro`
+- `${HOST_MODELS_DIR:-./models}:/models:ro`
 
 即：宿主机模型目录挂载为容器内 `/models`（只读）。
 
@@ -216,7 +263,7 @@ cp .env.example .env
 
 - `HTTP_PORT=80`
 - `MYSQL_BIND=127.0.0.1`（生产建议保持内网）
-- `HOST_MODELS_DIR=/opt/qasystem-models`
+- `HOST_MODELS_DIR=/srv/models`（当 `models` 与 `qasystem-images.tar` 同在 `/srv` 根目录）
 - `DATABASE_HOST=db`（外部 MySQL 可改为内网地址）
 - `DATABASE_PORT=3306`
 
@@ -415,6 +462,20 @@ docker compose up -d --build
 - 若仍不可达，改用宿主机内网 IP
 - 检查防火墙 / 安全组放行
 
+## 10.5 文档预处理报错 `libGL.so.1` 缺失
+
+- 现象：组件健康检查返回 `文档预处理模块不可用: libGL.so.1: cannot open shared object file`
+- 原因：`algorithm/preproc` 依赖链中的 `opencv` 需要系统动态库（`libGL.so.1` 等）
+- 处理：确认使用最新 `docker/backend.Dockerfile` 重新构建后端镜像（已包含 `libgl1`、`libglib2.0-0`、`libsm6`、`libxext6`、`libxrender1`）
+- 命令：`docker compose build --no-cache backend && docker compose up -d backend`
+
+## 10.6 DOC/DOCX 转换失败（`soffice` 不存在）
+
+- 现象：上传 `.doc` 或调用 `convert-to-pdf` 时失败，日志出现 `soffice: not found` 或 `未找到LibreOffice`
+- 原因：`algorithm/preproc` 的 `DocxProcessor` 依赖 LibreOffice（`soffice`）执行格式转换
+- 处理：确认使用最新 `docker/backend.Dockerfile` 重新构建后端镜像（已包含 `libreoffice-core`、`libreoffice-writer`）
+- 命令：`docker compose build --no-cache backend && docker compose up -d backend`
+
 ---
 
 ## 11. 生产安全建议
@@ -431,7 +492,7 @@ docker compose up -d --build
 
 1. 准备目标机 Docker 环境
 2. 同步代码到 `/srv/qasystem`
-3. 准备模型到 `/opt/qasystem-models`
+3. 准备模型到 `/srv/models`（可与 `qasystem-images.tar` 同级放在 `/srv`）
 4. 配置 `.env`（含 `HOST_MODELS_DIR` 与各类服务地址）
 5. `docker compose up -d --build`（或加 `--profile neo4j`）
 6. 完成验收清单并记录版本

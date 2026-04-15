@@ -94,7 +94,7 @@ services:
       - backend_documents:/app/backend/data/documents
       - backend_preproc_output:/app/backend/data/preproc_output
       # 挂载宿主机模型目录到容器内 /models（只读，避免模型被容器进程修改）
-      - ${HOST_MODELS_DIR:-/opt/qasystem-models}:/models:ro
+      - ${HOST_MODELS_DIR:-./models}:/models:ro
     # db 在 profile mysql 下才存在；外部 MySQL 时勿启用该 profile，并配置 .env 中 DATABASE_HOST
     depends_on:
       db:

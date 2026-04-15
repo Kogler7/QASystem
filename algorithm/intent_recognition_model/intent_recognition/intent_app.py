@@ -8,7 +8,10 @@ from ir_config.config import Config
 from ir_utils.search_intent import HybridSearch
 from langchain_openai import ChatOpenAI
 from ir_utils.handle_data import utils
-from data.intent_model import Intent
+try:
+    from algorithm.intent_recognition_model.data.intent_model import Intent
+except ModuleNotFoundError:
+    from data.intent_model import Intent
 import json
 
 # 配置日志

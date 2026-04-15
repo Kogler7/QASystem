@@ -17,6 +17,9 @@ _ROOT = _THIS.parents[5]
 _INTENT_ROOT = _ROOT / "algorithm" / "intent_recognition_model"
 
 
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 if _INTENT_ROOT.exists():
     if str(_INTENT_ROOT) not in sys.path:
         sys.path.insert(0, str(_INTENT_ROOT))
@@ -29,6 +32,8 @@ def _get_intent_recognition():
     global _IntentRecognition, _recognizer_instance
     if _IntentRecognition is None:
         try:
+            if str(_ROOT) not in sys.path:
+                sys.path.insert(0, str(_ROOT))
             if str(_INTENT_ROOT) not in sys.path:
                 sys.path.insert(0, str(_INTENT_ROOT))
             from intent_recognition.intent_app import IntentRecognition

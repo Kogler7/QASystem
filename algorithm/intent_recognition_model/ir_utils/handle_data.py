@@ -9,7 +9,10 @@ import re
 from ir_config.config import Config
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
-from data.intent_model import Intent_Base_Recognition
+try:
+    from algorithm.intent_recognition_model.data.intent_model import Intent_Base_Recognition
+except ModuleNotFoundError:
+    from data.intent_model import Intent_Base_Recognition
 
 # 配置日志
 config = Config()

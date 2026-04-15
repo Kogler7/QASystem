@@ -7,7 +7,10 @@ from pymilvus import MilvusClient, MilvusException, Collection, connections
 
 from ir_config.config import Config
 from ir_utils.encoder import HybridEncoder
-from data.intent_model import Intent
+try:
+    from algorithm.intent_recognition_model.data.intent_model import Intent
+except ModuleNotFoundError:
+    from data.intent_model import Intent
 from init_database.init_database import DatabaseInit
 from ir_utils.database_utils import DatabaseUtils
 
