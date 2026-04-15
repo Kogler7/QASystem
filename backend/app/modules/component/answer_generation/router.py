@@ -12,7 +12,7 @@ from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/answer-generation", tags=["component", "answer-generation"])
+router = APIRouter(prefix="/api/component", tags=["component"])
 
 
 class AskRequestBody(BaseModel):
@@ -46,12 +46,10 @@ class SolutionPlanningRequestBody(BaseModel):
 
 
 class AnswerGenerationRequestBody(BaseModel):
-    solution: dict
-    graph_paths: dict
-    question: str
+    intent_output: dict|str
 
 
-@router.post("/tools/problem-definition")
+@router.post("/problem-solving/problem-definition")
 async def problem_definition(body: ProblemDefinitionRequestBody) -> dict[str, Any]:
     """问题定义工具"""
     if not (body.question or "").strip():
@@ -64,7 +62,7 @@ async def problem_definition(body: ProblemDefinitionRequestBody) -> dict[str, An
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/tools/solution-planning")
+@router.post("/answer-generation/tools/solution-planning")
 async def solution_planning(body: SolutionPlanningRequestBody) -> dict[str, Any]:
     """方案规划工具"""
     if not body.problem_model:
@@ -77,21 +75,13 @@ async def solution_planning(body: SolutionPlanningRequestBody) -> dict[str, Any]
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/tools/answer-generation")
+@router.post("/answer-generation/tools/answer-generation")
 async def answer_generation(body: AnswerGenerationRequestBody) -> dict[str, Any]:
     """答案生成工具"""
-    if not body.solution:
-        raise HTTPException(status_code=400, detail="解决方案不能为空")
-    if not body.graph_paths:
-        raise HTTPException(status_code=400, detail="图谱路径不能为空")
-    if not (body.question or "").strip():
-        raise HTTPException(status_code=400, detail="问题不能为空")
     try:
         result = await asyncio.to_thread(
             service.generate_answer,
-            solution=body.solution,
-            graph_paths=body.graph_paths,
-            question=body.question.strip()
+            question=body.intent_output
         )
         return result
     except Exception as e:
