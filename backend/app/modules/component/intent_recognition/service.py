@@ -81,7 +81,7 @@ def get_plan(problem_model: dict) -> dict[str, Any]:
         "data": result
     }
 
-def get_tools(step: dict) -> dict[str, Any]:
+def get_tool_match(step: dict) -> dict[str, Any]:
     from intent_recognition.plan_to_tools import plan_tool
     result = plan_tool(step)
     return {

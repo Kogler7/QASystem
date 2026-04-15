@@ -61,7 +61,7 @@ model = ChatOpenAI(
 
 model = model.with_structured_output(Intent_Base_Recognition)
 
-def intent_recognition(problem_model: dict):
+def intent_recognition(problem_model: dict|str):
     """直接调用retrival_tool获取意图列表，然后注入给大模型判断"""
 
     # 检查输入是否为 JSON 字符串
@@ -123,7 +123,9 @@ if __name__ == "__main__":
         "children": []
       }
     }
+
+    query = "公开采购与非公开采购金额构成如何？"
     
-    final_answer = intent_recognition(json_input)
+    final_answer = intent_recognition(query)
     print(final_answer)
     print(type(final_answer))   # <class 'dict'>
