@@ -18,7 +18,11 @@ class HybridEncoder:
 
         # 验证本地模型路径是否存在
         if not os.path.exists(local_model_path):
-            raise FileNotFoundError(f"本地模型路径不存在: {local_model_path}")
+            raise FileNotFoundError(
+                "本地 BGE 模型路径不存在: "
+                f"{local_model_path}。请在根 .env 或 backend/.env 配置 MODEL_PATH "
+                "(例如 /models/bge_m3_model)，并确保 docker-compose 挂载了 HOST_MODELS_DIR 到 /models。"
+            )
 
         self.bge_m3 = BGEM3EmbeddingFunction(
             model_name=local_model_path,

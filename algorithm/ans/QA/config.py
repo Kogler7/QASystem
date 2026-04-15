@@ -63,12 +63,15 @@ class Config:
     def from_env(cls):
         """从环境变量加载配置"""
         neo4j_uri = _normalize_host_docker_internal(os.getenv("NEO4J_URI", cls.NEO4J_URI))
+        neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME") or cls.NEO4J_USER
+        llm_type = os.getenv("LLM_TYPE") or os.getenv("LLM_MODEL") or cls.LLM_TYPE
+        llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or cls.LLM_API_KEY
         return cls(
             NEO4J_URI=neo4j_uri,
-            NEO4J_USER=os.getenv("NEO4J_USER", cls.NEO4J_USER),
+            NEO4J_USER=neo4j_user,
             NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD", cls.NEO4J_PASSWORD),
-            LLM_TYPE=os.getenv("LLM_TYPE", cls.LLM_TYPE),
-            LLM_API_KEY=os.getenv("LLM_API_KEY", cls.LLM_API_KEY),
+            LLM_TYPE=llm_type,
+            LLM_API_KEY=llm_api_key,
             MAX_LENGTH=int(os.getenv("MAX_LENGTH", str(cls.MAX_LENGTH))),
             TEMPERATURE_EXPLORATION=float(os.getenv("TEMPERATURE_EXPLORATION", str(cls.TEMPERATURE_EXPLORATION))),
             TEMPERATURE_REASONING=float(os.getenv("TEMPERATURE_REASONING", str(cls.TEMPERATURE_REASONING))),
@@ -122,10 +125,21 @@ class Config:
         if llm_model:
             os.environ["LLM_MODEL"] = llm_model
             print(f"设置LLM_MODEL环境变量: {llm_model}")
+
+        # 兼容 QA 历史变量名：优先统一键 LLM_MODEL，缺失时再使用 LLM_TYPE
+        llm_type = os.getenv("LLM_TYPE") or os.getenv("LLM_MODEL")
+        if llm_type:
+            os.environ["LLM_TYPE"] = llm_type
         
         llm_api_key = os.getenv("LLM_API_KEY")
         if llm_api_key:
             os.environ["LLM_API_KEY"] = llm_api_key
+
+        # 兼容 OpenAI 命名，避免不同模块读取不同键导致空值
+        if (os.getenv("LLM_BASE_URL") or "").strip() and not (os.getenv("OPENAI_BASE_URL") or "").strip():
+            os.environ["OPENAI_BASE_URL"] = os.getenv("LLM_BASE_URL", "")
+        if (os.getenv("LLM_API_KEY") or "").strip() and not (os.getenv("OPENAI_API_KEY") or "").strip():
+            os.environ["OPENAI_API_KEY"] = os.getenv("LLM_API_KEY", "")
         
         llm_backend = os.getenv("LLM_BACKEND")
         if llm_backend:

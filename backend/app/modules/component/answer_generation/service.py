@@ -124,8 +124,20 @@ def close_neo4j_driver():
 
 def health() -> dict[str, Any]:
     try:
-        _get_qa_service()
-        return {"status": "ok", "service": "answer-generation"}
+        svc = _get_qa_service()
+        return {
+            "status": "ok",
+            "service": "answer-generation",
+            "config": {
+                "neo4j_uri": getattr(svc.config, "NEO4J_URI", ""),
+                "neo4j_user": getattr(svc.config, "NEO4J_USER", ""),
+                "llm_backend": __import__("os").getenv("LLM_BACKEND", ""),
+                "llm_base_url": __import__("os").getenv("LLM_BASE_URL", ""),
+                "llm_model": __import__("os").getenv("LLM_MODEL", ""),
+                "llm_type": getattr(svc.config, "LLM_TYPE", ""),
+                "llm_api_key_configured": bool(getattr(svc.config, "LLM_API_KEY", "")),
+            },
+        }
     except Exception as e:
         return {
             "status": "unavailable",

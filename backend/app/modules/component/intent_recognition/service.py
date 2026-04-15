@@ -4,6 +4,7 @@
 见 backend/.env.example 中「意图识别 / Milvus」相关项。单独跑 algorithm 下脚本时可用该目录 .env。
 """
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,7 +50,23 @@ def _get_intent_recognition():
 def health() -> dict[str, Any]:
     try:
         _get_intent_recognition()
-        return {"status": "ok"}
+        from ir_config.config import Config
+
+        cfg = Config()
+        return {
+            "status": "ok",
+            "service": "intent-recognition",
+            "config": {
+                "milvus_uri": cfg.milvus_uri,
+                "collection_name": cfg.collection_name,
+                "model_path": cfg.model_path,
+                "model_path_exists": Path(cfg.model_path).is_dir(),
+                "llm_base_url": cfg.llm_base_url,
+                "llm_model": cfg.llm_model,
+                "llm_api_key_configured": bool(cfg.api_key and cfg.api_key != "qwen"),
+                "intent_model_base_dir": os.getenv("INTENT_MODEL_BASE_DIR", ""),
+            },
+        }
     except Exception as e:
         return {
             "status": "unavailable",

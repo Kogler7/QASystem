@@ -12,7 +12,7 @@ from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component", tags=["component"])
+router = APIRouter(prefix="/api/component/answer-generation", tags=["component"])
 
 
 class AskRequestBody(BaseModel):
@@ -62,7 +62,7 @@ async def problem_definition(body: ProblemDefinitionRequestBody) -> dict[str, An
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/answer-generation/tools/solution-planning")
+@router.post("/tools/solution-planning")
 async def solution_planning(body: SolutionPlanningRequestBody) -> dict[str, Any]:
     """方案规划工具"""
     if not body.problem_model:
@@ -75,7 +75,7 @@ async def solution_planning(body: SolutionPlanningRequestBody) -> dict[str, Any]
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/answer-generation/tools/answer-generation")
+@router.post("/tools/answer-generation")
 async def answer_generation(body: AnswerGenerationRequestBody) -> dict[str, Any]:
     """答案生成工具"""
     try:

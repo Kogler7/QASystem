@@ -1,58 +1,19 @@
-# 轨道交通知识服务系统 - 全栈编排
+# 轨道交通知识服务系统 - 应用层编排（仅前后端）
 # 使用：在仓库根目录 cp .env.example .env 并编辑后执行
-#   docker compose up -d --build
+#   docker compose up -d
 #
-# 默认不启动 compose 内 MySQL（适合本机已占 3306 或只用外部库）：
-#   在 .env 设置 DATABASE_HOST / DATABASE_PORT / MYSQL_* 指向外部实例（勿用主机名 db）
-#
-# 需要 compose 内嵌 MySQL 时再启用 profile：
-#   docker compose --profile mysql up -d --build
-#   且 .env 中 DATABASE_HOST=db
-#
-# 可选 Neo4j（答案生成、图谱更新、抽取落库等）：
-#   docker compose --profile neo4j up -d --build
-# 然后在 .env 中设置 NEO4J_URI=bolt://neo4j:7687（与 NEO4J_AUTH 密码一致）
+# 边界约定（最佳实践）：
+# - 本文件只负责 backend/frontend 容器
+# - 所有数据库与中间件由 database/docker-compose.yml 统一管理
+# - backend 通过 .env 中的 DATABASE_HOST/NEO4J_URI/MILVUS_URI/CONFIDENCE_ES_HOSTS 连接 database 栈
 
 services:
-  db:
-    profiles: ["mysql"]
-    image: mysql:8.0
-    container_name: railway_mysql
-    restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-rail_assistant}
-      MYSQL_USER: ${MYSQL_USER:-rail}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-rail123}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    ports:
-      # 生产建议去掉 ports，仅容器内访问；开发可保留本机回环
-      - "${MYSQL_BIND:-127.0.0.1}:3306:3306"
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 8
-      start_period: 40s
-
-  neo4j:
-    profiles: ["neo4j"]
-    image: neo4j:5-community
-    container_name: railway_neo4j
-    restart: unless-stopped
-    environment:
-      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-neo4j2025}
-    volumes:
-      - neo4j_data:/data
-    ports:
-      - "${NEO4J_HTTP_BIND:-127.0.0.1}:7474:7474"
-      - "${NEO4J_BOLT_BIND:-127.0.0.1}:7687:7687"
   backend:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    pull_policy: never
     container_name: railway_backend
     restart: unless-stopped
     env_file:
@@ -64,8 +25,7 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      # 默认连 compose 内 db；若使用外部 MySQL，可在 .env 覆盖 DATABASE_HOST / DATABASE_PORT
-      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-rail}:${MYSQL_PASSWORD:-rail123}@${DATABASE_HOST:-db}:${DATABASE_PORT:-3306}/${MYSQL_DATABASE:-rail_assistant}
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-root}:${MYSQL_PASSWORD:-123456}@${DATABASE_HOST:-host.docker.internal}:${DATABASE_PORT:-3306}/${MYSQL_DATABASE:-railway_db}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
@@ -78,7 +38,7 @@ services:
       DIFY_WORKFLOW_OUTPUT_VAR: ${DIFY_WORKFLOW_OUTPUT_VAR:-text}
       DIFY_WORKFLOW_RESPONSE_MODE: ${DIFY_WORKFLOW_RESPONSE_MODE:-blocking}
       DIFY_WORKFLOW_TIMEOUT_SECONDS: ${DIFY_WORKFLOW_TIMEOUT_SECONDS:-120}
-      # 图谱 / QA / 冲突检测等（容器内连 compose 中的 neo4j 或宿主机）
+      # 图谱 / QA / 冲突检测等（连接 database 栈）
       NEO4J_URI: ${NEO4J_URI:-bolt://host.docker.internal:7687}
       NEO4J_USER: ${NEO4J_USER:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j2025}
@@ -95,11 +55,6 @@ services:
       - backend_preproc_output:/app/backend/data/preproc_output
       # 挂载宿主机模型目录到容器内 /models（只读，避免模型被容器进程修改）
       - ${HOST_MODELS_DIR:-./models}:/models:ro
-    # db 在 profile mysql 下才存在；外部 MySQL 时勿启用该 profile，并配置 .env 中 DATABASE_HOST
-    depends_on:
-      db:
-        condition: service_healthy
-        required: false
     expose:
       - "8000"
     healthcheck:
@@ -113,6 +68,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.frontend
+    image: ${FRONTEND_IMAGE:-qasystem-frontend:latest}
+    pull_policy: never
     container_name: railway_frontend
     restart: unless-stopped
     ports:
@@ -122,7 +79,5 @@ services:
         condition: service_healthy
 
 volumes:
-  mysql_data:
-  neo4j_data:
   backend_documents:
   backend_preproc_output:

@@ -1,6 +1,6 @@
-# QASystem Docker 完整部署手册（跨服务器）
+# QASystem Docker 完整部署手册（目标机离线）
 
-本文档面向生产/准生产部署，目标是把 `qasystem` 从当前开发机部署到另一台服务器，并满足以下要求：
+本文档面向生产/准生产部署，目标是把 `qasystem` 从当前开发机部署到另一台离线服务器，并满足以下要求：
 
 - 使用 Docker Compose 一次性拉起前后端与基础服务
 - 模型文件外置（不进仓库、不打进镜像）
@@ -58,14 +58,14 @@ docker compose version
 
 在网络受限或拉取 Docker Hub 较慢时，建议先为 Docker Engine 配置镜像加速源，再进行后续部署。
 
-1) 编辑或创建 Docker 守护进程配置文件：
+1. 编辑或创建 Docker 守护进程配置文件：
 
 ```bash
 sudo mkdir -p /etc/docker
 sudo nano /etc/docker/daemon.json
 ```
 
-2) 写入 `registry-mirrors`（示例，按你实际可用镜像源替换）：
+1. 写入 `registry-mirrors`（示例，按你实际可用镜像源替换）：
 
 ```json
 {
@@ -76,14 +76,14 @@ sudo nano /etc/docker/daemon.json
 }
 ```
 
-3) 重载并重启 Docker：
+1. 重载并重启 Docker：
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 ```
 
-4) 验证是否生效：
+1. 验证是否生效：
 
 ```bash
 docker info | rg "Registry Mirrors" -A 5
@@ -118,7 +118,7 @@ sudo mkdir -p /srv/models
 本节是“把部署材料送到目标机”的步骤，不是最终运行步骤。  
 最终运行统一在第 7 节执行 `docker compose up`。
 
-## 3.1 流水线 A：目标机在线拉代码并本地构建（推荐）
+## 3.1 流水线 A：目标机在线拉代码并本地构建（仅目标机可联网时）
 
 适用场景：
 
@@ -146,34 +146,38 @@ mkdir -p /srv/models
 ### A-3 在目标机构建并启动
 
 ```bash
-docker compose up -d --build
+docker compose build backend frontend
+docker compose up -d
 ```
 
 若要启用 compose 内 Neo4j：
 
 ```bash
-docker compose --profile neo4j up -d --build
+docker compose --profile neo4j build backend frontend
+docker compose --profile neo4j up -d
 ```
 
-## 3.2 流水线 B：源机预构建镜像，目标机离线加载
+## 3.2 流水线 B：源机预构建镜像，目标机离线加载（离线目标机推荐）
 
 适用场景：
 
 - 目标机不能访问外网或拉依赖慢
 - 希望固定镜像版本进行交付
 
+> 你的场景（目标机离线）默认使用本节流程；可直接跳过 3.1。
+
 ### B-1 在源机构建镜像
 
 ```bash
 cd /path/to/qasystem
-sudo docker compose build
-sudo docker image ls | rg "railway_(frontend|backend)|mysql|neo4j"
+sudo docker compose build backend frontend
+sudo docker image ls | rg "qasystem-(frontend|backend)"
 ```
 
 ### B-2 在源机导出镜像包
 
 ```bash
-sudo docker save -o qasystem-images.tar railway_frontend railway_backend mysql:8.0 neo4j:5-community
+sudo docker save -o qasystem-images.tar qasystem-frontend:latest qasystem-backend:latest
 ```
 
 ### B-3 传输到目标机
@@ -208,6 +212,25 @@ docker compose --profile neo4j up -d
 ```
 
 > 说明：离线镜像方案通常不需要 `--build`，除非你在目标机改了代码或 Dockerfile。
+
+### B-6 离线目标机最小执行清单（可直接照做）
+
+```bash
+# 源机（可联网）
+cd /path/to/qasystem
+sudo docker compose build backend frontend
+sudo docker save -o qasystem-images.tar qasystem-frontend:latest qasystem-backend:latest
+scp qasystem-images.tar user@<target-ip>:/srv/
+scp -r /path/to/qasystem user@<target-ip>:/srv/
+
+# 目标机（离线）
+cd /srv
+docker load -i qasystem-images.tar
+cd /srv/qasystem
+cp .env.example .env
+# 编辑 .env（重点：HOST_MODELS_DIR、NEO4J_URI、MILVUS_URI、LLM_*）
+docker compose up -d
+```
 
 ---
 
@@ -317,7 +340,8 @@ cp .env.example .env
 ### 方案 A：compose profile
 
 ```bash
-docker compose --profile neo4j up -d --build
+docker compose --profile neo4j build backend frontend
+docker compose --profile neo4j up -d
 ```
 
 并在 `.env`：
@@ -356,13 +380,15 @@ docker compose -f milvus-docker-compose.yml up -d
 
 ```bash
 cd /srv/qasystem
-docker compose up -d --build
+docker compose build backend frontend
+docker compose up -d
 ```
 
 如果需要 compose 内 Neo4j：
 
 ```bash
-docker compose --profile neo4j up -d --build
+docker compose --profile neo4j build backend frontend
+docker compose --profile neo4j up -d
 ```
 
 ## 7.2 查看状态与日志
@@ -401,12 +427,12 @@ docker compose exec backend ls /models/hub/models/OpenDataLab
 
 至少验证以下组件接口：
 
-- `document-preproc`
-- `intent-recognition`
-- `knowledge-extract`
-- `kg-update`
-- `nl2cypher`
-- `answer-generation`
+- `GET /api/component/document-preproc/health`
+- `GET /api/component/intent-recognition/health`
+- `GET /api/component/knowledge-extract/health`
+- `GET /api/component/kg-update/health`
+- `GET /api/component/nl2cypher/health`
+- `GET /api/component/answer-generation/health`
 
 ---
 
@@ -417,13 +443,14 @@ docker compose exec backend ls /models/hub/models/OpenDataLab
 ```bash
 cd /srv/qasystem
 git pull
-docker compose up -d --build
+docker compose build backend frontend
+docker compose up -d
 ```
 
 ## 9.2 快速回滚（建议）
 
 - 使用 Git tag / release 管理版本
-- 回滚到历史版本后重新 `docker compose up -d --build`
+- 回滚到历史版本后重新 `docker compose build backend frontend && docker compose up -d`
 - 外置模型和数据卷不受代码回滚影响
 
 ## 9.3 备份建议
@@ -462,14 +489,24 @@ docker compose up -d --build
 - 若仍不可达，改用宿主机内网 IP
 - 检查防火墙 / 安全组放行
 
-## 10.5 文档预处理报错 `libGL.so.1` 缺失
+## 10.5 组件健康检查返回 404
+
+- 现象：日志出现 `GET /api/component/intent-recognition/health 404` 或 `GET /api/component/answer-generation/health 404`
+- 原因：后端镜像还是旧版本，组件路由前缀未更新
+- 处理：重新构建并强制重建 backend 容器，确保新路由生效
+- 命令：`docker compose up -d --build --force-recreate backend`
+- 验证：
+  - `curl -i http://127.0.0.1:8000/api/component/intent-recognition/health`
+  - `curl -i http://127.0.0.1:8000/api/component/answer-generation/health`
+
+## 10.6 文档预处理报错 `libGL.so.1` 缺失
 
 - 现象：组件健康检查返回 `文档预处理模块不可用: libGL.so.1: cannot open shared object file`
 - 原因：`algorithm/preproc` 依赖链中的 `opencv` 需要系统动态库（`libGL.so.1` 等）
 - 处理：确认使用最新 `docker/backend.Dockerfile` 重新构建后端镜像（已包含 `libgl1`、`libglib2.0-0`、`libsm6`、`libxext6`、`libxrender1`）
 - 命令：`docker compose build --no-cache backend && docker compose up -d backend`
 
-## 10.6 DOC/DOCX 转换失败（`soffice` 不存在）
+## 10.7 DOC/DOCX 转换失败（`soffice` 不存在）
 
 - 现象：上传 `.doc` 或调用 `convert-to-pdf` 时失败，日志出现 `soffice: not found` 或 `未找到LibreOffice`
 - 原因：`algorithm/preproc` 的 `DocxProcessor` 依赖 LibreOffice（`soffice`）执行格式转换
@@ -494,7 +531,7 @@ docker compose up -d --build
 2. 同步代码到 `/srv/qasystem`
 3. 准备模型到 `/srv/models`（可与 `qasystem-images.tar` 同级放在 `/srv`）
 4. 配置 `.env`（含 `HOST_MODELS_DIR` 与各类服务地址）
-5. `docker compose up -d --build`（或加 `--profile neo4j`）
+5. `docker compose build backend frontend && docker compose up -d`（或加 `--profile neo4j`）
 6. 完成验收清单并记录版本
 7. 建立备份和监控策略
 

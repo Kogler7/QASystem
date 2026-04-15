@@ -13,7 +13,7 @@ from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component", tags=["component"])
+router = APIRouter(prefix="/api/component/intent-recognition", tags=["component"])
 
 
 class RecognizeRequestBody(BaseModel):
@@ -44,7 +44,7 @@ async def recognize(body: RecognizeRequestBody) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/intent-recognition/deep-recognize")
+@router.post("/deep-recognize")
 async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
     if not body.problem_model:
         raise HTTPException(status_code=400, detail="问题模型不能为空")

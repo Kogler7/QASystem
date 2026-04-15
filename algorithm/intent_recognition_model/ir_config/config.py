@@ -22,6 +22,22 @@ if _local_env.exists():
     load_dotenv(dotenv_path=_local_env, override=True)
 
 
+def _running_in_container() -> bool:
+    return Path("/.dockerenv").exists()
+
+
+def _normalize_host_docker_internal(value: str) -> str:
+    """
+    本机运行时将 host.docker.internal 回退到 127.0.0.1，
+    避免 Linux 主机直接运行 uvicorn 时 DNS 无法解析。
+    """
+    if not value:
+        return value
+    if _running_in_container():
+        return value
+    return value.replace("host.docker.internal", "127.0.0.1")
+
+
 def _intent_models_base_dir(project_root: Path) -> Path:
     raw = os.getenv("INTENT_MODEL_BASE_DIR", str(project_root / "models"))
     base = Path(raw)
@@ -105,11 +121,21 @@ class Config:
 
         self.data_dir = os.getenv("DATA_DIR") or str(_root / "data" / "intent.json")
         self.collection_name = os.getenv("COLLECTION_NAME", "intent_rag")
-        self.milvus_uri = os.getenv("MILVUS_URI", "http://localhost:19530")
+        self.milvus_uri = _normalize_host_docker_internal(os.getenv("MILVUS_URI", "http://localhost:19530"))
         self.milvus_consistency_level = os.getenv("MILVUS_CONSISTENCY_LEVEL", "Strong")
         self.max_drop_retries = int(os.getenv("MAX_DROP_RETRIES", "3"))
         self.drop_retry_delay = int(os.getenv("DROP_RETRY_DELAY", "2"))
-        self.model_path = _resolve_model_path(os.getenv("MODEL_PATH"), _project_root)
+        model_path_raw = os.getenv("MODEL_PATH")
+        # 历史兼容：若未设置 MODEL_PATH 且 MODEL_NAME 是本地目录路径，则作为模型目录使用。
+        if not (model_path_raw or "").strip():
+            model_name_raw = (os.getenv("MODEL_NAME") or "").strip()
+            if model_name_raw:
+                p = Path(model_name_raw)
+                if p.is_absolute() and p.is_dir():
+                    model_path_raw = model_name_raw
+                elif (not p.is_absolute()) and (_project_root / p).is_dir():
+                    model_path_raw = model_name_raw
+        self.model_path = _resolve_model_path(model_path_raw, _project_root)
         self.log_path = os.getenv("LOG_PATH") or str(_project_root / "logs")
         # LLM 配置：与 algorithm/common/llm_client 环境变量统一，便于一处配置多处生效
         self.api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "qwen"
@@ -117,7 +143,7 @@ class Config:
         self.llm_model = os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "Qwen/Qwen3-8B"
         # Neo4j 配置
         self.neo4j_uri = os.getenv("NEO4J_URI") or "neo4j://localhost:7687"
-        self.neo4j_username = os.getenv("NEO4J_USERNAME") or "neo4j"
+        self.neo4j_username = os.getenv("NEO4J_USERNAME") or os.getenv("NEO4J_USER") or "neo4j"
         self.neo4j_password = os.getenv("NEO4J_PASSWORD") or "neo4j2025"
         # Tools file path
         self.tools_file = os.getenv("TOOLS_FILE") or str(_root / "data" / "tools.md")
