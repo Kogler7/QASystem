@@ -23,6 +23,7 @@ WORKDIR /app
 
 # 依赖层单独 COPY，便于缓存（安装耗时较长，镜像体积较大属预期）
 COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -r backend/requirements.txt
 
