@@ -35,7 +35,7 @@ export function intentRecognitionDeepRecognize(params) {
  * @param {object} params - { problem_model }
  */
 export function intentRecognitionGetPlan(params) {
-  return request.post('/component/intent-recognition/get-plan', {
+  return request.post('/component/problem-solving/plan', {
     problem_model: params.problem_model  // 直接传递对象
   }, { timeout: 30000000 })
 }
@@ -45,7 +45,7 @@ export function intentRecognitionGetPlan(params) {
  * @param {object} params - { plan: list[dict] }
  */
 export function intentRecognitionGetTools(params) {
-  return request.post('/component/intent-recognition/get-tools', {
-    plan: params.plan
+  return request.post('/component/problem-solving/tool-match', {
+    step: params.step  // 直接传递对象
   }, { timeout: 30000000 })
 }

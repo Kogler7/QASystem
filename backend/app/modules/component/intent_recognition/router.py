@@ -13,11 +13,11 @@ from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/intent-recognition", tags=["component", "intent-recognition"])
+router = APIRouter(prefix="/api/component", tags=["component"])
 
 
 class RecognizeRequestBody(BaseModel):
-    problem_model: dict  # 直接接受字典类型
+    problem_model: dict|str  # 直接接受字典类型
 
 class GetPlanRequestBody(BaseModel):
     problem_model: dict  # 直接接受字典类型
@@ -44,7 +44,7 @@ async def recognize(body: RecognizeRequestBody) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/deep-recognize")
+@router.post("/intent-recognition/deep-recognize")
 async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
     if not body.problem_model:
         raise HTTPException(status_code=400, detail="问题模型不能为空")
@@ -56,7 +56,7 @@ async def deep_recognize(body: RecognizeRequestBody) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/get-plan")
+@router.post("/problem-solving/plan")
 async def get_plan(body: GetPlanRequestBody) -> dict[str, Any]:
     if not body.problem_model:
         raise HTTPException(status_code=400, detail="问题模型不能为空")
@@ -67,13 +67,13 @@ async def get_plan(body: GetPlanRequestBody) -> dict[str, Any]:
         logger.exception("获取计划失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-@router.post("/get-tools")
+@router.post("/problem-solving/tool-match")
 async def get_tools(body: GetToolsRequestBody) -> dict[str, Any]:
     if not body.step:
         raise HTTPException(status_code=400, detail="步骤不能为空")
     try:
-        result = await asyncio.to_thread(service.get_tools, step=body.step)
+        result = await asyncio.to_thread(service.get_tool_match, step=body.step)
         return result
     except Exception as e:  
-        logger.exception("获取工具列表失败")
+        logger.exception("获取工具匹配关系失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
