@@ -36,10 +36,7 @@ class BatchQuestionRequest(BaseModel):
     questions: list[str]
     detailed: Optional[bool] = False
 
-class VisualizedQuestionResponse(QuestionResponse):
-    """带可视化的响应"""
-    visualization: Optional[str] = None  # HTML文件路径或Base64编码的图像
-    visualization_type: Optional[str] = "html"  # html, image, json
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -155,52 +152,7 @@ async def ask_question(request: QuestionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/ask/visualize", response_model=VisualizedQuestionResponse)
-async def ask_question_with_visualization(request: QuestionRequest):
-    """
-    回答问题并生成可视化
-    """
-    global qa_service
 
-    if qa_service is None:
-        raise HTTPException(status_code=503, detail="服务未初始化")
-
-    try:
-        result = qa_service.answer_question_with_visualization(
-            request.question,
-            visualize=True
-        )
-
-        return VisualizedQuestionResponse(
-            success=result.get("success", False),
-            question=request.question,
-            answer=result.get("answer", "无答案"),
-            visualization=result.get("visualization"),
-            visualization_type="html",
-            timestamp=result.get("timestamp", ""),
-            error=result.get("error")
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/visualize/path/{question_id}")
-async def get_path_visualization(question_id: str):
-    """
-    获取已生成的可视化文件
-    """
-    import os
-    from fastapi.responses import HTMLResponse
-
-    # 查找对应的HTML文件
-    html_files = [f for f in os.listdir('.') if f.startswith(f"answer_path_{question_id}") and f.endswith('.html')]
-
-    if html_files:
-        with open(html_files[0], 'r', encoding='utf-8') as f:
-            content = f.read()
-        return HTMLResponse(content=content)
-
-    raise HTTPException(status_code=404, detail="可视化文件不存在")
 
 
 # 启动服务

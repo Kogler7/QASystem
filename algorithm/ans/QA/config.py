@@ -15,7 +15,7 @@ class Config:
     NEO4J_PASSWORD: str = "neo4j2025"  # 默认与 .env.example 一致；生产请通过 .env 或环境变量覆盖
 
     # ===== LLM 配置 =====
-    LLM_TYPE: str = "glm-4.7"
+    LLM_TYPE: str = "Qwen/Qwen3-8B"
     LLM_API_KEY: str = ""
     MAX_LENGTH: int = 256
     TEMPERATURE_EXPLORATION: float = 0.4
@@ -81,6 +81,26 @@ class Config:
             print(f"已加载配置文件: {env_path}")
         else:
             print(f"未找到配置文件: {env_path}")
+        
+        # 将LLM相关配置设置到全局环境变量，供algorithm/common/llm_client使用
+        llm_base_url = os.getenv("LLM_BASE_URL")
+        if llm_base_url:
+            os.environ["LLM_BASE_URL"] = llm_base_url
+            print(f"设置LLM_BASE_URL环境变量: {llm_base_url}")
+        
+        llm_model = os.getenv("LLM_MODEL")
+        if llm_model:
+            os.environ["LLM_MODEL"] = llm_model
+            print(f"设置LLM_MODEL环境变量: {llm_model}")
+        
+        llm_api_key = os.getenv("LLM_API_KEY")
+        if llm_api_key:
+            os.environ["LLM_API_KEY"] = llm_api_key
+        
+        llm_backend = os.getenv("LLM_BACKEND")
+        if llm_backend:
+            os.environ["LLM_BACKEND"] = llm_backend
+            print(f"设置LLM_BACKEND环境变量: {llm_backend}")
         
         # 从环境变量加载配置
         return cls.from_env()

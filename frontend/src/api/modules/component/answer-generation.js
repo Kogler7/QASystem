@@ -20,14 +20,7 @@ export function answerGenerationAsk(params) {
   }, { timeout: 120000 })
 }
 
-/**
- * 提问并获取可视化
- */
-export function answerGenerationAskVisualize(params) {
-  return request.post('/component/answer-generation/ask/visualize', {
-    question: params.question?.trim() ?? ''
-  }, { timeout: 120000 })
-}
+
 
 /**
  * 查询知识图谱
