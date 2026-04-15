@@ -5,16 +5,27 @@ from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore[reportMissingImports]
 
 # 先加载 .env 到 os.environ，再定义 Settings（算法子模块多读 os.getenv）。
-# 统一约定（本机）：
-#   - 业务相关变量请在 backend/.env 维护（唯一主配置）；
-#   - 仓库根 .env 主要用于 docker compose 注入容器，本机若也存在则只「补充」尚未设置的键，
-#     避免根目录模板里的遗留项（如 MODEL_PATH）覆盖你在 backend/.env 中的配置。
-# 顺序：backend/.env（override=True）→ 仓库根 .env（override=False）
+# 统一约定：
+#   - Docker / 部署场景：根 .env 为主；
+#   - 本机 uvicorn 场景：backend/.env 为主，避免误用 Docker 专用地址（如 db/host.docker.internal）。
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _ROOT_DIR = _BACKEND_DIR.parent
-for _env_path, _override in ((_BACKEND_DIR / ".env", True), (_ROOT_DIR / ".env", False)):
-    if _env_path.is_file():
-        load_dotenv(_env_path, override=_override)
+
+
+def _running_in_container() -> bool:
+    return Path("/.dockerenv").exists()
+
+
+if _running_in_container():
+    for _env_path in (_ROOT_DIR / ".env", _BACKEND_DIR / ".env"):
+        if _env_path.is_file():
+            load_dotenv(_env_path, override=False)
+else:
+    # 本机优先 backend/.env，并允许覆盖根 .env 里的同名键。
+    if (_ROOT_DIR / ".env").is_file():
+        load_dotenv(_ROOT_DIR / ".env", override=False)
+    if (_BACKEND_DIR / ".env").is_file():
+        load_dotenv(_BACKEND_DIR / ".env", override=True)
 
 
 class Settings(BaseSettings):

@@ -4,10 +4,12 @@ from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 单独运行本目录脚本时加载同级 .env（不覆盖已有环境变量）。
-# 通过 FastAPI 启动后端时，环境已由 backend/app/config.py 加载 backend/.env 与仓库根 .env。
-path = Path(__file__).resolve().parent.parent
-load_dotenv(dotenv_path=path / ".env", override=False)
+# 统一环境加载：仓库根 .env 为主，backend/.env 与本目录 .env 作为补充（均不覆盖已有环境变量）。
+_ROOT = Path(__file__).resolve().parents[3]
+_LOCAL = Path(__file__).resolve().parent.parent
+for _env_path in (_ROOT / ".env", _ROOT / "backend" / ".env", _LOCAL / ".env"):
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=False)
 
 
 def _intent_models_base_dir(project_root: Path) -> Path:

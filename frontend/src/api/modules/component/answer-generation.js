@@ -20,6 +20,17 @@ export function answerGenerationAsk(params) {
   }, { timeout: 120000 })
 }
 
+/**
+ * 兼容旧版可视化入口：
+ * 当前后端已将多阶段流程整合到 /ask（detailed=true）。
+ * @param {object} params - question
+ */
+export function answerGenerationAskVisualize(params) {
+  return request.post('/component/answer-generation/ask', {
+    question: params.question?.trim() ?? '',
+    detailed: true
+  }, { timeout: 120000 })
+}
 
 
 /**

@@ -119,14 +119,14 @@ docker compose --profile neo4j up -d --build
 
 ```bash
 cd /path/to/qasystem
-docker compose build
-docker image ls | rg "railway_(frontend|backend)|mysql|neo4j"
+sudo docker compose build
+sudo docker image ls | rg "railway_(frontend|backend)|mysql|neo4j"
 ```
 
 ### B-2 在源机导出镜像包
 
 ```bash
-docker save -o qasystem-images.tar railway_frontend railway_backend mysql:8.0 neo4j:5-community
+sudo docker save -o qasystem-images.tar railway_frontend railway_backend mysql:8.0 neo4j:5-community
 ```
 
 ### B-3 传输到目标机

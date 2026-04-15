@@ -2,12 +2,20 @@
 # 使用：在仓库根目录 cp .env.example .env 并编辑后执行
 #   docker compose up -d --build
 #
+# 默认不启动 compose 内 MySQL（适合本机已占 3306 或只用外部库）：
+#   在 .env 设置 DATABASE_HOST / DATABASE_PORT / MYSQL_* 指向外部实例（勿用主机名 db）
+#
+# 需要 compose 内嵌 MySQL 时再启用 profile：
+#   docker compose --profile mysql up -d --build
+#   且 .env 中 DATABASE_HOST=db
+#
 # 可选 Neo4j（答案生成、图谱更新、抽取落库等）：
 #   docker compose --profile neo4j up -d --build
 # 然后在 .env 中设置 NEO4J_URI=bolt://neo4j:7687（与 NEO4J_AUTH 密码一致）
 
 services:
   db:
+    profiles: ["mysql"]
     image: mysql:8.0
     container_name: railway_mysql
     restart: unless-stopped
@@ -87,9 +95,11 @@ services:
       - backend_preproc_output:/app/backend/data/preproc_output
       # 挂载宿主机模型目录到容器内 /models（只读，避免模型被容器进程修改）
       - ${HOST_MODELS_DIR:-/opt/qasystem-models}:/models:ro
+    # db 在 profile mysql 下才存在；外部 MySQL 时勿启用该 profile，并配置 .env 中 DATABASE_HOST
     depends_on:
       db:
         condition: service_healthy
+        required: false
     expose:
       - "8000"
     healthcheck:

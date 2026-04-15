@@ -5,6 +5,23 @@ from typing import Optional
 from dotenv import load_dotenv
 
 
+def _running_in_container() -> bool:
+    """判断当前是否运行在容器内。"""
+    return os.path.exists("/.dockerenv")
+
+
+def _normalize_host_docker_internal(value: str) -> str:
+    """
+    本机运行时将 host.docker.internal 回退到 127.0.0.1，
+    避免 Linux 主机直接运行 uvicorn 时 DNS 无法解析。
+    """
+    if not value:
+        return value
+    if _running_in_container():
+        return value
+    return value.replace("host.docker.internal", "127.0.0.1")
+
+
 @dataclass
 class Config:
     """项目配置类"""
@@ -45,8 +62,9 @@ class Config:
     @classmethod
     def from_env(cls):
         """从环境变量加载配置"""
+        neo4j_uri = _normalize_host_docker_internal(os.getenv("NEO4J_URI", cls.NEO4J_URI))
         return cls(
-            NEO4J_URI=os.getenv("NEO4J_URI", cls.NEO4J_URI),
+            NEO4J_URI=neo4j_uri,
             NEO4J_USER=os.getenv("NEO4J_USER", cls.NEO4J_USER),
             NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD", cls.NEO4J_PASSWORD),
             LLM_TYPE=os.getenv("LLM_TYPE", cls.LLM_TYPE),
@@ -69,21 +87,33 @@ class Config:
 
     @classmethod
     def load(cls, env_file: str = ".env"):
-        """加载配置的优先级：环境变量 > .env 文件 > 默认值"""
-        # 获取当前文件所在目录
+        """加载配置：容器内优先根 .env，本机优先 backend/.env，再补充 QA/.env。"""
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 构建 .env 文件的完整路径
-        env_path = os.path.join(current_dir, env_file)
-        
-        # 加载 .env 文件
-        if os.path.exists(env_path):
-            load_dotenv(env_path)
-            print(f"已加载配置文件: {env_path}")
+        project_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
+        backend_env_path = os.path.join(project_root, "backend", ".env")
+        root_env_path = os.path.join(project_root, ".env")
+        qa_env_path = os.path.join(current_dir, env_file)
+
+        if _running_in_container():
+            # 容器内：根 .env 为主，其他仅补充。
+            for path in (root_env_path, backend_env_path, qa_env_path):
+                if os.path.exists(path):
+                    load_dotenv(path, override=False)
+                    print(f"已加载配置文件: {path}")
         else:
-            print(f"未找到配置文件: {env_path}")
+            # 本机：backend/.env 为主，QA/.env 次之；根 .env 只作兜底补充。
+            if os.path.exists(root_env_path):
+                load_dotenv(root_env_path, override=False)
+                print(f"已加载配置文件: {root_env_path}")
+            if os.path.exists(backend_env_path):
+                load_dotenv(backend_env_path, override=True)
+                print(f"已加载配置文件: {backend_env_path}")
+            if os.path.exists(qa_env_path):
+                load_dotenv(qa_env_path, override=False)
+                print(f"已加载配置文件: {qa_env_path}")
         
         # 将LLM相关配置设置到全局环境变量，供algorithm/common/llm_client使用
-        llm_base_url = os.getenv("LLM_BASE_URL")
+        llm_base_url = _normalize_host_docker_internal(os.getenv("LLM_BASE_URL", ""))
         if llm_base_url:
             os.environ["LLM_BASE_URL"] = llm_base_url
             print(f"设置LLM_BASE_URL环境变量: {llm_base_url}")

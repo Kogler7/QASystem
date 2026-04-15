@@ -10,16 +10,18 @@ import torch.nn as nn
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 加载 backend/.env
-env_path = Path(__file__).parent.parent.parent.parent / 'backend' / '.env'
-load_dotenv(env_path)
+# 统一环境加载：仓库根 .env 为主，backend/.env 为本机补充（均不覆盖已有环境变量）
+_ROOT = Path(__file__).resolve().parents[3]
+for _env_path in (_ROOT / ".env", _ROOT / "backend" / ".env"):
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)
 
 _CC_ROOT = Path(__file__).resolve().parent.parent
 
 
 class TextEvidence(nn.Module):
     """
-    文本证据模块 - 从 config.yaml 加载模型参数，从 backend/.env 加载连接配置
+    文本证据模块 - 从 config.yaml 加载模型参数，从环境变量读取连接配置
     """
     def __init__(self, config: Optional[Dict] = None, config_path: Optional[str] = None):
         super().__init__()
@@ -37,18 +39,18 @@ class TextEvidence(nn.Module):
             text_config.update(config)
         
         # 从环境变量读取连接配置
-        es_hosts = os.getenv('ES_HOSTS', 'http://127.0.0.1:9200')
+        es_hosts = os.getenv('CONFIDENCE_ES_HOSTS') or os.getenv('ES_HOSTS') or 'http://127.0.0.1:9200'
         if ',' in es_hosts:
             es_hosts = [h.strip() for h in es_hosts.split(',')]
         else:
             es_hosts = [es_hosts]
         
-        es_user = os.getenv('ES_USER')
-        es_password = os.getenv('ES_PASSWORD')
-        es_verify_certs = os.getenv('ES_VERIFY_CERTS', 'false').lower() == 'true'
+        es_user = os.getenv('CONFIDENCE_ES_USERNAME') or os.getenv('ES_USER')
+        es_password = os.getenv('CONFIDENCE_ES_PASSWORD') or os.getenv('ES_PASSWORD')
+        es_verify_certs = (os.getenv('CONFIDENCE_ES_VERIFY_CERTS') or os.getenv('ES_VERIFY_CERTS') or 'false').lower() == 'true'
         
         # 从环境变量读取索引名
-        self.index_name = os.getenv('ES_INDEX', 'documents')
+        self.index_name = os.getenv('CONFIDENCE_ES_INDEX') or os.getenv('ES_INDEX', 'documents')
         
         # 从 config.yaml 读取业务参数
         self.size = text_config.get('es_size', 50)
@@ -79,7 +81,7 @@ class TextEvidence(nn.Module):
             self.es = None
         
         # 从环境变量读取 SBERT 模型路径（默认指向仓库根 models 目录）
-        model_path = os.getenv('SBERT_MODEL_PATH', str(_CC_ROOT.parent.parent / 'models' / 'sbert_model'))
+        model_path = os.getenv('CONFIDENCE_SBERT_MODEL_PATH') or os.getenv('SBERT_MODEL_PATH') or str(_CC_ROOT.parent.parent / 'models' / 'sbert_model')
         
         print(f"加载 SBERT 模型: {model_path}")
         

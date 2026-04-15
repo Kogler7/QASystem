@@ -7,9 +7,11 @@ from typing import Dict, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 加载 backend/.env
-env_path = Path(__file__).parent.parent.parent.parent / 'backend' / '.env'
-load_dotenv(env_path)
+# 统一环境加载：仓库根 .env 为主，backend/.env 为本机补充（均不覆盖已有环境变量）
+_ROOT = Path(__file__).resolve().parents[3]
+for _env_path in (_ROOT / ".env", _ROOT / "backend" / ".env"):
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)
 
 
 class KGEEvidence(nn.Module):
