@@ -6,6 +6,7 @@ from langchain_core.tools import tool
 from pathlib import Path
 import json
 from typing import Optional, Dict, List, Any
+import os
 
 #初始化工具类
 utils = utils()
@@ -16,11 +17,12 @@ api_key = cfg.api_key or "qwen"
 
 def _normalize_openai_base_url(base_url: str) -> str:
     base_url = (base_url or "").rstrip("/")
+    version = (os.getenv("LLM_API_VERSION", "v1") or "v1").strip("/")
     if not base_url:
-        return "http://localhost:9999/v1"
-    if base_url.endswith("/v1"):
+        return f"http://localhost:9999/{version}"
+    if base_url.endswith(f"/{version}"):
         return base_url
-    return f"{base_url}/v1"
+    return f"{base_url}/{version}"
 
 
 model = ChatOpenAI(

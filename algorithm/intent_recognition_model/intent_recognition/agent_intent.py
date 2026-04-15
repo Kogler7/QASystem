@@ -12,6 +12,9 @@ except ModuleNotFoundError:
     from data.intent_model import Intent_Base_Recognition
 from ir_utils.database_utils import DatabaseUtils
 import json
+import os
+import re
+from pydantic import ValidationError
 
 #初始化工具类
 utils = utils()
@@ -23,11 +26,12 @@ api_key = cfg.api_key or "qwen"
 
 def _normalize_openai_base_url(base_url: str) -> str:
     base_url = (base_url or "").rstrip("/")
+    version = (os.getenv("LLM_API_VERSION", "v1") or "v1").strip("/")
     if not base_url:
-        return "http://localhost:9999/v1"
-    if base_url.endswith("/v1"):
+        return f"http://localhost:9999/{version}"
+    if base_url.endswith(f"/{version}"):
         return base_url
-    return f"{base_url}/v1"
+    return f"{base_url}/{version}"
 
 def retrival_tool(problem_model: str):
     """从意图向量数据库中检索相关意图"""
@@ -62,7 +66,52 @@ model = ChatOpenAI(
     temperature=0,
 )
 
-model = model.with_structured_output(Intent_Base_Recognition)
+structured_model = model.with_structured_output(Intent_Base_Recognition)
+
+
+def _empty_intent() -> dict:
+    return {
+        "intent_id": "",
+        "domain": "",
+        "scenario": "",
+        "object": "",
+        "intent_name": "",
+        "user_goal": "",
+    }
+
+
+def _parse_json_from_text(text: str) -> dict:
+    text = (text or "").strip()
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        return {}
+    try:
+        data = json.loads(match.group(0))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _normalize_intent_payload(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return _empty_intent()
+    # 兼容模型返回 {"Intent_Base_Recognition": {...}}
+    if "Intent_Base_Recognition" in payload and isinstance(payload["Intent_Base_Recognition"], dict):
+        payload = payload["Intent_Base_Recognition"]
+
+    norm = _empty_intent()
+    for k in norm.keys():
+        v = payload.get(k, "")
+        norm[k] = "" if v is None else str(v)
+    return norm
 
 def intent_recognition(problem_model: dict|str):
     """直接调用retrival_tool获取意图列表，然后注入给大模型判断"""
@@ -87,19 +136,25 @@ def intent_recognition(problem_model: dict|str):
         {"role": "user", "content": problem_model}
     ]
 
-    # 调用模型进行意图判断
-    response = model.invoke(messages)
-    
-    # json_content = utils.extract_json_content(content)
-    
-    # if json_content == "":
-    #     json_content = "最终意图识别失败，未识别到相关意图"
-
-    response = response.model_dump()
+    # 调用模型进行意图判断（优先结构化；失败时回退文本解析，避免 500）
+    response: dict
+    try:
+        structured_resp = structured_model.invoke(messages)
+        response = structured_resp.model_dump()
+    except ValidationError:
+        raw_resp = model.invoke(messages)
+        content = getattr(raw_resp, "content", "")
+        parsed = _parse_json_from_text(content if isinstance(content, str) else str(content))
+        response = _normalize_intent_payload(parsed)
+    except Exception:
+        raw_resp = model.invoke(messages)
+        content = getattr(raw_resp, "content", "")
+        parsed = _parse_json_from_text(content if isinstance(content, str) else str(content))
+        response = _normalize_intent_payload(parsed)
 
     result = {
             "understanding": "最终意图识别成功",
-            "pass": True,
+            "pass": any(response.values()),
             "intent": response,
             "detail": {}
         }

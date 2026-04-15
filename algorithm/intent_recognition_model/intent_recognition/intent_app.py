@@ -34,8 +34,9 @@ logger = logging.getLogger(__name__)
 # LLM 配置：与 algorithm/common 统一，从 Config 读取（Config 优先使用 LLM_* / OPENAI_* 环境变量）
 _config = Config()
 _base = _config.llm_base_url.rstrip("/")
-if not _base.endswith("/v1"):
-    _base = _base + "/v1"
+_version = (os.getenv("LLM_API_VERSION", "v1") or "v1").strip("/")
+if not _base.endswith(f"/{_version}"):
+    _base = _base + f"/{_version}"
 
 model = ChatOpenAI(
     base_url=_base,

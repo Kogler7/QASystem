@@ -4,12 +4,22 @@ from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 统一环境加载：仓库根 .env 为主，backend/.env 与本目录 .env 作为补充（均不覆盖已有环境变量）。
+# 统一环境加载：
+# 1) 先加载仓库根 .env（Docker/部署主配置）；
+# 2) 再加载 backend/.env（本机后端调试可覆盖同名变量）；
+# 3) 最后加载本目录 .env（算法单独运行时可覆盖）。
 _ROOT = Path(__file__).resolve().parents[3]
 _LOCAL = Path(__file__).resolve().parent.parent
-for _env_path in (_ROOT / ".env", _ROOT / "backend" / ".env", _LOCAL / ".env"):
-    if _env_path.exists():
-        load_dotenv(dotenv_path=_env_path, override=False)
+_root_env = _ROOT / ".env"
+_backend_env = _ROOT / "backend" / ".env"
+_local_env = _LOCAL / ".env"
+
+if _root_env.exists():
+    load_dotenv(dotenv_path=_root_env, override=False)
+if _backend_env.exists():
+    load_dotenv(dotenv_path=_backend_env, override=True)
+if _local_env.exists():
+    load_dotenv(dotenv_path=_local_env, override=True)
 
 
 def _intent_models_base_dir(project_root: Path) -> Path:

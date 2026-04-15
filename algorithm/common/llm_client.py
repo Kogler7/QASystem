@@ -28,6 +28,8 @@ LLM_BASE_URL = _env("LLM_BASE_URL", "OLLAMA_URL", "OPENAI_BASE_URL", "VLLM_BASE_
 LLM_MODEL = _env("LLM_MODEL", "OLLAMA_MODEL_NAME", "OPENAI_MODEL", "VLLM_MODEL", default="Qwen/Qwen3-8B")
 # API Key（本地 vLLM 通常不需要；不写死，仅从环境读取）
 LLM_API_KEY = _env("LLM_API_KEY", "OLLAMA_API_KEY", "OPENAI_API_KEY", default="")
+# API 版本段（用于拼接 chat/completions 路径，如 v1 / v4）
+LLM_API_VERSION = _env("LLM_API_VERSION", default="v1")
 
 
 def extract_final_response(response_text: str) -> str:
@@ -45,19 +47,19 @@ def extract_final_response(response_text: str) -> str:
 
 def _norm_url(base: str, for_chat: bool = True) -> str:
     base = base.rstrip("/")
+    version = (LLM_API_VERSION or "v1").strip("/")
     if for_chat:
-        if "/v1/chat/completions" in base:
+        if "/chat/completions" in base:
             return base
-        # base 已含 /v1 时只拼 /chat/completions，避免 .../v1/v1/chat/completions
-        if base.endswith("/v1"):
+        if base.endswith(f"/{version}"):
             return f"{base}/chat/completions"
-        return f"{base}/v1/chat/completions"
+        return f"{base}/{version}/chat/completions"
     else:
         if "/completions" in base:
             return base
-        if base.endswith("/v1"):
+        if base.endswith(f"/{version}"):
             return f"{base}/completions"
-        return f"{base}/v1/completions"
+        return f"{base}/{version}/completions"
 
 
 def _headers(api_key: Optional[str] = None) -> dict:
@@ -145,12 +147,13 @@ def _call_zhipu(
     prompt: str,
     *,
     model: Optional[str] = None,
+    base_url: Optional[str] = None,
     api_key: Optional[str] = None,
     temperature: float = 0.7,
     max_tokens: int = 2048,
     timeout: int = 120,
 ) -> str:
-    url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    url = _norm_url(base_url or LLM_BASE_URL, for_chat=True)
     key = api_key or LLM_API_KEY
     if not key:
         raise ValueError("智谱需配置 LLM_API_KEY 或 OPENAI_API_KEY")
@@ -206,6 +209,7 @@ def complete(
             text = _call_zhipu(
                 prompt,
                 model=model,
+                base_url=base_url,
                 api_key=api_key,
                 temperature=temperature,
                 max_tokens=max_tokens,
