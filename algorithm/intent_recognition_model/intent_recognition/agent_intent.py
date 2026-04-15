@@ -10,7 +10,7 @@ try:
     from algorithm.intent_recognition_model.data.intent_model import Intent_Base_Recognition
 except ModuleNotFoundError:
     from data.intent_model import Intent_Base_Recognition
-from ir_utils.database_utils import DatabaseUtils
+from ir_utils.database_utils import build_intent_query_from_dict
 import json
 import os
 import re
@@ -120,7 +120,7 @@ def intent_recognition(problem_model: dict|str):
     try:
         # 如果是 JSON 格式，构建查询文本
         if isinstance(problem_model, dict):
-            problem_model = DatabaseUtils().build_query_from_json(problem_model)
+            problem_model = build_intent_query_from_dict(problem_model)
     except (json.JSONDecodeError, TypeError):
         # 如果不是 JSON 格式，直接使用原始查询
         pass

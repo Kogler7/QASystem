@@ -49,6 +49,11 @@ class AnswerGenerationRequestBody(BaseModel):
     intent_output: dict|str
 
 
+class QueryGraphRequestBody(BaseModel):
+    node_labels: List[str] = []
+    limit: int = 20
+
+
 @router.post("/problem-solving/problem-definition")
 async def problem_definition(body: ProblemDefinitionRequestBody) -> dict[str, Any]:
     """问题定义工具"""
@@ -86,4 +91,18 @@ async def answer_generation(body: AnswerGenerationRequestBody) -> dict[str, Any]
         return result
     except Exception as e:
         logger.exception("答案生成失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/query-graph")
+async def query_graph(body: QueryGraphRequestBody) -> dict[str, Any]:
+    """按节点名称/标签关键字查询 Neo4j 子图（组件页可视化）。"""
+    try:
+        return await asyncio.to_thread(
+            service.query_graph,
+            node_labels=body.node_labels,
+            limit=body.limit,
+        )
+    except Exception as e:
+        logger.exception("查询图谱失败")
         raise HTTPException(status_code=500, detail=str(e)) from e

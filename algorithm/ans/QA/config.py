@@ -62,7 +62,9 @@ class Config:
     @classmethod
     def from_env(cls):
         """从环境变量加载配置"""
-        neo4j_uri = _normalize_host_docker_internal(os.getenv("NEO4J_URI", cls.NEO4J_URI))
+        neo4j_uri = _normalize_host_docker_internal(
+            (os.getenv("NEO4J_URI") or cls.NEO4J_URI).strip()
+        )
         neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME") or cls.NEO4J_USER
         llm_type = os.getenv("LLM_TYPE") or os.getenv("LLM_MODEL") or cls.LLM_TYPE
         llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or cls.LLM_API_KEY

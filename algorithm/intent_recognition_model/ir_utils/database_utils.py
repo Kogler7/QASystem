@@ -5,6 +5,40 @@ from datetime import datetime
 from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
 from ir_config.config import Config
 
+
+def build_intent_query_from_dict(json_input: dict) -> str:
+    """
+    从 JSON 输入构建检索用查询文本（纯函数，不初始化 HybridEncoder / Milvus）。
+    供 API 层与 agent 调用，避免重复加载 BGE 与重复连接 Milvus。
+    """
+    if "problem_model" in json_input:
+        problem_model = json_input["problem_model"]
+    else:
+        problem_model = json_input
+
+    parts = []
+
+    if problem_model.get("description"):
+        parts.append(f"问题描述: {problem_model['description']}")
+
+    if problem_model.get("target_object"):
+        parts.append(f"目标对象: {problem_model['target_object']}")
+
+    if problem_model.get("goals"):
+        goals = problem_model["goals"]
+        if goals:
+            goals_text = " | ".join(goals)
+            parts.append(f"目标: {goals_text}")
+
+    if problem_model.get("related_entities"):
+        entities = problem_model["related_entities"]
+        if entities:
+            entities_text = " | ".join(entities)
+            parts.append(f"相关实体: {entities_text}")
+
+    return "\n".join(parts)
+
+
 class DatabaseUtils:
     def __init__(self):
         self.config = Config()
@@ -90,37 +124,7 @@ class DatabaseUtils:
 
     def build_query_from_json(self, json_input: dict) -> str:
         """从 JSON 输入构建查询文本"""
-        # 检查是否有 problem_model 字段
-        if "problem_model" in json_input:
-            problem_model = json_input["problem_model"]
-        else:
-            problem_model = json_input
-        
-        parts = []
-
-        # 问题描述（高权重）
-        if problem_model.get("description"):
-            parts.append(f"问题描述: {problem_model['description']}")
-
-        # 目标对象（中权重）
-        if problem_model.get("target_object"):
-            parts.append(f"目标对象: {problem_model['target_object']}")
-
-        # 目标（中权重）
-        if problem_model.get("goals"):
-            goals = problem_model["goals"]
-            if goals:
-                goals_text = " | ".join(goals)
-                parts.append(f"目标: {goals_text}")
-
-        # 相关实体（高价值样本）
-        if problem_model.get("related_entities"):
-            entities = problem_model["related_entities"]
-            if entities:
-                entities_text = " | ".join(entities)
-                parts.append(f"相关实体: {entities_text}")
-
-        return "\n".join(parts)
+        return build_intent_query_from_dict(json_input)
 
     def get_current_time_str(self) -> str:
         """生成当前时间的字符串格式"""

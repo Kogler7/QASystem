@@ -3,6 +3,7 @@
 使用前需安装 algorithm/ans/QA 依赖并配置 Neo4j、LLM 等。
 """
 import logging
+import os
 import sys
 import json
 from pathlib import Path
@@ -131,9 +132,9 @@ def health() -> dict[str, Any]:
             "config": {
                 "neo4j_uri": getattr(svc.config, "NEO4J_URI", ""),
                 "neo4j_user": getattr(svc.config, "NEO4J_USER", ""),
-                "llm_backend": __import__("os").getenv("LLM_BACKEND", ""),
-                "llm_base_url": __import__("os").getenv("LLM_BASE_URL", ""),
-                "llm_model": __import__("os").getenv("LLM_MODEL", ""),
+                "llm_backend": os.getenv("LLM_BACKEND", ""),
+                "llm_base_url": os.getenv("LLM_BASE_URL", ""),
+                "llm_model": os.getenv("LLM_MODEL", ""),
                 "llm_type": getattr(svc.config, "LLM_TYPE", ""),
                 "llm_api_key_configured": bool(getattr(svc.config, "LLM_API_KEY", "")),
             },
@@ -174,3 +175,94 @@ def generate_answer(question: str|dict) -> dict[str, Any]:
     tool = _get_answer_generation_tool()
     result = tool.generate_answer(question)
     return result
+
+
+def _problem_model_to_planning_text(problem_model: dict) -> str:
+    """从结构化问题模型中提取可供 LLM 使用的中文描述。"""
+    if not problem_model:
+        return ""
+    inner = problem_model.get("problem_model")
+    core: dict = inner if isinstance(inner, dict) else problem_model
+    if isinstance(core, dict):
+        for key in ("description", "Goal", "user_goal", "intent_name"):
+            v = core.get(key)
+            if v:
+                return str(v)
+        goals = core.get("goals")
+        if isinstance(goals, list) and goals:
+            return " | ".join(str(g) for g in goals)
+    return json.dumps(problem_model, ensure_ascii=False)
+
+
+def plan_solution(problem_model: dict) -> dict[str, Any]:
+    """方案规划：复用问题定义工具。"""
+    tool = _get_problem_definition_tool()
+    text = _problem_model_to_planning_text(problem_model)
+    if not (text or "").strip():
+        return {"success": False, "error": "无法从问题模型提取有效文本"}
+    return tool.define_problem(text.strip())
+
+
+def query_graph(node_labels: List, limit: int = 20) -> dict[str, Any]:
+    """按名称/标签关键字从 Neo4j 拉取子图，供前端可视化。"""
+    labels = [str(x).strip() for x in (node_labels or []) if str(x).strip()]
+    if not labels:
+        return {"success": False, "data": {"nodes": [], "relationships": []}}
+    try:
+        from neo4j import GraphDatabase
+
+        cfg = _load_neo4j_config()
+        driver = GraphDatabase.driver(
+            cfg["uri"],
+            auth=(cfg["user"], cfg["password"]),
+        )
+        nodes_map: Dict[int, Dict[str, Any]] = {}
+        relationships: List[Dict[str, Any]] = []
+        lim = max(1, min(int(limit), 100))
+        with driver.session() as session:
+            for lbl in labels[:20]:
+                res = session.run(
+                    """
+                    MATCH (n)
+                    WHERE n.name CONTAINS $lbl
+                       OR ANY(l IN labels(n) WHERE toString(l) CONTAINS $lbl)
+                    RETURN id(n) AS id, n.name AS name, labels(n) AS lab
+                    LIMIT $lim
+                    """,
+                    lbl=lbl,
+                    lim=lim,
+                )
+                for r in res:
+                    nid = int(r["id"])
+                    if nid not in nodes_map:
+                        nm = r["name"] or f"node_{nid}"
+                        nodes_map[nid] = {"id": nid, "name": nm, "labels": r["lab"]}
+            ids = list(nodes_map.keys())
+            if ids:
+                res2 = session.run(
+                    """
+                    MATCH (a)-[r]->(b)
+                    WHERE id(a) IN $ids AND id(b) IN $ids
+                    RETURN id(a) AS src, id(b) AS dst, type(r) AS t, id(r) AS rid
+                    LIMIT $lim2
+                    """,
+                    ids=ids,
+                    lim2=min(lim * 4, 200),
+                )
+                for r in res2:
+                    relationships.append(
+                        {
+                            "id": int(r["rid"]),
+                            "from": int(r["src"]),
+                            "to": int(r["dst"]),
+                            "type": r["t"],
+                        }
+                    )
+        return {"success": True, "data": {"nodes": list(nodes_map.values()), "relationships": relationships}}
+    except Exception as e:
+        logger.warning("query_graph 失败: %s", e)
+        return {
+            "success": False,
+            "data": {"nodes": [], "relationships": []},
+            "detail": str(e),
+        }

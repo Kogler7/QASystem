@@ -434,6 +434,30 @@ docker compose exec backend ls /models/hub/models/OpenDataLab
 - `GET /api/component/nl2cypher/health`
 - `GET /api/component/answer-generation/health`
 
+## 8.5 意图识别与答案生成（Docker 部署必查）
+
+根目录 `.env` 至少保证：
+
+- **意图识别**：`MILVUS_URI` 可达；`COLLECTION_NAME` 与 Milvus 中已建集合一致；`MODEL_PATH` 指向容器内已挂载目录（如 `/models/bge_m3_model`），且 `HOST_MODELS_DIR` 在宿主机存在对应模型；`LLM_BACKEND` / `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY`（智谱等）正确。
+- **答案生成**：`NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` 可达；LLM 配置同上（`algorithm/ans` 经 `QA.config` 与 `llm_client` 使用）。
+
+容器内确认模型目录：
+
+```bash
+docker compose exec backend ls -la /models
+docker compose exec backend ls -la /models/bge_m3_model
+```
+（若 `.env` 中 `MODEL_PATH` 不同，将最后一行路径改为该值。）
+
+健康检查应返回 `status: ok`（若依赖未就绪会返回 `unavailable` 及 `detail`，按提示修 `.env` 或中间件）：
+
+```bash
+curl -sS "http://127.0.0.1:${HTTP_PORT:-80}/api/component/intent-recognition/health"
+curl -sS "http://127.0.0.1:${HTTP_PORT:-80}/api/component/answer-generation/health"
+```
+
+> 说明：`docker-compose.yml` 已通过 `env_file` 与 `environment` 显式传入上述 LLM/Milvus/模型路径变量，离线机加载镜像后只需改 `.env` 并保证 `/models` 挂载即可。
+
 ---
 
 ## 9. 升级、回滚与备份

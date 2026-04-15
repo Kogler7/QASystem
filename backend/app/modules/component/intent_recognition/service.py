@@ -74,9 +74,28 @@ def health() -> dict[str, Any]:
         }
 
 
-def recognize(problem_model: dict) -> dict[str, Any]:
+def _intent_query_text(problem_model: dict | str) -> str:
+    """将前端传入的 problem_model（str 或 dict）转为检索用查询文本。"""
+    if isinstance(problem_model, str):
+        return problem_model.strip()
+    if not problem_model:
+        return ""
+    try:
+        from ir_utils.database_utils import build_intent_query_from_dict
+
+        return build_intent_query_from_dict(problem_model)
+    except Exception:
+        import json
+
+        return json.dumps(problem_model, ensure_ascii=False)
+
+
+def recognize(problem_model: dict | str) -> dict[str, Any]:
     recognizer = _get_intent_recognition()
-    result = recognizer.generate_result(problem_model)
+    query = _intent_query_text(problem_model)
+    if not query:
+        return {"data": {"error": "空查询"}}
+    result = recognizer.generate_result(query)
     if hasattr(result, "model_dump"):
         result = result.model_dump()
     elif not isinstance(result, dict):

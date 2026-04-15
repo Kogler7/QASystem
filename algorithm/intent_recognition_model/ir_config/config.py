@@ -39,7 +39,7 @@ def _normalize_host_docker_internal(value: str) -> str:
 
 
 def _intent_models_base_dir(project_root: Path) -> Path:
-    raw = os.getenv("INTENT_MODEL_BASE_DIR", str(project_root / "models"))
+    raw = (os.getenv("INTENT_MODEL_BASE_DIR") or str(project_root / "models")).strip()
     base = Path(raw)
     if not base.is_absolute():
         base = (project_root / base).resolve()
@@ -120,8 +120,10 @@ class Config:
         _project_root = _root.parent.parent  # 仓库根 qasystem
 
         self.data_dir = os.getenv("DATA_DIR") or str(_root / "data" / "intent.json")
-        self.collection_name = os.getenv("COLLECTION_NAME", "intent_rag")
-        self.milvus_uri = _normalize_host_docker_internal(os.getenv("MILVUS_URI", "http://localhost:19530"))
+        self.collection_name = (os.getenv("COLLECTION_NAME") or "intent_rag").strip()
+        self.milvus_uri = _normalize_host_docker_internal(
+            (os.getenv("MILVUS_URI") or "http://localhost:19530").strip()
+        )
         self.milvus_consistency_level = os.getenv("MILVUS_CONSISTENCY_LEVEL", "Strong")
         self.max_drop_retries = int(os.getenv("MAX_DROP_RETRIES", "3"))
         self.drop_retry_delay = int(os.getenv("DROP_RETRY_DELAY", "2"))

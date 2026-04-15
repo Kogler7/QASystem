@@ -7,7 +7,6 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from fastapi.responses import StreamingResponse
 
 from . import service
 
@@ -26,6 +25,15 @@ class GetToolsRequestBody(BaseModel):
     step: dict  # 直接接受字典类型
 
 
+def _problem_model_nonempty(pm: dict | str) -> bool:
+    if pm is None:
+        return False
+    if isinstance(pm, str):
+        return bool(pm.strip())
+    if isinstance(pm, dict):
+        return bool(pm)
+    return False
+
 
 @router.get("/health")
 async def intent_recognition_health() -> dict[str, Any]:
@@ -34,10 +42,10 @@ async def intent_recognition_health() -> dict[str, Any]:
 
 @router.post("/recognize")
 async def recognize(body: RecognizeRequestBody) -> dict[str, Any]:
-    if not (body.text or "").strip():
-        raise HTTPException(status_code=400, detail="输入文本不能为空")
+    if not _problem_model_nonempty(body.problem_model):
+        raise HTTPException(status_code=400, detail="问题模型不能为空")
     try:
-        result = await asyncio.to_thread(service.recognize, text=body.text.strip())
+        result = await asyncio.to_thread(service.recognize, body.problem_model)
         return result
     except Exception as e:
         logger.exception("基础意图识别失败")
