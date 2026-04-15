@@ -157,7 +157,7 @@ def define_problem(question: str) -> dict[str, Any]:
     return result
 
 
-def generate_answer(question: str) -> dict[str, Any]:
+def generate_answer(question: str|dict) -> dict[str, Any]:
     """答案生成工具（整合方案规划）"""
     tool = _get_answer_generation_tool()
     result = tool.generate_answer(question)
