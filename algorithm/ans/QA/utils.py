@@ -141,30 +141,34 @@ def run_zhipu_glm(prompt, temperature, max_tokens, api_key):
         return "Error in GLM API call"
 
 def run_llm(prompt, temperature, max_tokens, api_key, engine="gpt-3.5-turbo"):
-    if "glm" in engine.lower() or "zhipu" in engine.lower():
-        return run_zhipu_glm(prompt, temperature, max_tokens, api_key)
-
-    messages = [{"role":"system","content":"You are an AI assistant that helps people find information."}]
-    message_prompt = {"role":"user","content":prompt}
-    messages.append(message_prompt)
-    f = 0
-    while(f == 0):
-        try:
-            # 设置OpenAI API密钥
-            import openai
-            openai.api_key = api_key
-            response = openai.ChatCompletion.create(
-                    model=engine,
-                    messages = messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    frequency_penalty=0,
-                    presence_penalty=0)
-            result = response["choices"][0]['message']['content']
-            f = 1
-        except Exception as e:
-            print(f"openai error, retry: {e}")
-            time.sleep(2)
+    """使用项目统一的大模型接口调用模型"""
+    from algorithm.common.llm_client import complete
+    
+    system_prompt = """你是一个AI助手。请严格按照以下要求响应：
+    1. 直接给出答案，不要输出任何思考过程
+    2. 不要使用<think>或任何其他标签
+    3. 如果被要求提取实体，只输出实体列表，用逗号分隔
+    4. 保持响应简洁直接"""
+    
+    # 确保 engine 不是后端类型，而是模型名称
+    # 如果 engine 是 "ollama"，使用默认模型
+    model_name = engine if engine not in ["ollama", "openai", "zhipu"] else None
+    
+    # 使用项目统一的大模型接口
+    result = complete(
+        prompt,
+        system_prompt=system_prompt,
+        model=model_name,
+        api_key=api_key,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=60
+    )
+    
+    if not result:
+        print(f"LLM调用失败，返回空响应")
+        return "Error in LLM API call"
+    
     return result
 # def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="Qwen/Qwen3-8B"):
 #     """使用OpenAI兼容的chat接口调用远程模型"""

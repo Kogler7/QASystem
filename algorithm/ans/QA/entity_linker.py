@@ -2,6 +2,7 @@ import re
 import json
 from typing import Dict, List, Tuple, Any
 from algorithm.ans.QA.utils import run_llm
+from algorithm.ans.QA.prompt_list import entity_recognition_prompt, entity_ranking_prompt
 
 
 class EntityLinker:
@@ -24,144 +25,171 @@ class EntityLinker:
         prompt = self._build_entity_recognition_prompt(question)
 
         try:
-            response = run_llm(prompt, 0.1, 300, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            # 增加 max_tokens 以确保 JSON 响应不被截断
+            response = run_llm(prompt, 0.4, 800, self.args.LLM_API_KEY, self.args.LLM_TYPE)
 
             entities = self._parse_llm_response(question, response)
 
-            # 如果还没有实体，使用fallback方法
-            if not entities:
-                entities = self._fallback_extraction(question)
-
+            # 确保使用大模型识别的实体，不使用备用提取
             print(f"问题: '{question}' -> 提取的实体: {entities}")
             self.llm_cache[cache_key] = entities
             return entities
 
         except Exception as e:
             print(f"实体识别异常: {e}")
-            return self._fallback_extraction(question)
+            # 不使用备用提取，直接返回空列表
+            return []
 
-    # def recognize_entities(self, question: str) -> List[str]:
-    #     """使用LLM理解问题并提取相关实体"""
-    #     cache_key = f"ner_zh_{question}"
-    #     if cache_key in self.llm_cache:
-    #         return self.llm_cache[cache_key]
-    #
-    #     prompt = self._build_entity_recognition_prompt(question)
-    #
-    #     try:
-    #         response = run_llm(prompt, 0.1, 100, self.args.LLM_API_KEY, self.args.LLM_TYPE)
-    #
-    #         # 清理响应
-    #         response = self._clean_think_tags(response)
-    #         print(f"LLM响应: {response}")
-    #
-    #         # 简单的解析：取第一行或最后一行
-    #         lines = [line.strip() for line in response.split('\n') if line.strip()]
-    #
-    #         entities = []
-    #         if lines:
-    #             # 尝试找到包含逗号的行
-    #             for line in lines:
-    #                 if ',' in line:
-    #                     entities = [e.strip() for e in line.split(',') if e.strip()]
-    #                     break
-    #
-    #             # 如果没有逗号，使用第一行
-    #             if not entities:
-    #                 entities = [lines[0]]
-    #
-    #         # 过滤无效实体
-    #         filtered_entities = []
-    #         for entity in entities:
-    #             if (len(entity) >= 2 and len(entity) <= 10 and
-    #                     entity not in ['什么', '谁', '哪里', '如何', '为什么']):
-    #                 filtered_entities.append(entity)
-    #
-    #         # 如果还是没有，使用备用方法
-    #         if not filtered_entities:
-    #             filtered_entities = self._fallback_extraction(question)
-    #
-    #         print(f"问题: '{question}' -> 提取的实体: {filtered_entities}")
-    #         self.llm_cache[cache_key] = filtered_entities
-    #         return filtered_entities
-    #
-    #     except Exception as e:
-    #         print(f"实体识别异常: {e}")
-    #         return self._fallback_extraction(question)
-
-    # def _clean_think_tags(self, response: str) -> str:
-    #     """清理 <think> 标签"""
-    #     import re
-    #     # 移除 <think> 和 </think> 标签及其内容
-    #     cleaned = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-    #     # 移除可能漏掉的 <think> 标签
-    #     cleaned = re.sub(r'<think>', '', cleaned)
-    #     cleaned = re.sub(r'</think>', '', cleaned)
-    #     return cleaned.strip()
 
     def _build_entity_recognition_prompt(self, question: str) -> str:
         """构建实体识别提示词"""
-        return f"""
-        你是一个专业的实体提取专家。请分析以下问题，提取出所有对回答问题有帮助的实体。
+        return """你是一个专业的实体提取专家。请分析以下问题，提取出所有对回答问题有帮助的实体，并根据实体的类型进行标注。
 
-        问题："{question}"
+问题："{question}"
 
-        分析要求：
-        1. 理解问题的意图和上下文
-        2. 识别问题中提到的所有具体事物、概念、人物、地点等
-        3. 对于模糊的实体，根据上下文确定最可能的含义
-        4. 特别注意物品、工具、设备等具体事物
-        5. **重要**：对于需要计算或对比的问题，请根据业务逻辑推断可能需要的实体
+分析要求：
+1. 理解问题的意图和上下文
+2. 识别问题中提到的所有具体事物、概念、人物、地点等
+3. 对于模糊的实体，根据上下文确定最可能的含义
+4. 特别注意与问题核心相关的关键概念
+5. **重要**：对于需要计算或对比的问题，请根据业务逻辑推断可能需要的实体
 
-        实体提取标准：
-        - 名词性短语（如"瑜伽垫"、"跑步机"）
-        - 专有名词（如"姚明"、"北京"）
-        - 概念术语（如"人工智能"、"量子力学"）
-        - 事件活动（如"奥运会"、"春节"）
-        - **业务逻辑推断**：如果问题需要计算或对比，请推断可能需要的实体
-          - 例如：如果问题包含"非公开采购金额"，请推断需要"电子采购中标金额"和"公开采购中标金额"
-          - 例如：如果问题包含"A和B的对比"，请提取A和B相关的所有实体
+实体类型：
+- 物品/产品：具体的物品、产品、设备等
+- 人物：具体的个人、角色等
+- 组织/机构：公司、政府部门、组织等
+- 地点/位置：具体的地点、位置等
+- 时间/日期：具体的时间、日期、时期等
+- 事件：具体的事件、活动等
+- 概念/术语：抽象的概念、专业术语等
+- 学科/领域：具体的学科、领域等
+- 统计指标：金额、数量、比例等
+- 其他：其他类型的实体
 
-        输出格式：请用严格的JSON格式输出：
-        {{
-          "analysis": "简短分析问题的意图",
-          "entities": [
-            {{
-              "text": "实体文本",
-              "type": "实体类型",
-              "importance": "高/中/低",
-              "reason": "为什么提取这个实体"
-            }}
-          ]
-        }}
+实体提取标准：
+- 名词性短语（如"瑜伽垫"、"跑步机"）
+- 专有名词（如"姚明"、"北京"）
+- 概念术语（如"人工智能"、"量子力学"）
+- 事件活动（如"奥运会"、"春节"）
+- **业务逻辑推断**：如果问题需要计算或对比，请推断需要的实体
+  - 例如：如果问题包含"非公开采购金额"，请推断需要"电子采购中标金额"和"公开采购中标金额"
+  - 例如：如果问题包含"A和B的对比"，请提取A和B相关的所有实体
 
-        注意：
-        - 只提取问题中实际提到的实体或根据业务逻辑推断的实体
-        - 确保JSON格式正确，不要有多余的逗号或括号
-        """
+**重要提示**：
+- 直接输出JSON，不要输出任何思考过程或解释
+- 不要使用<think>标签
+- 确保JSON格式完整且正确
+
+输出格式（严格的JSON）：
+{{
+  "analysis": "简短分析问题的意图",
+  "entities": [
+    {{
+      "text": "实体文本",
+      "type": "物品/产品/人物/组织/机构/地点/位置/时间/日期/事件/概念/术语/学科/领域/统计指标/其他",
+      "importance": "高/中/低",
+      "reason": "为什么提取这个实体"
+    }}
+  ]
+}}
+
+注意：
+- 只提取问题中实际提到的实体或根据业务逻辑推断的实体
+- 确保JSON格式正确，不要有多余的逗号或括号
+- 直接输出JSON，不要添加任何其他内容""".format(question=question)
+
 
     def _parse_llm_response(self, question: str, response: str) -> List[str]:
         """解析LLM响应，提取实体"""
         entities = []
-        # response = self._clean_think_tags(response)
-        #尝试解析JSON
-        json_data = self._extract_json_from_response(response)
-        if json_data:
-            entities = self._parse_json_entities(json_data, question)
+        
+        # 清理响应
+        response = response.strip()
+        
+        # 移除 <think> 标签及其内容（即使没有结束标签）
+        import re
+        # 移除完整的 <think>...</think> 标签
+        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+        # 移除只有开始标签的情况
+        response = re.sub(r'<think>.*', '', response, flags=re.DOTALL)
+        response = response.strip()
+        
+        # 尝试解析JSON
+        try:
+            # 尝试直接解析整个响应
+            import json
+            # 清理可能的格式问题
+            clean_response = response
+            # 移除可能的markdown代码块标记
+            clean_response = re.sub(r'^```json\n|^```\n|\n```$', '', clean_response)
+            clean_response = clean_response.strip()
+            
+            json_data = json.loads(clean_response)
+            if json_data and "entities" in json_data:
+                entities = self._parse_json_entities(json_data, question)
+                if entities:
+                    return entities
+        except json.JSONDecodeError:
+            # 如果直接解析失败，尝试提取JSON片段
+            # 查找包含 entities 的JSON对象
+            entity_pattern = r'\{[\s\S]*?"entities"[\s\S]*?\}'
+            match = re.search(entity_pattern, response)
+            if match:
+                try:
+                    json_str = match.group(0)
+                    # 修复可能的JSON格式问题
+                    json_str = re.sub(r',\s*\}', '}', json_str)
+                    json_str = re.sub(r',\s*\]', ']', json_str)
+                    json_data = json.loads(json_str)
+                    if json_data and "entities" in json_data:
+                        entities = self._parse_json_entities(json_data, question)
+                        if entities:
+                            return entities
+                except json.JSONDecodeError:
+                    pass
 
-        #如果没有JSON，尝试自由文本解析
+        # 如果没有JSON，尝试自由文本解析
         if not entities:
-            entities = self._parse_free_text_entities(response, question)
-
-        #后处理
+            # 直接从问题中提取可能的实体
+            # 基于问题的结构和内容提取实体
+            import re
+            
+            # 分割问题
+            separators = ["与", "和", "的", "是", "如何", "什么", "多少", "？", "，", "。"]
+            temp_question = question
+            for sep in separators:
+                temp_question = temp_question.replace(sep, " ")
+            
+            # 提取单词
+            words = temp_question.split()
+            
+            # 过滤和处理
+            for word in words:
+                # 清理单词
+                cleaned_word = word.strip()
+                # 只保留长度大于等于2的单词
+                if len(cleaned_word) >= 2:
+                    # 排除常见疑问词
+                    if cleaned_word not in {"什么", "谁", "哪里", "如何", "为什么", "怎样", "多少"}:
+                        entities.append(cleaned_word)
+            
+            # 去重
+            entities = list(set(entities))
+        
+        # 后处理
         entities = self._post_process_entities(entities, question)
-
+        
         return entities
 
     def _extract_json_from_response(self, response: str) -> Dict:
         """从响应中提取JSON数据"""
         try:
-            # response = self._clean_think_tags(response)
+            # 清理 <think> 标签
+            import re
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = re.sub(r'<think>.*', '', response, flags=re.DOTALL)
+            response = response.strip()
+            
             # 尝试多种JSON匹配模式
             patterns = [
                 r'```json\n(.*?)\n```',  # 代码块
@@ -177,16 +205,27 @@ class EntityLinker:
                     json_str = match.group(1) if pattern.startswith('```') else match.group(0)
                     # 清理可能的markdown标记
                     json_str = json_str.strip()
+                    
+                    # 尝试修复JSON格式
+                    # 移除可能的多余逗号
+                    json_str = re.sub(r',\s*}', '}', json_str)
+                    json_str = re.sub(r',\s*]', ']', json_str)
+                    
                     # 尝试解析
-                    data = json.loads(json_str)
-                    if isinstance(data, dict):
-                        # 支持多种字段名
-                        if "entities" in data or "rankings" in data:
-                            return data
+                    try:
+                        data = json.loads(json_str)
+                        if isinstance(data, dict):
+                            # 支持多种字段名
+                            if "entities" in data or "rankings" in data:
+                                return data
+                    except json.JSONDecodeError:
+                        # 如果解析失败，继续尝试其他模式
+                        continue
         except Exception as e:
             print(f"JSON提取失败: {e}")
+            print(f"大模型原始响应: {response}")
 
-        return None
+        return {"rankings": []}
 
     def _parse_json_entities(self, json_data: Dict, question: str) -> List[str]:
         """从JSON数据中解析实体"""
@@ -242,13 +281,28 @@ class EntityLinker:
 
     def _validate_entity_in_question(self, entity: str, question: str) -> bool:
         """验证实体是否在问题中出现（或语义相关）"""
+        # 清理实体和问题
+        entity = entity.strip()
+        question = question.strip()
+        
+        # 检查实体是否就是整个问题
+        if entity == question:
+            return False
+        
+        # 检查实体是否包含整个问题
+        if question in entity:
+            return False
+        
         # 直接包含
         if entity in question:
             return True
 
         # 部分包含（对于长实体）
-        if len(entity) > 3 and entity in question:
-            return True
+        if len(entity) > 2:
+            # 检查实体的关键部分是否在问题中
+            for part in entity.split():
+                if part in question and len(part) > 1:
+                    return True
 
         # 对于短实体，确保不是常见虚词
         if len(entity) < 4:
@@ -270,7 +324,7 @@ class EntityLinker:
         return word in common_words
 
     def _post_process_entities(self, entities: List[str], question: str) -> List[str]:
-        """实体后处理"""
+        """后处理实体列表"""
         if not entities:
             return []
 
@@ -278,13 +332,22 @@ class EntityLinker:
         unique_entities = []
         seen = set()
 
+        # 清理问题文本，用于比较
+        cleaned_question = question.strip()
+        # 移除末尾的标点符号
+        cleaned_question = re.sub(r'[？！。,，]$', '', cleaned_question)
+
         for entity in entities:
             entity = entity.strip()
+            # 清理实体，移除末尾的标点符号
+            cleaned_entity = re.sub(r'[？！。,，]$', '', entity)
+            
             # 过滤条件
             if (entity and
                     len(entity) >= 2 and
                     entity not in seen and
-                    not self._is_common_word(entity)):
+                    not self._is_common_word(entity) and
+                    cleaned_entity != cleaned_question):  # 排除整个问题作为实体（忽略末尾标点）
                 seen.add(entity)
                 unique_entities.append(entity)
 
@@ -296,23 +359,7 @@ class EntityLinker:
 
         return sorted_entities
 
-    def _fallback_extraction(self, question: str) -> List[str]:
-        """备用提取方法"""
-        entities = []
 
-        # 提取所有名词短语（中文）
-        # 使用更智能的提取：提取连续的中文字符，排除常见虚词
-        words = re.findall(r'[\u4e00-\u9fa5]+', question)
-
-        # 动态判断是否为实体
-        for word in words:
-            if len(word) >= 2:
-                # 排除常见疑问词和虚词
-                if word not in {"什么", "谁", "哪里", "如何", "为什么", "怎样", "多少",
-                                "的", "了", "在", "和", "与", "或"}:
-                    entities.append(word)
-
-        return entities
 
     def link_entities_in_question(self, question: str) -> Dict[str, str]:
         """实体链接函数"""
@@ -323,8 +370,8 @@ class EntityLinker:
 
         if not entity_mentions:
             print("警告：未识别到任何实体")
-            # 尝试直接使用整个问题作为查询
-            entity_mentions = [question]
+            # 直接返回空结果，不使用备用机制
+            return {}
 
         # 实体链接
         linked_entities = {}
@@ -571,48 +618,7 @@ class EntityLinker:
                     value_str = value_str[:500] + "..."
                 candidates_text += f"  {key}: {value_str}\n"
         
-        prompt = f"""你是一个专业的信息检索专家。请根据用户的问题，评估以下候选实体的相关程度。
-
-用户问题："{question}"
-
-候选实体信息：
-{candidates_text}
-
-请对每个候选实体进行评估：
-1. 相关度分数（0-1之间，1表示最相关）
-2. 判断理由（简要说明为什么相关或不相关）
-3. 是否能直接回答用户问题（是/否）
-
-输出格式（严格的JSON）：
-{{
-  "rankings": [
-    {{
-      "qid": "实体的QID",
-      "relevance_score": 0.95,
-      "can_answer": true,
-      "reason": "判断理由"
-    }}
-  ]
-}}
-
-重要判断原则：
-1. 识别用户问题的核心关键词（如"金额"、"构成"、"标段数"、"比例"等）
-2. 优先选择与核心关键词完全匹配的实体
-3. 对于不匹配的实体类型，应该给出低分数（如0.1-0.2）
-   - 例如：如果问题问"金额构成"，则"标段数"、"比例"等实体相关性很低（0.1-0.2）
-   - 例如：如果问题问"金额构成"，则"金额"类实体相关性很高（0.8-1.0）
-4. 请仔细分析实体的所有属性，特别关注能够帮助回答用户问题的属性
-5. 相关度分数要严格区分，不要给所有实体相似的分数
-6. **业务逻辑推断**：如果问题需要计算或对比，请根据业务逻辑判断真正需要的实体
-   - 例如：如果问题问"非公开采购金额"，虽然问题中没有直接提到"电子采购"，但根据业务逻辑"非公开采购金额 = 电子采购中标金额 - 公开采购中标金额"，需要"电子采购中标金额"和"公开采购中标金额"两个实体
-   - 例如：如果问题问"A和B的金额构成"，只需要A和B相关的金额类实体，不需要比例、标段数等其他类型实体
-   - 例如：如果问题需要"总金额"，应该选择聚合查询（如SUM），而不是分组查询（如GROUP BY）
-7. **严格过滤**：对于问题不需要的实体类型，请给出很低的相关度分数（0.1-0.2）
-8. **精确匹配**：仔细分析实体的计算SQL，判断SQL的查询类型是否符合问题需求
-   - 如果问题需要总金额，应该选择聚合查询（如SUM），而不是分组查询（如GROUP BY）
-   - 如果问题需要构成分析，应该选择能够提供构成数据的实体，而不是细分数据的实体"""
-        
-        return prompt
+        return entity_ranking_prompt.format(question=question, candidates_text=candidates_text)
     
     def _parse_ranking_response(self, response: str, candidates: List[Dict]) -> List[Dict]:
         """解析大模型的排序响应"""
@@ -658,9 +664,6 @@ class EntityLinker:
         
         # 1. 提取实体/关键词
         keywords = self.recognize_entities(question)
-        if not keywords:
-            # 如果没有提取到实体，使用整个问题作为关键词
-            keywords = [question]
         
         print(f"提取的关键词: {keywords}")
         
@@ -696,17 +699,14 @@ class EntityLinker:
         # 4. 构建返回结果
         linked_entities = {}
         for cand in ranked_candidates:
-            # 只包含相关度分数高于0.5的实体
-            if cand.get('relevance_score', 0) >= 0.5:
+            # 只包含相关度分数高于0.7的实体，提高过滤阈值
+            if cand.get('relevance_score', 0) >= 0.7:
                 # 直接使用实体的name属性作为标签，如果没有则使用QID
                 # 大模型已经在排序过程中看到了所有属性，不需要在这里做额外处理
                 label = cand['properties'].get('name', cand['qid'])
                 linked_entities[cand['qid']] = label
         
-        best_match = ranked_candidates[0] if ranked_candidates else None
-        
         return {
             "linked_entities": linked_entities,
-            "best_match": best_match,
             "all_candidates": ranked_candidates
         }
