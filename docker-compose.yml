@@ -64,6 +64,9 @@ services:
       - backend_preproc_output:/app/backend/data/preproc_output
       # 挂载宿主机模型目录到容器内 /models（只读，避免模型被容器进程修改）
       - ${HOST_MODELS_DIR:-./models}:/models:ro
+    # 宿主机端口见根 .env 中 BACKEND_HOST_PORT（默认 8006 -> 容器 8000）
+    ports:
+      - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_HOST_PORT:-8006}:8000"
     expose:
       - "8000"
     healthcheck:
