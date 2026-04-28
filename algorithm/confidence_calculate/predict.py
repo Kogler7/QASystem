@@ -164,7 +164,11 @@ class ConfidencePredictor:
         从 schema_mapper 输出中提取关系并计算置信度
         """
         if confidence_threshold is None:
-            confidence_threshold = float(os.getenv('KG_CONFIDENCE_THRESHOLD', '0.7'))
+            raw = (os.getenv('KG_CONFIDENCE_THRESHOLD') or '').strip()
+            try:
+                confidence_threshold = float(raw) if raw else 0.7
+            except (TypeError, ValueError):
+                confidence_threshold = 0.7
         
         if Extractor is None:
             return {

@@ -21,6 +21,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _safe_float_env(name: str, default: float) -> float:
+    """从环境变量读取 float；空值或非法值时回退默认值。"""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    raw = str(raw).strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        logger.warning("环境变量 %s=%r 不是有效浮点数，回退默认值 %s", name, raw, default)
+        return default
+
+
 class KGUpdator:
     """
     知识图谱更新器
@@ -53,7 +68,11 @@ class KGUpdator:
         self.neo4j_username = neo4j_username or os.getenv('NEO4J_USER', 'neo4j')
         self.neo4j_password = neo4j_password or os.getenv('NEO4J_PASSWORD', 'neo4j2025')
         self.database = database or os.getenv('NEO4J_DATABASE', 'neo4j')
-        self.confidence_threshold = confidence_threshold if confidence_threshold is not None else float(os.getenv('KG_CONFIDENCE_THRESHOLD', '0.7'))
+        self.confidence_threshold = (
+            confidence_threshold
+            if confidence_threshold is not None
+            else _safe_float_env('KG_CONFIDENCE_THRESHOLD', 0.7)
+        )
         
         logger.info(f"使用的 Neo4j URI: {self.neo4j_uri}")
         logger.info(f"使用的用户名: {self.neo4j_username}")

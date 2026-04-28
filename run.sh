@@ -14,7 +14,7 @@ fi
 # 如果程序已启动，先停止后重启
 PIDS=$(lsof -ti :8000)
 if [ -n "$PIDS" ]; then
-  echo "检测到 8000 端口已有进程: $PIDS，正在停止..."
+  echo "检测到 8000端口已有进程: $PIDS，正在停止..."
   kill $PIDS
   sleep 1
 

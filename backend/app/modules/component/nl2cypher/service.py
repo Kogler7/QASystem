@@ -61,7 +61,7 @@ def _get_splitter():
         raise
 
 
-def _make_docs(text: str, source: str):
+def _make_docs(text: str, source: str = "nl2cypher"):
     """创建文档并添加 metadata"""
     from langchain_core.documents import Document
     return [Document(page_content=text, metadata={"source": source})]
@@ -69,28 +69,28 @@ def _make_docs(text: str, source: str):
 
 def split_by_character(text: str) -> dict[str, Any]:
     mod = _get_splitter()
-    docs = _make_docs(text)
+    docs = _make_docs(text, "split_by_character")
     split_docs = mod.split_by_character(docs)
     return {"chunks": [d.page_content for d in split_docs]}
 
 
 def split_recursively(text: str) -> dict[str, Any]:
     mod = _get_splitter()
-    docs = _make_docs(text)
+    docs = _make_docs(text, "split_recursively")
     split_docs = mod.split_recursively(docs)
     return {"chunks": [d.page_content for d in split_docs]}
 
 
 def split_by_markdown(text: str) -> dict[str, Any]:
     mod = _get_splitter()
-    docs = _make_docs(text)
+    docs = _make_docs(text, "split_by_markdown")
     split_docs = mod.split_by_markdown(docs)
     return {"chunks": [d.page_content for d in split_docs]}
 
 
 def split_by_language_python(text: str) -> dict[str, Any]:
     mod = _get_splitter()
-    docs = _make_docs(text)
+    docs = _make_docs(text, "split_by_language_python")
     split_docs = mod.split_by_language_python(docs)
     return {"chunks": [d.page_content for d in split_docs]}
 

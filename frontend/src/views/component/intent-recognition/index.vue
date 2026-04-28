@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Aim, Document, Plus, Refresh } from '@element-plus/icons-vue'
-import { intentRecognitionHealthCheck, intentRecognitionRecognize, intentRecognitionStream, intentRecognitionDeepRecognize, intentRecognitionGetPlan } from '@/api/modules/component/intent-recognition'
+import { intentRecognitionHealthCheck, intentRecognitionRecognize, intentRecognitionDeepRecognize, intentRecognitionGetPlan } from '@/api/modules/component/intent-recognition'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
