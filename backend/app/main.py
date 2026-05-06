@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .db import init_db
-from .routers import chat, knowledge, users
+from .routers import agent_template, chat, knowledge, users
 from .modules.component import COMPONENT_ROUTERS
 from .modules.component.document_preproc import service as doc_preproc_service
 
@@ -98,6 +98,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
+app.include_router(agent_template.router)
 app.include_router(conclictfix.router) #new
 for r in COMPONENT_ROUTERS:
     app.include_router(r)

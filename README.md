@@ -13,6 +13,7 @@
 qasystem/
 ├── frontend/
 ├── backend/
+├── agentcode/             # Claude Code 风格单智能体运行时（独立可编辑包）
 ├── algorithm/
 ├── docker/
 │   ├── backend.Dockerfile    # 后端镜像（构建上下文 = 仓库根目录）
@@ -53,13 +54,19 @@ docker compose up -d --build
 ```bash
 cd backend && cp .env.example .env
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt   # 已含可编辑安装 agentcode[fastapi]
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 cd frontend && npm install && npm run dev
 ```
 
 或使用 `./run.sh`、`./run_frontend.sh`。
+
+`./run.sh` 已自动注入 `PYTHONPATH`，可直接在后端中导入：
+
+```python
+from agentcode import AgentRuntime
+```
 
 ---
 

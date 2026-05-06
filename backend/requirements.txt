@@ -336,3 +336,4 @@ zipp==3.23.0
 zlib-state==0.1.10
 zstandard==0.25.0
 umap-learn>=0.5.3
+-e ../agentcode[fastapi]

@@ -1,5 +1,7 @@
 #!/bin/bash
-cd "$(dirname "$0")/backend"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/agentcode:${PYTHONPATH}"
+cd "${REPO_ROOT}/backend"
 
 # 启动后端服务
 echo "启动后端服务..."

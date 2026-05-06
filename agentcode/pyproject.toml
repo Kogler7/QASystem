@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentcode"
+version = "0.1.0"
+description = "Single-agent runtime aligned with Claude Code style loops."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2",
+  "httpx>=0.28.1",
+  "jsonschema>=4.26.0",
+]
+
+[project.optional-dependencies]
+fastapi = [
+  "fastapi>=0.111",
+]
+dev = [
+  "pytest>=8.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agentcode*"]
+
+[tool.setuptools.package-data]
+agentcode = ["skillsets/**/*.md", "examples/**/*.md"]

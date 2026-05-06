@@ -31,9 +31,12 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
 
 COPY backend/app ./backend/app
 COPY algorithm ./algorithm
+COPY agentcode ./agentcode
+
+RUN pip install --no-cache-dir -e '/app/agentcode[fastapi]'
 
 WORKDIR /app/backend
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/agentcode
 
 RUN mkdir -p data/documents data/preproc_output data/preproc_upload
 
