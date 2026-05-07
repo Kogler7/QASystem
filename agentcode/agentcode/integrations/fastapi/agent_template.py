@@ -8,6 +8,15 @@
 
 - AGENT_MCP_TIME_URL 或 MCP_BEIJING_TIME_URL：MCP 的 POST 入口，如 http://127.0.0.1:8765/mcp
 - AGENT_BEIJING_SKILL_PATH：可选，覆盖 skill 文件绝对路径；默认使用包内 skillsets/common/beijing_time.md
+
+工作流模板（``POST .../define``、``/plan``、``/match``）：问题定义 → 方案模型（含 ``steps``）→ **按步**组件匹配。
+问题分解默认不在路由中；编排层对 ``solution_model.steps`` 循环调用 ``/match``，body 为 ``{"step":{...}}``。
+
+- AGENT_WORKFLOW_MCP_URL / AGENT_WORKFLOW_MCP_SERVER_NAME / AGENT_WORKFLOW_TOOL_ALLOW：各阶段共用 MCP。
+- AGENT_DEFINE_SKILL_PATH、AGENT_PLAN_SKILL_PATH、AGENT_MATCH_SKILL_PATH：覆盖 skill（规划默认 ``solution_model.md``）。
+- AGENT_WORKFLOW_MAX_TURNS 等：预算；AGENT_WORKFLOW_TRACE_PATH：trace 路径。
+
+业务替换 ``workflow_pipeline`` 中 schema 与 ``skillsets/workflow/*.md`` 即可。
 """
 
 from __future__ import annotations
@@ -26,7 +35,16 @@ from pydantic import BaseModel
 
 from ...mcp import McpClient
 from ...models import DeliveryConfig, SessionConfig
-from ...profiles import build_beijing_time_config
+from ...profiles import (
+    build_beijing_time_config,
+    build_define_session_config,
+    build_match_session_config,
+    build_plan_session_config,
+    new_workflow_ids,
+    resolve_default_define_skill_path,
+    resolve_default_match_skill_path,
+    resolve_default_plan_skill_path,
+)
 from ...runtime import AgentRuntime
 from ...trace import JsonlTraceSink
 
@@ -36,6 +54,33 @@ logger = logging.getLogger(__name__)
 
 class AgentTemplateRequest(BaseModel):
     query: str
+
+
+class WorkflowDefineRequest(BaseModel):
+    """问题定义接口入参：自然语言问题。"""
+
+    question: str
+
+
+class WorkflowPlanRequest(BaseModel):
+    """方案规划：入参为问题模型 ``problem_model``；产出为 ``solution_model``（含 ``steps``）。"""
+
+    problem_model: dict[str, Any]
+
+
+class SolutionStepPayload(BaseModel):
+    """与方案模型中每一步一致；组件匹配接口每次传入一步。"""
+
+    objective: str
+    inputs: list[str]
+    outputs: list[str]
+    constraints: list[str]
+
+
+class WorkflowMatchRequest(BaseModel):
+    """组件匹配：对单个 ``step`` 调用；编排层对方案模型 ``steps`` 循环请求本接口。"""
+
+    step: SolutionStepPayload
 
 
 def _llm_config() -> dict[str, Any]:
@@ -370,13 +415,40 @@ def _call_template_agent(query: str):
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+def _workflow_trace_path() -> str:
+    return (os.getenv("AGENT_WORKFLOW_TRACE_PATH") or "/tmp/agentcode-workflow-trace.jsonl").strip()
+
+
+def _run_workflow_session(config: SessionConfig, user_message: str):
+    runtime = AgentRuntime(
+        llm_backend=_ConfiguredLLMBackend(),
+        mcp_client=McpClient(config=config),
+        trace_sink=JsonlTraceSink(path=_workflow_trace_path()),
+    )
+    return runtime.run_session(config=config, user_message=user_message)
+
+
+def _call_workflow_session(config: SessionConfig, user_message: str):
+    try:
+        return _run_workflow_session(config, user_message)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.get("/ping")
 async def agent_template_ping() -> dict[str, Any]:
     """
     连通性探测：若本接口返回 JSON 而非 HTML 404，说明请求已到达本 FastAPI 应用。
     `/brief` 等接口必须使用 **POST** + JSON body `{"query":"..."}`。
     """
-    return {"ok": True, "router": "agent-template", "hint": "POST /api/agent-template/brief with JSON body {\"query\":\"...\"}"}
+    return {
+        "ok": True,
+        "router": "agent-template",
+        "hint": (
+            "POST /api/agent-template/brief with JSON body {\"query\":\"...\"}; "
+            "workflow: /define, /plan, /match (per-step) — see module docstring"
+        ),
+    }
 
 
 @router.get("/config")
@@ -396,6 +468,16 @@ async def current_model_config() -> dict[str, Any]:
         "mcp_time_configured": bool(mcp_url),
         "mcp_time_tool_full_name": "time__get_beijing_time" if mcp_url else None,
         "beijing_skill_resolved": bool(_beijing_skill_path()),
+        "workflow_mcp_configured": bool((os.getenv("AGENT_WORKFLOW_MCP_URL") or "").strip()),
+        "workflow_define_skill_resolved": bool(
+            (os.getenv("AGENT_DEFINE_SKILL_PATH") or "").strip() or resolve_default_define_skill_path()
+        ),
+        "workflow_plan_skill_resolved": bool(
+            (os.getenv("AGENT_PLAN_SKILL_PATH") or "").strip() or resolve_default_plan_skill_path()
+        ),
+        "workflow_match_skill_resolved": bool(
+            (os.getenv("AGENT_MATCH_SKILL_PATH") or "").strip() or resolve_default_match_skill_path()
+        ),
     }
 
 
@@ -441,4 +523,131 @@ async def debug_result(body: AgentTemplateRequest) -> dict[str, Any]:
         "trace_ref": result.trace_ref,
         "warnings": result.warnings,
         "error": result.error.model_dump(mode="json") if result.error else None,
+    }
+
+
+@router.post("/define")
+async def workflow_define(body: WorkflowDefineRequest) -> dict[str, Any]:
+    """阶段一：问题定义。模板：单次 ``run_session``，返回 ``problem_model`` 占位结构。"""
+    question = body.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question 不能为空")
+
+    sid, tid = new_workflow_ids("wf-define")
+    cfg = build_define_session_config(session_id=sid, trace_id=tid)
+    define_input = json.dumps({"question": question}, ensure_ascii=False)
+    result = _call_workflow_session(cfg, define_input)
+
+    if result.status == "needs_human":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "stage": "define",
+                "message": "需要人工审批或输入",
+                "checkpoint_id": result.checkpoint_id,
+                "warnings": result.warnings,
+            },
+        )
+    if result.status != "ok":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "stage": "define",
+                "message": (result.error.message if result.error else "define failed"),
+                "error": result.error.model_dump(mode="json") if result.error else None,
+            },
+        )
+
+    payload = result.payload if isinstance(result.payload, dict) else {}
+    problem_model = payload.get("problem_model")
+    if not isinstance(problem_model, dict):
+        raise HTTPException(status_code=422, detail={"stage": "define", "message": "交付物缺少 problem_model"})
+
+    return {
+        "problem_model": problem_model,
+        "warnings": result.warnings,
+        "trace_ref": result.trace_ref,
+        "spent": result.spent,
+    }
+
+
+@router.post("/plan")
+async def workflow_plan(body: WorkflowPlanRequest) -> dict[str, Any]:
+    """阶段二：方案规划。入参问题模型，产出 ``solution_model``（``steps`` 供后续逐步 ``/match``）。"""
+    if not body.problem_model:
+        raise HTTPException(status_code=400, detail="problem_model 不能为空")
+
+    sid, tid = new_workflow_ids("wf-plan")
+    cfg = build_plan_session_config(session_id=sid, trace_id=tid)
+    plan_input = json.dumps({"problem_model": body.problem_model}, ensure_ascii=False)
+    result = _call_workflow_session(cfg, plan_input)
+
+    if result.status == "needs_human":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "stage": "plan",
+                "message": "方案规划需要人工审批或输入",
+                "checkpoint_id": result.checkpoint_id,
+                "warnings": result.warnings,
+            },
+        )
+    if result.status != "ok":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "stage": "plan",
+                "message": (result.error.message if result.error else "plan failed"),
+                "error": result.error.model_dump(mode="json") if result.error else None,
+            },
+        )
+
+    payload = result.payload if isinstance(result.payload, dict) else {}
+    solution_model = payload.get("solution_model")
+    if not isinstance(solution_model, dict):
+        raise HTTPException(status_code=422, detail={"stage": "plan", "message": "交付物缺少 solution_model"})
+    return {
+        "ok": True,
+        "solution_model": solution_model,
+        "warnings": result.warnings,
+        "trace_ref": result.trace_ref,
+        "spent": result.spent,
+    }
+
+
+@router.post("/match")
+async def workflow_match(body: WorkflowMatchRequest) -> dict[str, Any]:
+    """组件匹配：单步。入参 ``{"step":{objective, inputs, outputs, constraints}}``；对 ``solution_model.steps`` 逐项调用。"""
+    sid, tid = new_workflow_ids("wf-match")
+    cfg = build_match_session_config(session_id=sid, trace_id=tid)
+    payload_in = json.dumps({"step": body.step.model_dump()}, ensure_ascii=False)
+    result = _call_workflow_session(cfg, payload_in)
+
+    if result.status == "needs_human":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "stage": "match",
+                "message": "需要人工审批或输入",
+                "checkpoint_id": result.checkpoint_id,
+                "warnings": result.warnings,
+            },
+        )
+    if result.status != "ok":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "stage": "match",
+                "message": (result.error.message if result.error else "match failed"),
+                "error": result.error.model_dump(mode="json") if result.error else None,
+            },
+        )
+
+    payload = result.payload if isinstance(result.payload, dict) else {}
+    return {
+        "ok": True,
+        "component_match": payload.get("component_match"),
+        "warnings": result.warnings,
+        "trace_ref": result.trace_ref,
+        "spent": result.spent,
     }
