@@ -14,6 +14,9 @@ dependencies = [
   "jsonschema>=4.26.0",
 ]
 
+[project.scripts]
+agentcode = "agentcode.cli:main"
+
 [project.optional-dependencies]
 fastapi = [
   "fastapi>=0.111",
@@ -30,4 +33,4 @@ where = ["."]
 include = ["agentcode*"]
 
 [tool.setuptools.package-data]
-agentcode = ["skillsets/**/*.md", "examples/**/*.md"]
+agentcode = ["skillsets/**/*.md"]

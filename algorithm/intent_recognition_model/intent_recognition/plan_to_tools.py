@@ -7,6 +7,32 @@ from pathlib import Path
 import json
 from typing import Optional, Dict, List, Any
 import os
+import re
+
+# 自定义输出解析器，清理 Markdown 包裹
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.exceptions import OutputParserException
+
+class CleanedPydanticOutputParser(PydanticOutputParser):
+    """清理 Markdown 包裹的 Pydantic 输出解析器"""
+    def parse(self, text: str):
+        # 清理 Markdown 代码块
+        cleaned = text.strip()
+        # 移除 ```json 或 ``` 开头和结尾
+        cleaned = re.sub(r'^```json\n|^```\n|\n```$', '', cleaned, flags=re.MULTILINE)
+        cleaned = cleaned.strip()
+        try:
+            return super().parse(cleaned)
+        except Exception as e:
+            # 如果还是失败，尝试提取中间的 JSON
+            try:
+                # 查找 JSON 内容
+                json_match = re.search(r'\{[\s\S]*\}', cleaned, re.MULTILINE)
+                if json_match:
+                    return super().parse(json_match.group(0))
+            except:
+                pass
+            raise OutputParserException(f"解析失败: {str(e)}")
 
 #初始化工具类
 utils = utils()
@@ -62,10 +88,6 @@ class ToolInfo(BaseModel):
     confidence: float = Field(description="置信度")
     similar_options: List[Dict] = Field(default_factory=list, description="相似选项")
 
-class ToolMatch(BaseModel):
-    """工具列表模型"""
-    tools: list[ToolInfo] = Field(description="选择的工具信息列表")
-
 class ToolList(BaseModel):
     """工具列表模型"""
     tools: list[ToolInfo] = Field(description="选择的工具信息列表")
@@ -96,20 +118,21 @@ def plan_tool(step: dict):
     # 首先获取所有工具列表
     tools_content = get_all_tools()
     
-    # 使用 with_structured_output 来约束模型输出
-    structured_model = model.with_structured_output(ToolList)
+    # 使用自定义解析器
+    parser = CleanedPydanticOutputParser(pydantic_object=ToolList)
     
     # 构建提示词，让模型根据方案选择合适的工具和参数
+    format_instructions = parser.get_format_instructions()
     
     # 构建提示词
     prompt = f"""
     你是一个工具选择专家，任务是根据用户的方案列表从提供的工具列表中为每一个方案都选择最适合的工具，并为每个工具指定必要的参数描述。  
-    
+
     工具列表：
     {tools_content}
-    
+
     用户步骤：{step}
-    
+
     要求：
     1. 仔细分析用户输入的每个步骤，理解其核心需求和目标
     2. 对于每个步骤，从工具列表中选择最适合的工具
@@ -119,21 +142,26 @@ def plan_tool(step: dict):
     6. 如果有多个功能相似的工具，在 similar_options 字段中列出
     7. 确保返回的工具名称与工具列表中的完全一致
     8. 确保返回的参数结构符合 ToolList 模型的要求
-    
+
     输出格式要求：
     - 必须返回 ToolList 结构，包含 tools 列表
     - 每个 tool 包含 name、description、parameters、confidence 和 similar_options
     - parameters 必须是 Parameters 结构，包含 type、properties、required 和 additionalProperties
     - properties 是参数名称到 ParameterDefinition 的映射
     - 对于必填参数，必须在 required 列表中指定
-    
-    
-    请严格按照上述格式返回工具信息及其参数。
+    - 只输出纯 JSON，不要包含任何 Markdown 代码块（不要用 ``` 包裹）
+
+    {format_instructions}
     """
-    
+
     # 调用模型生成工具列表
     try:
-        result = structured_model.invoke([{"role": "user", "content": prompt}])
+        # 先让模型生成响应
+        response = model.invoke([{"role": "user", "content": prompt}])
+        
+        # 用自定义解析器解析
+        result = parser.parse(response.content if hasattr(response, 'content') else str(response))
+        
         # 将 ToolList 对象转换为正确的字典结构
         matches_list = []
         # 处理 tools 字段（模型定义的字段）
@@ -179,7 +207,7 @@ def plan_tool(step: dict):
         
         # 构建成功响应
         # 调用评估函数处理 ToolList 对象
-        final_results = evaluation_tool_list(matches_list)  
+        final_results = evaluation_tool_list(matches_list)
         
         return final_results
     except Exception as e:

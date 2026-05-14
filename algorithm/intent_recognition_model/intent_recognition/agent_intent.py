@@ -21,17 +21,9 @@ utils = utils()
 
 # 加载配置
 cfg = Config()
-api_key = cfg.api_key or "qwen"
+api_key = ""
 
 
-def _normalize_openai_base_url(base_url: str) -> str:
-    base_url = (base_url or "").rstrip("/")
-    version = (os.getenv("LLM_API_VERSION", "v1") or "v1").strip("/")
-    if not base_url:
-        return f"http://localhost:9999/{version}"
-    if base_url.endswith(f"/{version}"):
-        return base_url
-    return f"{base_url}/{version}"
 
 def retrival_tool(problem_model: str):
     """从意图向量数据库中检索相关意图"""
@@ -60,7 +52,7 @@ system_prompt = """
 
 
 model = ChatOpenAI(
-    base_url=_normalize_openai_base_url(cfg.llm_base_url),
+    base_url=cfg.llm_base_url,
     api_key=api_key,
     model=cfg.llm_model,
     temperature=0,

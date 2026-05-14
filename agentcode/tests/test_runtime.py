@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from unittest.mock import MagicMock
 
 from agentcode.errors import ErrorCode
-from agentcode.mcp import McpClient
 from agentcode.models import DeliveryConfig, HitlConfig, SessionConfig
 from agentcode.runtime import AgentRuntime
+from agentcode.tools.mcp_tools.tool_manager import ToolManager
 from agentcode.trace import JsonlTraceSink
 
 
@@ -19,14 +20,6 @@ class MockLLM:
         idx = min(self.calls, len(self._responses) - 1)
         self.calls += 1
         return self._responses[idx]
-
-
-class MockToolAdapter:
-    def list_tools(self) -> list[dict[str, Any]]:
-        return [{"name": "graph_search", "description": "mock", "input_schema": {"type": "object"}}]
-
-    def call_tool(self, name: str, arguments: dict[str, Any], timeout_s: int) -> dict[str, Any]:
-        return {"result": {"tool": name, "arguments": arguments, "answer": "station-A"}}
 
 
 def make_config() -> SessionConfig:
@@ -44,6 +37,24 @@ def make_config() -> SessionConfig:
         },
         tool_execution="sequential",
     )
+
+
+def _make_tool_manager() -> MagicMock:
+    tool_mgr = MagicMock(spec=ToolManager)
+    tool_mgr.list_tools.return_value = [
+        {"name": "graph__graph_search", "description": "mock", "input_schema": {"type": "object"}}
+    ]
+    tool_mgr.is_tool_allowed = ToolManager.is_tool_allowed
+    tool_mgr.call_many.return_value = [
+        {
+            "type": "tool_result",
+            "tool_use_id": "u1",
+            "name": "graph__graph_search",
+            "is_error": False,
+            "content": {"result": {"tool": "graph__graph_search", "arguments": {"q": "x"}, "answer": "station-A"}},
+        }
+    ]
+    return tool_mgr
 
 
 def test_delivery_reprompt_until_schema_satisfied(tmp_path):
@@ -64,7 +75,7 @@ def test_delivery_reprompt_until_schema_satisfied(tmp_path):
     )
     runtime = AgentRuntime(
         llm_backend=llm,
-        mcp_client=McpClient(config=config, adapters={"graph": MockToolAdapter()}),
+        tool_manager=_make_tool_manager(),
         trace_sink=JsonlTraceSink(str(tmp_path / "trace.jsonl")),
     )
     result = runtime.run_session(config, "q")
@@ -97,7 +108,7 @@ def test_hitl_pause_and_resume(tmp_path):
     )
     runtime = AgentRuntime(
         llm_backend=llm,
-        mcp_client=McpClient(config=config, adapters={"graph": MockToolAdapter()}),
+        tool_manager=_make_tool_manager(),
         trace_sink=JsonlTraceSink(str(tmp_path / "trace.jsonl")),
     )
     pending = runtime.run_session(config, "q")
@@ -146,7 +157,7 @@ def test_delivery_accepts_fenced_json_without_extra_llm_round(tmp_path):
     )
     runtime = AgentRuntime(
         llm_backend=llm,
-        mcp_client=McpClient(config=config, adapters={"graph": MockToolAdapter()}),
+        tool_manager=_make_tool_manager(),
         trace_sink=JsonlTraceSink(str(tmp_path / "trace.jsonl")),
     )
     result = runtime.run_session(config, "q")
@@ -168,7 +179,7 @@ def test_tool_policy_violation_returns_failed(tmp_path):
     config.tool_policy.allow = ["other__*"]
     runtime = AgentRuntime(
         llm_backend=llm,
-        mcp_client=McpClient(config=config, adapters={"graph": MockToolAdapter()}),
+        tool_manager=_make_tool_manager(),
         trace_sink=JsonlTraceSink(str(tmp_path / "trace.jsonl")),
     )
     result = runtime.run_session(config, "q")

@@ -3,16 +3,17 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
 from typing import Any
 
 from jsonschema import ValidationError, validate
 
 from .errors import ErrorCode, RuntimeErrorInfo
 from .interfaces import LLMBackend
-from .mcp import McpClient
+from .tools.mcp_tools.tool_manager import ToolManager
 from .memory import MemoryStore, NoopMemoryStore
 from .models import AgentState, FinalResult, SessionConfig
-from .skills import SkillLoader
+from .skillsets.loader import SkillLoader
 from .trace import JsonlTraceSink, TraceSink
 
 
@@ -20,16 +21,18 @@ class AgentRuntime:
     def __init__(
         self,
         llm_backend: LLMBackend,
-        mcp_client: McpClient,
+        tool_manager: ToolManager,
         trace_sink: TraceSink,
         memory_store: MemoryStore | None = None,
         skill_loader: SkillLoader | None = None,
+        on_tool_results: Callable[[list[dict[str, Any]], int], None] | None = None,
     ) -> None:
         self.llm_backend = llm_backend
-        self.mcp_client = mcp_client
+        self.tool_manager = tool_manager
         self.trace_sink = trace_sink
         self.memory_store = memory_store or NoopMemoryStore()
         self.skill_loader = skill_loader or SkillLoader()
+        self.on_tool_results = on_tool_results
 
     def run_session(self, config: SessionConfig, user_message: str) -> FinalResult:
         state = AgentState(
@@ -77,8 +80,14 @@ class AgentRuntime:
         return self._run_loop(config, state, checkpoint_id=checkpoint_id)
 
     def _run_loop(self, config: SessionConfig, state: AgentState, checkpoint_id: str | None = None) -> FinalResult:
-        tools = self.mcp_client.list_tools()
+        mcp_tools = self.tool_manager.list_tools()
+        if config.skills:
+            skill_tool_def = self.skill_loader.build_skill_tool_definition()
+            all_tools = mcp_tools + [skill_tool_def]
+        else:
+            all_tools = mcp_tools
         budget = config.budget
+        skill_name = self.skill_loader.skill_tool_name
         trace_ref = ""
         while True:
             if time.time() - state.started_at > budget.max_time_s:
@@ -97,12 +106,25 @@ class AgentRuntime:
 
             state.turn += 1
             started = time.time()
-            assistant = self.llm_backend.complete(state.messages, tools, cancel_token=None)
+            assistant = self.llm_backend.complete(state.messages, all_tools, cancel_token=None)
             state.messages.append(assistant)
             tool_calls = self._extract_tool_calls(assistant)
             duration_ms = int((time.time() - started) * 1000)
 
             if tool_calls:
+                skill_calls = [c for c in tool_calls if c.get("name") == skill_name]
+                mcp_calls = [c for c in tool_calls if c.get("name") != skill_name]
+
+                if skill_calls:
+                    skill_results = self._handle_skill_invocation(skill_calls)
+                    state.messages.append({"role": "user", "content": skill_results})
+                    if mcp_calls:
+                        tool_results = self._execute_tool_calls(config, state, mcp_calls)
+                        if isinstance(tool_results, FinalResult):
+                            return tool_results
+                        state.messages.append({"role": "user", "content": tool_results})
+                    continue
+
                 trace_ref = self._write_turn_trace(
                     state,
                     tool_calls=tool_calls,
@@ -188,8 +210,12 @@ class AgentRuntime:
         budget = config.budget
         allowed = config.tool_policy.allow
 
+        # ────────────────────────────────────────────────
+        # 1. 白名单校验：每个 tool_call 是否匹配 config.tool_policy.allow（fnmatch 通配符）
+        #   违规则返回 FinalResult(status="failed")
+        # ────────────────────────────────────────────────
         for call in tool_calls:
-            if not self.mcp_client.is_tool_allowed(call["name"], allowed):
+            if not self.tool_manager.is_tool_allowed(call["name"], allowed):
                 return self._fail(
                     state,
                     ErrorCode.CONSTRAINT_VIOLATION,
@@ -198,6 +224,11 @@ class AgentRuntime:
                     None,
                 )
 
+        # ────────────────────────────────────────────────
+        # 2. 重复动作检测：最近 N 次调用签名是否全部相同
+        #    签名格式: "{name}::{json.dumps(input)}"
+        #   违规则返回 FinalResult(status="failed")
+        # ────────────────────────────────────────────────
         repeated = self._detect_repeat_actions(state, tool_calls, budget.repeat_action_threshold)
         if repeated:
             return self._fail(
@@ -208,6 +239,10 @@ class AgentRuntime:
                 None,
             )
 
+        # ────────────────────────────────────────────────
+        # 3. HITL before_tool 门禁：如果配置了 gate="before_tool" 且工具匹配 tool_globs
+        #    保存检查点，返回 FinalResult(status="needs_human")
+        # ────────────────────────────────────────────────
         preapproved = bool(state.artifacts.pop("hitl_preapproved", False))
         if (
             not preapproved
@@ -224,17 +259,31 @@ class AgentRuntime:
                 checkpoint_id=checkpoint,
             )
 
+        # ────────────────────────────────────────────────
+        # 4. 工具预算检查：tool_calls_used + len(tool_calls) > max_tool_calls
+        # ────────────────────────────────────────────────
         if state.tool_calls_used + len(tool_calls) > budget.max_tool_calls:
             return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Tool call budget exceeded", "", None)
 
+        # ────────────────────────────────────────────────
+        # 5. ToolManager.call_many：实际执行工具调用
+        #    sequential: 逐个 call_tool  |  parallel: ThreadPoolExecutor 并发调用
+        # ────────────────────────────────────────────────
         state.tool_calls_used += len(tool_calls)
-        results = self.mcp_client.call_many(
+        started = time.time()
+        results = self.tool_manager.call_many(
             tool_calls,
             timeout_s=max(1, int(config.budget.max_time_s)),
             retries=budget.max_retries_per_tool,
             execution_mode=config.tool_execution,
         )
+        elapsed_ms = int((time.time() - started) * 1000)
+        if self.on_tool_results:
+            self.on_tool_results(results, elapsed_ms)
 
+        # ────────────────────────────────────────────────
+        # 6. HITL after_tool 门禁：工具执行后再次需要人工审批
+        # ────────────────────────────────────────────────
         if config.hitl and "after_tool" in config.hitl.gate and self._hitl_match(config, tool_calls):
             state.status = "awaiting_human"
             checkpoint = self._await_human(state, ErrorCode.HUMAN_INPUT_REQUIRED, "Post-tool approval required")
@@ -243,6 +292,35 @@ class AgentRuntime:
                 warnings=["Awaiting approval after tool execution"],
                 checkpoint_id=checkpoint,
             )
+        return results
+
+    def _handle_skill_invocation(self, skill_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
+        for call in skill_calls:
+            skill_id = (call.get("input", {}) or {}).get("skill", "")
+            call_id = call.get("id", "")
+            if not skill_id:
+                results.append({
+                    "type": "tool_result", "tool_use_id": call_id,
+                    "name": call.get("name", "Skill"), "is_error": True,
+                    "content": None, "error": "Missing required parameter: skill",
+                })
+                continue
+            try:
+                body = self.skill_loader.get_skill_body(skill_id)
+            except ValueError:
+                results.append({
+                    "type": "tool_result", "tool_use_id": call_id,
+                    "name": call.get("name", "Skill"), "is_error": True,
+                    "content": None,
+                    "error": f"Unknown skill: {skill_id}",
+                })
+                continue
+            results.append({
+                "type": "tool_result", "tool_use_id": call_id,
+                "name": call.get("name", "Skill"), "is_error": False,
+                "content": body,
+            })
         return results
 
     def _await_human(self, state: AgentState, code: ErrorCode, message: str) -> str:
@@ -357,11 +435,13 @@ class AgentRuntime:
 
     def _build_initial_messages(self, config: SessionConfig, user_message: str) -> list[dict[str, Any]]:
         skill_layers = self.skill_loader.resolve(config.skills)
+        metadata_text = self.skill_loader.build_metadata_text(config.skills)
         messages: list[dict[str, Any]] = []
         system_text = "\n\n".join(
             [
                 "You are a single-agent runtime executor.",
                 "Follow MCP-only tool usage and safety constraints.",
+                metadata_text,
                 *skill_layers["system"],
             ]
         ).strip()
@@ -403,12 +483,12 @@ def run_session(
     config: SessionConfig,
     user_message: str,
     llm_backend: LLMBackend,
-    mcp_client: McpClient,
+    tool_manager: ToolManager,
     trace_path: str,
 ) -> FinalResult:
     runtime = AgentRuntime(
         llm_backend=llm_backend,
-        mcp_client=mcp_client,
+        tool_manager=tool_manager,
         trace_sink=JsonlTraceSink(trace_path),
     )
     return runtime.run_session(config=config, user_message=user_message)

@@ -9,7 +9,7 @@ from .errors import RuntimeErrorInfo
 
 class McpServerConfig(BaseModel):
     name: str
-    transport: Literal["http", "stdio"]
+    transport: Literal["http", "streamable_http", "stdio", "sse"]
     url: str | None = None
     command: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
@@ -18,6 +18,8 @@ class McpServerConfig(BaseModel):
 
 class SkillRef(BaseModel):
     id: str
+    name: str = ""
+    description: str = ""
     path: str | None = None
     uri: str | None = None
     version: str | None = None
@@ -29,11 +31,11 @@ class ToolPolicy(BaseModel):
 
 
 class BudgetConfig(BaseModel):
-    max_turns: int = 8
-    max_tool_calls: int = 20
-    max_time_s: int = 120
+    max_turns: int = 30
+    max_tool_calls: int = 50
+    max_time_s: int = 1200
     max_retries_per_tool: int = 1
-    repeat_action_threshold: int = 3
+    repeat_action_threshold: int = 10
 
 
 class DeliveryConfig(BaseModel):
