@@ -18,11 +18,13 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 
 from .tools.mcp_tools.tool_manager import ToolManager
 from .models import SessionConfig, ToolPolicy
 from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
 from .skillsets.loader import SkillLoader
+from .interfaces import LLMBackend
 
 
 _C = {
@@ -52,7 +54,21 @@ def _dim(text: str) -> str:
 
 
 def _llm_env() -> dict[str, Any]:
-    """获取 LLM 环境变量。"""
+    """获取 LLM 环境变量。优先从 agentcode/.env 加载，其次是 backend/.env。"""
+    # 获取 agentcode 目录路径
+    agentcode_dir = os.path.dirname(os.path.dirname(__file__))
+    
+    # 优先加载 agentcode/.env
+    env_path = os.path.join(agentcode_dir, ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path, override=False)
+    
+    # 如果 agentcode/.env 不存在，尝试加载 backend/.env（保持向后兼容）
+    else:
+        backend_env_path = os.path.join(os.path.dirname(agentcode_dir), "backend", ".env")
+        if os.path.exists(backend_env_path):
+            load_dotenv(backend_env_path, override=False)
+    
     return {
         "base_url": (os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.deepseek.com").strip(),
         "api_key": (os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip(),
@@ -161,7 +177,7 @@ def _mcp_tools_to_openai(mcp_tools: list[dict[str, Any]]) -> list[dict[str, Any]
     return out
 
 
-class _StreamingLLM:
+class _StreamingLLM(LLMBackend):
     """流式 LLM 后端：逐 token 打印，同时返回完整 assistant 消息。"""
 
     def __init__(self) -> None:

@@ -11,6 +11,10 @@
         "information-get": {
             "transport": "streamable_http",
             "url": "http://10.126.62.88:51006/mcp"
+        },
+        "draw": {
+            "transport": "streamable_http",
+            "url": "http://10.126.62.88:8890/mcp"
         }
     }
 }

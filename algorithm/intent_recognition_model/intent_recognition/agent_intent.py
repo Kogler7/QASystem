@@ -15,13 +15,16 @@ import json
 import os
 import re
 from pydantic import ValidationError
-
+from dotenv import load_dotenv
+load_dotenv('backend/.env') 
 #初始化工具类
 utils = utils()
 
 # 加载配置
 cfg = Config()
-api_key = ""
+
+# 从环境变量读取 API Key，优先读取 LLM_API_KEY，其次是 OPENAI_API_KEY
+api_key = os.getenv("LLM_API_KEY") or ""
 
 
 
