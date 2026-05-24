@@ -15,6 +15,10 @@
         "draw": {
             "transport": "streamable_http",
             "url": "http://10.126.62.88:8890/mcp"
+        },
+        "plan": {
+            "transport": "streamable_http",
+            "url": "http://10.126.62.88:8892/mcp"
         }
     }
 }

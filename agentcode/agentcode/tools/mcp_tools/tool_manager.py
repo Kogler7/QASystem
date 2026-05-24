@@ -8,6 +8,7 @@ from typing import Any
 from ...errors import ErrorCode
 from .mcp import MCPToolWrapper
 from ...models import SessionConfig
+from ..base_tools import ShellTool
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,13 @@ class ToolManager:
         """
         self._config = config
         self._mcp_wrapper = MCPToolWrapper()
+        self._shell_tool = ShellTool()
         self._tool_map: dict[str, tuple[str, str]] = {}
         self._handlers: dict[str, Any] = {}
 
         self._mcp_wrapper.connect_all(config.mcp_servers)
         self._register_mcp_tools()
+        self._register_base_tools()
 
     def _register_mcp_tools(self) -> None:
         """将 MCPToolWrapper 已注册的工具导入本地 handler 字典和反向索引。
@@ -54,13 +57,25 @@ class ToolManager:
             if len(parts) == 2:
                 self._tool_map[tool_name] = (parts[0], parts[1])
 
+    def _register_base_tools(self) -> None:
+        """将内置基础工具（如命令行执行）注册到 handler 字典和反向索引。
+
+        与 _register_mcp_tools 采用相同的数据结构，确保 base tools
+        和 MCP tools 能够被 ToolManager 统一调度。
+        """
+        for tool_name, schema in self._shell_tool.get_tool_definitions().items():
+            self._handlers[tool_name] = self._shell_tool.get_tool_handlers()[tool_name]
+            parts = tool_name.split("__", 1)
+            if len(parts) == 2:
+                self._tool_map[tool_name] = (parts[0], parts[1])
+
     def list_tools(self) -> list[dict[str, Any]]:
         """获取所有可用工具的 schema 列表，供 LLM function calling 使用。
 
         Returns:
             工具描述列表，每个元素包含 ``name``、``description``、``input_schema`` 字段。
         """
-        return self._mcp_wrapper.get_tool_schemas()
+        return self._mcp_wrapper.get_tool_schemas() + self._shell_tool.get_tool_schemas()
 
     @staticmethod
     def is_tool_allowed(tool_name: str, allowlist: list[str]) -> bool:

@@ -14,7 +14,7 @@ if project_root not in sys.path:
 
 # 导入原有的意图识别模块
 try:
-    from algorithm.intent_recognition_model.intent_recognition.agent_intent import intent_recognition
+    from algorithm.intent_recognition_model.models.agent_intent import intent_recognition
 except ImportError:
     try:
         sys.path.insert(0, os.path.join(project_root, "algorithm", "intent_recognition_model"))

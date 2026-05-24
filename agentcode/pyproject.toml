@@ -17,10 +17,15 @@ dependencies = [
 
 [project.scripts]
 agentcode = "agentcode.cli:main"
+agentcode-api = "agentcode.api:main"
 
 [project.optional-dependencies]
 fastapi = [
   "fastapi>=0.111",
+]
+api = [
+  "fastapi>=0.111",
+  "uvicorn>=0.30",
 ]
 dev = [
   "pytest>=8.0",

@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 
-
 logger = logging.getLogger(__name__)
 
 _THIS = Path(__file__).resolve()
@@ -25,31 +24,9 @@ if _INTENT_ROOT.exists():
     if str(_INTENT_ROOT) not in sys.path:
         sys.path.insert(0, str(_INTENT_ROOT))
 
-_IntentRecognition = None
-_recognizer_instance = None
-
-
-def _get_intent_recognition():
-    global _IntentRecognition, _recognizer_instance
-    if _IntentRecognition is None:
-        try:
-            if str(_ROOT) not in sys.path:
-                sys.path.insert(0, str(_ROOT))
-            if str(_INTENT_ROOT) not in sys.path:
-                sys.path.insert(0, str(_INTENT_ROOT))
-            from intent_recognition.intent_app import IntentRecognition
-            _IntentRecognition = IntentRecognition
-        except Exception as e:
-            logger.warning("加载意图识别模块失败: %s", e)
-            raise
-    if _recognizer_instance is None:
-        _recognizer_instance = _IntentRecognition()
-    return _recognizer_instance
-
 
 def health() -> dict[str, Any]:
     try:
-        _get_intent_recognition()
         from ir_config.config import Config
 
         cfg = Config()
@@ -91,16 +68,10 @@ def _intent_query_text(problem_model: dict | str) -> str:
 
 
 def recognize(problem_model: dict | str) -> dict[str, Any]:
-    recognizer = _get_intent_recognition()
     query = _intent_query_text(problem_model)
     if not query:
         return {"data": {"error": "空查询"}}
-    result = recognizer.generate_result(query)
-    if hasattr(result, "model_dump"):
-        result = result.model_dump()
-    elif not isinstance(result, dict):
-        result = {"raw": str(result)}
-    return {"data": result}
+    return deep_recognize(problem_model)
 
 
 def deep_recognize(problem_model: dict|str) -> dict[str, Any]:
@@ -112,6 +83,7 @@ def deep_recognize(problem_model: dict|str) -> dict[str, Any]:
         "data": result
     }
 
+
 def get_plan(problem_model: dict) -> dict[str, Any]:
     from intent_recognition.plan_app import PlanApp
     plan_app = PlanApp()
@@ -121,6 +93,7 @@ def get_plan(problem_model: dict) -> dict[str, Any]:
         "info":"",
         "data": result
     }
+
 
 def get_tool_match(step: dict) -> dict[str, Any]:
     from intent_recognition.plan_to_tools import plan_tool

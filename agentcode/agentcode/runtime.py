@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from collections.abc import Callable
@@ -11,10 +12,11 @@ from jsonschema import ValidationError, validate
 from .errors import ErrorCode, RuntimeErrorInfo
 from .interfaces import LLMBackend
 from .tools.mcp_tools.tool_manager import ToolManager
-from .memory import MemoryStore, NoopMemoryStore
 from .models import AgentState, FinalResult, SessionConfig
 from .skillsets.loader import SkillLoader
 from .trace import JsonlTraceSink, TraceSink
+from .tools.base_tools.memory_tool import MemoryCompactor
+from .prompt import build_system_prompt
 
 
 class AgentRuntime:
@@ -23,16 +25,20 @@ class AgentRuntime:
         llm_backend: LLMBackend,
         tool_manager: ToolManager,
         trace_sink: TraceSink,
-        memory_store: MemoryStore | None = None,
         skill_loader: SkillLoader | None = None,
         on_tool_results: Callable[[list[dict[str, Any]], int], None] | None = None,
     ) -> None:
         self.llm_backend = llm_backend
         self.tool_manager = tool_manager
         self.trace_sink = trace_sink
-        self.memory_store = memory_store or NoopMemoryStore()
         self.skill_loader = skill_loader or SkillLoader()
         self.on_tool_results = on_tool_results
+        try:
+            self._compactor = MemoryCompactor()
+            self._compactor_threshold = int(os.environ.get("COMPACT_TOKEN_THRESHOLD", 100000))
+        except Exception:
+            self._compactor = None
+            self._compactor_threshold = 0
 
     def run_session(self, config: SessionConfig, user_message: str) -> FinalResult:
         state = AgentState(
@@ -44,42 +50,7 @@ class AgentRuntime:
         )
         return self._run_loop(config, state)
 
-    def resume(
-        self,
-        config: SessionConfig,
-        checkpoint_id: str,
-        decision: str,
-        edited_args: list[dict[str, Any]] | None = None,
-        user_message: str | None = None,
-    ) -> FinalResult:
-        state = self.memory_store.load_checkpoint(checkpoint_id)
-        if state.status != "awaiting_human":
-            return FinalResult(
-                status="failed",
-                error=RuntimeErrorInfo(
-                    code=ErrorCode.CONSTRAINT_VIOLATION,
-                    message="Checkpoint is not awaiting human decision",
-                ),
-            )
-        if decision == "reject":
-            return FinalResult(
-                status="failed",
-                error=RuntimeErrorInfo(
-                    code=ErrorCode.SESSION_CANCELLED,
-                    message="Human rejected this action",
-                ),
-                checkpoint_id=checkpoint_id,
-            )
-        if decision == "edited_args" and edited_args is not None:
-            state.pending_tool_calls = edited_args
-        if decision in {"approve", "edited_args"}:
-            state.artifacts["hitl_preapproved"] = True
-        if user_message:
-            state.messages.append({"role": "user", "content": [{"type": "text", "text": user_message}]})
-        state.status = "running"
-        return self._run_loop(config, state, checkpoint_id=checkpoint_id)
-
-    def _run_loop(self, config: SessionConfig, state: AgentState, checkpoint_id: str | None = None) -> FinalResult:
+    def _run_loop(self, config: SessionConfig, state: AgentState) -> FinalResult:
         mcp_tools = self.tool_manager.list_tools()
         if config.skills:
             skill_tool_def = self.skill_loader.build_skill_tool_definition()
@@ -91,9 +62,9 @@ class AgentRuntime:
         trace_ref = ""
         while True:
             if time.time() - state.started_at > budget.max_time_s:
-                return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Wall time exceeded", trace_ref, checkpoint_id)
+                return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Wall time exceeded", trace_ref)
             if state.turn >= budget.max_turns:
-                return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Turn budget exceeded", trace_ref, checkpoint_id)
+                return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Turn budget exceeded", trace_ref)
 
             pending_calls = state.pending_tool_calls
             if pending_calls:
@@ -101,11 +72,18 @@ class AgentRuntime:
                 state.pending_tool_calls = []
                 if isinstance(tool_results, FinalResult):
                     return tool_results
-                state.messages.append({"role": "user", "content": tool_results})
+                tool_msg = {"role": "tool", "content": tool_results}
+                state.messages.append(tool_msg)
                 continue
 
             state.turn += 1
             started = time.time()
+
+            if self._compactor is not None and self._compactor_threshold > 0:
+                estimated = self._compactor.estimate_tokens(state.messages)
+                if estimated > self._compactor_threshold:
+                    state.messages = self._compactor.auto_compact(state.messages)
+
             assistant = self.llm_backend.complete(state.messages, all_tools, cancel_token=None)
             state.messages.append(assistant)
             tool_calls = self._extract_tool_calls(assistant)
@@ -117,12 +95,15 @@ class AgentRuntime:
 
                 if skill_calls:
                     skill_results = self._handle_skill_invocation(skill_calls)
-                    state.messages.append({"role": "user", "content": skill_results})
+                    skill_msg = {"role": "user", "content": skill_results, "_agent_injected": True}
+                    state.messages.append(skill_msg)
                     if mcp_calls:
                         tool_results = self._execute_tool_calls(config, state, mcp_calls)
                         if isinstance(tool_results, FinalResult):
                             return tool_results
-                        state.messages.append({"role": "user", "content": tool_results})
+                        tool_msg = {"role": "tool", "content": tool_results}
+                        state.messages.append(tool_msg)
+                        continue
                     continue
 
                 trace_ref = self._write_turn_trace(
@@ -134,27 +115,9 @@ class AgentRuntime:
                 executed = self._execute_tool_calls(config, state, tool_calls)
                 if isinstance(executed, FinalResult):
                     return executed
-                state.messages.append({"role": "user", "content": executed})
+                tool_msg = {"role": "tool", "content": executed}
+                state.messages.append(tool_msg)
                 continue
-
-            if config.hitl and "before_finalize" in config.hitl.gate:
-                trace_ref = self._write_turn_trace(
-                    state,
-                    tool_calls=[],
-                    duration_ms=duration_ms,
-                    outcome="needs_human_before_finalize",
-                )
-                checkpoint = self._await_human(
-                    state,
-                    ErrorCode.HUMAN_INPUT_REQUIRED,
-                    "Finalize step requires human approval",
-                )
-                return FinalResult(
-                    status="needs_human",
-                    warnings=["Awaiting human approval before finalize"],
-                    checkpoint_id=checkpoint,
-                    trace_ref=trace_ref,
-                )
 
             payload, schema_error = self._validate_delivery(config, assistant)
             if schema_error:
@@ -165,27 +128,26 @@ class AgentRuntime:
                     outcome="delivery_invalid",
                     delivery_error=schema_error,
                 )
-                state.messages.append(
-                    {
-                        "role": "developer",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": (
-                                    "Delivery schema not satisfied. "
-                                    f"Please return JSON that matches schema. reason={schema_error}"
-                                ),
-                            }
-                        ],
-                    }
-                )
+                delivery_msg = {
+                    "role": "user",
+                    "_agent_injected": True,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Delivery schema not satisfied. "
+                                f"Please return JSON that matches schema. reason={schema_error}"
+                            ),
+                        }
+                    ],
+                }
+                state.messages.append(delivery_msg)
                 if state.turn >= budget.max_turns:
                     return self._fail(
                         state,
                         ErrorCode.DELIVERY_NOT_SATISFIED,
                         "Delivery schema not satisfied within budget",
                         trace_ref,
-                        checkpoint_id,
                     )
                 continue
 
@@ -201,7 +163,6 @@ class AgentRuntime:
                 payload=payload,
                 spent={"turns": state.turn, "tool_calls": state.tool_calls_used},
                 trace_ref=trace_ref,
-                checkpoint_id=checkpoint_id,
             )
 
     def _execute_tool_calls(
@@ -221,7 +182,6 @@ class AgentRuntime:
                     ErrorCode.CONSTRAINT_VIOLATION,
                     f"Tool not allowed by policy: {call['name']}",
                     "",
-                    None,
                 )
 
         # ────────────────────────────────────────────────
@@ -236,37 +196,16 @@ class AgentRuntime:
                 ErrorCode.REPEAT_ACTION_DETECTED,
                 "Detected repeated identical tool actions",
                 "",
-                None,
             )
 
         # ────────────────────────────────────────────────
-        # 3. HITL before_tool 门禁：如果配置了 gate="before_tool" 且工具匹配 tool_globs
-        #    保存检查点，返回 FinalResult(status="needs_human")
-        # ────────────────────────────────────────────────
-        preapproved = bool(state.artifacts.pop("hitl_preapproved", False))
-        if (
-            not preapproved
-            and config.hitl
-            and "before_tool" in config.hitl.gate
-            and self._hitl_match(config, tool_calls)
-        ):
-            state.status = "awaiting_human"
-            state.pending_tool_calls = tool_calls
-            checkpoint = self._await_human(state, ErrorCode.HUMAN_INPUT_REQUIRED, "Tool execution paused for approval")
-            return FinalResult(
-                status="needs_human",
-                warnings=["Awaiting approval before tool execution"],
-                checkpoint_id=checkpoint,
-            )
-
-        # ────────────────────────────────────────────────
-        # 4. 工具预算检查：tool_calls_used + len(tool_calls) > max_tool_calls
+        # 3. 工具预算检查：tool_calls_used + len(tool_calls) > max_tool_calls
         # ────────────────────────────────────────────────
         if state.tool_calls_used + len(tool_calls) > budget.max_tool_calls:
-            return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Tool call budget exceeded", "", None)
+            return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Tool call budget exceeded", "")
 
         # ────────────────────────────────────────────────
-        # 5. ToolManager.call_many：实际执行工具调用
+        # 4. ToolManager.call_many：实际执行工具调用
         #    sequential: 逐个 call_tool  |  parallel: ThreadPoolExecutor 并发调用
         # ────────────────────────────────────────────────
         state.tool_calls_used += len(tool_calls)
@@ -281,17 +220,6 @@ class AgentRuntime:
         if self.on_tool_results:
             self.on_tool_results(results, elapsed_ms)
 
-        # ────────────────────────────────────────────────
-        # 6. HITL after_tool 门禁：工具执行后再次需要人工审批
-        # ────────────────────────────────────────────────
-        if config.hitl and "after_tool" in config.hitl.gate and self._hitl_match(config, tool_calls):
-            state.status = "awaiting_human"
-            checkpoint = self._await_human(state, ErrorCode.HUMAN_INPUT_REQUIRED, "Post-tool approval required")
-            return FinalResult(
-                status="needs_human",
-                warnings=["Awaiting approval after tool execution"],
-                checkpoint_id=checkpoint,
-            )
         return results
 
     def _handle_skill_invocation(self, skill_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -322,11 +250,6 @@ class AgentRuntime:
                 "content": body,
             })
         return results
-
-    def _await_human(self, state: AgentState, code: ErrorCode, message: str) -> str:
-        state.status = "awaiting_human"
-        state.artifacts["await_reason"] = {"code": code.value, "message": message}
-        return self.memory_store.save_checkpoint(state)
 
     @staticmethod
     def _extract_tool_calls(assistant_message: dict[str, Any]) -> list[dict[str, Any]]:
@@ -388,19 +311,6 @@ class AgentRuntime:
             return payload, str(exc)
 
     @staticmethod
-    def _hitl_match(config: SessionConfig, tool_calls: list[dict[str, Any]]) -> bool:
-        if not config.hitl:
-            return False
-        if not config.hitl.tool_globs:
-            return True
-        import fnmatch
-
-        for call in tool_calls:
-            if any(fnmatch.fnmatch(call["name"], pattern) for pattern in config.hitl.tool_globs):
-                return True
-        return False
-
-    @staticmethod
     def _detect_repeat_actions(state: AgentState, tool_calls: list[dict[str, Any]], threshold: int) -> bool:
         history = state.artifacts.get("tool_signatures", [])
         for call in tool_calls:
@@ -434,30 +344,14 @@ class AgentRuntime:
         )
 
     def _build_initial_messages(self, config: SessionConfig, user_message: str) -> list[dict[str, Any]]:
-        skill_layers = self.skill_loader.resolve(config.skills)
-        metadata_text = self.skill_loader.build_metadata_text(config.skills)
         messages: list[dict[str, Any]] = []
-        system_text = "\n\n".join(
-            [
-                "You are a single-agent runtime executor.",
-                "Follow MCP-only tool usage and safety constraints.",
-                metadata_text,
-                *skill_layers["system"],
-            ]
-        ).strip()
-        developer_text = "\n\n".join(
-            [
-                "Respect session tool policy, budget and delivery schema.",
-                *skill_layers["developer"],
-            ]
-        ).strip()
-        task_text = "\n\n".join(skill_layers["task"]).strip()
+        system_text = build_system_prompt(
+            tool_manager=self.tool_manager,
+            skill_loader=self.skill_loader,
+            skills=config.skills,
+        )
         if system_text:
             messages.append({"role": "system", "content": [{"type": "text", "text": system_text}]})
-        if developer_text:
-            messages.append({"role": "developer", "content": [{"type": "text", "text": developer_text}]})
-        if task_text:
-            messages.append({"role": "developer", "content": [{"type": "text", "text": task_text}]})
         messages.append({"role": "user", "content": [{"type": "text", "text": user_message}]})
         return messages
 
@@ -467,7 +361,6 @@ class AgentRuntime:
         code: ErrorCode,
         message: str,
         trace_ref: str,
-        checkpoint_id: str | None,
     ) -> FinalResult:
         state.status = "failed"
         return FinalResult(
@@ -475,7 +368,6 @@ class AgentRuntime:
             error=RuntimeErrorInfo(code=code, message=message),
             spent={"turns": state.turn, "tool_calls": state.tool_calls_used},
             trace_ref=trace_ref or None,
-            checkpoint_id=checkpoint_id,
         )
 
 

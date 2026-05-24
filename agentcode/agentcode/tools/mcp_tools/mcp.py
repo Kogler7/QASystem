@@ -182,8 +182,7 @@ class MCPToolWrapper:
             return
 
         async def _connect() -> list[Any]:
-            tasks = []
-            for srv in servers:
+            async def _connect_one(srv: Any) -> Any:
                 cfg: dict[str, Any] = {"transport": srv.transport}
                 if srv.url:
                     cfg["url"] = srv.url
@@ -193,8 +192,13 @@ class MCPToolWrapper:
                     cfg["env"] = srv.env
                 if hasattr(srv, "headers") and srv.headers:
                     cfg["headers"] = srv.headers
-                tasks.append(connect_single_server(srv.name, cfg))
-            return await asyncio.gather(*tasks, return_exceptions=True)
+                try:
+                    return await connect_single_server(srv.name, cfg)
+                except BaseException as exc:
+                    return srv.name, exc
+
+            tasks = [_connect_one(srv) for srv in servers]
+            return await asyncio.gather(*tasks)
 
         loop = asyncio.new_event_loop()
         self._loop = loop
@@ -206,11 +210,13 @@ class MCPToolWrapper:
             raise
 
         for item in results:
-            if isinstance(item, Exception):
-                logger.error("MCP connection failed: %s", item)
+            if isinstance(item, tuple) and len(item) == 2 and isinstance(item[1], BaseException):
+                name, exc = item
+                logger.error("MCP server '%s': connection failed (%s): %s", name, type(exc).__name__, exc)
                 continue
             name, stack, session = item
             if stack is None or session is None:
+                logger.error("MCP server '%s': connection failed", name)
                 continue
 
             self._stacks[name] = stack

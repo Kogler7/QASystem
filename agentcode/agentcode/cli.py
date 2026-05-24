@@ -98,7 +98,7 @@ def _messages_to_openai(agent_messages: list[dict[str, Any]]) -> list[dict[str, 
             role = "system"
 
         """处理 tool_result 消息,解析工具调用结果。"""
-        if role == "user" and isinstance(content, list) and content:
+        if role in ("user", "tool") and isinstance(content, list) and content:
             if all(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
                 for b in content:
                     tid = (b.get("tool_use_id") or b.get("id") or "").strip()
@@ -138,7 +138,7 @@ def _messages_to_openai(agent_messages: list[dict[str, Any]]) -> list[dict[str, 
                 out.append(oa_msg)
                 continue
 
-        if role not in {"system", "user", "assistant"}:
+        if role not in {"system", "user", "assistant", "tool"}:
             continue
         if isinstance(content, list):
             text = "\n".join(b.get("text", "") for b in content if b.get("text")).strip()
@@ -311,13 +311,11 @@ class Conversation:
 
         from .runtime import AgentRuntime
         from .trace import NoopTraceSink
-        from .memory import NoopMemoryStore
 
         runtime = AgentRuntime(
             llm_backend=self.llm,
             tool_manager=self.tool_mgr,
             trace_sink=NoopTraceSink(),
-            memory_store=NoopMemoryStore(),
             skill_loader=self.skill_loader,
             on_tool_results=self._on_tool_results,
         )
@@ -375,10 +373,6 @@ class Conversation:
             err = result.error
             if err:
                 _cprint("red", f"\n  ✗ [{err.code.value}] {err.message}")
-        elif result.status == "needs_human":
-            _cprint("yellow", f"\n  ⚠ 需要人工审批")
-            for w in result.warnings or []:
-                _cprint("dim", f"    {w}")
 
     def clear(self) -> None:
         _cprint("dim", "对话已清除（每次查询均为独立会话）")

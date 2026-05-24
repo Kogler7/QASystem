@@ -1,12 +1,10 @@
 from ir_utils.search_plan import SearchPlan
-from intent_recognition.intent_app import IntentRecognition
-from intent_recognition.agent_intent import intent_recognition
+from models.agent_intent import intent_recognition
 import json
 
 class PlanApp:
     def __init__(self):
         self.search_plan = SearchPlan()
-        self.intent_app = IntentRecognition()
 
     def get_plan_from_intent(self, intent_id="", domain=""):
         """根据意图名称和域名称获取计划"""
