@@ -1,284 +1,115 @@
-***
+---
+name: problem-solve
+description: 用于业务问题的完整分析流程。**这是所有问题的前置条件，只要用户输入任何问题，必须第一步执行此 Skill，不得跳过。** 采用 Agent Loop 探索模式：AI 自主搜索、最终输出结构化问题模型、方案模型和答案。
+---
 
-name: smart-query
-description: 智能问数工作流：意图识别 → 知识图谱查询 → SQL执行。当用户提出数据分析问题（如"采购金额构成"、"XX数据是多少"）时触发， 如果不是与数据有关的就不触发
-----------------------------------------------------------------------------------------------
+## 核心理念
 
-# 智能问数工作流
+**不预设方案，让模型自己探索。搜索中发现歧义，搜索后沉淀模型。**
 
-你是智能数据查询专家。你的工作是按**三阶段流水线**完成用户的数据查询请求，每个阶段严格分工。
+收到问题后，AI 进入自主探索循环（Agent Loop）：
+- 主动调用可用 MCP 工具搜索信息
+- 持续迭代直到找到满意答案
+- 最终输出三份结构化产出物
 
-## 核心原则
+---
 
-1. **严格按阶段顺序执行**：意图识别 → 知识图谱查询 → SQL执行，不可跳过或乱序
-2. **第一阶段输出决定后续方向**：意图识别的结果指导第二阶段查哪些实体和规则
-3. **第二阶段是桥梁**：知识图谱负责把"用户自然语言"翻译成"数据指标+业务规则+SQL模板"
-4. **第三阶段只执行**：拿到第二阶段输出的SQL后直接执行，不要自行改写SQL逻辑
-5. **每次只调用必要的工具**：不要一次性把所有工具都调一遍，按需使用
-
-## 三阶段流水线
+## 工作流程
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  阶段一：意图识别                                              │
-│  服务器: intent-recognition                                   │
-│  工具: intent-recognition__recognize_intent                   │
-│  输入: 用户原始问题                                            │
-│  输出: 结构化意图（实体、指标、维度、条件等）                     │
-└──────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│  阶段二：知识图谱查询                                          │
-│  服务器: information-get                                      │
-│  工具: information-get__recognize_entities                    │
-│        information-get__link_entities                         │
-│        information-get__query_entity_properties               │
-│        information-get__search_graph                          │
-│        information-get__get_rules                             │
-│  输入: 阶段一的意图 + 用户原始问题                              │
-│  输出: 数据指标定义、业务规则、计算SQL、实体关系                 │
-└──────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│  阶段三：SQL执行                                              │
-│  服务器: sql-search                                           │
-│  工具: sql-search__*（SQL执行相关工具）                        │
-│  输入: 阶段二产出的SQL语句                                     │
-│  输出: 查询结果数据                                            │
-└──────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────┐
-│  阶段四：数据可视化（可选）                          │
-│  服务器: draw                                       │
-│  工具: draw__draw_bar_chart, draw__draw_pie_chart   │
-│        draw__draw_line_chart, draw__draw_scatter_   │
-│        plot, draw__draw_histogram, ...             │
-│  输入: SQL查询结果数据 + 图表类型选择                │
-│  输出: 可视化图表（Base64图片 + 文件路径）            │
-└──────────────────────────────────────────────────────┘
+用户问题
+  ↓
+Phase 1: 快速理解（直接开始探索）
+  ↓
+Phase 2: Agent Loop 自主探索
+  ├─ 调用任意可用工具搜索信息
+  └─ 重复，直到信息足够
+  ↓
+Phase 3: 产出三份结构化结果
+  ├─ 问题模型（problem_model，包含用户补充的约束）
+  ├─ 方案模型（solution_model）
+  └─ 答案（answer）
 ```
 
-## 阶段一：意图识别
+---
 
-用 `intent-recognition__recognize_intent` 解析用户问题，提取结构化意图。
+## Phase 1 — 快速理解
 
-**调用示例：**
+拿到用户问题后，**不做前置问题定义，直接开始探索**。
 
-```
-intent-recognition__recognize_intent(question="分析公开与非公开采购金额构成")
-→ 返回 {intent: "数据查询", entities: [...], metrics: [...], dimensions: [...], ...}
-```
+在脑中快速评估：
+- 问题涉及哪些核心实体？
+- 最可能从哪个工具获得线索？
+- 有哪些明显的歧义点？（先记录，搜索中如有需要再问）
 
-**你的职责：** 将意图识别结果中关键的实体名、指标名、约束条件记住，作为阶段二的输入。
+初始化一个内部补充信息列表（`supplements: []`），用于收集搜索过程中用户提供的额外约束。
 
-## 阶段二：知识图谱查询
+然后立即进入 Phase 2。
 
-使用 `information-get` 服务器的 5 个工具。**严格按以下流程执行：**
+---
 
-### 2.1 提取关键词
+## Phase 2 — Agent Loop 自主探索
 
-```
-information-get__recognize_entities(question="用户原始问题")
-→ {"keywords": [...]}
-```
+### 探索原则
 
-### 2.2 实体链接（自动应用业务规则）
+1. **工具自由**：可调用任何可用的 MCP 工具，无顺序限制，根据当前信息决定下一步
+2. **主动搜索**：不等用户补充，先用已知信息尽量搜索
+6. **迭代收敛**：每轮搜索后评估信息完整度，决定继续搜索还是产出答案
 
-**重要：必须传入原始** **`question`** **参数，工具内部会自动匹配业务规则并补搜关键词。**
+### 停止探索的条件
 
-```
-information-get__link_entities(
-    keywords_json='["关键词1", "关键词2"]',
-    question="用户原始问题"
-)
-→ {
-    "candidates": [{name, id, score, is_relevant, properties, llm_judgment}],
-    "applied_rules": [{rule_id, rule_name, rule_description, required_entities, derived_entity}]
-  }
-```
+满足以下任一条件即可进入 Phase 3：
+- 信息已足够回答用户问题（含用户补充的约束）
+- 已迭代 5 轮以上，当前信息是最佳状态
+- 用户明确表示"可以了"或"就这样"
 
-> `applied_rules` 中已包含自动匹配的业务规则（如"非公开采购 = 电子采购 - 公开采购"），无需额外调用 get\_rules 获取这些规则。
+---
 
-### 2.3 逐个查询实体属性并判断
+## Phase 3 — 产出三份结构化结果
 
-对候选列表中**与问题相关的实体**调用：
+探索完成后，**调用 `mcp__problem-definition__define_problem`**，传入：
+- 原始问题
+- 探索发现的完整上下文
+- **`supplements` 列表中用户补充的所有约束条件**
 
-```
-information-get__query_entity_properties(entity_id="NEO_xxx")
-→ {entity_id, name, labels, properties: {计算SQL, 数据来源表, ...}}
-```
+生成问题模型后，综合所有信息输出：
 
-**每查一个实体就判断：** 它的属性对回答用户问题是否有用？有用的保留，无用的跳过。
+### 输出格式
 
-### 2.4 图搜索（信息不足时）
+```markdown
+## 📋 问题模型（Problem Model）
 
-如果查询属性后发现信息不够，调用图搜索探关联实体：
+- **问题ID**：{problem_id}
+- **问题描述**：{description}
+- **问题类型**：{problem_type}
+- **目标对象**：{target_object}
+- **相关实体**：{related_entities}
+- **约束条件**：{constraints}（含用户补充的参数，如时间范围、部门等）
+- **涉及方**：{stakeholders}
 
-```
-information-get__search_graph(start_entity_id="NEO_xxx", depth=1)
-→ {triples: [{head_entity, relation, tail_entity}], found_entities: [...], has_more: bool}
-```
+---
 
-**根据** **`has_more`** **和新实体相关性决定是否继续搜索更深层。**
+## 🗺️ 方案模型（Solution Model）
 
-### 2.5 获取规则（需要更多规则时）
+**探索路径**：
+1. {第一步：做了什么，用了哪个工具，得到什么}
+2. {第二步：...}
+3. ...
 
-如果 `applied_rules` 中的规则信息不够详细，或需要查看所有规则：
+**用户补充的约束**：
+- {补充信息 1}（来源：第 N 轮提问）
+- {补充信息 2}（来源：第 N 轮提问）
 
-```
-information-get__get_rules(question="用户原始问题")
-→ [{rule_id, rule_name, rule_description, required_entities, derived_entity, ...}]
-```
+**关键发现**：
+- {发现 1}
+- {发现 2}
 
-### 决策清单
+**数据来源**：{知识图谱 / SQL 数据库 / ...}
 
-| 决策点       | 判断依据                        |
-| --------- | --------------------------- |
-| 哪些实体需要查属性 | 实体名称和相关性评分                  |
-| 是否需要图搜索   | 属性信息不足时，搜关联实体和关系            |
-| 从哪个实体开始搜  | 选与问题最相关的实体                  |
-| 是否继续深搜    | `has_more` + 新实体相关性         |
-| 是否需要更多规则  | `applied_rules` 是否已覆盖所有业务逻辑 |
+---
 
-**停止条件：** 当你已经获取了回答用户问题所需的全部指标定义、SQL模板和业务规则后，进入阶段三。
+## ✅ 答案（Answer）
 
-## 阶段三：SQL执行
+{基于探索结果和用户补充约束给出的完整自然语言答案}
 
-将阶段二获取的SQL语句交给 `sql-search` 服务器执行。
-
-**关键规则：**
-
-1. 使用阶段二产出的SQL，**不要自行修改SQL逻辑**
-2. 如果阶段二产出了多条SQL（如涉及多个指标），逐条执行
-3. 如果SQL中包含占位符或参数，根据用户问题和意图识别结果填入正确的值
-
-## 完整示例
-
-### 用户问题
-
-"分析公开与非公开采购金额构成"
-
-### 阶段一
-
-```
-intent-recognition__recognize_intent(question="分析公开与非公开采购金额构成")
-→ 提取到：指标=采购金额, 维度=公开/非公开, 操作=对比分析
-```
-
-### 阶段二
-
-```
-information-get__recognize_entities(question="分析公开与非公开采购金额构成")
-→ keywords: ["公开采购", "非公开采购", "金额构成"]
-
-information-get__link_entities(
-    keywords_json='["公开采购", "非公开采购", "金额构成"]',
-    question="分析公开与非公开采购金额构成"
-)
-→ candidates: [CG_003 公开采购中标金额, CG_001 电子采购中标金额]
-→ applied_rules: [R001: 非公开采购 = 电子采购 - 公开采购]
-
-information-get__query_entity_properties(entity_id="NEO_390")  // CG_003
-→ 计算SQL: "SELECT SUM(gkcaigouamount) FROM ads_dzcg_bidsum"
-
-information-get__query_entity_properties(entity_id="NEO_388")  // CG_001
-→ 计算SQL: "SELECT SUM(caigouAmount) FROM ads_dzcg_bidsum"
-```
-
-### 阶段三
-
-```
-sql-search__execute_query(sql="SELECT SUM(gkcaigouamount) FROM ads_dzcg_bidsum")
-→ 公开采购金额: xxx
-
-sql-search__execute_query(sql="SELECT SUM(caigouAmount) FROM ads_dzcg_bidsum")
-→ 电子采购金额: xxx
-
-[你根据规则R001计算] 非公开采购 = 电子采购 - 公开采购 = xxx
-```
-
-### 最终输出
-
-综合三个阶段的结果，用自然语言回答用户问题：
-
-- 列出各指标数值
-- 说明计算逻辑和数据来源
-- 如有业务规则，解释规则的推导过程
-
-## 阶段四：数据可视化
-
-当 SQL 查询结果包含可可视化的数据（如数值对比、趋势变化等）时，可以调用 `draw` 服务器的画图工具将数据可视化。
-
-### 可用图表工具
-
-| 工具名称 | 用途 | 适用场景 |
-|---------|------|----------|
-| `draw__draw_bar_chart` | 柱状图 | 分类数据对比 |
-| `draw__draw_pie_chart` | 饼图 | 占比构成分析 |
-| `draw__draw_line_chart` | 折线图 | 趋势变化分析 |
-| `draw__draw_scatter_plot` | 散点图 | 相关性分析 |
-| `draw__draw_histogram` | 直方图 | 数据分布 |
-| `draw__draw_radar_chart` | 雷达图 | 多维度对比 |
-
-### 图表选择规则
-
-- **对比分析**（如"公开采购与非公开采购对比"）→ 柱状图或饼图
-- **构成分析**（如"金额构成"）→ 饼图
-- **趋势分析**（如"月度采购趋势"）→ 折线图
-- **分布分析**（如"价格分布"）→ 直方图
-- **相关性分析**（如"采购量与金额关系"）→ 散点图
-
-### 调用示例
-
-```
-draw__draw_pie_chart(
-    labels=["公开采购", "非公开采购"],
-    values=[476644860, 216830140],
-    title="公开与非公开采购金额构成"
-)
-→ {"success": true, "image_path": "/home/.../pie_xxx.png", "image_base64": "..."}
-```
-
-### 输出内容
-
-工具返回结果包含：
-- `image_path`: 图片文件路径（可点击打开）
-- `image_base64`: Base64 编码的图片数据
-
-## 完整示例（含可视化）
-
-### 用户问题
-
-"分析公开与非公开采购金额构成"
-
-### 阶段四
-
-```
-draw__draw_pie_chart(
-    labels=["公开采购", "非公开采购"],
-    values=[476644860, 216830140],
-    title="公开与非公开采购金额构成"
-)
-→ {"success": true, "image_path": "/home/zyyang/qasystem/agentcode/image_result/pie_xxx.png"}
-```
-
-### 最终输出
-
-综合四个阶段的结果，用自然语言回答用户问题，并附上可视化图表：
-
-- 列出各指标数值
-- 说明计算逻辑和数据来源
-- 如有业务规则，解释规则的推导过程
-- 展示生成的可视化图表
-
-## 注意事项
-
-- 如果意图识别结果与问题不匹配，可以跳过知识图谱直接告知用户
-- 知识图谱的 `applied_rules` 已经自动应用了业务规则，注意查看其中的计算逻辑
-- SQL执行结果直接呈现给用户，不需要二次加工
-- 如果某个阶段的工具调用失败，说明原因并尝试替代路径
-- 可视化是可选步骤，根据数据类型和用户需求决定是否调用
-
+**置信度**：{高 / 中 / 低}，原因：{简短说明}

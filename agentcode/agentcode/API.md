@@ -7,14 +7,15 @@ agentcode 是一个 MCP Agent 运行时，提供智能问数和问题求解能�
 ## 目录
 
 - [1. 启动方式](#1-启动方式)
-- [2. 环境变量配置](#2-环境变量配置)
-- [3. API 端点一览](#3-api-端点一览)
-- [4. 请求参数详解](#4-请求参数详解)
-- [5. 响应格式](#5-响应格式)
-- [6. SSE 流式事件](#6-sse-流式事件)
-- [7. 错误码](#7-错误码)
-- [8. 使用示例](#8-使用示例)
-- [9. 架构说明](#9-架构说明)
+- [2. 并发模型](#2-并发模型)
+- [3. 环境变量配置](#3-环境变量配置)
+- [4. API 端点一览](#4-api-端点一览)
+- [5. 请求参数详解](#5-请求参数详解)
+- [6. 响应格式](#6-响应格式)
+- [7. SSE 流式事件](#7-sse-流式事件)
+- [8. 错误码](#8-错误码)
+- [9. 使用示例](#9-使用示例)
+- [10. 架构说明](#10-架构说明)
 
 ---
 
@@ -24,39 +25,122 @@ agentcode 是一个 MCP Agent 运行时，提供智能问数和问题求解能�
 
 ```bash
 cd agentcode
-pip install -e ".[api]"
+pip install -e ".[api]"        # API 服务（内嵌 worker，推荐）
+pip install -e ".[worker]"     # 独立 Worker（可选，仅高级部署需要）
 ```
 
-### 方式一：uvicorn 直接启动
+### 一键启动（推荐）
 
 ```bash
-uvicorn agentcode.api:app --host 0.0.0.0 --port 9180
+agentcode-api
 ```
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--host` | `0.0.0.0` | 绑定地址 |
-| `--port` | `9180` | HTTP 端口 |
-| `--reload` | 无 | 可选，开发模式自动重载 |
+服务启动后自动初始化 ToolManager 连接池并拉起工作线程，无需额外启动 worker 进程。
 
-### 方式二：CLI 入口启动
+```
+API worker: pool 4/4 就绪
+API worker: 发现 2 个 skill
+API worker: 4 个工作线程已启动, pool_size=4
+INFO:     Uvicorn running on http://0.0.0.0:9180
+```
+
+### CLI 参数
+
+| 参数 | 环境变量 | 默认值 | 说明 |
+|------|---------|--------|------|
+| `--host` | — | `0.0.0.0` | 绑定地址 |
+| `--port` | — | `9180` | HTTP 端口 |
+| `--workers` | `AGENT_API_WORKERS` | `1` | uvicorn worker 进程数（多进程模式需 Redis） |
+| `--concurrency` | `AGENT_WORKER_CONCURRENCY` | `4` | 每进程工作线程数 |
+| `--pool-size` | `AGENT_WORKER_POOL_SIZE` | `=concurrency` | ToolManager 连接池大小 |
+
+### 启动示例
 
 ```bash
-agentcode-api --host 0.0.0.0 --port 9180
+# 开发环境（单进程，可使用内存队列）
+agentcode-api
+
+# 单进程高并发
+agentcode-api --concurrency 8
+
+# 生产环境：2 进程 × 8 线程 = 16 并发（需 Redis）
+agentcode-api --workers 2 --concurrency 8
+
+# 高吞吐：4 进程 × 16 线程 = 64 并发（需 Redis）
+agentcode-api --workers 4 --concurrency 16
 ```
 
-### 验证服务已启动
+### 独立 Worker 模式（高级）
+
+API 和 Worker 分开部署时使用：
 
 ```bash
-curl http://localhost:9180/health
-# 返回: {"status":"ok"}
+# 终端 1：仅 HTTP 入队（无 worker 线程）
+AGENT_WORKER_CONCURRENCY=0 agentcode-api --port 9180
+
+# 终端 2：独立 worker 进程
+agentcode-worker --workers 2 --concurrency 8
 ```
+
+| 参数 | 环境变量 | 默认值 | 说明 |
+|------|---------|--------|------|
+| `--workers` | `AGENT_WORKER_WORKERS` | `1` | Worker 进程数 |
+| `--concurrency` | `AGENT_WORKER_CONCURRENCY` | `4` | 每进程工作线程数 |
+| `--pool-size` | `AGENT_WORKER_POOL_SIZE` | `=concurrency` | ToolManager 连接池大小 |
 
 ---
 
-## 2. 环境变量配置
+## 2. 并发模型
+
+### 默认模式（API 内嵌 worker）
+
+```
+agentcode-api --workers 2 --concurrency 8
+
+uvicorn 主进程
+  ├── API worker 进程 0 (pid=1001)
+  │     ├── lifespan → 初始化 ToolManagerPool × 8
+  │     ├── 线程 0: dequeue → borrow → execute → update → 循环
+  │     ├── 线程 1: dequeue → borrow → execute → update → 循环
+  │     ├── ...
+  │     └── 线程 7: dequeue → borrow → execute → update → 循环
+  │
+  ├── API worker 进程 1 (pid=1002)
+  │     ├── lifespan → 初始化 ToolManagerPool × 8
+  │     └── 线程 0..7 ...
+  │
+  └── 共享 Redis 队列（BLPOP 自动分发）
+```
+
+**总并发 = `--workers` × `--concurrency`**
+
+所有进程/线程竞争同一个 Redis 队列，无需额外协调。每个 uvicorn worker 进程独立管理自己的 ToolManager 连接池和工作线程，一个进程崩溃不影响其他。
+
+### 独立 Worker 模式（API 与 Worker 分离部署）
+
+```
+agentcode-api (仅 HTTP 入队，AGENT_WORKER_CONCURRENCY=0)
+     │
+     └── Redis 队列 ──┬── agentcode-worker --workers 2 --concurrency 8
+                      └── agentcode-worker --workers 2 --concurrency 8  (可再加)
+```
+
+适合需要独立扩缩 API 层和执行层的场景。
+
+### 队列选择
+
+| 模式 | 队列 | 说明 |
+|------|------|------|
+| 单进程 (`--workers 1`) | MemoryQueue 或 Redis | MemoryQueue 自动降级，进程重启丢失 |
+| 多进程 (`--workers >= 2`) | Redis（必需） | 跨进程共享，需设置 `TASK_STORE_REDIS_URL` |
+
+---
+
+## 3. 环境变量配置
 
 服务启动时优先加载 `agentcode/.env`，若不存在则回退到 `backend/.env`。
+
+### LLM 配置
 
 | 变量名 | 必需 | 默认值 | 说明 |
 |--------|------|--------|------|
@@ -69,7 +153,30 @@ curl http://localhost:9180/health
 | `AGENT_TEMPLATE_TEMPERATURE` | 否 | `0.2` | LLM 温度参数 |
 | `AGENT_TEMPLATE_MAX_TOKENS` | 否 | `4096` | LLM 单次最大输出 token |
 | `AGENT_TEMPLATE_TIMEOUT_SECONDS` | 否 | `120` | LLM API 调用超时（秒） |
-| `COMPACT_TOKEN_THRESHOLD` | 否 | `100000` | 触发上下文压缩的 token 阈值（运行时） |
+
+### 并发配置
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `AGENT_API_WORKERS` | `1` | API 服务的 uvicorn worker 进程数（`agentcode-api --workers`） |
+| `AGENT_WORKER_WORKERS` | `1` | 独立 Worker 进程数（`agentcode-worker --workers`） |
+| `AGENT_WORKER_CONCURRENCY` | `4` | 每进程工作线程数 |
+| `AGENT_WORKER_POOL_SIZE` | `=concurrency` | ToolManager 连接池大小 |
+
+### 队列/存储配置
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `TASK_STORE_REDIS_URL` | `redis://localhost:6379/0` | Redis 连接 URL（多进程模式必需） |
+| `TASK_STORE_KEY_PREFIX` | `agentcode:task` | Redis key 前缀 |
+| `TASK_STORE_TASK_TTL` | `86400` | 任务在 Redis 中的过期时间（秒） |
+| `TASK_STORE_MAX_QUEUE` | `50000` | 队列最大长度 |
+
+### 其他
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `COMPACT_TOKEN_THRESHOLD` | `100000` | 触发上下文压缩的 token 阈值 |
 
 ### .env 示例
 
@@ -80,6 +187,13 @@ LLM_MODEL=deepseek-v4-pro
 AGENT_TEMPLATE_TEMPERATURE=0.2
 AGENT_TEMPLATE_MAX_TOKENS=4096
 AGENT_TEMPLATE_TIMEOUT_SECONDS=120
+
+# 并发配置
+AGENT_WORKER_CONCURRENCY=8
+AGENT_WORKER_POOL_SIZE=8
+
+# Redis（多进程模式必需）
+TASK_STORE_REDIS_URL=redis://localhost:6379/0
 ```
 
 ### MCP 配置文件
@@ -123,21 +237,22 @@ MCP 配置文件格式：
 
 ---
 
-## 3. API 端点一览
+## 4. API 端点一览
 
 | 方法 | 路径 | Content-Type | 说明 |
 |------|------|-------------|------|
-| `GET` | `/health` | — | 健康检查 |
-| `POST` | `/v1/query` | `application/json` | 同步查询，返回完整结果 |
-| `POST` | `/v1/query/stream` | `application/json` | SSE 流式查询，实时返回 token/工具调用 |
+| `GET` | `/health` | — | 健康检查（含队列深度、worker 状态） |
+| `POST` | `/v1/query` | `application/json` | 提交异步任务，返回 202 + task_id |
+| `GET` | `/v1/task/{task_id}` | — | 查询任务状态 |
+| `GET` | `/v1/task/{task_id}/stream` | — | SSE 流式轮询任务状态 |
+
+`/v1/query` 只负责入队（<1ms），由内嵌工作线程消费队列并执行 Agent 循环。
 
 ---
 
-## 4. 请求参数详解
+## 5. 请求参数详解
 
 ### QueryRequest
-
-所有请求体字段：
 
 ```json
 {
@@ -147,9 +262,9 @@ MCP 配置文件格式：
   "mcp_config_path": "string|null (可选，默认加载内置 mcp_config.json)",
   "skill_ids": ["string (可选，过滤启用的 Skill)"],
   "tool_allowlist": ["string (可选，默认 [\"*\"])"],
-  "max_turns": "int (可选，默认 30)",
-  "max_tool_calls": "int (可选，默认 50)",
-  "max_time_s": "int (可选，默认 600)"
+  "max_turns": "int (可选，默认 50)",
+  "max_tool_calls": "int (可选，默认 70)",
+  "max_time_s": "int (可选，默认 1200)"
 }
 ```
 
@@ -161,9 +276,9 @@ MCP 配置文件格式：
 | `mcp_config_path` | `string\|null` | 否 | 内置配置 | MCP 配置文件路径，默认 `tools/mcp_tools/mcp_config.json` |
 | `skill_ids` | `list[string]` | 否 | `[]` | Skill 白名单过滤；为空则加载全部发现的 Skill |
 | `tool_allowlist` | `list[string]` | 否 | `["*"]` | 工具白名单（fnmatch 通配符），`["*"]` 表示全部允许 |
-| `max_turns` | `int` | 否 | `30` | 最大 LLM 对话轮数 |
-| `max_tool_calls` | `int` | 否 | `50` | 最大工具调用次数 |
-| `max_time_s` | `int` | 否 | `600` | 最大墙钟时间（秒） |
+| `max_turns` | `int` | 否 | `50` | 最大 LLM 对话轮数 |
+| `max_tool_calls` | `int` | 否 | `70` | 最大工具调用次数 |
+| `max_time_s` | `int` | 否 | `1200` | 最大墙钟时间（秒） |
 
 ### tool_allowlist 示例
 
@@ -180,19 +295,39 @@ MCP 配置文件格式：
 
 ---
 
-## 5. 响应格式
+## 6. 响应格式
 
 ### GET /health
 
 **响应 200：**
 
 ```json
-{"status": "ok"}
+{
+  "status": "ok",
+  "pid": 12345,
+  "queue_depth": 3,
+  "concurrency": 8,
+  "pool": {
+    "total": 8,
+    "in_use": 3,
+    "available": 5,
+    "total_errors": 0,
+    "total_borrows": 42
+  }
+}
 ```
+
+| 字段 | 说明 |
+|------|------|
+| `status` | 服务状态 |
+| `pid` | 当前响应请求的进程 ID（多 worker 时每次可能不同） |
+| `queue_depth` | 当前队列中等待处理的任务数 |
+| `concurrency` | 当前进程的工作线程数 |
+| `pool` | ToolManager 连接池状态（仅当前进程） |
 
 ---
 
-### POST /v1/query — 同步查询
+### POST /v1/query — 提交异步任务
 
 **请求示例：**
 
@@ -206,80 +341,84 @@ curl -X POST http://localhost:9180/v1/query \
   }'
 ```
 
-**响应 200 — 成功：**
+**响应 202 Accepted：**
 
 ```json
 {
-  "session_id": "sess-001",
-  "status": "ok",
-  "payload": { /* 交付数据，格式由 delivery schema 决定 */ },
-  "spent": {
-    "turns": 5,
-    "tool_calls": 8
-  },
-  "error": null
+  "task_id": "a1b2c3d4e5f6...",
+  "status": "queued",
+  "queue_position": 3
 }
 ```
 
-**响应 200 — 失败：**
+**响应 503 — 队列不可用：**
 
 ```json
-{
-  "session_id": "sess-001",
-  "status": "failed",
-  "payload": null,
-  "spent": {
-    "turns": 30,
-    "tool_calls": 50
-  },
-  "error": {
-    "code": "BUDGET_EXCEEDED",
-    "message": "Turn budget exceeded"
-  }
-}
+{"detail": "task_store unavailable: ..."}
 ```
-
-**响应 400 — 请求错误：**
-
-```json
-{"detail": "MCP config not found: /path/to/mcp.json"}
-```
-
-**响应 503 — MCP 连接失败：**
-
-```json
-{"detail": "MCP connection failed: ..."}
-```
-
-### QueryResponse 字段说明
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `session_id` | `string` | 会话 ID |
-| `status` | `"ok" \| "failed"` | 最终状态 |
-| `payload` | `any \| null` | 成功时的交付数据 |
-| `spent` | `object` | 消耗统计 |
-| `spent.turns` | `int` | LLM 调用轮数 |
-| `spent.tool_calls` | `int` | 工具调用总次数 |
-| `error` | `object \| null` | 失败时的错误信息 |
-| `error.code` | `string` | 错误码 |
-| `error.message` | `string` | 错误描述 |
 
 ---
 
-## 6. SSE 流式事件
+### GET /v1/task/{task_id} — 查询任务状态
 
-### POST /v1/query/stream — SSE 流式查询
+**响应 200 — 排队中：**
+
+```json
+{
+  "task_id": "a1b2c3d4...",
+  "status": "queued",
+  "created_at": "2026-05-23T10:00:00",
+  "updated_at": "2026-05-23T10:00:00",
+  "result": null,
+  "error": null,
+  "queue_position": 2
+}
+```
+
+**响应 200 — 执行完成：**
+
+```json
+{
+  "task_id": "a1b2c3d4...",
+  "status": "completed",
+  "created_at": "2026-05-23T10:00:00",
+  "updated_at": "2026-05-23T10:00:45",
+  "result": {
+    "payload": { /* 交付数据 */ },
+    "spent": {"turns": 5, "tool_calls": 8}
+  },
+  "error": null,
+  "queue_position": 0
+}
+```
+
+**响应 200 — 执行失败：**
+
+```json
+{
+  "task_id": "a1b2c3d4...",
+  "status": "failed",
+  "error": "BUDGET_EXCEEDED: Turn budget exceeded",
+  "result": null
+}
+```
+
+**响应 404 — 任务不存在：**
+
+```json
+{"detail": "task not found: a1b2c3d4..."}
+```
+
+---
+
+## 7. SSE 流式事件
+
+### GET /v1/task/{task_id}/stream — 流式轮询
 
 **请求示例：**
 
 ```bash
-curl -N -X POST http://localhost:9180/v1/query/stream \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_message": "查询上个月的故障率",
-    "max_turns": 20
-  }'
+curl -N http://localhost:9180/v1/task/a1b2c3d4/stream
 ```
 
 ### 响应头
@@ -292,112 +431,38 @@ curl -N -X POST http://localhost:9180/v1/query/stream \
 
 ### 事件类型
 
-共 6 种 SSE 事件类型，按典型收到顺序排列：
-
-#### (1) `token` — LLM 逐字输出
+#### `status` — 状态变更
 
 ```json
-event: token
-data: {"type":"token","data":"正在分析您的问题..."}
+event: status
+data: {"task_id":"a1b2c3d4","status":"queued","queue_position":3}
 ```
 
-收到 LLM 流式返回的每个文本片段。一个 assistant 消息由多个 token 事件组成。
+当任务状态从 queued → running → completed/failed 变化时推送。
 
-#### (2) `tool_call` — 工具调用
-
-```json
-event: tool_call
-data: {
-  "type": "tool_call",
-  "data": {
-    "calls": [
-      {
-        "name": "intent-recognition__recognize_intent",
-        "input": {"query": "查询上个月的故障率"}
-      }
-    ]
-  }
-}
-```
-
-LLM 决定调用工具时触发。`calls` 数组可能包含多个并发工具调用。
-
-#### (3) `tool_result` — 工具返回结果
-
-```json
-event: tool_result
-data: {
-  "type": "tool_result",
-  "data": {
-    "name": "intent-recognition__recognize_intent",
-    "is_error": false,
-    "content": "{\"intent\": \"fault_rate_query\", \"confidence\": 0.95}",
-    "elapsed_ms": 234
-  }
-}
-```
-
-工具执行完成后触发。`is_error: true` 表示工具调用失败。
-
-#### (4) `result` — Agent 最终结果
-
-```json
-event: result
-data: {
-  "type": "result",
-  "data": {
-    "status": "ok",
-    "payload": { /* 交付数据 */ },
-    "spent": {"turns": 5, "tool_calls": 8},
-    "error": null
-  }
-}
-```
-
-Agent loop 正常结束时触发。
-
-#### (5) `error` — 异常
+#### `error` — 任务不存在
 
 ```json
 event: error
-data: {"type":"error","data":"LLM API error 429: Rate limit exceeded"}
+data: {"error": "task not found"}
 ```
 
-LLM API 调用或运行时异常时触发。收到此事件后 SSE 流可能继续或终止。
-
-#### (6) `done` — 流结束
-
-```json
-event: done
-data: {}
-```
-
-SSE 流结束标志，此后无更多事件。
-
-### 完整 SSE 流时序图
+### 时序
 
 ```
-时间 →
-
-event: token      LLM 开始回答
-event: token      ...答案流式输出...
-event: token
-event: tool_call   LLM 决定调用工具
-event: tool_result 工具执行完成，返回结果
-event: token      LLM 基于工具结果继续回答
-event: token
-event: tool_call   LLM 再次调用工具
-event: tool_result
-event: token      最终答案
-event: result      最终结果（status/spent）
-event: done        流结束
+POST /v1/query                   → 202 + task_id（立刻）
+GET  /v1/task/{id}/stream        → 开始 SSE 连接
+  event: status  queued           ← 排队中
+  ... 2 秒后重新检查 ...
+  event: status  running          ← 开始执行
+  ... 2 秒后重新检查 ...
+  event: status  completed        ← 执行完成（data 含 result）
+  连接关闭
 ```
-
---- 一个 Agent loop 可能包含多轮 token→tool_call→tool_result 循环 —
 
 ---
 
-## 7. 错误码
+## 8. 错误码
 
 | 错误码 | 说明 | 触发条件 |
 |--------|------|---------|
@@ -405,135 +470,145 @@ event: done        流结束
 | `CONSTRAINT_VIOLATION` | 约束违规 | 尝试调用白名单之外的工具 |
 | `DELIVERY_NOT_SATISFIED` | 交付格式不符 | LLM 输出不满足 delivery JSON Schema |
 | `REPEAT_ACTION_DETECTED` | 重复操作 | 连续 N 次完全相同工具调用 |
-| `HTTP 400` | 请求错误 | MCP 配置不存在或格式错误 |
-| `HTTP 503` | 服务不可用 | 无法连接 MCP 服务器 |
+| `HTTP 404` | 任务不存在 | task_id 无效或已过期 |
+| `HTTP 503` | 队列不可用 | Redis 连接失败 + 内存队列未初始化 |
+| `HTTP 504` | 任务超时 | `/v1/query/wait` 等待超过 `max_time_s + 120` 秒 |
 
 ---
 
-## 8. 使用示例
+## 9. 使用示例
 
-### 8.1 同步查询
-
-```bash
-curl -X POST http://localhost:9180/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"user_message": "帮我查一下北京地铁1号线最近一周的故障情况"}'
-```
-
-### 8.2 流式查询
+### 9.1 提交任务 + 轮询结果
 
 ```bash
-curl -N -X POST http://localhost:9180/v1/query/stream \
+# 1. 提交任务
+TASK=$(curl -s -X POST http://localhost:9180/v1/query \
   -H "Content-Type: application/json" \
-  -d '{"user_message": "分析上半年各线路的故障趋势，画一张折线图", "max_turns": 50, "max_time_s": 300}'
+  -d '{"user_message": "帮我查一下北京地铁1号线最近一周的故障情况"}')
+TASK_ID=$(echo $TASK | python3 -c "import sys,json; print(json.load(sys.stdin)['task_id'])")
+echo "Task: $TASK_ID"
+
+# 2. 轮询直到完成
+while true; do
+  STATUS=$(curl -s http://localhost:9180/v1/task/$TASK_ID | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "Status: $STATUS"
+  [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ] && break
+  sleep 2
+done
+
+# 3. 获取最终结果
+curl -s http://localhost:9180/v1/task/$TASK_ID | python3 -m json.tool
 ```
 
-### 8.3 Python 客户端示例
+### 9.2 SSE 流式等待
+
+```bash
+curl -N http://localhost:9180/v1/task/$TASK_ID/stream
+```
+
+### 9.3 Python 客户端示例
 
 ```python
 import httpx
-import json
+import time
 
-# 同步查询
 def sync_query(message: str) -> dict:
-    with httpx.Client(timeout=120) as client:
-        resp = client.post(
-            "http://localhost:9180/v1/query",
-            json={"user_message": message},
-        )
-        return resp.json()
+    """提交任务并阻塞等待结果。"""
+    with httpx.Client(timeout=600) as client:
+        resp = client.post("http://localhost:9180/v1/query", json={"user_message": message})
+        task_id = resp.json()["task_id"]
 
-# 流式查询
+        while True:
+            resp = client.get(f"http://localhost:9180/v1/task/{task_id}")
+            info = resp.json()
+            if info["status"] in ("completed", "failed"):
+                return info
+            time.sleep(2)
+
 def stream_query(message: str):
-    with httpx.Client(timeout=300) as client:
-        with client.stream(
-            "POST",
-            "http://localhost:9180/v1/query/stream",
-            json={"user_message": message},
-        ) as resp:
-            for line in resp.iter_lines():
+    """SSE 流式等待。"""
+    with httpx.Client(timeout=600) as client:
+        resp = client.post("http://localhost:9180/v1/query", json={"user_message": message})
+        task_id = resp.json()["task_id"]
+
+        with client.stream("GET", f"http://localhost:9180/v1/task/{task_id}/stream") as stream:
+            for line in stream.iter_lines():
                 if line.startswith("event: "):
-                    event_type = line[7:]
+                    event = line[7:]
                 elif line.startswith("data: "):
-                    data = json.loads(line[6:])
-                    print(f"[{event_type}] {data}")
+                    print(f"[{event}] {line[6:]}")
 ```
-
-### 8.4 纯聊天模式（无 MCP 工具）
-
-如果请求中指定的 MCP 配置文件指向的服务器不可用，服务会自动降级为纯聊天模式，使用内置的 Skill 指令（如 `smart_query`）指导 LLM 工作流。
 
 ---
 
-## 9. 架构说明
+## 10. 架构说明
 
-### 9.1 请求处理流程
+### 10.1 请求处理流程（默认内嵌模式）
 
 ```
 HTTP 请求
   │
-  ├─ /health ─── 直接返回 {"status":"ok"}
+  ├─ GET /health ─── 返回 {"status":"ok", "pid":..., "concurrency":..., "pool":...}
   │
-  └─ /v1/query 或 /v1/query/stream
-       │
-       ├─ 1. 加载 MCP 配置 → 连接所有 MCP 服务器
-       ├─ 2. 发现并加载 Skill
-       ├─ 3. 构建系统提示词 (prompt.py)
-       ├─ 4. 创建 AgentRuntime
-       │     ├── LLMBackend (流式或同步)
-       │     ├── ToolManager (MCP + Shell)
-       │     └── SkillLoader
-       │
-       ├─ 5. Agent Runtime Loop
-       │     ┌─────────────────────────┐
-       │     │ while (budget 未超) {   │
-       │     │   LLM 推理              │
-       │     │   → 工具调用? 执行工具  │
-       │     │   → 最终答案? 返回结果  │
-       │     │   → token 超限? 压缩    │
-       │     │ }                      │
-       │     └─────────────────────────┘
-       │
-       └─ 6. 返回 FinalResult (同步) / SSE 流 (流式)
+  └─ POST /v1/query
+       └─ task_store.enqueue(task_id, request_data)  ← ~1ms
+            └─ Redis RPUSH / MemoryQueue append
+       └─ 202 {"task_id": "..."}
+
+                          ┌──────────────────────────────────────┐
+                          │  FastAPI lifespan 拉起的工作线程       │
+                          │                                      │
+                          │  线程 0: while not stop:             │
+                          │    task = task_store.dequeue()        │ ← Redis BLPOP
+                          │    pool.borrow(tm)                    │ ← 借 ToolManager
+                          │    AgentRuntime.run_session()         │ ← 执行 Agent 循环
+                          │    task_store.update()                │ ← 写回结果
+                          │                                      │
+                          │  线程 1..N: （同上，并发执行）         │
+                          └──────────────────────────────────────┘
+
+  GET /v1/task/{id}
+       └─ task_store.get(task_id)  ← Redis HGETALL / MemoryQueue dict
+       └─ 返回当前状态 + 结果
+
+  GET /v1/task/{id}/stream
+       └─ SSE 循环: task_store.get() 每 2 秒一次
+       └─ 状态变化时推送 event
 ```
 
-### 9.2 流式实现核心机制
+### 10.2 连接池模型
 
 ```
-FastAPI event loop (主线程)
+FastAPI lifespan (每 uvicorn worker 进程)
     │
-    ├─ run_in_executor ──→ 后台线程
-    │                       │
-    │                       ├─ QueueStreamingLLM.complete()
-    │                       │    │ 调用 LLM API (stream=True)
-    │                       │    │ 每收到 token → queue.put_nowait({"type":"token","data":...})
-    │                       │    ↓ 返回 assistant 消息
-    │                       │
-    │                       ├─ AgentRuntime._run_loop()
-    │                       │    │ 发送 tool_call 事件
-    │                       │    │ 执行工具 → on_tool_results 回调
-    │                       │    ↓ 下一轮 LLM.complete()...
-    │                       │
-    │                       └─ run_session() 结束 → queue.put_nowait(SENTINEL)
+    ├─ ToolManagerPool(size=N)      ← N = --pool-size
+    │     ├─ ToolManager[0]         ← MCP 连接 (所有配置的服务器)
+    │     ├─ ToolManager[1]
+    │     ├─ ...
+    │     └─ ToolManager[N-1]
     │
-    ├─ async for item in queue ──→ SSE event: token / tool_call / tool_result / result / error / done
-    │
-    └─ StreamingResponse(event_generator())
+    └─ borrow/return: 线程安全的 Condition 等待
+         线程 0 借 TM[0], 线程 1 借 TM[1], ...
+         用完归还, 下一个线程复用
 ```
 
-- `asyncio.Queue.put_nowait()` 是线程安全的，确保后台线程和主事件循环之间的数据传递
-- 工具调用事件来自 LLM 返回消息的解析
-- 工具结果事件来自 `AgentRuntime` 的 `on_tool_results` 回调
+### 10.3 降级策略
 
-### 9.3 相关文件
+| 组件 | 正常 | 降级 |
+|------|------|------|
+| task_store | Redis 队列（多进程共享） | MemoryQueue（单进程，进程重启丢失） |
+| ToolManager | 连接池 N 个 | 逐个创建（慢，但能跑） |
+| Worker | 内嵌线程（lifespan 管理） | 独立 `agentcode-worker` 进程（高级部署） |
+
+### 10.4 相关文件
 
 | 文件 | 职责 |
 |------|------|
-| `agentcode/api.py` | HTTP API 服务主体 |
-| `agentcode/runtime.py` | Agent 执行循环 |
+| `agentcode/api.py` | HTTP 网关 + lifespan 内嵌 worker 线程 |
+| `agentcode/worker.py` | 工作线程核心函数 + 独立 worker CLI |
+| `agentcode/pool.py` | ToolManager 连接池（线程安全） |
+| `agentcode/task_store.py` | 任务队列 + 状态存储（Redis / MemoryQueue） |
+| `agentcode/runtime.py` | Agent 执行循环（线程安全） |
 | `agentcode/prompt.py` | 系统提示词构建 |
-| `agentcode/models.py` | 数据模型（SessionConfig, FinalResult 等） |
-| `agentcode/interfaces.py` | LLMBackend / TraceSink 协议 |
-| `agentcode/tools/mcp_tools/tool_manager.py` | MCP 工具注册与调度 |
-| `agentcode/tools/mcp_tools/mcp_config.json` | MCP 服务器配置 |
-| `agentcode/skillsets/` | Skill 定义目录 |
+| `agentcode/models.py` | 数据模型 |
+| `agentcode/adapter.py` | LLM 消息格式适配 + 环境加载 |

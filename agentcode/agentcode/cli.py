@@ -25,6 +25,7 @@ from .models import SessionConfig, ToolPolicy
 from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
 from .skillsets.loader import SkillLoader
 from .interfaces import LLMBackend
+from .adapter import _load_env, _chat_completions_url, _default_mcp_path, _messages_to_openai, _mcp_tools_to_openai
 
 
 _C = {
@@ -53,135 +54,12 @@ def _dim(text: str) -> str:
     return f"{_C['dim']}{text}{_C['reset']}"
 
 
-def _llm_env() -> dict[str, Any]:
-    """获取 LLM 环境变量。优先从 agentcode/.env 加载，其次是 backend/.env。"""
-    # 获取 agentcode 目录路径
-    agentcode_dir = os.path.dirname(os.path.dirname(__file__))
-    
-    # 优先加载 agentcode/.env
-    env_path = os.path.join(agentcode_dir, ".env")
-    if os.path.exists(env_path):
-        load_dotenv(env_path, override=False)
-    
-    # 如果 agentcode/.env 不存在，尝试加载 backend/.env（保持向后兼容）
-    else:
-        backend_env_path = os.path.join(os.path.dirname(agentcode_dir), "backend", ".env")
-        if os.path.exists(backend_env_path):
-            load_dotenv(backend_env_path, override=False)
-    
-    return {
-        "base_url": (os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.deepseek.com").strip(),
-        "api_key": (os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip(),
-        "model": (os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "deepseek-v4-pro").strip(),
-        "temperature": float(os.getenv("AGENT_TEMPLATE_TEMPERATURE") or 0.2),
-        "max_tokens": int(os.getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),
-        "timeout_s": int(os.getenv("AGENT_TEMPLATE_TIMEOUT_SECONDS") or 120),
-    }
-
-
-def _chat_completions_url(base_url: str) -> str:
-    """根据 base_url 构建 chat/completions URL。"""
-    base = base_url.rstrip("/")
-    if base.endswith("/chat/completions"):
-        return base
-    if base.endswith("/v1"):
-        return f"{base}/chat/completions"
-    return f"{base}/v1/chat/completions"
-
-
-def _messages_to_openai(agent_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for msg in agent_messages:
-        role = (msg.get("role") or "user").strip().lower()
-        content = msg.get("content", [])
-        if role == "developer":
-            role = "system"
-
-        """处理 tool_result 消息,解析工具调用结果。"""
-        if role in ("user", "tool") and isinstance(content, list) and content:
-            if all(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-                for b in content:
-                    tid = (b.get("tool_use_id") or b.get("id") or "").strip()
-                    if b.get("is_error"):
-                        text = json.dumps({"error": b.get("error"), "error_code": b.get("error_code")}, ensure_ascii=False)
-                    else:
-                        payload = b.get("content")
-                        text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False) if payload else ""
-                    out.append({"role": "tool", "tool_call_id": tid, "content": text})
-                continue
-
-        """处理 assistant 消息,解析工具调用结果。"""
-        if role == "assistant" and isinstance(content, list):
-            tool_blocks = [b for b in content if isinstance(b, dict) and b.get("type") in ("tool_use", "tool-call")]
-            text_blocks = [b for b in content if isinstance(b, dict) and b.get("type") == "text"]
-            if tool_blocks:
-                tool_calls = []
-                for i, tb in enumerate(tool_blocks):
-                    call_id = (tb.get("id") or f"call_{i}").strip()
-                    fn_name = (tb.get("name") or "").strip()
-                    inp = tb.get("input")
-                    if isinstance(inp, str):
-                        try:
-                            inp = json.loads(inp)
-                        except json.JSONDecodeError:
-                            inp = {}
-                    elif not isinstance(inp, dict):
-                        inp = {}
-                    tool_calls.append({"id": call_id, "type": "function", "function": {"name": fn_name, "arguments": json.dumps(inp, ensure_ascii=False)}})
-                oa_msg: dict[str, Any] = {"role": "assistant", "tool_calls": tool_calls}
-                txt = "\n".join(b.get("text", "") for b in text_blocks if b.get("text")).strip()
-                if txt:
-                    oa_msg["content"] = txt
-                reasoning = msg.get("reasoning_content")
-                if reasoning:
-                    oa_msg["reasoning_content"] = reasoning
-                out.append(oa_msg)
-                continue
-
-        if role not in {"system", "user", "assistant", "tool"}:
-            continue
-        if isinstance(content, list):
-            text = "\n".join(b.get("text", "") for b in content if b.get("text")).strip()
-        elif isinstance(content, str):
-            text = content.strip()
-        else:
-            text = ""
-        if not text:
-            continue
-        oa_simple = {"role": role, "content": text}
-        reasoning = msg.get("reasoning_content")
-        if reasoning:
-            oa_simple["reasoning_content"] = reasoning
-        out.append(oa_simple)
-    return out
-
-
-def _mcp_tools_to_openai(mcp_tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """MCP 工具定义 → OpenAI Function Calling 格式。"""
-    out: list[dict[str, Any]] = []
-    for t in mcp_tools:
-        name = (t.get("name") or "").strip()
-        if not name:
-            continue
-        desc = (t.get("description") or "").strip() or name
-        params = t.get("input_schema") or t.get("inputSchema") or {"type": "object", "properties": {}}
-        if not isinstance(params, dict):
-            params = {"type": "object", "properties": {}}
-        for k in ("additionalProperties", "additional_properties", "$schema", "definitions", "$defs"):
-            params.pop(k, None)
-        if params.get("type") != "object":
-            params["type"] = "object"
-        if "properties" not in params or not isinstance(params["properties"], dict):
-            params["properties"] = {}
-        out.append({"type": "function", "function": {"name": name, "description": desc[:2048], "parameters": params}})
-    return out
-
 
 class _StreamingLLM(LLMBackend):
     """流式 LLM 后端：逐 token 打印，同时返回完整 assistant 消息。"""
 
     def __init__(self) -> None:
-        self.cfg = _llm_env()
+        self.cfg = _load_env()
         self.url = _chat_completions_url(self.cfg["base_url"])
 
     def stream_complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
@@ -378,18 +256,9 @@ class Conversation:
         _cprint("dim", "对话已清除（每次查询均为独立会话）")
 
 
-def _default_mcp_path() -> Path:
-    for candidate in [
-        Path(os.getenv("AGENT_MCP_CONFIG") or ""),
-        Path(__file__).resolve().parent / "tools" / "mcp_tools" / "mcp_config.json",
-    ]:
-        if candidate.is_file():
-            return candidate
-    return Path(os.getenv("AGENT_MCP_CONFIG") or "mcp_config.json")
-
 
 def _print_banner(config: SessionConfig, mcp_path: Path) -> None:
-    cfg = _llm_env()
+    cfg = _load_env()
     _cprint("bold", f"\n  agentcode v0.1.0  —  MCP Agent 运行时\n")
     _cprint("dim", f"  模型: {cfg['model']}  |  MCP: {mcp_path}  |  {len(config.mcp_servers)} 个服务\n")
     for s in config.mcp_servers:
@@ -464,7 +333,7 @@ def interactive_mode(config: SessionConfig, skill_loader: SkillLoader) -> None:
                             _cprint("dim", f"    路径: {sk.path}")
                         print()
             elif cmd == "/config":
-                cfg = _llm_env()
+                cfg = _load_env()
                 _cprint("dim", f"  模型: {cfg['model']}")
                 _cprint("dim", f"  地址: {cfg['base_url']}")
                 _cprint("dim", f"  MCP:  {_default_mcp_path()} ({len(config.mcp_servers)} 个服务)")

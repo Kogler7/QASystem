@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import time
 from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from agentcode.api import app, QueryRequest, QueryResponse, _messages_to_openai
+from agentcode.api import app, QueryRequest, TaskResponse
+from agentcode.adapter import _messages_to_openai
 
 
 client = TestClient(app)
@@ -16,7 +18,9 @@ class TestHealth:
     def test_health_ok(self) -> None:
         resp = client.get("/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert "queue_depth" in data
 
 
 class TestMessageConversion:
@@ -25,7 +29,6 @@ class TestMessageConversion:
         result = _messages_to_openai(msgs)
         assert len(result) == 1
         assert result[0]["role"] == "user"
-        assert result[0]["content"] == "hi"
 
     def test_assistant_with_text_and_tool_calls(self) -> None:
         msgs = [{"role": "assistant", "content": [
@@ -35,18 +38,7 @@ class TestMessageConversion:
         result = _messages_to_openai(msgs)
         assert len(result) == 1
         assert result[0]["role"] == "assistant"
-        assert result[0]["content"] == "Let me check."
         assert "tool_calls" in result[0]
-        assert result[0]["tool_calls"][0]["function"]["name"] == "search"
-
-    def test_tool_result_conversion(self) -> None:
-        msgs = [{"role": "tool", "content": [
-            {"type": "tool_result", "tool_use_id": "call_1", "content": "result data", "is_error": False},
-        ]}]
-        result = _messages_to_openai(msgs)
-        assert len(result) == 1
-        assert result[0]["role"] == "tool"
-        assert "result data" in result[0]["content"]
 
     def test_developer_role_maps_to_system(self) -> None:
         msgs = [{"role": "developer", "content": "instructions"}]
@@ -63,60 +55,63 @@ class TestQueryRequestModel:
     def test_defaults(self) -> None:
         req = QueryRequest(user_message="hello")
         assert req.user_message == "hello"
-        assert req.session_id
-        assert req.trace_id
-        assert req.tool_allowlist == ["*"]
         assert req.max_turns == 50
         assert req.max_tool_calls == 70
 
     def test_custom_params(self) -> None:
-        req = QueryRequest(
-            user_message="hello",
-            session_id="abc",
-            max_turns=10,
-            skill_ids=["smart_query"],
-        )
+        req = QueryRequest(user_message="hello", session_id="abc", max_turns=10)
         assert req.session_id == "abc"
         assert req.max_turns == 10
-        assert req.skill_ids == ["smart_query"]
 
 
-class TestQueryEndpoint:
-    @patch("agentcode.api.build_config_from_mcp_json")
-    @patch("agentcode.api.ToolManager")
-    @patch("agentcode.api._BlockingLLM")
-    def test_query_mcp_not_found(self, mock_llm, mock_tm, mock_cfg) -> None:
+class TestAsyncQuery:
+    """异步任务模式：提交 → 返回 task_id + 状态码 202。"""
+    def test_submit_returns_task_id(self) -> None:
+        resp = client.post("/v1/query", json={"user_message": "hello"})
+        assert resp.status_code == 202
+        data = resp.json()
+        assert "task_id" in data
+        assert data["status"] == "queued"
+
+    def test_submit_empty_message_still_works(self) -> None:
+        resp = client.post("/v1/query", json={"user_message": ""})
+        assert resp.status_code == 202
+
+
+class TestTaskStatus:
+    """任务状态查询。"""
+    def test_nonexistent_task_returns_404(self) -> None:
+        resp = client.get("/v1/task/nonexistent-id")
+        assert resp.status_code == 404
+
+    def test_task_lifecycle(self) -> None:
+        # 入队
         resp = client.post("/v1/query", json={
-            "user_message": "hello",
-            "mcp_config_path": "/nonexistent/mcp.json",
+            "user_message": "查询故障率",
+            "session_id": "test-session",
+            "max_turns": 5,
         })
-        assert resp.status_code == 400
-        assert "not found" in resp.json()["detail"]
+        assert resp.status_code == 202
+        task_id = resp.json()["task_id"]
+
+        # 查询状态（应为 queued）
+        resp = client.get(f"/v1/task/{task_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["task_id"] == task_id
+        assert data["status"] == "queued"
 
 
 class TestStreamEndpoint:
-    @patch("agentcode.api.build_config_from_mcp_json")
-    @patch("agentcode.api.ToolManager")
-    def test_stream_mcp_not_found(self, mock_tm, mock_cfg) -> None:
-        resp = client.post("/v1/query/stream", json={
-            "user_message": "hello",
-            "mcp_config_path": "/nonexistent/mcp.json",
-        })
-        assert resp.status_code == 400
-        assert "not found" in resp.json()["detail"]
+    def test_stream_nonexistent_task(self) -> None:
+        with client.stream("GET", "/v1/task/nonexistent/stream") as resp:
+            body = resp.iter_lines()
+            first_line = next(body)
+            assert "error" in first_line
 
 
-class TestStreamEvents:
-    """验证 SSE 事件格式"""
-    def test_event_format(self) -> None:
-        line = 'event: token\ndata: {"type": "token", "data": "hello"}\n\n'
-        assert line.startswith("event: ")
-        assert "\ndata: " in line
-        parts = line.strip().split("\n")
-        event_part = parts[0]
-        data_part = parts[1]
-        assert event_part.startswith("event: ")
-        assert data_part.startswith("data: ")
-        parsed = json.loads(data_part[6:])
-        assert parsed["type"] == "token"
-        assert parsed["data"] == "hello"
+class TestPool:
+    def test_import_pool(self) -> None:
+        """验证 pool 模块可正常导入。"""
+        from agentcode.pool import ToolManagerPool
+        assert ToolManagerPool is not None

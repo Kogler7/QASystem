@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
+import yaml
+
 from ..models import SkillRef
 
 _SKILL_TOOL_NAME = "Skill"
@@ -15,16 +17,15 @@ _SKILL_TOOL_DESCRIPTION = (
 )
 
 
-def _parse_frontmatter(text: str) -> dict[str, str]:
+def _parse_frontmatter(text: str) -> dict[str, Any]:
     m = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
     if not m:
         return {}
-    result: dict[str, str] = {}
-    for line in m.group(1).split("\n"):
-        if ":" in line:
-            key, _, val = line.partition(":")
-            result[key.strip()] = val.strip()
-    return result
+    try:
+        parsed = yaml.safe_load(m.group(1))
+        return parsed if isinstance(parsed, dict) else {}
+    except yaml.YAMLError:
+        return {}
 
 
 class SkillLoader:

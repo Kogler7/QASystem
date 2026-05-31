@@ -4,10 +4,6 @@
             "transport": "streamable_http",
             "url": "http://10.126.62.88:8889/mcp"
         },
-        "intent-recognition": {
-            "transport": "streamable_http",
-            "url": "http://10.126.62.88:8891/mcp"
-        },
         "information-get": {
             "transport": "streamable_http",
             "url": "http://10.126.62.88:51006/mcp"
@@ -15,10 +11,6 @@
         "draw": {
             "transport": "streamable_http",
             "url": "http://10.126.62.88:8890/mcp"
-        },
-        "plan": {
-            "transport": "streamable_http",
-            "url": "http://10.126.62.88:8892/mcp"
         }
     }
 }
