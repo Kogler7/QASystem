@@ -1,0 +1,282 @@
+"""本体驱动的 LLM 知识抽取（V2），不带模板匹配。
+
+参考：kg-extract-v7 的抽取方法 — LLM 直接读取 PUML 本体作为抽取 schema。
+直接使用 OpenAI SDK 调用 LLM。
+"""
+import json
+import logging
+import re
+import time
+from typing import Any, Optional
+
+from openai import OpenAI
+
+from .config import get_llm_config
+
+logger = logging.getLogger(__name__)
+
+
+# ── 通用抽取指令（参考 kg-extract-v7）──
+
+GENERIC_INSTRUCTION = """## 抽取规则
+
+你是知识图谱抽取专家。上方"本体定义"中的 PlantUML 类图就是你唯一的抽取 schema，请严格按本体定义抽取：
+
+### 实体抽取
+- 本体中每个 `class Xxx <<Stereotype>> #Color { ... }` 定义一个实体类型，**类名**即为实体 `type`
+- 类体中每个 `+属性名: 类型 // 注释` 即为该实体的属性字段，从文档中提取对应值填入 `properties`
+- 属性类型标注为 `String[]` 的用 JSON 数组表示，标注为 `Boolean` 的用 true/false
+- 文档中未提及的属性设为 null 或不包含在 properties 中
+- 可以根据文档结构（## 标题、|| 表格、// 段落、&& 小节等）识别内容边界，将对应内容映射到本体属性
+
+### 关系抽取
+- 本体中每条 `A "1" --> "B" : REL_NAME` 定义一个关系类型
+- relations 中每条记录的 `from_type`/`rel_type`/`to_type` 必须与本体定义的类名和关系名**完全一致**
+- `from_name`/`to_name` 使用实体的 name 属性值（或 @identity 标注的标识字段）
+- 从文档的层级结构推断父子归属关系
+- 从文档中的流程描述/关系表推断流程流转关系
+- 标注为"后处理建立"/"postprocess"的关系**跳过**，不在此阶段抽取
+
+### 输出要求
+- 只输出 JSON，不要任何解释、markdown 代码块或额外文字
+- 不要自创本体中不存在的类型、属性或关系名
+- 即使文档中某些字段缺失，也不要编造值"""
+
+
+def build_extraction_prompt(ontology: str, text: str) -> str:
+    """构建本体驱动的抽取 prompt（参考 kg-extract-v7 extract.py::build_prompt）。"""
+
+    # Extract @identity lines for entity matching
+    identity_hints = []
+    for line in ontology.split("\n"):
+        if "@identity" in line:
+            identity_hints.append(line.strip())
+    identity_text = "\n".join(identity_hints) if identity_hints else "所有类型默认用 name 属性作为 identity 标识"
+
+    return f"""你是一个知识图谱抽取专家。请根据以下本体定义，从文本中抽取实体和关系。
+
+## 本体定义
+{ontology}
+
+## 实体标识规则
+{identity_text}
+- relations 中的 from_name/to_name 必须填写实体的 identity 标识值
+- 若 identity 指定的属性值为空，回退使用实体的 name 属性值
+
+{GENERIC_INSTRUCTION}
+
+## 待抽取文本
+{text}
+
+## 输出格式
+{{
+  "entities": [
+    {{
+      "type": "本体中定义的类名",
+      "name": "实体标识值（按 @identity 规则）",
+      "properties": {{ "属性名": "属性值", ... }}
+    }}
+  ],
+  "relations": [
+    {{
+      "from_type": "源类名",
+      "from_name": "源实体标识值",
+      "rel_type": "本体中定义的关系名",
+      "to_type": "目标类名",
+      "to_name": "目标实体标识值"
+    }}
+  ]
+}}"""
+
+
+def extract_json_from_response(response: str) -> dict:
+    """从 LLM 响应中提取 JSON 对象（参考 kg-extract-v7 的 extract_json_from_response）。"""
+    response = (response or "").strip()
+    if not response:
+        return {}
+
+    # Remove markdown code fences
+    if response.startswith("```"):
+        lines = response.split("\n")
+        response = "\n".join(lines[1:]) if len(lines) > 1 else response
+        if response.endswith("```"):
+            response = response[:-3].rstrip()
+
+    # Find first { and last }
+    start = response.find("{")
+    end = response.rfind("}")
+    if start >= 0 and end > start:
+        response = response[start:end + 1]
+
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError as e:
+        logger.warning("JSON 解析失败: %s, 原始响应前 500 字符: %s", e, response[:500])
+        return {}
+
+
+def _entities_to_graph(extracted: dict) -> dict:
+    """
+    将抽取结果 { entities, relations } 转换为统一的 graph 结构：
+    { nodes: [...], relationships: [...] }
+    （不再需要 ontology_relations）
+    """
+    nodes = []
+    relationships = []
+
+    # Build uid → node lookup for dedup
+    node_index = {}
+
+    for entity in extracted.get("entities", []):
+        etype = entity.get("type", "Element")
+        ename = entity.get("name", "")
+        props = entity.get("properties", {}) or {}
+        if not isinstance(props, dict):
+            props = {}
+
+        uid = f"{etype}::{ename.lower()}" if ename else f"{etype}::{hash(json.dumps(props, sort_keys=True, default=str))}"
+
+        if uid not in node_index:
+            node = {
+                "uid": uid,
+                "label": etype,
+                "properties": {"name": ename, **props},
+            }
+            nodes.append(node)
+            node_index[uid] = node
+        else:
+            # Merge properties
+            node_index[uid]["properties"].update(props)
+
+    for rel in extracted.get("relations", []):
+        from_type = rel.get("from_type", "")
+        from_name = rel.get("from_name", "")
+        to_type = rel.get("to_type", "")
+        to_name = rel.get("to_name", "")
+        rel_type = rel.get("rel_type", "RELATED")
+
+        from_uid = f"{from_type}::{from_name.lower()}" if from_name else ""
+        to_uid = f"{to_type}::{to_name.lower()}" if to_name else ""
+
+        if from_uid and to_uid:
+            relationships.append({
+                "from_uid": from_uid,
+                "to_uid": to_uid,
+                "type": rel_type,
+            })
+
+    return {
+        "nodes": nodes,
+        "relationships": relationships,
+    }
+
+
+def _build_openai_client(
+    base_url: str = "",
+    api_key: str = "",
+) -> OpenAI:
+    """创建 OpenAI 客户端。"""
+    kwargs: dict = {}
+    if base_url:
+        kwargs["base_url"] = base_url
+    if api_key:
+        kwargs["api_key"] = api_key
+    else:
+        # openai 需要 api_key，传占位符避免报错（本地 vLLM 不校验）
+        kwargs["api_key"] = api_key or "not-needed"
+    return OpenAI(**kwargs)
+
+
+def extract_v2(
+    ontology: str,
+    text: str,
+    *,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+) -> dict[str, Any]:
+    """
+    本体驱动的知识抽取 V2（无模板匹配）。
+
+    参数：
+        ontology: PUML 本体文本
+        text: 待抽取文本
+        base_url: LLM API 地址，不传则使用环境变量
+        api_key: API 密钥，不传则使用环境变量
+        model: 模型名，不传则使用环境变量
+        max_tokens: 最大输出 token 数
+
+    返回：
+        {"raw": {...}, "graph": {"nodes": [...], "relationships": [...]}}
+    """
+    ontology = (ontology or "").strip()
+    text = (text or "").strip()
+
+    if not ontology:
+        raise ValueError("本体定义不能为空")
+    if not text:
+        return {
+            "raw": {},
+            "graph": {"nodes": [], "relationships": []},
+        }
+
+    cfg = get_llm_config()
+    base_url = base_url or cfg["base_url"]
+    api_key = api_key or cfg["api_key"]
+    model = model or cfg["model"]
+    max_tokens = max_tokens or cfg["max_tokens"]
+
+    logger.info(
+        "extract_v2: ontology_len=%d text_len=%d model=%s",
+        len(ontology), len(text), model,
+    )
+
+    # 构建 prompt
+    prompt = build_extraction_prompt(ontology, text)
+    system_msg = "你是一个知识图谱抽取专家。严格按照本体定义从文本中抽取实体和关系。只输出JSON，不要任何解释。"
+
+    t0 = time.perf_counter()
+
+    # 调用 LLM（直接使用 OpenAI SDK）
+    client = _build_openai_client(base_url=base_url, api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.1,
+            max_tokens=max_tokens,
+            timeout=180,
+        )
+        raw_response = response.choices[0].message.content or ""
+    except Exception as e:
+        logger.exception("LLM 调用失败")
+        return {
+            "raw": {},
+            "graph": {"nodes": [], "relationships": []},
+            "_error": str(e),
+        }
+
+    elapsed = time.perf_counter() - t0
+    logger.info("extract_v2: LLM call done in %.2fs, response_len=%d", elapsed, len(raw_response or ""))
+
+    # 解析 JSON
+    extracted = extract_json_from_response(raw_response)
+    if not extracted:
+        logger.warning("extract_v2: 未能从 LLM 响应中解析出 JSON")
+        return {
+            "raw": {},
+            "graph": {"nodes": [], "relationships": []},
+            "_raw_response": raw_response[:1000] if raw_response else "",
+        }
+
+    # 转换为图结构
+    graph = _entities_to_graph(extracted)
+
+    return {
+        "raw": extracted,
+        "graph": graph,
+    }

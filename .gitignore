@@ -155,3 +155,4 @@ repair_result.txt
 # =============================================================================
 gitignore/
 frontend/frontend_venv/
+.omc/

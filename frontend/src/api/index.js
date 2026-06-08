@@ -19,7 +19,7 @@ export {
 } from './modules/knowledge'
 
 // 组件管理：知识抽取、知识图谱更新、自然语言转 Cypher 等
-export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j, parseChunkedJsonExtract } from './modules/component'
+export { knowledgeExtract, extractHealthCheck, getUmlMainObjects, storeGraphToNeo4j, parseChunkedJsonExtract, uploadUmlAndParse, initKnowledgeSpace, getDimensionScales, knowledgeExtractV2, storeExtractionToNeo4j } from './modules/component'
 export {
   kgUpdateHealthCheck,
   kgUpdateAdd,

@@ -76,6 +76,43 @@ class SchemaMapper:
         if self.driver is not None:
             self.driver.close()
 
+    @staticmethod
+    def _is_primitive_value(val: Any) -> bool:
+        return val is None or isinstance(val, (str, int, float, bool))
+
+    @classmethod
+    def _sanitize_neo4j_property_value(cls, val: Any) -> Any:
+        """
+        Neo4j 属性值仅允许 primitive 或 primitive array。
+        对 dict / 复杂 list 统一 JSON 序列化，避免 CypherTypeError。
+        """
+        if cls._is_primitive_value(val):
+            return val
+        if isinstance(val, list):
+            if all(cls._is_primitive_value(item) for item in val):
+                return val
+            return json.dumps(val, ensure_ascii=False)
+        if isinstance(val, dict):
+            return json.dumps(val, ensure_ascii=False)
+        return str(val)
+
+    @classmethod
+    def _sanitize_neo4j_properties(cls, props: dict[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for k, v in (props or {}).items():
+            out[k] = cls._sanitize_neo4j_property_value(v)
+        return out
+
+    @staticmethod
+    def _sanitize_label_name(label: str) -> str:
+        cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in str(label or ""))
+        cleaned = cleaned.strip("_")
+        if not cleaned:
+            return "Element"
+        if cleaned[0].isdigit():
+            cleaned = f"L_{cleaned}"
+        return cleaned
+
     def _get_ontology_id(self, class_name):
         """查找本体节点 :Class {name: 'xxx'} 的 ID，带本地缓存。匹配时忽略大小写。"""
         key = (class_name or "").lower()
@@ -325,27 +362,41 @@ class SchemaMapper:
             for node in nodes:
                 uid = node.get("uid")
                 label = node.get("label") or "Element"
-                props = node.get("properties") or {}
+                props = self._sanitize_neo4j_properties(node.get("properties") or {})
+                labels = node.get("labels")
+                if not isinstance(labels, list) or len(labels) == 0:
+                    tags = node.get("properties", {}).get("tags")
+                    if isinstance(tags, list) and tags:
+                        labels = tags
+                if not isinstance(labels, list) or len(labels) == 0:
+                    labels = [label]
+                labels = [self._sanitize_label_name(x) for x in labels if str(x or "").strip()]
+                if "Element" not in labels:
+                    labels.insert(0, "Element")
+                is_uml_class_node = "Class" in labels
 
                 session.run(
                     "MERGE (n:Element {uid: $uid}) SET n += $props",
                     uid=uid,
                     props=props,
                 )
-                session.run(
-                    f"MATCH (n:Element {{uid: $uid}}) SET n:{label}",
-                    uid=uid,
-                )
-
-                cid = self._get_ontology_id(label)
-                if cid is not None:
+                for lb in labels:
                     session.run(
-                        "MATCH (c:Class) WHERE id(c) = $cid "
-                        "MATCH (i:Element {uid: $uid}) "
-                        "MERGE (i)-[:INSTANCE_OF]->(c)",
-                        cid=cid,
+                        f"MATCH (n:Element {{uid: $uid}}) SET n:{lb}",
                         uid=uid,
                     )
+
+                # UML 导入场景中，节点本身即 :Class，不再补 INSTANCE_OF 关系
+                if not is_uml_class_node:
+                    cid = self._get_ontology_id(label)
+                    if cid is not None:
+                        session.run(
+                            "MATCH (c:Class) WHERE id(c) = $cid "
+                            "MATCH (i:Element {uid: $uid}) "
+                            "MERGE (i)-[:INSTANCE_OF]->(c)",
+                            cid=cid,
+                            uid=uid,
+                        )
 
             # 再写关系
             for rel in relationships:
