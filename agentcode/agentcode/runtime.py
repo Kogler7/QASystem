@@ -89,6 +89,31 @@ class AgentRuntime:
             tool_calls = self._extract_tool_calls(assistant)
             duration_ms = int((time.time() - started) * 1000)
 
+            # 检测空响应（reasoning 模型可能耗尽 max_tokens 导致 content 为空）
+            if not tool_calls:
+                has_text = any(
+                    b.get("type") == "text" and b.get("text", "").strip()
+                    for b in (assistant.get("content") or [])
+                )
+                if not has_text:
+                    empty_count = state.artifacts.get("_empty_response_count", 0) + 1
+                    state.artifacts["_empty_response_count"] = empty_count
+                    if empty_count <= 2:
+                        retry_msg = {
+                            "role": "user", "_agent_injected": True,
+                            "content": [{"type": "text", "text": (
+                                "Your last response was empty (possibly due to output token limit). "
+                                "If you were about to call tools, do it now. "
+                                "If you were about to write a text answer, write it now."
+                            )}],
+                        }
+                        state.messages.append(retry_msg)
+                        continue
+                    return self._fail(
+                        state, ErrorCode.LLM_ERROR,
+                        "LLM returned empty response repeatedly", trace_ref,
+                    )
+
             if tool_calls:
                 skill_calls = [c for c in tool_calls if c.get("name") == skill_name]
                 mcp_calls = [c for c in tool_calls if c.get("name") != skill_name]

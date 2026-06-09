@@ -144,10 +144,6 @@ class ShellTool:
         nproc_limit: int = 50,
     ) -> None:
         self._allowed_commands = allowed_commands or []
-        if work_dir is None:
-            _ws = _Path(__file__).parent.parent.parent.parent / "workspace"
-            _ws.mkdir(parents=True, exist_ok=True)
-            work_dir = str(_ws)
         self._work_dir = work_dir
         self._timeout = timeout
         self._max_output_bytes = max_output_bytes

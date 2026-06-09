@@ -16,6 +16,7 @@ class ErrorCode(str, Enum):
     LOW_CONFIDENCE = "LOW_CONFIDENCE"
     BUDGET_EXCEEDED = "BUDGET_EXCEEDED"
     REPEAT_ACTION_DETECTED = "REPEAT_ACTION_DETECTED"
+    LLM_ERROR = "LLM_ERROR"
 
 
 class RuntimeErrorInfo(BaseModel):

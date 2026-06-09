@@ -63,19 +63,43 @@ from .worker import _process_one as _worker_process_one
 
 # ═══════════════════════════════════════════════════════
 # Worker 线程管理（模块级，由 lifespan 初始化/销毁）
+#
+# 并发层级:
+#   uvicorn --workers W   →  W 个 OS 进程（多进程）
+#   --concurrency C       →  每进程 C 个工作线程
+#   --pool-size P         →  每进程 P 个 ToolManager 连接
+#
+#   总并发 = W × C
+#   建议 C == P，避免线程抢连接或连接闲置
+#
+#   本模块管理的是「单个进程内」的线程和连接池。
+#   多进程由 uvicorn 内部 multiprocessing 负责，本模块不感知。
 # ═══════════════════════════════════════════════════════
 
 _worker_stop_event: threading.Event | None = None
 _worker_threads: list[threading.Thread] = []
 _worker_pool: ToolManagerPool | None = None
 
-# 可通过环境变量覆盖
+# 每进程的工作线程数（--concurrency / AGENT_WORKER_CONCURRENCY）
 _WORKER_CONCURRENCY = int(os.getenv("AGENT_WORKER_CONCURRENCY", "1"))
+
+# 每进程的 ToolManager 连接池大小（--pool-size / AGENT_WORKER_POOL_SIZE）
+# 默认等于 _WORKER_CONCURRENCY，保证每个线程配一个连接，无需排队
 _WORKER_POOL_SIZE = int(os.getenv("AGENT_WORKER_POOL_SIZE", str(_WORKER_CONCURRENCY)))
 
 
 def _start_workers() -> None:
-    """在 FastAPI 启动时初始化连接池并拉起工作线程。"""
+    """FastAPI 启动时回调（在本进程内只执行一次）。
+
+    1. 创建 ToolManagerPool × _WORKER_POOL_SIZE 个连接
+    2. 预扫描 skillsets/ 目录加载所有 Skill
+    3. 拉起 _WORKER_CONCURRENCY 个工作线程，共享上面的连接池
+
+    线程数 vs 连接数:
+      _WORKER_CONCURRENCY == _WORKER_POOL_SIZE  → 理想，一对一
+      _WORKER_CONCURRENCY  >  _WORKER_POOL_SIZE  → 多余线程在 borrow() 上排队等
+      _WORKER_CONCURRENCY  <  _WORKER_POOL_SIZE  → 多余连接闲置，浪费
+    """
     global _worker_stop_event, _worker_threads, _worker_pool
 
     mcp_path = str(_default_mcp_path())

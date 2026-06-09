@@ -13,7 +13,7 @@ SYNTHETIC_PREFIXES = ("<background-results>", "<inbox>", "<agent-injected>")
 
 DEFAULT_THRESHOLD = 8000
 DEFAULT_MODEL = "deepseek-chat"
-DEFAULT_TRANSCRIPT_DIR = "workspace/transcripts"
+DEFAULT_TRANSCRIPT_DIR = ""
 
 
 class MemoryCompactor:
@@ -60,11 +60,7 @@ class MemoryCompactor:
             self._client = OpenAI(base_url=base_url, api_key=api_key)
         self._model = model
 
-        if transcript_dir is None:
-            _ws = Path(__file__).parent.parent.parent.parent / DEFAULT_TRANSCRIPT_DIR
-            _ws.mkdir(parents=True, exist_ok=True)
-            transcript_dir = str(_ws)
-        self._transcript_dir = Path(transcript_dir)
+        self._transcript_dir = Path(transcript_dir) if transcript_dir else None
 
     def estimate_tokens(self, messages: list[dict[str, Any]]) -> int:
         """估算消息列表的 token 数。
@@ -179,12 +175,6 @@ class MemoryCompactor:
         Returns:
             压缩后的消息列表。
         """
-        self._transcript_dir.mkdir(parents=True, exist_ok=True)
-        transcript_path = self._transcript_dir / f"transcript_{int(time.time())}.jsonl"
-        with transcript_path.open("w", encoding="utf-8") as f:
-            for msg in messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
-
         system_msgs: list[dict[str, Any]] = []
         non_system_msgs: list[dict[str, Any]] = []
         for msg in messages:
@@ -227,7 +217,7 @@ class MemoryCompactor:
         compressed_msgs: list[dict[str, Any]] = [
             {
                 "role": "user",
-                "content": f"[Conversation compressed. Transcript: {transcript_path}]\n\n{summary}",
+                "content": f"[Conversation compressed.]\n\n{summary}",
             },
         ]
         return system_msgs + compressed_msgs + recent_msgs

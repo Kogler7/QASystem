@@ -134,26 +134,33 @@ class VisualizationExecutor:
 
     def line_chart(self, data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            labels = data.get('labels', [])
-            values = data.get('values', [])
+            x_data = data.get('x_data', [])
+            y_series = data.get('y_series', [])
             title = data.get('title', '')
             xlabel = data.get('xlabel', '')
             ylabel = data.get('ylabel', '')
-            
-            if not labels or not values:
-                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'line', 'error': 'Labels and values are required'}
-            
+            legends = data.get('legends', [])
+
+            if not x_data:
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'line', 'error': 'x_data is required'}
+            if not y_series or not any(y_series):
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'line', 'error': 'y_series is required'}
+
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.plot(labels, values, marker='o', linestyle='-', linewidth=2, color='#1f77b4')
-            
-            for i, value in enumerate(values):
-                ax.text(i, value, f'{value:,}', ha='center', va='bottom')
-            
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+            for idx, ys in enumerate(y_series):
+                color = colors[idx % len(colors)]
+                label = legends[idx] if idx < len(legends) else f'Series {idx+1}'
+                ax.plot(x_data, ys, marker='o', linestyle='-', linewidth=2, color=color, label=label)
+                for i, value in enumerate(ys):
+                    ax.text(i, value, f'{value:,}', ha='center', va='bottom', fontsize=8)
+
             ax.set_title(title)
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
+            ax.legend()
             ax.grid(True)
-            
+
             result = self._save_fig(fig, 'line')
             return {'success': True, 'image_base64': result['image_base64'], 'image_path': result['filepath'], 'filename': result['filename'], 'chart_type': 'line', 'error': ''}
         except Exception as e:
@@ -161,18 +168,19 @@ class VisualizationExecutor:
 
     def scatter_plot(self, data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            x_values = data.get('x_values', [])
-            y_values = data.get('y_values', [])
+            x_data = data.get('x_data', [])
+            y_data = data.get('y_data', [])
             title = data.get('title', '')
             xlabel = data.get('xlabel', '')
             ylabel = data.get('ylabel', '')
             colors = data.get('colors', '#1f77b4')
-            
-            if not x_values or not y_values:
-                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'scatter', 'error': 'X and Y values are required'}
-            
+            sizes = data.get('sizes', 100)
+
+            if not x_data or not y_data:
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'scatter', 'error': 'x_data and y_data are required'}
+
             fig, ax = plt.subplots(figsize=(8, 6))
-            ax.scatter(x_values, y_values, color=colors, s=100, alpha=0.7)
+            ax.scatter(x_data, y_data, color=colors, s=sizes, alpha=0.7)
             
             ax.set_title(title)
             ax.set_xlabel(xlabel)
@@ -209,23 +217,27 @@ class VisualizationExecutor:
 
     def area_chart(self, data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            labels = data.get('labels', [])
-            values = data.get('values', [])
+            x_data = data.get('x_data', [])
+            y_series = data.get('y_series', [])
             title = data.get('title', '')
             xlabel = data.get('xlabel', '')
             ylabel = data.get('ylabel', '')
-            
-            if not labels or not values:
-                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'area', 'error': 'Labels and values are required'}
-            
+            legends = data.get('legends', [])
+
+            if not x_data:
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'area', 'error': 'x_data is required'}
+            if not y_series or not any(y_series):
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'area', 'error': 'y_series is required'}
+
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.stackplot(labels, [values], labels=['Values'], alpha=0.5)
-            
+            series_labels = [legends[i] if i < len(legends) else f'Series {i+1}' for i in range(len(y_series))]
+            ax.stackplot(x_data, y_series, labels=series_labels, alpha=0.5)
+
             ax.set_title(title)
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.legend()
-            
+
             result = self._save_fig(fig, 'area')
             return {'success': True, 'image_base64': result['image_base64'], 'image_path': result['filepath'], 'filename': result['filename'], 'chart_type': 'area', 'error': ''}
         except Exception as e:
@@ -233,24 +245,31 @@ class VisualizationExecutor:
 
     def radar_chart(self, data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            labels = data.get('labels', [])
+            categories = data.get('categories', [])
             values = data.get('values', [])
             title = data.get('title', '')
-            
-            if not labels or not values:
-                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'radar', 'error': 'Labels and values are required'}
-            
-            angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
-            values += values[:1]
+            legends = data.get('legends', [])
+
+            if not categories or not values:
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'radar', 'error': 'categories and values are required'}
+
+            N = len(categories)
+            angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
             angles += angles[:1]
-            
+
             fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'polar': True})
-            ax.plot(angles, values, 'o-', linewidth=2)
-            ax.fill(angles, values, alpha=0.25)
-            
-            ax.set_thetagrids(np.degrees(angles[:-1]), labels)
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+            for idx, vs in enumerate(values):
+                vs = list(vs) + [vs[0]]
+                color = colors[idx % len(colors)]
+                label = legends[idx] if idx < len(legends) else f'Series {idx+1}'
+                ax.plot(angles, vs, 'o-', linewidth=2, color=color, label=label)
+                ax.fill(angles, vs, alpha=0.15, color=color)
+
+            ax.set_thetagrids(np.degrees(angles[:-1]), categories)
             ax.set_title(title, y=1.1)
-            
+            ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+
             result = self._save_fig(fig, 'radar')
             return {'success': True, 'image_base64': result['image_base64'], 'image_path': result['filepath'], 'filename': result['filename'], 'chart_type': 'radar', 'error': ''}
         except Exception as e:
@@ -279,18 +298,19 @@ class VisualizationExecutor:
 
     def bubble_chart(self, data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            x_values = data.get('x_values', [])
-            y_values = data.get('y_values', [])
+            x_data = data.get('x_data', [])
+            y_data = data.get('y_data', [])
             sizes = data.get('sizes', [])
             title = data.get('title', '')
             xlabel = data.get('xlabel', '')
             ylabel = data.get('ylabel', '')
-            
-            if not x_values or not y_values:
-                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'bubble', 'error': 'X and Y values are required'}
-            
+            colors = data.get('colors', '#1f77b4')
+
+            if not x_data or not y_data:
+                return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'bubble', 'error': 'x_data and y_data are required'}
+
             fig, ax = plt.subplots(figsize=(8, 6))
-            ax.scatter(x_values, y_values, s=sizes, alpha=0.5)
+            ax.scatter(x_data, y_data, s=sizes, c=colors, alpha=0.5)
             
             ax.set_title(title)
             ax.set_xlabel(xlabel)
