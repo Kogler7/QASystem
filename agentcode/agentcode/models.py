@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -76,3 +77,27 @@ class FinalResult(BaseModel):
     error: RuntimeErrorInfo | None = None
     spent: dict[str, Any] = Field(default_factory=dict)
     trace_ref: str | None = None
+
+
+class StreamEvent(BaseModel):
+    """SSE 常规事件。"""
+
+    type: str
+    data: dict[str, Any] = {}
+
+    def __str__(self) -> str:
+        payload = {"type": self.type, **self.data}
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+class StreamFirstEvent(BaseModel):
+    """SSE 首条 / 心跳。"""
+
+    model_config = {"extra": "allow"}
+
+    type: str
+
+    def __str__(self) -> str:
+        if self.type == "heartbeat":
+            return ": heartbeat\n\n"
+        return f"data: {self.model_dump_json(exclude_none=True)}\n\n"

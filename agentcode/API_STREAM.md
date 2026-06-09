@@ -1,0 +1,751 @@
+# AgentCode 流式 API 接口文档
+
+## 概述
+
+AgentCode 提供基于 HTTP + SSE（Server-Sent Events）的高并发异步 Agent 执行 API。核心架构为 **异步任务模型**：请求入队即返回 `task_id`，工作线程异步消费执行，客户端通过轮询或 SSE 订阅获取结果。
+
+- **默认端口**：`9180`
+- **Content-Type**：请求 `application/json`；SSE 响应 `text/event-stream`
+- **SSE 格式**：仅 ``data: <JSON>\n\n``，无 ``event:`` 前缀（事件类型由 ``data.type`` 字段区分）
+
+---
+
+## 端点总览
+
+| 方法   | 路径                        | 说明                               |
+| ------ | --------------------------- | ---------------------------------- |
+| `GET`  | `/health`                   | 健康检查（含队列深度、并发状态）   |
+| `POST` | `/v1/query`                 | 提交异步任务，立即返回 `task_id`   |
+| `GET`  | `/v1/task/{task_id}`        | 查询任务状态与结果                 |
+| `GET`  | `/v1/task/{task_id}/stream` | SSE 流式订阅任务执行事件           |
+
+---
+
+## 1. 健康检查
+
+### `GET /health`
+
+返回服务健康状态、当前队列堆积量、工作并发数、连接池状态。
+
+**响应示例**：
+
+```json
+{
+  "status": "ok",
+  "pid": 12345,
+  "queue_depth": 3,
+  "concurrency": 4,
+  "pool": {
+    "total": 4,
+    "available": 2,
+    "borrowed": 2
+  }
+}
+```
+
+| 字段            | 类型   | 说明                       |
+| --------------- | ------ | -------------------------- |
+| `status`        | string | 服务状态，正常为 `"ok"`    |
+| `pid`           | int    | 当前进程 ID                |
+| `queue_depth`   | int    | 当前队列中等待处理的任务数 |
+| `concurrency`   | int    | 每进程工作线程数           |
+| `pool`          | object | ToolManager 连接池统计     |
+| `pool.total`    | int    | 连接池总大小               |
+| `pool.available` | int   | 当前可用连接数             |
+| `pool.borrowed` | int    | 当前被借出的连接数         |
+
+---
+
+## 2. 提交异步任务
+
+### `POST /v1/query`
+
+提交任务到队列，**立即返回** `task_id`（HTTP 202），不等待 Agent 执行完成。客户端应随后轮询 `/v1/task/{task_id}` 或订阅 SSE 流。
+
+**请求体** (`QueryRequest`)：
+
+```json
+{
+  "user_message": "帮我查询最近一周的故障率趋势",
+  "session_id": "abc123",
+  "trace_id": "trace-xyz",
+  "mcp_config_path": null,
+  "skill_ids": [],
+  "tool_allowlist": ["*"],
+  "max_turns": 50,
+  "max_tool_calls": 70,
+  "max_time_s": 1200
+}
+```
+
+| 字段               | 类型          | 必填 | 默认值                | 说明                                          |
+| ------------------ | ------------- | ---- | --------------------- | --------------------------------------------- |
+| `user_message`     | string        | 是   | —                     | 用户输入的自然语言消息                        |
+| `session_id`       | string        | 否   | 自动生成 UUID         | 会话标识，用于关联多轮对话                    |
+| `trace_id`         | string        | 否   | 自动生成 UUID         | 链路追踪 ID                                   |
+| `mcp_config_path`  | string\|null  | 否   | `null`（使用默认路径） | MCP 配置文件路径                              |
+| `skill_ids`        | string[]      | 否   | `[]`（全部可用）      | 限定启用的 Skill ID 列表，空数组表示全部启用  |
+| `tool_allowlist`   | string[]      | 否   | `["*"]`               | 工具白名单，`["*"]` 表示允许所有工具          |
+| `max_turns`        | int           | 否   | `50`                  | 最大对话轮次（LLM 调用次数）上限              |
+| `max_tool_calls`   | int           | 否   | `70`                  | 最大工具调用次数上限                          |
+| `max_time_s`       | int           | 否   | `1200`                | 单任务最大执行时长（秒），超时返回 504        |
+
+**最简请求**（仅需 `user_message`，其余使用默认值）：
+
+```json
+{
+  "user_message": "你好，请帮我分析数据"
+}
+```
+
+**响应** (HTTP 202)：
+
+```json
+{
+  "task_id": "a1b2c3d4e5f6...",
+  "status": "queued",
+  "queue_position": 3
+}
+```
+
+| 字段             | 类型   | 说明                                |
+| ---------------- | ------ | ----------------------------------- |
+| `task_id`        | string | 任务唯一标识，用于后续查询/订阅     |
+| `status`         | string | 初始状态，固定为 `"queued"`         |
+| `queue_position` | int    | 当前在队列中的位置（0 表示即将执行） |
+
+**可能的状态码**：
+
+| 状态码 | 说明                                   |
+| ------ | -------------------------------------- |
+| `202`  | 任务已入队                             |
+| `503`  | 任务队列不可用（Redis 连接失败等）     |
+
+---
+
+## 3. 查询任务状态
+
+### `GET /v1/task/{task_id}`
+
+查询指定任务的当前状态和结果。任务状态流转为 `queued → running → completed / failed`。
+
+**路径参数**：
+
+| 参数      | 类型   | 说明    |
+| --------- | ------ | ------- |
+| `task_id` | string | 任务 ID |
+
+**响应 — 排队中 / 运行中** (HTTP 200)：
+
+```json
+{
+  "task_id": "a1b2c3d4e5f6...",
+  "status": "running",
+  "queue_position": 0,
+  "created_at": "2026-06-09T10:30:00",
+  "result": null,
+  "error": null
+}
+```
+
+**响应 — 已完成** (HTTP 200)：
+
+```json
+{
+  "task_id": "a1b2c3d4e5f6...",
+  "status": "completed",
+  "queue_position": 0,
+  "created_at": "2026-06-09T10:30:00",
+  "result": {
+    "payload": "根据最近一周的数据分析，故障率为 2.3%...",
+    "spent": {
+      "turns": 3,
+      "tool_calls": 5,
+      "wall_time_s": 12.5
+    }
+  },
+  "error": null
+}
+```
+
+**响应 — 失败** (HTTP 200)：
+
+```json
+{
+  "task_id": "a1b2c3d4e5f6...",
+  "status": "failed",
+  "queue_position": 0,
+  "created_at": "2026-06-09T10:30:00",
+  "result": null,
+  "error": "budget_exceeded: max_turns (50) reached"
+}
+```
+
+| 字段             | 类型          | 说明                                                 |
+| ---------------- | ------------- | ---------------------------------------------------- |
+| `task_id`        | string        | 任务 ID                                              |
+| `status`         | string        | 任务状态：`queued` / `running` / `completed` / `failed` |
+| `queue_position` | int           | 入队时的位置（完成后无意义）                          |
+| `created_at`     | string        | 任务创建时间                                         |
+| `result`         | object\|null  | 任务结果（仅在 `completed` 时有值）                  |
+| `result.payload` | any           | Agent 最终输出内容                                   |
+| `result.spent`   | object        | 资源消耗统计                                         |
+| `result.spent.turns` | int       | 消耗的 LLM 对话轮次                                  |
+| `result.spent.tool_calls` | int  | 工具调用总次数                                       |
+| `result.spent.wall_time_s` | number | 墙钟耗时（秒）                                |
+| `error`          | string\|null  | 错误信息（仅在 `failed` 时有值）                     |
+
+**可能的状态码**：
+
+| 状态码 | 说明               |
+| ------ | ------------------ |
+| `200`  | 成功获取任务信息   |
+| `404`  | 任务不存在         |
+
+---
+
+## 4. SSE 流式订阅
+
+### `GET /v1/task/{task_id}/stream`
+
+通过 SSE（Server-Sent Events）实时订阅任务的执行过程。连接建立后，LLM 每生成一个 token、每次工具调用、每次状态变更都会即时推送给客户端。任务完成后连接自动关闭。
+
+**路径参数**：
+
+| 参数      | 类型   | 说明                               |
+| --------- | ------ | ---------------------------------- |
+| `task_id` | string | 任务 ID（需先通过 `/v1/query` 获取） |
+
+**响应头**：
+
+```
+Content-Type: text/event-stream
+X-Accel-Buffering: no
+Cache-Control: no-cache
+```
+
+**状态码**：
+
+| 状态码 | 说明         |
+| ------ | ------------ |
+| `200`  | SSE 流已建立 |
+| `404`  | 任务不存在   |
+
+**连接生命周期**：
+
+- 连接建立后**第一条消息携带任务当前信息**（`type: "status"`）
+- 若任务已 `completed` / `failed`，发完第一条后立即关闭连接
+- 若任务排队/执行中，持续推送后续事件，收到 `done` 后关闭
+- 空闲超过 30 秒推送 `: heartbeat`（SSE 注释行，保活不触发事件）
+
+**SSE 格式**：每条消息为 ``data: <JSON>\n\n``，事件类型由 `data.type` 字段区分，无 `event:` 前缀。
+
+---
+
+### 消息输出结构
+
+核心逻辑（摘自 `api.py`）：
+
+```python
+async def _generator():
+    # ① 第一条：task_store 快照
+    info = task_store.get(task_id)
+    yield str(StreamFirstEvent(type="status", **info))
+
+    # ② 已完成/失败则直接结束
+    if info["status"] in ("completed", "failed"):
+        return
+
+    # ③ 订阅 broker 实时事件
+    async for event in broker.subscribe(task_id):
+        if event.get("type") == "heartbeat":
+            yield str(StreamFirstEvent(type="heartbeat"))
+        else:
+            event_type = event["type"]
+            event_data = {k: v for k, v in event.items() if k != "type"}
+            yield str(StreamEvent(type=event_type, data=event_data))
+```
+
+**所有消息 data 均包含 `type` 字段**，前端统一用 `data.type` 分支处理，无需区分"第一条"和"后续"。
+
+按时间顺序，SSE 流输出的消息如下：
+
+---
+
+### 一、第一条消息（始终最先发送）
+
+```json
+{
+  "type": "status",
+  "task_id": "a1b2c3d4",
+  "status": "queued",
+  "queue_position": 2,
+  "created_at": "2026-06-09T10:30:00",
+  "updated_at": "2026-06-09T10:30:00",
+  "result": null,
+  "error": null
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"status"` |
+| `task_id` | string | 任务 ID |
+| `status` | string | 当前状态：`queued`（排队中） |
+| `queue_position` | int | 队列位置，0 表示已出队 |
+| `created_at` | string | 任务创建时间 |
+| `updated_at` | string | 最后更新时间 |
+| `result` | object\|null | 始终为 `null`（第一条消息时还未执行） |
+| `error` | string\|null | 始终为 `null` |
+
+> 若连接建立时任务已执行完成，`status` 会是 `completed`/`failed`，`result`/`error` 有对应值，且发完此条后连接直接关闭，不再有后续事件。
+
+---
+
+### 二、执行过程中的事件
+
+---
+
+#### `token` — LLM 逐 token 输出
+
+LLM 流式生成文本时，每收到一个 token 立刻推送。一次流式响应会**连续推送多条**。
+
+```json
+{
+  "type": "token",
+  "text": "根据查询结果，最近一周故障率为"
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"token"` |
+| `text` | string | 当前 token 的文本内容 |
+
+---
+
+#### `reasoning` — LLM 推理链（可选）
+
+部分模型（DeepSeek R1、Claude Opus 等）输出 `reasoning_content` 时推送。非思考类模型不触发。
+
+```json
+{
+  "type": "reasoning",
+  "text": "用户询问故障率趋势，需要先查数据库获取最近一周的数据..."
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"reasoning"` |
+| `text` | string | 推理链文本片段 |
+
+---
+
+#### `tool_calls` — LLM 决定调用工具
+
+LLM 完成本轮流式输出后，若决定调用工具，推送一次该事件。`calls` 数组包含本轮所有工具调用。
+
+```json
+{
+  "type": "tool_calls",
+  "calls": [
+    {
+      "name": "sql_execute",
+      "input": {
+        "db_uri": "mysql://...",
+        "query": "SELECT COUNT(*) FROM faults WHERE ..."
+      }
+    }
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"tool_calls"` |
+| `calls` | array | 本轮工具调用列表 |
+| `calls[].name` | string | 工具名称 |
+| `calls[].input` | object | 工具调用参数 |
+
+---
+
+#### `tool_result` — 工具执行结果
+
+每个工具调用执行完成后推送。
+
+成功：
+```json
+{
+  "type": "tool_result",
+  "name": "sql_execute",
+  "is_error": false,
+  "content": "{\"result\":[{\"count\":42}]}",
+  "error": null
+}
+```
+
+失败：
+```json
+{
+  "type": "tool_result",
+  "name": "sql_execute",
+  "is_error": true,
+  "content": null,
+  "error": "Connection refused to 10.0.0.5:3306"
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"tool_result"` |
+| `name` | string | 工具名称 |
+| `is_error` | boolean | 是否执行出错 |
+| `content` | string\|null | 成功时的返回内容 |
+| `error` | string\|null | 失败时的错误描述 |
+
+---
+
+### 三、异常/结束事件
+
+#### `error` — LLM 流式调用异常
+
+LLM 流式请求过程中发生异常时推送（如 API 超时、连接中断）。收到此事件并不意味着任务一定失败——Agent Runtime 可能重试或走失败流程。
+
+```json
+{
+  "type": "error",
+  "error": "httpx.ReadTimeout: The read operation timed out"
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"error"` |
+| `error` | string | 异常描述 |
+
+---
+
+#### `status` — 任务终态
+
+Worker 执行完毕后推送。只可能是 `completed` 或 `failed`（不会推送 `running`）。
+
+```json
+{
+  "type": "status",
+  "status": "completed",
+  "payload": "根据查询结果，最近一周故障率为 2.3%...",
+  "spent": {
+    "turns": 3,
+    "tool_calls": 2,
+    "wall_time_s": 8.2
+  }
+}
+```
+
+```json
+{
+  "type": "status",
+  "status": "failed",
+  "error": "budget_exceeded: max_turns (50) reached"
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"status"` |
+| `status` | string | `"completed"` 或 `"failed"` |
+| `payload` | any | 仅 `completed`：Agent 最终文本输出 |
+| `spent` | object | 仅 `completed`：资源消耗统计 |
+| `spent.turns` | int | LLM 对话轮次 |
+| `spent.tool_calls` | int | 工具调用总次数 |
+| `spent.wall_time_s` | number | 墙钟耗时（秒） |
+| `error` | string | 仅 `failed`：错误描述 |
+
+---
+
+#### `done` — 终止信号
+
+Worker 线程 `finally` 块中发送，始终是**最后一条消息**。客户端收到后应关闭连接。
+
+```json
+{
+  "type": "done"
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | string | `"done"` |
+
+---
+
+#### `heartbeat` — 保活
+
+30 秒内无任何事件推送时发送。SSE 注释行，不会触发客户端事件回调。
+
+```
+: heartbeat
+```
+
+---
+
+### 完整消息时序总览
+
+```
+连接建立
+│
+├─ data: {type:"status", task_id, status:"queued", queue_position, ...}
+│
+├─ data: {type:"reasoning", text:"..."}        ← 可选：思考模型推理链
+├─ data: {type:"token", text:"..."}            ← LLM 流式输出（连续多条）
+├─ data: {type:"token", text:"..."}
+├─ data: {type:"token", text:"..."}
+├─ data: {type:"tool_calls", calls:[...]}      ← LLM 决定调用工具
+├─ data: {type:"tool_result", name, ...}       ← 工具执行结果
+├─ data: {type:"token", text:"..."}            ← LLM 继续输出
+│   ...                                           （以上可能循环多轮）
+│
+├─ data: {type:"error", error:"..."}           ← 可能：LLM 流异常
+│
+├─ data: {type:"status", status:"completed"|"failed", ...}  ← 终态
+├─ data: {type:"done"}                         ← 终止信号
+│
+连接关闭
+```
+
+---
+
+### 典型错误场景
+
+**场景一：LLM 流式请求中断**
+
+```
+data: {"type":"token","text":"..."}
+data: {"type":"error","error":"httpx.ReadTimeout: ..."}
+data: {"type":"status","status":"failed","error":"llm_call: timeout"}
+data: {"type":"done"}
+```
+
+**场景二：任务已过期（连接建立时已完成）**
+
+```
+data: {"type":"status","task_id":"...","status":"failed","error":"...","created_at":"...","result":null}
+（连接关闭）
+```
+
+**场景三：工具执行失败（非致命，Agent 可能据此调整策略继续）**
+
+```
+data: {"type":"tool_calls","calls":[...]}
+data: {"type":"tool_result","name":"sql_execute","is_error":true,"error":"Connection refused"}
+data: {"type":"token","text":"查询失败了，让我换一种方式..."}   ← Agent 自适应调整
+data: {"type":"status","status":"completed","payload":"...",...}  ← 最终仍可能成功
+data: {"type":"done"}
+```
+
+---
+
+## 典型交互流程
+
+### 流式交互时序（推荐）
+
+```
+前端                              AgentCode API                     Worker 线程
+  │                                  │                                │
+  │── POST /v1/query ──────────────→│                                │
+  │←─ 202 {task_id, status:queued} ─│                                │
+  │                                  │                                │
+  │── GET /v1/task/{id}/stream ────→│                                │
+  │←─ data: {type:"status",         │                                │
+  │     task_id, status:"queued"}    │                                │
+  │                                  │──── dequeue task ────────────→│── 构建配置
+  │                                  │                                │── LLM 流式调用
+  │←─ data: {type:"token",          │←── publish token ─────────────│
+  │     text:"根据查询结果"}          │                                │
+  │←─ data: {type:"token",          │←── publish token ─────────────│
+  │     text:"，故障率为2.3%"}        │                                │
+  │                                  │                                │
+  │←─ data: {type:"tool_calls",     │←── publish tool_calls ────────│
+  │     calls:[{name, input}]}      │                                │── 执行工具
+  │←─ data: {type:"tool_result",    │←── publish tool_result ───────│
+  │     name:"sql_execute",...}     │                                │
+  │                                  │                                │── LLM 继续...
+  │←─ data: {type:"token",          │←── publish token ─────────────│
+  │     text:"综上分析..."}           │                                │
+  │                                  │                                │
+  │←─ data: {type:"status",         │←── status:completed ──────────│
+  │     status:"completed",payload}  │                                │
+  │←─ data: {type:"done"}           │←── done ──────────────────────│
+  │                                  │                                │
+  │  连接关闭                         │                                │
+```
+
+### 简化轮询流程
+
+```
+前端                              AgentCode API
+  │                                  │
+  │── POST /v1/query ──────────────→│
+  │←─ 202 {task_id, queued} ────────│
+  │                                  │
+  │── GET /v1/task/{id} ───────────→│   (每 2s 轮询一次)
+  │←─ 200 {status: "running"} ──────│
+  │   ...                            │
+  │── GET /v1/task/{id} ───────────→│
+  │←─ 200 {status: "completed", ...} │
+```
+
+## 客户端集成示例
+
+### JavaScript (EventSource)
+
+```javascript
+const { task_id } = await fetch("http://localhost:9180/v1/query", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ user_message: "分析故障率趋势" }),
+}).then(r => r.json());
+
+const es = new EventSource(`http://localhost:9180/v1/task/${task_id}/stream`);
+
+let fullText = "";
+
+es.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+
+  switch (data.type) {
+    case "status":
+      if (data.status === "completed") {
+        console.log("完成! 最终输出:", data.payload);
+        console.log("消耗:", data.spent);
+        es.close();
+      } else if (data.status === "failed") {
+        console.error("失败:", data.error);
+        es.close();
+      } else {
+        console.log("状态:", data.status, data.queue_position != null ? `排队位置 ${data.queue_position}` : "");
+      }
+      break;
+
+    case "token":
+      fullText += data.text;
+      console.log("流式输出:", data.text);
+      // 前端可实时更新展示区：el.textContent = fullText
+      break;
+
+    case "reasoning":
+      console.log("推理:", data.text);
+      break;
+
+    case "tool_calls":
+      console.log("调用工具:", data.calls);
+      break;
+
+    case "tool_result":
+      console.log(`工具 ${data.name} 结果:`, data.is_error ? "失败" : data.content);
+      break;
+
+    case "error":
+      console.error("执行异常:", data.error);
+      break;
+
+    case "done":
+      es.close();
+      break;
+  }
+};
+```
+
+### Python (httpx)
+
+```python
+import httpx
+import json
+
+# 提交任务
+with httpx.Client() as client:
+    resp = client.post(
+        "http://localhost:9180/v1/query",
+        json={"user_message": "分析故障率趋势"}
+    )
+    task = resp.json()
+    task_id = task["task_id"]
+
+# 流式订阅
+with httpx.Client() as client:
+    with client.stream("GET", f"http://localhost:9180/v1/task/{task_id}/stream") as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: "):
+                data = json.loads(line[6:])
+                t = data["type"]
+
+                if t == "token":
+                    print(data["text"], end="", flush=True)
+                elif t == "tool_calls":
+                    print(f"\n[工具调用] {data['calls']}")
+                elif t == "tool_result":
+                    status = "失败" if data["is_error"] else "成功"
+                    print(f"\n[工具结果 {status}] {data['name']}")
+                elif t == "status":
+                    print(f"\n[状态] {data['status']}")
+                    if data["status"] in ("completed", "failed"):
+                        break
+                elif t == "done":
+                    break
+```
+
+### curl（命令行测试）
+
+```bash
+# 1. 提交任务
+curl -s -X POST http://localhost:9180/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"user_message":"查询故障率"}' | jq .
+
+# 2. 流式订阅（将 TASK_ID 替换为上一步返回的值）
+curl -N -s http://localhost:9180/v1/task/TASK_ID/stream
+```
+
+---
+
+## 错误处理
+
+| 场景               | HTTP 状态码 | 行为说明                                        |
+| ------------------ | ----------- | ----------------------------------------------- |
+| 队列不可用         | `503`       | `/v1/query` 返回错误，需检查 Redis 连接          |
+| 任务不存在         | `404`       | `/v1/task/{id}` 或 `/stream` 时任务 ID 无效      |
+| 任务执行失败       | `200`       | 通过 `status: "failed"` + `error` 字段体现       |
+| Worker 内部异常    | —           | 推送 `error` 事件（SSE），任务可能重试或标记失败   |
+| SSE 连接中断       | —           | 客户端应实现重连逻辑，重新订阅同一 `task_id`      |
+
+---
+
+## 配置参考
+
+服务启动方式及并发参数：
+
+```bash
+# 单进程 × 4 线程（默认）
+agentcode-api --port 9180
+
+# 单进程 × 8 线程
+agentcode-api --concurrency 8
+
+# 2 进程 × 8 线程 = 16 并发
+agentcode-api --workers 2 --concurrency 8
+
+# 4 进程 × 16 线程 = 64 并发（需 Redis 队列）
+agentcode-api --workers 4 --concurrency 16 --pool-size 16
+```
+
+| 参数            | 环境变量                   | 默认值          | 说明                             |
+| --------------- | -------------------------- | --------------- | -------------------------------- |
+| `--host`        | —                          | `0.0.0.0`       | 绑定地址                         |
+| `--port`        | —                          | `9180`          | 服务端口                         |
+| `--workers`     | `AGENT_API_WORKERS`        | `1`             | uvicorn worker 进程数             |
+| `--concurrency` | `AGENT_WORKER_CONCURRENCY` | `4`             | 每进程工作线程数                 |
+| `--pool-size`   | `AGENT_WORKER_POOL_SIZE`   | `=concurrency`  | ToolManager 连接池大小           |
+
+> **多进程模式**（`--workers >= 2`）必须使用 Redis 队列（设置 `TASK_STORE_REDIS_URL` 环境变量）。
+> MemoryQueue 仅支持单进程（`--workers 1`）。

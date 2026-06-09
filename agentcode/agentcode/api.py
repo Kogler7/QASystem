@@ -33,7 +33,6 @@ agentcode HTTP API — 高并发异步任务模型。
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import threading
@@ -48,7 +47,7 @@ from pydantic import BaseModel, Field
 
 from . import task_store
 from .adapter import _default_mcp_path
-from .models import SessionConfig
+from .models import SessionConfig, StreamEvent, StreamFirstEvent
 from .pool import ToolManagerPool
 from .skillsets.loader import SkillLoader
 from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
@@ -255,13 +254,14 @@ async def query_wait(req: QueryRequest, stream: bool = False):
         broker.create_task(task_id)
 
         async def _generator():
-            yield f"event: status\ndata: {json.dumps({'task_id': task_id, 'status': 'queued', 'queue_position': position}, ensure_ascii=False)}\n\n"
+            yield str(StreamFirstEvent(type="status", task_id=task_id, status="queued", queue_position=position))
             async for event in broker.subscribe(task_id):
-                event_type = event.get("type", "")
-                if event_type == "heartbeat":
-                    yield ": heartbeat\n\n"
+                if event.get("type") == "heartbeat":
+                    yield str(StreamFirstEvent(type="heartbeat"))
                 else:
-                    yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    event_type = event["type"]
+                    event_data = {k: v for k, v in event.items() if k != "type"}
+                    yield str(StreamEvent(type=event_type, data=event_data))
 
         return StreamingResponse(
             _generator(),
@@ -313,23 +313,21 @@ async def stream_task(task_id: str):
         raise HTTPException(404, f"task not found: {task_id}")
 
     async def _generator():
-        # 发送初始状态
-        yield f"event: status\ndata: {json.dumps(info, ensure_ascii=False)}\n\n"
+        # 首条：task_store 快照
+        yield str(StreamFirstEvent(type="status", **info))
 
-        # 如果任务已完成，直接返回
         if info["status"] in ("completed", "failed"):
             return
 
-        # 订阅 StreamBroker 实时事件
         from .stream_broker import get_broker
         broker = get_broker()
         async for event in broker.subscribe(task_id):
-            event_type = event.get("type", "")
-            if event_type == "heartbeat":
-                # SSE 注释，保活但不触发客户端事件
-                yield ": heartbeat\n\n"
+            if event.get("type") == "heartbeat":
+                yield str(StreamFirstEvent(type="heartbeat"))
             else:
-                yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+                event_type = event["type"]
+                event_data = {k: v for k, v in event.items() if k != "type"}
+                yield str(StreamEvent(type=event_type, data=event_data))
 
     return StreamingResponse(
         _generator(),
