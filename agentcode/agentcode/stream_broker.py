@@ -28,22 +28,42 @@ class StreamBroker:
         self._queues: dict[str, queue.Queue] = {}
         self._lock = threading.Lock()
 
+    def create_task(self, task_id: str) -> None:
+        """API 端点调用：在任务入队后立即预建队列。
+
+        这样 Worker 的 publish() 在 subscribe() 到达之前就能把事件
+        写入队列，避免丢失早期 token / tool_calls。
+        """
+        with self._lock:
+            if task_id not in self._queues:
+                self._queues[task_id] = queue.Queue()
+
     def publish(self, task_id: str, event: dict) -> None:
-        """Worker 线程调用：推送一个事件到指定任务的订阅者。"""
+        """Worker 线程调用：推送一个事件到指定任务的订阅者。
+
+        若队列尚未创建（create_task 未调用且 subscribe 未到达），
+        事件被静默丢弃并记录 warning。
+        """
         with self._lock:
             q = self._queues.get(task_id)
         if q is not None:
             q.put(event)
+        else:
+            logger.warning("stream_broker: 丢弃 task_id=%s 的事件 type=%s（队列未创建）",
+                           task_id, event.get("type", ""))
 
     async def subscribe(self, task_id: str) -> AsyncIterator[dict]:
         """SSE async generator 调用：订阅指定任务的事件流。
 
+        优先复用 create_task() 预建的队列，否则现场创建。
         使用 run_in_executor 阻塞在 queue.Queue.get() 上，
         而非轮询，保证事件到达后立即唤醒。
         """
-        q: queue.Queue = queue.Queue()
         with self._lock:
-            self._queues[task_id] = q
+            q = self._queues.get(task_id)
+            if q is None:
+                q = queue.Queue()
+                self._queues[task_id] = q
 
         loop = asyncio.get_running_loop()
         try:

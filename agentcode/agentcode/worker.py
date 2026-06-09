@@ -179,6 +179,7 @@ class _StreamingWorkerLLM:
 
                     if "reasoning_content" in delta and delta["reasoning_content"]:
                         accumulated_reasoning += delta["reasoning_content"]
+                        self._publish("reasoning", {"text": delta["reasoning_content"]})
 
                     if "content" in delta and delta["content"]:
                         text = delta["content"]

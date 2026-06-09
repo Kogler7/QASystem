@@ -225,6 +225,9 @@ async def query(req: QueryRequest):
         position = task_store.enqueue(task_id, req.model_dump())
     except Exception as exc:
         raise HTTPException(503, f"task_store unavailable: {exc}")
+    # 预建 StreamBroker 队列，确保 Worker 的 publish 不丢消息
+    from .stream_broker import get_broker
+    get_broker().create_task(task_id)
     return JSONResponse(
         status_code=202,
         content={"task_id": task_id, "status": "queued", "queue_position": position},
@@ -249,6 +252,7 @@ async def query_wait(req: QueryRequest, stream: bool = False):
     if stream:
         from .stream_broker import get_broker
         broker = get_broker()
+        broker.create_task(task_id)
 
         async def _generator():
             yield f"event: status\ndata: {json.dumps({'task_id': task_id, 'status': 'queued', 'queue_position': position}, ensure_ascii=False)}\n\n"
