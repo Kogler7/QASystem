@@ -222,6 +222,36 @@ def init_knowledge_space(dimension_scales: dict[str, list[str]]) -> dict:
     return api.init_knowledge_space(dimension_scales)
 
 
+def init_knowledge_map_spaces(
+    space_name: str,
+    dimension_scales: dict[str, list[str]],
+) -> dict:
+    """
+    知识空间初始化 V3（笛卡尔积多子空间）：
+    - space_name: 根知识空间名称
+    - dimension_scales: {维度: [刻度列表]}
+    - 按维度刻度的笛卡尔积生成多个子空间节点
+    - 每个子空间连接根空间和对应刻度
+    """
+    api = _get_knowledge_space_api()
+    return api.init_knowledge_map_spaces(space_name, dimension_scales)
+
+
+def init_knowledge_space_tree(
+    workspace_tree: list[dict],
+    dimensions: list[dict],
+) -> dict:
+    """
+    知识空间初始化 V2（树形结构）：
+    - workspace_tree: 空间树草稿，含根空间和子空间
+    - dimensions: 维度刻度列表
+    - 创建 KnowledgeSpace 节点树、Dimension/Scale 节点
+    - 返回 root_workspace_id
+    """
+    api = _get_knowledge_space_api()
+    return api.init_knowledge_space_tree(workspace_tree, dimensions)
+
+
 def get_dimension_scales(dimension: str) -> dict:
     """根据维度名称返回该维度下的所有刻度。"""
     api = _get_knowledge_space_api()

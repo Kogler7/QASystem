@@ -36,6 +36,11 @@ class InitKnowledgeSpaceBody(BaseModel):
     dimension_scales: dict[str, list[str]]
 
 
+class InitKnowledgeMapSpacesBody(BaseModel):
+    space_name: str
+    dimension_scales: dict[str, list[str]]
+
+
 class DimensionScalesBody(BaseModel):
     dimension: str
 
@@ -192,6 +197,32 @@ async def api_init_knowledge_space(body: InitKnowledgeSpaceBody) -> dict[str, An
         raise
     except Exception as e:
         logger.exception("初始化知识空间失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/storage/knowledge-map/spaces")
+async def api_init_knowledge_map_spaces(body: InitKnowledgeMapSpacesBody) -> dict[str, Any]:
+    """
+    知识空间初始化 V3（笛卡尔积多子空间）：
+    - POST /api/component/knowledge-extract/storage/knowledge-map/spaces
+    - 输入 space_name（根空间名称）+ dimension_scales（维度刻度映射）
+    - 按维度刻度的笛卡尔积生成多个子空间节点
+    - 每个子空间连接根空间（CONTAINS）和对应刻度（BELONGS_TO）
+    - 返回 root_workspace_id 和子空间列表
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.init_knowledge_map_spaces,
+            space_name=body.space_name,
+            dimension_scales=body.dimension_scales,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("detail", "初始化失败"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("初始化知识空间（笛卡尔积）失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
