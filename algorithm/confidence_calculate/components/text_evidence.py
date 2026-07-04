@@ -5,124 +5,90 @@ from pathlib import Path
 from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 from typing import Dict, Optional
-import torch
-import torch.nn as nn
 from dotenv import load_dotenv
-from pathlib import Path
 
-# 统一环境加载：仓库根 .env 为主，backend/.env 为本机补充（均不覆盖已有环境变量）
-_ROOT = Path(__file__).resolve().parents[3]
-for _env_path in (_ROOT / ".env", _ROOT / "backend" / ".env"):
-    if _env_path.exists():
-        load_dotenv(_env_path, override=False)
-
-_CC_ROOT = Path(__file__).resolve().parent.parent
+# 加载 backend/.env 补充环境变量（不覆盖已有变量）
+env_path = Path(__file__).parent.parent.parent.parent / 'backend' / '.env'
+if env_path.exists():
+    load_dotenv(env_path, override=False)
 
 
-class TextEvidence(nn.Module):
+class TextEvidence:
     """
-    文本证据模块 - 从 config.yaml 加载模型参数，从环境变量读取连接配置
+    文本证据组件
+    通过 Elasticsearch 检索文档，并利用 SBERT 计算语义相似度，
+    结合 BM25 分数，输出一个 0-1 的标量文本证据分数。
     """
-    def __init__(self, config: Optional[Dict] = None, config_path: Optional[str] = None):
-        super().__init__()
-        
-        # 加载 config.yaml
-        if config_path is None:
-            config_path = Path(__file__).parent.parent / 'config.yaml'
-        
+
+    def __init__(self, config: Optional[Dict] = None):
+        # 加载配置文件（默认同目录下 config.yaml）
+        config_path = Path(__file__).parent.parent / 'config.yaml'
         with open(config_path, 'r', encoding='utf-8') as f:
             yaml_config = yaml.safe_load(f)
-        
-        # 合并传入的 config（如果有）
+
         text_config = yaml_config.get('text', {})
         if config:
             text_config.update(config)
-        
-        # 从环境变量读取连接配置
-        es_hosts = os.getenv('CONFIDENCE_ES_HOSTS') or os.getenv('ES_HOSTS') or 'http://127.0.0.1:9200'
-        if ',' in es_hosts:
-            es_hosts = [h.strip() for h in es_hosts.split(',')]
+
+        # 从环境变量读取 Elasticsearch 连接信息
+        es_host = os.getenv('CONFIDENCE_ES_HOSTS', os.getenv('ES_HOSTS', 'http://127.0.0.1:9200'))
+        if ',' in es_host:
+            es_hosts = [h.strip() for h in es_host.split(',')]
         else:
-            es_hosts = [es_hosts]
-        
-        es_user = os.getenv('CONFIDENCE_ES_USERNAME') or os.getenv('ES_USER')
-        es_password = os.getenv('CONFIDENCE_ES_PASSWORD') or os.getenv('ES_PASSWORD')
-        es_verify_certs = (os.getenv('CONFIDENCE_ES_VERIFY_CERTS') or os.getenv('ES_VERIFY_CERTS') or 'false').lower() == 'true'
-        
-        # 从环境变量读取索引名
-        self.index_name = os.getenv('CONFIDENCE_ES_INDEX') or os.getenv('ES_INDEX', 'documents')
-        
-        # 从 config.yaml 读取业务参数
-        self.size = text_config.get('es_size', 50)
-        self.top_k = text_config.get('text_top_k', 10)
-        self.max_bm25 = text_config.get('max_bm25_norm', 100.0)
-        
-        # 构建 ES 连接
+            es_hosts = [es_host]
+
+        es_user = os.getenv('CONFIDENCE_ES_USERNAME', os.getenv('ES_USER'))
+        es_password = os.getenv('CONFIDENCE_ES_PASSWORD', os.getenv('ES_PASSWORD'))
+        verify_certs = (os.getenv('CONFIDENCE_ES_VERIFY_CERTS', os.getenv('ES_VERIFY_CERTS', 'false'))).lower() == 'true'
+
+        # ES 客户端配置
         es_kwargs = {
             'hosts': es_hosts,
             'request_timeout': text_config.get('es_timeout', 30),
             'retry_on_timeout': True,
             'max_retries': 3,
-            'verify_certs': es_verify_certs,
+            'verify_certs': verify_certs,
         }
-        
         if es_user and es_password:
             es_kwargs['basic_auth'] = (es_user, es_password)
-        
-        # 初始化 Elasticsearch
-        try:
-            self.es = Elasticsearch(**es_kwargs)
-            if not self.es.ping():
-                print("警告: Elasticsearch 连接失败")
-            else:
-                print(f"Elasticsearch 连接成功: {es_hosts}")
-        except Exception as e:
-            print(f"Elasticsearch 连接异常: {e}")
-            self.es = None
-        
-        # 从环境变量读取 SBERT 模型路径（默认指向仓库根 models 目录）
-        model_path = os.getenv('CONFIDENCE_SBERT_MODEL_PATH') or os.getenv('SBERT_MODEL_PATH') or str(_CC_ROOT.parent.parent / 'models' / 'sbert_model')
-        
+
+        self.es = Elasticsearch(**es_kwargs)
+        if not self.es.ping():
+            print("警告: Elasticsearch 连接失败")
+        else:
+            print(f"Elasticsearch 连接成功: {es_hosts}")
+
+        self.index_name = os.getenv('CONFIDENCE_ES_INDEX', os.getenv('ES_INDEX', 'documents'))
+        self.size = text_config.get('es_size', 50)          # ES 返回的文档数
+        self.max_bm25 = text_config.get('max_bm25_norm', 100.0)  # BM25 归一化上限
+
+        # 加载 SBERT 模型
+        model_path = os.getenv('CONFIDENCE_SBERT_MODEL_PATH', os.getenv('SBERT_MODEL_PATH',
+                               '/mnt/data3/srv/qasystem/models/sbert_model'))
         print(f"加载 SBERT 模型: {model_path}")
-        
         if not os.path.exists(model_path):
-            print(f"本地模型不存在: {model_path}")
-            print("使用 HuggingFace 默认模型: paraphrase-multilingual-MiniLM-L12-v2")
+            print(f"本地模型不存在，使用默认模型 paraphrase-multilingual-MiniLM-L12-v2")
             self.sbert = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         else:
-            try:
-                self.sbert = SentenceTransformer(model_path)
-                print(f"SBERT 模型加载成功")
-            except Exception as e:
-                print(f"SBERT 模型加载失败: {e}")
-                print("使用 HuggingFace 默认模型: paraphrase-multilingual-MiniLM-L12-v2")
-                self.sbert = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-        
-        self.embed_dim = self.sbert.get_sentence_embedding_dimension()
-        
-        # 特征处理层（使用 config.yaml 中的维度）
-        text_dim = yaml_config.get('text_dim', 128)
-        self.feature_layer = nn.Sequential(
-            nn.Linear(self.top_k * (self.embed_dim + 1), 256),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(256, text_dim),
-            nn.ReLU()
-        )
-    
+            self.sbert = SentenceTransformer(model_path)
+
     def build_query(self, triple: Dict) -> str:
         """根据三元组构造查询字符串"""
-        subj = triple.get("subject", "")
-        pred = triple.get("predicate", "")
-        obj = triple.get("object", "")
+        subj = triple.get('subject', '')
+        pred = triple.get('predicate', '')
+        obj = triple.get('object', '')
         return f"{subj} {pred} {obj}"
-    
-    def get_text_features(self, triple: Dict) -> np.ndarray:
-        """返回文本特征向量"""
+
+    def get_score(self, triple: Dict) -> float:
+        """
+        计算文本证据分数 (0-1)。
+        返回所有候选文档中（语义相似度与 BM25 综合得分）的最高分。
+        """
         query_str = self.build_query(triple)
         if not query_str.strip() or self.es is None:
-            return np.zeros(self.top_k * (self.embed_dim + 1))
-        
+            return 0.5   # 无法计算时返回默认值
+
+        # Elasticsearch BM25 检索
         try:
             response = self.es.search(
                 index=self.index_name,
@@ -131,35 +97,31 @@ class TextEvidence(nn.Module):
             )
         except Exception as e:
             print(f"ES 检索失败: {e}")
-            return np.zeros(self.top_k * (self.embed_dim + 1))
-        
-        hits = response["hits"]["hits"]
-        features = []
-        
-        for hit in hits[:self.top_k]:
-            content = hit["_source"].get("content", "")
-            if content:
-                vec = self.sbert.encode(content)
-                bm25_norm = min(hit["_score"] / self.max_bm25, 1.0)
-            else:
-                vec = np.zeros(self.embed_dim)
-                bm25_norm = 0.0
-            
-            features.append(vec)
-            features.append(np.array([bm25_norm]))
-        
-        # 填充
-        while len(features) < self.top_k * 2:
-            features.append(np.zeros(self.embed_dim))
-            features.append(np.array([0.0]))
-        
-        return np.concatenate(features)
-    
-    def forward(self, triple: Dict) -> torch.Tensor:
-        """前向传播"""
-        features = self.get_text_features(triple)
-        features_tensor = torch.FloatTensor(features).unsqueeze(0)
-        device = next(self.parameters()).device
-        features_tensor = features_tensor.to(device)
-        processed = self.feature_layer(features_tensor)
-        return processed.squeeze(0)
+            return 0.5
+
+        hits = response.get('hits', {}).get('hits', [])
+        if not hits:
+            return 0.5
+
+        # 编码查询语句
+        query_vec = self.sbert.encode(query_str)
+        query_norm = np.linalg.norm(query_vec)
+
+        best_score = 0.0
+        for hit in hits:
+            content = hit['_source'].get('content', '')
+            if not content:
+                continue
+            # 编码文档句子
+            doc_vec = self.sbert.encode(content)
+            doc_norm = np.linalg.norm(doc_vec)
+            # 余弦相似度
+            cos_sim = np.dot(query_vec, doc_vec) / (query_norm * doc_norm + 1e-10)
+            # BM25 归一化
+            bm25_norm = min(hit['_score'] / self.max_bm25, 1.0)
+            # 综合得分：语义权重 0.7，BM25 权重 0.3
+            combined = 0.7 * cos_sim + 0.3 * bm25_norm
+            if combined > best_score:
+                best_score = combined
+
+        return round(best_score, 4)
