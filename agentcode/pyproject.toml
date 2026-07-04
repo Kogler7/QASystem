@@ -12,11 +12,22 @@ dependencies = [
   "pydantic>=2",
   "httpx>=0.28.1",
   "jsonschema>=4.26.0",
+  "python-dotenv>=1.0.0",
+  "pyyaml>=6.0",
 ]
+
+[project.scripts]
+agentcode = "agentcode.cli:main"
+agentcode-api = "agentcode.api:main"
 
 [project.optional-dependencies]
 fastapi = [
   "fastapi>=0.111",
+]
+api = [
+  "fastapi>=0.111",
+  "uvicorn>=0.30",
+  "redis>=4.0",
 ]
 dev = [
   "pytest>=8.0",
@@ -30,4 +41,4 @@ where = ["."]
 include = ["agentcode*"]
 
 [tool.setuptools.package-data]
-agentcode = ["skillsets/**/*.md", "examples/**/*.md"]
+agentcode = ["skillsets/**/*.md"]

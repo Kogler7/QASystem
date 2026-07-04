@@ -1,2 +1,3 @@
-"""Reusable skill markdown collections."""
+from .loader import SkillLoader
 
+__all__ = ["SkillLoader"]

@@ -11,6 +11,11 @@ class TraceSink(Protocol):
         """Write one trace event and return trace reference."""
 
 
+class NoopTraceSink:
+    def write(self, event: dict[str, Any]) -> str:
+        return ""
+
+
 class JsonlTraceSink:
     def __init__(self, path: str, redact_keys: set[str] | None = None) -> None:
         self.path = path

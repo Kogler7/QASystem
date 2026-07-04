@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -9,7 +10,7 @@ from .errors import RuntimeErrorInfo
 
 class McpServerConfig(BaseModel):
     name: str
-    transport: Literal["http", "stdio"]
+    transport: Literal["http", "streamable_http", "stdio", "sse"]
     url: str | None = None
     command: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
@@ -18,6 +19,8 @@ class McpServerConfig(BaseModel):
 
 class SkillRef(BaseModel):
     id: str
+    name: str = ""
+    description: str = ""
     path: str | None = None
     uri: str | None = None
     version: str | None = None
@@ -29,24 +32,16 @@ class ToolPolicy(BaseModel):
 
 
 class BudgetConfig(BaseModel):
-    max_turns: int = 8
-    max_tool_calls: int = 20
-    max_time_s: int = 120
-    max_retries_per_tool: int = 1
-    repeat_action_threshold: int = 3
+    max_turns: int = 50
+    max_tool_calls: int = 70
+    max_time_s: int = 1200
+    max_retries_per_tool: int = 2
+    repeat_action_threshold: int = 10
 
 
 class DeliveryConfig(BaseModel):
     output_schema_id: str
     json_schema: dict[str, Any]
-
-
-class HitlConfig(BaseModel):
-    tool_globs: list[str] = Field(default_factory=list)
-    gate: list[Literal["before_tool", "after_tool", "before_finalize"]] = Field(
-        default_factory=list
-    )
-    require_explicit_approve: bool = True
 
 
 class SessionConfig(BaseModel):
@@ -61,7 +56,6 @@ class SessionConfig(BaseModel):
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     tool_execution: Literal["sequential", "parallel"] = "sequential"
     delivery: DeliveryConfig | None = None
-    hitl: HitlConfig | None = None
 
 
 class AgentState(BaseModel):
@@ -71,16 +65,39 @@ class AgentState(BaseModel):
     turn: int = 0
     tool_calls_used: int = 0
     started_at: float
-    status: Literal["running", "awaiting_human", "completed", "failed"] = "running"
+    status: Literal["running", "completed", "failed"] = "running"
     pending_tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     artifacts: dict[str, Any] = Field(default_factory=dict)
 
 
 class FinalResult(BaseModel):
-    status: Literal["ok", "needs_human", "failed"]
+    status: Literal["ok", "failed"]
     payload: Any = None
     warnings: list[str] = Field(default_factory=list)
     error: RuntimeErrorInfo | None = None
     spent: dict[str, Any] = Field(default_factory=dict)
     trace_ref: str | None = None
-    checkpoint_id: str | None = None
+
+
+class StreamEvent(BaseModel):
+    """SSE 常规事件。"""
+
+    type: str
+    data: dict[str, Any] = {}
+
+    def __str__(self) -> str:
+        payload = {"type": self.type, **self.data}
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+class StreamFirstEvent(BaseModel):
+    """SSE 首条 / 心跳。"""
+
+    model_config = {"extra": "allow"}
+
+    type: str
+
+    def __str__(self) -> str:
+        if self.type == "heartbeat":
+            return ": heartbeat\n\n"
+        return f"data: {self.model_dump_json(exclude_none=True)}\n\n"

@@ -268,4 +268,7 @@ class DatabaseInit:
         except Exception as e:
             print(f"插入失败: {type(e).__name__}: {e}")
 
-
+if __name__ == "__main__":
+    init = DatabaseInit()
+    init.create_collection()
+    init.insert_data()
