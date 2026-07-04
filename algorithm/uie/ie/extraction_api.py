@@ -13,6 +13,7 @@ from ie.template_matcher import (
     build_llm_hint_from_matches,
 )
 from ie.chunked_json import extract_from_chunked_payload, parse_chunked_json_bytes
+from ie.uml_upload import list_main_objects_from_uml, save_uploaded_uml_and_parse
 
 
 UML_DIR = os.path.join(os.path.dirname(__file__), "UML")
@@ -236,7 +237,34 @@ def extract_from_chunked_json_bytes(
     return {"raw": out["raw"], "graph": out["graph"]}
 
 
-__all__ = ["extract", "store_graph_to_neo4j", "extract_from_chunked_json_bytes"]
+__all__ = [
+    "extract",
+    "store_graph_to_neo4j",
+    "extract_from_chunked_json_bytes",
+    "upload_uml_and_parse",
+    "list_uml_main_objects",
+]
+
+
+def upload_uml_and_parse(
+    data: bytes,
+    filename: str,
+    main_object: Optional[str] = None,
+    new_main_object: Optional[str] = None,
+) -> dict:
+    """
+    保存上传的 UML 文件（归档副本 + 可选主对象覆盖文件），并解析 class/属性/关系为图结构。
+    """
+    return save_uploaded_uml_and_parse(
+        data=data,
+        filename=filename,
+        main_object=main_object,
+        new_main_object=new_main_object,
+    )
+
+
+def list_uml_main_objects() -> list[dict[str, str]]:
+    return list_main_objects_from_uml()
 
 
 def run_local_tests(

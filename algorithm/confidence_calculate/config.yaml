@@ -1,63 +1,16 @@
-# 基础训练配置
-learning_rate: 0.001
-l2_lambda: 0.001
-batch_size: 16
-epochs: 100
+# 置信度计算配置
 
-# 特征维度
-text_dim: 128
-kg_dim: 128
-path_dim: 64
+# 文本与路径证据权重（加权平均）
+text_weight: 0.7
+path_weight: 0.3
 
-# 文本证据配置（业务参数，连接配置在 .env）
+# 文本证据配置（业务参数，ES 连接信息在 .env 中）
 text:
   es_timeout: 30
   es_size: 50
-  text_top_k: 10
   max_bm25_norm: 100.0
 
-# KG证据配置
-kg:
-  kg_embedding_dim: 100
-  entity_emb_path: "embeddings/entities.pt"
-  relation_emb_path: "embeddings/relations.pt"
-  use_pretrained: true
-  freeze_embeddings: true
-
-# 路径证据（Neo4j 可用 NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD / NEO4J_DATABASE 覆盖）
+# 路径证据配置（Neo4j 连接信息在 .env 中）
 path:
   max_path_length: 3
   max_paths_per_triple: 20
-  path_embedding_dim: 64
-
-# 模型融合配置
-fusion:
-  dropout_rate: 0.5
-  use_batch_norm: false
-  hidden_layers: [256, 128]
-
-# 训练配置
-training:
-  val_check_interval: 1.0
-  log_every_n_steps: 10
-  accumulate_grad_batches: 1
-  gradient_clip_val: 1.0
-
-# 早停配置
-early_stopping:
-  monitor: "val_loss"
-  patience: 10
-  mode: "min"
-
-# 检查点配置
-checkpoint:
-  monitor: "val_loss"
-  save_top_k: 1
-  mode: "min"
-  filename: "best-{epoch:02d}-{val_loss:.3f}"
-
-# 硬件配置
-hardware:
-  accelerator: "auto"
-  devices: 1
-  precision: 32

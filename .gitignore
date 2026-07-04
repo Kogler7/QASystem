@@ -156,3 +156,4 @@ repair_result.txt
 gitignore/
 frontend/frontend_venv/
 CURSOR_PROMPT_AGENTLOOP_PYTHON_LIB.md
+.omc/

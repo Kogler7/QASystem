@@ -32,9 +32,44 @@ class StoreGraphRequestBody(BaseModel):
     neo4j_password: str = "neo4j2025"
 
 
+class InitKnowledgeSpaceBody(BaseModel):
+    dimension_scales: dict[str, list[str]]
+
+
+class InitKnowledgeMapSpacesBody(BaseModel):
+    space_name: str
+    dimension_scales: dict[str, list[str]]
+
+
+class DimensionScalesBody(BaseModel):
+    dimension: str
+
+
+class ExtractV2Body(BaseModel):
+    ontology: str
+    text: str
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+
+class StoreExtractionBody(BaseModel):
+    graph: dict
+
+
 @router.get("/health")
 async def extract_health() -> dict[str, Any]:
     return service.health()
+
+
+@router.get("/uml-main-objects")
+async def api_uml_main_objects() -> dict[str, Any]:
+    try:
+        items = await asyncio.to_thread(service.list_uml_main_objects)
+        return {"items": items}
+    except Exception as e:
+        logger.exception("读取 UML 主对象列表失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/extract")
@@ -103,4 +138,158 @@ async def api_store_graph(body: StoreGraphRequestBody) -> dict[str, Any]:
         return {"status": "ok", "message": "已写入 Neo4j"}
     except Exception as e:
         logger.exception("存储 Neo4j 失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/upload-uml")
+async def api_upload_uml(
+    file: UploadFile = File(...),
+    new_main_object: str = Form(...),
+) -> dict[str, Any]:
+    """
+    上传 UML（.puml），文件保存到 algorithm/uie/ie/UML（含归档副本），并解析 class/属性/关系为图结构。
+    """
+    if not file.filename or not str(file.filename).strip():
+        raise HTTPException(status_code=400, detail="请选择 UML 文件")
+    if not file.filename.lower().endswith(".puml"):
+        raise HTTPException(status_code=400, detail="仅支持 .puml 文件")
+    if not (new_main_object or "").strip():
+        raise HTTPException(status_code=400, detail="请填写新增主对象名称")
+    try:
+        raw_bytes = await file.read()
+        result = await asyncio.to_thread(
+            service.upload_uml_and_parse,
+            raw_bytes,
+            file.filename,
+            (new_main_object or "").strip() or None,
+        )
+        return result
+    except UnicodeDecodeError as e:
+        raise HTTPException(status_code=400, detail="UML 文件必须是 UTF-8 编码") from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("UML 上传解析失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ── 知识空间初始化 ──
+
+
+@router.post("/init-knowledge-space")
+async def api_init_knowledge_space(body: InitKnowledgeSpaceBody) -> dict[str, Any]:
+    """
+    初始化知识空间：
+    - 输入 {维度: [刻度列表]}，例如 {"时间":["年月"], "空间":["集团","子公司"]}
+    - 检查维度是否存在、创建/复用刻度节点
+    - 创建 KnowledgeSpace 节点（命名：维度.刻度+维度.刻度+...）
+    - 连接 KnowledgeSpace BELONGS_TO 刻度
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.init_knowledge_space,
+            dimension_scales=body.dimension_scales,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("detail", "初始化失败"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("初始化知识空间失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/storage/knowledge-map/spaces")
+async def api_init_knowledge_map_spaces(body: InitKnowledgeMapSpacesBody) -> dict[str, Any]:
+    """
+    知识空间初始化 V3（笛卡尔积多子空间）：
+    - POST /api/component/knowledge-extract/storage/knowledge-map/spaces
+    - 输入 space_name（根空间名称）+ dimension_scales（维度刻度映射）
+    - 按维度刻度的笛卡尔积生成多个子空间节点
+    - 每个子空间连接根空间（CONTAINS）和对应刻度（BELONGS_TO）
+    - 返回 root_workspace_id 和子空间列表
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.init_knowledge_map_spaces,
+            space_name=body.space_name,
+            dimension_scales=body.dimension_scales,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("detail", "初始化失败"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("初始化知识空间（笛卡尔积）失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/dimension-scales")
+async def api_dimension_scales(body: DimensionScalesBody) -> dict[str, Any]:
+    """根据维度名称返回该维度下的所有刻度。"""
+    try:
+        result = await asyncio.to_thread(
+            service.get_dimension_scales,
+            dimension=body.dimension,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("detail", "查询失败"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("查询维度刻度失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ── 知识抽取 V2 ──
+
+
+@router.post("/extract-v2")
+async def api_extract_v2(body: ExtractV2Body) -> dict[str, Any]:
+    """
+    本体驱动的知识抽取 V2（无模板匹配）：
+    - 输入本体 PUML + 待抽取文本
+    - 返回 {raw, graph}
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.extract_v2,
+            ontology=body.ontology,
+            text=body.text,
+            base_url=body.base_url,
+            api_key=body.api_key,
+            model=body.model,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("知识抽取 V2 失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ── 抽取结果入库 ──
+
+
+@router.post("/store-extraction")
+async def api_store_extraction(body: StoreExtractionBody) -> dict[str, Any]:
+    """
+    将知识抽取 V2 返回的 graph 结构存入 Neo4j。
+    按 uid 去重：同一 uid 的节点不重复创建。
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.store_extraction_to_neo4j,
+            graph=body.graph,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("detail", "存储失败"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("存储抽取结果失败")
         raise HTTPException(status_code=500, detail=str(e)) from e

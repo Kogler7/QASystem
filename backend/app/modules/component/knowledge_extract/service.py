@@ -2,6 +2,7 @@
 知识抽取：进程内调用 algorithm/uie 算法。
 长文本或 Markdown 大块统一走切块抽取；超长块经 nl2cypher 递归切分细化后再喂 UIE。
 """
+import importlib
 import json
 import logging
 import sys
@@ -164,4 +165,128 @@ def extract_from_chunked_json_file(
         llm_base_url=llm_base_url,
         llm_model=llm_model,
         llm_api_key=llm_api_key,
+    )
+
+
+def upload_uml_and_parse(
+    data: bytes,
+    filename: str,
+    main_object: Optional[str] = None,
+    new_main_object: Optional[str] = None,
+) -> dict[str, Any]:
+    api = _get_extraction_api()
+    result = api.upload_uml_and_parse(
+        data=data,
+        filename=filename,
+        main_object=main_object,
+        new_main_object=new_main_object,
+    )
+    graph_struct = result.get("graph") or {}
+    # UML 上传后自动入库，避免前端再发一次 store-graph 请求
+    api.store_graph_to_neo4j(graph_struct=graph_struct)
+    result["stored_to_neo4j"] = True
+    return result
+
+
+def list_uml_main_objects() -> list[dict[str, str]]:
+    api = _get_extraction_api()
+    return api.list_uml_main_objects()
+
+
+# ── 知识空间初始化 ──
+
+
+def _get_knowledge_space_api():
+    """延迟导入 algorithm/knowledge_extract 模块。"""
+    try:
+        # 确保 algorithm 在 sys.path
+        algo_root = _ROOT / "algorithm"
+        if str(algo_root) not in sys.path:
+            sys.path.insert(0, str(algo_root))
+        return importlib.import_module("knowledge_extract")
+    except Exception as e:
+        logger.warning("加载 knowledge_extract 模块失败: %s", e)
+        raise
+
+
+def init_knowledge_space(dimension_scales: dict[str, list[str]]) -> dict:
+    """
+    初始化知识空间：
+    - 输入 {维度: [刻度列表]}，例如 {"时间":["年月"], "空间":["集团","子公司"]}
+    - 检查维度是否存在
+    - 检查/创建刻度节点
+    - 创建 KnowledgeSpace 节点（命名：维度.刻度+维度.刻度+...）
+    - 连接 KnowledgeSpace BELONGS_TO 刻度
+    """
+    api = _get_knowledge_space_api()
+    return api.init_knowledge_space(dimension_scales)
+
+
+def init_knowledge_map_spaces(
+    space_name: str,
+    dimension_scales: dict[str, list[str]],
+) -> dict:
+    """
+    知识空间初始化 V3（笛卡尔积多子空间）：
+    - space_name: 根知识空间名称
+    - dimension_scales: {维度: [刻度列表]}
+    - 按维度刻度的笛卡尔积生成多个子空间节点
+    - 每个子空间连接根空间和对应刻度
+    """
+    api = _get_knowledge_space_api()
+    return api.init_knowledge_map_spaces(space_name, dimension_scales)
+
+
+def init_knowledge_space_tree(
+    workspace_tree: list[dict],
+    dimensions: list[dict],
+) -> dict:
+    """
+    知识空间初始化 V2（树形结构）：
+    - workspace_tree: 空间树草稿，含根空间和子空间
+    - dimensions: 维度刻度列表
+    - 创建 KnowledgeSpace 节点树、Dimension/Scale 节点
+    - 返回 root_workspace_id
+    """
+    api = _get_knowledge_space_api()
+    return api.init_knowledge_space_tree(workspace_tree, dimensions)
+
+
+def get_dimension_scales(dimension: str) -> dict:
+    """根据维度名称返回该维度下的所有刻度。"""
+    api = _get_knowledge_space_api()
+    return api.get_dimension_scales(dimension)
+
+
+def store_extraction_to_neo4j(graph: dict) -> dict:
+    """
+    将知识抽取 V2 返回的 graph 结构存入 Neo4j。
+    按 uid 去重：同一 uid 的节点不重复创建。
+    """
+    api = _get_knowledge_space_api()
+    return api.store_extraction_to_neo4j(graph)
+
+
+# ── 知识抽取 V2 ──
+
+
+def extract_v2(
+    ontology: str,
+    text: str,
+    *,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+) -> dict:
+    """
+    本体驱动的知识抽取 V2（无模板匹配）。
+    输入本体 PUML + 待抽取文本，返回 {raw, graph}。
+    """
+    api = _get_knowledge_space_api()
+    return api.extract_v2(
+        ontology=ontology,
+        text=text,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
     )

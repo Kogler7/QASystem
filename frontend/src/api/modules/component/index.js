@@ -2,7 +2,7 @@
  * 组件管理 - API 统一入口
  * 新增组件时：在此导出对应模块的接口
  */
-export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j, parseChunkedJsonExtract } from './knowledge-extract'
+export { knowledgeExtract, extractHealthCheck, getUmlMainObjects, storeGraphToNeo4j, parseChunkedJsonExtract, uploadUmlAndParse, initKnowledgeSpace, getDimensionScales, knowledgeExtractV2, storeExtractionToNeo4j } from './knowledge-extract'
 export { 
   kgUpdateHealthCheck, 
   kgUpdateAdd, 
