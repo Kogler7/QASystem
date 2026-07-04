@@ -6,7 +6,6 @@ import json
 import time
 from openai import OpenAI
 import re
-from algorithm.ans.QA.prompt_list import *
 # from rank_bm25 import BM25Okapi
 # from sentence_transformers import util
 
@@ -141,35 +140,50 @@ def run_zhipu_glm(prompt, temperature, max_tokens, api_key):
         return "Error in GLM API call"
 
 def run_llm(prompt, temperature, max_tokens, api_key, engine="gpt-3.5-turbo"):
-    """使用项目统一的大模型接口调用模型"""
-    from algorithm.common.llm_client import complete
-    
+    import os
+    import httpx
+
+    model = engine if engine and engine not in ("ollama", "openai", "zhipu") else os.environ.get("LLM_MODEL", "deepseek-chat")
+    base_url = (os.environ.get("LLM_BASE_URL") or os.environ.get("OPENAI_BASE_URL") or "https://api.deepseek.com").rstrip("/")
+    key = api_key or os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+    verify_ssl = os.environ.get("LLM_VERIFY_SSL", "true").lower() not in ("false", "0", "no", "off")
+
     system_prompt = """你是一个AI助手。请严格按照以下要求响应：
     1. 直接给出答案，不要输出任何思考过程
     2. 不要使用<think>或任何其他标签
     3. 如果被要求提取实体，只输出实体列表，用逗号分隔
     4. 保持响应简洁直接"""
-    
-    # 确保 engine 不是后端类型，而是模型名称
-    # 如果 engine 是 "ollama"，使用默认模型
-    model_name = engine if engine not in ["ollama", "openai", "zhipu"] else None
-    
-    # 使用项目统一的大模型接口
-    result = complete(
-        prompt,
-        system_prompt=system_prompt,
-        model=model_name,
-        api_key=api_key,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=60
-    )
-    
-    if not result:
-        print(f"LLM调用失败，返回空响应")
-        return "Error in LLM API call"
-    
-    return result
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt}
+    ]
+
+    http_client = httpx.Client(verify=verify_ssl, timeout=60.0)
+    client = OpenAI(base_url=base_url, api_key=key, http_client=http_client)
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"LLM调用错误 (尝试 {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+            else:
+                print("LLM调用失败，返回空响应")
+            http_client.close()
+            if attempt < max_retries - 1:
+                http_client = httpx.Client(verify=verify_ssl, timeout=60.0)
+                client = OpenAI(base_url=base_url, api_key=key, http_client=http_client)
+
+    return "Error in LLM API call"
 # def run_llm(prompt, temperature, max_tokens, opeani_api_keys, engine="Qwen/Qwen3-8B"):
 #     """使用OpenAI兼容的chat接口调用远程模型"""
 #     client = OpenAI(
@@ -224,13 +238,13 @@ def run_llm(prompt, temperature, max_tokens, api_key, engine="gpt-3.5-turbo"):
 #     return result
 
 def all_unknown_entity(entity_candidates):
-    return all(candidate == "UnName_Entity" for candidate in entity_candidates)
+    return all(candidate == "未知实体" for candidate in entity_candidates)
 
 
 def del_unknown_entity(entity_candidates):
-    if len(entity_candidates)==1 and entity_candidates[0]=="UnName_Entity":
+    if len(entity_candidates)==1 and entity_candidates[0]=="未知实体":
         return entity_candidates
-    entity_candidates = [candidate for candidate in entity_candidates if candidate != "UnName_Entity"]
+    entity_candidates = [candidate for candidate in entity_candidates if candidate != "未知实体"]
     return entity_candidates
 
 

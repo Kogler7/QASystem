@@ -12,7 +12,7 @@ sys.path.insert(0, project_root)
 
 
 from algorithm.ans.QA.entity_linker import EntityLinker
-from algorithm.ans.QA.wiki_func import relation_search_prune, entity_search, del_all_unknown_entity, entity_score, update_history, entity_prune, reasoning, if_finish_list, generate_without_explored_paths
+from algorithm.ans.QA.wiki_func import relation_search_prune, entity_search, entity_score, update_history, entity_prune, generate_without_explored_paths
 from typing import Dict, List, Tuple
 from datetime import datetime
 import re
@@ -21,23 +21,13 @@ import json
 
 class AnswerGenerationTool:
     """
-    答案生成工具：整合方案规划和答案生成功能
+    答案生成工具：基于知识图谱的问答功能
     """
     
     def __init__(self, neo4j_client, args):
         self.client = neo4j_client
         self.args = args
         self.entity_linker = EntityLinker(neo4j_client, args)
-        self.reasoning_logs = []  # 收集推理过程中的日志
-    
-    def _log(self, step: str, message: str, data: any = None):
-        """记录推理日志"""
-        log_entry = {
-            "step": step,
-            "message": message,
-            "data": data
-        }
-        self.reasoning_logs.append(log_entry)
     
     def generate_answer(self, question_or_intent: any) -> Dict:
         """
@@ -48,139 +38,178 @@ class AnswerGenerationTool:
         try:
             self.reasoning_logs = []  # 清空之前的日志
             
+            # 初始化answer_history：用于存放与答案相关的实体信息
+            # 结构：{实体名称: {属性: 值, 判断理由: "...", 有用信息: "..."}}
+            answer_history = {}
+            
             # 处理输入
+            # 支持的输入格式：{"intent_id": "...", "user_goal": "...", ...}
             if isinstance(question_or_intent, str):
                 # 如果是字符串，直接作为问题
                 problem_description = question_or_intent
             else:
-                # 如果是字典，从意图识别结果中提取
-                # 处理嵌套的intent_output结构
-                if "intent_output" in question_or_intent:
-                    problem_description = question_or_intent.get("intent_output", {}).get("Goal", "")
-                else:
-                    problem_description = question_or_intent.get("Goal", "")
+                # 从user_goal提取问题描述
+                problem_description = question_or_intent.get("user_goal", "")
+                if not problem_description:
+                    problem_description = question_or_intent.get("goal", "")
             
             problem_id = f"PROB-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
-            # 记录问题信息
-            self._log("问题分析", f"开始处理问题: {problem_description}", {
-                "问题ID": problem_id,
-                "意图识别结果": question_or_intent if isinstance(question_or_intent, dict) else None
-            })
+            print(f"\n{'═' * 60}")
+            print(f"[1/4] 实体识别")
+            print(f"{'═' * 60}")
+            print(f"  问题: {problem_description}")
             
-            # 1. 智能实体链接
-            best_match = None
             topic_entity = {}
-            
-            # 进行实体链接
-            self._log("实体链接", "开始智能实体链接...")
             link_result = self.entity_linker.link_entities_with_llm_judge(problem_description)
             
-            # 提取所有候选实体
             all_candidates = link_result.get("all_candidates", [])
-            answerable_entities = [cand for cand in all_candidates if cand.get("can_answer", False)]
+            relevant_entities = [cand for cand in all_candidates if cand.get("is_relevant", False)]
             
-            print(f"  找到 {len(answerable_entities)} 个可回答的实体")
+            print(f"\n{'─' * 60}")
+            print(f"[2/4] 实体链接与排序")
+            print(f"{'─' * 60}")
+            print(f"  候选实体: {len(all_candidates)} 个")
+            if all_candidates:
+                print(f"  所有候选实体详情:")
+                for i, cand in enumerate(all_candidates[:10], 1):
+                    entity_name = cand['properties'].get('name', cand['qid'])
+                    score = cand.get('relevance_score', 0)
+                    mark = "✓相关" if cand.get('is_relevant') else "✗不相关"
+                    properties = cand.get('properties', {})
+                    print(f"    {i}. {entity_name} ({score:.2f}) {mark}")
+                    print(f"       属性: {', '.join([f'{k}={v}' for k, v in properties.items()][:5])}")
+                    if cand.get('llm_judgment'):
+                        print(f"       LLM判断: {cand['llm_judgment'][:50]}...")
+            print(f"  相关实体: {len(relevant_entities)} 个")
             
-            # 记录所有候选实体的详细信息
-            self._log("实体链接", f"找到 {len(all_candidates)} 个候选实体，其中 {len(answerable_entities)} 个可回答", {
-                "所有候选实体": [
-                    {
-                        "QID": cand["qid"],
-                        "名称": cand["properties"].get("name", cand["qid"]),
-                        "相关性分数": round(cand.get("relevance_score", 0), 2),
-                        "可回答": cand.get("can_answer", False),
-                        "判断理由": cand.get("reason", "")
-                    }
-                    for cand in all_candidates[:10]  # 只显示前10个，避免日志过长
-                ]
-            })
+            is_direct_answer = False
+            direct_answer_entities = []
             
-            # 如果有可回答的实体，尝试直接使用它们生成答案
-            if answerable_entities:
-                # 构建候选实体列表（用于 _check_if_entity_can_answer）
-                candidates_for_check = []
-                for cand in answerable_entities:
-                    candidates_for_check.append({
-                        "id": cand["qid"],
-                        "name": cand["properties"].get("name", cand["qid"]),
-                        "properties": cand["properties"]
-                    })
-                
-                # 使用大模型判断这些实体是否可以直接回答问题
-                self._log("答案判断", "使用大模型判断实体是否可以直接回答问题", {
-                    "待判断实体": [
-                        {
-                            "QID": c["id"],
-                            "名称": c["name"],
-                            "属性数量": len(c["properties"])
-                        }
-                        for c in candidates_for_check
-                    ]
-                })
-                
-                can_answer, answer_from_entities, source_entities = self._check_if_entity_can_answer(
-                    problem_description, candidates_for_check
-                )
-                
-                # 记录判断结果
-                self._log("答案判断结果", f"判断结果: {'可以回答' if can_answer else '不能回答'}", {
-                    "是否可以回答": can_answer,
-                    "生成的答案": answer_from_entities if can_answer else "无",
-                    "判断依据": "大模型根据实体属性判断是否可以直接回答问题"
-                })
-                
-                if can_answer and answer_from_entities:
-                    print(f"  从实体属性直接生成答案")
-                    self._log("答案生成", "从实体属性直接生成答案", {
-                        "答案": answer_from_entities,
-                        "使用实体": [c["name"] for c in candidates_for_check]
-                    })
-                    # 实体属性足够回答问题
-                    reasoning_chains = []
-                    search_result = {
-                        "found_answer": True,
-                        "depth_reached": 0,
-                        "topic_entity": link_result["linked_entities"],
-                        "answerable_entities": answerable_entities,
-                        "source_entities": source_entities  # 保存源实体，用于构建graph_paths
-                    }
-                    answer = answer_from_entities
-                else:
-                    # 实体属性不足以直接回答，执行ToG深度搜索
-                    print(f"  实体属性不足以直接回答，执行ToG深度搜索...")
-                    self._log("知识图谱检索", "实体属性不足以直接回答，开始ToG深度搜索")
-                    topic_entity = link_result["linked_entities"]
-                    answer, reasoning_chains, search_result = self._run_tog_search(
-                        question=problem_description,
-                        topic_entity=topic_entity,
-                        config=self.args
+            if relevant_entities:
+                print(f"\n{'─' * 60}")
+                print(f"[3/4] 答案判断")
+                print(f"{'─' * 60}")
+                for cand in relevant_entities:
+                    entity_id = cand["qid"]
+                    entity_name = cand["properties"].get("name", cand["qid"])
+                    
+                    print(f"\n  ┌──────────────────────────────────────────────")
+                    print(f"  │ 实体: {entity_name}")
+                    print(f"  │ ID: {entity_id}")
+                    
+                    try:
+                        full_info = self.entity_linker.get_node_full_info(entity_id)
+                        if full_info:
+                            entity_properties = full_info.get("properties", cand["properties"])
+                        else:
+                            entity_properties = cand["properties"]
+                    except Exception:
+                        entity_properties = cand["properties"]
+                    
+                    print(f"  │ 属性查询结果:")
+                    if entity_properties:
+                        for key, value in entity_properties.items():
+                            print(f"  │   {key}: {value}")
+                    else:
+                        print(f"  │   (无属性信息)")
+                    
+                    can_answer, answer_text = self._judge_entity_can_answer(
+                        problem_description, entity_id, entity_name, entity_properties
                     )
+                    
+                    mark = "✓可回答" if can_answer else "✗不足以回答"
+                    print(f"  │")
+                    print(f"  │ LLM判断结果: {mark}")
+                    if answer_text:
+                        print(f"  │ 判断理由:")
+                        # 按行输出，每行添加缩进
+                        for line in answer_text.split('\n'):
+                            print(f"  │   {line}")
+                    else:
+                        print(f"  │ 判断理由: N/A")
+                    print(f"  └──────────────────────────────────────────────")
+                    
+                    if can_answer:
+                        # 将可回答实体的信息存入answer_history
+                        if entity_name not in answer_history:
+                            answer_history[entity_name] = {
+                                "entity_id": entity_id,
+                                "properties": entity_properties.copy(),
+                                "judgment_reason": answer_text,
+                                "useful_info": []
+                            }
+                        # 提取有用的信息（如计算SQL等）
+                        useful_info = self._extract_useful_info(entity_properties, answer_text)
+                        if useful_info:
+                            answer_history[entity_name]["useful_info"].append(useful_info)
+                        
+                        direct_answer_entities.append({
+                            "id": entity_id,
+                            "name": entity_name,
+                            "properties": entity_properties,
+                            "answer_text": answer_text
+                        })
+            
+            # 判断当前history是否足以回答问题
+            if answer_history:
+                is_sufficient = self._is_history_sufficient(problem_description, answer_history)
             else:
-                # 没有找到可直接回答的实体，使用链接结果作为起始实体
+                is_sufficient = False
+            
+            if is_sufficient:
+                print(f"\n  → 当前收集的信息足以回答问题，无需继续搜索")
+                reasoning_chains = []
+                search_result = {
+                    "found_answer": True,
+                    "depth_reached": 0,
+                    "topic_entity": link_result["linked_entities"],
+                    "source_entities": direct_answer_entities
+                }
+                is_direct_answer = True
+            elif direct_answer_entities:
+                # 有可回答的实体但信息可能还不够完整
+                print(f"\n  → 找到 {len(direct_answer_entities)} 个相关实体，继续搜索以获取更完整信息")
                 topic_entity = link_result["linked_entities"]
-                print(f"  起始实体: {topic_entity}")
+                entity_names = list(topic_entity.values())
+                print(f"\n{'─' * 60}")
+                print(f"[4/4] ToG 图搜索")
+                print(f"{'─' * 60}")
+                print(f"  起始实体: {', '.join(entity_names[:5])}")
                 
-                # 记录实体识别与链接结果
-                self._log("实体识别与链接", f"识别到 {len(topic_entity)} 个实体", topic_entity)
-
-                # 调用 ToG 方法在知识图谱上检索
                 answer, reasoning_chains, search_result = self._run_tog_search(
                     question=problem_description,
                     topic_entity=topic_entity,
-                    config=self.args
+                    config=self.args,
+                    answer_history=answer_history
                 )
+                # 更新answer_history
+                if 'answer_history' in search_result:
+                    answer_history = search_result['answer_history']
+                is_direct_answer = False
+            else:
+                topic_entity = link_result["linked_entities"]
+                entity_names = list(topic_entity.values())
+                print(f"\n{'─' * 60}")
+                print(f"[3/4] 答案判断 → 全部不足以回答")
+                print(f"{'─' * 60}")
+                print(f"\n{'─' * 60}")
+                print(f"[4/4] ToG 图搜索")
+                print(f"{'─' * 60}")
+                print(f"  起始实体: {', '.join(entity_names[:5])}")
+
+                answer, reasoning_chains, search_result = self._run_tog_search(
+                    question=problem_description,
+                    topic_entity=topic_entity,
+                    config=self.args,
+                    answer_history=answer_history
+                )
+                # 更新answer_history
+                if 'answer_history' in search_result:
+                    answer_history = search_result['answer_history']
+                is_direct_answer = False
             
-            # 2. 将检索结果转换为方案模型
-            solution = self._convert_tog_result_to_solution(
-                problem_id=problem_id,
-                problem_description=problem_description,
-                answer=answer,
-                reasoning_chains=reasoning_chains,
-                search_result=search_result
-            )
-            
-            # 3. 构建图谱路径信息
+            # 构建图谱路径信息
             graph_paths = {
                 "answer_path": [],
                 "reasoning_chains": reasoning_chains
@@ -189,7 +218,6 @@ class AnswerGenerationTool:
             # 从推理链中提取路径信息
             for depth, chain in enumerate(reasoning_chains):
                 if chain:
-                    # 直接处理 chain 中的元素
                     for item in chain:
                         path = {
                             "depth": depth + 1,
@@ -197,37 +225,31 @@ class AnswerGenerationTool:
                             "relationships": []
                         }
                         
-                        # 检查 item 的类型
                         if isinstance(item, tuple) and len(item) == 3:
-                            # 格式为 (实体1, 关系, 实体2)
                             entity1, relation, entity2 = item
                             
-                            # 处理实体1
                             entity1_id = entity1
                             entity1_name = entity1
                             entity1_properties = {}
                             
-                            # 检查entity1是否是字典格式
                             if isinstance(entity1, dict):
                                 entity1_id = entity1.get('id', entity1)
                                 entity1_name = entity1.get('name', str(entity1))
                                 entity1_properties = entity1.get('properties', {})
                             else:
-                                # 首先检查是否在topic_entity中（键是ID，值是名称）
                                 for id, name in topic_entity.items():
                                     if name == entity1:
                                         entity1_id = id
+                                        entity1_name = name
                                         break
-                                # 如果不是NEO_开头的ID，尝试通过实体链接器搜索
                                 if isinstance(entity1_id, str) and not entity1_id.startswith("NEO_"):
                                     try:
-                                        # 尝试搜索实体
                                         candidates = self.entity_linker.search_entities_with_full_info(entity1, limit=1)
                                         if candidates:
                                             entity1_id = candidates[0].get("qid", entity1)
+                                            entity1_properties = candidates[0].get("properties", {})
                                     except Exception:
                                         pass
-                                # 获取实体1的属性
                                 try:
                                     entity1_info = self.entity_linker.get_node_full_info(entity1_id)
                                     if entity1_info:
@@ -235,38 +257,33 @@ class AnswerGenerationTool:
                                 except Exception:
                                     pass
                             
-                            # 处理实体2
                             entity2_id = entity2
                             entity2_name = entity2
                             entity2_properties = {}
                             
-                            # 检查entity2是否是字典格式
                             if isinstance(entity2, dict):
                                 entity2_id = entity2.get('id', entity2)
                                 entity2_name = entity2.get('name', str(entity2))
                                 entity2_properties = entity2.get('properties', {})
                             else:
-                                # 首先检查是否在topic_entity中（键是ID，值是名称）
                                 for id, name in topic_entity.items():
                                     if name == entity2:
                                         entity2_id = id
                                         break
-                                # 如果不是NEO_开头的ID，尝试通过实体链接器搜索
                                 if isinstance(entity2_id, str) and not entity2_id.startswith("NEO_"):
                                     try:
-                                        # 尝试搜索实体
                                         candidates = self.entity_linker.search_entities_with_full_info(entity2, limit=1)
                                         if candidates:
                                             entity2_id = candidates[0].get("qid", entity2)
                                     except Exception:
                                         pass
-                                # 获取实体2的属性
                                 try:
                                     entity2_info = self.entity_linker.get_node_full_info(entity2_id)
                                     if entity2_info:
                                         entity2_properties = entity2_info.get("properties", {})
                                 except Exception:
                                     pass
+                            
                             path["nodes"].append({
                                 "id": entity1_id,
                                 "label": entity1_name,
@@ -283,30 +300,34 @@ class AnswerGenerationTool:
                                 "to": entity2_name
                             })
                         elif isinstance(item, list):
-                            # 格式为列表，可能包含多个实体和关系
                             for i, sub_item in enumerate(item):
                                 if isinstance(sub_item, dict):
-                                    # 处理实体
-                                    if "entity" in sub_item:
-                                        entity_id = sub_item["entity"]
-                                        entity_name = sub_item.get("label", entity_id)
-                                        # 获取实体的属性
-                                        entity_properties = {}
+                                    entity_id = sub_item.get("id", sub_item.get("entity", str(sub_item)))
+                                    entity_name = sub_item.get("name", entity_id)
+                                    entity_properties = {}
+                                    
+                                    if not entity_id.startswith("NEO_"):
                                         try:
-                                            entity_info = self.entity_linker.get_node_full_info(entity_id)
-                                            if entity_info:
-                                                entity_properties = entity_info.get("properties", {})
+                                            candidates = self.entity_linker.search_entities_with_full_info(entity_name, limit=1)
+                                            if candidates:
+                                                entity_id = candidates[0].get("qid", entity_id)
+                                                entity_properties = candidates[0].get("properties", {})
                                         except Exception:
                                             pass
-                                        path["nodes"].append({
-                                            "id": entity_id,
-                                            "label": entity_name,
-                                            "properties": entity_properties
-                                        })
-                                    # 处理关系
+                                    
+                                    try:
+                                        entity_info = self.entity_linker.get_node_full_info(entity_id)
+                                        if entity_info:
+                                            entity_properties = entity_info.get("properties", {})
+                                    except Exception:
+                                        pass
+                                    path["nodes"].append({
+                                        "id": entity_id,
+                                        "label": entity_name,
+                                        "properties": entity_properties
+                                    })
                                     if "relation" in sub_item and i > 0:
                                         relation_type = sub_item["relation"]
-                                        # 添加关系
                                         path["relationships"].append({
                                             "from": item[i-1].get("entity"),
                                             "type": relation_type,
@@ -316,10 +337,7 @@ class AnswerGenerationTool:
                         if path["nodes"]:
                             graph_paths["answer_path"].append(path)
             
-            print(f"提取的 answer_path: {graph_paths['answer_path']}")
-            
-            # 如果没有从推理链中提取到路径，但从实体属性直接生成了答案
-            # 使用source_entities构建answer_path
+            # 如果没有从推理链中提取到路径，但有source_entities（直接回答的情况）
             if not graph_paths['answer_path'] and search_result.get('source_entities'):
                 graph_paths['answer_path'] = []
                 for entity in search_result['source_entities']:
@@ -335,15 +353,16 @@ class AnswerGenerationTool:
                         "relationships": []
                     }
                     graph_paths['answer_path'].append(path)
-                print(f"为直接从实体属性生成答案构建answer_path: {graph_paths['answer_path']}")
+                pass
             
-            # 4. 生成最终的结构化答案
+            # 生成最终的结构化答案
+            direct_answer_text = direct_answer_entities[0].get("answer_text", "") if direct_answer_entities else ""
             final_answer = self._generate_final_answer(
                 question=problem_description,
-                solution_description=solution.get("方案描述", ""),
-                outputs=solution.get("输出", []),
-                steps=solution.get("步骤", []),
-                answer_path=graph_paths["answer_path"]
+                answer_path=graph_paths["answer_path"],
+                answer_history=answer_history,
+                is_direct_answer=is_direct_answer,
+                direct_answer_text=direct_answer_text
             )
             
             return {
@@ -358,15 +377,28 @@ class AnswerGenerationTool:
                 "message": "答案生成失败"
             }
     
-    def _generate_final_answer(self, question: str, solution_description: str, 
-                              outputs: List, steps: List, answer_path: List) -> str:
+    def _generate_final_answer(self, question: str, answer_path: List,
+                              answer_history: Dict = None,
+                              is_direct_answer: bool = False, direct_answer_text: str = "") -> str:
         """
         生成最终答案
         使用大模型和提示词生成结构化答案
+        如果是直接回答（is_direct_answer=True），则使用第二步判断中生成的答案
+        如果有answer_history，则基于history中的信息生成答案
         """
-        # 从答案路径中提取相关实体和完整信息
         matched_entities = []
         entities_info = []
+        
+        # 如果有answer_history，先使用history中的信息
+        if answer_history:
+            for entity_name, entity_data in answer_history.items():
+                matched_entities.append(entity_name)
+                entities_info.append({
+                    "label": entity_name,
+                    "properties": entity_data.get("properties", {}),
+                    "judgment_reason": entity_data.get("judgment_reason", ""),
+                    "useful_info": entity_data.get("useful_info", [])
+                })
         
         if answer_path:
             for path in answer_path:
@@ -381,12 +413,47 @@ class AnswerGenerationTool:
                             "properties": node_properties
                         })
         
+        if is_direct_answer and entities_info:
+            matched_entity = entities_info[0].get('label', '未知实体')
+            
+            # 构建answer_history的详细文本
+            history_detail = ""
+            if answer_history and len(answer_history) > 0:
+                history_detail = "\n".join([
+                    f"    - {name}: {'; '.join(info.get('useful_info', []))}"
+                    for name, info in answer_history.items()
+                ])
+            
+            # 如果有answer_history，让LLM基于问题和history重新生成答案
+            if history_detail:
+                detailed_answer = self._generate_answer_from_history(
+                    question=question,
+                    answer_history=answer_history
+                )
+            elif direct_answer_text:
+                detailed_answer = direct_answer_text
+            else:
+                detailed_answer = self._generate_detailed_answer(question, entities_info)
+            
+            # 使用更详细的答案格式
+            if history_detail:
+                structured_answer = f"""o 根据业务模型识别到该问题对应的业务活动是：{matched_entity.split(' ')[0] if ' ' in matched_entity else matched_entity}
+o 根据指标模型匹配：{', '.join(answer_history.keys())}
+o 关键发现：
+{history_detail}
+o 最终答案：{detailed_answer}"""
+            else:
+                structured_answer = f"""o 根据业务模型识别到该问题对应的业务活动是：{matched_entity.split(' ')[0] if ' ' in matched_entity else matched_entity}
+o 根据指标模型匹配：{matched_entity}
+o 推导：不适用
+o 因此，业务被转化为用指标描述的业务，最终答案：{detailed_answer}"""
+            return structured_answer
+        
         # 使用大模型生成结构化答案
         try:
             from algorithm.ans.QA.utils import run_llm
             from algorithm.ans.QA.prompt_list import structured_answer_prompt
             
-            # 构建提示词
             matched_entities_text = "\n".join([f"- {e}" for e in matched_entities]) if matched_entities else "无"
             
             entities_info_text = ""
@@ -404,10 +471,8 @@ class AnswerGenerationTool:
                 entities_info_text=entities_info_text
             )
             
-            # 调用大模型
             response = run_llm(prompt, 0.3, 1500, self.args.LLM_API_KEY, self.args.LLM_TYPE)
             
-            # 清理响应
             import re
             response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
             response = re.sub(r'<think>.*', '', response, flags=re.DOTALL)
@@ -422,331 +487,41 @@ class AnswerGenerationTool:
             print(f"生成结构化答案异常: {e}")
             return "根据知识图谱中的信息，可以回答您的问题。"
     
-    def _run_tog_search(self, question: str, topic_entity: Dict, config) -> tuple:
+    def _extract_useful_info(self, entity_properties: Dict, judgment_reason: str) -> str:
         """
-        运行 ToG 知识图谱检索
-        在检索过程中获取节点的完整属性，并让大模型判断是否可以直接回答
+        从实体属性中提取对回答问题有用的信息
+        现在简化为直接使用LLM的判断理由作为有用信息
         """
-        cluster_chain_of_entities = []
-        pre_relations = []
-        pre_heads = [-1] * len(topic_entity)
-        found_answer = False
-        final_answer = "信息不足"
-
-        for depth in range(1, config.DEPTH + 1):
-            print(f"    ToG深度 {depth} 搜索...")
-
-            current_entity_relations_list = []
-            i = 0
-            for entity in topic_entity:
-                if entity != "[FINISH_ID]":
-                    pre_head_value = pre_heads[i] if i < len(pre_heads) else -1
-
-                    retrieve_relations_with_scores = relation_search_prune(
-                        entity, topic_entity[entity], pre_relations,
-                        pre_head_value, question, config, self.client
-                    )
-                    current_entity_relations_list.extend(retrieve_relations_with_scores)
-                i += 1
-
-            if not current_entity_relations_list:
-                print(f"    深度 {depth} 未找到关系")
-                break
-
-            # 记录大模型选择的关系和打分
-            llm_response = current_entity_relations_list[0].get('llm_response', '') if current_entity_relations_list else ''
-            
-            self._log("知识图谱检索", f"深度 {depth} - 大模型关系选择", {
-                "深度": depth,
-                "大模型选择原因": llm_response,
-                "候选关系": [
-                    {
-                        "实体": rel.get('entity_name', rel.get('entity', '')),
-                        "关系": rel.get('relation', ''),
-                        "方向": "出度" if rel.get('head', True) else "入度",
-                        "评分": round(rel.get('score', 0), 2)
-                    }
-                    for rel in current_entity_relations_list[:5]
-                ]
-            })
-
-            # 收集候选实体
-            total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head = [], [], [], [], [], []
-
-            for entity in current_entity_relations_list:
-                direction_outgoing = entity.get('head', True)
-
-                if direction_outgoing:
-                    entity_candidates_id, entity_candidates_name = entity_search(
-                        entity['entity'], entity['relation'], self.client, True
-                    )
-                else:
-                    entity_candidates_id, entity_candidates_name = entity_search(
-                        entity['entity'], entity['relation'], self.client, False
-                    )
-
-                if len(entity_candidates_name) == 0:
-                    continue
-
-                # 处理候选实体
-                if len(entity_candidates_id) == 0:  # 值类型
-                    if len(entity_candidates_name) >= 20:
-                        import random
-                        entity_candidates_name = random.sample(entity_candidates_name, 10)
-                    entity_candidates_id = ["[FINISH_ID]"] * len(entity_candidates_name)
-                else:  # 实体类型
-                    entity_candidates_id, entity_candidates_name = del_all_unknown_entity(
-                        entity_candidates_id, entity_candidates_name
-                    )
-                    if len(entity_candidates_id) >= 20:
-                        import random
-                        indices = random.sample(range(len(entity_candidates_name)), 10)
-                        entity_candidates_id = [entity_candidates_id[i] for i in indices]
-                        entity_candidates_name = [entity_candidates_name[i] for i in indices]
-
-                if len(entity_candidates_id) == 0:
-                    continue
-
-                # ===== 增强：获取候选实体的完整属性并进行智能判断 =====
-                enriched_candidates = []
-                for idx, candidate_id in enumerate(entity_candidates_id):
-                    if candidate_id != "[FINISH_ID]":
-                        # 获取候选实体的完整信息
-                        candidate_info = self.entity_linker.get_node_full_info(candidate_id)
-                        if candidate_info:
-                            enriched_candidates.append({
-                                "id": candidate_id,
-                                "name": entity_candidates_name[idx],
-                                "properties": candidate_info["properties"]
-                            })
-                        else:
-                            enriched_candidates.append({
-                                "id": candidate_id,
-                                "name": entity_candidates_name[idx],
-                                "properties": {}
-                            })
-                    else:
-                        enriched_candidates.append({
-                            "id": candidate_id,
-                            "name": entity_candidates_name[idx],
-                            "properties": {}
-                        })
-
-                # 使用大模型对候选实体进行智能判断
-                if enriched_candidates:
-                    can_answer, answer_from_entity, source_entities = self._check_if_entity_can_answer(
-                        question, enriched_candidates
-                    )
-                    
-                    if can_answer and answer_from_entity:
-                        print(f"    深度 {depth} - 从实体属性中直接找到答案！")
-                        final_answer = answer_from_entity
-                        found_answer = True
-                        
-                        # 记录找到答案的实体信息
-                        self._log("知识图谱检索", f"深度 {depth} - 从实体属性直接回答", {
-                            "找到答案": True,
-                            "答案": answer_from_entity,
-                            "候选实体": [
-                                {
-                                    "id": c["id"],
-                                    "name": c["name"],
-                                    "属性数": len(c["properties"])
-                                }
-                                for c in enriched_candidates[:3]
-                            ]
-                        })
-                        
-                        # 继续搜索，尝试找到更多相关实体
-                        # 不在这里直接返回，而是继续搜索其他可能的实体
-                        # 这样可以找到多个相关实体，提供更完整的答案
-                        print(f"    找到答案后继续搜索其他相关实体...")
-
-                # 评分和更新
-                scores, entity_candidates, entity_candidates_id = entity_score(
-                    question, entity_candidates_id, entity_candidates_name,
-                    entity['score'], entity['relation'], config
-                )
-
-                total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head = update_history(
-                    entity_candidates, entity, scores, entity_candidates_id,
-                    total_candidates, total_scores, total_relations, total_entities_id,
-                    total_topic_entities, total_head, len(entity_candidates_id) == 0
-                )
-
-            if len(total_candidates) == 0:
-                print(f"    深度 {depth} 未找到候选实体")
-                break
-
-            # 实体剪枝
-            flag, chain_of_entities, entities_id, pre_relations, pre_heads = entity_prune(
-                total_entities_id, total_relations, total_candidates,
-                total_topic_entities, total_head, total_scores, config, self.client, self.entity_linker
-            )
-            cluster_chain_of_entities.append(chain_of_entities)
-
-            if flag:
-                # 推理
-                stop, answer = reasoning(question, cluster_chain_of_entities, config)
-                if stop:
-                    print(f"    在深度 {depth} 找到答案")
-                    final_answer = answer
-                    found_answer = True
-                    break
-                else:
-                    print(f"    深度 {depth} 未找到答案，继续搜索")
-                    flag_finish, entities_id = if_finish_list(entities_id)
-                    if flag_finish:
-                        break
-                    else:
-                        # 更新主题实体
-                        topic_entity = {}
-                        for entity in entities_id:
-                            if entity != "[FINISH_ID]":
-                                labels = self.client.query_all("qid2label", entity)
-                                label = next(iter(labels)) if labels else "未知实体"
-                                topic_entity[entity] = label
-                        continue
-            else:
-                print(f"    深度 {depth} 实体剪枝失败")
-                break
-
-        # 如果没找到答案，使用LLM直接回答
-        if not found_answer:
-            final_answer = generate_without_explored_paths(question, config)
-
-        # 记录最终推理结果
-        self._log("知识图谱检索", "检索完成", {
-            "是否找到答案": found_answer,
-            "搜索深度": depth,
-            "最终答案": final_answer,
-            "推理链数量": len(cluster_chain_of_entities)
-        })
-
-        return final_answer, cluster_chain_of_entities, {
-            "found_answer": found_answer,
-            "depth_reached": depth,
-            "topic_entity": topic_entity,
-            "source_entities": source_entities if 'source_entities' in dir() else []
-        }
+        return judgment_reason if judgment_reason else ""
     
-    def _check_if_entity_can_answer(self, question: str, candidates: List[Dict]) -> tuple:
+    def _is_history_sufficient(self, question: str, answer_history: Dict) -> bool:
         """
-        检查候选实体是否可以直接回答问题
-        返回: (是否可以回答, 答案, 数据来源实体列表)
+        判断当前answer_history中的信息是否足以回答问题
+        返回: True表示信息充足，可以生成答案；False表示信息不足，需要继续搜索
         """
-        if not candidates:
-            return False, None, []
-
-        # 构建提示词，让大模型判断是否可以回答
-        prompt = self._build_entity_answer_check_prompt(question, candidates)
-
-        try:
-            from algorithm.ans.QA.utils import run_llm
-            response = run_llm(prompt, 0.1, 1500, self.args.LLM_API_KEY, self.args.LLM_TYPE)
-            
-            # 解析响应
-            result = self._parse_entity_answer_check(response)
-            
-            if result.get("can_answer", False):
-                answer = result.get("answer", "")
-                # 再次检查答案是否真正回答了用户的问题
-                if self._is_answer_sufficient(question, answer):
-                    # 返回答案和相关的候选实体（用于构建answer_path）
-                    return True, answer, candidates
-                else:
-                    print(f"  答案不足以回答问题: {answer}")
-                    return False, None, []
-            
-            return False, None, []
-            
-        except Exception as e:
-            print(f"实体回答检查异常: {e}")
-            return False, None, []
-
-    def _build_entity_answer_check_prompt(self, question: str, candidates: List[Dict]) -> str:
-        """构建实体回答检查提示词"""
+        if not answer_history:
+            return False
         
-        candidates_text = ""
-        for i, cand in enumerate(candidates[:5], 1):  # 最多检查前5个
-            candidates_text += f"\n【候选实体 {i}】\n"
-            candidates_text += f"名称: {cand['name']}\n"
-            candidates_text += f"属性:\n"
-            for key, value in cand['properties'].items():
-                value_str = str(value)
-                if len(value_str) > 300:
-                    value_str = value_str[:300] + "..."
-                candidates_text += f"  - {key}: {value_str}\n"
-
-        # 使用原始字符串，避免f-string中的花括号问题
-        prompt = """
-你是一个智能问答助手。请根据用户的问题和候选实体的完整属性信息，判断是否可以直接从实体属性中找到答案。
-
-用户问题："{question}"
-
-候选实体信息：
-{candidates_text}
-
-请分析：
-1. 候选实体的属性中是否包含回答问题的关键信息？
-2. 如果需要多个实体的信息才能完整回答问题，请检查所有候选实体
-3. 如果有足够信息，请直接生成答案
-4. 如果只有部分信息，请基于现有信息生成尽可能完整的答案
-
-输出格式（严格的JSON）：
-{{
-  "can_answer": true/false,
-  "answer": "如果可以回答，请提供答案；如果不能，请填null",
-  "reason": "判断理由"
-}}
-
-注意：
-- 如果问题需要对比或计算（如：A和B的对比、A比B多多少等），请检查是否有多个相关实体
-- 对于需要计算的问题（如：非公开采购金额 = 电子采购中标金额 - 公开采购中标金额），请检查是否能找到所有需要的实体
-- 如果找到多个相关实体的SQL，请将所有SQL都返回，并说明计算逻辑
-- 如果实体的属性中包含计算SQL等可以直接回答问题的信息，请设置 can_answer 为 true
-- 答案应该直接、准确地回答用户的问题，包含所有必要的SQL语句和计算说明
-- 例如：如果问题问"非公开采购金额"，但知识图谱中没有这个节点，可以通过"电子采购中标金额"和"公开采购中标金额"的SQL计算得到
-- 对于"公开采购与非公开采购金额构成如何"的问题，只使用CG_001 电子采购中标金额和CG_003 公开采购中标金额这两个实体，不要使用CG_006 电子采购品类中标金额
-- 不要过滤或忽略任何可能相关的属性，让用户自己判断哪些信息有用
-""".format(question=question, candidates_text=candidates_text)
-
-        return prompt
-
-    def _parse_entity_answer_check(self, response: str) -> Dict:
-        """解析实体回答检查的响应"""
-        try:
-            # 尝试提取JSON
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-                return {
-                    "can_answer": data.get("can_answer", False),
-                    "answer": data.get("answer"),
-                    "reason": data.get("reason", "")
-                }
-        except Exception as e:
-            print(f"解析实体回答检查响应异常: {e}")
-        
-        return {"can_answer": False, "answer": None, "reason": "解析失败"}
-
-    def _is_answer_sufficient(self, question: str, answer: str) -> bool:
-        """
-        判断答案是否足够回答用户的问题
-        """
         try:
             from algorithm.ans.QA.utils import run_llm
             
-            prompt = f"""你是一个智能问答评估助手。请判断以下答案是否足够回答用户的问题。
+            # 构建history信息文本
+            history_text = ""
+            for entity_name, entity_data in answer_history.items():
+                history_text += f"\n【{entity_name}】\n"
+                history_text += f"  判断理由: {entity_data.get('judgment_reason', '')}\n"
+                if entity_data.get('useful_info'):
+                    history_text += f"  关键信息: {'; '.join(entity_data['useful_info'])}\n"
+            
+            # 构建prompt
+            prompt = f"""请判断以下收集到的信息是否足以回答用户的问题。
 
-用户问题："{question}"
+问题：{question}
 
-提供的答案："{answer}"
+已收集到的信息：
+{history_text}
 
-请分析：
-1. 答案是否直接回答了用户的问题？
-2. 答案是否包含足够的信息来满足用户的需求？
-3. 答案是否具体、明确，而不是泛泛而谈？
+请判断：这些信息是否足以回答问题？不需要生成完整答案，只需要判断是或否。
 
 输出格式（严格的JSON）：
 {{
@@ -754,43 +529,545 @@ class AnswerGenerationTool:
   "reason": "判断理由"
 }}
 
-注意：
-- 如果答案只是简单地重复实体名称或基本属性，而没有回答问题的核心内容，应判断为不足够
-- 如果答案只是说"根据实体信息可以回答"但没有提供具体信息，应判断为不足够
-- 只有当答案真正解决了用户的问题时，才判断为足够"""
+判断原则：
+1. 如果收集到的信息包含回答问题所需的关键要素（如指标定义、计算方法、数据来源、业务流程等），则认为信息充足
+2. 如果明显缺少关键信息（如缺少计算公式、缺少必要的数据表信息等），则认为信息不足
+3. 即使信息不完整但包含关键线索，也可以认为信息充足，让最终答案生成阶段处理
+"""
             
             response = run_llm(prompt, 0.1, 500, self.args.LLM_API_KEY, self.args.LLM_TYPE)
             
-            # 解析响应
             import re
             import json
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-                sufficient = data.get("sufficient", False)
-                reason = data.get("reason", "")
-                print(f"  答案评估: {'足够' if sufficient else '不足够'}")
-                print(f"  评估理由: {reason}")
-                return sufficient
             
-            return False
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = response.strip()
+            
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if json_match:
+                try:
+                    json_data = json.loads(json_match.group())
+                    print(f"\n  → History充足性判断: {'✓充足' if json_data.get('sufficient') else '✗不足'}")
+                    print(f"    判断理由: {json_data.get('reason', '')[:50]}...")
+                    return json_data.get('sufficient', False)
+                except Exception:
+                    return len(answer_history) >= 2  # 默认规则：至少2个相关实体
+            
+            return len(answer_history) >= 2  # 默认规则：至少2个相关实体
             
         except Exception as e:
-            print(f"答案评估异常: {e}")
-            return False
+            print(f"判断history充足性异常: {e}")
+            return len(answer_history) >= 2  # 默认规则
+    
+    def _generate_answer_from_history(self, question: str, answer_history: Dict) -> str:
+        """
+        根据问题和answer_history生成最终答案
+        让LLM综合所有收集到的信息来生成更准确的答案
+        """
+        try:
+            from algorithm.ans.QA.utils import run_llm
+            
+            # 构建history信息文本
+            history_text = ""
+            for entity_name, entity_data in answer_history.items():
+                history_text += f"\n【{entity_name}】\n"
+                history_text += f"  判断理由: {entity_data.get('judgment_reason', '')}\n"
+                if entity_data.get('useful_info'):
+                    history_text += f"  关键信息: {'; '.join(entity_data['useful_info'])}\n"
+            
+            # 构建prompt
+            prompt = f"""请根据以下问题和收集到的信息，生成一个详细、准确的答案。
 
-    def _convert_tog_result_to_solution(self, problem_id: str, problem_description: str, 
-                                       answer: str, reasoning_chains: List, 
-                                       search_result: Dict) -> Dict:
-        """将 ToG 结果转换为方案模型"""
-        # 构建方案模型
-        solution_data = {
-            "方案ID": f"SOL-{problem_id.split('-')[1]}",
-            "方案类别": "分析类问题解决方案",
-            "方案目标": f"针对问题 '{problem_description}' 的解决方案",
-            "输入": [problem_description],
-            "输出": [answer] if answer else ["信息不足"],
-            "约束": ["基于知识图谱检索", "遵循最佳实践"],
-            "置信度": 0.9 if answer and answer != "信息不足" else 0.5
+问题：{question}
+
+收集到的相关信息：
+{history_text}
+
+请基于以上信息，用自然、友好的语言回答问题。如果信息中有SQL语句，请解释如何使用该SQL获取所需数据。
+"""
+            
+            # 调用LLM生成答案
+            response = run_llm(prompt, 0.3, 1500, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            
+            # 清理响应
+            import re
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = re.sub(r'<think>.*', '', response, flags=re.DOTALL)
+            response = response.strip()
+            
+            return response if response else "根据收集到的信息，可以回答您的问题。"
+            
+        except Exception as e:
+            print(f"基于history生成答案异常: {e}")
+            # 如果LLM调用失败，返回第一个实体的判断理由
+            if answer_history:
+                first_entity = list(answer_history.values())[0]
+                return first_entity.get('judgment_reason', '无法生成答案')
+            return "无法生成答案"
+    
+    def _judge_entity_can_answer(self, question: str, entity_id: str, entity_name: str, entity_properties: Dict) -> tuple:
+        """
+        第二步判断：基于实体完整信息判断是否能回答问题
+        返回: (can_answer: bool, answer_text: str)
+        """
+        from algorithm.ans.QA.utils import run_llm
+        from algorithm.ans.QA.prompt_list import entity_answer_judge_prompt
+        from algorithm.ans.QA.rules_config import format_rules_for_prompt
+        
+        entity_info_text = f"实体名称: {entity_name}\n实体ID: {entity_id}\n"
+        for key, value in entity_properties.items():
+            value_str = str(value)
+            if len(value_str) > 500:
+                value_str = value_str[:500] + "..."
+            entity_info_text += f"  {key}: {value_str}\n"
+        
+        # 加载适用的业务规则
+        rules_text = format_rules_for_prompt(question)
+        
+        prompt = entity_answer_judge_prompt.format(
+            rules_text=rules_text,
+            question=question,
+            entity_info_text=entity_info_text
+        )
+        
+        try:
+            response = run_llm(prompt, 0.1, 1500, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            
+            import re
+            response = re.sub(r'熟虑.*?总结', '', response, flags=re.DOTALL)
+            response = re.sub(r'熟虑.*', '', response, flags=re.DOTALL)
+            response = response.strip()
+            
+            json_data = None
+            try:
+                json_match = re.search(r'\{[\s\S]*\}', response)
+                if json_match:
+                    json_data = json.loads(json_match.group())
+            except Exception:
+                pass
+            
+            if json_data:
+                can_answer = json_data.get("can_answer", False)
+                answer_text = json_data.get("answer", "")
+                reason = json_data.get("reason", "")
+                
+                # 检查该实体是否是业务规则中所需的实体
+                from algorithm.ans.QA.rules_config import get_applicable_rules
+                applicable_rules = get_applicable_rules(question)
+                is_required_entity = False
+                for rule in applicable_rules:
+                    if entity_name in rule.get("required_entities", []):
+                        is_required_entity = True
+                        break
+                
+                # 如果实体是业务规则所需的，强制标记为可回答
+                if is_required_entity:
+                    new_reason = f"{reason} 根据业务规则，该实体是计算非公开采购金额所需的关键实体。"
+                    return True, new_reason
+                elif can_answer and answer_text:
+                    return True, answer_text
+                else:
+                    return False, reason
+            else:
+                return False, "解析大模型响应失败"
+                
+        except Exception as e:
+            return False, str(e)
+    
+    def _judge_triple_can_answer(self, question: str, triple_info: Dict) -> tuple:
+        """
+        判断三元组是否对回答问题有用
+        triple_info: {h_name, h_id, h_properties, relation, t_name, t_id, t_properties}
+        返回: (is_useful: bool, reason: str)
+        """
+        from algorithm.ans.QA.utils import run_llm
+        from algorithm.ans.QA.prompt_list import triple_answer_judge_prompt
+        
+        h_name = triple_info.get('h_name', '')
+        h_properties = triple_info.get('h_properties', {})
+        relation = triple_info.get('relation', '')
+        t_name = triple_info.get('t_name', '')
+        t_properties = triple_info.get('t_properties', {})
+        
+        # 构建三元组信息文本
+        triple_text = f"三元组: {h_name} —[{relation}]→ {t_name}\n"
+        
+        # 添加头实体属性
+        if h_properties:
+            triple_text += f"{h_name} 的属性:\n"
+            for key, value in h_properties.items():
+                value_str = str(value)
+                if len(value_str) > 200:
+                    value_str = value_str[:200] + "..."
+                triple_text += f"  {key}: {value_str}\n"
+        
+        # 添加尾实体属性
+        if t_properties:
+            triple_text += f"{t_name} 的属性:\n"
+            for key, value in t_properties.items():
+                value_str = str(value)
+                if len(value_str) > 200:
+                    value_str = value_str[:200] + "..."
+                triple_text += f"  {key}: {value_str}\n"
+        
+        prompt = triple_answer_judge_prompt.format(
+            question=question,
+            triple_info=triple_text
+        )
+        
+        try:
+            response = run_llm(prompt, 0.1, 1500, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            
+            import re
+            response = response.strip()
+            
+            json_data = None
+            try:
+                json_match = re.search(r'\{[\s\S]*\}', response)
+                if json_match:
+                    json_data = json.loads(json_match.group())
+            except Exception:
+                pass
+            
+            if json_data:
+                is_useful = json_data.get("is_useful", False)
+                reason = json_data.get("reason", "")
+                
+                return is_useful, reason
+            else:
+                # 如果解析失败，简单判断
+                if "有用" in response or "可以回答" in response or "有助于" in response:
+                    return True, response
+                return False, "解析大模型响应失败"
+                
+        except Exception as e:
+            return False, str(e)
+    
+    def _generate_detailed_answer(self, question: str, entities_info: List[Dict]) -> str:
+        """
+        根据实体属性生成详细的自然语言答案
+        """
+        if not entities_info:
+            return "未找到相关实体信息"
+        
+        entities_info_text = ""
+        for i, entity in enumerate(entities_info, 1):
+            entities_info_text += f"\n【实体{i}】{entity['label']}\n"
+            for key, value in entity['properties'].items():
+                value_str = str(value)
+                if len(value_str) > 500:
+                    value_str = value_str[:500] + "..."
+                entities_info_text += f"  {key}: {value_str}\n"
+        
+        prompt = f"""你是一个智能问答助手。请根据用户的问题和实体的完整属性信息，直接生成详细的自然语言答案。
+
+用户问题："{question}"
+
+实体信息：
+{entities_info_text}
+
+请基于实体的属性信息，直接生成自然语言的答案。
+答案要求：
+1. 直接回答用户问题
+2. 包含实体中的关键属性信息
+3. 如果实体有计算SQL或数据来源等信息，可以一并说明
+4. 答案要准确、清晰、完整
+
+直接输出答案，不要输出其他内容。"""
+        
+        try:
+            from algorithm.ans.QA.utils import run_llm
+            response = run_llm(prompt, 0.1, 2000, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            return response.strip()
+        except Exception as e:
+            print(f"从实体属性生成详细答案异常: {e}")
+            return "\n".join([f"{entity['label']}: {', '.join(entity['properties'].keys())}" for entity in entities_info])
+
+    def _run_tog_search(self, question: str, topic_entity: Dict, config, answer_history: Dict = None) -> tuple:
+        cluster_chain_of_entities = []
+        pre_relations = []
+        pre_heads = [-1] * len(topic_entity)
+        found_answer = False
+        final_answer = "信息不足"
+        depth = 0
+
+        for depth in range(1, config.DEPTH + 1):
+            print(f"\n  [深度{depth}] 关系搜索:")
+            total_entities_id = []
+            total_relations = []
+            total_candidates = []
+            total_topic_entities = []
+            total_head = []
+            total_scores = []
+
+            i = 0
+            for entity in topic_entity:
+                pre_head_value = pre_heads[i] if i < len(pre_heads) else -1
+
+                retrieve_relations_with_scores = relation_search_prune(
+                    entity, topic_entity[entity], pre_relations,
+                    pre_head_value, question, config, self.client
+                )
+
+                for rel_info in retrieve_relations_with_scores:
+                    relation = rel_info['relation']
+                    score = rel_info['score']
+                    head = rel_info['head']
+                    source_entity = rel_info['entity']
+                    entity_name = topic_entity.get(entity, entity)
+                    print(f"    {entity_name} → {relation} ({score:.2f})")
+
+                    entity_candidates_id, entity_candidates = entity_search(
+                        source_entity, relation, self.client, head
+                    )
+
+                    if entity_candidates_id:
+                        scores, entity_candidates, entity_candidates_id = entity_score(
+                            question, entity_candidates_id, entity_candidates,
+                            score, relation, config
+                        )
+
+                        total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head = update_history(
+                            entity_candidates, rel_info, scores, entity_candidates_id,
+                            total_candidates, total_scores, total_relations, total_entities_id,
+                            total_topic_entities, total_head, False
+                        )
+                i += 1
+
+            if not total_entities_id:
+                print(f"  [深度{depth}] 未找到候选实体，搜索终止")
+                break
+
+            success, triple_list, entities_id, relations, heads = entity_prune(
+                total_entities_id, total_relations, total_candidates,
+                total_topic_entities, total_head, total_scores,
+                config, self.client, self.entity_linker
+            )
+
+            if success:
+                cluster_chain_of_entities.append(triple_list)
+                print(f"\n  [深度{depth}] 实体搜索:")
+                for item in triple_list:
+                    if isinstance(item, tuple) and len(item) >= 3:
+                        h, r, t = item
+                        h_name = h.get('name', str(h)) if isinstance(h, dict) else str(h)
+                        t_name = t.get('name', str(t)) if isinstance(t, dict) else str(t)
+                        print(f"    {h_name} —[{r}]→ {t_name}")
+                        
+                        # 获取实体属性
+                        h_properties = {}
+                        t_properties = {}
+                        h_id = h.get('id', '') if isinstance(h, dict) else ''
+                        t_id = t.get('id', '') if isinstance(t, dict) else ''
+                        
+                        if h_id:
+                            try:
+                                h_full_info = self.entity_linker.get_node_full_info(h_id)
+                                h_properties = h_full_info.get("properties", {}) if h_full_info else {}
+                            except Exception:
+                                pass
+                        
+                        if t_id:
+                            try:
+                                t_full_info = self.entity_linker.get_node_full_info(t_id)
+                                t_properties = t_full_info.get("properties", {}) if t_full_info else {}
+                            except Exception:
+                                pass
+                        
+                        # 将三元组作为一个整体判断是否对回答问题有用
+                        triple_info = {
+                            "h_name": h_name,
+                            "h_id": h_id,
+                            "h_properties": h_properties,
+                            "relation": r,
+                            "t_name": t_name,
+                            "t_id": t_id,
+                            "t_properties": t_properties
+                        }
+                        
+                        # 使用LLM判断这个三元组是否对回答问题有用
+                        can_answer, answer_text = self._judge_triple_can_answer(question, triple_info)
+                        
+                        print(f"      └─ 三元组: {'✓有用' if can_answer else '✗无用'}")
+                        
+                        # 如果有用，将三元组信息加入answer_history
+                        if can_answer:
+                            triple_key = f"{h_name} —[{r}]→ {t_name}"
+                            if triple_key not in answer_history:
+                                answer_history[triple_key] = {
+                                    "type": "triple",
+                                    "triple_info": triple_info,
+                                    "judgment_reason": answer_text,
+                                    "useful_info": [triple_key]
+                                }
+                        
+                        # 同时对每个实体单独判断（保留原有逻辑）
+                        for entity_item, entity_name, entity_id, entity_properties in [(h, h_name, h_id, h_properties), (t, t_name, t_id, t_properties)]:
+                            if isinstance(entity_item, dict) and entity_id and entity_name:
+                                try:
+                                    # 使用LLM判断该实体是否能回答问题
+                                    can_answer_entity, answer_text_entity = self._judge_entity_can_answer(
+                                        question, entity_id, entity_name, entity_properties
+                                    )
+                                    
+                                    print(f"      └─ {entity_name}: {'✓可回答' if can_answer_entity else '✗不足以回答'}")
+                                    
+                                    # 如果可回答，加入answer_history
+                                    if can_answer_entity:
+                                        if entity_name not in answer_history:
+                                            answer_history[entity_name] = {
+                                                "type": "entity",
+                                                "entity_id": entity_id,
+                                                "properties": entity_properties.copy(),
+                                                "judgment_reason": answer_text_entity,
+                                                "useful_info": []
+                                            }
+                                            useful_info = self._extract_useful_info(entity_properties, answer_text_entity)
+                                            if useful_info:
+                                                answer_history[entity_name]["useful_info"].append(useful_info)
+                                except Exception as e:
+                                    print(f"      └─ {entity_name}: 属性查询失败 - {str(e)[:30]}")
+
+                # 统一使用answer_history判断信息是否充足
+                if answer_history:
+                    is_sufficient = self._is_history_sufficient(question, answer_history)
+                else:
+                    is_sufficient = False
+                
+                if is_sufficient:
+                    print(f"  [深度{depth}] History信息充足 ✓，停止搜索")
+                    found_answer = True
+                    break
+                else:
+                    print(f"  [深度{depth}] History信息不足，继续搜索")
+                    topic_entity = {}
+                    for entity in entities_id:
+                        labels = self.client.query_all("qid2label", entity)
+                        label = next(iter(labels)) if labels else "未知实体"
+                        topic_entity[entity] = label
+                    pre_relations = relations
+                    pre_heads = heads
+                    continue
+            else:
+                print(f"  [深度{depth}] 实体剪枝失败，搜索终止")
+                break
+
+        if not found_answer:
+            final_answer = generate_without_explored_paths(question, config)
+
+        return final_answer, cluster_chain_of_entities, {
+            "found_answer": found_answer,
+            "depth_reached": depth,
+            "topic_entity": topic_entity,
+            "source_entities": [],
+            "answer_history": answer_history
         }
-        return solution_data
+
+    def search_single_depth(self, question: str, topic_entity: Dict, depth: int = 1, args=None) -> Dict:
+        """单深度图搜索：执行一个深度的图搜索，返回原始三元组（不做LLM判断）
+
+        此方法供 MCP 细粒度工具调用，只返回原始数据，由 Claude Code 自行判断。
+        
+        Args:
+            question: 问题文本
+            topic_entity: 起始实体 {entity_id: entity_name}
+            depth: 当前搜索深度
+            args: 配置参数
+        
+        Returns:
+            {"depth": int, "triples": [...], "found_entities": [...], "has_more": bool}
+        """
+        if args is None:
+            args = self.args
+        
+        if isinstance(args, dict):
+            width = args.get("WIDTH", 5)
+        else:
+            width = getattr(args, 'WIDTH', 5)
+        
+        total_entities_id = []
+        total_relations = []
+        total_candidates = []
+        total_topic_entities = []
+        total_head = []
+        total_scores = []
+        
+        i = 0
+        for entity_id in topic_entity:
+            entity_name = topic_entity[entity_id]
+            
+            retrieve_relations_with_scores = relation_search_prune(
+                entity_id, entity_name, [], -1, question, args, self.client
+            )
+            
+            for rel_info in retrieve_relations_with_scores:
+                relation = rel_info['relation']
+                score = rel_info['score']
+                head = rel_info['head']
+                source_entity = rel_info['entity']
+                
+                entity_candidates_id, entity_candidates = entity_search(
+                    source_entity, relation, self.client, head
+                )
+                
+                if entity_candidates_id:
+                    scores, entity_candidates, entity_candidates_id = entity_score(
+                        question, entity_candidates_id, entity_candidates,
+                        score, relation, args
+                    )
+                    
+                    total_candidates, total_scores, total_relations, total_entities_id, total_topic_entities, total_head = update_history(
+                        entity_candidates, rel_info, scores, entity_candidates_id,
+                        total_candidates, total_scores, total_relations, total_entities_id,
+                        total_topic_entities, total_head, False
+                    )
+            i += 1
+        
+        if not total_entities_id:
+            return {"depth": depth, "triples": [], "found_entities": [], "has_more": False}
+        
+        success, triple_list, entities_id, relations, heads = entity_prune(
+            total_entities_id, total_relations, total_candidates,
+            total_topic_entities, total_head, total_scores,
+            args, self.client, self.entity_linker
+        )
+        
+        if not success:
+            return {"depth": depth, "triples": [], "found_entities": [], "has_more": False}
+        
+        triples = []
+        found_entities = []
+        seen_entity_ids = set()
+        start_entity_ids = set(topic_entity.keys())
+        
+        for item in triple_list:
+            if isinstance(item, tuple) and len(item) >= 3:
+                h, r, t = item
+                h_name = h.get('name', str(h)) if isinstance(h, dict) else str(h)
+                h_id = h.get('id', '') if isinstance(h, dict) else ''
+                h_props = h.get('properties', {}) if isinstance(h, dict) else {}
+                t_name = t.get('name', str(t)) if isinstance(t, dict) else str(t)
+                t_id = t.get('id', '') if isinstance(t, dict) else ''
+                t_props = t.get('properties', {}) if isinstance(t, dict) else {}
+                
+                if t_id == '未知ID':
+                    t_id = ''
+                
+                triples.append({
+                    "head_entity": {"id": h_id, "name": h_name, "properties": h_props},
+                    "relation": r,
+                    "tail_entity": {"id": t_id, "name": t_name, "properties": t_props}
+                })
+                
+                if t_id and t_id not in seen_entity_ids and t_id not in start_entity_ids:
+                    seen_entity_ids.add(t_id)
+                    found_entities.append({
+                        "id": t_id, "name": t_name, "properties": t_props
+                    })
+        
+        return {
+            "depth": depth,
+            "triples": triples,
+            "found_entities": found_entities,
+            "has_more": len(found_entities) > 0
+        }

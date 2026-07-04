@@ -30,14 +30,10 @@ class EntityLinker:
 
             entities = self._parse_llm_response(question, response)
 
-            # 确保使用大模型识别的实体，不使用备用提取
-            print(f"问题: '{question}' -> 提取的实体: {entities}")
             self.llm_cache[cache_key] = entities
             return entities
 
         except Exception as e:
-            print(f"实体识别异常: {e}")
-            # 不使用备用提取，直接返回空列表
             return []
 
 
@@ -222,8 +218,7 @@ class EntityLinker:
                         # 如果解析失败，继续尝试其他模式
                         continue
         except Exception as e:
-            print(f"JSON提取失败: {e}")
-            print(f"大模型原始响应: {response}")
+            return {"rankings": []}
 
         return {"rankings": []}
 
@@ -246,7 +241,7 @@ class EntityLinker:
                                         entities.append(entity_text)
                                     break
         except Exception as e:
-            print(f"解析JSON实体失败: {e}")
+            pass
 
         return entities
 
@@ -362,39 +357,20 @@ class EntityLinker:
 
 
     def link_entities_in_question(self, question: str) -> Dict[str, str]:
-        """实体链接函数"""
-        print(f"原始问题: {question}")
-        # 提取实体
         entity_mentions = self.recognize_entities(question)
-        print(f"提取的实体: {entity_mentions}")
 
         if not entity_mentions:
-            print("警告：未识别到任何实体")
-            # 直接返回空结果，不使用备用机制
             return {}
 
-        # 实体链接
         linked_entities = {}
         for mention in entity_mentions:
-            print(f"\n处理实体: '{mention}'")
-
             try:
                 qid = self._find_entity_in_knowledge_base(mention)
-
                 if qid:
-                    # 获取标签
                     label = self._get_entity_label(qid, mention)
                     linked_entities[qid] = label
-                    print(f"链接成功: '{mention}' -> {qid} ({label})")
-                else:
-                    print(f"未找到实体: '{mention}'")
-
             except Exception as e:
-                print(f"实体链接异常: {e}")
-                import traceback
-                traceback.print_exc()
-
-        print(f"最终链接结果: {linked_entities}")
+                pass
 
         return linked_entities
 
@@ -448,49 +424,82 @@ class EntityLinker:
 
     def search_entities_with_full_info(self, keyword: str, limit: int = 10) -> List[Dict]:
         """
-        灵活搜索：遍历所有属性，返回匹配的节点及其完整信息
-        让大模型根据完整信息判断相关性
+        术语对齐搜索：优先精确匹配 name，其次同义词展开，再模糊匹配。
+        匹配策略：name精确匹配 > 同义词匹配 > name包含匹配 > 其他属性匹配
         """
         try:
-            # 检查wiki_client的类型
             driver = None
             if hasattr(self.wiki_client, 'client'):
-                # 如果是MultiServerWikidataQueryClient包装类
                 driver = self.wiki_client.client.driver
             else:
-                # 如果是直接的Neo4jClient
                 driver = self.wiki_client.driver
-            
+
             with driver.session() as session:
-                # 策略1：首先搜索name属性
-                query_name = """
-                MATCH (n)
-                WHERE n.name IS NOT NULL AND toLower(n.name) CONTAINS toLower($keyword)
+                matches = []
+                seen_ids = set()
+
+                def add_match(node_id, node_data, matched_props):
+                    qid = f"NEO_{node_id}"
+                    if qid not in seen_ids:
+                        seen_ids.add(qid)
+                        matches.append({
+                            "qid": qid,
+                            "properties": node_data,
+                            "matched_properties": matched_props,
+                            "matched_keyword": keyword
+                        })
+
+                # ── 策略1: Term 标签 name 精确匹配（文档: Term 节点就是标准名称和同义词的集合）──
+                query_term = """
+                MATCH (n:Term)
+                WHERE n.name = $keyword
                 RETURN id(n) as node_id, n as node
                 LIMIT $limit
                 """
-                
-                result = session.run(query_name, keyword=keyword, limit=limit)
-                
-                matches = []
-                for record in result:
+                for record in session.run(query_term, keyword=keyword, limit=limit):
                     node_data = dict(record["node"])
-                    node_id = record["node_id"]
-                    
-                    # 找出哪些属性匹配了关键词
-                    matched_properties = {}
-                    for key, value in node_data.items():
-                        if isinstance(value, str) and keyword.lower() in value.lower():
-                            matched_properties[key] = value
-                    
-                    matches.append({
-                        "qid": f"NEO_{node_id}",
-                        "properties": node_data,
-                        "matched_properties": matched_properties,
-                        "matched_keyword": keyword
-                    })
-                
-                # 如果name属性搜索结果不足，搜索其他属性
+                    add_match(record["node_id"], node_data,
+                              {"name": node_data.get("name", "")})
+
+                # ── 策略2: name 精确匹配（全类型，兜底）──
+                query_exact = """
+                MATCH (n)
+                WHERE n.name = $keyword
+                RETURN id(n) as node_id, n as node
+                LIMIT $limit
+                """
+                for record in session.run(query_exact, keyword=keyword, limit=limit):
+                    node_data = dict(record["node"])
+                    add_match(record["node_id"], node_data,
+                              {"name": node_data.get("name", "")})
+
+                # ── 策略3: name 包含匹配（原有逻辑，兜底）──
+                if len(matches) < limit:
+                    query_name = """
+                    MATCH (n)
+                    WHERE n.name IS NOT NULL AND (
+                        toLower(n.name) CONTAINS toLower($keyword) OR
+                        toLower($keyword) CONTAINS toLower(replace(n.name, 'CG_00', '')) OR
+                        toLower($keyword) CONTAINS toLower(split(n.name, ' ')[-1]) OR
+                        toLower(replace(n.name, 'CG_00', '')) CONTAINS toLower($keyword) OR
+                        toLower(n.name) CONTAINS toLower(split($keyword, '与')[0]) OR
+                        toLower(n.name) CONTAINS toLower(split($keyword, '与')[1]) OR
+                        toLower(n.name) =~ ('(?i).*' + replace(replace($keyword, '与', '|'), '金额', '') + '.*') OR
+                        toLower(n.name) =~ ('(?i).*' + $keyword + '.*')
+                    )
+                    RETURN id(n) as node_id, n as node
+                    ORDER BY
+                        CASE WHEN n.name CONTAINS $keyword THEN 0 ELSE 1 END,
+                        CASE WHEN replace(n.name, 'CG_00', '') CONTAINS $keyword THEN 0 ELSE 1 END
+                    LIMIT $limit
+                    """
+                    for record in session.run(query_name, keyword=keyword, limit=limit):
+                        node_data = dict(record["node"])
+                        mprops = {k: v for k, v in node_data.items()
+                                  if isinstance(v, str) and keyword.lower() in v.lower()}
+                        add_match(record["node_id"], node_data, mprops)
+
+                # ── 策略4: 其他属性搜索（原有逻辑，兜底）──
                 if len(matches) < 3:
                     query_other = """
                     MATCH (n)
@@ -498,39 +507,17 @@ class EntityLinker:
                     RETURN id(n) as node_id, n as node
                     LIMIT 50
                     """
-                    
-                    result2 = session.run(query_other, keyword=keyword)
-                    seen_ids = {m['qid'] for m in matches}
-                    
-                    for record in result2:
+                    for record in session.run(query_other, keyword=keyword):
                         node_data = dict(record["node"])
-                        node_id = record["node_id"]
-                        qid = f"NEO_{node_id}"
-                        
-                        if qid in seen_ids:
-                            continue
-                        
-                        # 检查其他属性
-                        matched_properties = {}
-                        for key, value in node_data.items():
-                            if isinstance(value, str) and keyword.lower() in value.lower():
-                                matched_properties[key] = value
-                        
-                        if matched_properties:
-                            matches.append({
-                                "qid": qid,
-                                "properties": node_data,
-                                "matched_properties": matched_properties,
-                                "matched_keyword": keyword
-                            })
-                            seen_ids.add(qid)
-                        
+                        mprops = {k: v for k, v in node_data.items()
+                                  if isinstance(v, str) and keyword.lower() in v.lower()}
+                        if mprops:
+                            add_match(record["node_id"], node_data, mprops)
                         if len(matches) >= limit:
                             break
-                
-                return matches
+
+                return matches[:limit]
         except Exception as e:
-            print(f"灵活搜索异常: {e}")
             return []
 
     def get_node_full_info(self, qid: str) -> Dict:
@@ -564,7 +551,7 @@ class EntityLinker:
                         "properties": dict(record["node"])
                     }
         except Exception as e:
-            print(f"获取节点信息异常: {e}")
+            return None
         
         return None
 
@@ -599,8 +586,6 @@ class EntityLinker:
             return ranked_results
             
         except Exception as e:
-            print(f"大模型排序异常: {e}")
-            # 如果大模型失败，返回原始列表，默认分数为0.5
             return [{**cand, "relevance_score": 0.5, "reason": "默认分数"} for cand in candidates]
     
     def _build_entity_ranking_prompt(self, question: str, candidates: List[Dict]) -> str:
@@ -637,7 +622,7 @@ class EntityLinker:
                         ranked.append({
                             **cand_map[qid],
                             "relevance_score": ranking.get("relevance_score", 0.5),
-                            "can_answer": ranking.get("can_answer", False),
+                            "is_relevant": ranking.get("is_relevant", ranking.get("can_answer", False)),
                             "reason": ranking.get("reason", "")
                         })
                 
@@ -646,66 +631,41 @@ class EntityLinker:
                 return ranked
                 
         except Exception as e:
-            print(f"解析排序响应异常: {e}")
+            pass
         
         # 解析失败，返回默认分数
-        return [{**cand, "relevance_score": 0.5, "can_answer": False, "reason": "解析失败，默认分数"} for cand in candidates]
+        return [{**cand, "relevance_score": 0.5, "is_relevant": False, "reason": "解析失败，默认分数"} for cand in candidates]
 
-    def link_entities_with_llm_judge(self, question: str) -> Dict[str, Any]:
-        """
-        完整的实体链接流程：
-        1. 从问题中提取关键词
-        2. 搜索匹配的节点（所有属性）
-        3. 使用大模型判断相关性
-        4. 返回最相关的实体及其完整信息
-        """
-        print(f"\n=== 开始实体链接（带大模型判断）===")
-        print(f"问题: {question}")
-        
-        # 1. 提取实体/关键词
-        keywords = self.recognize_entities(question)
-        
-        print(f"提取的关键词: {keywords}")
-        
-        # 2. 搜索所有关键词，收集候选
+    def link_entities_with_llm_judge(self, question: str, keywords: list = None) -> Dict[str, Any]:
+        if keywords is None:
+            keywords = self.recognize_entities(question)
+        print(f"  搜索关键词: {keywords}")
+
         all_candidates = []
         seen_qids = set()
-        
+
         for keyword in keywords:
             candidates = self.search_entities_with_full_info(keyword, limit=5)
             for cand in candidates:
                 if cand['qid'] not in seen_qids:
                     all_candidates.append(cand)
                     seen_qids.add(cand['qid'])
-        
-        print(f"找到 {len(all_candidates)} 个候选实体")
-        
+
         if not all_candidates:
-            print("未找到任何候选实体")
             return {
                 "linked_entities": {},
                 "best_match": None,
                 "all_candidates": []
             }
-        
-        # 3. 使用大模型进行相关性排序
+
         ranked_candidates = self.rank_entities_by_llm(question, all_candidates)
-        
-        print(f"\n大模型排序结果（前3）：")
-        for i, cand in enumerate(ranked_candidates[:3], 1):
-            print(f"  {i}. QID: {cand['qid']}, 分数: {cand['relevance_score']:.2f}, 可回答: {cand['can_answer']}")
-            print(f"     理由: {cand['reason']}")
-        
-        # 4. 构建返回结果
+
         linked_entities = {}
         for cand in ranked_candidates:
-            # 只包含相关度分数高于0.7的实体，提高过滤阈值
             if cand.get('relevance_score', 0) >= 0.7:
-                # 直接使用实体的name属性作为标签，如果没有则使用QID
-                # 大模型已经在排序过程中看到了所有属性，不需要在这里做额外处理
                 label = cand['properties'].get('name', cand['qid'])
                 linked_entities[cand['qid']] = label
-        
+
         return {
             "linked_entities": linked_entities,
             "all_candidates": ranked_candidates
