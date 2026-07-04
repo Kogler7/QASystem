@@ -5,6 +5,17 @@ import { request } from './request'
  * 使用方式：import { sendChatMessage, knowledgeQuery, knowledgeExtract } from '@/api'
  */
 
+// 认证与用户管理
+export {
+  loginApi,
+  registerApi,
+  getMeApi,
+  listUsersApi,
+  createUserApi,
+  updateUserApi,
+  deleteUserApi
+} from './modules/auth'
+
 // 智能问答
 export { sendChatMessage } from './modules/chat'
 

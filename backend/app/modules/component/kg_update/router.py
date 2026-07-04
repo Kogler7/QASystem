@@ -5,14 +5,19 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ....deps.auth import require_admin
 from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/kg-update", tags=["component", "kg-update"])
+router = APIRouter(
+    prefix="/api/component/kg-update",
+    tags=["component", "kg-update"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 # ==================== 请求模型 ====================

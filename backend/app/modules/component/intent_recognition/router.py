@@ -5,14 +5,19 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ....deps.auth import require_admin
 from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/intent-recognition", tags=["component"])
+router = APIRouter(
+    prefix="/api/component/intent-recognition",
+    tags=["component", "intent-recognition"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 class RecognizeRequestBody(BaseModel):

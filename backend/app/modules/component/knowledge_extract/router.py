@@ -6,14 +6,19 @@ import asyncio
 import logging
 from typing import Any, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from ....deps.auth import require_admin
 from . import service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/component/knowledge-extract", tags=["component", "knowledge-extract"])
+router = APIRouter(
+    prefix="/api/component/knowledge-extract",
+    tags=["component", "knowledge-extract"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 class ExtractRequestBody(BaseModel):

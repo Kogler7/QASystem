@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from ..config import settings
+from ..core.roles import ROLE_ADMIN
 from ..db import get_session
 from ..models.user import User
 
@@ -24,9 +25,10 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-        user_id: int | None = payload.get("sub")
-        if user_id is None:
+        raw_sub = payload.get("sub")
+        if not isinstance(raw_sub, str) or not raw_sub.strip():
             raise credentials_exception
+        user_id = raw_sub.strip()
     except jwt.PyJWTError:
         raise credentials_exception
 
@@ -35,4 +37,15 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if current_user.role != ROLE_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限",
+        )
+    return current_user
 
