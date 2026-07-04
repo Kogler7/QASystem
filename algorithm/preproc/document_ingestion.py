@@ -1,3 +1,4 @@
+import requests
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, List
 from datetime import datetime
@@ -26,12 +27,16 @@ class DocumentConversionInterface:
                  output_format: str = 'md',  # 默认输出md
                  save_to_file: bool = True,
                  output_dir: Optional[str] = None,
-                 enable_db_storage: bool = True,
+                 enable_db_storage: bool = False,
                  db_config: Optional[Dict] = None,
-                 excel_to_mysql: bool = True,
+                 excel_to_mysql: bool = False,
                  mineru_config_path: Optional[str] = None,
                  mineru_model_source: str = "local",
-                 libreoffice_path: Optional[str] = None):
+                 libreoffice_path: Optional[str] = None,
+                 default_lang: str = "ch",
+                 file_service_url: Optional[str] = None,
+                 knowledge_space_id: Optional[str] = None
+                 ):
         """
         初始化接口
 
@@ -44,9 +49,17 @@ class DocumentConversionInterface:
             excel_to_mysql: 是否将Excel数据存储到MySQL
             mineru_config_path: MinerU配置文件路径（如 mineru.json）
             mineru_model_source: MinerU模型源，默认 "local"
+            default_lang: 默认语言
+            file_service_url: 文件存储服务地址，如 http://10.10.2.33
+            knowledge_space_id: 知识空间ID（可选）
         """
         # 初始化设置
         Settings.init_dirs()
+
+        self.default_lang = default_lang
+
+        self.file_service_url = file_service_url or os.getenv("FILE_SERVICE_URL", "http://10.10.2.33")
+        self.knowledge_space_id = knowledge_space_id
 
         # 设置输出格式
         self.output_format = output_format.lower()
@@ -76,8 +89,106 @@ class DocumentConversionInterface:
 
         self.excel_processor = ExcelProcessor()
 
-        if enable_db_storage:
-            self._initialize_databases(db_config)
+        # if enable_db_storage:
+        #     self._initialize_databases(db_config)
+    
+    def _upload_md_to_file_service(self, md_content: str, file_name: str, knowledge_space_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        将 Markdown 内容上传到文件存储服务
+
+        Args:
+            md_content: Markdown 文件内容
+            file_name: 文件名（含扩展名）
+            knowledge_space_id: 知识空间ID（可选）
+
+        Returns:
+            {
+                "success": bool,
+                "file_id": str,
+                "file_path": str,
+                "file_url": str,
+                "error": str
+            }
+        """
+        try:
+            # 构建上传 URL
+            upload_url = f"{self.file_service_url}/file/upload"
+            
+            # 准备文件
+            files = {
+                'file': (file_name, md_content.encode('utf-8'), 'text/markdown')
+            }
+            
+            # 准备表单数据
+            data = {}
+            if knowledge_space_id or self.knowledge_space_id:
+                data['knowledgeSpaceId'] = knowledge_space_id or self.knowledge_space_id
+            
+            logger.info(f"上传 MD 文件到文件服务: {upload_url}, 文件名: {file_name}")
+            
+            # 发送请求
+            response = requests.post(
+                upload_url,
+                files=files,
+                data=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('code') == 0:
+                    data = result.get('data', {})
+                    return {
+                        "success": True,
+                        "file_id": data.get('id'),
+                        "file_path": data.get('file_path'),
+                        "file_url": data.get('file_url'),
+                        "error": None
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "file_id": None,
+                        "file_path": None,
+                        "file_url": None,
+                        "error": result.get('info', '上传失败')
+                    }
+            else:
+                return {
+                    "success": False,
+                    "file_id": None,
+                    "file_path": None,
+                    "file_url": None,
+                    "error": f"HTTP {response.status_code}: {response.text}"
+                }
+                
+        except requests.exceptions.Timeout:
+            logger.error("文件服务上传超时")
+            return {
+                "success": False,
+                "file_id": None,
+                "file_path": None,
+                "file_url": None,
+                "error": "上传超时"
+            }
+        except requests.exceptions.ConnectionError:
+            logger.error(f"无法连接到文件服务: {self.file_service_url}")
+            return {
+                "success": False,
+                "file_id": None,
+                "file_path": None,
+                "file_url": None,
+                "error": f"无法连接到文件服务: {self.file_service_url}"
+            }
+        except Exception as e:
+            logger.error(f"上传 MD 文件失败: {e}")
+            return {
+                "success": False,
+                "file_id": None,
+                "file_path": None,
+                "file_url": None,
+                "error": str(e)
+            }
 
     def _initialize_databases(self, db_config: Optional[Dict] = None):
         """初始化数据库，允许失败"""
@@ -157,8 +268,10 @@ class DocumentConversionInterface:
             logger.warning(f"MySQL 初始化失败: {e}")
             self.mysql_client = None
 
+
     def convert_document(self, input_path: str, model_name: Optional[str] = None, output_filename: Optional[str] = None,
-                         save_metadata: bool = False, store_excel_raw: bool = False) -> Dict[str, Any]:
+                         save_metadata: bool = False, store_excel_raw: bool = False, lang: Optional[str] = None,
+                         knowledge_space_id: Optional[str] = None) -> Dict[str, Any]:
         """
         处理单个文档
 
@@ -168,10 +281,14 @@ class DocumentConversionInterface:
             output_filename: 输出文件名（可选）
             save_metadata: 是否保存元数据
             store_excel_raw: 是否将 Excel 原始数据存储到 MySQL（结构化存储）
+            lang: 文档语言
+            knowledge_space_id: 知识空间ID
 
         Returns:
             Dict: 包含转换结果的信息
         """
+        if lang is None:
+            lang = self.default_lang
         result = {
             'success': False,
             'input_path': input_path,
@@ -179,13 +296,14 @@ class DocumentConversionInterface:
             'content': None,
             'metadata': None,
             'error': None,
-            'mysql_tables': []   # 存储创建的 MySQL 表信息
+            'mysql_tables': [],   # 存储创建的 MySQL 表信息
+            'md_file_info': None
         }
 
         try:
             # 处理文件
             logger.info(f"开始处理文件: {input_path}")
-            processor_result = self.processor.process_file(input_path, model_name=model_name)
+            processor_result = self.processor.process_file(input_path, model_name=model_name, lang=lang)
 
             if processor_result is None:
                 result['error'] = '处理失败：处理器未返回结果（可能为 PDF/MinerU 异常）'
@@ -204,20 +322,20 @@ class DocumentConversionInterface:
             # 处理 Excel/CSV 特殊格式（如果是字典格式的结构化数据）
             if file_type in ('excel', 'csv') and isinstance(content, dict):
                 # 如果启用了 Excel 到 MySQL 的结构化存储
-                if self.enable_db_storage and self.excel_to_mysql and self.mysql_client:
-                    logger.info(f"开始将 Excel 数据存储到 MySQL: {metadata.get('file_name')}")
-                    mysql_results = self._store_excel_to_mysql_structured(content, metadata)
-                    result['mysql_tables'] = mysql_results
+                # if self.enable_db_storage and self.excel_to_mysql and self.mysql_client:
+                #     logger.info(f"开始将 Excel 数据存储到 MySQL: {metadata.get('file_name')}")
+                #     mysql_results = self._store_excel_to_mysql_structured(content, metadata)
+                #     result['mysql_tables'] = mysql_results
                     # 如果只需要存储原始数据到数据库，不保存文件
-                    if store_excel_raw:
-                        logger.info("Excel 原始数据已存储到 MySQL，跳过文件保存")
-                        result.update({
-                            'success': True,
-                            'content': content,
-                            'metadata': metadata,
-                            'file_type': file_type
-                        })
-                        return result
+                    # if store_excel_raw:
+                    #     logger.info("Excel 原始数据已存储到 MySQL，跳过文件保存")
+                    #     result.update({
+                    #         'success': True,
+                    #         'content': content,
+                    #         'metadata': metadata,
+                    #         'file_type': file_type
+                    #     })
+                    #     return result
 
                 # 将 Excel/CSV 数据转换为 Markdown 表格（用于文件输出）
                 if self.output_format == 'md':
@@ -230,7 +348,36 @@ class DocumentConversionInterface:
                 if self.output_format == 'txt':
                     content = self._markdown_to_text(content)
 
-            # 保存到文件
+            # ==================== 上传 MD 到文件服务 ====================
+            # 确定文件名
+            if output_filename:
+                md_file_name = f"{Path(output_filename).stem}.{self.output_format}"
+            else:
+                md_file_name = f"{Path(input_path).stem}.{self.output_format}"
+            
+            # 上传 MD 内容到文件服务
+            upload_result = self._upload_md_to_file_service(
+                md_content=content,
+                file_name=md_file_name,
+                knowledge_space_id=knowledge_space_id or self.knowledge_space_id
+            )
+            
+            if upload_result.get('success'):
+                result['md_file_info'] = {
+                    'file_id': upload_result.get('file_id'),
+                    'file_path': upload_result.get('file_path'),
+                    'file_url': upload_result.get('file_url'),
+                }
+                logger.info(f"MD 文件上传成功: {upload_result.get('file_url')}")
+            else:
+                logger.warning(f"MD 文件上传失败: {upload_result.get('error')}")
+                result['md_file_info'] = {
+                    'success': False,
+                    'error': upload_result.get('error')
+                }
+            # ====================================================================
+
+            # 如果需要保存到本地文件（可选，兼容旧逻辑）
             if self.save_to_file:
                 output_path = self._save_content(
                     content,
@@ -304,8 +451,8 @@ class DocumentConversionInterface:
                 cfs = str(content_for_storage)
 
             # 存储到数据库（非 Excel 或 Excel 元数据存储）
-            if self.enable_db_storage:
-                self._store_to_databases(cfs, metadata, file_type)
+            # if self.enable_db_storage:
+            #     self._store_to_databases(cfs, metadata, file_type)
 
             # 保存元数据文件
             if save_metadata and metadata:
@@ -330,7 +477,7 @@ class DocumentConversionInterface:
         return result
 
     def convert_batch(self, input_paths: Union[str, list],
-                      output_dir: Optional[str] = None) -> Dict[str, Any]:
+                      output_dir: Optional[str] = None, lang: str = "ch") -> Dict[str, Any]:
         """
         批量处理文档
 
@@ -366,7 +513,7 @@ class DocumentConversionInterface:
 
         for file_path in file_paths:
             logger.info(f"处理文件 {results['successful'] + results['failed'] + 1}/{len(file_paths)}: {file_path}")
-            file_result = self.convert_document(file_path)
+            file_result = self.convert_document(file_path, lang=lang)
             results['results'].append(file_result)
             if file_result['success']:
                 results['successful'] += 1
@@ -509,220 +656,227 @@ class DocumentConversionInterface:
 
         return '\n'.join(lines).strip()
 
-    def _store_excel_to_mysql_structured(self, excel_data: Dict, metadata: Dict) -> List[Dict]:
-        """
-        将 Excel 数据结构化存储到 MySQL 数据库
-        每个工作表创建一个表，并插入数据
+    # def _store_excel_to_mysql_structured(self, excel_data: Dict, metadata: Dict) -> List[Dict]:
+    #     """
+    #     将 Excel 数据结构化存储到 MySQL 数据库
+    #     每个工作表创建一个表，并插入数据
 
-        Args:
-            excel_data: Excel 数据（字典格式）
-            metadata: 文件元数据
+    #     Args:
+    #         excel_data: Excel 数据（字典格式）
+    #         metadata: 文件元数据
 
-        Returns:
-            List[Dict]: 创建的表格信息列表
-        """
-        if not self.mysql_client:
-            logger.warning("MySQL 客户端未初始化，跳过 Excel 存储")
-            return []
+    #     Returns:
+    #         List[Dict]: 创建的表格信息列表
+    #     """
+    #     if not self.mysql_client:
+    #         logger.warning("MySQL 客户端未初始化，跳过 Excel 存储")
+    #         return []
 
-        logger.info(f"开始结构化存储 Excel 数据到 MySQL: {metadata.get('file_name')}")
-        logger.info(f"工作表数量: {excel_data.get('total_sheets', 0)}")
+    #     logger.info(f"开始结构化存储 Excel 数据到 MySQL: {metadata.get('file_name')}")
+    #     logger.info(f"工作表数量: {excel_data.get('total_sheets', 0)}")
 
-        tables_created = []
-        total_rows_inserted = 0
+    #     tables_created = []
+    #     total_rows_inserted = 0
 
-        # 生成 SQL 模式（表结构）
-        schemas = self.excel_processor.generate_sql_schema(excel_data)
+    #     # 生成 SQL 模式（表结构）
+    #     schemas = self.excel_processor.generate_sql_schema(excel_data)
 
-        for schema in schemas:
-            logger.info(f"\n处理工作表: {schema['sheet_name']}")
-            logger.info(f"表名: {schema['table_name']}")
+    #     for schema in schemas:
+    #         logger.info(f"\n处理工作表: {schema['sheet_name']}")
+    #         logger.info(f"表名: {schema['table_name']}")
 
-            table_info = {
-                'sheet_name': schema['sheet_name'],
-                'table_name': schema['table_name'],
-                'rows_inserted': 0,
-                'status': 'pending'
-            }
+    #         table_info = {
+    #             'sheet_name': schema['sheet_name'],
+    #             'table_name': schema['table_name'],
+    #             'rows_inserted': 0,
+    #             'status': 'pending'
+    #         }
 
-            try:
-                # 创建表
-                logger.info("  创建表...")
-                if self.mysql_client.create_table(schema['sql']):
-                    logger.info("  ✓ 表创建成功")
-                else:
-                    logger.error("  ✗ 表创建失败，继续处理下一个工作表")
-                    table_info['status'] = 'failed'
-                    table_info['error'] = '表创建失败'
-                    tables_created.append(table_info)
-                    continue
+    #         try:
+    #             # 创建表
+    #             logger.info("  创建表...")
+    #             if self.mysql_client.create_table(schema['sql']):
+    #                 logger.info("  ✓ 表创建成功")
+    #             else:
+    #                 logger.error("  ✗ 表创建失败，继续处理下一个工作表")
+    #                 table_info['status'] = 'failed'
+    #                 table_info['error'] = '表创建失败'
+    #                 tables_created.append(table_info)
+    #                 continue
 
-                # 找到对应的 sheet 数据
-                sheet_data = None
-                for sheet in excel_data['sheets']:
-                    if sheet['sheet_name'] == schema['sheet_name']:
-                        sheet_data = sheet
-                        break
+    #             # 找到对应的 sheet 数据
+    #             sheet_data = None
+    #             for sheet in excel_data['sheets']:
+    #                 if sheet['sheet_name'] == schema['sheet_name']:
+    #                     sheet_data = sheet
+    #                     break
 
-                if sheet_data and sheet_data['data']:
-                    logger.info(f"  数据行数: {len(sheet_data['data'])}")
-                    logger.info(f"  列数: {len(sheet_data['columns'])}")
+    #             if sheet_data and sheet_data['data']:
+    #                 logger.info(f"  数据行数: {len(sheet_data['data'])}")
+    #                 logger.info(f"  列数: {len(sheet_data['columns'])}")
 
-                    # 清理列名
-                    clean_columns = []
-                    for col in sheet_data['columns']:
-                        clean_col = ''.join(c for c in str(col) if c.isalnum() or c == '_')
-                        if clean_col and clean_col[0].isdigit():
-                            clean_col = f"col_{clean_col}"
-                        clean_columns.append(clean_col)
+    #                 # 清理列名
+    #                 clean_columns = []
+    #                 for col in sheet_data['columns']:
+    #                     clean_col = ''.join(c for c in str(col) if c.isalnum() or c == '_')
+    #                     if clean_col and clean_col[0].isdigit():
+    #                         clean_col = f"col_{clean_col}"
+    #                     clean_columns.append(clean_col)
 
-                    logger.info(f"  清理后的列名: {clean_columns}")
+    #                 logger.info(f"  清理后的列名: {clean_columns}")
 
-                    # 插入数据
-                    logger.info(f"  插入数据 ({len(sheet_data['data'])} 行)...")
-                    rows_inserted = self.mysql_client.insert_excel_data(
-                        schema['table_name'],
-                        clean_columns,
-                        sheet_data['data']
-                    )
+    #                 # 插入数据
+    #                 logger.info(f"  插入数据 ({len(sheet_data['data'])} 行)...")
+    #                 rows_inserted = self.mysql_client.insert_excel_data(
+    #                     schema['table_name'],
+    #                     clean_columns,
+    #                     sheet_data['data']
+    #                 )
 
-                    if rows_inserted > 0:
-                        total_rows_inserted += rows_inserted
-                        logger.info(f"  ✓ 成功插入 {rows_inserted} 行数据")
-                        table_info['rows_inserted'] = rows_inserted
-                        table_info['status'] = 'success'
-                    else:
-                        logger.warning(f"  ⚠ 插入数据失败或行数为 0")
-                        table_info['status'] = 'warning'
-                else:
-                    logger.info("  ℹ️ 工作表无数据")
-                    table_info['status'] = 'empty'
+    #                 if rows_inserted > 0:
+    #                     total_rows_inserted += rows_inserted
+    #                     logger.info(f"  ✓ 成功插入 {rows_inserted} 行数据")
+    #                     table_info['rows_inserted'] = rows_inserted
+    #                     table_info['status'] = 'success'
+    #                 else:
+    #                     logger.warning(f"  ⚠ 插入数据失败或行数为 0")
+    #                     table_info['status'] = 'warning'
+    #             else:
+    #                 logger.info("  ℹ️ 工作表无数据")
+    #                 table_info['status'] = 'empty'
 
-                tables_created.append(table_info)
+    #             tables_created.append(table_info)
 
-            except Exception as e:
-                logger.error(f"  处理工作表失败 {schema['sheet_name']}: {e}")
-                table_info['status'] = 'error'
-                table_info['error'] = str(e)
-                tables_created.append(table_info)
+    #         except Exception as e:
+    #             logger.error(f"  处理工作表失败 {schema['sheet_name']}: {e}")
+    #             table_info['status'] = 'error'
+    #             table_info['error'] = str(e)
+    #             tables_created.append(table_info)
 
-        # 存储 Excel 文件的元数据到 document_metadata 表
-        try:
-            doc_id = f"excel_{metadata.get('file_name', 'unknown')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-            tables_json = json.dumps(tables_created, ensure_ascii=False)
+    #     # 存储 Excel 文件的元数据到 document_metadata 表
+    #     try:
+    #         doc_id = f"excel_{metadata.get('file_name', 'unknown')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    #         tables_json = json.dumps(tables_created, ensure_ascii=False)
 
-            self.mysql_client.insert_document_metadata(
-                doc_id=doc_id,
-                file_name=metadata.get('file_name', 'Unknown'),
-                file_type=metadata.get('file_type', 'excel'),
-                file_path=metadata.get('file_path', ''),
-                file_size=metadata.get('file_size', 0),
-                processed_at=metadata.get('processed_at', datetime.now().isoformat()),
-                mysql_stored=True,
-                tables_info=tables_json,
-                rows_inserted=total_rows_inserted
-            )
+    #         self.mysql_client.insert_document_metadata(
+    #             doc_id=doc_id,
+    #             file_name=metadata.get('file_name', 'Unknown'),
+    #             file_type=metadata.get('file_type', 'excel'),
+    #             file_path=metadata.get('file_path', ''),
+    #             file_size=metadata.get('file_size', 0),
+    #             processed_at=metadata.get('processed_at', datetime.now().isoformat()),
+    #             mysql_stored=True,
+    #             tables_info=tables_json,
+    #             rows_inserted=total_rows_inserted
+    #         )
 
-            logger.info(f"Excel 元数据已存储到 MySQL: {metadata.get('file_name')}")
-            logger.info(f"总计插入 {total_rows_inserted} 行数据到 {len(tables_created)} 个表")
+    #         logger.info(f"Excel 元数据已存储到 MySQL: {metadata.get('file_name')}")
+    #         logger.info(f"总计插入 {total_rows_inserted} 行数据到 {len(tables_created)} 个表")
 
-        except Exception as e:
-            logger.error(f"存储 Excel 元数据到 MySQL 失败: {e}")
+    #     except Exception as e:
+    #         logger.error(f"存储 Excel 元数据到 MySQL 失败: {e}")
 
-        return tables_created
+    #     return tables_created
 
-    def _store_to_databases(self, content: str, metadata: Dict, file_type: str):
-        """存储到数据库（非 Excel 结构化存储时调用）"""
-        if metadata is None:
-            metadata = {}
-        if not self.enable_db_storage:
-            return
+    # def _store_to_databases(self, content: str, metadata: Dict, file_type: str):
+    #     """存储到数据库（非 Excel 结构化存储时调用）"""
+    #     if metadata is None:
+    #         metadata = {}
+    #     if not self.enable_db_storage:
+    #         return
 
-        # Excel 文件且已结构化存储，不再重复处理
-        if file_type == 'excel' and self.excel_to_mysql:
-            return
+    #     # Excel 文件且已结构化存储，不再重复处理
+    #     if file_type == 'excel' and self.excel_to_mysql:
+    #         return
 
-        # 其他文档存储到 Elasticsearch 或 MySQL 元数据
-        if file_type == 'excel' and not self.excel_to_mysql:
-            self._store_excel_metadata_only(content, metadata)
-        else:
-            self._store_document_to_es(content, metadata, file_type)
+    #     # 其他文档存储到 Elasticsearch 或 MySQL 元数据
+    #     if file_type == 'excel' and not self.excel_to_mysql:
+    #         self._store_excel_metadata_only(content, metadata)
+    #     else:
+    #         self._store_document_to_es(content, metadata, file_type)
 
-    def _store_document_to_es(self, content: str, metadata: Dict, file_type: str):
-        """存储文档到 Elasticsearch"""
-        if not self.es_client:
-            logger.warning("ES 客户端未初始化，跳过索引存储")
-            return
-        if metadata is None:
-            metadata = {}
+    # def _store_document_to_es(self, content: str, metadata: Dict, file_type: str):
+    #     """存储文档到 Elasticsearch"""
+    #     if not self.es_client:
+    #         logger.warning("ES 客户端未初始化，跳过索引存储")
+    #         return
+    #     if metadata is None:
+    #         metadata = {}
 
-        try:
-            document = {
-                'title': metadata.get('file_name', 'Unknown'),
-                    'content': content[:10000],
-                'file_type': file_type,
-                    'file_path': metadata.get('file_path', ''),
-                    # 如果存在解析后保存的 Markdown 路径，则一并记录
-                    'md_path': metadata.get('output_md_path', ''),
-                'file_size': metadata.get('file_size', 0),
-                'is_scanned': metadata.get('is_scanned', False),
-                'metadata': metadata,
-                'created_at': datetime.now().isoformat()
-            }
+    #     try:
+    #         document = {
+    #             'title': metadata.get('file_name', 'Unknown'),
+    #                 'content': content[:10000],
+    #             'file_type': file_type,
+    #                 'file_path': metadata.get('file_path', ''),
+    #                 # 如果存在解析后保存的 Markdown 路径，则一并记录
+    #                 'md_path': metadata.get('output_md_path', ''),
+    #             'file_size': metadata.get('file_size', 0),
+    #             'is_scanned': metadata.get('is_scanned', False),
+    #             'metadata': metadata,
+    #             'created_at': datetime.now().isoformat()
+    #         }
 
-            success = self.es_client.index_document(Settings.ES_INDEX_NAME, document)
-            if success:
-                logger.info(f"文档已存储到 Elasticsearch: {metadata.get('file_name')}")
-            else:
-                logger.warning(f"文档存储到 Elasticsearch 失败: {metadata.get('file_name')}")
-        except Exception as e:
-            logger.error(f"Elasticsearch 存储失败: {e}")
+    #         success = self.es_client.index_document(Settings.ES_INDEX_NAME, document)
+    #         if success:
+    #             logger.info(f"文档已存储到 Elasticsearch: {metadata.get('file_name')}")
+    #         else:
+    #             logger.warning(f"文档存储到 Elasticsearch 失败: {metadata.get('file_name')}")
+    #     except Exception as e:
+    #         logger.error(f"Elasticsearch 存储失败: {e}")
 
-    def _store_excel_metadata_only(self, content: str, metadata: Dict):
-        """仅存储 Excel 元数据到 MySQL（当 excel_to_mysql=False 时）"""
-        if not self.mysql_client:
-            return
-        if metadata is None:
-            metadata = {}
+    # def _store_excel_metadata_only(self, content: str, metadata: Dict):
+    #     """仅存储 Excel 元数据到 MySQL（当 excel_to_mysql=False 时）"""
+    #     if not self.mysql_client:
+    #         return
+    #     if metadata is None:
+    #         metadata = {}
 
-        try:
-            doc_id = f"excel_{metadata.get('file_name', 'unknown')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-            self.mysql_client.insert_document_metadata(
-                doc_id=doc_id,
-                file_name=metadata.get('file_name', 'Unknown'),
-                file_type=metadata.get('file_type', 'excel'),
-                file_path=metadata.get('file_path', ''),
-                file_size=metadata.get('file_size', 0),
-                processed_at=metadata.get('processed_at', datetime.now().isoformat()),
-                mysql_stored=True,
-                tables_info=None,
-                rows_inserted=0
-            )
-            logger.info(f"Excel 元数据已存储到 MySQL: {metadata.get('file_name')}")
-        except Exception as e:
-            logger.error(f"MySQL 存储失败: {e}")
+    #     try:
+    #         doc_id = f"excel_{metadata.get('file_name', 'unknown')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    #         self.mysql_client.insert_document_metadata(
+    #             doc_id=doc_id,
+    #             file_name=metadata.get('file_name', 'Unknown'),
+    #             file_type=metadata.get('file_type', 'excel'),
+    #             file_path=metadata.get('file_path', ''),
+    #             file_size=metadata.get('file_size', 0),
+    #             processed_at=metadata.get('processed_at', datetime.now().isoformat()),
+    #             mysql_stored=True,
+    #             tables_info=None,
+    #             rows_inserted=0
+    #         )
+    #         logger.info(f"Excel 元数据已存储到 MySQL: {metadata.get('file_name')}")
+    #     except Exception as e:
+    #         logger.error(f"MySQL 存储失败: {e}")
 
 
 # 快速使用函数
 def convert_document(input_path: str, output_format: str = 'md', output_dir: Optional[str] = None,
                      enable_db_storage: bool = False, excel_to_mysql: bool = False,
                      mineru_config_path: Optional[str] = None,
-                     mineru_model_source: str = "local") -> Dict[str, Any]:
+                     mineru_model_source: str = "local",
+                     lang: str = "ch",
+                     file_service_url: Optional[str] = None,
+                     knowledge_space_id: Optional[str] = None) -> Dict[str, Any]:
     """
     快速转换单个文档
 
     Args:
         input_path: 输入文件路径
-        output_format: 输出格式 ('md' 或 'txt')
+        output_format: 输出格式 ('md')
         output_dir: 输出目录
         enable_db_storage: 是否启用数据库存储
         excel_to_mysql: 是否将 Excel 数据存储到 MySQL（结构化存储）
         mineru_config_path: MinerU 配置文件路径
         mineru_model_source: MinerU 模型源
+        default_lang: 文档语言,
+        file_service_url: 文件服务 URL,
+        knowledge_space_id: 知识空间 ID
 
     Returns:
         Dict: 转换结果
     """
+    
     converter = DocumentConversionInterface(
         output_format=output_format,
         save_to_file=True,
@@ -730,15 +884,19 @@ def convert_document(input_path: str, output_format: str = 'md', output_dir: Opt
         enable_db_storage=enable_db_storage,
         excel_to_mysql=excel_to_mysql,
         mineru_config_path=mineru_config_path,
-        mineru_model_source=mineru_model_source
+        mineru_model_source=mineru_model_source,
+        default_lang=lang,
+        file_service_url=file_service_url,
+        knowledge_space_id=knowledge_space_id
     )
-    return converter.convert_document(input_path)
+    return converter.convert_document(input_path, lang=lang, knowledge_space_id=knowledge_space_id)
 
 
 def convert_directory(directory_path: str, output_format: str = 'md', output_dir: Optional[str] = None,
                       enable_db_storage: bool = False, excel_to_mysql: bool = False,
                       mineru_config_path: Optional[str] = None,
-                      mineru_model_source: str = "local") -> Dict[str, Any]:
+                      mineru_model_source: str = "local",
+                      lang: str = "ch") -> Dict[str, Any]:
     """
     快速转换目录中的所有文档
 
@@ -763,4 +921,4 @@ def convert_directory(directory_path: str, output_format: str = 'md', output_dir
         mineru_config_path=mineru_config_path,
         mineru_model_source=mineru_model_source
     )
-    return converter.convert_batch(directory_path)
+    return converter.convert_batch(directory_path,lang=lang)

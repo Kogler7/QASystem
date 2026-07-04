@@ -205,11 +205,12 @@ class DocumentProcessor:
             }
         }
 
-    def process_file(self, file_path: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+    def process_file(self, file_path: str, model_name: Optional[str] = None, lang: str = "ch") -> Dict[str, Any]:
         """
         处理单个文件，支持指定模型
         :param file_path: 文件路径
         :param model_name: 可选的模型名称，如果为None则使用默认模型
+        :param lang: 文档语言，默认 'ch'，可选 'en'
         返回格式: {
             'success': bool,
             'file_type': str,
@@ -257,7 +258,7 @@ class DocumentProcessor:
                 backend_choice = os.getenv('MINERU_BACKEND') or 'vlm'
                 kwargs = {
                     'output_dir': str(self.output_dir),
-                    'lang': "ch",
+                    'lang': lang,
                     'backend': backend_choice,
                     'method': "auto",
                     'formula_enable': True,
@@ -375,7 +376,7 @@ class DocumentProcessor:
             for file_path in path.rglob(f'*{ext}'):
                 results['total_files'] += 1
                 print(f"处理文件: {file_path}")
-                result = self.process_file(str(file_path))
+                result = self.process_file(str(file_path), lang=lang)
                 results['results'].append({
                     'file': str(file_path),
                     'result': result
