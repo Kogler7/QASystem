@@ -75,7 +75,7 @@ def recognize(problem_model: dict | str) -> dict[str, Any]:
 
 
 def deep_recognize(problem_model: dict|str) -> dict[str, Any]:
-    from intent_recognition.agent_intent import intent_recognition
+    from models.agent_intent import intent_recognition
     result = intent_recognition(problem_model)
     return {
         "code":0,
@@ -85,7 +85,7 @@ def deep_recognize(problem_model: dict|str) -> dict[str, Any]:
 
 
 def get_plan(problem_model: dict) -> dict[str, Any]:
-    from intent_recognition.plan_app import PlanApp
+    from models.plan_app import PlanApp
     plan_app = PlanApp()
     result = plan_app.get_plan_from_model(problem_model)
     return {
@@ -96,7 +96,7 @@ def get_plan(problem_model: dict) -> dict[str, Any]:
 
 
 def get_tool_match(step: dict) -> dict[str, Any]:
-    from intent_recognition.plan_to_tools import plan_tool
+    from models.plan_to_tools import plan_tool
     result = plan_tool(step)
     return {
         "code":0,
