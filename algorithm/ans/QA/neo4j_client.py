@@ -39,7 +39,8 @@ class Neo4jClient:
         elif method == "get_all_relations_of_an_entity":
             return self.get_all_relations_of_an_entity(args[0])
         elif method == "get_tail_entities_given_head_and_relation":
-            return self.get_tail_entities_given_head_and_relation(args[0], args[1])
+            direction = args[2] if len(args) > 2 else "outgoing"
+            return self.get_tail_entities_given_head_and_relation(args[0], args[1], direction)
         elif method == "get_tail_values_given_head_and_relation":
             return self.get_tail_values_given_head_and_relation(args[0], args[1])
         else:
@@ -157,17 +158,14 @@ class Neo4jClient:
 
             return {"head": unique_head, "tail": unique_tail}
 
-    def get_tail_entities_given_head_and_relation(self, head_qid: str, relation: str) -> Dict[str, List[Dict]]:
-        """根据头和关系查找尾实体"""
+    def get_tail_entities_given_head_and_relation(self, head_qid: str, relation: str, direction: str = "outgoing") -> Dict[str, List[Dict]]:
+        """根据头和关系查找尾实体，支持指定方向"""
         if not head_qid.startswith("NEO_"):
-            print(f"非Neo4j格式的QID: {head_qid}")
             return {"head": [], "tail": []}
 
         head_id = int(head_qid.replace("NEO_", ""))
+        relation_clean = relation.strip()
 
-        #正确处理关系类型（去掉空格，转为大写）
-        relation_clean = relation.strip().upper().replace(" ", "_")
-        # 先尝试出度关系查询
         out_query = """
         MATCH (start)-[r]->(end)
         WHERE id(start) = $head_id AND type(r) = $relation
@@ -178,43 +176,58 @@ class Neo4jClient:
         LIMIT 20
         """
 
+        out_query_ci = """
+        MATCH (start)-[r]->(end)
+        WHERE id(start) = $head_id AND toUpper(type(r)) = toUpper($relation)
+        RETURN 
+            end.name as name,
+            labels(end) as labels,
+            id(end) as id
+        LIMIT 20
+        """
+
+        in_query = """
+        MATCH (start)-[r]->(end)
+        WHERE id(end) = $head_id AND type(r) = $relation
+        RETURN 
+            start.name as name,
+            labels(start) as labels,
+            id(start) as id
+        LIMIT 20
+        """
+
+        in_query_ci = """
+        MATCH (start)-[r]->(end)
+        WHERE id(end) = $head_id AND toUpper(type(r)) = toUpper($relation)
+        RETURN 
+            start.name as name,
+            labels(start) as labels,
+            id(start) as id
+        LIMIT 20
+        """
+
         with self.driver.session() as session:
             tails = []
 
-            # 尝试查询
             try:
-                result = session.run(out_query, head_id=head_id, relation=relation_clean)
-
-                for record in result:
-                    tail_qid = f"NEO_{record['id']}"
-                    tail_name = record['name'] if record['name'] else "Unname_Entity"
-                    tails.append({
-                        'qid': tail_qid,
-                        'label': tail_name
-                    })
-                if not tails:
-                    # 尝试入度关系查询
-                    in_query = """
-                    MATCH (start)-[r]->(end)
-                    WHERE id(end) = $head_id AND type(r) = $relation
-                    RETURN 
-                        start.name as name,
-                        labels(start) as labels,
-                        id(start) as id
-                    LIMIT 20
-                    """
-
+                if direction == "outgoing":
+                    result = session.run(out_query, head_id=head_id, relation=relation_clean)
+                    for record in result:
+                        tails.append({'qid': f"NEO_{record['id']}", 'label': record['name'] if record['name'] else "未知实体"})
+                    if not tails:
+                        result = session.run(out_query_ci, head_id=head_id, relation=relation_clean)
+                        for record in result:
+                            tails.append({'qid': f"NEO_{record['id']}", 'label': record['name'] if record['name'] else "未知实体"})
+                else:
                     result = session.run(in_query, head_id=head_id, relation=relation_clean)
                     for record in result:
-                        tail_qid = f"NEO_{record['id']}"
-                        tail_name = record['name'] if record['name'] else "Unname_Entity"
-                        tails.append({
-                            'qid': tail_qid,
-                            'label': tail_name
-                        })
-                        print(f"   通过入度找到实体: {tail_name} -> {tail_qid}")
+                        tails.append({'qid': f"NEO_{record['id']}", 'label': record['name'] if record['name'] else "未知实体"})
+                    if not tails:
+                        result = session.run(in_query_ci, head_id=head_id, relation=relation_clean)
+                        for record in result:
+                            tails.append({'qid': f"NEO_{record['id']}", 'label': record['name'] if record['name'] else "未知实体"})
             except Exception as e:
-                print(f"查询执行异常: {e}")
+                pass
             return {"head": [], "tail": tails}
 
     def get_tail_values_given_head_and_relation(self, head_qid: str, relation: str) -> Set[str]:

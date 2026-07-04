@@ -27,7 +27,7 @@ class Config:
     """项目配置类"""
 
     # ===== Neo4j 配置 =====
-    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_URI: str = "bolt://localhost:7688"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "neo4j2025"  # 默认与 .env.example 一致；生产请通过 .env 或环境变量覆盖
 
@@ -117,7 +117,7 @@ class Config:
                 load_dotenv(qa_env_path, override=False)
                 print(f"已加载配置文件: {qa_env_path}")
         
-        # 将LLM相关配置设置到全局环境变量，供algorithm/common/llm_client使用
+        # 将LLM相关配置设置到全局环境变量
         llm_base_url = _normalize_host_docker_internal(os.getenv("LLM_BASE_URL", ""))
         if llm_base_url:
             os.environ["LLM_BASE_URL"] = llm_base_url

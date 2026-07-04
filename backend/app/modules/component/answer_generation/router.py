@@ -41,19 +41,14 @@ class ProblemDefinitionRequestBody(BaseModel):
     question: str
 
 
-class SolutionPlanningRequestBody(BaseModel):
-    problem_model: dict
-
 
 class AnswerGenerationRequestBody(BaseModel):
-    intent_output: dict|str
+    intent: dict|str = None
+    question: str = None
 
 class DecomposeProblemRequestBody(BaseModel):
     problem_model: dict
 
-class QueryGraphRequestBody(BaseModel):
-    node_labels: List[str] = []
-    limit: int = 20
 
 
 @router.post("/problem-solving/problem-definition")
@@ -69,46 +64,33 @@ async def problem_definition(body: ProblemDefinitionRequestBody) -> dict[str, An
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/tools/solution-planning")
-async def solution_planning(body: SolutionPlanningRequestBody) -> dict[str, Any]:
-    """方案规划工具"""
-    if not body.problem_model:
-        raise HTTPException(status_code=400, detail="问题模型不能为空")
-    try:
-        result = await asyncio.to_thread(service.plan_solution, problem_model=body.problem_model)
-        return result
-    except Exception as e:
-        logger.exception("方案规划失败")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
 
 @router.post("/tools/answer-generation")
 async def answer_generation(body: AnswerGenerationRequestBody) -> dict[str, Any]:
-    """答案生成工具"""
+    """答案生成工具
+    支持两种输入格式：
+    1. JSON格式: {"intent": {"intent_id": "...", "user_goal": "...", ...}}
+    2. 直接字符串问题: {"question": "分析公开与非公开采购金额构成"}
+    """
     try:
+        # 优先使用intent字段，其次使用question字段
+        input_data = body.intent if body.intent else body.question
+        
+        if not input_data:
+            raise HTTPException(status_code=400, detail="intent或question字段不能为空")
+        
         result = await asyncio.to_thread(
             service.generate_answer,
-            question=body.intent_output
+            question=input_data
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("答案生成失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-
-@router.post("/query-graph")
-async def query_graph(body: QueryGraphRequestBody) -> dict[str, Any]:
-    """按节点名称/标签关键字查询 Neo4j 子图（组件页可视化）。"""
-    try:
-        return await asyncio.to_thread(
-            service.query_graph,
-            node_labels=body.node_labels,
-            limit=body.limit,
-        )
-    except Exception as e:
-        logger.exception("查询图谱失败")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-        
+      
 @router.post("/problem-solving/decompose")
 async def decompose_problem(body: DecomposeProblemRequestBody) -> dict[str, Any]:
     """问题分解工具"""
@@ -159,4 +141,52 @@ async def decompose_problem(body: DecomposeProblemRequestBody) -> dict[str, Any]
             "steps": [],
             "details": {}
         }
-} 
+}
+
+
+class RecommendDimensionsRequestBody(BaseModel):
+    requirement: dict
+    selected_dimensions: list[dict] = []
+    total_dimensions: list[dict] | None = None
+
+
+class GenerateSpaceDraftRequestBody(BaseModel):
+    requirement: dict
+    dimensions: list[dict]
+
+
+@router.post("/tools/recommend-dimensions")
+async def recommend_dimensions(body: RecommendDimensionsRequestBody) -> dict[str, Any]:
+    """维度推荐
+
+    根据用户需求和预选维度，LLM分析推荐维度刻度。
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.recommend_dimensions,
+            requirement=body.requirement,
+            selected_dimensions=body.selected_dimensions,
+            total_dimensions=body.total_dimensions,
+        )
+        return result
+    except Exception as e:
+        logger.exception("维度推荐失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/tools/generate-space-draft")
+async def generate_space_draft(body: GenerateSpaceDraftRequestBody) -> dict[str, Any]:
+    """空间草稿
+
+    根据用户确定的维度刻度，生成知识空间树草稿。
+    """
+    try:
+        result = await asyncio.to_thread(
+            service.generate_space_draft,
+            requirement=body.requirement,
+            dimensions=body.dimensions,
+        )
+        return result
+    except Exception as e:
+        logger.exception("空间草稿生成失败")
+        raise HTTPException(status_code=500, detail=str(e)) from e
