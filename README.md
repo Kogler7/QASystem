@@ -111,4 +111,26 @@ from agentcode import AgentRuntime
 
 后端：Python 3.10+（镜像 3.12）、FastAPI、SQLAlchemy（async）、MySQL。  
 前端：Vue 3、Vite、Element Plus、Axios。  
-外部：Dify、Neo4j、Milvus、LLM、Ollama 等。
+外部：Dify、Neo4j、Milvus、LLM、Ollama、vLLM 等。
+
+---
+
+## IntentGPT/vLLM 意图识别实验模块
+
+`wzc-dev` 分支补充了独立的 `intent/` 实验模块，用于基于 IntentGPT 思路做意图识别，并通过 vLLM API 调用远程或本地模型（默认示例为 Qwen/Qwen3-8B）。该模块包含配置、提示词、评估脚本和 API 封装，适合单独验证意图识别策略或沉淀到主系统的意图识别组件中。
+
+关键入口：
+
+- `intent/main.py`：实验主入口。
+- `intent/predict_intent.py`：意图预测封装。
+- `intent/intentgpt/utils/vllm_client.py`：vLLM API 客户端。
+- `intent/configs/track.yaml`：示例配置。
+- `intent/.env.example`：vLLM 相关环境变量模板。
+
+常用环境变量：
+
+```env
+VLLM_API_URL=http://127.0.0.1:8000/v1/completions
+VLLM_MODEL=Qwen/Qwen3-8B
+VLLM_API_KEY=
+```

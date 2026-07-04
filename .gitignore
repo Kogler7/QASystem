@@ -157,3 +157,25 @@ gitignore/
 frontend/frontend_venv/
 CURSOR_PROMPT_AGENTLOOP_PYTHON_LIB.md
 .omc/
+
+# 保存的模型文件
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# 日志文件
+*.log
+
+# Neo4j / 知识图谱缓存数据
+.neo4j/
+.graph_cache/
+
+# wzc
+intent/.env
+intent/embeddings/
+intent/track/
+intent/models/
+intent/results_v3/
+intent/dataset
