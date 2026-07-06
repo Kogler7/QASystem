@@ -9,36 +9,111 @@ import logging
 import tempfile
 import os
 import re
+import uuid
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from langchain_core.documents import Document
+from pydantic import BaseModel, Field
 
 # ==================== 1. 设置路径和导入 ====================
 import sys
-_ALGO_ROOT = Path(__file__).resolve().parent.parent
-if str(_ALGO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ALGO_ROOT))
+_ALGO_ROOT = Path(__file__).resolve().parent
+_IMPORT_ROOTS = [
+    _ALGO_ROOT,
+    _ALGO_ROOT / "preproc",
+    _ALGO_ROOT / "knowledge_extract",
+    _ALGO_ROOT / "NL_to_cypher",
+    _ALGO_ROOT / "confidence_calculate",
+]
+for _path in _IMPORT_ROOTS:
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
+
+def _configure_local_runtime_defaults() -> None:
+    """Make the standalone 8080 service usable without backend-specific env."""
+
+    def _force_local_if_unset_or_docker_host(key: str, value: str) -> None:
+        current = (os.getenv(key) or "").strip()
+        if not current or "host.docker.internal" in current:
+            os.environ[key] = value
+
+    _force_local_if_unset_or_docker_host("CONFIDENCE_ES_HOSTS", "http://127.0.0.1:9200")
+    _force_local_if_unset_or_docker_host("ES_HOSTS", "http://127.0.0.1:9200")
+    _force_local_if_unset_or_docker_host("NEO4J_URI", "bolt://127.0.0.1:7687")
+    os.environ.setdefault("NEO4J_USER", "neo4j")
+    os.environ.setdefault("NEO4J_PASSWORD", "neo4j2025")
+    os.environ.setdefault("CONFIDENCE_ES_INDEX", "documents")
+
+    model_dir = _ALGO_ROOT / "NL_to_cypher" / "bge-small-zh-v1.5"
+    pooling_dir = model_dir / "1_Pooling"
+    normalize_dir = model_dir / "2_Normalize"
+    pooling_dir.mkdir(exist_ok=True)
+    normalize_dir.mkdir(exist_ok=True)
+    pooling_config = pooling_dir / "config.json"
+    if not pooling_config.exists():
+        pooling_config.write_text(
+            json.dumps(
+                {
+                    "word_embedding_dimension": 512,
+                    "pooling_mode_cls_token": False,
+                    "pooling_mode_mean_tokens": True,
+                    "pooling_mode_max_tokens": False,
+                    "pooling_mode_mean_sqrt_len_tokens": False,
+                    "pooling_mode_weightedmean_tokens": False,
+                    "pooling_mode_lasttoken": False,
+                    "include_prompt": True,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    if not (os.getenv("CONFIDENCE_SBERT_MODEL_PATH") or os.getenv("SBERT_MODEL_PATH")):
+        os.environ["CONFIDENCE_SBERT_MODEL_PATH"] = str(model_dir)
+
+
+_configure_local_runtime_defaults()
 
 from preproc_src.main_processor import DocumentProcessor
 from knowledge_extract import extract_v2
 
 # 从 NL_to_cypher 导入向量化和切分函数
-from NL_to_cypher.vector import batch_text_to_vectors
+from NL_to_cypher.vector import batch_text_to_vectors, text_to_vector as single_text_to_vector
 from NL_to_cypher.splitter import (
     split_by_character,
     split_recursively,
     split_by_markdown,
 )
+from calculator import calculate_graph_confidence
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="知识沉淀服务", version="1.0.0")
+
+MOCK_DIR = _ALGO_ROOT / "data" / "mock_storage"
+FILE_DIR = MOCK_DIR / "files"
+VECTOR_DIR = MOCK_DIR / "vectors"
+FILE_DIR.mkdir(parents=True, exist_ok=True)
+VECTOR_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class TextVectorRequest(BaseModel):
+    text: str = Field(..., description="待向量化文本")
+
+
+class BatchTextVectorRequest(BaseModel):
+    texts: List[str] = Field(..., description="待向量化文本列表")
+
+
+class GraphRequest(BaseModel):
+    graph: Dict[str, Any] = Field(..., description="包含 nodes 和 relationships 的知识图谱数据")
 
 
 # ==================== 2. 辅助函数 ====================
@@ -191,11 +266,46 @@ def generate_understanding(graph: Dict[str, Any]) -> str:
             f"{len(relationships)} 条关系，形成完整的知识图谱结构。")
 
 
+def _safe_name(filename: str) -> str:
+    name = Path(filename or "upload.bin").name
+    return name or "upload.bin"
+
+
+def _save_file_bytes(
+    content: bytes,
+    file_name: str,
+    knowledge_space_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    file_id = str(uuid.uuid4())
+    filename = _safe_name(file_name)
+    target_dir = FILE_DIR / file_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / filename
+    target_path.write_bytes(content)
+    return {
+        "id": file_id,
+        "file_name": filename,
+        "file_path": str(target_path),
+        "file_url": f"/file/{file_id}/{filename}",
+        "knowledgeSpaceId": knowledge_space_id,
+    }
+
+
 def upload_md_to_file_service(md_content: str, file_name: str,
                               file_service_url: str,
                               knowledge_space_id: Optional[str] = None) -> Dict[str, Any]:
     """将 Markdown 内容上传到文件存储服务"""
     try:
+        if not file_service_url:
+            data = _save_file_bytes(md_content.encode("utf-8"), file_name, knowledge_space_id)
+            return {
+                "success": True,
+                "file_id": data.get("id"),
+                "file_path": data.get("file_path"),
+                "file_url": data.get("file_url"),
+                "error": None,
+            }
+
         upload_url = f"{file_service_url.rstrip('/')}/file/upload"
         
         files = {
@@ -251,6 +361,88 @@ def upload_md_to_file_service(md_content: str, file_name: str,
 
 # ==================== 3. 主接口 ====================
 
+@app.post("/file/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    knowledgeSpaceId: Optional[str] = Form(None),
+) -> Dict[str, Any]:
+    content = await file.read()
+    data = _save_file_bytes(content, file.filename or "upload.bin", knowledgeSpaceId)
+    return {"code": 0, "info": "success", "msg": "success", "data": data}
+
+
+@app.post("/vector/save")
+async def save_vector(request: Request) -> Dict[str, Any]:
+    payload = await request.json()
+    save_id = str(uuid.uuid4())
+    target_path = VECTOR_DIR / f"{save_id}.json"
+    record = {
+        "id": save_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "payload": payload,
+    }
+    target_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "code": 0,
+        "msg": "success",
+        "info": "success",
+        "data": {
+            "id": save_id,
+            "saved_path": str(target_path),
+            "item_count": len(payload.get("items", [])) if isinstance(payload, dict) else 0,
+        },
+    }
+
+
+@app.post("/api/component/nl2cypher/text-to-vector")
+async def text_to_vector_api(body: TextVectorRequest) -> Dict[str, Any]:
+    text = (body.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    vector = single_text_to_vector(text)
+    return {
+        "code": 0,
+        "info": "文本转向量完成",
+        "message": "文本转向量完成",
+        "data": {"text": text, "vector": vector},
+    }
+
+
+@app.post("/api/component/nl2cypher/text-to-vectors")
+async def text_to_vectors_api(body: BatchTextVectorRequest) -> Dict[str, Any]:
+    texts = [text.strip() for text in body.texts if text and text.strip()]
+    if not texts:
+        raise HTTPException(status_code=400, detail="文本列表不能为空")
+    vectors = batch_text_to_vectors(texts)
+    return {
+        "code": 0,
+        "info": f"批量文本转向量完成，共 {len(vectors)} 个向量",
+        "message": f"批量文本转向量完成，共 {len(vectors)} 个向量",
+        "data": {"count": len(vectors), "vectors": vectors},
+    }
+
+
+@app.post("/api/component/kg-update/calculate-confidence")
+async def calculate_confidence_api(body: GraphRequest) -> Dict[str, Any]:
+    graph = body.graph or {}
+    if not graph.get("relationships") and not graph.get("ontology_relations"):
+        return {
+            "code": 0,
+            "info": "置信度评估完成",
+            "data": {
+                "evaluation_id": f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "total_count": 0,
+                "graph": {
+                    "nodes": graph.get("nodes", []),
+                    "relationships": graph.get("relationships", []),
+                    "ontology_relations": graph.get("ontology_relations", []),
+                },
+                "details": {},
+            },
+        }
+    return calculate_graph_confidence(body.model_dump())
+
+
 @app.post("/api/knowledge/precipitation")
 async def knowledge_precipitation(
     # ===== 文件与基础参数 =====
@@ -287,7 +479,7 @@ async def knowledge_precipitation(
     
     temp_file_path = None
     file_name_stem = Path(file.filename).stem
-    file_service = file_service_url or os.getenv("FILE_SERVICE_URL", "http://10.10.2.33")
+    file_service = file_service_url or os.getenv("FILE_SERVICE_URL", "").strip()
     
     try:
         # ==================== 1. 保存上传文件 ====================
