@@ -97,6 +97,13 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="知识沉淀服务", version="1.0.0")
 
+DEFAULT_ONTOLOGY = """@startuml
+class BusinessObject {
+  name
+  description
+}
+@enduml"""
+
 MOCK_DIR = _ALGO_ROOT / "data" / "mock_storage"
 FILE_DIR = MOCK_DIR / "files"
 VECTOR_DIR = MOCK_DIR / "vectors"
@@ -208,6 +215,15 @@ def md_to_text(markdown_content: str) -> str:
     text = '\n'.join(cleaned_lines)
     text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
     return text.strip()
+
+
+def normalize_document_content(content: Any) -> str:
+    """Normalize parser output into text for storage, extraction, and chunking."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    return json.dumps(content, ensure_ascii=False, indent=2)
 
 
 def build_graphs_response(graph: Dict[str, Any]) -> Dict[str, List]:
@@ -457,7 +473,7 @@ async def knowledge_precipitation(
     similarity: float = Form(0.6, description="语义切分相似度阈值，默认0.6"),
     
     # ===== 知识抽取参数 =====
-    ontology: str = Form(..., description="PlantUML 本体定义"),
+    ontology: Optional[str] = Form(None, description="PlantUML 本体定义"),
     model: Optional[str] = Form(None, description="LLM 模型名"),
     base_url: Optional[str] = Form(None, description="LLM API 地址"),
     
@@ -511,7 +527,7 @@ async def knowledge_precipitation(
                 }
             })
         
-        md_content = parse_result.get("content", "")
+        md_content = normalize_document_content(parse_result.get("content", ""))
         stats["document"]["content_length"] = len(md_content)
 
         # ==================== 3. 存储原始MD (origin_url) ====================
@@ -526,19 +542,21 @@ async def knowledge_precipitation(
 
         # ==================== 4. 知识抽取 ====================
         plain_text = md_to_text(md_content)
+        ontology_text = (ontology or os.getenv("KG_EXTRACT_ONTOLOGY") or DEFAULT_ONTOLOGY).strip()
         extract_result = extract_v2(
-            ontology=ontology, 
+            ontology=ontology_text,
             text=plain_text, 
             model=model, 
             base_url=base_url
         )
         
-        if extract_result.get("error"):
+        extract_error = extract_result.get("error") or extract_result.get("_error")
+        if extract_error:
             return JSONResponse(status_code=200, content={
                 "code": 1002, "info": "知识抽取失败",
                 "data": {
                     "name": None,
-                    "understanding": f"知识抽取失败：{extract_result.get('error')}",
+                    "understanding": f"知识抽取失败：{extract_error}",
                     "origin_url": origin_url,
                     "vector_url": None,
                     "extract_url": None,
