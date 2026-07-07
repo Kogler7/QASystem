@@ -12,7 +12,7 @@ from .db import AsyncSessionLocal, init_db
 from .deps.auth import require_admin
 from .modules.component import COMPONENT_ROUTERS
 from .modules.component.document_preproc import service as doc_preproc_service
-from .routers import admin_users, agent_template, chat, knowledge, users
+from .routers import admin_users, agent_template, chat, knowledge, knowledge_precipitation, users
 
 #冲突检测new
 from app.routers import conclictfix
@@ -100,6 +100,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"detail": "内部服务器错误，请稍后重试", "type": type(exc).__name__},
     )
 
+app.include_router(knowledge_precipitation.router)
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
