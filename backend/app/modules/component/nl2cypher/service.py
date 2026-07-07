@@ -147,3 +147,91 @@ def get_all_vectors() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error("获取向量数据失败: %s", e, exc_info=True)
         return {"vectors": [], "stats": {"message": f"内部错误: {str(e)}"}}
+
+def text_to_vector_service(text: str) -> dict[str, Any]:
+    """
+    单文本转向量服务
+    
+    Args:
+        text: 输入文本
+    
+    Returns:
+        符合接口规范的返回结果
+    """
+    try:
+        import vector
+    except Exception as e:
+        logger.warning("加载依赖失败: %s", e)
+        return {"code":400, "info": "依赖加载失败"}
+    
+    # 调用已有的 text_to_vector 函数
+    vector_result = vector.text_to_vector(text)
+    
+    return {
+        "code": 0,
+        "info": "文本转向量完成",
+        "data": {
+            "text": text,
+            "vector": vector_result
+        }
+    }
+
+# service.py
+
+def batch_text_to_vector_service(texts: List[str]) -> dict[str, Any]:
+    """
+    批量文本转向量服务
+    
+    Args:
+        texts: 文本列表
+    
+    Returns:
+        符合接口规范的返回结果
+    """
+    try:
+        import vector
+    except Exception as e:
+        logger.warning("加载依赖失败: %s", e)
+        return {"code":400, "info": "依赖加载失败"}
+    # 参数校验
+    if not texts:
+        return {
+            "code": 400,
+            "message": "文本列表不能为空",
+            "data": None
+        }
+    
+    if len(texts) == 0:
+        return {
+            "code": 400,
+            "message": "文本列表至少需要一个元素",
+            "data": None
+        }
+    
+    # 过滤空文本
+    valid_texts = [t for t in texts if t and t.strip()]
+    if not valid_texts:
+        return {
+            "code": 400,
+            "message": "文本列表中所有文本均为空",
+            "data": None
+        }
+    
+    try:
+        # 调用已有的 batch_text_to_vectors 函数
+        vectors = vector.batch_text_to_vectors(valid_texts)
+        
+        return {
+            "code": 0,
+            "message": f"批量文本转向量完成，共 {len(vectors)} 个向量",
+            "data": {
+                "count": len(vectors),
+                "vectors": vectors
+            }
+        }
+    except Exception as e:
+        return {
+            "code": 500,
+            "message": f"批量文本转向量失败: {str(e)}",
+            "data": None
+        }
