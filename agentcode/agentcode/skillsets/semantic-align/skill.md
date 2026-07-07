@@ -13,11 +13,11 @@ description: 语义对齐与图谱上下文获取技能。通过 graph-search �
 
 | 工具 | 作用 | 关键参数 |
 |------|------|---------|
-| `mcp__graph-search__link_entities` | 关键词搜索候选实体 | keywords_json, question |
-| `mcp__graph-search__query_entity_properties` | 查实体完整属性 | entity_id |
-| `mcp__graph-search__query_triple_info` | 单跳图搜索（三元组+新实体） | start_entity_id, question, depth |
+| `graph-search__link_entities` | 关键词搜索候选实体 | keywords_json, question |
+| `graph-search__query_entity_properties` | 查实体完整属性 | entity_id |
+| `graph-search__search_graph` | 单跳图搜索（三元组+新实体） | start_entity_id, question, depth |
 
-> `query_triple_info` 每次只搜一层。返回的 `triples` 含关系名和两端实体，`found_entities` 含新实体的完整属性。你需要根据返回的关系名判断哪条路通向目标，选择对应的实体继续。
+> `search_graph` 每次只搜一层。返回的 `triples` 含关系名和两端实体，`found_entities` 含新实体的完整属性。你需要根据返回的关系名判断哪条路通向目标，选择对应的实体继续。
 
 ---
 
@@ -29,7 +29,7 @@ description: 语义对齐与图谱上下文获取技能。通过 graph-search �
 用户关键词
     ↓ link_entities（搜索候选实体）
 候选实体列表
-    ↓ query_triple_info（追踪 SYNONYM_OF 关系）
+    ↓ search_graph（追踪 SYNONYM_OF 关系）
 标准 Term 节点（后续所有探索的起点）
 ```
 
@@ -37,7 +37,7 @@ description: 语义对齐与图谱上下文获取技能。通过 graph-search �
 
 > **任务**：用用户关键词在图谱中搜索候选实体，获取初步匹配结果。
 
-调用 `mcp__graph-search__link_entities`：
+调用 `graph-search__link_entities`：
 
 ```
 link_entities(
@@ -51,7 +51,7 @@ link_entities(
 
 > **任务**：从候选实体出发，追踪 `SYNONYM_OF` 关系，找到标准术语节点。
 
-对 score 高的候选，若其 label 含 `Term`，调用 `query_triple_info(start_entity_id, depth=1)`。
+对 score 高的候选，若其 label 含 `Term`，调用 `search_graph(start_entity_id, depth=1)`。
 
 在三元组中关注关系名：
 - 遇到 `SYNONYM_OF` → 继续往标准 Term 走
@@ -70,16 +70,16 @@ link_entities(
 ```
 【路径A】Term 直接关联（优先）
 Term
-    ↓ query_triple_info（关注 HAS_STAKEHOLDER）
+    ↓ search_graph（关注 HAS_STAKEHOLDER）
 Stakeholder
 
 【路径B】通过 Metric 间接关联
 Term
-    ↓ query_triple_info（关注 DENOTES）
+    ↓ search_graph（关注 DENOTES）
 Metric
-    ↓ query_triple_info（关注 BELONGS_TO_ENTITY）
+    ↓ search_graph（关注 BELONGS_TO_ENTITY）
 BusinessObject
-    ↓ query_triple_info（关注 HAS_STAKEHOLDER）
+    ↓ search_graph（关注 HAS_STAKEHOLDER）
 Stakeholder
 ```
 
@@ -87,7 +87,7 @@ Stakeholder
 
 > **任务**：检查 Term 是否直接关联利益相关者。
 
-`query_triple_info(start_entity_id=<Term的ID>, depth=1)`，在三元组中查找 `HAS_STAKEHOLDER` 关系。
+`search_graph(start_entity_id=<Term的ID>, depth=1)`，在三元组中查找 `HAS_STAKEHOLDER` 关系。
 
 - 若找到 → 获得 Stakeholder 实体，提取 name、role
 - 若未找到 → 转向路径B
@@ -97,13 +97,13 @@ Stakeholder
 > **任务**：如果 Term 没有直接关联利益相关者，则通过 Metric 和 BusinessObject 间接获取。
 
 #### 2b1. Term → Metric
-`query_triple_info(start_entity_id=<Term的ID>, depth=1)`，在三元组中找 `DENOTES` 关系 → 获得 Metric 实体（若存在）。
+`search_graph(start_entity_id=<Term的ID>, depth=1)`，在三元组中找 `DENOTES` 关系 → 获得 Metric 实体（若存在）。
 
 #### 2b2. Metric → BusinessObject
-`query_triple_info(start_entity_id=<Metric的ID>, depth=1)`，在三元组中找 `BELONGS_TO_ENTITY` 关系 → 获得 BusinessObject 实体。
+`search_graph(start_entity_id=<Metric的ID>, depth=1)`，在三元组中找 `BELONGS_TO_ENTITY` 关系 → 获得 BusinessObject 实体。
 
 #### 2b3. BusinessObject → Stakeholder
-`query_triple_info(start_entity_id=<BusinessObject的ID>, depth=1)`，在三元组中找 `HAS_STAKEHOLDER` 关系 → 获得 Stakeholder 实体。提取 name、role。
+`search_graph(start_entity_id=<BusinessObject的ID>, depth=1)`，在三元组中找 `HAS_STAKEHOLDER` 关系 → 获得 Stakeholder 实体。提取 name、role。
 
 ---
 
@@ -118,14 +118,14 @@ Stakeholder
 ```
 【路径A】直接路径
 Stakeholder
-    ↓ query_triple_info（关注 提出问题）
+    ↓ search_graph（关注 提出问题）
 ProblemClass
 
 【路径B】间接路径（通过关注点）
 Stakeholder
-    ↑ query_triple_info（关注 is_a_matter_of_importance_to）
+    ↑ search_graph（关注 is_a_matter_of_importance_to）
 Concern
-    ↓ query_triple_info（关注 HAS_PROBLEM_CLASS）
+    ↓ search_graph（关注 HAS_PROBLEM_CLASS）
 ProblemClass
 ```
 
@@ -133,7 +133,7 @@ ProblemClass
 
 > **任务**：从利益相关者出发，通过 `提出问题` 关系找到该干系人通常关注的问题类型。例如"采购管理部门"对应"指标单值查询类""趋势分析类"等问题。
 
-`query_triple_info(start_entity_id=<Stakeholder的ID>, depth=1)`，找 `提出问题` 关系 → 获得 ProblemClass。
+`search_graph(start_entity_id=<Stakeholder的ID>, depth=1)`，找 `提出问题` 关系 → 获得 ProblemClass。
 
 若无 `提出问题` 关系，尝试路径B。
 
@@ -142,8 +142,8 @@ ProblemClass
 > **任务**：通过关注点（Concern）间接获取问题类。关注点表示利益相关者关心的业务领域，每个关注点对应若干问题类。
 
 **步骤：**
-1. 从 Stakeholder 出发，`query_triple_info` 找 `is_a_matter_of_importance_to` 的**入边**（注意方向是 Concern → Stakeholder）→ 获得 Concern 实体
-2. 从 Concern 出发，`query_triple_info` 找 `HAS_PROBLEM_CLASS` 关系 → 获得 ProblemClass
+1. 从 Stakeholder 出发，`search_graph` 找 `is_a_matter_of_importance_to` 的**入边**（注意方向是 Concern → Stakeholder）→ 获得 Concern 实体
+2. 从 Concern 出发，`search_graph` 找 `HAS_PROBLEM_CLASS` 关系 → 获得 ProblemClass
 
 ### 3c. 多利益相关者的问题类匹配策略
 
@@ -192,7 +192,7 @@ ProblemClass
 
 > **任务**：找到解决此类问题的方案模板。SolutionClass 中存储了方案步骤序列（steps），这是后续 plan-execute 要执行的蓝图。
 
-`query_triple_info(start_entity_id=<ProblemClass的ID>, depth=1)`，找 `需要方案` 关系 → 获得 SolutionClass。
+`search_graph(start_entity_id=<ProblemClass的ID>, depth=1)`，找 `需要方案` 关系 → 获得 SolutionClass。
 
 对 SolutionClass，调用 `query_entity_properties` 获取完整属性，特别关注：
 - **方案步骤序列**（`solutionTemplate`）：执行步骤模板
@@ -211,7 +211,7 @@ ProblemClass
 
 ### 4.2 资源探索流程
 
-从 Term 出发，调用 `query_triple_info` 获取所有相关三元组，对出边指向的节点进行探索：
+从 Term 出发，调用 `search_graph` 获取所有相关三元组，对出边指向的节点进行探索：
 
  **属性获取**：对属性丰富的节点，进一步调用 `query_entity_properties` 获取详情，标记为资源节点。
 
@@ -226,7 +226,7 @@ ProblemClass
 | 情况 | 处理 |
 |------|------|
 | link_entities 返回空 | 换关键词重试 |
-| 无 Term 标签的候选 | 继续用 query_triple_info 沿其他方向探索 |
+| 无 Term 标签的候选 | 继续用 search_graph 沿其他方向探索 |
 | DENOTES / BO / Stakeholder 缺失 | 标注缺失，不影响后续 |
 | Stakeholder 无 提出问题 | 尝试路径B（通过 Concern）或直接搜 ProblemClass |
 | 路径A和路径B都无结果 | 基于问题特征直接推断问题类 |

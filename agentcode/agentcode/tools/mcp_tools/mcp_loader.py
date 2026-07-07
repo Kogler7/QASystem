@@ -28,9 +28,9 @@
 }
 
 transport 取值与必需字段：
-  - streamable_http / http:必需 url
-  - stdio:必需 command, 可选 args、env
-  - sse:必需 url, 可选 headers
+  - streamable_http / http: 必需 url, 可选 headers
+  - stdio: 必需 command, 可选 args、cwd、env
+  - sse: 必需 url, 可选 headers
 """
 
 from __future__ import annotations
@@ -45,7 +45,8 @@ from ...models import McpServerConfig, SessionConfig, SkillRef, BudgetConfig, To
 def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
     """读取 mcp_config.json，返回 McpServerConfig 列表。
 
-    每个 key 对应一个 MCP 服务名，其 value 至少需含 "transport" 和 "url" 字段。
+    每个 key 对应一个 MCP 服务名。HTTP/SSE transport 需要 url；
+    stdio transport 需要 command，可选 args/cwd/env。
     """
     config_path = Path(config_path)
     if not config_path.is_file():
@@ -67,16 +68,36 @@ def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
         if transport not in ("http", "streamable_http", "stdio", "sse"):
             raise ValueError(f"MCP 服务 {name} 不支持的 transport: {transport}")
 
-        url = (cfg.get("url") or "").strip()
-        if not url:
-            raise ValueError(f"MCP 服务 {name} 缺少 url 字段")
+        url = (cfg.get("url") or "").strip() or None
+        command = (cfg.get("command") or "").strip() or None
+
+        if transport in ("http", "streamable_http", "sse") and not url:
+            raise ValueError(f"MCP 服务 {name} 使用 {transport} transport 时缺少 url 字段")
+        if transport == "stdio" and not command:
+            raise ValueError(f"MCP 服务 {name} 使用 stdio transport 时缺少 command 字段")
+
+        args = cfg.get("args") or []
+        if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
+            raise ValueError(f"MCP 服务 {name} 的 args 字段必须为字符串数组")
+
+        env = cfg.get("env") or {}
+        if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
+            raise ValueError(f"MCP 服务 {name} 的 env 字段必须为字符串键值对象")
+
+        headers = cfg.get("headers") or {}
+        if not isinstance(headers, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in headers.items()):
+            raise ValueError(f"MCP 服务 {name} 的 headers 字段必须为字符串键值对象")
 
         servers.append(
             McpServerConfig(
                 name=name,
                 transport=transport,
                 url=url,
-                env=cfg.get("env") or {},
+                command=command,
+                args=args,
+                cwd=cfg.get("cwd") or None,
+                env=env,
+                headers=headers,
                 auth_ref=cfg.get("auth_ref"),
             )
         )
