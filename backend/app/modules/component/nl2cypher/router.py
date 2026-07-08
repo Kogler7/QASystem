@@ -26,6 +26,8 @@ class GenerateRequestBody(BaseModel):
 
 class TextRequestBody(BaseModel):
     text: str
+class TextsRequestBody(BaseModel):
+    texts: list[str]
 
 class TextVectorRequestBody(BaseModel):
     text: str
@@ -123,6 +125,74 @@ async def split_python(body: TextRequestBody) -> dict[str, Any]:
     except Exception as e:
         logger.exception("Python语言切片失败")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.post("/text-to-vector")
+async def text_to_vector_api(body: TextRequestBody) -> dict[str, Any]:
+    """
+    将单段文本转换为向量
+    
+    Args:
+        body: 请求体，包含待向量化文本
+    
+    Returns:
+        向量化结果
+    """
+    # 参数校验
+    if not (body.text or "").strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+    
+    try:
+        # 异步调用服务层函数
+        result = await asyncio.to_thread(
+            service.text_to_vector_service,
+            text=body.text.strip()
+        )
+        return result
+    except Exception as e:
+        # 异常处理
+        raise HTTPException(status_code=500, detail=f"文本转向量失败: {str(e)}")
+
+@router.post("/text-to-vectors")
+async def batch_text_to_vectors_api(body:TextsRequestBody) -> dict[str, Any]:
+    """
+    批量将多段文本转换为向量
+    
+    接口地址: /api/component/nl2cypher/batch-text-to-vectors
+    请求方式: POST
+    请求格式: application/json; charset=utf-8
+    认证方式: 无
+    """
+    # 参数校验
+    if not body.texts:
+        raise HTTPException(status_code=400, detail="文本列表不能为空")
+    
+    if len(body.texts) == 0:
+        raise HTTPException(status_code=400, detail="文本列表至少需要一个元素")
+    
+    # 过滤空文本
+    valid_texts = [t for t in body.texts if t and t.strip()]
+    if not valid_texts:
+        raise HTTPException(status_code=400, detail="文本列表中所有文本均为空")
+    
+    try:
+        # 异步调用服务层函数
+        result = await asyncio.to_thread(
+            service.batch_text_to_vector_service,
+            texts=valid_texts
+        )
+        
+        # 如果服务层返回错误码，转为 HTTP 异常
+        if result.get("code") != 0:
+            raise HTTPException(
+                status_code=result.get("code", 500),
+                detail=result.get("message", "未知错误")
+            )
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"批量文本转向量失败: {str(e)}")
     
 # 在router.py中增加
 @router.get("/vectors")

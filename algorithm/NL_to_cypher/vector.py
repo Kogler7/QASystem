@@ -12,6 +12,19 @@ from transformers import AutoTokenizer, AutoModel
 from neo4j import GraphDatabase
 import time
 
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+    CharacterTextSplitter,
+    MarkdownTextSplitter,
+    Language,
+    TokenTextSplitter,
+    NLTKTextSplitter,
+    SpacyTextSplitter
+)
+from langchain_core.documents import Document
+# import tiktoken
+from typing import List
+
 # 导入统一的LLM客户端
 import sys
 _root = Path(__file__).resolve().parent.parent
@@ -69,7 +82,7 @@ def load_markdown_file(filepath: str) -> str:
     return content
 # ==================== 语义切片 ====================
 
-def semantic_chunking(text: str, model_path: str = MODEL_PATH) -> List[str]:
+def semantic_chunking(text: str,chunk_size:int,similarity:float=0.6, model_path: Optional[str] = MODEL_PATH) -> List[str]:
     """
     语义切片 - 使用bge-small-zh-v1.5模型
     
@@ -108,7 +121,7 @@ def semantic_chunking(text: str, model_path: str = MODEL_PATH) -> List[str]:
         similarities.append(sim)
     
     # 4.语义融合，相似度低于阈值则切分
-    threshold = 0.6
+    threshold = similarity
     split_points = [0]
     for i, sim in enumerate(similarities):
         if sim < threshold:
@@ -132,7 +145,7 @@ def semantic_chunking(text: str, model_path: str = MODEL_PATH) -> List[str]:
     return chunks
 # ==================== 文本转向量 ====================
 
-def text_to_vector(text: str, model_path: str = MODEL_PATH) -> List[float]:
+def text_to_vector(text: str, model_path: Optional[str] = MODEL_PATH) -> List[float]:
     """
     将单段文本转换为向量
     
@@ -149,7 +162,7 @@ def text_to_vector(text: str, model_path: str = MODEL_PATH) -> List[float]:
     return vector
 
 
-def batch_text_to_vectors(texts: List[str], model_path: str = MODEL_PATH) -> List[List[float]]:
+def batch_text_to_vectors(texts: List[str], model_path: Optional[str] = MODEL_PATH) -> List[List[float]]:
     """
     批量将文本转换为向量
     
@@ -454,6 +467,52 @@ def main():
                         target_id=target_resource_id,
                         relationship_type="PLACE_IN"
                     )
+
+def split_by_character(documents: List[Document],chunk_size:int=500,chunk_character:str="\n") -> List[Document]:
+    """单个字符分割器"""
+    text_splitter = CharacterTextSplitter(
+        separator=chunk_character,  # 空字符串表示按字符分割
+        chunk_size=chunk_size,  # 文本块最大字符数
+        chunk_overlap=50,  # 块之间的重叠字数
+    )
+    split_docs = text_splitter.split_documents(documents)
+    # for i, split_doc in enumerate(split_docs):
+    #     print(f"分块 {i + 1}:")
+    #     print(f"内容: {split_doc.page_content[:100]}...")
+    #     print(f"长度: {len(split_doc.page_content)} 字符")
+    #     print("#" * 30)
+    return split_docs
+
+
+def split_recursively(documents: List[Document],chunk_size:int=500,chunk_character:list[str]=["\n\n", "\n", "。", "！", "？", ".", "!", "?", " ", ""]) -> List[Document]:
+    """递归字符列表分割器"""
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,  # 文本块最大字符数
+        chunk_overlap=50,  # 块之间的重叠字数
+        separators=chunk_character
+    )
+    split_docs = text_splitter.split_documents(documents)
+    # for i, split_doc in enumerate(split_docs):
+    #     print(f"分块 {i + 1}:")
+    #     print(f"内容: {split_doc.page_content[:100]}...")
+    #     print(f"长度: {len(split_doc.page_content)} 字符")
+    #     print("#" * 30)
+    return split_docs
+
+
+def split_by_markdown(documents: List[Document],chunk_size:int=500) -> List[Document]:
+    """Markdown标题分割器"""
+    text_splitter = MarkdownTextSplitter(
+        chunk_size=chunk_size,  # 文本块最大字符数
+        chunk_overlap=50,  # 块之间的重叠字数
+    )
+    split_docs = text_splitter.split_documents(documents)
+    # for i, split_doc in enumerate(split_docs):
+    #     print(f"分块 {i + 1}:")
+    #     print(f"内容: {split_doc.page_content[:100]}...")
+    #     print(f"长度: {len(split_doc.page_content)} 字符")
+    #     print("#" * 30)
+    return split_docs
 
 
 if __name__ == "__main__":
