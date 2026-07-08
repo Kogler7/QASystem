@@ -3,24 +3,33 @@
 """
 import logging
 import asyncio
+import os
+import sys
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
 from langchain_core.documents import Document
-import json
 
 from ..modules.component.document_preproc import service as doc_preproc_service
 from ..modules.component.knowledge_extract import service as knowledge_extract_service
 from ..modules.component.kg_update import service as kg_update_service
 from ..modules.component.nl2cypher import service as nl2cypher_service
 
-logger = logging.getLogger(__name__)
 
 _THIS = Path(__file__).resolve()
 _ROOT = _THIS.parents[5]
 _NL2CYPHER_ROOT = _ROOT / "algorithm" / "NL_to_cypher"
 if _NL2CYPHER_ROOT.exists() and str(_NL2CYPHER_ROOT) not in sys.path:
     sys.path.insert(0, str(_NL2CYPHER_ROOT))
+
+_ALGO_ROOT = _ROOT / "algorithm"
+if str(_ALGO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ALGO_ROOT))
+
+from preproc_src.main_processor import DocumentProcessor
+
+logger = logging.getLogger(__name__)
 
 
 async def process_document_pipeline(
@@ -301,36 +310,46 @@ async def knowledge_extract_service(
     Returns:
         知识提取结果
     """
+
+    temp_file_path = None
+    file_name_stem = Path(file.filename).stem
+
     try:
         import vector
     except Exception as e:
         logger.warning("加载依赖失败: %s", e)
         raise
     try:
-        #=============文件解析(输入file,输出str)================
-        parse_content="""33.列车着火在站台的处置预案
-        33.1编制目的
-        为了提高员工现场应急处置能力，确保列车着火在站台时，能够快速妥善的将乘客疏散至安全地带，降低人员伤亡和财产损失。
-        33.2风险分析
-        33.2.1站台空间有限，人流密度大，疏散条件受限。火灾发生的时间和地点具有突发性和不确定性。
-        33.2.2站台突发火灾时，乘客容易产生恐慌及焦虑心理，易导致拥挤、踩踏等次生灾害。
-        33.2.3大型消防设备无法进入站台实施抢险救援。
-        33.3.启动时机
-        当列车着火在站台时，值班站长立即下令启动本预案。
-        33.4.现场处置流程
-        33.4.1列车在车站发生火灾时，综控员立即向行车调度员、辖区公交总队派出所、“119”及运营分公司生产调度室报告。                
-        33.4.2车站值班站长为现场临时指挥，立即启动相应的应急响应，通知相关单位和人员进行应急处置。综控员按照行调指令关闭后方站来车方向的出站信号，将后续列车扣在站内。
-        33.4.3车站工作人员穿戴好相应防护备品对站台着火列车进行清车工作，微型消防站人员立即穿戴微型消防站设备进入车厢进行火灾扑救工作，微型消防站人员应保持与综控室联络畅通，到达现场后疏散周围乘客，上报人员伤亡情况，及时对受伤人员进行救治，同时进行救火工作，并随时汇报火灾扑救现场情况。
-        33.4.4当火情失去控制时，微型消防站人员应及时上报综控员，综控员向行车调度员汇报现场情况，车站应根据行调指令，发布封闭车站的命令。
-        33.4.5站务员携带担架及湿毛巾到站台接应区间疏散出来的乘客，值班站长指派专人在站台查看乘客伤情，必要时拨打120或999，无需救治的乘客由专人带领引导出站。
-        33.4.6值班站长下令立即封闭车站后，站台站厅各岗立即按预案要求进行清人工作，待各岗清人完毕后，南厅各留守一名工作人员等待接应支援人员。
-        33.4.7现场应急救援人员待专业消防员到达现场后，将火灾情况进行转述，在无需配合的情况，将火灾现场交给消防员处理。
-        33.4.8值班站长指派综控专人对事故处理经过进行记录，待救火工作结束后，向消防员了解情况，并汇报给行调及上级领导，等待下一步工作指示。
-        33.5.应急物资和装备保障
-        灭火器、呼吸器、防毒面罩、湿毛巾，消防应急包等。
-        33.6.附则
-        术语和定义执行地铁公司应急预案中的术语和定义。"""#最终的解析结果 这里先写上模拟数据 变量名称不要修改
-        #=============文本切片（输入str,输出list[str]）================
+        # ==================== 1. 保存上传文件 ====================
+        suffix = Path(file.filename).suffix.lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            temp_file_path = tmp.name
+        
+        logger.info(f"文件已保存: {temp_file_path}, 大小: {len(content)} bytes")
+        
+        # ==================== 2. 文档解析 ====================
+        logger.info(f"开始文档解析，引擎: {parser_engine or '自动选择'}")
+        processor = DocumentProcessor()
+        parse_result = processor.process_file(
+            temp_file_path,
+            lang=lang,
+            model_name=parser_engine,
+        )
+        
+        if not parse_result.get("success"):
+            return {
+                "code": 1001,
+                "info": f"文档解析失败：{parse_result.get('error', '未知错误')}",
+                "data": None
+            }
+
+        parse_content = parse_result.get("content", "")
+        logger.info(f"文档解析完成，MD长度: {len(parse_content)} 字符")
+
+
+        # =============文本切片（输入str,输出list[str]）================
         doc=[Document(
             page_content=parse_content
         )]
@@ -559,8 +578,12 @@ async def knowledge_extract_service(
         vectors=vector.batch_text_to_vectors(extract_content)
         # print(vectors)  测试完毕
 
-
-
+        # # ==================== 6. 构建 graphs 响应 ====================
+        # graphs = build_graphs_response(graph)
+        
+        # # ==================== 7. 生成 understanding ====================
+        # understanding = generate_understanding(graph)
+        
         #以下皆为模拟输出数据 需要替换
         graphs =[
         {
@@ -784,8 +807,67 @@ async def knowledge_extract_service(
             "info": f"知识提取失败: {str(e)}",
             "data": None
         }
-    # finally:
-    #     # 清理临时文件
-    #     if file_path.exists():
-    #         file_path.unlink()
+    finally:
+        # 清理临时文件
+        if temp_file_path and Path(temp_file_path).exists():
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+
+
+# ==================== 辅助函数 ====================
+
+def build_graphs_response(graph: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """构建接口文档定义的 graphs 格式"""
+    if not graph:
+        return []
+    
+    if isinstance(graph, list):
+        result = []
+        for idx, g in enumerate(graph):
+            if g.get("nodes") or g.get("relationships"):
+                result.append({
+                    "graph": {
+                        "index": str(idx),
+                        "nodes": g.get("nodes", []),
+                        "relationships": g.get("relationships", [])
+                    }
+                })
+        return result
+    
+    if graph.get("nodes") and graph.get("relationships"):
+        return [
+            {
+                "graph": {
+                    "index": "0",
+                    "nodes": graph.get("nodes", []),
+                    "relationships": graph.get("relationships", [])
+                }
+            }
+        ]
+    return []
+
+
+def generate_understanding(graph: Dict[str, Any]) -> str:
+    """生成知识的自然语言描述"""
+    if not graph:
+        return "未抽取到知识节点"
+    
+    nodes = graph.get("nodes", [])
+    relationships = graph.get("relationships", [])
+    
+    if not nodes:
+        return "未抽取到知识节点"
+    
+    labels = {}
+    for node in nodes:
+        label = node.get("label", "Unknown")
+        labels[label] = labels.get(label, 0) + 1
+    
+    label_desc = "、".join([f"{count} 个 {label}" for label, count in labels.items()])
+    
+    return (f"本知识描述了业务域中的核心实体与关系，"
+            f"共抽取 {len(nodes)} 个节点（{label_desc}），"
+            f"{len(relationships)} 条关系，形成完整的知识图谱结构。")
 
