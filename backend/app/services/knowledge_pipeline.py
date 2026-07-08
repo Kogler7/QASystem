@@ -18,7 +18,14 @@ from ..modules.component.nl2cypher import service as nl2cypher_service
 
 
 _THIS = Path(__file__).resolve()
-_ROOT = _THIS.parents[5]
+_ROOT = next(
+    (
+        parent
+        for parent in _THIS.parents
+        if (parent / "backend").exists() and (parent / "algorithm").exists()
+    ),
+    _THIS.parents[3],
+)
 _NL2CYPHER_ROOT = _ROOT / "algorithm" / "NL_to_cypher"
 if _NL2CYPHER_ROOT.exists() and str(_NL2CYPHER_ROOT) not in sys.path:
     sys.path.insert(0, str(_NL2CYPHER_ROOT))

@@ -15,6 +15,7 @@ from ..db import get_session
 from ..deps.auth import require_admin
 from ..models.document import Document
 from ..config import settings
+from ..services.knowledge_pipeline import knowledge_extract_service
 
 logger = logging.getLogger(__name__)
 
@@ -539,3 +540,48 @@ async def pipeline_health() -> dict[str, Any]:
     """
     from ..services.knowledge_pipeline import health_check
     return health_check()
+
+
+@router.post("/deposit")
+async def knowledge_deposit(
+    file: UploadFile = File(...),
+    lang: str = Form("ch"),
+    ontology: str = Form(""),
+    parser_engine: Optional[str] = Form(None),
+    chunk_character: Optional[str] = Form("\n"),
+    chunk_size: Optional[int] = Form(500),
+    chunk_type: int = Form(0),
+    similarity: Optional[float] = Form(0.6),
+    save_to_db: bool = Form(False),
+) -> dict[str, Any]:
+    """
+    知识提取接口 - 上传文件进行解析、切片、向量化、图谱抽取
+    """
+    if not file:
+        raise HTTPException(status_code=400, detail="文件不能为空")
+
+    if chunk_type not in [0, 1, 2, 3]:
+        raise HTTPException(
+            status_code=400,
+            detail="切片类型无效，可选值: 0(语义), 1(符号), 2(递归), 3(Markdown)",
+        )
+
+    if similarity < 0 or similarity > 1:
+        raise HTTPException(status_code=400, detail="相似度阈值范围为 [0, 1]")
+
+    try:
+        return await knowledge_extract_service(
+            file=file,
+            lang=lang,
+            parser_engine=parser_engine,
+            chunk_character=chunk_character,
+            chunk_size=chunk_size,
+            chunk_type=chunk_type,
+            similarity=similarity,
+            save_to_db=save_to_db,
+            ontology=ontology,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"知识提取失败: {str(e)}") from e
