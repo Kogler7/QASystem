@@ -2,6 +2,10 @@
 # 必须在仓库根目录构建：docker compose build backend
 # 包含 backend/app 与 algorithm/，以支持组件管理中的进程内算法调用。
 
+FROM node:20-bullseye-slim AS opencode-runtime
+
+RUN npm install -g opencode-ai
+
 FROM python:3.12-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -32,6 +36,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
 # Basic tools for in-container inspection and small emergency edits.
 # Keep this in a separate layer so tool changes do not reinstall Python deps.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
     vim-tiny \
     less \
     procps \
@@ -41,8 +47,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
     lsof \
     jq \
+    ripgrep \
     tree \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=opencode-runtime /usr/local/bin/opencode /usr/local/bin/opencode
+COPY --from=opencode-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 COPY backend/app ./backend/app
 COPY algorithm ./algorithm
