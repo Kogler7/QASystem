@@ -29,6 +29,21 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -r backend/requirements.docker.txt
 
+# Basic tools for in-container inspection and small emergency edits.
+# Keep this in a separate layer so tool changes do not reinstall Python deps.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    vim-tiny \
+    less \
+    procps \
+    iproute2 \
+    iputils-ping \
+    dnsutils \
+    netcat-openbsd \
+    lsof \
+    jq \
+    tree \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/app ./backend/app
 COPY algorithm ./algorithm
 COPY agentcode ./agentcode
