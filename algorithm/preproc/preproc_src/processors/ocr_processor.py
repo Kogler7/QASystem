@@ -96,6 +96,18 @@ class OCRProcessor(BaseProcessor):
                     f"MinerU 本地模型配置缺失: {', '.join(missing_modes)}。"
                     "请在 mineru.json 的 'models-dir' 中补全对应路径"
                 )
+            missing_paths = [
+                f"{mode}={path}"
+                for mode, path in local_models_config.items()
+                if mode in ("pipeline", "vlm") and path and not Path(str(path)).exists()
+            ]
+            if missing_paths:
+                raise ValueError(
+                    "MinerU 本地模型目录不存在: "
+                    + "; ".join(missing_paths)
+                    + "。请确认部署机 .env 中 HOST_MODELS_DIR 已挂载到容器 /models，"
+                    "并且 MINERU_MODEL_PIPELINE_PATH / MINERU_MODEL_VLM_PATH 指向容器内真实目录。"
+                )
 
         from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
         from mineru.data.data_reader_writer import FileBasedDataWriter

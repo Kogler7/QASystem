@@ -27,6 +27,6 @@ if [ -n "$PIDS" ]; then
   fi
 fi
 
-# 后台启动后端服务
+# 后台启动 HTTP API 与挂载在 /mcp 的统一 MCP 服务
 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > app.log 2>&1 &
 echo "后端服务已启动，PID: $!"

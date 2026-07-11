@@ -9,19 +9,10 @@
 4. 用选中的5个刻度反向图谱查询匹配的子空间
 """
 
-import sys
 import os
 import json
 import re
 from typing import Dict, List, Any, Optional
-
-current_file = os.path.abspath(__file__)
-tools_dir = os.path.dirname(current_file)
-qa_dir = os.path.dirname(tools_dir)
-ans_dir = os.path.dirname(qa_dir)
-algorithm_dir = os.path.dirname(ans_dir)
-project_root = os.path.dirname(algorithm_dir)
-sys.path.insert(0, project_root)
 
 from algorithm.ans.QA.neo4j_client import Neo4jClient
 from algorithm.ans.QA.utils import run_llm

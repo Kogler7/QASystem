@@ -357,7 +357,7 @@ class LLMClient:
 class LLMRunAdapter:
     """
     统一接口：run(system_prompt, text) -> str。
-    供 algorithm/uie、知识抽取等需要「系统提示 + 用户文本」的组件复用，
+    供知识抽取等需要「系统提示 + 用户文本」的组件复用，
     内部委托给 LLMClient.complete。
     """
 

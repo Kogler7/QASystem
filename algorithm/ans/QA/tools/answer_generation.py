@@ -1,16 +1,3 @@
-import sys
-import os
-
-# 添加项目根目录到Python路径
-current_file = os.path.abspath(__file__)
-tools_dir = os.path.dirname(current_file)
-qa_dir = os.path.dirname(tools_dir)
-ans_dir = os.path.dirname(qa_dir)
-algorithm_dir = os.path.dirname(ans_dir)
-project_root = os.path.dirname(algorithm_dir)
-sys.path.insert(0, project_root)
-
-
 from algorithm.ans.QA.entity_linker import EntityLinker
 from algorithm.ans.QA.wiki_func import relation_search_prune, entity_search, entity_score, update_history, entity_prune, generate_without_explored_paths
 from typing import Dict, List, Tuple

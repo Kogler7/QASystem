@@ -5,7 +5,7 @@ import torch  # type: ignore[import-untyped]
 import torchvision  # type: ignore[import-untyped]
 from milvus_model.hybrid import BGEM3EmbeddingFunction  # type: ignore[import-untyped]
 
-from ir_config.config import Config
+from algorithm.intent_recognition_model.ir_config.config import Config
 
 
 class HybridEncoder:

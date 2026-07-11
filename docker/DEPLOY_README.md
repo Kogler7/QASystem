@@ -14,6 +14,7 @@ docker compose ps
 ```
 
 默认端口为 `8006`。模型可以单独传输或更新，目录位置由 `HOST_MODELS_DIR` 指定。
+统一 MCP 地址为 `http://127.0.0.1:8006/mcp`。
 
 ## 更新代码
 

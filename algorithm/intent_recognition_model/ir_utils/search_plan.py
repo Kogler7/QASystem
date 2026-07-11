@@ -1,4 +1,4 @@
-from ir_utils.neo4j_connection import Neo4jConnection
+from algorithm.intent_recognition_model.ir_utils.neo4j_connection import Neo4jConnection
 
 
 class SearchPlan:

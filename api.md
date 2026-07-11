@@ -14,8 +14,8 @@
 |          | 3. 组件匹配       | 将方案描述匹配为可执行工具及参数                                        |
 | **智能问数** | 1. 意图识别       | 输出业务域、场景、对象、意图类型与用户目标等                                  |
 |          | 2. 上下文获取与指标匹配 | 输入结构化意图，输出指标/业务叙述类答案说明                                  |
-|          | 3. SQL 转换     | Agent/Dify 工具：`text2sql`，由自然语言生成可执行 SQL（字符串）            |
-|          | 4. SQL 执行     | Agent/Dify 工具：`sql_execute`，在指定库上执行 SQL 并返回 `result` 行集 |
+|          | 3. SQL 转换     | Agent/MCP 工具：`text2sql`，由自然语言生成可执行 SQL（字符串）            |
+|          | 4. SQL 执行     | Agent/MCP 工具：`execute_sql`，在指定库上执行并返回结果行集 |
 |          | 5. 图表可视化      | 根据查询结果与展示类型生成图表结构与解读文案                                  |
 
 
@@ -402,9 +402,9 @@ POST /api/component/answer-generation/tools/answer-generation
 
 ---
 
-### 3. SQL 转换（Dify 工具：database）
+### 3. SQL 转换（Agent 工具）
 
-本节为 **SQL 转换**独立模块。Agent **工具调用**形态：外层以工具名为键、值为具体入参；响应同样以工具名为键。与上一节 HTTP 组件接口并存，由编排层选择调用 Dify/Agent 工具或后端 HTTP。
+本节为 **SQL 转换**独立模块，由 Agent 生成 SQL 后调用统一 MCP 数据工具执行。
 
 - **工具名**：`text2sql`  
 - **说明**：根据数据库连接与自然语言问题，生成可执行 SQL（返回为字符串，常含推理说明与最终 SQL 片段）。
@@ -471,7 +471,7 @@ LIMIT 5;
 
 ---
 
-### 4. SQL 执行（Dify 工具：database）
+### 4. SQL 执行（统一 MCP 数据工具）
 
 本节为 **SQL 执行**独立模块，与 **SQL 转换** 衔接：通常以上一节 `text2sql` 产出（经解析）的 SQL 作为本模块 `query` 入参。调用形态与上一节相同（工具名为键的对象）。
 

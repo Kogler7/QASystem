@@ -1,0 +1,7 @@
+@startuml
+class 术语 <<Terminology>> {
+ + 术语标准名称 (TermName): String //术语的标准名称，用于统一业务表达，例如“采购标段数量”
+ + 术语标准定义 (TermDefinition): String //术语的标准业务定义，用于说明该术语在业务场景中的准确含义
+ + 同义词 (Synonyms): String[] //术语的同义表达、简称、别称或口语化表达，例如“标段、包、采购标段数、标段数量”
+}
+@enduml

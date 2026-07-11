@@ -1,4 +1,4 @@
-from ir_config.config import Config
+from algorithm.intent_recognition_model.ir_config.config import Config
 from neo4j import GraphDatabase
 import logging
 

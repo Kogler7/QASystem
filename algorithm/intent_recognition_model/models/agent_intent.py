@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
-from ir_config.config import Config
-from ir_utils.search_intent import HybridSearch
+from algorithm.intent_recognition_model.ir_config.config import Config
+from algorithm.intent_recognition_model.ir_utils.search_intent import HybridSearch
 from langchain_openai import ChatOpenAI
-from ir_utils.handle_data import utils
+from algorithm.intent_recognition_model.ir_utils.handle_data import utils
 from langchain_core.tools import tool
 from langchain.agents import create_agent
 from langchain_core.prompts import ChatPromptTemplate
@@ -10,7 +10,7 @@ try:
     from algorithm.intent_recognition_model.data.intent_model import Intent_Base_Recognition
 except ModuleNotFoundError:
     from data.intent_model import Intent_Base_Recognition
-from ir_utils.database_utils import build_intent_query_from_dict
+from algorithm.intent_recognition_model.ir_utils.database_utils import build_intent_query_from_dict
 import json
 import os
 import re

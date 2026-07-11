@@ -3,18 +3,11 @@
 所有置信度相关逻辑集中在这里，后端只需调用 calculate_graph_confidence()。
 """
 
-import sys
-from pathlib import Path
 from datetime import datetime
 from typing import Dict
 
-# 确保当前目录在 sys.path 中，方便内部模块导入
-_current_dir = Path(__file__).resolve().parent
-if str(_current_dir) not in sys.path:
-    sys.path.insert(0, str(_current_dir))
-
-from components.text_evidence import TextEvidence
-from components.path_evidence import PathEvidence
+from .components.text_evidence import TextEvidence
+from .components.path_evidence import PathEvidence
 
 
 def calculate_graph_confidence(data: dict) -> dict:

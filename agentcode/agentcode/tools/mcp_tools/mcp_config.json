@@ -1,16 +1,8 @@
 {
     "mcpServers": {
-        "sql-search": {
+        "qasystem-tools": {
             "transport": "streamable_http",
-            "url": "http://10.126.62.88:8889/mcp"
-        },
-        "information-get": {
-            "transport": "streamable_http",
-            "url": "http://10.126.62.88:51006/mcp"
-        },
-        "draw": {
-            "transport": "streamable_http",
-            "url": "http://10.126.62.88:8890/mcp"
+            "url": "http://127.0.0.1:8000/mcp"
         }
     }
 }

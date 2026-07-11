@@ -25,12 +25,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # 依赖层单独 COPY，便于缓存（安装耗时较长，镜像体积较大属预期）
-COPY backend/requirements.txt backend/requirements.docker.txt ./backend/
+COPY backend/requirements.txt ./backend/
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/ https://pypi.doubanio.com/simple/" && \
     pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com pypi.doubanio.com"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir -r backend/requirements.docker.txt
+    && pip install --no-cache-dir -r backend/requirements.txt
 
 # Basic tools for in-container inspection and small emergency edits.
 # Keep this in a separate layer so tool changes do not reinstall Python deps.

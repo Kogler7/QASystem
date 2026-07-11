@@ -176,7 +176,7 @@ pip install -e ".[fastapi]"
 ```
 
 - 路由实现：`agentcode.integrations.fastapi.agent_template`（多路径 `/raw`、`/brief`、`/debug`、`/ping`、`/config`）。
-- 本仓库 `backend` 通过 `app.routers.agent_template` **仅 re-export `router`**，便于与现有 `main.py` 对齐。
+- 本仓库通过 `mcp_services` 提供统一 MCP Server，`agentcode` 作为客户端连接 `/mcp`。
 
 ---
 

@@ -12,90 +12,31 @@ import re
 import uuid
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime
 
 import requests
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 
-# ==================== 1. 设置路径和导入 ====================
-import sys
 _ALGO_ROOT = Path(__file__).resolve().parent
-_IMPORT_ROOTS = [
-    _ALGO_ROOT,
-    _ALGO_ROOT / "preproc",
-    _ALGO_ROOT / "knowledge_extract",
-    _ALGO_ROOT / "NL_to_cypher",
-    _ALGO_ROOT / "confidence_calculate",
-]
-for _path in _IMPORT_ROOTS:
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
-
-
-def _configure_local_runtime_defaults() -> None:
-    """Make the standalone 8080 service usable without backend-specific env."""
-
-    def _force_local_if_unset_or_docker_host(key: str, value: str) -> None:
-        current = (os.getenv(key) or "").strip()
-        if not current or "host.docker.internal" in current:
-            os.environ[key] = value
-
-    _force_local_if_unset_or_docker_host("CONFIDENCE_ES_HOSTS", "http://127.0.0.1:9200")
-    _force_local_if_unset_or_docker_host("ES_HOSTS", "http://127.0.0.1:9200")
-    _force_local_if_unset_or_docker_host("NEO4J_URI", "bolt://127.0.0.1:7687")
-    os.environ.setdefault("NEO4J_USER", "neo4j")
-    os.environ.setdefault("NEO4J_PASSWORD", "neo4j2025")
-    os.environ.setdefault("CONFIDENCE_ES_INDEX", "documents")
-
-    model_dir = _ALGO_ROOT / "NL_to_cypher" / "bge-small-zh-v1.5"
-    pooling_dir = model_dir / "1_Pooling"
-    normalize_dir = model_dir / "2_Normalize"
-    pooling_dir.mkdir(exist_ok=True)
-    normalize_dir.mkdir(exist_ok=True)
-    pooling_config = pooling_dir / "config.json"
-    if not pooling_config.exists():
-        pooling_config.write_text(
-            json.dumps(
-                {
-                    "word_embedding_dimension": 512,
-                    "pooling_mode_cls_token": False,
-                    "pooling_mode_mean_tokens": True,
-                    "pooling_mode_max_tokens": False,
-                    "pooling_mode_mean_sqrt_len_tokens": False,
-                    "pooling_mode_weightedmean_tokens": False,
-                    "pooling_mode_lasttoken": False,
-                    "include_prompt": True,
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-    if not (os.getenv("CONFIDENCE_SBERT_MODEL_PATH") or os.getenv("SBERT_MODEL_PATH")):
-        os.environ["CONFIDENCE_SBERT_MODEL_PATH"] = str(model_dir)
-
-
-_configure_local_runtime_defaults()
-
-from preproc_src.main_processor import DocumentProcessor
-from knowledge_extract import extract_v2
+from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
+from algorithm.knowledge_extract import extract_v2, store_extraction_to_neo4j
 
 # 从 NL_to_cypher 导入向量化和切分函数
-from NL_to_cypher.vector import batch_text_to_vectors, text_to_vector as single_text_to_vector
-from NL_to_cypher.splitter import (
+from algorithm.NL_to_cypher.vector import batch_text_to_vectors, text_to_vector as single_text_to_vector
+from algorithm.NL_to_cypher.splitter import (
     split_by_character,
     split_recursively,
     split_by_markdown,
 )
-from calculator import calculate_graph_confidence
+from algorithm.confidence_calculate.calculator import calculate_graph_confidence
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="知识沉淀服务", version="1.0.0")
+router = APIRouter(tags=["knowledge-precipitation"])
 
 DEFAULT_ONTOLOGY = """@startuml
 class BusinessObject {
@@ -106,9 +47,6 @@ class BusinessObject {
 
 MOCK_DIR = _ALGO_ROOT / "data" / "mock_storage"
 FILE_DIR = MOCK_DIR / "files"
-VECTOR_DIR = MOCK_DIR / "vectors"
-FILE_DIR.mkdir(parents=True, exist_ok=True)
-VECTOR_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class TextVectorRequest(BaseModel):
@@ -163,19 +101,24 @@ def chunk_document(content: str, chunk_type: int = 0, chunk_size: int = 500,
     
     if chunk_type == 0:
         # 语义切分 - 暂用递归切分替代，后续可接入真正的语义切分
-        split_docs = split_recursively(docs)
+        split_docs = split_recursively(docs, chunk_size=chunk_size)
         return [d.page_content for d in split_docs]
     elif chunk_type == 1:
         # 符号切分
-        split_docs = split_by_character(docs)
+        separator = (chunk_character or ["\n"])[0]
+        split_docs = split_by_character(docs, chunk_size=chunk_size, separator=separator)
         return [d.page_content for d in split_docs]
     elif chunk_type == 2:
         # 递归切分
-        split_docs = split_recursively(docs)
+        split_docs = split_recursively(
+            docs,
+            chunk_size=chunk_size,
+            separators=chunk_character,
+        )
         return [d.page_content for d in split_docs]
     elif chunk_type == 3:
         # Markdown 切分
-        split_docs = split_by_markdown(docs)
+        split_docs = split_by_markdown(docs, chunk_size=chunk_size)
         return [d.page_content for d in split_docs]
     else:
         return [content]
@@ -244,7 +187,7 @@ def build_graphs_response(graph: Dict[str, Any]) -> Dict[str, List]:
                 })
         return {"graphs": graphs_list}
     
-    if graph.get("nodes") and graph.get("relationships"):
+    if graph.get("nodes") or graph.get("relationships"):
         return {
             "graphs": [
                 {
@@ -377,40 +320,7 @@ def upload_md_to_file_service(md_content: str, file_name: str,
 
 # ==================== 3. 主接口 ====================
 
-@app.post("/third/files/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    knowledgeSpaceId: Optional[str] = Form(None),
-) -> Dict[str, Any]:
-    content = await file.read()
-    data = _save_file_bytes(content, file.filename or "upload.bin", knowledgeSpaceId)
-    return {"code": 0, "info": "success", "msg": "success", "data": data}
-
-
-@app.post("/vector/save")
-async def save_vector(request: Request) -> Dict[str, Any]:
-    payload = await request.json()
-    save_id = str(uuid.uuid4())
-    target_path = VECTOR_DIR / f"{save_id}.json"
-    record = {
-        "id": save_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "payload": payload,
-    }
-    target_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {
-        "code": 0,
-        "msg": "success",
-        "info": "success",
-        "data": {
-            "id": save_id,
-            "saved_path": str(target_path),
-            "item_count": len(payload.get("items", [])) if isinstance(payload, dict) else 0,
-        },
-    }
-
-
-@app.post("/api/component/nl2cypher/text-to-vector")
+@router.post("/api/component/nl2cypher/text-to-vector")
 async def text_to_vector_api(body: TextVectorRequest) -> Dict[str, Any]:
     text = (body.text or "").strip()
     if not text:
@@ -424,7 +334,7 @@ async def text_to_vector_api(body: TextVectorRequest) -> Dict[str, Any]:
     }
 
 
-@app.post("/api/component/nl2cypher/text-to-vectors")
+@router.post("/api/component/nl2cypher/text-to-vectors")
 async def text_to_vectors_api(body: BatchTextVectorRequest) -> Dict[str, Any]:
     texts = [text.strip() for text in body.texts if text and text.strip()]
     if not texts:
@@ -438,7 +348,7 @@ async def text_to_vectors_api(body: BatchTextVectorRequest) -> Dict[str, Any]:
     }
 
 
-@app.post("/api/component/kg-update/calculate-confidence")
+@router.post("/api/component/kg-update/calculate-confidence")
 async def calculate_confidence_api(body: GraphRequest) -> Dict[str, Any]:
     graph = body.graph or {}
     if not graph.get("relationships") and not graph.get("ontology_relations"):
@@ -459,7 +369,7 @@ async def calculate_confidence_api(body: GraphRequest) -> Dict[str, Any]:
     return calculate_graph_confidence(body.model_dump())
 
 
-@app.post("/api/knowledge/precipitation")
+@router.post("/api/knowledge/precipitation")
 async def knowledge_precipitation(
     # ===== 文件与基础参数 =====
     file: UploadFile = File(..., description="待解析的原始文档文件"),
@@ -474,6 +384,7 @@ async def knowledge_precipitation(
     
     # ===== 知识抽取参数 =====
     ontology: Optional[str] = Form(None, description="PlantUML 本体定义"),
+    save_to_db: bool = Form(False, description="是否将抽取结果存入 Neo4j"),
     model: Optional[str] = Form(None, description="LLM 模型名"),
     base_url: Optional[str] = Form(None, description="LLM API 地址"),
     
@@ -567,6 +478,8 @@ async def knowledge_precipitation(
         graph = extract_result.get("graph", {"nodes": [], "relationships": []})
         stats["extraction"]["nodes_extracted"] = len(graph.get("nodes", []))
         stats["extraction"]["relationships_extracted"] = len(graph.get("relationships", []))
+        if save_to_db:
+            stats["extraction"]["storage"] = store_extraction_to_neo4j(graph=graph)
 
         # ==================== 5. 存储抽取结果 (extract_url) ====================
         extract_md = f"# 知识抽取结果\n\n"
@@ -653,15 +566,3 @@ async def knowledge_precipitation(
                 os.unlink(temp_file_path)
             except Exception:
                 pass
-
-
-# ==================== 4. 健康检查 ====================
-
-@app.get("/api/knowledge/health")
-async def health_check():
-    return {"status": "ok", "service": "knowledge-precipitation", "version": "1.0.0"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)

@@ -28,7 +28,8 @@ deploy/
 ├── qasystem-runtime/
 │   ├── backend/
 │   ├── algorithm/
-│   └── agentcode/
+│   ├── agentcode/
+│   └── mcp_services/
 └── qasystem-backend-latest.tar  # 使用 -IncludeImage 时生成
 ```
 
@@ -53,6 +54,8 @@ vi .env
 docker compose up -d
 curl http://127.0.0.1:8006/health
 ```
+
+统一 MCP 地址为 `http://127.0.0.1:8006/mcp`。
 
 MySQL、Neo4j、Milvus、Elasticsearch、LLM 和文件服务均作为外部服务配置，当前
 Compose 不负责启动这些组件。

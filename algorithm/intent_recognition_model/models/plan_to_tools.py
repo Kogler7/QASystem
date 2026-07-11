@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
-from ir_config.config import Config
+from algorithm.intent_recognition_model.ir_config.config import Config
 from langchain_openai import ChatOpenAI
-from ir_utils.handle_data import utils
+from algorithm.intent_recognition_model.ir_utils.handle_data import utils
 from langchain_core.tools import tool
 from pathlib import Path
 import json

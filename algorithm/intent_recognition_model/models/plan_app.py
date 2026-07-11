@@ -1,5 +1,5 @@
-from ir_utils.search_plan import SearchPlan
-from models.agent_intent import intent_recognition
+from algorithm.intent_recognition_model.ir_utils.search_plan import SearchPlan
+from algorithm.intent_recognition_model.models.agent_intent import intent_recognition
 import json
 
 class PlanApp:

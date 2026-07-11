@@ -1,8 +1,8 @@
 import sys
 import time
 import os
-from ir_config.config import Config
-from ir_utils.encoder import HybridEncoder
+from algorithm.intent_recognition_model.ir_config.config import Config
+from algorithm.intent_recognition_model.ir_utils.encoder import HybridEncoder
 from pymilvus import MilvusClient, MilvusException
 import logging
 

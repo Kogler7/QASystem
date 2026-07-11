@@ -1,135 +1,57 @@
-# 轨道交通知识服务系统（Railway Assistant）
+# QASystem Knowledge Services
 
-面向轨道交通领域的知识服务：**知识库与文档**、基于 **Dify** 的智能问答、以及可在**组件管理**中调用的算法能力（文档预处理、知识抽取、图谱更新、NL2Cypher、意图识别、图谱问答、冲突检测等）。
+QASystem 当前提供四个知识沉淀 HTTP 接口、一个统一 MCP 服务，以及保留的
+`agentcode` Agent 运行时。
 
-- **前后端分离**：Vue 3 + FastAPI。  
-- **算法集成**：后端通过 `sys.path` **进程内**加载 `algorithm/`（非独立微服务）；部署时保持仓库内 `algorithm/` 与 `backend/` 的相对路径。
+## 对外接口
 
----
+| 方法 | 路径 | 能力 |
+| --- | --- | --- |
+| POST | `/api/knowledge/precipitation` | 文档解析、知识抽取、切片和向量化 |
+| POST | `/api/component/nl2cypher/text-to-vector` | 单文本向量化 |
+| POST | `/api/component/nl2cypher/text-to-vectors` | 多文本向量化 |
+| POST | `/api/component/kg-update/calculate-confidence` | 图谱关系置信度更新 |
 
-## 仓库顶层一览
+服务健康检查为 `GET /health`。统一 MCP Streamable HTTP 入口为 `/mcp`。
 
-```
+## 项目结构
+
+```text
 qasystem/
-├── frontend/
-├── backend/
-├── agentcode/             # Claude Code 风格单智能体运行时（独立可编辑包）
-├── algorithm/
-├── docker/
-│   ├── backend.Dockerfile         # 纯后端运行环境镜像
-│   ├── docker-compose.deploy.yml  # 部署模板
-│   ├── package-deploy.ps1         # 生成 deploy/ 交付目录
-│   └── README.md
-├── docs/
-├── deploy/               # 本地交付目录，不由 Git 跟踪
-├── models/               # 本地模型，不由 Git 跟踪
-├── user.yaml
-├── .dockerignore
-├── .env.example
-├── run.sh
-├── run_frontend.sh
-├── LICENSE.txt
-└── README.md
+├── backend/              # FastAPI 入口、四接口适配和契约测试
+├── algorithm/            # 文档、抽取、向量、置信度及 MCP 业务实现
+├── mcp_services/         # 统一 MCP Server 与领域工具
+├── agentcode/            # Agent 与 MCP 客户端运行时
+├── docker/               # 运行环境镜像和部署包生成脚本
+├── docs/                 # 架构、部署和协议说明
+├── models/               # 本地模型，不纳入 Git
+└── deploy/               # 本地交付目录，不纳入 Git
 ```
 
----
+## 本地运行
 
-## Docker 部署
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+$env:PYTHONPATH="$PWD;$PWD\agentcode"
+cd backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
-后端镜像只包含 Python 和系统依赖，业务代码与模型都在容器外维护。生成交付目录：
+## 本地测试
+
+契约测试使用轻量桩，不需要模型、数据库或 Docker：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.test.txt
+.\.venv\Scripts\python.exe -m pytest -c backend\pytest.ini backend\tests -q
+```
+
+## 部署
+
+镜像只包含运行环境。代码挂载到 `/app`，模型挂载到 `/models`。
 
 ```powershell
 .\docker\package-deploy.ps1
 ```
 
-生成的 `deploy/qasystem-runtime` 挂载到 `/app`，`deploy/models` 挂载到 `/models`。
-代码、模型和运行环境镜像可以分别更新。详见 [docker/README.md](docker/README.md)
-和 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
-
----
-
-## 本地开发
-
-```bash
-cd backend && cp .env.example .env
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt   # 已含可编辑安装 agentcode[fastapi]
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-cd frontend && npm install && npm run dev
-```
-
-或使用 `./run.sh`、`./run_frontend.sh`。
-
-`./run.sh` 已自动注入 `PYTHONPATH`，可直接在后端中导入：
-
-```python
-from agentcode import AgentRuntime
-```
-
----
-
-## 环境变量
-
-| 场景 | 文件 |
-|------|------|
-| 本机 `uvicorn` | **`backend/.env`**（主配置，模板 `backend/.env.example`） |
-| `docker compose` | 仓库根目录 **`.env`**（`env_file` 注入后端容器；模板根目录 `.env.example`） |
-| 后端内加载顺序 | `backend/app/config.py`：**先** `backend/.env`（`override=True`）**再** 仓库根 `.env`（`override=False`，只补缺） |
-
-算法子目录下的 `.env`（如 `algorithm/intent_recognition_model/.env`）**仅建议在单独跑该目录脚本时使用**；走后端 API 时请在 **`backend/.env`**（或 Docker 根 `.env`）写同一批变量。`algorithm/ans/QA/.env` 等同理，见各目录 `.env.example`。
-
----
-
-## 模块要点
-
-**前端**：`src/views/knowledge/`、`src/views/component/*/` + `manifest.js`；`src/api/modules/component/*.js`；`vite.config.js` 代理 `/api`。
-
-**后端**：`app/main.py`、`app/config.py`、`app/routers/*`、`app/modules/component/*/`（各组件 `router.py` + `service.py`）。
-
-**算法**：`preproc`、`uie`、`KGUpdate`、`NL_to_cypher`、`intent_recognition_model`、`ans/QA`、`common`、`confidence_calculate`、`conflict_detection`。
-
-**组件映射**（前端 / 后端 / 算法目录名）：文档预处理 `document-preproc` / `document_preproc` / `preproc`；知识抽取 `knowledge-extract` / `knowledge_extract` / `uie`；图谱更新 `knowledge-graph-update` / `kg_update` / `KGUpdate`；NL2Cypher；意图识别；答案生成 `answer-generation` / `answer_generation` / `ans`。
-
----
-
-## 文档索引
-
-- [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)  
-- [docs/DEPLOYMENT_BY_MODULE.md](docs/DEPLOYMENT_BY_MODULE.md)  
-- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)  
-- [docs/DIFY_WORKFLOW_SETUP.md](docs/DIFY_WORKFLOW_SETUP.md)  
-- [docs/TIMEOUT_DIAGNOSIS.md](docs/TIMEOUT_DIAGNOSIS.md)  
-- [backend/README.md](backend/README.md)  
-- [frontend/README.md](frontend/README.md)  
-- [frontend/DEPLOY.md](frontend/DEPLOY.md)  
-
----
-
-## 技术栈
-
-后端：Python 3.10+（镜像 3.12）、FastAPI、SQLAlchemy（async）、MySQL。  
-前端：Vue 3、Vite、Element Plus、Axios。  
-外部：Dify、Neo4j、Milvus、LLM、Ollama、vLLM 等。
-
----
-
-## IntentGPT/vLLM 意图识别实验模块
-
-`wzc-dev` 分支补充了独立的 `intent/` 实验模块，用于基于 IntentGPT 思路做意图识别，并通过 vLLM API 调用远程或本地模型（默认示例为 Qwen/Qwen3-8B）。该模块包含配置、提示词、评估脚本和 API 封装，适合单独验证意图识别策略或沉淀到主系统的意图识别组件中。
-
-关键入口：
-
-- `intent/main.py`：实验主入口。
-- `intent/predict_intent.py`：意图预测封装。
-- `intent/intentgpt/utils/vllm_client.py`：vLLM API 客户端。
-- `intent/configs/track.yaml`：示例配置。
-- `intent/.env.example`：vLLM 相关环境变量模板。
-
-常用环境变量：
-
-```env
-VLLM_API_URL=http://127.0.0.1:8000/v1/completions
-VLLM_MODEL=Qwen/Qwen3-8B
-VLLM_API_KEY=
-```
+详细说明见 `docs/DEPLOYMENT.md`。

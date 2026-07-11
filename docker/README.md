@@ -20,3 +20,7 @@ docker build -f docker/backend.Dockerfile -t qasystem-backend:latest .
 
 脚本会重新生成 `deploy/qasystem-runtime`，并复制 Compose、环境变量模板和部署说明。
 `deploy/` 与 `models/` 都不由 Git 跟踪，模型需要单独同步到服务器。
+
+部署模板在 `.env` 中用 `OPENAI_*=${LLM_*}` 兼容 OpenAI 风格变量。请勿在
+Compose 文件中使用 `${OPENAI_*:-${LLM_*:-...}}` 形式的嵌套默认值，Docker
+Compose 会把多余的 `}` 解析进变量值。

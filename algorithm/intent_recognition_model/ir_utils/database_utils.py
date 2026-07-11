@@ -1,9 +1,9 @@
-from ir_utils.encoder import HybridEncoder
+from algorithm.intent_recognition_model.ir_utils.encoder import HybridEncoder
 import numpy as np
 import time
 from datetime import datetime
 from pymilvus import connections, MilvusClient, FieldSchema, DataType, CollectionSchema, Collection, MilvusException
-from ir_config.config import Config
+from algorithm.intent_recognition_model.ir_config.config import Config
 
 
 def build_intent_query_from_dict(json_input: dict) -> str:

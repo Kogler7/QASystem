@@ -6,7 +6,7 @@ import json
 import re
 
 
-from ir_config.config import Config
+from algorithm.intent_recognition_model.ir_config.config import Config
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 try:
