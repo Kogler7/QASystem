@@ -16,12 +16,13 @@ qasystem/
 ├── agentcode/             # Claude Code 风格单智能体运行时（独立可编辑包）
 ├── algorithm/
 ├── docker/
-│   ├── backend.Dockerfile    # 后端镜像（构建上下文 = 仓库根目录）
+│   ├── backend.Dockerfile         # 纯后端运行环境镜像
+│   ├── docker-compose.deploy.yml  # 部署模板
+│   ├── package-deploy.ps1         # 生成 deploy/ 交付目录
 │   └── README.md
 ├── docs/
-├── docker-compose.yml        # MySQL + backend + frontend；可选 profile neo4j
-├── milvus-docker-compose.yml # 可选：本地 Milvus
-├── embedEtcd.yaml
+├── deploy/               # 本地交付目录，不由 Git 跟踪
+├── models/               # 本地模型，不由 Git 跟踪
 ├── user.yaml
 ├── .dockerignore
 ├── .env.example
@@ -35,17 +36,15 @@ qasystem/
 
 ## Docker 部署
 
-在**仓库根目录**：
+后端镜像只包含 Python 和系统依赖，业务代码与模型都在容器外维护。生成交付目录：
 
-```bash
-cp .env.example .env
-docker compose up -d --build
+```powershell
+.\docker\package-deploy.ps1
 ```
 
-访问 `http://<主机>:${HTTP_PORT:-80}/`；健康检查 `http://<主机>/health`。  
-可选 Neo4j：`docker compose --profile neo4j up -d --build`，并将 `.env` 中 `NEO4J_URI=bolt://neo4j:7687`。
-
-后端镜像**包含** `algorithm/`；构建执行完整 `backend/requirements.txt`，**耗时长、镜像大**，请预留内存与磁盘。详见 [frontend/DEPLOY.md](frontend/DEPLOY.md)、[docker/README.md](docker/README.md)。
+生成的 `deploy/qasystem-runtime` 挂载到 `/app`，`deploy/models` 挂载到 `/models`。
+代码、模型和运行环境镜像可以分别更新。详见 [docker/README.md](docker/README.md)
+和 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
 ---
 

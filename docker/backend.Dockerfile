@@ -1,6 +1,5 @@
-# 轨道交通知识服务系统 - 后端镜像
-# 必须在仓库根目录构建：docker compose build backend
-# 包含 backend/app 与 algorithm/，以支持组件管理中的进程内算法调用。
+# 轨道交通知识服务系统 - 后端运行环境镜像
+# 必须在仓库根目录构建；业务代码和模型均由 Compose 在运行时挂载。
 
 FROM node:20-bullseye-slim AS opencode-runtime
 
@@ -57,16 +56,8 @@ COPY --from=opencode-runtime /usr/local/lib/node_modules /usr/local/lib/node_mod
 RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-COPY backend/app ./backend/app
-COPY algorithm ./algorithm
-COPY agentcode ./agentcode
-
-RUN pip install --no-cache-dir -e '/app/agentcode[fastapi]'
-
 WORKDIR /app/backend
 ENV PYTHONPATH=/app:/app/agentcode
-
-RUN mkdir -p data/documents data/preproc_output data/preproc_upload
 
 EXPOSE 8000
 

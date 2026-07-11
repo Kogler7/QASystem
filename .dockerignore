@@ -4,6 +4,8 @@
 .idea
 .cursor
 .vscode
+deploy
+models
 
 # 前端不参与后端镜像
 frontend/node_modules

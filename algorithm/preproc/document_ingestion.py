@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional, Union, List
 from datetime import datetime
 import json
 import logging
+import os
 
 from preproc_config.settings import Settings
 from preproc_src.main_processor import DocumentProcessor
@@ -50,7 +51,7 @@ class DocumentConversionInterface:
             mineru_config_path: MinerU配置文件路径（如 mineru.json）
             mineru_model_source: MinerU模型源，默认 "local"
             default_lang: 默认语言
-            file_service_url: 文件存储服务地址，如 http://10.10.2.33
+            file_service_url: 文件存储服务地址；未传时读取 FILE_SERVICE_URL
             knowledge_space_id: 知识空间ID（可选）
         """
         # 初始化设置
@@ -58,7 +59,7 @@ class DocumentConversionInterface:
 
         self.default_lang = default_lang
 
-        self.file_service_url = file_service_url or os.getenv("FILE_SERVICE_URL", "http://10.10.2.33")
+        self.file_service_url = (file_service_url or os.getenv("FILE_SERVICE_URL", "")).rstrip("/")
         self.knowledge_space_id = knowledge_space_id
 
         # 设置输出格式
@@ -112,7 +113,10 @@ class DocumentConversionInterface:
         """
         try:
             # 构建上传 URL
-            upload_url = f"{self.file_service_url}/file/upload"
+            if not self.file_service_url:
+                raise ValueError("未配置文件服务地址，请设置 FILE_SERVICE_URL 或传入 file_service_url")
+
+            upload_url = f"{self.file_service_url}/third/files/upload"
             
             # 准备文件
             files = {

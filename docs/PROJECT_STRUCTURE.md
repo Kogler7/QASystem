@@ -9,9 +9,10 @@ qasystem/
 ├── frontend/           # 前端（Vue 3 + Vite）
 ├── backend/            # 后端（FastAPI）
 ├── algorithm/          # 算法模块（Python，进程内调用）
-├── docker/             # 后端 Dockerfile 等（Compose 构建上下文为仓库根）
+├── docker/             # 运行环境镜像、部署模板和打包脚本
 ├── docs/               # 项目文档
-├── docker-compose.yml  # 全栈编排（MySQL + backend + frontend，可选 profile neo4j）
+├── deploy/             # 本地生成的交付目录（Git 忽略）
+├── models/             # 本地模型目录（Git 忽略）
 └── README.md
 ```
 

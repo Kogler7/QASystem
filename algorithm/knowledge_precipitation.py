@@ -322,7 +322,7 @@ def upload_md_to_file_service(md_content: str, file_name: str,
                 "error": None,
             }
 
-        upload_url = f"{file_service_url.rstrip('/')}/file/upload"
+        upload_url = f"{file_service_url.rstrip('/')}/third/files/upload"
         
         files = {
             'file': (file_name, md_content.encode('utf-8'), 'text/markdown')
@@ -377,7 +377,7 @@ def upload_md_to_file_service(md_content: str, file_name: str,
 
 # ==================== 3. 主接口 ====================
 
-@app.post("/file/upload")
+@app.post("/third/files/upload")
 async def upload_file(
     file: UploadFile = File(...),
     knowledgeSpaceId: Optional[str] = Form(None),

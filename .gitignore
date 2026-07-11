@@ -4,6 +4,7 @@
 .env
 .env.*
 !.env.example
+!docker/.env.deploy.example
 backend/.env
 backend/.env.*
 !backend/.env.example
@@ -85,6 +86,8 @@ backend/*.log
 # =============================================================================
 volumes/
 *.tar
+/deploy/
+/models/
 
 # =============================================================================
 # 日志

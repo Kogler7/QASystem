@@ -52,7 +52,7 @@ async def _unavailable() -> dict[str, Any]:
 
 if _protocol_app is None:
     for _method, _path in [
-        ("POST", "/file/upload"),
+        ("POST", "/third/files/upload"),
         ("POST", "/vector/save"),
         ("POST", "/api/component/nl2cypher/text-to-vector"),
         ("POST", "/api/component/nl2cypher/text-to-vectors"),
