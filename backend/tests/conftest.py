@@ -21,78 +21,69 @@ def _module(name: str, **attributes: object) -> types.ModuleType:
 
 @pytest.fixture(scope="session")
 def protocol_module():
-    class Document:
-        def __init__(self, page_content: str):
-            self.page_content = page_content
-
     class DocumentProcessor:
         def process_file(self, *_args, **_kwargs):
-            return {"success": True, "content": "# 测试文档\n测试内容"}
+            return {"success": True, "content": "# 测试文档\n测试内容", "metadata": {"model_used": "pandas"}}
 
-    document_processor_module = _module(
-        "algorithm.preproc.preproc_src.main_processor", DocumentProcessor=DocumentProcessor
-    )
-    knowledge_extract_module = _module(
-        "algorithm.knowledge_extract",
-        extract_v2=lambda **_kwargs: {
-            "graph": {"nodes": [], "relationships": []}
-        },
-        store_extraction_to_neo4j=lambda **_kwargs: {"success": True},
-    )
-    vector_module = _module(
-        "algorithm.NL_to_cypher.vector",
-        batch_text_to_vectors=lambda texts: [[float(index)] for index, _ in enumerate(texts)],
-        text_to_vector=lambda _text: [0.1, 0.2],
-    )
-    splitter_module = _module(
-        "algorithm.NL_to_cypher.splitter",
-        split_by_character=lambda text, **_kwargs: [text],
-        split_recursively=lambda text, **_kwargs: [text],
-        split_by_markdown=lambda text, **_kwargs: [text],
-    )
-    calculator_module = _module(
-        "algorithm.confidence_calculate.calculator",
-        calculate_graph_confidence=lambda payload: {
-            "code": 0,
-            "info": "置信度评估完成",
-            "data": {
-                "evaluation_id": "EVAL-TEST",
-                "total_count": len(payload["graph"].get("relationships", [])),
-                "graph": payload["graph"],
-                "details": {},
-            },
-        },
-    )
+    def store_artifact(_content, file_name, *_args, **_kwargs):
+        return {"success": True, "file_url": f"/knowledge/{file_name}"}
+
     stubs = {
-        "langchain_core": _module("langchain_core"),
-        "langchain_core.documents": _module("langchain_core.documents", Document=Document),
-        "preproc_src": _module("preproc_src"),
-        "preproc_src.main_processor": document_processor_module,
-        "algorithm.preproc.preproc_src.main_processor": document_processor_module,
-        "knowledge_extract": knowledge_extract_module,
-        "algorithm.knowledge_extract": knowledge_extract_module,
-        "NL_to_cypher": _module("NL_to_cypher"),
-        "NL_to_cypher.vector": vector_module,
-        "algorithm.NL_to_cypher.vector": vector_module,
-        "NL_to_cypher.splitter": splitter_module,
-        "algorithm.NL_to_cypher.splitter": splitter_module,
-        "calculator": calculator_module,
-        "algorithm.confidence_calculate.calculator": calculator_module,
+        "algorithm.NL_to_cypher.vector": _module(
+            "algorithm.NL_to_cypher.vector",
+            batch_text_to_vectors=lambda texts: [[float(index), 1.0] for index, _ in enumerate(texts)],
+        ),
+        "algorithm.knowledge_extract": _module(
+            "algorithm.knowledge_extract",
+            extract_v2=lambda **_kwargs: {"raw": {}, "graph": {"nodes": [], "relationships": []}},
+            store_extraction_to_neo4j=lambda **_kwargs: {"success": True},
+        ),
+        "algorithm.knowledge_pipeline": _module(
+            "algorithm.knowledge_pipeline",
+            build_graphs_response=lambda graph: {"graphs": [{"graph": {"index": "0", **graph}}]} if graph.get("nodes") else {"graphs": []},
+            chunk_document=lambda content, *_args, **_kwargs: [content],
+            generate_understanding=lambda graph: f"节点数: {len(graph.get('nodes', []))}",
+            md_to_text=lambda text: text,
+            normalize_document_content=lambda content: str(content or ""),
+            parse_chunk_characters=lambda _raw: ["。", "\n"],
+            store_artifact=store_artifact,
+        ),
+        "algorithm.knowledge_pipeline.artifacts": _module(
+            "algorithm.knowledge_pipeline.artifacts",
+            resolve_local_artifact=lambda *_args: None,
+        ),
+        "algorithm.preproc.preproc_src.main_processor": _module(
+            "algorithm.preproc.preproc_src.main_processor",
+            DocumentProcessor=DocumentProcessor,
+        ),
+        "algorithm.confidence_calculate.calculator": _module(
+            "algorithm.confidence_calculate.calculator",
+            calculate_graph_confidence=lambda payload: {
+                "code": 0,
+                "message": "置信度评估完成",
+                "info": "置信度评估完成",
+                "data": {"evaluation_id": "EVAL-TEST", "total_count": 1, "graph": payload["graph"], "details": {}},
+                "error": None,
+            },
+            close_confidence_resources=lambda: None,
+        ),
     }
-
-    original_modules = {name: sys.modules.get(name) for name in stubs}
+    original = {name: sys.modules.get(name) for name in stubs}
     sys.modules.update(stubs)
     try:
-        import algorithm.knowledge_precipitation as protocol
         from fastapi import FastAPI
+        from backend.app.routers.confidence import router as confidence_router
+        from backend.app.routers.knowledge_precipitation import router as knowledge_router
+        from backend.app.routers.vectorization import router as vector_router
 
-        protocol.app = FastAPI()
-        protocol.app.include_router(protocol.router)
-
-        yield protocol
+        app = FastAPI()
+        app.include_router(knowledge_router)
+        app.include_router(vector_router)
+        app.include_router(confidence_router)
+        yield types.SimpleNamespace(app=app)
     finally:
-        for name, original in original_modules.items():
-            if original is None:
+        for name, previous in original.items():
+            if previous is None:
                 sys.modules.pop(name, None)
             else:
-                sys.modules[name] = original
+                sys.modules[name] = previous

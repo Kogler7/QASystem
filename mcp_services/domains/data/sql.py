@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 from mcp_services.runtime import mcp
+from mcp_services.result import ToolCode, invoke_tool, tool_error, tool_success
 
 
 def _executor(database_url: str | None = None, *, read_only: bool = True):
@@ -21,6 +22,14 @@ def execute_sql(
     read_only: bool = True,
 ) -> dict[str, Any]:
     """Execute SQL against the configured database."""
+    return invoke_tool(
+        lambda: _execute_sql(sql, params, database_url, read_only),
+        ToolCode.DATA_FAILED,
+        "SQL 执行",
+    )
+
+
+def _execute_sql(sql, params, database_url, read_only):
     with _executor(database_url, read_only=read_only) as executor:
         return executor.execute(sql, params=params).to_dict()
 
@@ -28,6 +37,10 @@ def execute_sql(
 @mcp.tool(name="list_tables")
 def list_tables(database_url: str | None = None) -> dict[str, Any]:
     """List tables in the configured database."""
+    return invoke_tool(lambda: _list_tables(database_url), ToolCode.DATA_FAILED, "数据表查询")
+
+
+def _list_tables(database_url: str | None = None) -> dict[str, Any]:
     with _executor(database_url) as executor:
         dialect = executor.dialect.value
         if dialect in {"mysql", "mariadb"}:
@@ -45,7 +58,11 @@ def list_tables(database_url: str | None = None) -> dict[str, Any]:
 def describe_table(table_name: str, database_url: str | None = None) -> dict[str, Any]:
     """Describe columns in a database table."""
     if not table_name.replace("_", "").isalnum():
-        raise ValueError("table_name 只能包含字母、数字和下划线")
+        return tool_error(ToolCode.INVALID_ARGUMENT, "table_name 只能包含字母、数字和下划线")
+    return invoke_tool(lambda: _describe_table(table_name, database_url), ToolCode.DATA_FAILED, "表结构查询")
+
+
+def _describe_table(table_name: str, database_url: str | None = None) -> dict[str, Any]:
     with _executor(database_url) as executor:
         dialect = executor.dialect.value
         if dialect in {"mysql", "mariadb"}:
@@ -64,14 +81,18 @@ def describe_table(table_name: str, database_url: str | None = None) -> dict[str
 
 
 @mcp.tool(name="list_supported_dialects")
-def list_supported_dialects() -> list[str]:
+def list_supported_dialects() -> dict[str, Any]:
     """List database dialects supported by the SQL tool."""
-    return ["mysql", "mariadb", "postgresql", "sqlite", "mssql", "oracle"]
+    return tool_success(["mysql", "mariadb", "postgresql", "sqlite", "mssql", "oracle"], "数据库方言查询完成")
 
 
 @mcp.tool(name="get_database_info")
 def get_database_info(database_url: str | None = None) -> dict[str, Any]:
     """Return configured database dialect and connectivity status."""
+    return invoke_tool(lambda: _get_database_info(database_url), ToolCode.DATA_FAILED, "数据库连接信息查询")
+
+
+def _get_database_info(database_url: str | None = None) -> dict[str, Any]:
     with _executor(database_url) as executor:
         return {
             "dialect": executor.dialect.value,

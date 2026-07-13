@@ -2,7 +2,7 @@
 
 ## 运行入口
 
-`backend/app/main.py` 是唯一 ASGI 入口。它只注册四个业务接口、健康检查和统一 MCP
+`backend/app/main.py` 是唯一 ASGI 入口。它只注册三个业务接口、健康检查、产物下载和统一 MCP
 挂载点，不负责业务编排。
 
 ## 目录职责
@@ -10,7 +10,9 @@
 ```text
 backend/
 ├── app/main.py
-├── app/routers/knowledge_precipitation.py
+├── app/routers/
+├── app/services/
+├── app/schemas.py
 └── tests/
 
 mcp_services/

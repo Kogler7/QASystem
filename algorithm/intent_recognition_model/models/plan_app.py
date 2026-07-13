@@ -18,9 +18,17 @@ class PlanApp:
                             "pass": False
                         }
                         # 获取最终计划内容
-            if "description" in plan and "steps" in plan:
-                final_description = plan.get("description")
-                final_steps = json.loads(plan.get("steps"))
+            final_description = plan.get("description")
+            raw_steps = plan.get("steps")
+            if isinstance(raw_steps, str):
+                final_steps = json.loads(raw_steps)
+            elif isinstance(raw_steps, list):
+                final_steps = raw_steps
+            else:
+                return {
+                    "understanding": "计划步骤格式无效",
+                    "pass": False,
+                }
 
             # 评估计划是否存在
             if not self.is_plan_exist(final_description):

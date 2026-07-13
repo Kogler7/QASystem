@@ -1,10 +1,13 @@
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from mcp_services.runtime import mcp
+from mcp_services.result import ToolCode, invoke_tool, tool_success
 
 
+@lru_cache(maxsize=1)
 def _executor():
     from algorithm.visualization.charts import VisualizationExecutor
 
@@ -13,7 +16,11 @@ def _executor():
 
 
 def _draw(method: str, data: dict[str, Any]) -> dict[str, Any]:
-    return getattr(_executor(), method)(data)
+    return invoke_tool(
+        lambda: getattr(_executor(), method)(data),
+        ToolCode.VISUALIZATION_FAILED,
+        "图表生成完成",
+    )
 
 
 @mcp.tool(name="draw_bar_chart")
@@ -91,4 +98,4 @@ def list_chart_types() -> dict[str, Any]:
         "bubble": "气泡图",
         "heatmap": "热力图",
     }
-    return {"chart_types": list(descriptions), "descriptions": descriptions}
+    return tool_success({"chart_types": list(descriptions), "descriptions": descriptions}, "图表类型查询完成")

@@ -27,7 +27,7 @@ def text_to_vector(text: str, model_path: str | None = None) -> list[float]:
 
 def batch_text_to_vectors(texts: list[str], model_path: str | None = None) -> list[list[float]]:
     """Encode multiple texts with one batched model call."""
-    values = [text.strip() for text in texts if text and text.strip()]
+    values = [str(text) for text in texts]
     if not values:
         raise ValueError("文本列表不能为空")
     vectors = _load_model(_model_path(model_path)).encode(values, convert_to_numpy=True)

@@ -1,8 +1,11 @@
 from typing import Any
+from functools import lru_cache
 
 from mcp_services.runtime import mcp
+from mcp_services.result import ToolCode, invoke_tool
 
 
+@lru_cache(maxsize=1)
 def _locator():
     from algorithm.ans.QA.config import Config
     from algorithm.ans.QA.tools.knowledge_space_locator import KnowledgeSpaceLocator
@@ -11,12 +14,16 @@ def _locator():
 
 
 @mcp.tool(name="locate_knowledge_space")
-def locate_knowledge_space(user_question: str) -> dict[str, Any]:
+def locate_knowledge_space(user_question: str, app_requirement: dict[str, Any] | None = None) -> dict[str, Any]:
     """Locate the knowledge subspace that best matches a user question."""
-    return _locator().locate(user_question)
+    return invoke_tool(
+        lambda: _locator().locate(user_question, app_requirement),
+        ToolCode.REASONING_FAILED,
+        "知识空间定位完成",
+    )
 
 
 @mcp.tool(name="get_all_subspaces")
 def get_all_subspaces() -> dict[str, Any]:
     """Return all configured knowledge subspaces."""
-    return _locator().get_all_subspaces()
+    return invoke_tool(lambda: _locator().get_all_subspaces(), ToolCode.REASONING_FAILED, "知识子空间查询")

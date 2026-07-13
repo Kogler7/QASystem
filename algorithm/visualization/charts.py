@@ -4,6 +4,7 @@ import base64
 import os
 from io import BytesIO
 from datetime import datetime
+from uuid import uuid4
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -50,8 +51,8 @@ class VisualizationExecutor:
         plt.rcParams['axes.unicode_minus'] = False
 
     def _save_fig(self, fig: plt.Figure, chart_type: str, dpi: int = 100) -> Dict[str, str]:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{chart_type}_{timestamp}.png"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{chart_type}_{timestamp}_{uuid4().hex[:8]}.png"
         filepath = os.path.join(self.output_dir, filename)
         
         fig.savefig(filepath, format='png', dpi=dpi, bbox_inches='tight')
@@ -153,7 +154,7 @@ class VisualizationExecutor:
                 label = legends[idx] if idx < len(legends) else f'Series {idx+1}'
                 ax.plot(x_data, ys, marker='o', linestyle='-', linewidth=2, color=color, label=label)
                 for i, value in enumerate(ys):
-                    ax.text(i, value, f'{value:,}', ha='center', va='bottom', fontsize=8)
+                    ax.text(x_data[i], value, f'{value:,}', ha='center', va='bottom', fontsize=8)
 
             ax.set_title(title)
             ax.set_xlabel(xlabel)
@@ -327,6 +328,8 @@ class VisualizationExecutor:
             title = data.get('title', '')
             x_labels = data.get('x_labels', [])
             y_labels = data.get('y_labels', [])
+            xlabel = data.get('xlabel', '')
+            ylabel = data.get('ylabel', '')
             
             if not matrix or not isinstance(matrix, list) or not isinstance(matrix[0], list):
                 return {'success': False, 'image_base64': '', 'image_path': '', 'filename': '', 'chart_type': 'heatmap', 'error': 'Matrix data is required'}
@@ -348,6 +351,8 @@ class VisualizationExecutor:
                     ax.text(j, i, matrix[i][j], ha='center', va='center', color='w')
             
             ax.set_title(title)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
             fig.tight_layout()
             
             result = self._save_fig(fig, 'heatmap')

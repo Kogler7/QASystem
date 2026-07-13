@@ -61,7 +61,7 @@ class PathEvidence:
         except Exception:
             return 0.1
 
-    def _find_paths(self, start_name: str, end_name: str) -> List[Tuple[List[Tuple[str, str]], int]]:
+    def _find_paths(self, start_name: str, end_name: str) -> List[Tuple[List[str], int]]:
         """
         查找头尾实体之间的所有简单路径。
         返回列表，每个元素为 (路径, 长度)。
@@ -81,8 +81,7 @@ class PathEvidence:
                 res = session.run(query, start=start_name, end=end_name)
                 paths = []
                 for record in res:
-                    # 将关系类型和中间节点名组成对
-                    path = list(zip(record['rel_types'], record['mid_nodes']))
+                    path = list(record['rel_types'])
                     paths.append((path, record['length']))
                 return paths
         except Exception as e:
@@ -108,8 +107,8 @@ class PathEvidence:
             # 长度惩罚（指数衰减）
             len_score = math.exp(-0.5 * length)
             # 关系频率因子（平均频率，1 + avg_freq 作为乘数）
-            rel_scores = [self._get_relation_freq(rel) for rel, _ in path]
-            avg_rel = sum(rel_scores) / len(rel_scores) if rel_scores else 0.5
+            rel_scores = [self._get_relation_freq(rel) for rel in path]
+            avg_rel = sum(rel_scores) / len(rel_scores) if rel_scores else 0.0
             total_score += len_score * (1.0 + avg_rel)
 
         # 归一化到 0-1，平均每条路径得分

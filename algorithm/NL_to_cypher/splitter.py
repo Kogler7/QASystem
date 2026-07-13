@@ -19,6 +19,53 @@ def split_by_character(
     return splitter.split_documents(documents)
 
 
+def split_by_characters(
+    documents: list[Document],
+    chunk_size: int = 500,
+    separators: list[str] | None = None,
+) -> list[Document]:
+    """Split documents through every configured separator, then pack chunks."""
+    active_separators = [separator for separator in (separators or ["\n"]) if separator]
+    if not active_separators:
+        active_separators = ["\n"]
+
+    fragments: list[Document] = []
+    for document in documents:
+        texts = [document.page_content]
+        for separator in active_separators:
+            next_texts: list[str] = []
+            for text in texts:
+                parts = text.split(separator)
+                next_texts.extend(
+                    part + (separator if index < len(parts) - 1 else "")
+                    for index, part in enumerate(parts)
+                    if part or index < len(parts) - 1
+                )
+            texts = next_texts
+        fragments.extend(
+            Document(page_content=text, metadata=dict(document.metadata))
+            for text in texts
+            if text
+        )
+
+    chunks: list[Document] = []
+    for fragment in fragments:
+        if len(fragment.page_content) <= chunk_size:
+            if chunks and len(chunks[-1].page_content) + len(fragment.page_content) <= chunk_size:
+                chunks[-1].page_content += fragment.page_content
+            else:
+                chunks.append(fragment)
+            continue
+        chunks.extend(
+            Document(
+                page_content=fragment.page_content[start:start + chunk_size],
+                metadata=dict(fragment.metadata),
+            )
+            for start in range(0, len(fragment.page_content), chunk_size)
+        )
+    return chunks
+
+
 def split_recursively(
     documents: list[Document],
     chunk_size: int = 500,

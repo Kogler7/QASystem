@@ -5,6 +5,7 @@
 """
 import json
 import logging
+import os
 import re
 import time
 from typing import Any, Optional
@@ -195,6 +196,7 @@ def extract_v2(
     api_key: Optional[str] = None,
     model: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    json_retries: Optional[int] = None,
 ) -> dict[str, Any]:
     """
     本体驱动的知识抽取 V2（无模板匹配）。
@@ -226,6 +228,7 @@ def extract_v2(
     api_key = api_key or cfg["api_key"]
     model = model or cfg["model"]
     max_tokens = max_tokens or cfg["max_tokens"]
+    json_retries = max(0, json_retries if json_retries is not None else int(os.getenv("KG_EXTRACT_JSON_RETRIES", "2")))
 
     logger.info(
         "extract_v2: ontology_len=%d text_len=%d model=%s",
@@ -238,45 +241,92 @@ def extract_v2(
 
     t0 = time.perf_counter()
 
-    # 调用 LLM（直接使用 OpenAI SDK）
+    # 调用 LLM（流式读取，避免等待超大响应一次性返回）
     client = _build_openai_client(base_url=base_url, api_key=api_key)
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": prompt},
+    ]
+    attempts: list[dict[str, Any]] = []
+    extracted: dict[str, Any] = {}
+    raw_response = ""
+    for attempt in range(json_retries + 1):
+        try:
+            stream = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=max_tokens,
+                timeout=180,
+                stream=True,
+            )
+            parts: list[str] = []
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                content = chunk.choices[0].delta.content
+                if content:
+                    parts.append(content)
+            raw_response = "".join(parts)
+        except Exception as exc:
+            attempts.append({"attempt": attempt + 1, "type": "request", "message": str(exc)})
+            logger.warning("LLM 调用第 %d 次失败: %s", attempt + 1, exc)
+            if attempt >= json_retries:
+                client.close()
+                return {
+                    "raw": {},
+                    "graph": {"nodes": [], "relationships": []},
+                    "_error": "LLM 调用失败",
+                    "error_code": "LLM_REQUEST_FAILED",
+                    "attempts": attempts,
+                }
+            time.sleep(min(2 ** attempt, 4))
+            continue
+
+        extracted = extract_json_from_response(raw_response)
+        entities = extracted.get("entities") if isinstance(extracted, dict) else None
+        relations = extracted.get("relations") if isinstance(extracted, dict) else None
+        if isinstance(entities, list) and isinstance(relations, list):
+            break
+
+        attempts.append({
+            "attempt": attempt + 1,
+            "type": "json",
+            "message": "响应不是包含 entities 和 relations 数组的 JSON 对象",
+        })
+        logger.warning("LLM 响应第 %d 次 JSON 校验失败", attempt + 1)
+        if attempt < json_retries:
+            messages = [
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-            max_tokens=max_tokens,
-            timeout=180,
-        )
-        raw_response = response.choices[0].message.content or ""
-    except Exception as e:
-        logger.exception("LLM 调用失败")
-        return {
-            "raw": {},
-            "graph": {"nodes": [], "relationships": []},
-            "_error": str(e),
-        }
+                {"role": "assistant", "content": raw_response[:12000]},
+                {
+                    "role": "user",
+                    "content": "上一次输出不是合法的目标 JSON。请重新输出且只输出包含 entities 和 relations 两个数组的 JSON 对象。",
+                },
+            ]
 
     elapsed = time.perf_counter() - t0
     logger.info("extract_v2: LLM call done in %.2fs, response_len=%d", elapsed, len(raw_response or ""))
 
-    # 解析 JSON
-    extracted = extract_json_from_response(raw_response)
-    if not extracted:
-        logger.warning("extract_v2: 未能从 LLM 响应中解析出 JSON")
+    if not extracted or not isinstance(extracted.get("entities"), list) or not isinstance(extracted.get("relations"), list):
+        logger.warning("extract_v2: 重试后仍未获得有效 JSON")
+        client.close()
         return {
             "raw": {},
             "graph": {"nodes": [], "relationships": []},
+            "_error": "LLM 返回内容无法解析为知识抽取 JSON",
+            "error_code": "LLM_JSON_PARSE_FAILED",
+            "attempts": attempts,
             "_raw_response": raw_response[:1000] if raw_response else "",
         }
 
     # 转换为图结构
     graph = _entities_to_graph(extracted)
+    client.close()
 
     return {
         "raw": extracted,
         "graph": graph,
+        "attempts": attempts,
     }

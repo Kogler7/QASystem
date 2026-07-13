@@ -1,107 +1,103 @@
-"""
-置信度计算统一入口。
-所有置信度相关逻辑集中在这里，后端只需调用 calculate_graph_confidence()。
-"""
+from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict
+from functools import lru_cache
+from pathlib import Path
+from threading import RLock
+from typing import Any
 
-from .components.text_evidence import TextEvidence
+import yaml
+
 from .components.path_evidence import PathEvidence
+from .components.text_evidence import TextEvidence
 
 
-def calculate_graph_confidence(data: dict) -> dict:
-    """
-    接收完整 graph JSON（nodes + relationships + ontology_relations），
-    为每条关系计算置信度（文本证据 + 路径证据加权平均），
-    将 confidence 写入 relationship.properties，并返回完整的 graph。
+class ConfidenceCalculator:
+    def __init__(self, text_evidence: TextEvidence | None = None, path_evidence: PathEvidence | None = None):
+        config_path = Path(__file__).with_name("config.yaml")
+        with config_path.open("r", encoding="utf-8") as handle:
+            config = yaml.safe_load(handle) or {}
+        self.text_weight = float(config.get("text_weight", 0.7))
+        self.path_weight = float(config.get("path_weight", 0.3))
+        total_weight = self.text_weight + self.path_weight
+        if total_weight <= 0:
+            raise ValueError("置信度权重之和必须大于 0")
+        self.text_weight /= total_weight
+        self.path_weight /= total_weight
+        self.text_evidence = text_evidence or TextEvidence()
+        self.path_evidence = path_evidence or PathEvidence()
+        self._lock = RLock()
 
-    参数
-    ----
-    data : dict
-        包含 "graph" 字段的字典：
-        {
-            "graph": {
-                "nodes": [...],
-                "relationships": [...],
-                "ontology_relations": [...]   # 可选
-            }
+    def calculate(self, data: dict[str, Any]) -> dict[str, Any]:
+        graph = data.get("graph") or {}
+        nodes = graph.get("nodes") or []
+        relationships = graph.get("relationships") or []
+        ontology_relations = graph.get("ontology_relations") or []
+        names = {
+            node.get("uid", ""): (node.get("properties") or {}).get("name", node.get("uid", ""))
+            for node in nodes
         }
+        details: dict[str, Any] = {}
 
-    返回
-    ----
-    dict
-        {
+        with self._lock:
+            for index, relation in enumerate([*relationships, *ontology_relations]):
+                from_uid = relation.get("from_uid", "")
+                to_uid = relation.get("to_uid", "")
+                triple = {
+                    "subject": names.get(from_uid, from_uid),
+                    "predicate": relation.get("type", ""),
+                    "object": names.get(to_uid, to_uid),
+                }
+                text_score = float(self.text_evidence.get_score(triple))
+                path_score = float(self.path_evidence.get_score(triple))
+                confidence = round(
+                    self.text_weight * text_score + self.path_weight * path_score,
+                    4,
+                )
+                relation.setdefault("properties", {})["confidence"] = confidence
+                details[str(index)] = {
+                    "from_uid": from_uid,
+                    "to_uid": to_uid,
+                    "type": relation.get("type", ""),
+                    "text_score": text_score,
+                    "path_score": path_score,
+                    "text_weight": self.text_weight,
+                    "path_weight": self.path_weight,
+                    "confidence": confidence,
+                }
+
+        return {
             "code": 0,
+            "message": "置信度评估完成",
             "info": "置信度评估完成",
             "data": {
-                "evaluation_id": "EVAL-...",
-                "total_count": 4,
+                "evaluation_id": f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+                "total_count": len(relationships) + len(ontology_relations),
                 "graph": {
-                    "nodes": [...],
-                    "relationships": [...],   # 已附加 properties.confidence
-                    "ontology_relations": [...]  # 已附加 properties.confidence
+                    "nodes": nodes,
+                    "relationships": relationships,
+                    "ontology_relations": ontology_relations,
                 },
-                "details": {}
-            }
-        }
-    """
-    graph = data.get('graph', {})
-    nodes = graph.get('nodes', [])
-    relationships = graph.get('relationships', [])
-    ontology_relations = graph.get('ontology_relations', [])
-
-    # 构建 uid -> name 映射（用于提取实体名称作为 subject/object）
-    name_map = {}
-    for node in nodes:
-        uid = node.get('uid', '')
-        props = node.get('properties', {})
-        name_map[uid] = props.get('name', uid)
-
-    # 初始化两个证据组件（ES 和 Neo4j 连接信息从各自的环境变量读取）
-    text_ev = TextEvidence()
-    path_ev = PathEvidence()
-
-    all_rels = relationships + ontology_relations
-
-    for rel in all_rels:
-        from_uid = rel.get('from_uid', '')
-        to_uid = rel.get('to_uid', '')
-        pred = rel.get('type', '')
-
-        subj = name_map.get(from_uid, from_uid)
-        obj = name_map.get(to_uid, to_uid)
-
-        triple = {'subject': subj, 'predicate': pred, 'object': obj}
-
-        # 计算两个证据分数
-        text_score = text_ev.get_score(triple)
-        path_score = path_ev.get_score(triple)
-
-        print(f"[置信度计算] {subj} -- {pred} --> {obj}")
-        print(f"  文本证据分数: {text_score:.4f}, 路径证据分数: {path_score:.4f}")
-
-        # 加权平均（权重可从 config.yaml 读取）
-        confidence = float(round(0.5 * text_score + 0.5 * path_score, 2))
-
-        # 将置信度写入关系属性
-        if 'properties' not in rel:
-            rel['properties'] = {}
-        rel['properties']['confidence'] = confidence
-
-    path_ev.close()
-
-    return {
-        "code": 0,
-        "info": "置信度评估完成",
-        "data": {
-            "evaluation_id": f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "total_count": len(all_rels),
-            "graph": {
-                "nodes": nodes,
-                "relationships": relationships,
-                "ontology_relations": ontology_relations
+                "details": details,
             },
-            "details": {}
+            "error": None,
         }
-    }
+
+    def close(self) -> None:
+        self.text_evidence.close()
+        self.path_evidence.close()
+
+
+@lru_cache(maxsize=1)
+def get_confidence_calculator() -> ConfidenceCalculator:
+    return ConfidenceCalculator()
+
+
+def calculate_graph_confidence(data: dict[str, Any]) -> dict[str, Any]:
+    return get_confidence_calculator().calculate(data)
+
+
+def close_confidence_resources() -> None:
+    if get_confidence_calculator.cache_info().currsize:
+        get_confidence_calculator().close()
+        get_confidence_calculator.cache_clear()

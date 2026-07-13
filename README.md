@@ -1,6 +1,6 @@
 # QASystem Knowledge Services
 
-QASystem 当前提供四个知识沉淀 HTTP 接口、一个统一 MCP 服务，以及保留的
+QASystem 当前提供三个知识服务 HTTP 接口、一个统一 MCP 服务，以及保留的
 `agentcode` Agent 运行时。
 
 ## 对外接口
@@ -8,7 +8,6 @@ QASystem 当前提供四个知识沉淀 HTTP 接口、一个统一 MCP 服务，
 | 方法 | 路径 | 能力 |
 | --- | --- | --- |
 | POST | `/api/knowledge/precipitation` | 文档解析、知识抽取、切片和向量化 |
-| POST | `/api/component/nl2cypher/text-to-vector` | 单文本向量化 |
 | POST | `/api/component/nl2cypher/text-to-vectors` | 多文本向量化 |
 | POST | `/api/component/kg-update/calculate-confidence` | 图谱关系置信度更新 |
 
@@ -18,7 +17,7 @@ QASystem 当前提供四个知识沉淀 HTTP 接口、一个统一 MCP 服务，
 
 ```text
 qasystem/
-├── backend/              # FastAPI 入口、四接口适配和契约测试
+├── backend/              # FastAPI 路由、业务服务编排和契约测试
 ├── algorithm/            # 文档、抽取、向量、置信度及 MCP 业务实现
 ├── mcp_services/         # 统一 MCP Server 与领域工具
 ├── agentcode/            # Agent 与 MCP 客户端运行时

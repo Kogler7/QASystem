@@ -1,4 +1,5 @@
 import os
+import threading
 import yaml
 import numpy as np
 from pathlib import Path
@@ -71,6 +72,7 @@ class TextEvidence:
             self.sbert = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         else:
             self.sbert = SentenceTransformer(model_path)
+        self._encode_lock = threading.Lock()
 
     def build_query(self, triple: Dict) -> str:
         """根据三元组构造查询字符串"""
@@ -104,7 +106,8 @@ class TextEvidence:
             return 0.5
 
         # 编码查询语句
-        query_vec = self.sbert.encode(query_str)
+        with self._encode_lock:
+            query_vec = self.sbert.encode(query_str)
         query_norm = np.linalg.norm(query_vec)
 
         best_score = 0.0
@@ -113,7 +116,8 @@ class TextEvidence:
             if not content:
                 continue
             # 编码文档句子
-            doc_vec = self.sbert.encode(content)
+            with self._encode_lock:
+                doc_vec = self.sbert.encode(content)
             doc_norm = np.linalg.norm(doc_vec)
             # 余弦相似度
             cos_sim = np.dot(query_vec, doc_vec) / (query_norm * doc_norm + 1e-10)
@@ -125,3 +129,7 @@ class TextEvidence:
                 best_score = combined
 
         return round(best_score, 4)
+
+    def close(self):
+        if self.es is not None:
+            self.es.close()

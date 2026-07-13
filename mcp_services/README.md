@@ -11,6 +11,14 @@
 
 工具适配层应保持轻量，业务实现放在 `algorithm/`。禁止在业务目录新增独立 MCP Server。
 
+所有工具统一返回：
+
+```json
+{"code": 0, "message": "success", "data": {}, "error": null}
+```
+
+失败时 `code` 为非零值，`data` 为 `null`，`error.details` 提供可诊断信息。
+
 独立启动统一 MCP Server：
 
 ```powershell

@@ -12,6 +12,7 @@
 import os
 import json
 import re
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 from algorithm.ans.QA.neo4j_client import Neo4jClient
@@ -101,8 +102,8 @@ class KnowledgeSpaceLocator:
         """从图谱查根节点，用LLM匹配用户问题"""
         try:
             result = self.client.execute_cypher('''
-                MATCH (root:KnowledgeSpace)-[:包含]->(d:Dimension)
-                WHERE NOT EXISTS { (parent)-[:包含]->(root) }
+                MATCH (root:KnowledgeSpace)-[:包含|BELONGS_TO]-(d:Dimension)
+                WHERE NOT EXISTS { (parent:KnowledgeSpace)-[:包含]->(root) }
                 RETURN DISTINCT root.name as name, root.description as desc
                 LIMIT 10
             ''')
@@ -157,8 +158,8 @@ class KnowledgeSpaceLocator:
         for dim_name in self.DIMENSION_NAMES:
             try:
                 result = self.client.execute_cypher(f'''
-                    MATCH (:KnowledgeSpace {{name: '{root_name}'}})-[:包含]->(d:Dimension {{name: '{dim_name}'}})
-                    OPTIONAL MATCH (d)-[:包含]->(scale)
+                    MATCH (:KnowledgeSpace {{name: '{root_name}'}})-[:包含|BELONGS_TO]-(d:Dimension {{name: '{dim_name}'}})
+                    OPTIONAL MATCH (d)-[:包含|BELONGS_TO]-(scale:Scale)
                     RETURN d.name as dim,
                            collect(distinct scale.name) as scales,
                            d.description as desc
@@ -280,23 +281,22 @@ class KnowledgeSpaceLocator:
         if len(scale_list) < 5:
             return None
 
-        # WHERE 逐条 MATCH
-        clauses = " AND ".join(
-            f"EXISTS {{ ({{name: '{val}'}})-[:包含]->(ks) }}"
-            for _, val in scale_list
-        )
-
-        query = f"""
-            MATCH (ks:KnowledgeSpace)
-            WHERE ks.name CONTAINS '时间' AND ks.name CONTAINS '空间'
-            AND ks.name CONTAINS '抽象层级'
-              AND {clauses}
-            RETURN ks.name as name
+        scale_names = [value for _, value in scale_list]
+        query = """
+            MATCH (ks:KnowledgeSpace)-[:BELONGS_TO|包含]-(scale:Scale)
+            WHERE scale.name IN $scale_names
+            WITH ks, count(distinct scale.name) AS matched
+            WHERE matched = $expected
+            RETURN ks.name AS name
             LIMIT 1
         """
 
         try:
-            result = self.client.execute_cypher(query)
+            result = self.client.execute_cypher(
+                query,
+                scale_names=scale_names,
+                expected=len(scale_names),
+            )
             if result:
                 return result[0]["name"]
         except Exception:
@@ -307,10 +307,10 @@ class KnowledgeSpaceLocator:
 
     def _load_md_descriptions(self) -> Dict[str, str]:
         """从 knowledge_space_dimensions.md 加载刻度描述"""
-        md_path = os.path.join(tools_dir, "knowledge_space_dimensions.md")
+        md_path = Path(__file__).with_name("knowledge_space_dimensions.md")
         desc = {}
         try:
-            with open(md_path, "r", encoding="utf-8") as f:
+            with md_path.open("r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line.startswith("|") and line.endswith("|"):
@@ -347,9 +347,7 @@ class KnowledgeSpaceLocator:
         """获取所有维度组合子空间"""
         try:
             result = self.client.execute_cypher('''
-                MATCH (ks:KnowledgeSpace)
-                WHERE ks.name CONTAINS '时间' AND ks.name CONTAINS '空间'
-                MATCH (scale)-[:包含]->(ks)
+                MATCH (ks:KnowledgeSpace)-[:BELONGS_TO|包含]-(scale:Scale)
                 RETURN ks.name as name, collect(distinct scale.name) as scales
             ''')
             return [{"子空间名称": r["name"], "关联刻度": r["scales"]} for r in result]
