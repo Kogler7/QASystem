@@ -43,7 +43,7 @@ foreach ($file in @("Dockerfile", "docker-compose.yml", "backend\requirements.tx
     $path = Join-Path $repoRoot $file
     $manifest.files[$file] = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
 }
-$manifest | ConvertTo-Json -Depth 4 | Set-Content \
+$manifest | ConvertTo-Json -Depth 4 | Set-Content `
     -LiteralPath (Join-Path $runtimeDir "部署清单.json") -Encoding utf8
 
 $backendRuntimeData = Join-Path $runtimeDir "backend\data"
