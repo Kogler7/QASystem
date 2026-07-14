@@ -77,101 +77,18 @@ def build_tool_usage(tool_manager: Any) -> str:
     # ── 通用原则 ──
     lines.append("## General Principles")
     lines.append("")
-    lines.append("- **Prefer specialized tools over generic ones.** "
-                  "For example, use intent-recognition tools for intent analysis "
-                  "rather than trying to infer intent from raw text.")
+    lines.append("- **Understand the request yourself, then select only the tools needed to execute it.**")
     lines.append("- **Read tool descriptions carefully.** Each tool has specific input requirements "
                   "and expected output formats. Respect them.")
     lines.append("- **Handle tool errors gracefully.** If a tool fails, analyze the error, "
                   "adjust parameters, and retry before giving up.")
     lines.append("")
 
-    # ── 意图识别工具 ──
-    intent_tools = groups.get("intent-recognition", [])
-    if intent_tools:
-        lines.append("## Intent Recognition Tools")
+    for group_name, tools in groups.items():
+        lines.append(f"## Tools: {group_name}")
         lines.append("")
-        lines.append("Purpose: Analyze user questions to determine the underlying business intent.")
-        lines.append("")
-        for t in intent_tools:
-            lines.append(f"- **`{t['name']}`**: {t.get('description', 'No description')}")
-        lines.append("")
-        lines.append("**When to use:** When the user asks a data-related question, "
-                      "consider calling intent recognition to understand the underlying business intent "
-                      "and narrow down the scope. This is recommended but not required — "
-                      "feel free to explore with other tools if the intent is already clear.")
-        lines.append("")
-
-    # ── 计划/方案工具 ──
-    plan_tools = groups.get("plan", [])
-    if plan_tools:
-        lines.append("## Problem Solving Plan Tools")
-        lines.append("")
-        lines.append("Purpose: Query knowledge graph for problem-solving execution plans "
-                      "based on problem model.")
-        lines.append("")
-        for t in plan_tools:
-            lines.append(f"- **`{t['name']}`**: {t.get('description', 'No description')}")
-        lines.append("")
-        lines.append("**When to use:** After intent recognition has returned "
-                      "intent_id and domain, call this tool to retrieve a "
-                      "structured execution plan with step-by-step instructions.")
-        lines.append("")
-
-    # ── 信息获取 / 知识图谱工具 ──
-    info_tools = groups.get("information-get", [])
-    if info_tools:
-        lines.append("## Knowledge Graph & Information Retrieval Tools")
-        lines.append("")
-        lines.append("Purpose: Extract entities, link them to the knowledge graph, query entity properties, "
-                      "explore relationships, and retrieve business rules.")
-        lines.append("")
-        for t in info_tools:
-            lines.append(f"- **`{t['name']}`**: {t.get('description', 'No description')}")
-        lines.append("")
-        lines.append("**Typical sequence:**")
-        lines.append("1. Extract entities from the user question")
-        lines.append("2. Link entities to knowledge graph nodes (respect business rules)")
-        lines.append("3. Query entity properties (includes computed SQL, data source tables, etc.)")
-        lines.append("4. Search graph for relationships between entities if needed")
-        lines.append("5. Get business rules if applicable")
-        lines.append("")
-
-    # ── SQL 执行工具 ──
-    sql_tools = groups.get("sql-search", [])
-    if sql_tools:
-        lines.append("## SQL Execution Tools")
-        lines.append("")
-        lines.append("Purpose: Execute SQL queries against configured data sources.")
-        lines.append("")
-        for t in sql_tools:
-            lines.append(f"- **`{t['name']}`**: {t.get('description', 'No description')}")
-        lines.append("")
-        lines.append("**When to use:** Execute SQL to retrieve or manipulate data. "
-                      "You can explore data sources directly with SQL queries, "
-                      "without always requiring a prior knowledge graph lookup.")
-        lines.append("")
-
-    # ── 可视化工具 ──
-    draw_tools = groups.get("draw", [])
-    if draw_tools:
-        lines.append("## Data Visualization Tools")
-        lines.append("")
-        lines.append("Purpose: Generate charts and visualizations from query results.")
-        lines.append("")
-        chart_names = []
-        for t in draw_tools:
-            chart_names.append(f"`{t['name']}`")
-            lines.append(f"- **`{t['name']}`**: {t.get('description', 'No description')}")
-        lines.append("")
-        lines.append("**When to use:** After obtaining query results, choose the appropriate chart type "
-                      "based on the data structure and the user's analytical goal:")
-        lines.append("- Bar chart: comparing categories")
-        lines.append("- Pie chart: showing proportions")
-        lines.append("- Line chart: showing trends over time")
-        lines.append("- Scatter plot: showing correlations")
-        lines.append("- Histogram: showing distributions")
-        lines.append("- Radar chart: multi-dimensional comparison")
+        for tool in tools:
+            lines.append(f"- **`{tool['name']}`**: {tool.get('description', 'No description')}")
         lines.append("")
 
     return "\n".join(lines)
@@ -200,11 +117,19 @@ def build_domain_knowledge(skill_loader: Any, skills: list[Any]) -> str:
                   "and deliver structured solutions.")
     lines.append("")
 
+    lines.append("## Knowledge Grounding")
+    lines.append("")
+    lines.append("Business facts, definitions, rules, metrics, solution templates, and resource mappings "
+                 "must come from knowledge-graph evidence. Use model reasoning only to navigate the graph, "
+                 "bind user constraints, and schedule atomic tools. Never present model memory as business knowledge.")
+    lines.append("If the graph does not contain the required knowledge or solution, report the gap instead of inventing it.")
+    lines.append("")
+
     # ── 标准工作流 ──
     lines.append("## Standard Data Query Workflow")
     lines.append("")
     lines.append("```")
-    lines.append("1. Intent Recognition   →  Understand what the user is really asking")
+    lines.append("1. Understand Request    →  The agent determines intent from the conversation")
     lines.append("2. Entity Extraction     →  Identify key entities (names, metrics, dimensions)")
     lines.append("3. Knowledge Graph Lookup →  Link entities, get properties, compute SQL")
     lines.append("4. SQL Execution         →  Run queries, retrieve data")

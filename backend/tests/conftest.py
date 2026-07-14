@@ -10,6 +10,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+AGENT_ROOT = ROOT / "agent"
+if str(AGENT_ROOT) not in sys.path:
+    sys.path.insert(0, str(AGENT_ROOT))
 
 
 def _module(name: str, **attributes: object) -> types.ModuleType:
