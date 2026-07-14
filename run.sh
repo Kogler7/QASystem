@@ -1,6 +1,6 @@
 #!/bin/bash
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
-export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/agentcode:${PYTHONPATH}"
+export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/agent:${PYTHONPATH}"
 cd "${REPO_ROOT}/backend"
 
 # 启动后端服务

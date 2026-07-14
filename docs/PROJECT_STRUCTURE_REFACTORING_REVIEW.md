@@ -62,7 +62,7 @@
 
 ### 3.2 保留的 Agent 能力
 
-`agentcode/` 保留，定位为：
+`agent/` 保留，定位为：
 
 - Agent 运行时。
 - MCP 客户端。
@@ -126,7 +126,7 @@ qasystem/
 │   │   ├── data/
 │   │   └── visualization/
 │   └── tests/
-├── agentcode/
+├── agent/
 ├── docker/
 ├── docs/
 ├── models/                 # 不纳入 Git
@@ -151,7 +151,7 @@ qasystem/
 | --- | --- | --- | --- | --- |
 | `backend/` | HTTP 服务及历史后台能力 | 大幅收缩 | 所有 HTTP 调用方 | 确认除四接口外无生产调用 |
 | `algorithm/` | 算法、脚本和多套服务 | 按能力重组 | HTTP、MCP、离线脚本 | 建立反向依赖清单 |
-| `agentcode/` | Agent 与 MCP 客户端 | 保留并适配统一 MCP | Agent 使用者 | 确认配置和工具名称兼容要求 |
+| `agent/` | Agent 与 MCP 客户端 | 保留并适配统一 MCP | Agent 使用者 | 确认配置和工具名称兼容要求 |
 | `frontend/` | 旧 Web 前端 | 已删除 | 无 | 产品边界已收缩为 API 与 MCP |
 | `agentic_graphrag/` | 独立 GraphRAG 试验或历史能力 | 待确认后删除 | 研究或离线任务 | 原维护者确认是否仍在使用 |
 | `intent/` | 历史意图训练或推理工程 | 条件删除 | 模型训练人员 | 确认与现有意图 MCP 无运行依赖 |
@@ -199,8 +199,8 @@ qasystem/
 
 | 当前路径 | 当前角色 | 拟定处理 | 兼容要求 |
 | --- | --- | --- | --- |
-| `agentcode/agentcode/tools/mcp_tools/` | MCP 客户端 | 保留 | 支持统一 Server 配置 |
-| `agentcode/.../mcp_config.json` | MCP 连接配置 | 修改 | 保留环境差异配置能力 |
+| `agent/agent/tools/mcp_tools/` | MCP 客户端 | 保留 | 支持统一 Server 配置 |
+| `agent/.../mcp_config.json` | MCP 连接配置 | 修改 | 保留环境差异配置能力 |
 | `algorithm/knowledge_extract/mcp_server.py` | 独立知识 MCP Server | 迁移后删除 | 工具名、参数、结果兼容 |
 | `algorithm/ans/mcp_servers/` | 答案和定位 MCP | 迁移后删除 | 工具行为和资源依赖兼容 |
 | `algorithm/intent_recognition_model/mcp/` | 意图、规划、SQL、绘图 MCP | 迁移后删除 | 工具行为和资源依赖兼容 |

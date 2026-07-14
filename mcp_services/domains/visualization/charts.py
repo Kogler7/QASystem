@@ -11,7 +11,7 @@ from mcp_services.result import ToolCode, invoke_tool, tool_success
 def _executor():
     from algorithm.visualization.charts import VisualizationExecutor
 
-    default_dir = Path.cwd() / "agentcode" / "image_result"
+    default_dir = Path.cwd() / "agent" / "image_result"
     return VisualizationExecutor(os.getenv("MCP_IMAGE_OUTPUT_DIR", str(default_dir)))
 
 

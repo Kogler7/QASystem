@@ -12,7 +12,7 @@ import numpy as np
 
 
 class VisualizationExecutor:
-    def __init__(self, output_dir: str = "/home/zyyang/qasystem/agentcode/image_result"):
+    def __init__(self, output_dir: str = "/home/zyyang/qasystem/agent/image_result"):
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self._setup_font()

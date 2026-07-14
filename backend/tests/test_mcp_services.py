@@ -52,7 +52,7 @@ def test_unified_mcp_registers_expected_tools():
 
 def test_agentcode_uses_single_mcp_server():
     root = Path(__file__).resolve().parents[2]
-    config_path = root / "agentcode" / "agentcode" / "tools" / "mcp_tools" / "mcp_config.json"
+    config_path = root / "agent" / "agentcode" / "tools" / "mcp_tools" / "mcp_config.json"
     servers = json.loads(config_path.read_text(encoding="utf-8"))["mcpServers"]
     assert servers == {
         "qasystem-tools": {

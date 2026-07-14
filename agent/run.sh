@@ -15,7 +15,7 @@ if command -v conda &>/dev/null; then
     conda activate qasystem 2>/dev/null || true
 fi
 
-PYTHONPATH="$(pwd)/agentcode"
+PYTHONPATH="$(pwd)/agent"
 export PYTHONPATH
 
 exec python -m agentcode.cli "$@"

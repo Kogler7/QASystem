@@ -95,7 +95,7 @@ curl -N http://127.0.0.1:9180/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47/stream
 ### 本地开发启动
 
 ```powershell
-cd agentcode
+cd agent
 ..\.venv\Scripts\python.exe -m pip install -e ".[api,dev]"
 $env:PYTHONPATH = "$PWD"
 python -m agentcode.api --host 127.0.0.1 --port 9180
@@ -104,7 +104,7 @@ python -m agentcode.api --host 127.0.0.1 --port 9180
 默认 MCP 配置位于：
 
 ```text
-agentcode/agentcode/tools/mcp_tools/mcp_config.json
+agent/agentcode/tools/mcp_tools/mcp_config.json
 ```
 
 也可以设置：
@@ -199,15 +199,15 @@ result = runtime.run_session(
 普通测试：
 
 ```powershell
-$env:PYTHONPATH = "$PWD\agentcode"
-.\.venv\Scripts\python.exe -m pytest agentcode/tests -q
+$env:PYTHONPATH = "$PWD\agent"
+.\.venv\Scripts\python.exe -m pytest agent/tests -q
 ```
 
 Redis 集成测试：
 
 ```powershell
 $env:TEST_REDIS_URL = "redis://127.0.0.1:6379/15"
-.\.venv\Scripts\python.exe -m pytest agentcode/tests/test_task_store_redis.py -q
+.\.venv\Scripts\python.exe -m pytest agent/tests/test_task_store_redis.py -q
 ```
 
 Shell 资源限制测试依赖 POSIX `resource`，在 Windows 上会自动跳过，应在 Linux 镜像或 CI 中执行。

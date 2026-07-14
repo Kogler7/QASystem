@@ -42,7 +42,7 @@ deploy/
 ├── qasystem-runtime/
 │   ├── backend/
 │   ├── algorithm/
-│   ├── agentcode/
+│   ├── agent/
 │   └── mcp_services/
 └── qasystem-backend-latest.tar  # 可选
 ```
@@ -58,7 +58,7 @@ curl http://127.0.0.1:9180/health
 
 Compose 启动 `backend`、`agent` 和 `redis`。统一 MCP 的宿主机地址为 `http://127.0.0.1:8006/mcp`，Agent 容器通过 `http://backend:8000/mcp` 访问。MySQL、Neo4j、Elasticsearch、LLM 和文件服务均作为外部服务配置。
 
-Agent API 默认地址为 `http://127.0.0.1:9180`。详细配置、容量规划和排障见 [`agentcode/docs/部署运维指南.md`](../agentcode/docs/部署运维指南.md)。
+Agent API 默认地址为 `http://127.0.0.1:9180`。详细配置、容量规划和排障见 [`agent/docs/部署运维指南.md`](../agent/docs/部署运维指南.md)。
 
 业务代码更新后重新运行 `package-deploy.ps1`，再执行：
 

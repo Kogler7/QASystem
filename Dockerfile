@@ -49,8 +49,8 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && 
     pip install --no-cache-dir -r backend/requirements.txt && \
     python -c "import docling, mineru, PIL; from docling.datamodel.base_models import InputFormat; assert hasattr(InputFormat, 'PPTX') and hasattr(InputFormat, 'IMAGE')"
 
-COPY agentcode /opt/agentcode
-RUN pip install --no-cache-dir --no-deps /opt/agentcode
+COPY agent /opt/agent
+RUN pip install --no-cache-dir --no-deps /opt/agent
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=opencode-runtime /usr/local/bin/opencode /usr/local/bin/opencode
@@ -59,7 +59,7 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 WORKDIR /app/backend
-ENV PYTHONPATH=/app:/app/agentcode \
+ENV PYTHONPATH=/app:/app/agent \
     LIBREOFFICE_PATH=/usr/bin/soffice
 
 EXPOSE 8000

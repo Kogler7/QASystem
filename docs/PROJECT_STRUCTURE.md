@@ -2,7 +2,7 @@
 
 ## 运行入口
 
-`backend/app/main.py` 是业务 HTTP/MCP ASGI 入口。`agentcode/agentcode/api.py` 是独立的后台 Agent ASGI 入口；二者在 Compose 中使用同一镜像、不同进程。
+`backend/app/main.py` 是业务 HTTP/MCP ASGI 入口。`agent/agentcode/api.py` 是独立的后台 Agent ASGI 入口；二者在 Compose 中使用同一镜像、不同进程。
 
 ## 目录职责
 
@@ -51,4 +51,4 @@ package-deploy.ps1
 - 新业务配置统一使用环境变量，不在导入时改写环境变量。
 - `agentcode` 只作为 Agent 和 MCP 客户端，不承载服务端业务实现。
 
-AgentCode 的详细结构见 [`agentcode/README.md`](../agentcode/README.md) 和[架构设计](../agentcode/docs/架构设计.md)。
+AgentCode 的详细结构见 [`agent/README.md`](../agent/README.md) 和[架构设计](../agent/docs/架构设计.md)。

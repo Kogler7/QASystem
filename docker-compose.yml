@@ -11,7 +11,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app:/app/agentcode
+      PYTHONPATH: /app:/app/agent
     volumes:
       - ./deploy/qasystem-runtime:/app
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
@@ -35,7 +35,7 @@ services:
       - .env
     environment:
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app:/app/agentcode
+      PYTHONPATH: /app:/app/agent
       AGENT_MCP_URL: http://backend:8000/mcp
       TASK_STORE_REDIS_URL: redis://redis:6379/0
     extra_hosts:
