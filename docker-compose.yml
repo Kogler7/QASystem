@@ -12,9 +12,10 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app:/app/agent
+      LIBREOFFICE_PATH: ${LIBREOFFICE_PATH:-/usr/bin/soffice}
     volumes:
-      - ./deploy/qasystem-runtime:/app
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
+      - backend-data:/app/backend/data
     working_dir: /app/backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
@@ -41,7 +42,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./deploy/qasystem-runtime:/app
+      - agent-output:/app/agent/image_result
     working_dir: /app
     command: python -m agentcode.api --host 0.0.0.0 --port 9180
     ports:
@@ -73,3 +74,5 @@ services:
 
 volumes:
   agent-redis-data:
+  backend-data:
+  agent-output:

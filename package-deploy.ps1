@@ -1,11 +1,12 @@
 param(
     [switch]$IncludeImage,
-    [string]$ImageName = "qasystem-backend:latest"
+    [string]$ImageName = "qasystem-backend:latest",
+    [switch]$SkipImageVerification
 )
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = $PSScriptRoot
 $deployDir = Join-Path $repoRoot "deploy"
 $runtimeDir = Join-Path $deployDir "qasystem-runtime"
 $resolvedRepoRoot = [System.IO.Path]::GetFullPath($repoRoot)
@@ -21,7 +22,7 @@ if (Test-Path -LiteralPath $runtimeDir) {
 }
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 
-foreach ($directory in @("backend", "algorithm", "agentcode", "mcp_services")) {
+foreach ($directory in @("backend", "algorithm", "agent", "mcp_services")) {
     $source = Join-Path $repoRoot $directory
     $destination = Join-Path $runtimeDir $directory
     robocopy $source $destination /E /NFL /NDL /NJH /NJS /NP `
@@ -32,24 +33,37 @@ foreach ($directory in @("backend", "algorithm", "agentcode", "mcp_services")) {
     }
 }
 
+$manifest = [ordered]@{
+    generated_at_utc = [DateTime]::UtcNow.ToString("o")
+    git_commit = (git -C $repoRoot rev-parse HEAD 2>$null)
+    image = $ImageName
+    files = [ordered]@{}
+}
+foreach ($file in @("Dockerfile", "docker-compose.yml", "backend\requirements.txt", "agent\pyproject.toml")) {
+    $path = Join-Path $repoRoot $file
+    $manifest.files[$file] = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+}
+$manifest | ConvertTo-Json -Depth 4 | Set-Content \
+    -LiteralPath (Join-Path $runtimeDir "部署清单.json") -Encoding utf8
+
 $backendRuntimeData = Join-Path $runtimeDir "backend\data"
 if (Test-Path -LiteralPath $backendRuntimeData) {
     Remove-Item -LiteralPath $backendRuntimeData -Recurse -Force
 }
 
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docker-compose.deploy.yml") -Destination (Join-Path $deployDir "docker-compose.yml") -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot ".env.deploy.example") -Destination (Join-Path $deployDir ".env.example") -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "DEPLOY_README.md") -Destination (Join-Path $deployDir "README.md") -Force
-
-$deployEnv = Join-Path $deployDir ".env"
-if (-not (Test-Path -LiteralPath $deployEnv)) {
-    Copy-Item -LiteralPath (Join-Path $deployDir ".env.example") -Destination $deployEnv
-    Write-Warning "Created deploy/.env from the template; review it before starting the service."
-}
-
 if ($IncludeImage) {
     docker image inspect $ImageName | Out-Null
+    if (-not $SkipImageVerification) {
+        docker run --rm --entrypoint python $ImageName /usr/local/bin/verify_qasystem_runtime.py
+        if ($LASTEXITCODE -ne 0) {
+            throw "Image verification failed (exit code $LASTEXITCODE): $ImageName"
+        }
+    }
     docker save -o (Join-Path $deployDir "qasystem-backend-latest.tar") $ImageName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to export image (exit code $LASTEXITCODE): $ImageName"
+    }
 }
 
-Write-Host "Deployment files generated at $deployDir"
+Write-Host "Runtime package generated at $runtimeDir"
+Write-Host "The runtime directory is a source snapshot; Compose runs code baked into the verified image."

@@ -3,9 +3,10 @@
 仓库根目录是唯一部署配置入口：
 
 - `.env.example`：唯一环境变量模板。
-- `Dockerfile`：后端运行环境镜像。
+- `Dockerfile`：包含后端、Agent、系统程序和 Python 依赖的完整运行镜像。
 - `docker-compose.yml`：唯一 Compose 配置。
-- `package-deploy.ps1`：生成运行时代码目录。
+- `build-image.ps1`：构建候选镜像、执行容器内验证并原子替换正式标签。
+- `package-deploy.ps1`：生成源码快照，并可导出已验证的离线镜像包。
 
 `deploy/` 只存放生成的 `qasystem-runtime/` 和可选镜像包，不再保存第二套 Compose、`.env` 或部署文档。
 
@@ -22,13 +23,17 @@ LLM 配置按调用模块分组：
 | 知识抽取 | `KG_EXTRACT_LLM_*` |
 | Agent 运行时 | `AGENT_LLM_*` |
 
-## 生成运行时代码
+## 构建并验证镜像
 
 ```powershell
-.\package-deploy.ps1
+.\build-image.ps1
 ```
 
-如需同时导出已构建镜像：
+脚本先构建 `candidate-latest`，验证 Python 依赖、系统程序、文档解析能力以及 Backend/Agent 入口。只有全部通过后才替换 `qasystem-backend:latest`，旧镜像会在不再被引用时删除。
+
+内网环境可先导入批准的基础镜像，再通过 `-PythonImage`、`-NodeImage` 指定本地标签；默认使用 Docker Hub 官方标签。
+
+如需生成源码快照并导出离线镜像：
 
 ```powershell
 .\package-deploy.ps1 -IncludeImage
@@ -43,14 +48,14 @@ deploy/
 │   ├── backend/
 │   ├── algorithm/
 │   ├── agent/
-│   └── mcp_services/
+│   ├── mcp_services/
+│   └── 部署清单.json
 └── qasystem-backend-latest.tar  # 可选
 ```
 
 ## 构建与启动
 
 ```bash
-docker build -t qasystem-backend:latest .
 docker compose up -d
 curl http://127.0.0.1:8006/health
 curl http://127.0.0.1:9180/health
@@ -60,8 +65,9 @@ Compose 启动 `backend`、`agent` 和 `redis`。统一 MCP 的宿主机地址�
 
 Agent API 默认地址为 `http://127.0.0.1:9180`。详细配置、容量规划和排障见 [`agent/docs/部署运维指南.md`](../agent/docs/部署运维指南.md)。
 
-业务代码更新后重新运行 `package-deploy.ps1`，再执行：
+Backend 与 Agent 代码已经打入镜像，Compose 不再用宿主机目录覆盖 `/app`。这样代码版本和依赖版本始终一致。业务代码或依赖更新后执行：
 
-```bash
-docker compose restart backend agent
+```powershell
+.\build-image.ps1
+docker compose up -d --force-recreate backend agent
 ```
