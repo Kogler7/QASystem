@@ -1,75 +1,67 @@
-# 后端部署说明
+# QASystem 部署说明
 
-当前部署方式只运行一个 `backend` 服务。镜像只提供 Python、系统依赖和运维工具，
-业务代码与模型都通过宿主机目录挂载。
+仓库根目录是唯一部署配置入口：
 
-## 生成交付目录
+- `.env.example`：唯一环境变量模板。
+- `Dockerfile`：后端运行环境镜像。
+- `docker-compose.yml`：唯一 Compose 配置。
+- `package-deploy.ps1`：生成运行时代码目录。
 
-在仓库根目录执行：
+`deploy/` 只存放生成的 `qasystem-runtime/` 和可选镜像包，不再保存第二套 Compose、`.env` 或部署文档。
 
-```powershell
-.\docker\package-deploy.ps1
-```
-
-如需同时导出已经构建好的环境镜像：
+## 准备配置
 
 ```powershell
-.\docker\package-deploy.ps1 -IncludeImage
+Copy-Item .env.example .env
 ```
 
-脚本生成：
+LLM 配置按调用模块分组：
+
+| 模块 | 环境变量前缀 |
+| --- | --- |
+| 知识抽取 | `KG_EXTRACT_LLM_*` |
+| Agent 运行时 | `AGENT_LLM_*` |
+
+## 生成运行时代码
+
+```powershell
+.\package-deploy.ps1
+```
+
+如需同时导出已构建镜像：
+
+```powershell
+.\package-deploy.ps1 -IncludeImage
+```
+
+生成目录：
 
 ```text
 deploy/
-├── docker-compose.yml
-├── .env.example
-├── .env
-├── README.md
+├── models/
 ├── qasystem-runtime/
 │   ├── backend/
 │   ├── algorithm/
 │   ├── agentcode/
 │   └── mcp_services/
-└── qasystem-backend-latest.tar  # 使用 -IncludeImage 时生成
+└── qasystem-backend-latest.tar  # 可选
 ```
 
-模型不随代码或镜像打包。将模型单独同步到 `deploy/models/`，或在 `.env` 中通过
-`HOST_MODELS_DIR` 指向其他宿主机目录。
-
-## 构建环境镜像
-
-仅当 Python 依赖、系统软件或镜像工具发生变化时才需要重新构建：
+## 构建与启动
 
 ```bash
-docker build -f docker/backend.Dockerfile -t qasystem-backend:latest .
-```
-
-## 服务器启动
-
-```bash
-cd deploy
-docker load -i qasystem-backend-latest.tar
-cp .env.example .env
-vi .env
+docker build -t qasystem-backend:latest .
 docker compose up -d
 curl http://127.0.0.1:8006/health
+curl http://127.0.0.1:9180/health
 ```
 
-统一 MCP 地址为 `http://127.0.0.1:8006/mcp`。
+Compose 启动 `backend`、`agent` 和 `redis`。统一 MCP 的宿主机地址为 `http://127.0.0.1:8006/mcp`，Agent 容器通过 `http://backend:8000/mcp` 访问。MySQL、Neo4j、Elasticsearch、LLM 和文件服务均作为外部服务配置。
 
-MySQL、Neo4j、Milvus、Elasticsearch、LLM 和文件服务均作为外部服务配置，当前
-Compose 不负责启动这些组件。
+Agent API 默认地址为 `http://127.0.0.1:9180`。详细配置、容量规划和排障见 [`agentcode/docs/部署运维指南.md`](../agentcode/docs/部署运维指南.md)。
 
-## 更新策略
-
-只修改业务代码时，替换 `qasystem-runtime/` 后执行：
+业务代码更新后重新运行 `package-deploy.ps1`，再执行：
 
 ```bash
-docker compose restart
-```
-
-只更新模型时，同步模型目录并按需重启。更新环境镜像、Compose 或环境变量时执行：
-
-```bash
-docker compose up -d --force-recreate
+docker compose restart backend agent
 ```

@@ -12,6 +12,9 @@ QASystem 当前提供三个知识服务 HTTP 接口、一个统一 MCP 服务，
 | POST | `/api/component/kg-update/calculate-confidence` | 图谱关系置信度更新 |
 
 服务健康检查为 `GET /health`。统一 MCP Streamable HTTP 入口为 `/mcp`。
+Agent 通过 MCP 自主选择知识、图谱检索、数据和可视化工具；仓库不再提供独立意图识别和方案规划 MCP。`problem-solve`、`semantic-align`、`plan-execute` Skills 负责约束求解框架，业务事实与方案仍以知识图谱为唯一知识来源。
+
+AgentCode 后台服务默认监听 `9180`，提供异步任务、任务取消、状态查询和 SSE。文档入口见 [AgentCode README](agentcode/README.md)。
 
 ## 项目结构
 
@@ -21,10 +24,11 @@ qasystem/
 ├── algorithm/            # 文档、抽取、向量、置信度及 MCP 业务实现
 ├── mcp_services/         # 统一 MCP Server 与领域工具
 ├── agentcode/            # Agent 与 MCP 客户端运行时
-├── docker/               # 运行环境镜像和部署包生成脚本
+├── Dockerfile            # 后端运行环境镜像
+├── docker-compose.yml    # 唯一容器编排配置
+├── package-deploy.ps1    # 生成 deploy/qasystem-runtime
 ├── docs/                 # 架构、部署和协议说明
-├── models/               # 本地模型，不纳入 Git
-└── deploy/               # 本地交付目录，不纳入 Git
+└── deploy/               # 运行时代码与模型，不纳入 Git
 ```
 
 ## 本地运行
@@ -50,7 +54,9 @@ cd backend
 镜像只包含运行环境。代码挂载到 `/app`，模型挂载到 `/models`。
 
 ```powershell
-.\docker\package-deploy.ps1
+Copy-Item .env.example .env
+.\package-deploy.ps1
+docker compose up -d
 ```
 
-详细说明见 `docs/DEPLOYMENT.md`。
+项目部署见 `docs/DEPLOYMENT.md`；Agent 专项部署和排障见 [AgentCode 部署运维指南](agentcode/docs/部署运维指南.md)。
