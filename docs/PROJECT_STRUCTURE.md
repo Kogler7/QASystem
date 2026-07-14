@@ -51,4 +51,4 @@ package-deploy.ps1
 - 新业务配置统一使用环境变量，不在导入时改写环境变量。
 - `agentcode` 只作为 Agent 和 MCP 客户端，不承载服务端业务实现。
 
-AgentCode 的详细结构见 [`agent/README.md`](../agent/README.md) 和[架构设计](../agent/docs/架构设计.md)。
+AgentCode 的详细结构见 [`agent/README.md`](../agent/README.md)、[架构设计](../agent/docs/架构设计.md) 和 [Agent 知识图谱驱动求解架构](AGENT_KNOWLEDGE_GRAPH_PROBLEM_SOLVING.md)。

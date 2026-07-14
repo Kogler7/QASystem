@@ -1,6 +1,6 @@
 # QASystem 项目结构重构审查计划
 
-> 状态更新：当前实现已取消单文本向量化 HTTP 接口，保留知识沉淀、批量向量化和置信度更新三个业务接口；知识沉淀编排已迁移到 `backend/app/services/`。下文保留为历史审查记录。
+> 状态更新：当前实现已取消单文本向量化 HTTP 接口，保留知识沉淀、批量向量化和置信度更新三个业务接口；知识沉淀编排已迁移到 `backend/app/services/`；Docker、Compose、打包脚本和环境模板已统一到仓库根目录；历史意图识别与方案规划 MCP 已删除，知识空间定位、实体链接和图谱搜索 MCP 保留为原子能力，问题求解、语义对齐和方案执行框架由 Agent Skills 约束。下文保留为历史审查记录。
 
 ## 1. 文档目的
 
@@ -199,7 +199,7 @@ qasystem/
 
 | 当前路径 | 当前角色 | 拟定处理 | 兼容要求 |
 | --- | --- | --- | --- |
-| `agent/agent/tools/mcp_tools/` | MCP 客户端 | 保留 | 支持统一 Server 配置 |
+| `agent/agentcode/tools/mcp_tools/` | MCP 客户端 | 保留 | 支持统一 Server 配置 |
 | `agent/.../mcp_config.json` | MCP 连接配置 | 修改 | 保留环境差异配置能力 |
 | `algorithm/knowledge_extract/mcp_server.py` | 独立知识 MCP Server | 迁移后删除 | 工具名、参数、结果兼容 |
 | `algorithm/ans/mcp_servers/` | 答案和定位 MCP | 迁移后删除 | 工具行为和资源依赖兼容 |
