@@ -259,7 +259,7 @@ class Conversation:
 
 def _print_banner(config: SessionConfig, mcp_path: Path) -> None:
     cfg = _load_env()
-    _cprint("bold", f"\n  agentcode v0.1.0  —  MCP Agent 运行时\n")
+    _cprint("bold", f"\n  agentcode v0.3.0  —  MCP Agent 运行时\n")
     _cprint("dim", f"  模型: {cfg['model']}  |  MCP: {mcp_path}  |  {len(config.mcp_servers)} 个服务\n")
     for s in config.mcp_servers:
         _cprint("dim", f"    • {s.name} → {s.url}")

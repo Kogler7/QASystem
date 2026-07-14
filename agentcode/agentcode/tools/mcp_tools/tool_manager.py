@@ -9,6 +9,7 @@ from ...errors import ErrorCode
 from .mcp import MCPToolWrapper
 from ...models import SessionConfig
 from ..base_tools import ShellTool
+from ...cancellation import CancellationToken
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class ToolManager:
         空白名单表示全部允许。
 
         Args:
-            tool_name: 全局工具名，例如 ``"sql-search__execute_query"``。
+            tool_name: 全局工具名，例如 ``"qasystem-tools__execute_sql"``。
             allowlist: 通配符模式列表，如 ``["sql-*", "graph__*"]``。
 
         Returns:
@@ -100,6 +101,7 @@ class ToolManager:
         arguments: dict[str, Any],
         timeout_s: int,
         retries: int,
+        cancel_token: CancellationToken | None = None,
     ) -> dict[str, Any]:
         """执行单个工具调用，支持自动重试。
 
@@ -126,8 +128,18 @@ class ToolManager:
         last_error = ""
 
         for _ in range(attempts):
+            if cancel_token is not None and cancel_token.is_cancelled():
+                return {
+                    "ok": False,
+                    "error_code": ErrorCode.CANCELLED.value,
+                    "error": "Task cancelled",
+                }
             try:
-                raw = handler(**arguments)
+                raw = handler(
+                    **arguments,
+                    _agent_timeout_s=timeout_s,
+                    _agent_cancel_token=cancel_token,
+                )
                 if isinstance(raw, str) and raw.startswith("Error:"):
                     last_error = raw
                     continue
@@ -147,6 +159,7 @@ class ToolManager:
         timeout_s: int,
         retries: int,
         execution_mode: str = "sequential",
+        cancel_token: CancellationToken | None = None,
     ) -> list[dict[str, Any]]:
         """批量执行工具调用，支持顺序和并行两种模式。
 
@@ -171,6 +184,7 @@ class ToolManager:
                         call.get("input", {}),
                         timeout_s,
                         retries,
+                        cancel_token,
                     )
                     for call in calls
                 ]
@@ -178,7 +192,7 @@ class ToolManager:
         else:
             results = [
                 self.call_tool(
-                    call["name"], call.get("input", {}), timeout_s, retries
+                    call["name"], call.get("input", {}), timeout_s, retries, cancel_token
                 )
                 for call in calls
             ]

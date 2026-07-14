@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentcode"
-version = "0.1.0"
+version = "0.3.0"
 description = "Single-agent runtime aligned with Claude Code style loops."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,6 +14,9 @@ dependencies = [
   "jsonschema>=4.26.0",
   "python-dotenv>=1.0.0",
   "pyyaml>=6.0",
+  "mcp>=1.27.0,<2",
+  "openai>=2.24.0,<3",
+  "tiktoken>=0.12.0,<1",
 ]
 
 [project.scripts]
@@ -27,7 +30,7 @@ fastapi = [
 api = [
   "fastapi>=0.111",
   "uvicorn>=0.30",
-  "redis>=4.0",
+  "redis>=5.0,<8",
 ]
 dev = [
   "pytest>=8.0",

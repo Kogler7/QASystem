@@ -73,9 +73,15 @@ class TestAsyncQuery:
         assert "task_id" in data
         assert data["status"] == "queued"
 
-    def test_submit_empty_message_still_works(self) -> None:
+    def test_submit_empty_message_is_rejected(self) -> None:
         resp = client.post("/v1/query", json={"user_message": ""})
-        assert resp.status_code == 202
+        assert resp.status_code == 422
+
+    def test_per_request_mcp_switch_is_rejected(self) -> None:
+        resp = client.post("/v1/query", json={
+            "user_message": "hello", "mcp_config_path": "another.json",
+        })
+        assert resp.status_code == 400
 
 
 class TestTaskStatus:
@@ -105,9 +111,16 @@ class TestTaskStatus:
 class TestStreamEndpoint:
     def test_stream_nonexistent_task(self) -> None:
         with client.stream("GET", "/v1/task/nonexistent/stream") as resp:
-            body = resp.iter_lines()
-            first_line = next(body)
-            assert "error" in first_line
+            assert resp.status_code == 404
+            resp.read()
+            assert "task not found" in resp.text
+
+    def test_cancel_queued_task(self) -> None:
+        submitted = client.post("/v1/query", json={"user_message": "cancel me"})
+        task_id = submitted.json()["task_id"]
+        resp = client.post(f"/v1/task/{task_id}/cancel")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "cancelled"
 
 
 class TestPool:
@@ -115,3 +128,10 @@ class TestPool:
         """验证 pool 模块可正常导入。"""
         from agentcode.pool import ToolManagerPool
         assert ToolManagerPool is not None
+
+    def test_multi_process_mode_requires_redis(self, monkeypatch) -> None:
+        from agentcode import api, task_store
+        monkeypatch.setattr(task_store, "_QUEUE", task_store._MemoryQueue())
+        monkeypatch.setenv("AGENT_API_WORKERS", "2")
+        with pytest.raises(RuntimeError, match="Redis is required"):
+            api._start_workers()

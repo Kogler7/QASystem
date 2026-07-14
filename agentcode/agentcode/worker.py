@@ -28,7 +28,8 @@ from .pool import ToolManagerPool
 from .runtime import AgentRuntime
 from .skillsets.loader import SkillLoader
 from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
-from .trace import NoopTraceSink
+from .trace import TaskEventTraceSink
+from .cancellation import AgentCancelled, CancellationToken
 
 logger = logging.getLogger("agentcode.worker")
 
@@ -74,7 +75,14 @@ class _BlockingLLM:
         if self._cfg["api_key"]:
             headers["Authorization"] = f"Bearer {self._cfg['api_key']}"
 
-        resp = self._client.post(self._url, json=payload, headers=headers)
+        if cancel_token is not None and cancel_token.is_cancelled():
+            raise AgentCancelled("Task cancelled")
+        timeout = self._cfg["timeout_s"]
+        if cancel_token is not None and cancel_token.remaining_seconds() is not None:
+            timeout = max(0.1, min(timeout, cancel_token.remaining_seconds()))
+        resp = self._client.post(self._url, json=payload, headers=headers, timeout=timeout)
+        if cancel_token is not None and cancel_token.is_cancelled():
+            raise AgentCancelled("Task cancelled")
         resp.raise_for_status()
         body = resp.json()
 
@@ -160,9 +168,16 @@ class _StreamingWorkerLLM:
         finish_reason = ""
 
         try:
-            with self._client.stream("POST", self._url, json=payload, headers=headers) as resp:
+            timeout = self._cfg["timeout_s"]
+            if cancel_token is not None and cancel_token.remaining_seconds() is not None:
+                timeout = max(0.1, min(timeout, cancel_token.remaining_seconds()))
+            with self._client.stream(
+                "POST", self._url, json=payload, headers=headers, timeout=timeout
+            ) as resp:
                 resp.raise_for_status()
                 for line in resp.iter_lines():
+                    if cancel_token is not None and cancel_token.is_cancelled():
+                        raise AgentCancelled("Task cancelled")
                     if not line.startswith("data: "):
                         continue
                     data_str = line[6:]
@@ -314,8 +329,24 @@ def _process_one(
             msg_preview = request_data.get("user_message", "")[:80]
             logger.info("[%s] thread-%d 开始: %s", task_id, thread_id, msg_preview)
             task_store.update(task_id, "running")
+            broker.publish(task_id, {"type": "status", "status": "running"})
+            lease_stop = threading.Event()
+
+            def _renew_lease(current_id=task_id):
+                while not lease_stop.wait(30):
+                    task_store.touch(current_id)
+
+            lease_thread = threading.Thread(
+                target=_renew_lease,
+                daemon=True,
+                name=f"task-lease-{task_id[:8]}",
+            )
+            lease_thread.start()
 
             try:
+                cancel_token = CancellationToken(
+                    remote_check=lambda current_id=task_id: task_store.is_cancel_requested(current_id)
+                )
                 config, sk_loader = _build_config(
                     request_data, mcp_path, skill_loader, discovered_refs,
                 )
@@ -334,26 +365,36 @@ def _process_one(
                     runtime = AgentRuntime(
                         llm_backend=llm,
                         tool_manager=tm,
-                        trace_sink=NoopTraceSink(),
+                        trace_sink=TaskEventTraceSink(task_id),
                         skill_loader=sk_loader,
                         on_tool_results=_on_tool_results,
                     )
-                    result = runtime.run_session(config, request_data["user_message"])
+                    result = runtime.run_session(
+                        config, request_data["user_message"], cancel_token=cancel_token
+                    )
 
                 if result.status == "ok":
                     task_store.update(task_id, "completed", result={
                         "payload": result.payload,
                         "spent": result.spent,
+                        "trace_ref": result.trace_ref,
                     })
                     broker.publish(task_id, {
                         "type": "status", "status": "completed",
                         "payload": result.payload, "spent": result.spent,
+                        "trace_ref": result.trace_ref,
                     })
                     logger.info(
                         "[%s] thread-%d 完成: turns=%s, tool_calls=%s",
                         task_id, thread_id,
                         result.spent.get("turns"), result.spent.get("tool_calls"),
                     )
+                elif result.status == "cancelled":
+                    task_store.update(task_id, "cancelled", error="Task cancelled")
+                    broker.publish(task_id, {
+                        "type": "status", "status": "cancelled",
+                    })
+                    logger.info("[%s] thread-%d 已取消", task_id, thread_id)
                 else:
                     err = result.error
                     error_msg = f"{err.code.value}: {err.message}" if err else "unknown"
@@ -370,6 +411,8 @@ def _process_one(
                 })
                 logger.exception("[%s] thread-%d 异常: %s", task_id, thread_id, exc)
             finally:
+                lease_stop.set()
+                lease_thread.join(timeout=1)
                 broker.publish(task_id, {"type": "done"})
 
     finally:

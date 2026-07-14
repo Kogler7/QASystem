@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import json as json_module
 import logging
+import os
 import sys
+import threading
+import concurrent.futures
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -167,6 +170,7 @@ class MCPToolWrapper:
         self._tool_schemas: dict[str, dict] = {}
         self._tool_handlers: dict[str, Any] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._loop_thread: threading.Thread | None = None
 
     def connect_all(self, servers: list[Any]) -> None:
         """并行连接所有配置的 MCP 服务器。
@@ -188,10 +192,18 @@ class MCPToolWrapper:
                     cfg["url"] = srv.url
                 if srv.command:
                     cfg["command"] = srv.command
+                if srv.args:
+                    cfg["args"] = srv.args
                 if srv.env:
                     cfg["env"] = srv.env
-                if hasattr(srv, "headers") and srv.headers:
+                if srv.headers:
                     cfg["headers"] = srv.headers
+                if srv.auth_ref:
+                    token = os.getenv(srv.auth_ref)
+                    if token:
+                        cfg.setdefault("headers", {}).setdefault(
+                            "Authorization", f"Bearer {token}"
+                        )
                 try:
                     return await connect_single_server(srv.name, cfg)
                 except BaseException as exc:
@@ -236,6 +248,13 @@ class MCPToolWrapper:
                 "MCP server '%s': registered %d tools", name, len(tools.tools)
             )
 
+        self._loop_thread = threading.Thread(
+            target=loop.run_forever,
+            daemon=True,
+            name="agentcode-mcp-loop",
+        )
+        self._loop_thread.start()
+
     def _convert_schema(self, tool_name: str, mcp_tool: Any) -> dict:
         """将 MCP SDK 返回的 Tool 对象转换为 agent 内部使用的工具描述格式。
 
@@ -264,26 +283,40 @@ class MCPToolWrapper:
         导致的跨循环挂起问题。
 
         Args:
-            server_name: MCP 服务器名称（如 ``"sql-search"``）。
+            server_name: MCP 服务器名称（如 ``"qasystem-tools"``）。
             tool_name: 该服务器上的本地工具名（原始名，不含 server 前缀）。
 
         Returns:
             一个签名为 ``(**kwargs) -> str`` 的可调用对象。
         """
         def handler(**kwargs: Any) -> str:
+            timeout_s = max(0.1, float(kwargs.pop("_agent_timeout_s", 60)))
+            cancel_token = kwargs.pop("_agent_cancel_token", None)
             session = self._sessions.get(server_name)
             if not session:
                 return f"Error: MCP server '{server_name}' is not connected"
             try:
                 if self._loop and self._loop.is_running():
-                    """在当前事件循环中执行 call_tool 协程。"""
                     future = asyncio.run_coroutine_threadsafe(
                         session.call_tool(tool_name, kwargs), self._loop
                     )
-                    result = future.result(timeout=60)
+                    deadline = self._loop.time() + timeout_s
+                    while True:
+                        if cancel_token is not None and cancel_token.is_cancelled():
+                            future.cancel()
+                            return "Error: Task cancelled"
+                        remaining = deadline - self._loop.time()
+                        if remaining <= 0:
+                            future.cancel()
+                            return f"Error: MCP tool timed out after {timeout_s:g}s"
+                        try:
+                            result = future.result(timeout=min(0.2, remaining))
+                            break
+                        except concurrent.futures.TimeoutError:
+                            continue
                 elif self._loop:
                     result = self._loop.run_until_complete(
-                        session.call_tool(tool_name, kwargs)
+                        asyncio.wait_for(session.call_tool(tool_name, kwargs), timeout_s)
                     )
                 else:
                     result = asyncio.run(session.call_tool(tool_name, kwargs))
@@ -350,7 +383,11 @@ class MCPToolWrapper:
 
         try:
             if self._loop and self._stacks:
-                self._loop.run_until_complete(_disconnect())
+                if self._loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(_disconnect(), self._loop)
+                    future.result(timeout=30)
+                else:
+                    self._loop.run_until_complete(_disconnect())
         except Exception:
             logger.exception("Error during MCP disconnect")
         finally:
@@ -359,8 +396,13 @@ class MCPToolWrapper:
             self._tool_schemas.clear()
             self._tool_handlers.clear()
             if self._loop:
+                if self._loop.is_running():
+                    self._loop.call_soon_threadsafe(self._loop.stop)
+                if self._loop_thread is not None:
+                    self._loop_thread.join(timeout=5)
                 self._loop.close()
                 self._loop = None
+                self._loop_thread = None
 
 
 def _format_mcp_result(result: Any) -> str:

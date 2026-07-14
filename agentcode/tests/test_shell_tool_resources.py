@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import uuid
 
 import pytest
 
 from agentcode.tools.base_tools.shell_tool import ShellTool
+
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="POSIX resource-limit tests")
 
 
 def _make_script(content: str) -> str:

@@ -101,6 +101,10 @@ def _start_workers() -> None:
     """
     global _worker_stop_event, _worker_threads, _worker_pool
 
+    api_workers = int(os.getenv("AGENT_API_WORKERS", "1"))
+    if api_workers > 1 and not task_store.is_distributed():
+        raise RuntimeError("Redis is required when AGENT_API_WORKERS > 1")
+
     mcp_path = str(_default_mcp_path())
     logger.info("API worker: 初始化 MCP 路径=%s", mcp_path)
 
@@ -164,15 +168,27 @@ def _stop_workers() -> None:
 
 class QueryRequest(BaseModel):
     """HTTP API 请求体。所有字段均有默认值，只需提供 user_message 即可。"""
-    user_message: str
+    user_message: str = Field(min_length=1, max_length=100_000)
     session_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     trace_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     mcp_config_path: str | None = None
-    skill_ids: list[str] = Field(default_factory=list)
-    tool_allowlist: list[str] = Field(default_factory=lambda: ["*"])
-    max_turns: int = 50
-    max_tool_calls: int = 70
-    max_time_s: int = 1200
+    skill_ids: list[str] = Field(default_factory=list, max_length=32)
+    tool_allowlist: list[str] = Field(default_factory=lambda: ["*"], max_length=256)
+    max_turns: int = Field(default=50, ge=1, le=500)
+    max_tool_calls: int = Field(default=70, ge=0, le=2000)
+    max_time_s: int = Field(default=1200, ge=1, le=86_400)
+
+
+def _request_data(req: QueryRequest) -> dict[str, Any]:
+    if req.mcp_config_path:
+        requested = Path(req.mcp_config_path).resolve()
+        configured = _default_mcp_path().resolve()
+        if requested != configured:
+            raise HTTPException(
+                400,
+                "per-request mcp_config_path is unsupported; configure AGENT_MCP_CONFIG at service startup",
+            )
+    return req.model_dump(exclude={"mcp_config_path"})
 
 class TaskResponse(BaseModel):
     task_id: str
@@ -220,8 +236,9 @@ async def query(req: QueryRequest):
     返回 202 Accepted + task_id，客户端后续轮询 GET /v1/task/{task_id}。
     """
     task_id = uuid.uuid4().hex
+    request_data = _request_data(req)
     try:
-        position = task_store.enqueue(task_id, req.model_dump())
+        position = task_store.enqueue(task_id, request_data)
     except Exception as exc:
         raise HTTPException(503, f"task_store unavailable: {exc}")
     # 预建 StreamBroker 队列，确保 Worker 的 publish 不丢消息
@@ -242,8 +259,9 @@ async def query_wait(req: QueryRequest, stream: bool = False):
     查询参数: ?stream=true  开启 SSE 流式
     """
     task_id = uuid.uuid4().hex
+    request_data = _request_data(req)
     try:
-        position = task_store.enqueue(task_id, req.model_dump())
+        position = task_store.enqueue(task_id, request_data)
     except Exception as exc:
         raise HTTPException(503, f"task_store unavailable: {exc}")
 
@@ -276,7 +294,7 @@ async def query_wait(req: QueryRequest, stream: bool = False):
         info = task_store.get(task_id)
         if info is None:
             raise HTTPException(500, "task lost from store")
-        if info["status"] in ("completed", "failed"):
+        if info["status"] in ("completed", "failed", "cancelled"):
             return JSONResponse(status_code=200, content=info)
         await asyncio.sleep(2)
 
@@ -292,6 +310,19 @@ async def get_task(task_id: str):
     info = task_store.get(task_id)
     if info is None:
         raise HTTPException(404, f"task not found: {task_id}")
+    return info
+
+
+@app.post("/v1/task/{task_id}/cancel")
+async def cancel_task(task_id: str):
+    """Request cooperative cancellation for a queued or running task."""
+    info = task_store.cancel(task_id)
+    if info is None:
+        raise HTTPException(404, f"task not found: {task_id}")
+    from .stream_broker import get_broker
+    get_broker().publish(task_id, {"type": "status", "status": info["status"]})
+    if info["status"] == "cancelled":
+        get_broker().publish(task_id, {"type": "done"})
     return info
 
 @app.get("/v1/task/{task_id}/stream")
@@ -316,7 +347,7 @@ async def stream_task(task_id: str):
         # 首条：task_store 快照
         yield str(StreamFirstEvent(type="status", **info))
 
-        if info["status"] in ("completed", "failed"):
+        if info["status"] in ("completed", "failed", "cancelled"):
             return
 
         from .stream_broker import get_broker
@@ -341,6 +372,7 @@ async def stream_task(task_id: str):
 # ═══════════════════════════════════════════════════════
 
 def main():
+    global _WORKER_CONCURRENCY, _WORKER_POOL_SIZE
     import argparse
     parser = argparse.ArgumentParser(
         description="agentcode HTTP API server (内嵌 worker，支持多进程)",
@@ -368,7 +400,7 @@ def main():
     parser.add_argument("--workers", type=int, default=0,
                         help="uvicorn worker 进程数 (默认: env AGENT_API_WORKERS or 1)")
     parser.add_argument("--concurrency", type=int, default=0,
-                        help="每进程工作线程数 (默认: env AGENT_WORKER_CONCURRENCY or 4)")
+                        help="每进程工作线程数 (默认: env AGENT_WORKER_CONCURRENCY or 1)")
     parser.add_argument("--pool-size", type=int, default=0,
                         help="ToolManager 连接池大小 (默认: =concurrency)")
     args = parser.parse_args()
@@ -376,10 +408,15 @@ def main():
     # 将 CLI 参数写入环境变量，以便 uvicorn fork 后子进程继承
     if args.concurrency:
         os.environ["AGENT_WORKER_CONCURRENCY"] = str(args.concurrency)
+        _WORKER_CONCURRENCY = args.concurrency
     if args.pool_size:
         os.environ["AGENT_WORKER_POOL_SIZE"] = str(args.pool_size)
+        _WORKER_POOL_SIZE = args.pool_size
+    elif args.concurrency:
+        _WORKER_POOL_SIZE = args.concurrency
 
     api_workers = args.workers or int(os.getenv("AGENT_API_WORKERS", "1"))
+    os.environ["AGENT_API_WORKERS"] = str(api_workers)
 
     import uvicorn
 
@@ -387,8 +424,8 @@ def main():
         # 多 worker 模式：必须用字符串引用，uvicorn 在每个子进程中重新导入 app
         logger.info("启动 API: host=%s port=%s api_workers=%d concurrency=%s pool_size=%s",
                     args.host, args.port, api_workers,
-                    os.environ.get("AGENT_WORKER_CONCURRENCY", "4"),
-                    os.environ.get("AGENT_WORKER_POOL_SIZE", "4"))
+                    os.environ.get("AGENT_WORKER_CONCURRENCY", "1"),
+                    os.environ.get("AGENT_WORKER_POOL_SIZE", "1"))
         uvicorn.run(
             "agentcode.api:app",
             host=args.host,
@@ -400,8 +437,8 @@ def main():
         # 单 worker 模式：直接传 app 实例
         logger.info("启动 API: host=%s port=%s api_workers=1 concurrency=%s pool_size=%s",
                     args.host, args.port,
-                    os.environ.get("AGENT_WORKER_CONCURRENCY", "4"),
-                    os.environ.get("AGENT_WORKER_POOL_SIZE", "4"))
+                    os.environ.get("AGENT_WORKER_CONCURRENCY", "1"),
+                    os.environ.get("AGENT_WORKER_POOL_SIZE", "1"))
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 import re
 import shlex
 import subprocess
+import tempfile
 from typing import Any
 
 try:
@@ -18,16 +20,14 @@ logger = logging.getLogger(__name__)
 
 from pathlib import Path as _Path
 
-_log_dir = _Path(__file__).parent.parent.parent.parent / "log"
-_log_dir.mkdir(parents=True, exist_ok=True)
-_log_file = _log_dir / "shell_tool.log"
-
-if not logger.handlers:
-    _fh = logging.FileHandler(str(_log_file), encoding="utf-8")
-    _fh.setLevel(logging.DEBUG)
+_log_dir = _Path(os.getenv("AGENT_LOG_DIR") or tempfile.gettempdir()) / "agentcode"
+try:
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _fh = logging.FileHandler(str(_log_dir / "shell_tool.log"), encoding="utf-8")
     _fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
     logger.addHandler(_fh)
-    logger.setLevel(logging.DEBUG)
+except OSError:
+    logger.addHandler(logging.NullHandler())
 
 BLOCKED_COMMANDS = {
     "rm",
@@ -230,11 +230,16 @@ class ShellTool:
 
     def _make_handler(self):
         def handler(command: str = "", **kwargs: Any) -> str:
-            return self._execute(command)
+            token = kwargs.get("_agent_cancel_token")
+            if token is not None and token.is_cancelled():
+                return "Error: Task cancelled"
+            requested_timeout = kwargs.get("_agent_timeout_s")
+            timeout_s = min(self._timeout, float(requested_timeout)) if requested_timeout else self._timeout
+            return self._execute(command, timeout_s=timeout_s)
 
         return handler
 
-    def _execute(self, command: str) -> str:
+    def _execute(self, command: str, timeout_s: float | None = None) -> str:
         if not command or not command.strip():
             return "Error: 命令为空"
 
@@ -247,7 +252,7 @@ class ShellTool:
             return f"Error: 命令被安全策略拒绝 — {validation_error}"
 
         try:
-            tokens = shlex.split(command)
+            tokens = self._split_command(command)
         except ValueError as e:
             logger.warning("Command parse error: %s — %s", command, e)
             return f"Error: 命令解析失败 — {e}"
@@ -259,13 +264,14 @@ class ShellTool:
             result = subprocess.run(
                 tokens,
                 capture_output=True,
-                timeout=self._timeout,
+                timeout=timeout_s or self._timeout,
                 cwd=self._work_dir,
                 preexec_fn=self._limits_preexec,
             )
         except subprocess.TimeoutExpired:
-            logger.warning("Command timed out (%ds): %s", self._timeout, command)
-            return f"Error: 命令执行超时（>{self._timeout}s）"
+            effective_timeout = timeout_s or self._timeout
+            logger.warning("Command timed out (%ss): %s", effective_timeout, command)
+            return f"Error: 命令执行超时（>{effective_timeout:g}s）"
         except FileNotFoundError:
             logger.warning("Executable not found: %s", tokens[0])
             return f"Error: 未找到可执行文件 '{tokens[0]}'"
@@ -310,7 +316,7 @@ class ShellTool:
             return "命令中包含禁止的 shell 特殊字符（& | ; ` $ > <），不支持命令链/管道/重定向"
 
         try:
-            tokens = shlex.split(command)
+            tokens = self._split_command(command)
         except ValueError:
             return "命令语法错误，无法解析"
 
@@ -335,6 +341,18 @@ class ShellTool:
             return f"命令 '{executable_basename}' 不在白名单中"
 
         return None
+
+    @staticmethod
+    def _split_command(command: str) -> list[str]:
+        tokens = shlex.split(command, posix=os.name != "nt")
+        if os.name == "nt":
+            tokens = [
+                token[1:-1]
+                if len(token) >= 2 and token[0] == token[-1] and token[0] in {'"', "'"}
+                else token
+                for token in tokens
+            ]
+        return tokens
 
     def get_tool_schemas(self) -> list[dict]:
         """获取所有工具的 schema 列表，供 LLM function calling。"""

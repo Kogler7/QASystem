@@ -36,6 +36,7 @@ transport 取值与必需字段：
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -67,8 +68,13 @@ def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
         if transport not in ("http", "streamable_http", "stdio", "sse"):
             raise ValueError(f"MCP 服务 {name} 不支持的 transport: {transport}")
 
-        url = (cfg.get("url") or "").strip()
-        if not url:
+        url = (cfg.get("url") or "").strip() or None
+        if len(mcp_servers) == 1 and os.getenv("AGENT_MCP_URL"):
+            url = os.environ["AGENT_MCP_URL"].strip()
+        command = (cfg.get("command") or "").strip() or None
+        if transport == "stdio" and not command:
+            raise ValueError(f"MCP 服务 {name} 缺少 command 字段")
+        if transport != "stdio" and not url:
             raise ValueError(f"MCP 服务 {name} 缺少 url 字段")
 
         servers.append(
@@ -76,7 +82,10 @@ def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
                 name=name,
                 transport=transport,
                 url=url,
+                command=command,
+                args=cfg.get("args") or [],
                 env=cfg.get("env") or {},
+                headers=cfg.get("headers") or {},
                 auth_ref=cfg.get("auth_ref"),
             )
         )

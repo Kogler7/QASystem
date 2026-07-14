@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import base64
 import os
+import sys
 import tempfile
 
 import pytest
 
 from agentcode.tools.base_tools.shell_tool import ShellTool, _safe_decode
+
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Linux container command tests")
 
 
 def _make_script(content: str) -> str:

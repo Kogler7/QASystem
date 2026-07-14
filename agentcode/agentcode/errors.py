@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 
 class ErrorCode(str, Enum):
+    CANCELLED = "CANCELLED"
     TOOL_TIMEOUT = "TOOL_TIMEOUT"
     TOOL_BAD_RESPONSE = "TOOL_BAD_RESPONSE"
     TOOL_UNAVAILABLE = "TOOL_UNAVAILABLE"

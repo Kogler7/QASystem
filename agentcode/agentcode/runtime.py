@@ -17,6 +17,7 @@ from .skillsets.loader import SkillLoader
 from .trace import JsonlTraceSink, TraceSink
 from .tools.base_tools.memory_tool import MemoryCompactor
 from .prompt import build_system_prompt
+from .cancellation import AgentCancelled, CancellationToken
 
 
 class AgentRuntime:
@@ -40,7 +41,12 @@ class AgentRuntime:
             self._compactor = None
             self._compactor_threshold = 0
 
-    def run_session(self, config: SessionConfig, user_message: str) -> FinalResult:
+    def run_session(
+        self,
+        config: SessionConfig,
+        user_message: str,
+        cancel_token: CancellationToken | None = None,
+    ) -> FinalResult:
         state = AgentState(
             session_id=config.session_id,
             trace_id=config.trace_id,
@@ -48,9 +54,13 @@ class AgentRuntime:
             status="running",
             messages=self._build_initial_messages(config, user_message),
         )
-        return self._run_loop(config, state)
+        cancel_token = cancel_token or CancellationToken()
+        cancel_token.set_deadline(time.monotonic() + config.budget.max_time_s)
+        return self._run_loop(config, state, cancel_token)
 
-    def _run_loop(self, config: SessionConfig, state: AgentState) -> FinalResult:
+    def _run_loop(
+        self, config: SessionConfig, state: AgentState, cancel_token: CancellationToken
+    ) -> FinalResult:
         mcp_tools = self.tool_manager.list_tools()
         if config.skills:
             skill_tool_def = self.skill_loader.build_skill_tool_definition()
@@ -61,6 +71,8 @@ class AgentRuntime:
         skill_name = self.skill_loader.skill_tool_name
         trace_ref = ""
         while True:
+            if cancel_token.is_cancelled():
+                return self._interrupt(state, cancel_token, trace_ref)
             if time.time() - state.started_at > budget.max_time_s:
                 return self._fail(state, ErrorCode.BUDGET_EXCEEDED, "Wall time exceeded", trace_ref)
             if state.turn >= budget.max_turns:
@@ -68,7 +80,9 @@ class AgentRuntime:
 
             pending_calls = state.pending_tool_calls
             if pending_calls:
-                tool_results = self._execute_tool_calls(config, state, pending_calls)
+                tool_results = self._execute_tool_calls(
+                    config, state, pending_calls, cancel_token
+                )
                 state.pending_tool_calls = []
                 if isinstance(tool_results, FinalResult):
                     return tool_results
@@ -84,7 +98,18 @@ class AgentRuntime:
                 if estimated > self._compactor_threshold:
                     state.messages = self._compactor.auto_compact(state.messages)
 
-            assistant = self.llm_backend.complete(state.messages, all_tools, cancel_token=None)
+            try:
+                assistant = self.llm_backend.complete(
+                    state.messages, all_tools, cancel_token=cancel_token
+                )
+            except AgentCancelled:
+                return self._interrupt(state, cancel_token, trace_ref)
+            except Exception as exc:
+                return self._fail(
+                    state, ErrorCode.LLM_ERROR, f"LLM request failed: {exc}", trace_ref
+                )
+            if cancel_token.is_cancelled():
+                return self._interrupt(state, cancel_token, trace_ref)
             state.messages.append(assistant)
             tool_calls = self._extract_tool_calls(assistant)
             duration_ms = int((time.time() - started) * 1000)
@@ -123,7 +148,9 @@ class AgentRuntime:
                     skill_msg = {"role": "user", "content": skill_results, "_agent_injected": True}
                     state.messages.append(skill_msg)
                     if mcp_calls:
-                        tool_results = self._execute_tool_calls(config, state, mcp_calls)
+                        tool_results = self._execute_tool_calls(
+                            config, state, mcp_calls, cancel_token
+                        )
                         if isinstance(tool_results, FinalResult):
                             return tool_results
                         tool_msg = {"role": "tool", "content": tool_results}
@@ -137,7 +164,9 @@ class AgentRuntime:
                     duration_ms=duration_ms,
                     outcome="tool_requests",
                 )
-                executed = self._execute_tool_calls(config, state, tool_calls)
+                executed = self._execute_tool_calls(
+                    config, state, tool_calls, cancel_token
+                )
                 if isinstance(executed, FinalResult):
                     return executed
                 tool_msg = {"role": "tool", "content": executed}
@@ -191,7 +220,11 @@ class AgentRuntime:
             )
 
     def _execute_tool_calls(
-        self, config: SessionConfig, state: AgentState, tool_calls: list[dict[str, Any]]
+        self,
+        config: SessionConfig,
+        state: AgentState,
+        tool_calls: list[dict[str, Any]],
+        cancel_token: CancellationToken,
     ) -> list[dict[str, Any]] | FinalResult:
         budget = config.budget
         allowed = config.tool_policy.allow
@@ -235,15 +268,20 @@ class AgentRuntime:
         # ────────────────────────────────────────────────
         state.tool_calls_used += len(tool_calls)
         started = time.time()
+        remaining_s = max(1, int(config.budget.max_time_s - (time.time() - state.started_at)))
         results = self.tool_manager.call_many(
             tool_calls,
-            timeout_s=max(1, int(config.budget.max_time_s)),
+            timeout_s=remaining_s,
             retries=budget.max_retries_per_tool,
             execution_mode=config.tool_execution,
+            cancel_token=cancel_token,
         )
         elapsed_ms = int((time.time() - started) * 1000)
         if self.on_tool_results:
             self.on_tool_results(results, elapsed_ms)
+
+        if cancel_token.is_cancelled():
+            return self._interrupt(state, cancel_token, "")
 
         return results
 
@@ -394,6 +432,26 @@ class AgentRuntime:
             spent={"turns": state.turn, "tool_calls": state.tool_calls_used},
             trace_ref=trace_ref or None,
         )
+
+    @staticmethod
+    def _cancel(state: AgentState, trace_ref: str) -> FinalResult:
+        state.status = "cancelled"
+        return FinalResult(
+            status="cancelled",
+            error=RuntimeErrorInfo(code=ErrorCode.CANCELLED, message="Task cancelled"),
+            spent={"turns": state.turn, "tool_calls": state.tool_calls_used},
+            trace_ref=trace_ref or None,
+        )
+
+    @staticmethod
+    def _interrupt(
+        state: AgentState, cancel_token: CancellationToken, trace_ref: str
+    ) -> FinalResult:
+        if cancel_token.deadline_exceeded():
+            return AgentRuntime._fail(
+                state, ErrorCode.BUDGET_EXCEEDED, "Wall time exceeded", trace_ref
+            )
+        return AgentRuntime._cancel(state, trace_ref)
 
 
 def run_session(

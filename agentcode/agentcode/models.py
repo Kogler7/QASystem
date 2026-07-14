@@ -13,7 +13,9 @@ class McpServerConfig(BaseModel):
     transport: Literal["http", "streamable_http", "stdio", "sse"]
     url: str | None = None
     command: str | None = None
+    args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
     auth_ref: str | None = None
 
 
@@ -32,11 +34,11 @@ class ToolPolicy(BaseModel):
 
 
 class BudgetConfig(BaseModel):
-    max_turns: int = 50
-    max_tool_calls: int = 70
-    max_time_s: int = 1200
-    max_retries_per_tool: int = 2
-    repeat_action_threshold: int = 10
+    max_turns: int = Field(default=50, ge=1, le=10_000)
+    max_tool_calls: int = Field(default=70, ge=0, le=100_000)
+    max_time_s: int = Field(default=1200, ge=1, le=604_800)
+    max_retries_per_tool: int = Field(default=2, ge=0, le=20)
+    repeat_action_threshold: int = Field(default=10, ge=0, le=10_000)
 
 
 class DeliveryConfig(BaseModel):
@@ -65,13 +67,13 @@ class AgentState(BaseModel):
     turn: int = 0
     tool_calls_used: int = 0
     started_at: float
-    status: Literal["running", "completed", "failed"] = "running"
+    status: Literal["running", "completed", "failed", "cancelled"] = "running"
     pending_tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     artifacts: dict[str, Any] = Field(default_factory=dict)
 
 
 class FinalResult(BaseModel):
-    status: Literal["ok", "failed"]
+    status: Literal["ok", "failed", "cancelled"]
     payload: Any = None
     warnings: list[str] = Field(default_factory=list)
     error: RuntimeErrorInfo | None = None
@@ -83,7 +85,7 @@ class StreamEvent(BaseModel):
     """SSE 常规事件。"""
 
     type: str
-    data: dict[str, Any] = {}
+    data: dict[str, Any] = Field(default_factory=dict)
 
     def __str__(self) -> str:
         payload = {"type": self.type, **self.data}

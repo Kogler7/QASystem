@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import os
 
 from agentcode.models import BudgetConfig, SessionConfig, ToolPolicy
 from agentcode.tools.mcp_tools.tool_manager import ToolManager
@@ -36,7 +37,8 @@ class TestToolManagerBaseTools:
 
     def test_call_base_tool(self) -> None:
         tm = ToolManager(_make_config())
-        result = tm.call_tool("base__execute_command", {"command": "echo hello_from_manager"}, timeout_s=30, retries=0)
+        command = "cmd /d /c echo hello_from_manager" if os.name == "nt" else "echo hello_from_manager"
+        result = tm.call_tool("base__execute_command", {"command": command}, timeout_s=30, retries=0)
         assert result["ok"] is True
         assert "hello_from_manager" in result["content"]
 
