@@ -131,7 +131,7 @@ class KnowledgeSpaceLocator:
 ## 输出要求
 
 只输出最匹配的根节点名称，不要其他内容。"""
-            response = run_llm(prompt, 0.3, 200, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            response = run_llm(prompt, 0.3, 200, self.args.GRAPH_LLM_API_KEY, self.args.GRAPH_LLM_MODEL)
             if response:
                 for r in result:
                     if r["name"] in response:
@@ -224,7 +224,7 @@ class KnowledgeSpaceLocator:
 只输出JSON，不要有其他内容。"""
 
         try:
-            response = run_llm(prompt, 0.3, 800, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            response = run_llm(prompt, 0.3, 800, self.args.GRAPH_LLM_API_KEY, self.args.GRAPH_LLM_MODEL)
             parsed = self._extract_json(response)
             if parsed:
                 self._reason = parsed.pop("reason", "")

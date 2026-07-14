@@ -256,6 +256,97 @@ class Neo4jClient:
 
         return self.execute_cypher(query, keyword=keyword, limit=limit)
 
+    def search_neighbors(
+        self,
+        start_qid: str,
+        relationship_types: list[str] | None = None,
+        direction: str = "both",
+        limit: int = 50,
+    ) -> Dict[str, Any]:
+        """确定性查询一个节点的一跳邻居，不进行 LLM 关系剪枝。"""
+        if not start_qid.startswith("NEO_"):
+            raise ValueError("start_qid 必须是 NEO_ 开头的节点 ID")
+        if direction not in {"outgoing", "incoming", "both"}:
+            raise ValueError("direction 必须是 outgoing、incoming 或 both")
+        if not 1 <= limit <= 200:
+            raise ValueError("limit 必须在 1 到 200 之间")
+
+        try:
+            start_id = int(start_qid.removeprefix("NEO_"))
+        except ValueError as exc:
+            raise ValueError("start_qid 中的节点 ID 必须是整数") from exc
+
+        query = """
+        MATCH (start)-[r]-(neighbor)
+        WHERE id(start) = $start_id
+          AND ($relationship_types IS NULL OR type(r) IN $relationship_types)
+          AND (
+            $direction = 'both'
+            OR ($direction = 'outgoing' AND startNode(r) = start)
+            OR ($direction = 'incoming' AND endNode(r) = start)
+          )
+        RETURN
+          id(start) AS start_id,
+          labels(start) AS start_labels,
+          properties(start) AS start_properties,
+          type(r) AS relationship_type,
+          properties(r) AS relationship_properties,
+          startNode(r) = start AS is_outgoing,
+          id(neighbor) AS neighbor_id,
+          labels(neighbor) AS neighbor_labels,
+          properties(neighbor) AS neighbor_properties
+        ORDER BY relationship_type, coalesce(neighbor.name, '')
+        LIMIT $limit
+        """
+        rows = self.execute_cypher(
+            query,
+            start_id=start_id,
+            relationship_types=relationship_types or None,
+            direction=direction,
+            limit=limit,
+        )
+
+        triples = []
+        found_entities = []
+        seen_ids = set()
+        for row in rows:
+            start = {
+                "id": f"NEO_{row['start_id']}",
+                "name": row["start_properties"].get("name", ""),
+                "labels": row["start_labels"],
+                "properties": row["start_properties"],
+            }
+            neighbor = {
+                "id": f"NEO_{row['neighbor_id']}",
+                "name": row["neighbor_properties"].get("name", ""),
+                "labels": row["neighbor_labels"],
+                "properties": row["neighbor_properties"],
+            }
+            head, tail = (start, neighbor) if row["is_outgoing"] else (neighbor, start)
+            triples.append(
+                {
+                    "head_entity": head,
+                    "relation": row["relationship_type"],
+                    "relationship_properties": row["relationship_properties"],
+                    "tail_entity": tail,
+                }
+            )
+            if neighbor["id"] not in seen_ids:
+                seen_ids.add(neighbor["id"])
+                found_entities.append(neighbor)
+
+        return {
+            "depth": 1,
+            "triples": triples,
+            "found_entities": found_entities,
+            "has_more": bool(found_entities),
+            "filters": {
+                "relationship_types": relationship_types or [],
+                "direction": direction,
+                "limit": limit,
+            },
+        }
+
     def get_two_hop_relations(self, start_qid: str) -> List[Dict]:
         """获取两跳内的关系"""
         if not start_qid.startswith("NEO_"):

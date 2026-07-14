@@ -2,7 +2,7 @@ import re
 import json
 from typing import Dict, List, Tuple, Any
 from algorithm.ans.QA.utils import run_llm
-from algorithm.ans.QA.prompt_list import entity_recognition_prompt, entity_ranking_prompt
+from algorithm.ans.QA.prompt_list import entity_ranking_prompt
 
 
 class EntityLinker:
@@ -26,7 +26,7 @@ class EntityLinker:
 
         try:
             # 增加 max_tokens 以确保 JSON 响应不被截断
-            response = run_llm(prompt, 0.4, 800, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            response = run_llm(prompt, 0.4, 800, self.args.GRAPH_LLM_API_KEY, self.args.GRAPH_LLM_MODEL)
 
             entities = self._parse_llm_response(question, response)
 
@@ -39,60 +39,24 @@ class EntityLinker:
 
     def _build_entity_recognition_prompt(self, question: str) -> str:
         """构建实体识别提示词"""
-        return """你是一个专业的实体提取专家。请分析以下问题，提取出所有对回答问题有帮助的实体，并根据实体的类型进行标注。
+        return """你是知识图谱检索的查询词提取器。请只提取问题文本中明确出现、适合用于图谱实体链接的名词短语。
 
 问题："{question}"
 
-分析要求：
-1. 理解问题的意图和上下文
-2. 识别问题中提到的所有具体事物、概念、人物、地点等
-3. 对于模糊的实体，根据上下文确定最可能的含义
-4. 特别注意与问题核心相关的关键概念
-5. **重要**：对于需要计算或对比的问题，请根据业务逻辑推断可能需要的实体
-
-实体类型：
-- 物品/产品：具体的物品、产品、设备等
-- 人物：具体的个人、角色等
-- 组织/机构：公司、政府部门、组织等
-- 地点/位置：具体的地点、位置等
-- 时间/日期：具体的时间、日期、时期等
-- 事件：具体的事件、活动等
-- 概念/术语：抽象的概念、专业术语等
-- 学科/领域：具体的学科、领域等
-- 统计指标：金额、数量、比例等
-- 其他：其他类型的实体
-
-实体提取标准：
-- 名词性短语（如"瑜伽垫"、"跑步机"）
-- 专有名词（如"姚明"、"北京"）
-- 概念术语（如"人工智能"、"量子力学"）
-- 事件活动（如"奥运会"、"春节"）
-- **业务逻辑推断**：如果问题需要计算或对比，请推断需要的实体
-  - 例如：如果问题包含"非公开采购金额"，请推断需要"电子采购中标金额"和"公开采购中标金额"
-  - 例如：如果问题包含"A和B的对比"，请提取A和B相关的所有实体
-
-**重要提示**：
-- 直接输出JSON，不要输出任何思考过程或解释
-- 不要使用<think>标签
-- 确保JSON格式完整且正确
+禁止根据模型记忆补充问题中没有出现的实体、业务规则、公式或上下游概念。后续关联实体必须通过图谱关系探索获得。
 
 输出格式（严格的JSON）：
 {{
-  "analysis": "简短分析问题的意图",
   "entities": [
     {{
       "text": "实体文本",
-      "type": "物品/产品/人物/组织/机构/地点/位置/时间/日期/事件/概念/术语/学科/领域/统计指标/其他",
-      "importance": "高/中/低",
-      "reason": "为什么提取这个实体"
+      "type": "问题文本可判断的粗粒度类型",
+      "importance": "高/中/低"
     }}
   ]
 }}
 
-注意：
-- 只提取问题中实际提到的实体或根据业务逻辑推断的实体
-- 确保JSON格式正确，不要有多余的逗号或括号
-- 直接输出JSON，不要添加任何其他内容""".format(question=question)
+只输出 JSON，不要输出解释或 Markdown。""".format(question=question)
 
 
     def _parse_llm_response(self, question: str, response: str) -> List[str]:
@@ -541,14 +505,16 @@ class EntityLinker:
                 query = """
                 MATCH (n)
                 WHERE id(n) = $node_id
-                RETURN id(n) as node_id, n as node
+                RETURN id(n) as node_id, labels(n) as labels, properties(n) as properties
                 """
                 
                 result = session.run(query, node_id=node_id)
                 for record in result:
                     return {
                         "qid": qid,
-                        "properties": dict(record["node"])
+                        "name": record["properties"].get("name", ""),
+                        "labels": record["labels"],
+                        "properties": record["properties"],
                     }
         except Exception as e:
             return None
@@ -578,7 +544,7 @@ class EntityLinker:
         prompt = self._build_entity_ranking_prompt(question, candidates)
         
         try:
-            response = run_llm(prompt, 0.1, 1000, self.args.LLM_API_KEY, self.args.LLM_TYPE)
+            response = run_llm(prompt, 0.1, 1000, self.args.GRAPH_LLM_API_KEY, self.args.GRAPH_LLM_MODEL)
             
             # 解析大模型的响应
             ranked_results = self._parse_ranking_response(response, candidates)
