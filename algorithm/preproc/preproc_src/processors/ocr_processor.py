@@ -13,7 +13,42 @@ class OCRProcessor(BaseProcessor):
     支持 pipeline 和 vlm 两种后端。
     """
 
-    def __init__(self, config_path: Optional[str] = None, model_source: str = "local"):
+    @staticmethod
+    def _validate_local_models_config(
+        local_models_config: object,
+        required_mode: Optional[str] = None,
+    ) -> None:
+        if not isinstance(local_models_config, dict):
+            raise ValueError(
+                "MinerU 本地模型配置无效：请在 mineru.json 中提供 'models-dir'，"
+                "且其值为包含 pipeline/vlm 路径的对象"
+            )
+        required_modes = (required_mode,) if required_mode in {"pipeline", "vlm"} else ("pipeline", "vlm")
+        missing_modes = [mode for mode in required_modes if not local_models_config.get(mode)]
+        if missing_modes:
+            raise ValueError(
+                f"MinerU 本地模型配置缺失: {', '.join(missing_modes)}。"
+                "请在 mineru.json 的 models-dir 中补全对应路径"
+            )
+        missing_paths = [
+            f"{mode}={local_models_config[mode]}"
+            for mode in required_modes
+            if local_models_config.get(mode) and not Path(str(local_models_config[mode])).exists()
+        ]
+        if missing_paths:
+            raise ValueError(
+                "MinerU 本地模型目录不存在: "
+                + "; ".join(missing_paths)
+                + "。请确认部署机 .env 中 HOST_MODELS_DIR 已挂载到容器 /models，"
+                "并且 MINERU_MODEL_PIPELINE_PATH / MINERU_MODEL_VLM_PATH 指向容器内真实目录。"
+            )
+
+    def __init__(
+        self,
+        config_path: Optional[str] = None,
+        model_source: str = "local",
+        required_mode: Optional[str] = None,
+    ):
         """
         初始化处理器。
 
@@ -29,7 +64,7 @@ class OCRProcessor(BaseProcessor):
             or (str(_default_json) if _default_json.is_file() else str(_default_json))
         )
 
-        # If a relative path (not absolute) is provided (e.g. repo-relative in backend/.env),
+        # If a relative path (not absolute) is provided from the root .env,
         # resolve it relative to the algorithm/preproc root so downstream libraries can find it.
         try:
             if effective_config_path and not Path(effective_config_path).is_absolute():
@@ -85,29 +120,7 @@ class OCRProcessor(BaseProcessor):
 
         if effective_model_source == 'local':
             local_models_config = mineru_config_reader.get_local_models_dir()
-            if not isinstance(local_models_config, dict):
-                raise ValueError(
-                    "MinerU 本地模型配置无效：请在 mineru.json 中提供 'models-dir'，"
-                    "且其值为包含 pipeline/vlm 路径的对象"
-                )
-            missing_modes = [mode for mode in ("pipeline", "vlm") if not local_models_config.get(mode)]
-            if missing_modes:
-                raise ValueError(
-                    f"MinerU 本地模型配置缺失: {', '.join(missing_modes)}。"
-                    "请在 mineru.json 的 'models-dir' 中补全对应路径"
-                )
-            missing_paths = [
-                f"{mode}={path}"
-                for mode, path in local_models_config.items()
-                if mode in ("pipeline", "vlm") and path and not Path(str(path)).exists()
-            ]
-            if missing_paths:
-                raise ValueError(
-                    "MinerU 本地模型目录不存在: "
-                    + "; ".join(missing_paths)
-                    + "。请确认部署机 .env 中 HOST_MODELS_DIR 已挂载到容器 /models，"
-                    "并且 MINERU_MODEL_PIPELINE_PATH / MINERU_MODEL_VLM_PATH 指向容器内真实目录。"
-                )
+            self._validate_local_models_config(local_models_config, required_mode)
 
         from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
         from mineru.data.data_reader_writer import FileBasedDataWriter

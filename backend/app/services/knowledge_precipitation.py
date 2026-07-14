@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from algorithm.NL_to_cypher.vector import batch_text_to_vectors
 from algorithm.knowledge_extract import extract_v2, store_extraction_to_neo4j
@@ -24,13 +27,39 @@ from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 from backend.app.responses import ErrorCode
 
 
+class MinerUOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    language: str = Field(default="ch", min_length=1)
+    ocr_mode: Literal["auto", "on", "off"] = "auto"
+    table_enable: bool = True
+    formula_enable: bool = True
+
+
+class ParserConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    engine: Literal[
+        "auto",
+        "text",
+        "docling",
+        "vlm",
+        "mineru",
+        "pandas",
+        "beautifulsoup",
+        "excel",
+        "bs4",
+        "html",
+    ] = "auto"
+    mineru_options: MinerUOptions = Field(default_factory=MinerUOptions)
+
+
 @dataclass(slots=True)
 class PrecipitationRequest:
     file_name: str
     content: bytes
     ontology: str
-    lang: str = "ch"
-    parser_engine: str | None = None
+    parser: ParserConfig = field(default_factory=ParserConfig)
     chunk_character: str | None = None
     chunk_size: int = 500
     chunk_type: int = 0
@@ -54,7 +83,31 @@ class PipelineError(Exception):
 
 class KnowledgePrecipitationService:
     def __init__(self, processor_factory=DocumentProcessor):
-        self.processor_factory = processor_factory
+        self.processor = processor_factory()
+        self._parse_lock = threading.Lock()
+
+    @staticmethod
+    def _parser_summary(metadata: dict[str, Any]) -> dict[str, Any]:
+        selection = metadata.get("engine_selection") or {}
+        summary: dict[str, Any] = {
+            "preferred_engine": selection.get("preferred_engine") or metadata.get("model_used"),
+            "final_engine": metadata.get("model_used"),
+        }
+        requested_engine = selection.get("requested_engine")
+        if requested_engine:
+            summary["requested_engine"] = requested_engine
+            summary["request_handling"] = selection.get("request_role")
+        if metadata.get("fallback_from"):
+            fallback = metadata["fallback_from"]
+            summary["fallback"] = {
+                "from_engine": fallback.get("engine"),
+                "reason": fallback.get("error"),
+            }
+        if metadata.get("mineru_options"):
+            summary["mineru_options"] = metadata["mineru_options"]
+        if metadata.get("encoding"):
+            summary["encoding"] = metadata["encoding"]
+        return summary
 
     @staticmethod
     def _store_or_raise(
@@ -102,15 +155,20 @@ class KnowledgePrecipitationService:
                 handle.write(request.content)
                 temp_path = handle.name
 
-            parse_result = self.processor_factory().process_file(
-                temp_path,
-                model_name=request.parser_engine,
-                lang=request.lang,
-            )
+            with self._parse_lock:
+                parse_result = self.processor.process_file(
+                    temp_path,
+                    model_name=request.parser.engine,
+                    lang=request.parser.mineru_options.language,
+                    ocr_mode=request.parser.mineru_options.ocr_mode,
+                    table_enable=request.parser.mineru_options.table_enable,
+                    formula_enable=request.parser.mineru_options.formula_enable,
+                )
             if not parse_result.get("success"):
+                parse_error = str(parse_result.get("error") or "未知原因")
                 raise PipelineError(
                     ErrorCode.DOCUMENT_PARSE_FAILED,
-                    "文档解析失败",
+                    f"文档解析失败：{parse_error}",
                     "document_parse",
                     parse_result,
                 )
@@ -118,7 +176,8 @@ class KnowledgePrecipitationService:
             if not markdown.strip():
                 raise PipelineError(ErrorCode.DOCUMENT_PARSE_FAILED, "文档解析结果为空", "document_parse")
             stats["document"]["content_length"] = len(markdown)
-            stats["document"]["parser"] = parse_result.get("metadata", {})
+            parser_metadata = parse_result.get("metadata", {})
+            stats["document"]["parser"] = self._parser_summary(parser_metadata)
 
             origin = self._store_or_raise(
                 markdown.encode("utf-8"), f"{stem}.md", "text/markdown", request, "origin_storage"

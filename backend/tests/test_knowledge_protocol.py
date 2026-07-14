@@ -77,3 +77,129 @@ def test_precipitation_returns_complete_artifact_urls(protocol_module):
     assert body["data"]["origin_url"].endswith("sample.md")
     assert body["data"]["extract_url"].endswith("sample_extract.json")
     assert body["data"]["vector_url"].endswith("sample_vectors.json")
+    assert body["data"]["stats"]["document"]["parser"] == {
+        "preferred_engine": "pandas",
+        "final_engine": "pandas",
+    }
+
+
+def test_precipitation_accepts_structured_parser_config(protocol_module):
+    response = TestClient(protocol_module.app).post(
+        "/api/knowledge/precipitation",
+        files={"file": ("sample.csv", b"name\nvalue\n", "text/csv")},
+        data={
+            "ontology": "@startuml\nclass Term\n@enduml",
+            "parser_config": (
+                '{"engine":"auto","mineru_options":{"language":"ch",'
+                '"ocr_mode":"on","table_enable":false,"formula_enable":false}}'
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["code"] == 0
+
+
+def test_precipitation_rejects_invalid_parser_config(protocol_module):
+    response = TestClient(protocol_module.app).post(
+        "/api/knowledge/precipitation",
+        files={"file": ("sample.pdf", b"%PDF-test", "application/pdf")},
+        data={
+            "ontology": "@startuml\nclass Term\n@enduml",
+            "parser_config": '{"engine":"vlm","mineru_options":{"ocr_mode":"sometimes"}}',
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 400
+    assert body["code"] == 1000
+    assert body["error"]["stage"] == "validation"
+
+
+def test_precipitation_rejects_coerced_parser_config_types(protocol_module):
+    response = TestClient(protocol_module.app).post(
+        "/api/knowledge/precipitation",
+        files={"file": ("sample.pdf", b"%PDF-test", "application/pdf")},
+        data={
+            "ontology": "@startuml\nclass Term\n@enduml",
+            "parser_config": '{"mineru_options":{"table_enable":"false"}}',
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == 1000
+
+
+def test_parser_metadata_is_returned_as_compact_summary(protocol_module):
+    from backend.app.services.knowledge_precipitation import KnowledgePrecipitationService
+
+    summary = KnowledgePrecipitationService._parser_summary(
+        {
+            "model_used": "mineru",
+            "engine_selection": {
+                "preferred_engine": "docling",
+                "requested_engine": "mineru",
+                "request_role": "fallback_candidate",
+            },
+            "fallback_from": {"engine": "docling", "error": "parse failed"},
+            "mineru_options": {
+                "language": "ch",
+                "ocr_mode": "on",
+                "table_enable": True,
+                "formula_enable": False,
+            },
+            "file_path": "/internal/path/that/must/not/leak",
+            "allowed_engines": ["internal", "noise"],
+        }
+    )
+
+    assert summary == {
+        "preferred_engine": "docling",
+        "final_engine": "mineru",
+        "requested_engine": "mineru",
+        "request_handling": "fallback_candidate",
+        "fallback": {"from_engine": "docling", "reason": "parse failed"},
+        "mineru_options": {
+            "language": "ch",
+            "ocr_mode": "on",
+            "table_enable": True,
+            "formula_enable": False,
+        },
+    }
+
+
+def test_document_processor_is_reused_and_parse_error_is_specific(protocol_module):
+    from backend.app.services.knowledge_precipitation import (
+        KnowledgePrecipitationService,
+        PipelineError,
+        PrecipitationRequest,
+    )
+
+    class FailingProcessor:
+        instances = 0
+        calls = 0
+
+        def __init__(self):
+            type(self).instances += 1
+
+        def process_file(self, *_args, **_kwargs):
+            type(self).calls += 1
+            return {"success": False, "error": "缺少 LibreOffice（soffice）"}
+
+    service = KnowledgePrecipitationService(processor_factory=FailingProcessor)
+    request = PrecipitationRequest(
+        file_name="sample.doc",
+        content=b"test",
+        ontology="@startuml\nclass Term\n@enduml",
+    )
+
+    for _ in range(2):
+        try:
+            service.process(request)
+        except PipelineError as exc:
+            assert exc.message == "文档解析失败：缺少 LibreOffice（soffice）"
+        else:
+            raise AssertionError("expected PipelineError")
+
+    assert FailingProcessor.instances == 1
+    assert FailingProcessor.calls == 2

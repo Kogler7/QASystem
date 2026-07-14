@@ -1,6 +1,6 @@
 # Document Processing
 
-该包只负责将 PDF、Word、Excel、CSV 和 HTML 转换为 Markdown 或文本。
+该包只负责将 PDF、Word、PowerPoint、图片、Markdown、TXT、Excel、CSV 和 HTML 转换为 Markdown 或文本。
 
 入口：
 
@@ -8,5 +8,10 @@
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 ```
 
-Python 与系统依赖统一由 `backend/requirements.txt` 和 `docker/backend.Dockerfile` 管理。
+Python 与系统依赖统一由 `backend/requirements.txt` 和根目录 `Dockerfile` 管理。
 MinerU 模型通过 `/models` 外置挂载，LibreOffice 使用系统安装版本。
+
+解析引擎名称中，`vlm` 表示视觉语言模型解析，`mineru` 表示传统专用模型流水线解析。
+
+完整的接口参数、自动选择和 fallback 规则见 [文档解析行为规范](../../docs/文档解析行为规范.md)。
+镜像依赖、模型挂载和 GPU 配置见 [文档解析部署与依赖](../../docs/文档解析部署与依赖.md)。

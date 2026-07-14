@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import zipfile
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -10,14 +11,21 @@ from typing import Any, Optional
 
 class DocumentProcessor:
     ENGINE_MATRIX = {
-        ".pdf": ("docling", "mineru"),
-        ".docx": ("docling", "mineru"),
-        ".doc": ("docling", "mineru"),
+        ".pdf": ("docling", "vlm", "mineru"),
+        ".docx": ("docling", "vlm", "mineru"),
+        ".doc": ("docling", "vlm", "mineru"),
+        ".pptx": ("docling", "vlm", "mineru"),
+        ".ppt": ("docling", "vlm", "mineru"),
+        ".png": ("vlm", "mineru", "docling"),
+        ".jpg": ("vlm", "mineru", "docling"),
+        ".jpeg": ("vlm", "mineru", "docling"),
+        ".md": ("text",),
+        ".txt": ("text",),
         ".xlsx": ("pandas",),
         ".xls": ("pandas",),
         ".csv": ("pandas",),
-        ".html": ("bs4",),
-        ".htm": ("bs4",),
+        ".html": ("beautifulsoup",),
+        ".htm": ("beautifulsoup",),
     }
 
     def __init__(
@@ -47,18 +55,19 @@ class DocumentProcessor:
             from .processors.docx_processor import DocxProcessor
 
             processor = DocxProcessor(libreoffice_path=self.libreoffice_path)
-        elif engine == "mineru":
+        elif engine in {"mineru", "vlm"}:
             from .processors.ocr_processor import OCRProcessor
 
             processor = OCRProcessor(
                 config_path=self.mineru_config_path,
                 model_source=self.mineru_model_source,
+                required_mode="pipeline" if engine == "mineru" else "vlm",
             )
         elif engine == "pandas":
             from .processors.excel_processor import ExcelProcessor
 
             processor = ExcelProcessor()
-        elif engine == "bs4":
+        elif engine == "beautifulsoup":
             from .processors.html_processor import HTMLProcessor
 
             processor = HTMLProcessor()
@@ -113,16 +122,21 @@ class DocumentProcessor:
         profile = {"kind": "text", "reason": "常规 Word 文档"}
         try:
             with zipfile.ZipFile(file_path) as archive:
-                document_xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
-            tables = document_xml.count("<w:tbl")
-            drawings = document_xml.count("<w:drawing") + document_xml.count("<w:pict")
-            formulas = document_xml.count("<m:oMath")
+                document_xml = archive.read("word/document.xml")
+            root = ET.fromstring(document_xml)
+            word_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            math_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+            tables = sum(1 for _ in root.iter(f"{{{word_ns}}}tbl"))
+            drawings = sum(1 for _ in root.iter(f"{{{word_ns}}}drawing"))
+            drawings += sum(1 for _ in root.iter(f"{{{word_ns}}}pict"))
+            formulas = sum(1 for _ in root.iter(f"{{{math_ns}}}oMath"))
             complex_layout = tables >= 4 or drawings >= 5 or formulas >= 3
             profile = {
                 "kind": "complex" if complex_layout else "text",
                 "tables": tables,
                 "drawings": drawings,
                 "formulas": formulas,
+                "complexity_thresholds": {"tables": 4, "drawings": 5, "formulas": 3},
                 "reason": "表格、图形或公式较多" if complex_layout else "以连续文本为主",
             }
         except Exception as exc:
@@ -136,45 +150,106 @@ class DocumentProcessor:
             raise ValueError(f"不支持的文件类型: {suffix}")
 
         normalized = (requested or "auto").strip().lower()
-        aliases = {"excel": "pandas", "html": "bs4", "beautifulsoup": "bs4"}
+        aliases = {"excel": "pandas", "html": "beautifulsoup", "bs4": "beautifulsoup"}
         normalized = aliases.get(normalized, normalized)
-        if normalized not in {"", "auto"}:
-            if normalized not in allowed:
-                raise ValueError(
-                    f"解析引擎 {normalized} 不适用于 {suffix}，可用引擎: {', '.join(allowed)}"
-                )
-            return normalized, {"mode": "explicit", "allowed_engines": list(allowed)}
+        supplied_engine = None if normalized in {"", "auto"} else normalized
+        requested_engine = supplied_engine if supplied_engine in allowed else None
+
+        selection: dict[str, Any] = {"mode": "auto", "allowed_engines": list(allowed)}
+        if supplied_engine:
+            selection["requested_engine"] = supplied_engine
+            selection["request_compatible"] = requested_engine is not None
+            if requested_engine is None:
+                selection["request_role"] = "ignored_incompatible"
+
+        if suffix in {".md", ".txt"}:
+            if supplied_engine:
+                selection["request_role"] = "matched_default" if requested_engine == "text" else "ignored_incompatible"
+            selection["preferred_engine"] = "text"
+            return "text", selection
 
         if suffix == ".pdf":
             profile = self._profile_pdf(file_path)
-            engine = "docling" if profile["kind"] == "text" else "mineru"
-            return engine, {"mode": "auto", "pdf_profile": profile, "allowed_engines": list(allowed)}
+            engine = "docling" if profile["kind"] == "text" else "vlm"
+            selection["preferred_engine"] = engine
+            selection["pdf_profile"] = profile
+            if requested_engine:
+                selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
+                selection["request_matched_selection"] = requested_engine == engine
+                if requested_engine != engine:
+                    selection["fallback_engine"] = requested_engine
+            return engine, selection
         if suffix == ".docx":
             profile = self._profile_docx(file_path)
-            engine = "mineru" if profile["kind"] == "complex" else "docling"
-            return engine, {"mode": "auto", "word_profile": profile, "allowed_engines": list(allowed)}
-        return allowed[0], {"mode": "auto", "allowed_engines": list(allowed)}
+            preferred_engine = "vlm" if profile["kind"] == "complex" else "docling"
+            selection["preferred_engine"] = preferred_engine
+            if profile["kind"] == "complex" and requested_engine:
+                engine = requested_engine
+                selection["request_role"] = "matched_default" if requested_engine == preferred_engine else "selected_primary"
+            else:
+                engine = preferred_engine
+                if requested_engine:
+                    selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
+                    if requested_engine != engine:
+                        selection["fallback_engine"] = requested_engine
+            selection["word_profile"] = profile
+            if requested_engine:
+                selection["request_matched_selection"] = requested_engine == engine
+            return engine, selection
+        engine = allowed[0]
+        selection["preferred_engine"] = engine
+        if requested_engine:
+            selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
+            selection["request_matched_selection"] = requested_engine == engine
+            if requested_engine != engine and len(allowed) > 1:
+                selection["fallback_engine"] = requested_engine
+        return engine, selection
 
-    def _run_processor(self, engine: str, file_path: str, suffix: str, lang: str) -> dict[str, Any]:
+    def _run_processor(
+        self,
+        engine: str,
+        file_path: str,
+        suffix: str,
+        lang: str,
+        ocr_mode: str = "auto",
+        table_enable: bool = True,
+        formula_enable: bool = True,
+    ) -> dict[str, Any]:
         process_path = file_path
         temp_pdf_path = None
         try:
-            if suffix in {".doc", ".docx"} and engine == "mineru":
+            if engine == "text":
+                raw_content = Path(file_path).read_bytes()
+                for encoding in ("utf-8-sig", "gb18030"):
+                    try:
+                        return {
+                            "success": True,
+                            "content": raw_content.decode(encoding),
+                            "metadata": {"processor": "text", "read_mode": "direct", "encoding": encoding},
+                        }
+                    except UnicodeDecodeError:
+                        continue
+                return {"success": False, "error": "文本文件编码无法识别"}
+
+            if suffix in {".doc", ".docx", ".ppt", ".pptx", ".png", ".jpg", ".jpeg"} and engine in {"mineru", "vlm"}:
                 docling = self._processor("docling")
                 temp_pdf_path = docling.convert_to_pdf(file_path)
                 if not temp_pdf_path or not os.path.exists(temp_pdf_path):
-                    return {"success": False, "error": "Word 转 PDF 失败，无法使用 MinerU 解析"}
+                    detail = getattr(docling, "last_conversion_error", None) or f"{suffix} 转 PDF 失败"
+                    return {"success": False, "error": detail}
                 process_path = temp_pdf_path
 
             kwargs: dict[str, Any] = {}
-            if engine == "mineru":
+            if engine in {"mineru", "vlm"}:
+                backend = "pipeline" if engine == "mineru" else "vlm-transformers"
+                pipeline_method = {"auto": "auto", "on": "ocr", "off": "txt"}[ocr_mode]
                 kwargs = {
                     "output_dir": str(self.output_dir),
                     "lang": lang,
-                    "backend": os.getenv("MINERU_BACKEND") or "vlm",
-                    "method": "auto",
-                    "formula_enable": True,
-                    "table_enable": True,
+                    "backend": backend,
+                    "method": pipeline_method,
+                    "formula_enable": formula_enable,
+                    "table_enable": table_enable,
                     "draw_layout_bbox": False,
                     "draw_span_bbox": False,
                     "dump_md": True,
@@ -187,23 +262,48 @@ class DocumentProcessor:
                 }
             result = self._processor(engine).process(process_path, **kwargs)
             metadata = result.get("metadata") or {}
+            if engine == "mineru":
+                metadata["mineru_options"] = {
+                    "language": lang,
+                    "ocr_mode": ocr_mode,
+                    "table_enable": table_enable,
+                    "formula_enable": formula_enable,
+                }
             content = result.get("content")
             if metadata.get("error"):
                 return {"success": False, "error": str(metadata["error"]), "metadata": metadata}
             if content is None or not str(content).strip():
                 return {"success": False, "error": f"{engine} 未生成有效内容", "metadata": metadata}
             return {"success": True, "content": content, "metadata": metadata}
+        except ModuleNotFoundError as exc:
+            return {"success": False, "error": f"缺少 Python 依赖模块：{exc.name}"}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
         finally:
             if temp_pdf_path:
                 shutil.rmtree(os.path.dirname(temp_pdf_path), ignore_errors=True)
 
-    def process_file(self, file_path: str, model_name: Optional[str] = None, lang: str = "ch") -> dict[str, Any]:
+    def process_file(
+        self,
+        file_path: str,
+        model_name: Optional[str] = None,
+        lang: str = "ch",
+        ocr_mode: str = "auto",
+        table_enable: bool = True,
+        formula_enable: bool = True,
+    ) -> dict[str, Any]:
         path = Path(file_path)
         if not path.exists():
             return {"success": False, "error_code": "FILE_NOT_FOUND", "error": "文件不存在"}
         suffix = path.suffix.lower()
+        normalized_ocr_mode = (ocr_mode or "auto").strip().lower()
+        if normalized_ocr_mode not in {"auto", "on", "off"}:
+            return {
+                "success": False,
+                "error_code": "INVALID_OCR_MODE",
+                "error": "ocr_mode 仅支持 auto、on、off",
+                "file_type": suffix.lstrip("."),
+            }
         try:
             engine, selection = self.select_engine(file_path, model_name)
         except ValueError as exc:
@@ -214,13 +314,14 @@ class DocumentProcessor:
                 "file_type": suffix.lstrip("."),
             }
 
-        result = self._run_processor(engine, file_path, suffix, lang)
+        run_options = (normalized_ocr_mode, table_enable, formula_enable)
+        result = self._run_processor(engine, file_path, suffix, lang, *run_options)
         fallback_from = None
-        if not result.get("success") and selection["mode"] == "auto" and len(self.ENGINE_MATRIX[suffix]) > 1:
-            fallback = next(candidate for candidate in self.ENGINE_MATRIX[suffix] if candidate != engine)
+        fallback = selection.get("fallback_engine")
+        if not result.get("success") and fallback and fallback != engine:
             fallback_from = {"engine": engine, "error": result.get("error", "解析失败")}
             engine = fallback
-            result = self._run_processor(engine, file_path, suffix, lang)
+            result = self._run_processor(engine, file_path, suffix, lang, *run_options)
 
         base_metadata = {
             "file_name": path.name,

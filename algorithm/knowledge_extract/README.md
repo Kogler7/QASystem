@@ -221,7 +221,7 @@ LLM 即使返回展示名：
 ### 知识沉淀接口
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/knowledge/precipitation \
+curl -X POST http://127.0.0.1:8006/api/knowledge/precipitation \
   -F 'file=@./terms.docx' \
   -F 'ontology=<./terminology.puml' \
   -F 'save_to_db=false'
