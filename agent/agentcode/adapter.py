@@ -20,21 +20,14 @@ from dotenv import load_dotenv
 
 
 def _load_env() -> dict[str, Any]:
-    """加载 LLM 连接所需的环境变量。
-    加载顺序：1. agentcode/.env → 2. backend/.env → 3. 硬编码默认值
-    """
-    agentcode_dir = os.path.dirname(os.path.dirname(__file__))
-    env_path = os.path.join(agentcode_dir, ".env")
-    if os.path.exists(env_path):
-        load_dotenv(env_path, override=False)
-    else:
-        backend_env = os.path.join(os.path.dirname(agentcode_dir), "backend", ".env")
-        if os.path.exists(backend_env):
-            load_dotenv(backend_env, override=False)
+    """从仓库根目录的唯一 .env 加载 Agent LLM 配置。"""
+    root_env = Path(__file__).resolve().parents[2] / ".env"
+    if root_env.exists():
+        load_dotenv(root_env, override=False)
     return {
-        "base_url": (os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.deepseek.com").strip(),
-        "api_key": (os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip(),
-        "model": (os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "deepseek-v4-pro").strip(),
+        "base_url": (os.getenv("AGENT_LLM_BASE_URL") or "http://localhost:9999").strip(),
+        "api_key": (os.getenv("AGENT_LLM_API_KEY") or "").strip(),
+        "model": (os.getenv("AGENT_LLM_MODEL") or "Qwen/Qwen3-8B").strip(),
         "temperature": float(os.getenv("AGENT_TEMPLATE_TEMPERATURE") or 0.2),
         "max_tokens": int(os.getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),
         "timeout_s": int(os.getenv("AGENT_TEMPLATE_TIMEOUT_SECONDS") or 120),

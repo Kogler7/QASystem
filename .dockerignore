@@ -25,10 +25,7 @@ frontend/.vite
 # 密钥与本地配置（运行时由 compose env / 挂载注入）
 .env
 .env.*
-!**/.env.example
-backend/.env
-backend/.env.*
-!backend/.env.example
+!/.env.example
 
 # 本地数据与缓存（运行时用命名卷挂载）
 backend/data/documents/**

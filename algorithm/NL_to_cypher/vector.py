@@ -13,7 +13,7 @@ def _load_model(model_path: str) -> SentenceTransformer:
 
 
 def _model_path(model_path: str | None = None) -> str:
-    return model_path or os.getenv("MODEL_PATH") or DEFAULT_MODEL_PATH
+    return model_path or os.getenv("VECTOR_MODEL_PATH") or DEFAULT_MODEL_PATH
 
 
 def text_to_vector(text: str, model_path: str | None = None) -> list[float]:

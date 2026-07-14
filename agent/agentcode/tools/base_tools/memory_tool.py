@@ -45,16 +45,16 @@ class MemoryCompactor:
         Args:
             threshold: 待压缩消息的 token 上限。
             model: 摘要生成模型名。
-            api_key: API 密钥，默认从 OPENAI_API_KEY 环境变量读取。
-            base_url: API 地址，默认从 OPENAI_BASE_URL 环境变量读取。
+            api_key: API 密钥，默认从 AGENT_LLM_API_KEY 环境变量读取。
+            base_url: API 地址，默认从 AGENT_LLM_BASE_URL 环境变量读取。
             transcript_dir: transcript 保存目录，默认为 workspace/transcripts。
         """
         self.threshold = threshold
 
         self._encoding = tiktoken.get_encoding("cl100k_base")
 
-        api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        base_url = base_url or os.environ.get("OPENAI_BASE_URL", "https://api.deepseek.com")
+        api_key = api_key or os.environ.get("AGENT_LLM_API_KEY", "")
+        base_url = base_url or os.environ.get("AGENT_LLM_BASE_URL", "http://localhost:9999")
         self._client: OpenAI | None = None
         if api_key:
             self._client = OpenAI(base_url=base_url, api_key=api_key)

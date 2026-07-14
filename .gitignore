@@ -1,21 +1,9 @@
 # =============================================================================
 # 密钥与本地环境（允许 *.example）
 # =============================================================================
-.env
-.env.*
-!.env.example
-!docker/.env.deploy.example
-backend/.env
-backend/.env.*
-!backend/.env.example
-agentcode/.env
-agentcode/.env.*
-!agentcode/.env.example
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
-algorithm/**/.env
-!algorithm/**/.env.example
+**/.env
+**/.env.*
+!/.env.example
 
 # =============================================================================
 # Python

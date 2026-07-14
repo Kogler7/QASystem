@@ -8,8 +8,8 @@ from sentence_transformers import SentenceTransformer
 from typing import Dict, Optional
 from dotenv import load_dotenv
 
-# 加载 backend/.env 补充环境变量（不覆盖已有变量）
-env_path = Path(__file__).parent.parent.parent.parent / 'backend' / '.env'
+# 加载仓库根目录唯一配置
+env_path = Path(__file__).resolve().parents[3] / '.env'
 if env_path.exists():
     load_dotenv(env_path, override=False)
 

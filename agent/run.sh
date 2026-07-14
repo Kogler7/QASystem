@@ -4,9 +4,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
-if [ -f backend/.env ]; then
+if [ -f .env ]; then
     set -a
-    source <(grep -E '^(LLM_BACKEND|LLM_BASE_URL|LLM_API_VERSION|LLM_MODEL|LLM_API_KEY|AGENT_TEMPLATE_MAX_TOKENS|AGENT_TEMPLATE_TEMPERATURE|AGENT_TEMPLATE_TIMEOUT_SECONDS|AGENT_TEMPLATE_TOOL_CHOICE|AGENT_MCP_CONFIG)=' backend/.env)
+    source <(grep -E '^(AGENT_LLM_BASE_URL|AGENT_LLM_API_KEY|AGENT_LLM_MODEL|AGENT_TEMPLATE_MAX_TOKENS|AGENT_TEMPLATE_TEMPERATURE|AGENT_TEMPLATE_TIMEOUT_SECONDS|AGENT_TEMPLATE_TOOL_CHOICE|AGENT_MCP_CONFIG)=' .env)
     set +a
 fi
 
@@ -15,7 +15,7 @@ if command -v conda &>/dev/null; then
     conda activate qasystem 2>/dev/null || true
 fi
 
-PYTHONPATH="$(pwd)/agent"
+PYTHONPATH="$(pwd):$(pwd)/agent"
 export PYTHONPATH
 
 exec python -m agentcode.cli "$@"

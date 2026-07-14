@@ -233,7 +233,12 @@ def extract_v2(
     api_key = api_key or cfg["api_key"]
     model = model or cfg["model"]
     max_tokens = max_tokens or cfg["max_tokens"]
-    json_retries = max(0, json_retries if json_retries is not None else int(os.getenv("KG_EXTRACT_JSON_RETRIES", "2")))
+    json_retries = max(
+        0,
+        json_retries
+        if json_retries is not None
+        else int(os.getenv("KG_EXTRACT_LLM_JSON_RETRIES", os.getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
+    )
 
     logger.info(
         "extract_v2: ontology_len=%d text_len=%d model=%s",

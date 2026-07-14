@@ -25,10 +25,10 @@ def get_neo4j_config() -> dict:
 
 
 # ── LLM API (知识抽取 V2) ──
-KG_EXTRACT_API_URL = _env("KG_EXTRACT_API_URL", "LLM_BASE_URL", default="http://localhost:9999")
-KG_EXTRACT_API_KEY = _env("KG_EXTRACT_API_KEY", "LLM_API_KEY", "OPENAI_API_KEY", default="")
-KG_EXTRACT_MODEL = _env("KG_EXTRACT_MODEL", "LLM_MODEL", default="Qwen/Qwen3-8B")
-KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_MAX_TOKENS", default="16384"))
+KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_API_URL", default="http://localhost:9999")
+KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY", default="")
+KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="Qwen/Qwen3-8B")
+KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_MAX_TOKENS", default="16384"))
 
 
 def get_llm_config() -> dict:
