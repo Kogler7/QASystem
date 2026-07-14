@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from algorithm.knowledge_extract import extractor
+from algorithm.knowledge_extract.ontology_schema import OntologySchema
 
 
 def _stream(text):
@@ -42,3 +43,77 @@ def test_extract_v2_reports_json_retry_details(monkeypatch):
     result = extractor.extract_v2("class Term", "text", json_retries=1)
     assert result["error_code"] == "LLM_JSON_PARSE_FAILED"
     assert len(result["attempts"]) == 2
+
+
+def test_extract_v2_uses_stereotype_as_graph_label(monkeypatch):
+    response = (
+        '{"entities":[{"type":"术语","name":"采购标段数量","properties":{}}],'
+        '"relations":[]}'
+    )
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_kwargs: _stream(response))),
+        close=lambda: None,
+    )
+    monkeypatch.setattr(extractor, "_build_openai_client", lambda **_kwargs: client)
+
+    ontology = """@startuml
+class 术语 <<Terminology>> {
+- 术语标准名称 (TermName): String
+}
+@enduml"""
+    result = extractor.extract_v2(ontology, "采购标段数量", json_retries=0)
+
+    assert result["raw"]["entities"][0]["type"] == "Terminology"
+    assert result["graph"]["nodes"][0]["label"] == "Terminology"
+    assert result["graph"]["nodes"][0]["uid"] == "Terminology::采购标段数量"
+
+
+def test_schema_normalizes_relationship_endpoint_types():
+    ontology = 'class 术语 <<Terminology, KnowledgeUnit>>\nclass 业务域 <<BusinessDomain>>'
+    extracted = {
+        "entities": [],
+        "relations": [{"from_type": "术语", "to_type": "业务域", "rel_type": "BELONGS_TO"}],
+    }
+
+    normalized = OntologySchema.parse(ontology).normalize_extraction(extracted)
+
+    assert normalized["relations"][0]["from_type"] == "Terminology"
+    assert normalized["relations"][0]["to_type"] == "BusinessDomain"
+
+
+def test_schema_prefers_standard_plantuml_alias_as_identifier():
+    schema = OntologySchema.parse('class "术语" as Terminology <<KnowledgeUnit>>')
+
+    assert schema.classes[0].display_name == "术语"
+    assert schema.classes[0].alias == "Terminology"
+    assert schema.classes[0].identifier == "Terminology"
+    assert schema.classes[0].stereotypes == ("KnowledgeUnit",)
+
+
+def test_schema_separates_display_names_identifiers_and_secondary_stereotypes():
+    ontology = """class 术语 <<Terminology, KnowledgeUnit>> {
+- 术语标准名称 (TermName): String
+- 同义词 (Synonyms): String[]
+}"""
+    schema = OntologySchema.parse(ontology)
+    ontology_class = schema.classes[0]
+
+    assert ontology_class.display_name == "术语"
+    assert ontology_class.identifier == "Terminology"
+    assert ontology_class.stereotypes == ("Terminology", "KnowledgeUnit")
+    assert ontology_class.properties[0].display_name == "术语标准名称"
+    assert ontology_class.properties[0].identifier == "TermName"
+
+    normalized = schema.normalize_extraction({
+        "entities": [{
+            "type": "术语",
+            "name": "采购标段数量",
+            "properties": {"术语标准名称": "采购标段数量", "Synonyms": ["标段数量"]},
+        }],
+        "relations": [],
+    })
+    assert normalized["entities"][0]["type"] == "Terminology"
+    assert normalized["entities"][0]["properties"] == {
+        "TermName": "采购标段数量",
+        "Synonyms": ["标段数量"],
+    }

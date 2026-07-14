@@ -13,6 +13,7 @@ from typing import Any, Optional
 from openai import OpenAI
 
 from .config import get_llm_config
+from .ontology_schema import OntologySchema
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ GENERIC_INSTRUCTION = """## 抽取规则
 你是知识图谱抽取专家。上方"本体定义"中的 PlantUML 类图就是你唯一的抽取 schema，请严格按本体定义抽取：
 
 ### 实体抽取
-- 本体中每个 `class Xxx <<Stereotype>> #Color { ... }` 定义一个实体类型，**类名**即为实体 `type`
+- 本体中每个 class 定义一个实体类型，实体 `type` 必须使用下方“本体标识目录”给出的稳定类型标识
 - 类体中每个 `+属性名: 类型 // 注释` 即为该实体的属性字段，从文档中提取对应值填入 `properties`
 - 属性类型标注为 `String[]` 的用 JSON 数组表示，标注为 `Boolean` 的用 true/false
 - 文档中未提及的属性设为 null 或不包含在 properties 中
@@ -32,7 +33,7 @@ GENERIC_INSTRUCTION = """## 抽取规则
 
 ### 关系抽取
 - 本体中每条 `A "1" --> "B" : REL_NAME` 定义一个关系类型
-- relations 中每条记录的 `from_type`/`rel_type`/`to_type` 必须与本体定义的类名和关系名**完全一致**
+- relations 中每条记录的 `from_type`/`to_type` 使用上述元模型类标识，`rel_type` 使用本体关系名
 - `from_name`/`to_name` 使用实体的 name 属性值（或 @identity 标注的标识字段）
 - 从文档的层级结构推断父子归属关系
 - 从文档中的流程描述/关系表推断流程流转关系
@@ -53,11 +54,15 @@ def build_extraction_prompt(ontology: str, text: str) -> str:
         if "@identity" in line:
             identity_hints.append(line.strip())
     identity_text = "\n".join(identity_hints) if identity_hints else "所有类型默认用 name 属性作为 identity 标识"
+    schema_catalog = OntologySchema.parse(ontology).prompt_catalog()
 
     return f"""你是一个知识图谱抽取专家。请根据以下本体定义，从文本中抽取实体和关系。
 
 ## 本体定义
 {ontology}
+
+## 本体标识目录
+{schema_catalog}
 
 ## 实体标识规则
 {identity_text}
@@ -73,17 +78,17 @@ def build_extraction_prompt(ontology: str, text: str) -> str:
 {{
   "entities": [
     {{
-      "type": "本体中定义的类名",
+      "type": "本体标识目录中定义的稳定类型标识",
       "name": "实体标识值（按 @identity 规则）",
       "properties": {{ "属性名": "属性值", ... }}
     }}
   ],
   "relations": [
     {{
-      "from_type": "源类名",
+      "from_type": "源元模型类标识",
       "from_name": "源实体标识值",
       "rel_type": "本体中定义的关系名",
-      "to_type": "目标类名",
+      "to_type": "目标元模型类标识",
       "to_name": "目标实体标识值"
     }}
   ]
@@ -320,6 +325,9 @@ def extract_v2(
             "attempts": attempts,
             "_raw_response": raw_response[:1000] if raw_response else "",
         }
+
+    # 统一通过本体模型解析层规范化类型、属性和关系标识。
+    extracted = OntologySchema.parse(ontology).normalize_extraction(extracted)
 
     # 转换为图结构
     graph = _entities_to_graph(extracted)
