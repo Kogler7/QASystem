@@ -270,8 +270,8 @@ class EmbeddingService:
             "count": len(vectors),
             "dimension": len(vectors[0]) if vectors else 0,
             "items": [
-                {"text": item.text, "vector": vector}
-                for item, vector in zip(items, vectors)
+                {"vector": vector}
+                for vector in vectors
             ],
         }
 

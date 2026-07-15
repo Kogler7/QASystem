@@ -57,7 +57,12 @@ def test_batch_vector_preserves_empty_strings(protocol_module):
     body = response.json()
     assert body["code"] == 0
     assert body["data"]["count"] == 3
-    assert [item["text"] for item in body["data"]["items"]] == ["第一段", "", "第二段"]
+    assert [item["vector"] for item in body["data"]["items"]] == [
+        [0.0, 1.0],
+        [1.0, 1.0],
+        [2.0, 1.0],
+    ]
+    assert all("text" not in item for item in body["data"]["items"])
     assert "Deprecated" in body["info"]
     assert "message" not in body
 
@@ -71,7 +76,11 @@ def test_v1_text_embeddings_preserve_item_order(protocol_module):
     assert body["code"] == 0
     assert "message" not in body
     assert body["data"]["dimension"] == 2
-    assert [item["text"] for item in body["data"]["items"]] == ["第一段", ""]
+    assert [item["vector"] for item in body["data"]["items"]] == [
+        [0.0, 1.0],
+        [1.0, 1.0],
+    ]
+    assert all("text" not in item for item in body["data"]["items"])
 
 
 def test_v1_text_embeddings_reject_unknown_index_field(protocol_module):
@@ -235,11 +244,11 @@ def test_deprecated_pipeline_uses_v1_fields_and_response_shape(protocol_module):
         "qpm": 0,
     }
     assert body["data"]["stats"]["chunking"]["vector_source"] == "text_chunk"
-    assert body["data"]["parser"] == {
+    assert body["data"]["stats"]["document"]["parser"] == {
         "preferred_engine": "pandas",
         "final_engine": "pandas",
     }
-    assert "parser" not in body["data"]["stats"]["document"]
+    assert "parser" not in body["data"]
     assert "Deprecated" in body["info"]
 
 
@@ -560,8 +569,10 @@ def test_pipeline_returns_parser_execution_status_at_data_level(protocol_module)
         )
     )
 
-    assert result["parser"] == expected_status
-    assert "mineru_options" not in result["parser"]
+    parser_status = result["stats"]["document"]["parser"]
+    assert parser_status == expected_status
+    assert "mineru_options" not in parser_status
+    assert "parser" not in result
 
 
 def test_document_processor_is_reused_and_parse_error_is_specific(protocol_module):

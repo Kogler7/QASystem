@@ -102,7 +102,12 @@ class KnowledgePrecipitationService:
             parsed = self.parsing.parse(file_name, request.content, request.options.parser)
             markdown = parsed["markdown"]
             parser_status = parsed["parser"]
-            stats["document"].update({"content_length": parsed["content_length"]})
+            stats["document"].update(
+                {
+                    "content_length": parsed["content_length"],
+                    "parser": parser_status,
+                }
+            )
 
             origin = self._upload_markdown(
                 markdown.encode("utf-8"), f"{stem}.md", "text/markdown", request, "origin_storage"
@@ -175,8 +180,15 @@ class KnowledgePrecipitationService:
                 embedded = self.embeddings.texts(
                     [TextEmbeddingItem(text=item["text"]) for item in chunks]
                 )
+                vector_items = [
+                    {
+                        "text": chunk["text"],
+                        "vector": embedded_item["vector"],
+                    }
+                    for chunk, embedded_item in zip(chunks, embedded["items"])
+                ]
                 vector_result = store_vectors(
-                    embedded["items"],
+                    vector_items,
                     os.getenv("FILE_SERVICE_URL", "").strip(),
                     request.options.storage.knowledge_space_id,
                     origin["id"],
@@ -191,13 +203,13 @@ class KnowledgePrecipitationService:
                     )
                 vector_ids = vector_result.get("ids")
                 inserted_count = vector_result.get("inserted_count")
-                if not isinstance(vector_ids, list) or inserted_count != len(embedded["items"]) or len(vector_ids) != len(embedded["items"]):
+                if not isinstance(vector_ids, list) or inserted_count != len(vector_items) or len(vector_ids) != len(vector_items):
                     raise PipelineError(
                         ErrorCode.VECTOR_ID_COUNT_MISMATCH,
                         "向量存储返回的 ids 数量与输入不一致",
                         "vector_storage",
                         {
-                            "input_count": len(embedded["items"]),
+                            "input_count": len(vector_items),
                             "inserted_count": inserted_count,
                             "id_count": len(vector_ids) if isinstance(vector_ids, list) else None,
                         },
@@ -218,7 +230,6 @@ class KnowledgePrecipitationService:
 
             result = {
                 "name": stem,
-                "parser": parser_status,
                 "summary": (
                     generate_understanding(final_graph)
                     if final_graph is not None
