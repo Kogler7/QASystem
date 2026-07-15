@@ -266,6 +266,9 @@ result = extract_v2(
 | `KG_EXTRACT_LLM_MODEL` | 模型名称 |
 | `KG_EXTRACT_LLM_MAX_TOKENS` | 最大输出 token 数 |
 | `KG_EXTRACT_LLM_JSON_RETRIES` | JSON 格式错误后的重试次数 |
+| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认 `4` |
+| `KG_EXTRACT_LLM_QPS` | 每秒最大请求数，`0` 表示不限制 |
+| `KG_EXTRACT_LLM_QPM` | 每分钟最大请求数，`0` 表示不限制 |
 
 部分配置保留旧环境变量作为回退，具体以 `config.py` 和 `extractor.py` 为准。
 

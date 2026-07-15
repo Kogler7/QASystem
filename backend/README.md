@@ -2,7 +2,8 @@
 
 后端是 QASystem 的唯一 ASGI 入口，职责限定为：
 
-- 暴露知识沉淀、批量向量化和图谱置信度三个 HTTP 接口。
+- 暴露 `/api/v1` 聚合流水线、文档、图谱和向量化 HTTP 接口。
+- 历史路径作为 deprecated aliases 保留，并在响应 `info` 中返回迁移目标。
 - 暴露 `/health` 健康检查。
 - 在 `/mcp` 挂载统一 MCP Streamable HTTP 服务。
 
@@ -10,6 +11,10 @@
 旧前端、用户系统、历史编排平台、文档管理或重复组件路由。
 
 ## 运行
+
+本地直接启动时，后端会在尚未注入 `ENVIRONMENT` 的情况下加载仓库根目录 `.env`。
+Docker、Kubernetes 或其他部署环境应直接注入进程环境变量，并设置
+`QASYSTEM_LOAD_DOTENV=false`。进程环境变量的优先级始终高于 dotenv。
 
 ```powershell
 $env:PYTHONPATH="$PWD;$PWD\agent"

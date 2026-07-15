@@ -29,7 +29,9 @@ def test_environment_template_uses_module_specific_llm_keys():
 
 def test_compose_reuses_root_environment_without_variable_duplication():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    template = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "- .env" in compose
+    assert "QASYSTEM_LOAD_DOTENV=false" in template
     assert "./deploy/qasystem-runtime:/app" not in compose
     assert "backend-data:/app/backend/data" in compose
     assert "agent-output:/app/agent/image_result" in compose

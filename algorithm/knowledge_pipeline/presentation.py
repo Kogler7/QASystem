@@ -26,8 +26,22 @@ def normalize_document_content(content: Any) -> str:
     return json.dumps(content, ensure_ascii=False, indent=2, default=str)
 
 
-def build_graphs_response(graph: dict[str, Any]) -> dict[str, list[Any]]:
-    if not graph or not (graph.get("nodes") or graph.get("relationships")):
+def build_graphs_response(graph_or_items: dict[str, Any] | list[dict[str, Any]]) -> dict[str, list[Any]]:
+    if isinstance(graph_or_items, list):
+        return {
+            "graphs": [
+                {
+                    "graph": {
+                        "index": str(item.get("index", index)),
+                        "nodes": (item.get("graph") or {}).get("nodes", []),
+                        "relationships": (item.get("graph") or {}).get("relationships", []),
+                    }
+                }
+                for index, item in enumerate(graph_or_items)
+            ]
+        }
+    graph = graph_or_items or {}
+    if not (graph.get("nodes") or graph.get("relationships")):
         return {"graphs": []}
     return {
         "graphs": [

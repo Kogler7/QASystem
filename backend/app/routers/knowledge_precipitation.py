@@ -1,95 +1,81 @@
 from __future__ import annotations
 
-from typing import Optional
-
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from algorithm.knowledge_pipeline.artifacts import resolve_local_artifact
-from backend.app.responses import ErrorCode, error_response, payload
+from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
+from backend.app.schemas import PipelineOptions
+from backend.app.services.algorithm_capabilities import (
+    document_chunking_service,
+    document_parsing_service,
+    embedding_service,
+    graph_extraction_service,
+)
 from backend.app.services.knowledge_precipitation import (
+    KnowledgeIngestionRequest,
     KnowledgePrecipitationService,
-    ParserConfig,
     PipelineError,
-    PrecipitationRequest,
 )
 
 
-router = APIRouter(tags=["knowledge-precipitation"])
-service = KnowledgePrecipitationService()
+router = APIRouter(tags=["knowledge-ingestion"])
+service = KnowledgePrecipitationService(
+    parsing=document_parsing_service,
+    chunking=document_chunking_service,
+    extraction=graph_extraction_service,
+    embeddings=embedding_service,
+)
+V1_PATH = "/api/v1/pipelines/knowledge-ingestion"
 
 
-@router.post("/api/knowledge/precipitation")
-async def knowledge_precipitation(
+def _info(info: str, deprecated: bool) -> str:
+    return deprecated_info(info, V1_PATH) if deprecated else info
+
+
+@router.post(V1_PATH)
+@router.post("/api/knowledge/precipitation", deprecated=True)
+async def knowledge_ingestion(
+    http_request: Request,
     file: UploadFile = File(...),
     ontology: str = Form(...),
-    parser_config: str = Form(
-        "{}",
-        description="JSON 格式解析配置，包含 engine 和 mineru_options",
-    ),
-    chunk_character: Optional[str] = Form(None),
-    chunk_size: int = Form(500),
-    chunk_type: int = Form(0),
-    similarity: float = Form(0.6),
-    save_to_db: bool = Form(False),
-    model: Optional[str] = Form(None),
-    base_url: Optional[str] = Form(None),
-    knowledge_space_id: Optional[str] = Form(None),
-    file_service_url: Optional[str] = Form(None),
+    options: str = Form("{}"),
 ) -> JSONResponse:
+    deprecated = http_request.url.path != V1_PATH
     try:
-        parser = ParserConfig.model_validate_json(parser_config or "{}")
+        config = PipelineOptions.model_validate_json(options or "{}")
     except ValidationError as exc:
         return error_response(
             ErrorCode.INVALID_REQUEST,
-            "parser_config 无效",
+            _info("options 无效", deprecated),
             stage="validation",
             details={"errors": exc.errors(include_url=False, include_input=False)},
             status_code=400,
         )
 
-    request = PrecipitationRequest(
+    request = KnowledgeIngestionRequest(
         file_name=file.filename or "upload.bin",
         content=await file.read(),
         ontology=ontology,
-        parser=parser,
-        chunk_character=chunk_character,
-        chunk_size=chunk_size,
-        chunk_type=chunk_type,
-        similarity=similarity,
-        save_to_db=save_to_db,
-        model=model,
-        base_url=base_url,
-        knowledge_space_id=knowledge_space_id,
-        file_service_url=file_service_url,
+        options=config,
     )
     try:
         data = await run_in_threadpool(service.process, request)
-        return JSONResponse(content=payload(data, "知识沉淀完成"))
+        return JSONResponse(content=payload(data, _info("知识沉淀完成", deprecated)))
     except PipelineError as exc:
         return error_response(
             exc.code,
-            exc.message,
+            _info(exc.info, deprecated),
             stage=exc.stage,
             details=exc.details,
             data=exc.partial_data,
-            status_code=400 if exc.code == ErrorCode.INVALID_REQUEST else 500,
         )
     except Exception as exc:
         return error_response(
             ErrorCode.INTERNAL_ERROR,
-            "知识沉淀处理异常",
+            _info("知识沉淀处理异常", deprecated),
             stage="pipeline",
             details={"type": type(exc).__name__, "message": str(exc)},
             status_code=500,
         )
-
-
-@router.get("/file/{file_id}/{file_name}", include_in_schema=False)
-async def get_local_artifact(file_id: str, file_name: str) -> FileResponse:
-    path = resolve_local_artifact(file_id, file_name)
-    if path is None:
-        raise HTTPException(status_code=404, detail="文件不存在")
-    return FileResponse(path, filename=path.name)

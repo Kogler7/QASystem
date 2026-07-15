@@ -7,7 +7,8 @@ from algorithm.knowledge_pipeline import (
     md_to_text,
     normalize_document_content,
     parse_chunk_characters,
-    store_artifact,
+    store_vectors,
+    upload_file,
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "md_to_text",
     "normalize_document_content",
     "parse_chunk_characters",
-    "store_artifact",
+    "store_vectors",
+    "upload_file",
 ]

@@ -37,48 +37,46 @@ class ConfidenceCalculator:
             node.get("uid", ""): (node.get("properties") or {}).get("name", node.get("uid", ""))
             for node in nodes
         }
-        details: dict[str, Any] = {}
+        relationship_scores: list[dict[str, Any]] = []
+        ontology_relation_scores: list[dict[str, Any]] = []
 
         with self._lock:
-            for index, relation in enumerate([*relationships, *ontology_relations]):
-                from_uid = relation.get("from_uid", "")
-                to_uid = relation.get("to_uid", "")
-                triple = {
-                    "subject": names.get(from_uid, from_uid),
-                    "predicate": relation.get("type", ""),
-                    "object": names.get(to_uid, to_uid),
-                }
-                text_score = float(self.text_evidence.get_score(triple))
-                path_score = float(self.path_evidence.get_score(triple))
-                confidence = round(
-                    self.text_weight * text_score + self.path_weight * path_score,
-                    4,
-                )
-                relation.setdefault("properties", {})["confidence"] = confidence
-                details[str(index)] = {
-                    "from_uid": from_uid,
-                    "to_uid": to_uid,
-                    "type": relation.get("type", ""),
-                    "text_score": text_score,
-                    "path_score": path_score,
-                    "text_weight": self.text_weight,
-                    "path_weight": self.path_weight,
-                    "confidence": confidence,
-                }
+            for source, target in (
+                (relationships, relationship_scores),
+                (ontology_relations, ontology_relation_scores),
+            ):
+                for relation in source:
+                    from_uid = relation.get("from_uid", "")
+                    to_uid = relation.get("to_uid", "")
+                    triple = {
+                        "subject": names.get(from_uid, from_uid),
+                        "predicate": relation.get("type", ""),
+                        "object": names.get(to_uid, to_uid),
+                    }
+                    text_score = float(self.text_evidence.get_score(triple))
+                    path_score = float(self.path_evidence.get_score(triple))
+                    confidence = round(
+                        self.text_weight * text_score + self.path_weight * path_score,
+                        4,
+                    )
+                    target.append(
+                        {
+                            "text_score": text_score,
+                            "path_score": path_score,
+                            "text_weight": self.text_weight,
+                            "path_weight": self.path_weight,
+                            "confidence": confidence,
+                        }
+                    )
 
         return {
             "code": 0,
-            "message": "置信度评估完成",
             "info": "置信度评估完成",
             "data": {
                 "evaluation_id": f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
                 "total_count": len(relationships) + len(ontology_relations),
-                "graph": {
-                    "nodes": nodes,
-                    "relationships": relationships,
-                    "ontology_relations": ontology_relations,
-                },
-                "details": details,
+                "relationships": relationship_scores,
+                "ontology_relations": ontology_relation_scores,
             },
             "error": None,
         }

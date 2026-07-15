@@ -62,3 +62,31 @@ def chunk_document(
     else:
         raise ValueError("chunk_type 仅支持 0、1、2、3")
     return [document.page_content for document in result]
+
+
+def chunk_document_items(
+    content: str,
+    chunk_type: int = 0,
+    chunk_size: int = 500,
+    chunk_characters: list[str] | None = None,
+    similarity: float = 0.6,
+) -> list[dict[str, Any]]:
+    """Return ordered chunks with source character ranges."""
+    chunks = chunk_document(content, chunk_type, chunk_size, chunk_characters, similarity)
+    items: list[dict[str, Any]] = []
+    cursor = 0
+    for index, text in enumerate(chunks):
+        start = content.find(text, cursor)
+        if start < 0:
+            start = content.find(text)
+        if start < 0:
+            raise ValueError(f"无法定位切片 {index} 在原始 Markdown 中的字符偏移")
+        end = min(len(content), start + len(text))
+        items.append(
+            {
+                "text": text,
+                "range": [start, end],
+            }
+        )
+        cursor = end
+    return items

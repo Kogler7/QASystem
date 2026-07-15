@@ -14,6 +14,7 @@ from openai import OpenAI
 
 from .config import get_llm_config
 from .ontology_schema import OntologySchema
+from .scheduler import get_llm_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -262,21 +263,22 @@ def extract_v2(
     raw_response = ""
     for attempt in range(json_retries + 1):
         try:
-            stream = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=max_tokens,
-                timeout=180,
-                stream=True,
-            )
-            parts: list[str] = []
-            for chunk in stream:
-                if not chunk.choices:
-                    continue
-                content = chunk.choices[0].delta.content
-                if content:
-                    parts.append(content)
+            with get_llm_scheduler().request_slot():
+                stream = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=max_tokens,
+                    timeout=180,
+                    stream=True,
+                )
+                parts: list[str] = []
+                for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        parts.append(content)
             raw_response = "".join(parts)
         except Exception as exc:
             attempts.append({"attempt": attempt + 1, "type": "request", "message": str(exc)})

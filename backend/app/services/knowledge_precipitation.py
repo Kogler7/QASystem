@@ -1,141 +1,90 @@
 from __future__ import annotations
 
-import json
 import os
-import tempfile
-import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from algorithm.NL_to_cypher.vector import batch_text_to_vectors
-from algorithm.knowledge_extract import extract_v2, store_extraction_to_neo4j
-from algorithm.knowledge_pipeline import (
-    build_graphs_response,
-    chunk_document,
-    generate_understanding,
-    md_to_text,
-    normalize_document_content,
-    parse_chunk_characters,
-    store_artifact,
-)
+from algorithm.knowledge_extract import store_extraction_to_neo4j
+from algorithm.knowledge_pipeline import generate_understanding, store_vectors, upload_file
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 
 from backend.app.responses import ErrorCode
-
-
-class MinerUOptions(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    language: str = Field(default="ch", min_length=1)
-    ocr_mode: Literal["auto", "on", "off"] = "auto"
-    table_enable: bool = True
-    formula_enable: bool = True
-
-
-class ParserConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    engine: Literal[
-        "auto",
-        "text",
-        "docling",
-        "vlm",
-        "mineru",
-        "pandas",
-        "beautifulsoup",
-        "excel",
-        "bs4",
-        "html",
-    ] = "auto"
-    mineru_options: MinerUOptions = Field(default_factory=MinerUOptions)
+from backend.app.schemas import PipelineOptions, TextChunk, TextEmbeddingItem
+from backend.app.services.algorithm_capabilities import (
+    CapabilityError,
+    DocumentChunkingService,
+    DocumentParsingService,
+    EmbeddingService,
+    GraphExtractionService,
+)
 
 
 @dataclass(slots=True)
-class PrecipitationRequest:
+class KnowledgeIngestionRequest:
     file_name: str
     content: bytes
     ontology: str
-    parser: ParserConfig = field(default_factory=ParserConfig)
-    chunk_character: str | None = None
-    chunk_size: int = 500
-    chunk_type: int = 0
-    similarity: float = 0.6
-    save_to_db: bool = False
-    model: str | None = None
-    base_url: str | None = None
-    knowledge_space_id: str | None = None
-    file_service_url: str | None = None
+    options: PipelineOptions = field(default_factory=PipelineOptions)
 
 
 class PipelineError(Exception):
-    def __init__(self, code: ErrorCode, message: str, stage: str, details: Any = None, partial_data: Any = None):
-        super().__init__(message)
+    def __init__(self, code: ErrorCode, info: str, stage: str, details: Any = None, partial_data: Any = None):
+        super().__init__(info)
         self.code = code
-        self.message = message
+        self.info = info
         self.stage = stage
         self.details = details
         self.partial_data = partial_data
 
 
 class KnowledgePrecipitationService:
-    def __init__(self, processor_factory=DocumentProcessor):
-        self.processor = processor_factory()
-        self._parse_lock = threading.Lock()
+    def __init__(
+        self,
+        processor_factory=DocumentProcessor,
+        parsing: DocumentParsingService | None = None,
+        chunking: DocumentChunkingService | None = None,
+        extraction: GraphExtractionService | None = None,
+        embeddings: EmbeddingService | None = None,
+    ):
+        self.parsing = parsing or DocumentParsingService(processor_factory)
+        self.chunking = chunking or DocumentChunkingService()
+        self.extraction = extraction or GraphExtractionService()
+        self.embeddings = embeddings or EmbeddingService()
 
     @staticmethod
     def _parser_summary(metadata: dict[str, Any]) -> dict[str, Any]:
-        selection = metadata.get("engine_selection") or {}
-        summary: dict[str, Any] = {
-            "preferred_engine": selection.get("preferred_engine") or metadata.get("model_used"),
-            "final_engine": metadata.get("model_used"),
-        }
-        requested_engine = selection.get("requested_engine")
-        if requested_engine:
-            summary["requested_engine"] = requested_engine
-            summary["request_handling"] = selection.get("request_role")
-        if metadata.get("fallback_from"):
-            fallback = metadata["fallback_from"]
-            summary["fallback"] = {
-                "from_engine": fallback.get("engine"),
-                "reason": fallback.get("error"),
-            }
-        if metadata.get("mineru_options"):
-            summary["mineru_options"] = metadata["mineru_options"]
-        if metadata.get("encoding"):
-            summary["encoding"] = metadata["encoding"]
-        return summary
+        return DocumentParsingService.parser_summary(metadata)
 
     @staticmethod
-    def _store_or_raise(
+    def _upload_markdown(
         content: bytes,
         file_name: str,
         content_type: str,
-        request: PrecipitationRequest,
+        request: KnowledgeIngestionRequest,
         stage: str,
-    ) -> dict[str, Any]:
-        result = store_artifact(
+    ) -> dict[str, Any] | None:
+        file_service_url = os.getenv("FILE_SERVICE_URL", "").strip()
+        if not file_service_url:
+            return None
+        result = upload_file(
             content,
             file_name,
             content_type,
-            request.file_service_url or os.getenv("FILE_SERVICE_URL", "").strip(),
-            request.knowledge_space_id,
+            file_service_url,
+            request.options.storage.knowledge_space_id,
         )
         if not result.get("success"):
-            raise PipelineError(
-                ErrorCode.STORAGE_FAILED,
-                f"{stage}产物存储失败",
-                stage,
-                result,
-            )
-        return result
+            raise PipelineError(ErrorCode.FILE_SERVICE_FAILED, f"{stage}产物存储失败", stage, result)
+        normalized = {key: result.get(key) for key in ("id", "name", "path", "url")}
+        if not normalized["id"]:
+            raise PipelineError(ErrorCode.FILE_SERVICE_FAILED, "文件服务未返回文件 id", stage, result)
+        return normalized
 
-    def process(self, request: PrecipitationRequest) -> dict[str, Any]:
+    def process(self, request: KnowledgeIngestionRequest) -> dict[str, Any]:
         if not request.ontology.strip():
-            raise PipelineError(ErrorCode.INVALID_REQUEST, "ontology 不能为空", "validation")
+            raise PipelineError(ErrorCode.ONTOLOGY_INVALID, "ontology 不能为空", "validation")
         if not request.content:
             raise PipelineError(ErrorCode.INVALID_REQUEST, "上传文件不能为空", "validation")
 
@@ -147,146 +96,145 @@ class KnowledgePrecipitationService:
             "document": {"file_name": file_name, "file_size": len(request.content), "file_type": suffix.lstrip(".")},
             "extraction": {},
             "chunking": {},
-            "storage": {},
+            "storage": {"enabled": bool(os.getenv("FILE_SERVICE_URL", "").strip())},
         }
-        temp_path = None
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
-                handle.write(request.content)
-                temp_path = handle.name
+            parsed = self.parsing.parse(file_name, request.content, request.options.parser)
+            markdown = parsed["markdown"]
+            parser_status = parsed["parser"]
+            stats["document"].update({"content_length": parsed["content_length"]})
 
-            with self._parse_lock:
-                parse_result = self.processor.process_file(
-                    temp_path,
-                    model_name=request.parser.engine,
-                    lang=request.parser.mineru_options.language,
-                    ocr_mode=request.parser.mineru_options.ocr_mode,
-                    table_enable=request.parser.mineru_options.table_enable,
-                    formula_enable=request.parser.mineru_options.formula_enable,
-                )
-            if not parse_result.get("success"):
-                parse_error = str(parse_result.get("error") or "未知原因")
-                raise PipelineError(
-                    ErrorCode.DOCUMENT_PARSE_FAILED,
-                    f"文档解析失败：{parse_error}",
-                    "document_parse",
-                    parse_result,
-                )
-            markdown = normalize_document_content(parse_result.get("content"))
-            if not markdown.strip():
-                raise PipelineError(ErrorCode.DOCUMENT_PARSE_FAILED, "文档解析结果为空", "document_parse")
-            stats["document"]["content_length"] = len(markdown)
-            parser_metadata = parse_result.get("metadata", {})
-            stats["document"]["parser"] = self._parser_summary(parser_metadata)
-
-            origin = self._store_or_raise(
+            origin = self._upload_markdown(
                 markdown.encode("utf-8"), f"{stem}.md", "text/markdown", request, "origin_storage"
             )
-            stats["storage"]["origin"] = origin
+            if origin is not None:
+                stats["storage"]["origin"] = origin
 
-            extraction = extract_v2(
+            chunked = self.chunking.chunk(markdown, request.options.chunking)
+            chunks = chunked["items"]
+            extracted_batch = self.extraction.extract(
                 ontology=request.ontology,
-                text=md_to_text(markdown),
-                model=request.model,
-                base_url=request.base_url,
+                items=[
+                    TextChunk(
+                        text=item["text"],
+                        ranges=item["range"],
+                    )
+                    for item in chunks
+                ],
+                model=request.options.extraction.model,
+                merge=request.options.extraction.merge,
             )
-            if extraction.get("_error") or extraction.get("error"):
-                raise PipelineError(
-                    ErrorCode.KNOWLEDGE_EXTRACT_FAILED,
-                    "知识抽取失败",
-                    "knowledge_extract",
-                    {
-                        "error_code": extraction.get("error_code"),
-                        "message": extraction.get("_error") or extraction.get("error"),
-                        "attempts": extraction.get("attempts", []),
-                        "raw_response": extraction.get("_raw_response", ""),
-                    },
-                    {"origin_url": origin.get("file_url")},
-                )
-            graph = extraction.get("graph") or {"nodes": [], "relationships": []}
+            extracted_items = extracted_batch.items
+            extracted_result = extracted_batch.pipeline_data()
+            final_graph = extracted_batch.graph
+            final_graphs = extracted_batch.graphs
+            node_count = (
+                len(final_graph.get("nodes", []))
+                if final_graph is not None
+                else sum(len(graph.get("nodes", [])) for graph in final_graphs or [])
+            )
+            relationship_count = (
+                len(final_graph.get("relationships", []))
+                if final_graph is not None
+                else sum(len(graph.get("relationships", [])) for graph in final_graphs or [])
+            )
             stats["extraction"] = {
-                "nodes_extracted": len(graph.get("nodes", [])),
-                "relationships_extracted": len(graph.get("relationships", [])),
-                "llm_attempts": extraction.get("attempts", []),
+                "chunks_extracted": len(extracted_items),
+                "merge": request.options.extraction.merge,
+                "nodes_extracted": node_count,
+                "relationships_extracted": relationship_count,
+                "attempts": extracted_batch.attempts,
+                "scheduler": extracted_batch.scheduler,
             }
 
-            if request.save_to_db:
-                database_result = store_extraction_to_neo4j(graph=graph)
+            if request.options.storage.persist_graph:
+                if final_graph is not None:
+                    database_result = store_extraction_to_neo4j(graph=final_graph)
+                else:
+                    database_items = [
+                        {"position": position, **store_extraction_to_neo4j(graph=item["graph"])}
+                        for position, item in enumerate(extracted_items)
+                    ]
+                    database_result = {
+                        "success": all(item.get("success") for item in database_items),
+                        "items": database_items,
+                    }
                 stats["extraction"]["database"] = database_result
                 if not database_result.get("success"):
                     raise PipelineError(
-                        ErrorCode.STORAGE_FAILED,
+                        ErrorCode.GRAPH_STORAGE_FAILED,
                         "知识图谱入库失败",
                         "graph_storage",
                         database_result,
-                        {"origin_url": origin.get("file_url"), "graph": graph},
+                        {"artifacts": {"markdown": origin}} if origin is not None else None,
                     )
 
-            extraction_artifact = {
-                "raw": extraction.get("raw", {}),
-                "graph": graph,
-            }
-            extracted = self._store_or_raise(
-                json.dumps(extraction_artifact, ensure_ascii=False, indent=2).encode("utf-8"),
-                f"{stem}_extract.json",
-                "application/json",
-                request,
-                "extract_storage",
-            )
-            stats["storage"]["extract"] = extracted
-
-            try:
-                separators = parse_chunk_characters(request.chunk_character)
-                chunks = chunk_document(
-                    markdown,
-                    request.chunk_type,
-                    request.chunk_size,
-                    separators,
-                    request.similarity,
+            vector_ids = None
+            vector_dimension = None
+            if origin is not None:
+                embedded = self.embeddings.texts(
+                    [TextEmbeddingItem(text=item["text"]) for item in chunks]
                 )
-            except ValueError as exc:
-                raise PipelineError(ErrorCode.CHUNK_FAILED, str(exc), "chunking") from exc
-            if not chunks:
-                raise PipelineError(ErrorCode.CHUNK_FAILED, "文档切片结果为空", "chunking")
-
-            try:
-                vectors = batch_text_to_vectors(chunks)
-            except Exception as exc:
-                raise PipelineError(ErrorCode.VECTORIZE_FAILED, "向量化失败", "vectorization", str(exc)) from exc
+                vector_result = store_vectors(
+                    embedded["items"],
+                    os.getenv("FILE_SERVICE_URL", "").strip(),
+                    request.options.storage.knowledge_space_id,
+                    origin["id"],
+                )
+                if not vector_result.get("success"):
+                    raise PipelineError(
+                        ErrorCode.VECTOR_STORE_FAILED,
+                        "向量存储失败",
+                        "vector_storage",
+                        vector_result,
+                        {"artifacts": {"markdown": origin}, "extraction": extracted_result},
+                    )
+                vector_ids = vector_result.get("ids")
+                inserted_count = vector_result.get("inserted_count")
+                if not isinstance(vector_ids, list) or inserted_count != len(embedded["items"]) or len(vector_ids) != len(embedded["items"]):
+                    raise PipelineError(
+                        ErrorCode.VECTOR_ID_COUNT_MISMATCH,
+                        "向量存储返回的 ids 数量与输入不一致",
+                        "vector_storage",
+                        {
+                            "input_count": len(embedded["items"]),
+                            "inserted_count": inserted_count,
+                            "id_count": len(vector_ids) if isinstance(vector_ids, list) else None,
+                        },
+                        {"artifacts": {"markdown": origin}, "extraction": extracted_result},
+                    )
+                vector_dimension = embedded["dimension"]
+                stats["storage"]["vectors"] = {"inserted_count": inserted_count}
             stats["chunking"] = {
-                "chunk_count": len(chunks),
-                "chunk_type": request.chunk_type,
-                "chunk_size": request.chunk_size,
-                "separators": separators,
-                "vector_dimension": len(vectors[0]) if vectors else 0,
+                "chunk_count": chunked["count"],
+                "strategy": request.options.chunking.strategy,
+                "size": request.options.chunking.size,
+                "separators": request.options.chunking.separators,
+                "vector_storage_enabled": origin is not None,
+                "vector_dimension": vector_dimension,
+                "vector_source": "text_chunk",
             }
-            vector_artifact = {
-                "count": len(vectors),
-                "dimension": stats["chunking"]["vector_dimension"],
-                "items": [
-                    {"index": index, "text": text, "vector": vector}
-                    for index, (text, vector) in enumerate(zip(chunks, vectors))
-                ],
-            }
-            vectorized = self._store_or_raise(
-                json.dumps(vector_artifact, ensure_ascii=False).encode("utf-8"),
-                f"{stem}_vectors.json",
-                "application/json",
-                request,
-                "vector_storage",
-            )
-            stats["storage"]["vector"] = vectorized
             stats["total_time_seconds"] = round((datetime.now() - started).total_seconds(), 3)
 
-            return {
+            result = {
                 "name": stem,
-                "understanding": generate_understanding(graph),
-                "origin_url": origin.get("file_url"),
-                "vector_url": vectorized.get("file_url"),
-                "extract_url": extracted.get("file_url"),
-                "graphs": build_graphs_response(graph),
+                "parser": parser_status,
+                "summary": (
+                    generate_understanding(final_graph)
+                    if final_graph is not None
+                    else f"共抽取 {len(final_graphs or [])} 个分片图谱，包含 {node_count} 个节点实例和 {relationship_count} 条关系实例。"
+                ),
+                "artifacts": (
+                    {"markdown": origin, "vector_ids": vector_ids}
+                    if origin is not None
+                    else None
+                ),
+                "extraction": extracted_result,
                 "stats": stats,
             }
-        finally:
-            if temp_path and os.path.exists(temp_path):
-                os.unlink(temp_path)
+            return result
+        except CapabilityError as exc:
+            partial = None
+            if stats["storage"].get("origin"):
+                partial = {"artifacts": {"markdown": stats["storage"]["origin"]}}
+            raise PipelineError(exc.code, exc.info, exc.stage, exc.details, partial) from exc

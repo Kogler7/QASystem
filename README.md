@@ -1,15 +1,22 @@
 # QASystem Knowledge Services
 
-QASystem 当前提供三个知识服务 HTTP 接口、一个统一 MCP 服务，以及保留的
-`agentcode` Agent 运行时。
+QASystem 当前提供版本化算法 HTTP 接口、一个统一 MCP 服务，以及保留的
+`agentcode` Agent 运行时。历史 HTTP 路径作为 deprecated aliases 暂时保留。
 
 ## 对外接口
 
 | 方法 | 路径 | 能力 |
 | --- | --- | --- |
-| POST | `/api/knowledge/precipitation` | 文档解析、知识抽取、切片和向量化 |
-| POST | `/api/component/nl2cypher/text-to-vectors` | 多文本向量化 |
-| POST | `/api/component/kg-update/calculate-confidence` | 图谱关系置信度更新 |
+| POST | `/api/v1/pipelines/knowledge-ingestion` | 文档解析、切片、知识抽取和文本切片向量化聚合流水线 |
+| POST | `/api/v1/documents/parse` | 文档解析为 Markdown |
+| POST | `/api/v1/documents/chunk` | Markdown 切片 |
+| POST | `/api/v1/graphs/extract` | 分片图谱抽取 |
+| POST | `/api/v1/graphs/merge` | Graph 确定性去重 |
+| POST | `/api/v1/embeddings/texts` | 多文本向量化 |
+| POST | `/api/v1/embeddings/graphs` | Graph JSON 向量化 |
+| POST | `/api/v1/graphs/confidence` | 图谱关系置信度更新 |
+
+历史接口仅保留 deprecated 路径 aliases，请求和响应字段与 v1 完全一致，`info` 会注明迁移目标。
 
 服务健康检查为 `GET /health`。统一 MCP Streamable HTTP 入口为 `/mcp`。
 Agent 通过 MCP 自主选择知识、图谱检索、数据和可视化工具；仓库不再提供独立意图识别和方案规划 MCP。`problem-solve`、`semantic-align`、`plan-execute` Skills 负责约束求解框架，业务事实与方案仍以知识图谱为唯一知识来源。
