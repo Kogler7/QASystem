@@ -1,4 +1,4 @@
-# NVIDIA Container Toolkit 内网离线安装操作手册
+# NVIDIA 容器工具包内网离线安装操作手册
 
 本文档用于在**完全无法访问互联网**的 Linux 服务器上离线安装 NVIDIA Container Toolkit，使 Docker 具备访问服务器 NVIDIA GPU 的基础能力，并使用标准 CUDA 容器完成验证。
 

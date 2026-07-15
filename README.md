@@ -51,12 +51,12 @@ cd backend
 
 ## 部署
 
-镜像只包含运行环境。代码挂载到 `/app`，模型挂载到 `/models`。
+镜像包含运行环境和业务代码，Compose 不使用宿主机代码覆盖 `/app`；模型单独挂载到 `/models`。
 
 ```powershell
 Copy-Item .env.example .env
-.\package-deploy.ps1
+.\build-image.ps1
 docker compose up -d
 ```
 
-项目部署见 `docs/DEPLOYMENT.md`；Agent 专项部署和排障见 [AgentCode 部署运维指南](agent/docs/部署运维指南.md)。
+文档总入口见[文档索引](docs/文档索引.md)，项目部署见[部署说明](docs/部署说明.md)，接口联调见[算法接口协议](docs/算法接口协议.md)；Agent 专项部署和排障见 [AgentCode 部署运维指南](agent/docs/部署运维指南.md)。
