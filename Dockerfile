@@ -2,11 +2,19 @@
 
 ARG NODE_IMAGE=node:20-bullseye-slim
 ARG PYTHON_IMAGE=python:3.12-bookworm
+ARG MAVEN_IMAGE=maven:3.9.9-eclipse-temurin-17
 FROM ${NODE_IMAGE} AS opencode-runtime
 
 ARG OPENCODE_VERSION=1.17.15
 RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" && \
     test "$(opencode --version)" = "${OPENCODE_VERSION}"
+
+FROM ${MAVEN_IMAGE} AS ofd-converter-builder
+
+WORKDIR /build
+COPY ofd_converter/pom.xml /build/pom.xml
+COPY ofd_converter/src /build/src
+RUN mvn --batch-mode --no-transfer-progress package -DskipTests
 
 FROM ${PYTHON_IMAGE}
 
@@ -29,6 +37,7 @@ RUN apt-get -o Acquire::Retries=5 update && \
     libmagic1 \
     libreoffice-core \
     libreoffice-impress \
+    openjdk-17-jre-headless \
     libreoffice-writer \
     fonts-dejavu-core \
     fonts-noto-cjk \
@@ -78,6 +87,7 @@ COPY backend /app/backend
 COPY algorithm /app/algorithm
 COPY mcp_services /app/mcp_services
 COPY docker/verify_runtime.py /usr/local/bin/verify_qasystem_runtime.py
+COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=opencode-runtime /usr/local/bin/opencode /usr/local/bin/opencode
@@ -86,7 +96,8 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 ENV PYTHONPATH=/app:/app/agent \
-    LIBREOFFICE_PATH=/usr/bin/soffice
+    LIBREOFFICE_PATH=/usr/bin/soffice \
+    OFD_CONVERTER_COMMAND="java -jar /opt/qasystem/ofdrw/ofd-to-pdf.jar"
 
 # Validate dependencies, native programs and both ASGI entry points while the
 # image is being built. Any missing runtime component aborts the build.

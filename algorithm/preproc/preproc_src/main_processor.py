@@ -12,6 +12,7 @@ from typing import Any, Optional
 class DocumentProcessor:
     ENGINE_MATRIX = {
         ".pdf": ("docling", "vlm", "mineru"),
+        ".ofd": ("docling", "vlm", "mineru"),
         ".docx": ("docling", "vlm", "mineru"),
         ".doc": ("docling", "vlm", "mineru"),
         ".pptx": ("docling", "vlm", "mineru"),
@@ -75,6 +76,13 @@ class DocumentProcessor:
             raise ValueError(f"未知解析引擎: {engine}")
         self._processors[engine] = processor
         return processor
+
+    def _ofd_converter(self):
+        if "ofd_converter" not in self._processors:
+            from .processors.ofd_converter import OFDConverter
+
+            self._processors["ofd_converter"] = OFDConverter()
+        return self._processors["ofd_converter"]
 
     def _profile_pdf(self, file_path: str) -> dict[str, Any]:
         profile = {
@@ -304,9 +312,30 @@ class DocumentProcessor:
                 "error": "ocr_mode 仅支持 auto、on、off",
                 "file_type": suffix.lstrip("."),
             }
+        process_path = file_path
+        process_suffix = suffix
+        converted_pdf_path = None
         try:
-            engine, selection = self.select_engine(file_path, model_name)
+            if suffix == ".ofd":
+                converter = self._ofd_converter()
+                converted_pdf_path = converter.convert_to_pdf(file_path)
+                if not converted_pdf_path:
+                    error = converter.last_conversion_error or "OFD 转换为 PDF 失败"
+                    return {
+                        "success": False,
+                        "error_code": "DOCUMENT_CONVERT_FAILED",
+                        "error": error,
+                        "file_type": suffix.lstrip("."),
+                    }
+                process_path = converted_pdf_path
+                process_suffix = ".pdf"
+            engine, selection = self.select_engine(process_path, model_name)
+            if suffix == ".ofd":
+                selection["source_file_type"] = ".ofd"
+                selection["converted_file_type"] = ".pdf"
         except ValueError as exc:
+            if converted_pdf_path:
+                shutil.rmtree(os.path.dirname(converted_pdf_path), ignore_errors=True)
             return {
                 "success": False,
                 "error_code": "ENGINE_NOT_SUPPORTED",
@@ -315,13 +344,13 @@ class DocumentProcessor:
             }
 
         run_options = (normalized_ocr_mode, table_enable, formula_enable)
-        result = self._run_processor(engine, file_path, suffix, lang, *run_options)
+        result = self._run_processor(engine, process_path, process_suffix, lang, *run_options)
         fallback_from = None
         fallback = selection.get("fallback_engine")
         if not result.get("success") and fallback and fallback != engine:
             fallback_from = {"engine": engine, "error": result.get("error", "解析失败")}
             engine = fallback
-            result = self._run_processor(engine, file_path, suffix, lang, *run_options)
+            result = self._run_processor(engine, process_path, process_suffix, lang, *run_options)
 
         base_metadata = {
             "file_name": path.name,
@@ -336,6 +365,8 @@ class DocumentProcessor:
             base_metadata["fallback_from"] = fallback_from
         base_metadata.update(result.get("metadata") or {})
         if not result.get("success"):
+            if converted_pdf_path:
+                shutil.rmtree(os.path.dirname(converted_pdf_path), ignore_errors=True)
             return {
                 "success": False,
                 "error_code": "DOCUMENT_PARSE_FAILED",
@@ -343,12 +374,15 @@ class DocumentProcessor:
                 "file_type": suffix.lstrip("."),
                 "metadata": base_metadata,
             }
-        return {
+        response = {
             "success": True,
             "file_type": suffix.lstrip("."),
             "content": result["content"],
             "metadata": base_metadata,
         }
+        if converted_pdf_path:
+            shutil.rmtree(os.path.dirname(converted_pdf_path), ignore_errors=True)
+        return response
 
     def process_directory(self, directory: str, lang: str = "ch") -> dict[str, Any]:
         path = Path(directory)

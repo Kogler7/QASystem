@@ -22,7 +22,7 @@ if (Test-Path -LiteralPath $runtimeDir) {
 }
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 
-foreach ($directory in @("backend", "algorithm", "agent", "mcp_services")) {
+foreach ($directory in @("backend", "algorithm", "agent", "mcp_services", "ofd_converter")) {
     $source = Join-Path $repoRoot $directory
     $destination = Join-Path $runtimeDir $directory
     robocopy $source $destination /E /NFL /NDL /NJH /NJS /NP `

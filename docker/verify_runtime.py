@@ -6,6 +6,7 @@ import importlib
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 
 MODULES = (
@@ -49,6 +50,7 @@ PROGRAMS = (
     "ffmpeg",
     "file",
     "git",
+    "java",
     "jq",
     "libreoffice",
     "node",
@@ -90,6 +92,10 @@ def _check_application() -> None:
 
     assert hasattr(InputFormat, "PPTX")
     assert hasattr(InputFormat, "IMAGE")
+    if not shutil.which("java"):
+        raise RuntimeError("missing Java runtime required by the OFD converter")
+    if not Path("/opt/qasystem/ofdrw/ofd-to-pdf.jar").is_file():
+        raise RuntimeError("missing bundled ofdrw OFD converter")
 
     from agentcode.api import app as agent_app
     from backend.app.main import app as backend_app

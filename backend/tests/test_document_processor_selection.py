@@ -42,6 +42,61 @@ def test_scanned_pdf_prefers_vlm(tmp_path, monkeypatch):
     assert engine == "vlm"
 
 
+def test_ofd_is_converted_then_uses_pdf_selection(tmp_path, monkeypatch):
+    path = tmp_path / "sample.ofd"
+    path.write_bytes(b"ofd-test")
+    conversion_dir = tmp_path / "conversion"
+    conversion_dir.mkdir()
+    converted = conversion_dir / "converted.pdf"
+    converted.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "text", "reason": "test"})
+
+    class FakeConverter:
+        last_conversion_error = None
+
+        def convert_to_pdf(self, _path):
+            return str(converted)
+
+    monkeypatch.setattr(processor, "_ofd_converter", lambda: FakeConverter())
+    monkeypatch.setattr(
+        processor,
+        "_run_processor",
+        lambda engine, file_path, suffix, *_args: {
+            "success": True,
+            "content": "parsed",
+            "metadata": {"processed_path": file_path, "processed_suffix": suffix, "engine": engine},
+        },
+    )
+
+    result = processor.process_file(str(path))
+
+    assert result["success"] is True
+    assert result["metadata"]["model_used"] == "docling"
+    assert result["metadata"]["engine_selection"]["source_file_type"] == ".ofd"
+    assert result["metadata"]["processed_suffix"] == ".pdf"
+
+
+def test_ofd_conversion_failure_is_reported(tmp_path, monkeypatch):
+    path = tmp_path / "sample.ofd"
+    path.write_bytes(b"ofd-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+
+    class FakeConverter:
+        last_conversion_error = "OFD 转换为 PDF 失败：invalid OFD"
+
+        def convert_to_pdf(self, _path):
+            return None
+
+    monkeypatch.setattr(processor, "_ofd_converter", lambda: FakeConverter())
+
+    result = processor.process_file(str(path))
+
+    assert result["success"] is False
+    assert result["error_code"] == "DOCUMENT_CONVERT_FAILED"
+    assert "invalid OFD" in result["error"]
+
+
 def test_requested_mineru_is_only_a_hint_for_text_docx(tmp_path, monkeypatch):
     path = tmp_path / "sample.docx"
     path.write_bytes(b"docx-test")

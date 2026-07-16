@@ -46,6 +46,7 @@ def test_deploy_script_only_generates_runtime_assets():
     assert "qasystem-runtime" in script
     assert "docker-compose.deploy.yml" not in script
     assert ".env.deploy.example" not in script
+    assert '"ofd_converter"' in script
 
 
 def test_dockerfile_performs_complete_runtime_verification():
@@ -59,6 +60,8 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert "from agentcode.api import app as agent_app" in verifier
     assert '"mcp"' in verifier
     assert '"loguru"' in verifier
+    assert '"java"' in verifier
+    assert "ofd-to-pdf.jar" in verifier
 
 
 def test_agent_module_reads_its_own_llm_namespace(monkeypatch):
