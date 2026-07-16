@@ -1,6 +1,6 @@
 # Document Processing
 
-该包只负责将 PDF、Word、PowerPoint、图片、Markdown、TXT、Excel、CSV 和 HTML 转换为 Markdown 或文本。
+该包只负责将 PDF、OFD、Word、PowerPoint、图片、Markdown、TXT、Excel、CSV 和 HTML 转换为 Markdown 或文本。
 
 入口：
 
@@ -9,7 +9,7 @@ from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 ```
 
 Python 与系统依赖统一由 `backend/requirements.txt` 和根目录 `Dockerfile` 管理。
-MinerU 模型通过 `/models` 外置挂载，LibreOffice 使用系统安装版本。
+MinerU 模型通过 `/models` 外置挂载，LibreOffice 使用系统安装版本。OFD 先由镜像内置的 ofdrw 转换为 PDF，再复用 PDF 的自动解析路线；该流程不提供 OFD 电子签名验签能力。
 
 解析引擎名称中，`vlm` 表示视觉语言模型解析，`mineru` 表示传统专用模型流水线解析。
 
