@@ -62,6 +62,7 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert '"loguru"' in verifier
     assert '"java"' in verifier
     assert "ofd-to-pdf.jar" in verifier
+    assert '"Usage: ofd-to-pdf"' in verifier
 
 
 def test_agent_module_reads_its_own_llm_namespace(monkeypatch):

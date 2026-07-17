@@ -96,6 +96,15 @@ def _check_application() -> None:
         raise RuntimeError("missing Java runtime required by the OFD converter")
     if not Path("/opt/qasystem/ofdrw/ofd-to-pdf.jar").is_file():
         raise RuntimeError("missing bundled ofdrw OFD converter")
+    converter = subprocess.run(
+        ["java", "-jar", "/opt/qasystem/ofdrw/ofd-to-pdf.jar"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=30,
+    )
+    if converter.returncode != 2 or "Usage: ofd-to-pdf" not in converter.stdout:
+        raise RuntimeError(f"bundled OFD converter is not executable: {converter.stdout}")
 
     from agentcode.api import app as agent_app
     from backend.app.main import app as backend_app
