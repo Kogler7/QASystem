@@ -56,8 +56,9 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
     relationships: list[dict[str, Any]] = []
     relationship_keys: set[tuple[str, str, str]] = set()
 
-    for item in items:
+    for position, item in enumerate(items):
         graph = item.get("graph") or {}
+        chunk_index = item.get("index", position)
         for node in graph.get("nodes", []):
             uid = str(node.get("uid") or "")
             if not uid:
@@ -66,9 +67,13 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                 nodes_by_uid[uid] = {
                     **node,
                     "properties": dict(node.get("properties") or {}),
+                    "chunk_indices": [chunk_index],
                 }
             else:
                 nodes_by_uid[uid].setdefault("properties", {}).update(node.get("properties") or {})
+                chunk_indices = nodes_by_uid[uid].setdefault("chunk_indices", [])
+                if chunk_index not in chunk_indices:
+                    chunk_indices.append(chunk_index)
 
         for relationship in graph.get("relationships", []):
             key = (

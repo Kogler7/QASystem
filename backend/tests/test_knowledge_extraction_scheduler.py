@@ -66,6 +66,8 @@ def test_deduplicate_chunk_graphs_deduplicates_nodes_and_relationships():
     assert len(graph["nodes"]) == 2
     assert len(graph["relationships"]) == 1
     assert graph["nodes"][0]["properties"] == {"name": "A", "description": "merged"}
+    assert graph["nodes"][0]["chunk_indices"] == [0, 1]
+    assert graph["nodes"][1]["chunk_indices"] == [1]
 
 
 def test_request_scheduler_limits_in_flight_requests():
