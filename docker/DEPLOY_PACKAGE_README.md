@@ -26,7 +26,9 @@ curl http://127.0.0.1:8006/health
 curl http://127.0.0.1:9180/health
 ```
 
-`docker-compose.yml` 默认申请全部 NVIDIA GPU。CPU-only 部署时，删除 `backend` 服务中的 `gpus: all`；VLM/MinerU 能力仍需要根据实际可用硬件与模型配置评估。
+`.env.example` 默认将 Backend 发布到 `0.0.0.0:8006`，可由其他主机访问。生产环境应通过宿主机防火墙、安全组或反向代理限制来源；只需本机访问时设为 `BACKEND_BIND=127.0.0.1`。
+
+`docker-compose.yml` 通过 `.env` 中的 `GPU_DEVICE_IDS=4,5,6,7` 设置 Backend 进程的 `CUDA_VISIBLE_DEVICES`，默认只供模型使用宿主机 4、5、6、7 号卡。可改为单张卡，例如 `GPU_DEVICE_IDS=4`；CPU-only 部署时，删除 `backend` 服务中的 `gpus` 配置。VLM/MinerU 能力仍需要根据实际可用硬件与模型配置评估。
 
 ## 模型与外部服务
 

@@ -29,6 +29,7 @@ def test_environment_template_uses_module_specific_llm_keys():
 
 def test_compose_reuses_root_environment_without_variable_duplication():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    source_mounted_compose = (ROOT / "docker" / "docker-compose.delivery.yml").read_text(encoding="utf-8")
     template = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "- .env" in compose
     assert "QASYSTEM_LOAD_DOTENV=false" in template
@@ -39,6 +40,10 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "INTENT_LLM_" not in compose
     assert "QA_LLM_" not in compose
     assert "AGENT_LLM_" not in compose
+    assert "GPU_DEVICE_IDS=4,5,6,7" in template
+    assert "BACKEND_BIND=0.0.0.0" in template
+    assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" in compose
+    assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" in source_mounted_compose
 
 
 def test_deploy_script_only_generates_runtime_assets():
