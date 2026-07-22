@@ -1,9 +1,12 @@
+import os
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from .environment import configure_runtime_environment
 from .health import full_health
 
@@ -35,6 +38,51 @@ app = FastAPI(title="QASystem Knowledge Services", lifespan=lifespan)
 app.include_router(capabilities_router)
 app.include_router(knowledge_router)
 app.include_router(confidence_router)
+
+
+async def _proxy_agent(request: Request, path: str = "") -> StreamingResponse:
+    """Expose the isolated Agent service through the Backend public endpoint."""
+    upstream = os.getenv("AGENT_INTERNAL_URL", "http://agent:9180").rstrip("/")
+    target = f"{upstream}/{path.lstrip('/')}"
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in {"host", "connection", "content-length"}
+    }
+    client = httpx.AsyncClient(timeout=None)
+    try:
+        response = await client.send(
+            client.build_request(
+                request.method,
+                target,
+                params=request.query_params,
+                headers=headers,
+                content=request.stream(),
+            ),
+            stream=True,
+        )
+    except httpx.HTTPError as exc:
+        await client.aclose()
+        return JSONResponse(
+            status_code=503,
+            content={"detail": f"Agent service unavailable: {exc}"},
+        )
+
+    response_headers = {
+        key: value
+        for key, value in response.headers.items()
+        if key.lower() not in {"connection", "content-length", "transfer-encoding"}
+    }
+    return StreamingResponse(
+        response.aiter_raw(),
+        status_code=response.status_code,
+        headers=response_headers,
+        background=BackgroundTask(client.aclose),
+    )
+
+
+app.add_api_route("/agent", _proxy_agent, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+app.add_api_route("/agent/{path:path}", _proxy_agent, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 
 
 @app.exception_handler(RequestValidationError)

@@ -51,6 +51,18 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "BACKEND_BIND=0.0.0.0" in template
     assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" in compose
     assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" in source_mounted_compose
+    assert "AGENT_MCP_URL: http://backend:8000/mcp" in compose
+    assert "AGENT_MCP_URL: http://backend:8000/mcp" in source_mounted_compose
+    assert "AGENT_HOST_PORT" not in compose
+    assert "AGENT_HOST_PORT" not in source_mounted_compose
+    assert "MCP_PORT" not in template
+
+
+def test_backend_proxies_agent_under_its_public_route():
+    main = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")
+    assert 'app.add_api_route("/agent"' in main
+    assert 'app.add_api_route("/agent/{path:path}"' in main
+    assert '"http://agent:9180"' in main
 
 
 def test_deploy_script_only_generates_runtime_assets():
