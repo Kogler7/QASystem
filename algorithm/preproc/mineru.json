@@ -32,8 +32,8 @@
     },
     
     "models-dir": {
-        "pipeline": "/mnt/data3/srv/qasystem/models/hub/models/OpenDataLab/PDF-Extract-Kit-1___0",
-        "vlm": "/mnt/data3/srv/qasystem/models/hub/models/OpenDataLab/MinerU2___5-2509-1___2B"
+        "pipeline": "/models/mineru/pipeline",
+        "vlm": "/models/mineru/vlm"
     },
     
     "config_version": "1.3.1"

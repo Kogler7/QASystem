@@ -1,0 +1,54 @@
+services:
+  mock-llm:
+    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    pull_policy: never
+    entrypoint: ["python", "/usr/local/bin/offline_mock_llm.py"]
+    networks: [offline]
+
+  backend:
+    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    pull_policy: never
+    gpus: all
+    environment:
+      ENVIRONMENT: offline-test
+      QASYSTEM_LOAD_DOTENV: "false"
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /app:/app/agent
+      LIBREOFFICE_PATH: /usr/bin/soffice
+      MINERU_MODEL_SOURCE: local
+      MINERU_CONFIG_PATH: /app/algorithm/preproc/mineru.json
+      MINERU_MODEL_PIPELINE_PATH: /models/mineru/pipeline
+      MINERU_MODEL_VLM_PATH: /models/mineru/vlm
+      VECTOR_MODEL_PATH: /models/bge-small-zh-v1.5
+      CONFIDENCE_SBERT_MODEL_PATH: /models/bge-small-zh-v1.5
+      NL2CYPHER_EMBEDDING_MODEL_PATH: /models/bge-small-zh-v1.5
+      DATABASE_HOST: ""
+      NEO4J_URI: ""
+      CONFIDENCE_ES_HOSTS: ""
+      FILE_SERVICE_URL: ""
+      KG_EXTRACT_LLM_BASE_URL: http://mock-llm:9000/v1
+      KG_EXTRACT_LLM_API_KEY: offline-test
+      KG_EXTRACT_LLM_MODEL: offline-mock
+      KG_EXTRACT_LLM_JSON_RETRIES: "0"
+    volumes:
+      - ${HOST_MODELS_DIR:-../deploy/models}:/models:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    networks: [offline]
+    depends_on: [mock-llm]
+
+  verifier:
+    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    pull_policy: never
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ${OFFLINE_SAMPLES_DIR:-../test_artifacts/parser}:/samples:ro
+    entrypoint: ["python", "/usr/local/bin/offline_validation.py"]
+    command: ["--samples", "/samples"]
+    networks: [offline]
+    depends_on: [backend]
+    restart: "no"
+
+networks:
+  offline:
+    internal: true

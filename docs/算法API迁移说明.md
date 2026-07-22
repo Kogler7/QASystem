@@ -266,7 +266,7 @@ v1 响应：
   "info": "文本向量化完成，共 2 个向量",
   "data": {
     "count": 2,
-    "dimension": 1024,
+    "dimension": 512,
     "items": [
       {"vector": [0.1, -0.2]},
       {"vector": [0.3, -0.4]}

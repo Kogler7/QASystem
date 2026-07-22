@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from .environment import configure_runtime_environment
+from .health import full_health
 
 
 configure_runtime_environment()
@@ -74,8 +75,16 @@ async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSON
     )
 
 
-@app.get("/health", include_in_schema=False)
-async def health() -> dict[str, str]:
+@app.get("/health", include_in_schema=False, response_model=None)
+async def health(
+    full: bool = Query(default=False),
+    validate_models: bool = Query(default=False),
+) -> dict | JSONResponse:
+    if full or validate_models:
+        result = full_health()
+        if result["status"] != "ok":
+            return JSONResponse(status_code=503, content=result)
+        return result
     return {"status": "ok"}
 
 

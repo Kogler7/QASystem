@@ -176,6 +176,32 @@ def test_requested_engine_is_preferred_when_primary_engine_fails(tmp_path, monke
     assert result["metadata"]["fallback_from"]["engine"] == "docling"
 
 
+def test_text_pdf_falls_back_to_requested_mineru_when_docling_fails(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "text", "reason": "test"})
+    calls = []
+
+    def fake_run(engine, *_args):
+        calls.append(engine)
+        if engine == "docling":
+            return {"success": False, "error": "docling model unavailable"}
+        return {"success": True, "content": "parsed", "metadata": {}}
+
+    monkeypatch.setattr(processor, "_run_processor", fake_run)
+
+    result = processor.process_file(str(path), model_name="mineru")
+
+    assert result["success"] is True
+    assert calls == ["docling", "mineru"]
+    assert result["metadata"]["model_used"] == "mineru"
+    assert result["metadata"]["fallback_from"] == {
+        "engine": "docling",
+        "error": "docling model unavailable",
+    }
+
+
 def test_no_fallback_is_attempted_without_a_compatible_user_request(tmp_path, monkeypatch):
     path = tmp_path / "sample.docx"
     path.write_bytes(b"docx-test")

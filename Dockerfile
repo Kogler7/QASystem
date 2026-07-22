@@ -76,6 +76,13 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && 
     pip install -r /tmp/qasystem/requirements.txt && \
     pip check
 
+# MinerU publishes its pipeline/VLM dependencies as optional extras. Keep this
+# layer separate so ordinary application changes reuse the heavy base layer.
+COPY backend/requirements.mineru-extras.txt /tmp/qasystem/requirements.mineru-extras.txt
+RUN pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
+    --retries 8 --timeout 120 -r /tmp/qasystem/requirements.mineru-extras.txt && \
+    pip check
+
 # Install Agent with dependency resolution enabled. This makes a future
 # pyproject dependency change fail the image build instead of being hidden.
 COPY agent /app/agent
@@ -87,6 +94,9 @@ COPY backend /app/backend
 COPY algorithm /app/algorithm
 COPY mcp_services /app/mcp_services
 COPY docker/verify_runtime.py /usr/local/bin/verify_qasystem_runtime.py
+COPY docker/download_models.py /usr/local/bin/download_qasystem_models.py
+COPY docker/offline_mock_llm.py /usr/local/bin/offline_mock_llm.py
+COPY docker/offline_validation.py /usr/local/bin/offline_validation.py
 COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node

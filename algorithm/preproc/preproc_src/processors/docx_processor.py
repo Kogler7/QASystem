@@ -1,4 +1,7 @@
 from docling.datamodel.base_models import InputFormat
+from docling.datamodel.settings import settings as docling_settings
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.document_converter import PdfFormatOption
 from docling.document_converter import DocumentConverter
 import os
 import shutil
@@ -7,8 +10,7 @@ import subprocess
 from typing import Optional, Dict, Any
 from . import BaseProcessor
 
-# import os
-# os.environ["HF_HOME"] = "/home/admin_user_3/.cache/huggingface"
+DOCLING_MODELS_PATH = "/models/docling-models"
 
 class DocxProcessor(BaseProcessor):
     def __init__(self, libreoffice_path: str = None):
@@ -27,6 +29,7 @@ class DocxProcessor(BaseProcessor):
 
     def _get_converter(self) -> DocumentConverter:
         if self.converter is None:
+            self._ensure_docling_artifacts()
             self.converter = DocumentConverter(
                 allowed_formats=[InputFormat.DOCX, InputFormat.PPTX, InputFormat.IMAGE]
             )
@@ -34,8 +37,25 @@ class DocxProcessor(BaseProcessor):
 
     def _get_pdf_converter(self) -> DocumentConverter:
         if self.pdf_converter is None:
-            self.pdf_converter = DocumentConverter(allowed_formats=[InputFormat.PDF])
+            self._ensure_docling_artifacts()
+            self.pdf_converter = DocumentConverter(
+                allowed_formats=[InputFormat.PDF],
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=PdfPipelineOptions(artifacts_path=DOCLING_MODELS_PATH)
+                    )
+                },
+            )
         return self.pdf_converter
+
+    @staticmethod
+    def _ensure_docling_artifacts() -> None:
+        if not os.path.isdir(DOCLING_MODELS_PATH):
+            raise RuntimeError(
+                f"Docling 离线模型目录不存在：{DOCLING_MODELS_PATH}；"
+                "请在交付包的 models 目录中包含 docling-models"
+            )
+        docling_settings.artifacts_path = DOCLING_MODELS_PATH
 
     def _detect_office_app(self) -> Optional[str]:
         """检测系统中的LibreOffice应用"""

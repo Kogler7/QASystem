@@ -63,7 +63,20 @@ cd backend
 ```powershell
 Copy-Item .env.example .env
 .\build-image.ps1
+.\download-models.ps1
 docker compose up -d
 ```
+
+`download-models.ps1` 必须在可访问 ModelScope 或 Hugging Face 的机器运行；它将 Docling 和 MinerU 模型保存到外部 `deploy/models/`，Docker 镜像不包含模型。
+
+## 封闭网络验收
+
+目标内网部署前可执行：
+
+```powershell
+.\run-offline-validation.ps1
+```
+
+该命令通过内部 Docker 网络、Mock LLM 和 `test_artifacts/parser` 中的真实样本验证完整运行时，详见 [封闭网络验收](docker/OFFLINE_VALIDATION.md)。
 
 文档总入口见[文档索引](docs/文档索引.md)，项目部署见[部署说明](docs/部署说明.md)，接口联调见[算法接口协议](docs/算法接口协议.md)；Agent 专项部署和排障见 [AgentCode 部署运维指南](agent/docs/部署运维指南.md)。

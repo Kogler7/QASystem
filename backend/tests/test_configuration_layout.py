@@ -10,7 +10,14 @@ def test_root_is_the_only_configuration_source():
     assert (ROOT / "docker-compose.yml").is_file()
     assert (ROOT / "package-deploy.ps1").is_file()
     assert (ROOT / "build-image.ps1").is_file()
+    assert (ROOT / "download-models.ps1").is_file()
+    assert (ROOT / "run-offline-validation.ps1").is_file()
     assert (ROOT / "docker" / "verify_runtime.py").is_file()
+    assert (ROOT / "docker" / "download_models.py").is_file()
+    assert (ROOT / "docker" / "docker-compose.offline-test.yml").is_file()
+    assert (ROOT / "docker" / "offline_mock_llm.py").is_file()
+    assert (ROOT / "docker" / "offline_validation.py").is_file()
+    assert (ROOT / "backend" / "app" / "health.py").is_file()
     assert not (ROOT / "agent" / ".env.example").exists()
     assert not (ROOT / "docker" / ".env.deploy.example").exists()
     assert not (ROOT / "docker" / "docker-compose.deploy.yml").exists()
@@ -57,10 +64,15 @@ def test_deploy_script_only_generates_runtime_assets():
 def test_dockerfile_performs_complete_runtime_verification():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     verifier = (ROOT / "docker" / "verify_runtime.py").read_text(encoding="utf-8")
+    docling_processor = (
+        ROOT / "algorithm" / "preproc" / "preproc_src" / "processors" / "docx_processor.py"
+    ).read_text(encoding="utf-8")
     assert "pip check" in dockerfile
+    assert "docling-tools models download" not in dockerfile
     assert 'pip install "/app/agent[api]"' in dockerfile
     assert "--no-deps" not in dockerfile
     assert "verify_qasystem_runtime.py" in dockerfile
+    assert "download_qasystem_models.py" in dockerfile
     assert "from backend.app.main import app as backend_app" in verifier
     assert "from agentcode.api import app as agent_app" in verifier
     assert '"mcp"' in verifier
@@ -68,6 +80,8 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert '"java"' in verifier
     assert "ofd-to-pdf.jar" in verifier
     assert '"Usage: ofd-to-pdf"' in verifier
+    assert 'DOCLING_MODELS_PATH = "/models/docling-models"' in docling_processor
+    assert "DOCLING_ARTIFACTS_PATH" not in dockerfile
 
 
 def test_agent_module_reads_its_own_llm_namespace(monkeypatch):

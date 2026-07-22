@@ -1,0 +1,5 @@
+# Required by the actual MinerU pipeline and VLM routes, which are not included
+# in MinerU's base package.
+mineru[pipeline,vlm]==2.7.6
+# MinerU's supported baseline avoids newer Ultralytics' optional Polars runtime.
+ultralytics==8.3.48
