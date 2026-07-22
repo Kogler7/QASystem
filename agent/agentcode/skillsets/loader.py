@@ -44,6 +44,8 @@ class SkillLoader:
         """扫描 .md → 提取 frontmatter 元数据"""
         refs: list[SkillRef] = []
         for md_path in sorted(self._skillset_dir.rglob("*.md")):
+            if any(part.startswith(".") for part in md_path.relative_to(self._skillset_dir).parts[:-1]):
+                continue
             skill_id = md_path.parent.name
             try:
                 with open(md_path, "r", encoding="utf-8") as fh:
