@@ -43,12 +43,10 @@ def _collect_files(
     result: list[tuple[str, bytes]] = []
     if file is not None and file.filename:
         result.append((file.filename, file.file.read()))
-        file.file.seek(0)
     if files:
         for f in files:
             if f.filename:
                 result.append((f.filename, f.file.read()))
-                f.file.seek(0)
     return result
 
 

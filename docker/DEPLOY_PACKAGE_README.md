@@ -8,7 +8,7 @@
 | --- | --- |
 | `qasystem-backend-latest.tar` | QASystem Backend 与 Agent 离线镜像；仅在打包时指定 `-IncludeImage` 时生成 |
 | `redis-7-alpine.tar` | Redis 离线镜像；仅在打包时指定 `-IncludeImage` 时生成 |
-| `docker-compose.yml` | 启动 Backend、Agent 和 Redis 的 Compose 文件 |
+| `docker-compose.yml` | 启动 Backend、Agent 和 Redis 的 Compose 文件；仅 Backend 对外发布 HTTP 端口 |
 | `download-models.ps1` | 在联网机器将 Docling、MinerU 模型下载到 `models/` |
 | `ENV_MIGRATION.md` | 已有部署更新时需要合并的模型相关 `.env` 变更 |
 | `.env.example` | 脱敏环境变量模板；部署前复制为 `.env` 并填写 |
@@ -25,7 +25,7 @@ Copy-Item .env.example .env
 # 编辑 .env：外部服务地址、LLM 密钥、端口和模型路径
 docker compose up -d
 curl http://127.0.0.1:8006/health
-curl http://127.0.0.1:9180/health
+curl http://127.0.0.1:8006/agent/health
 ```
 
 模型不包含在 Docker 镜像中。请先在可访问模型仓库的机器执行：
@@ -48,4 +48,4 @@ curl http://127.0.0.1:9180/health
 
 MySQL、Neo4j、Elasticsearch、文件服务和 LLM 服务是外部依赖；部署前将 `.env` 中的地址、账号和密钥替换为目标环境可访问的配置。不要交付包含真实密钥的 `.env`。
 
-只使用文档解析和知识接口时，可以不启动 `agent` 与 `redis`；完整 Agent 异步任务和 SSE 流式接口需要 Redis。
+只使用文档解析和知识接口时，仍需启动 Redis，但它不会暴露宿主机端口；完整 Agent 异步任务和 SSE 流式接口依赖 Redis。

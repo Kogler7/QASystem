@@ -46,8 +46,6 @@ services:
       - agent-output:/app/agent/image_result
     working_dir: /app
     command: python -m agentcode.api --host 0.0.0.0 --port 9180
-    ports:
-      - "${AGENT_BIND:-0.0.0.0}:${AGENT_HOST_PORT:-9180}:9180"
     depends_on:
       backend:
         condition: service_healthy

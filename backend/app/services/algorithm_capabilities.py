@@ -294,18 +294,13 @@ class EmbeddingService:
         }
 
 
-class GraphMergeService:
-    def merge(self, items: list[GraphItem]) -> dict[str, Any]:
-        graph = deduplicate_chunk_graphs(
-            [{"graph": item.graph} for item in items]
-        )
-        return {"count": len(items), "graph": graph}
+def merge_graphs(items: list[GraphItem]) -> dict[str, Any]:
+    graph = deduplicate_chunk_graphs([{"graph": item.graph} for item in items])
+    return {"count": len(items), "graph": graph}
 
 
-# Shared process-wide capability instances. The aggregate pipeline and atomic
-# HTTP endpoints use the same parser lock, extraction scheduler and models.
 document_parsing_service = DocumentParsingService()
 document_chunking_service = DocumentChunkingService()
 graph_extraction_service = GraphExtractionService()
 embedding_service = EmbeddingService()
-graph_merge_service = GraphMergeService()
+graph_merge_service = merge_graphs

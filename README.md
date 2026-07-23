@@ -21,7 +21,7 @@ QASystem 当前提供版本化算法 HTTP 接口、一个统一 MCP 服务，以
 服务健康检查为 `GET /health`。统一 MCP Streamable HTTP 入口为 `/mcp`。
 Agent 通过 MCP 自主选择知识、图谱检索、数据和可视化工具；仓库不再提供独立意图识别和方案规划 MCP。`problem-solve`、`semantic-align`、`plan-execute` Skills 负责约束求解框架，业务事实与方案仍以知识图谱为唯一知识来源。
 
-AgentCode 后台服务默认监听 `9180`，提供异步任务、任务取消、状态查询和 SSE。文档入口见 [AgentCode README](agent/README.md)。
+AgentCode 通过 Backend 的 `/agent` 路由统一对外提供异步任务、任务取消、状态查询和 SSE；部署默认地址为 `http://127.0.0.1:8006/agent/v1/query`。文档入口见 [AgentCode README](agent/README.md)。
 
 ## 项目结构
 

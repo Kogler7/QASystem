@@ -4,6 +4,7 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+from .graph_utils import filter_relationships_with_known_nodes, iter_persistable_properties
 from .neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)
@@ -221,6 +222,13 @@ def store_extraction_to_neo4j(
     if not nodes:
         return {"success": False, "detail": "没有可存储的节点"}
 
+    valid_uids = {
+        str(node.get("uid") or "")
+        for node in nodes
+        if str(node.get("uid") or "")
+    }
+    relationships = filter_relationships_with_known_nodes(relationships, valid_uids)
+
     client = neo4j_client or Neo4jClient()
     own_client = neo4j_client is None
 
@@ -260,11 +268,10 @@ def store_extraction_to_neo4j(
                 nodes_merged += 1
                 set_clauses = []
                 set_params: dict[str, Any] = {"uid": uid}
-                for k, v in props.items():
-                    if v is not None:
-                        param_key = f"p_{k}"
-                        set_clauses.append(f"n.{k} = ${param_key}")
-                        set_params[param_key] = v
+                for k, v in iter_persistable_properties(props):
+                    param_key = f"p_{k}"
+                    set_clauses.append(f"n.{k} = ${param_key}")
+                    set_params[param_key] = v
                 if set_clauses:
                     client.run(
                         f"MATCH (n:{safe_label} {{uid: $uid}}) SET {', '.join(set_clauses)}",
@@ -275,11 +282,10 @@ def store_extraction_to_neo4j(
                 nodes_created += 1
                 set_items = ["n.uid = $uid"]
                 set_params = {"uid": uid}
-                for k, v in props.items():
-                    if v is not None:
-                        param_key = f"p_{k}"
-                        set_items.append(f"n.{k} = ${param_key}")
-                        set_params[param_key] = v
+                for k, v in iter_persistable_properties(props):
+                    param_key = f"p_{k}"
+                    set_items.append(f"n.{k} = ${param_key}")
+                    set_params[param_key] = v
 
                 client.run(
                     f"CREATE (n:{safe_label} {{uid: $uid}}) SET {', '.join(set_items)}",

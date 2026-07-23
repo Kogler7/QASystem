@@ -28,6 +28,7 @@ _PROPERTY = re.compile(
     r'(?:\s*//\s*(?P<comment>.*))?\s*$'
 )
 _PROPERTY_ID = re.compile(r'^(?P<display>.*?)\s*\((?P<identifier>[A-Za-z_][\w.]*)\)\s*$')
+_IDENTITY = re.compile(r"^\s*'\s*@identity\s+(?P<class_name>[^\s:]+)\s*:\s*(?P<property_name>[^\s]+)\s*$")
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class OntologyClass:
     alias: str | None = None
     stereotypes: tuple[str, ...] = ()
     properties: list[OntologyProperty] = field(default_factory=list)
+    identity_property: str | None = None
 
     @property
     def identifier(self) -> str:
@@ -128,7 +130,16 @@ class OntologySchema:
                 )
             )
 
-        return cls(classes)
+        schema = cls(classes)
+        for line in (source or "").splitlines():
+            identity_match = _IDENTITY.match(line)
+            if not identity_match:
+                continue
+            ontology_class = schema.resolve_class(identity_match.group("class_name"))
+            if ontology_class is None:
+                continue
+            ontology_class.identity_property = ontology_class.resolve_property(identity_match.group("property_name"))
+        return schema
 
     def resolve_class(self, symbol: str) -> OntologyClass | None:
         return self._symbols.get((symbol or "").strip())
@@ -148,6 +159,16 @@ class OntologySchema:
                     lines.append(f"  - 属性 `{prop.display_name}` -> `{prop.identifier}`")
         return "\n".join(lines)
 
+    @staticmethod
+    def _coerce_name(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, (int, float, bool)):
+            return str(value)
+        return ""
+
     def normalize_extraction(self, extracted: dict[str, Any]) -> dict[str, Any]:
         """统一实体、属性和关系端点的标识，同时保留未知输出供后续校验。"""
         normalized = deepcopy(extracted)
@@ -163,6 +184,21 @@ class OntologySchema:
                 entity["properties"] = {
                     ontology_class.resolve_property(str(key)): value for key, value in properties.items()
                 }
+                properties = entity["properties"]
+            else:
+                properties = {}
+                entity["properties"] = properties
+
+            entity_name = self._coerce_name(entity.get("name"))
+            identity_name = self._coerce_name(
+                properties.get(ontology_class.identity_property) if ontology_class.identity_property else None
+            )
+            property_name = self._coerce_name(properties.get("name"))
+            resolved_name = entity_name or identity_name or property_name
+            entity["name"] = resolved_name
+            if property_name or not resolved_name:
+                continue
+            properties["name"] = resolved_name
 
         for relation in normalized.get("relations", []):
             if not isinstance(relation, dict):

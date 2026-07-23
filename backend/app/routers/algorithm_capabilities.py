@@ -103,7 +103,7 @@ async def embed_texts(http_request: Request, body: TextEmbeddingRequest) -> JSON
 @router.post("/api/v1/graphs/merge")
 async def merge_graphs(body: GraphMergeRequest) -> JSONResponse:
     try:
-        data = await run_in_threadpool(graph_merge_service.merge, body.items)
+        data = await run_in_threadpool(graph_merge_service, body.items)
         return JSONResponse(content=payload(data, "Graph 去重完成"))
     except CapabilityError as exc:
         return _capability_error(exc)

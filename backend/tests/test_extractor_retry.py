@@ -68,6 +68,50 @@ class 术语 <<Terminology>> {
     assert result["graph"]["nodes"][0]["uid"] == "Terminology::采购标段数量"
 
 
+def test_extract_v2_discards_relationships_whose_endpoints_are_missing(monkeypatch):
+    response = (
+        '{"entities":[{"type":"Term","name":"A","properties":{}}],'
+        '"relations":[{"from_type":"Term","from_name":"A","rel_type":"RELATED",'
+        '"to_type":"Term","to_name":"B"}]}'
+    )
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_kwargs: _stream(response))),
+        close=lambda: None,
+    )
+    monkeypatch.setattr(extractor, "_build_openai_client", lambda **_kwargs: client)
+
+    result = extractor.extract_v2("class Term", "text", json_retries=0)
+
+    assert len(result["graph"]["nodes"]) == 1
+    assert result["graph"]["relationships"] == []
+
+
+def test_extract_v2_keeps_non_empty_entity_name_when_properties_name_is_empty(monkeypatch):
+    response = (
+        '{"entities":[{"type":"Term","name":"A","properties":{"name":""}}],"relations":[]}'
+    )
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_kwargs: _stream(response))),
+        close=lambda: None,
+    )
+    monkeypatch.setattr(extractor, "_build_openai_client", lambda **_kwargs: client)
+
+    result = extractor.extract_v2("class Term", "text", json_retries=0)
+
+    assert result["graph"]["nodes"][0]["properties"]["name"] == "A"
+
+
+def test_build_extraction_prompt_requires_creating_missing_nodes_before_relations():
+    prompt = extractor.build_extraction_prompt("class Term", "A relates to B")
+
+    assert "先补建该实体，再输出 relation" in prompt
+    assert "禁止输出引用不存在实体的 relation" in prompt
+    assert "输出 relations 之前，先检查 `entities` 是否已经包含两端实体" in prompt
+    assert "正确示例" in prompt
+    assert "错误示例" in prompt
+    assert "不要输出悬空 relation" in prompt
+
+
 def test_schema_normalizes_relationship_endpoint_types():
     ontology = 'class 术语 <<Terminology, KnowledgeUnit>>\nclass 业务域 <<BusinessDomain>>'
     extracted = {
@@ -79,6 +123,26 @@ def test_schema_normalizes_relationship_endpoint_types():
 
     assert normalized["relations"][0]["from_type"] == "Terminology"
     assert normalized["relations"][0]["to_type"] == "BusinessDomain"
+
+
+def test_schema_backfills_entity_name_from_identity_property():
+    ontology = """@startuml
+class 术语 <<Terminology>> {
+- 术语标准名称 (TermName): String
+}
+' @identity Terminology: TermName
+@enduml"""
+    normalized = OntologySchema.parse(ontology).normalize_extraction({
+        "entities": [{
+            "type": "术语",
+            "name": "",
+            "properties": {"术语标准名称": "采购标段数量"},
+        }],
+        "relations": [],
+    })
+
+    assert normalized["entities"][0]["name"] == "采购标段数量"
+    assert normalized["entities"][0]["properties"]["name"] == "采购标段数量"
 
 
 def test_schema_prefers_standard_plantuml_alias_as_identifier():
@@ -116,4 +180,5 @@ def test_schema_separates_display_names_identifiers_and_secondary_stereotypes():
     assert normalized["entities"][0]["properties"] == {
         "TermName": "采购标段数量",
         "Synonyms": ["标段数量"],
+        "name": "采购标段数量",
     }
