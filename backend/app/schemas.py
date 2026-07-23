@@ -23,13 +23,22 @@ class ParserConfig(StrictModel):
 
 
 class ChunkOptions(StrictModel):
-    strategy: Literal["recursive", "symbols", "custom_recursive", "markdown"] = "recursive"
+    strategy: Literal["recursive", "symbols", "custom_recursive", "markdown", "semantic"] = "recursive"
     size: int = Field(default=500, gt=0)
     separators: list[str] | None = None
     similarity: float = Field(default=0.6, ge=0, le=1)
+    chunk_overlap: int = Field(default=0, ge=0)
+    size_unit: Literal["char", "token"] = "char"
+    breakpoint_method: Literal["percentile", "stddev", "none"] = "percentile"
+
+    @model_validator(mode="after")
+    def validate_overlap_lt_size(self):
+        if self.chunk_overlap >= self.size:
+            raise ValueError("chunk_overlap 必须小于 size")
+        return self
 
     def legacy_chunk_type(self) -> int:
-        return {"recursive": 0, "symbols": 1, "custom_recursive": 2, "markdown": 3}[self.strategy]
+        return {"recursive": 0, "symbols": 1, "custom_recursive": 2, "markdown": 3, "semantic": 4}[self.strategy]
 
 
 class ExtractionOptions(StrictModel):
