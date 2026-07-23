@@ -70,6 +70,49 @@ def test_deduplicate_chunk_graphs_deduplicates_nodes_and_relationships():
     assert graph["nodes"][1]["chunk_indices"] == [1]
 
 
+def test_deduplicate_chunk_graphs_discards_relationships_missing_nodes():
+    items = [
+        {
+            "graph": {
+                "nodes": [{"uid": "Term::a", "label": "Term", "properties": {"name": "A"}}],
+                "relationships": [{"from_uid": "Term::a", "to_uid": "Term::missing", "type": "RELATED"}],
+            }
+        },
+        {
+            "graph": {
+                "nodes": [{"uid": "Term::b", "label": "Term", "properties": {"name": "B"}}],
+                "relationships": [],
+            }
+        },
+    ]
+
+    graph = deduplicate_chunk_graphs(items)
+
+    assert len(graph["nodes"]) == 2
+    assert graph["relationships"] == []
+
+
+def test_deduplicate_chunk_graphs_does_not_overwrite_non_empty_name_with_empty_name():
+    items = [
+        {
+            "graph": {
+                "nodes": [{"uid": "Term::a", "label": "Term", "properties": {"name": "A", "description": "first"}}],
+                "relationships": [],
+            }
+        },
+        {
+            "graph": {
+                "nodes": [{"uid": "Term::a", "label": "Term", "properties": {"name": "", "alias": "A1"}}],
+                "relationships": [],
+            }
+        },
+    ]
+
+    graph = deduplicate_chunk_graphs(items)
+
+    assert graph["nodes"][0]["properties"] == {"name": "A", "description": "first", "alias": "A1"}
+
+
 def test_request_scheduler_limits_in_flight_requests():
     scheduler = LLMRequestScheduler(LLMRateLimits(max_concurrency=2))
     active = 0

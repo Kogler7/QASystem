@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from .config import get_llm_config
 from .extractor import extract_v2
+from .graph_utils import filter_relationships_with_known_nodes, merge_node_properties
 
 
 def extract_chunks(
@@ -70,12 +71,22 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                     "chunk_indices": [chunk_index],
                 }
             else:
-                nodes_by_uid[uid].setdefault("properties", {}).update(node.get("properties") or {})
+                nodes_by_uid[uid]["properties"] = merge_node_properties(
+                    nodes_by_uid[uid].setdefault("properties", {}),
+                    node.get("properties") or {},
+                )
                 chunk_indices = nodes_by_uid[uid].setdefault("chunk_indices", [])
                 if chunk_index not in chunk_indices:
                     chunk_indices.append(chunk_index)
 
-        for relationship in graph.get("relationships", []):
+    valid_uids = set(nodes_by_uid)
+
+    for item in items:
+        graph = item.get("graph") or {}
+        for relationship in filter_relationships_with_known_nodes(
+            graph.get("relationships", []),
+            valid_uids,
+        ):
             key = (
                 str(relationship.get("from_uid") or ""),
                 str(relationship.get("to_uid") or ""),

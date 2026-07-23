@@ -13,6 +13,7 @@ from typing import Any, Optional
 from openai import OpenAI
 
 from .config import get_llm_config
+from .graph_utils import build_node_properties, filter_relationships_with_known_nodes, merge_node_properties
 from .ontology_schema import OntologySchema
 from .scheduler import get_llm_scheduler
 
@@ -36,6 +37,10 @@ GENERIC_INSTRUCTION = """## 抽取规则
 - 本体中每条 `A "1" --> "B" : REL_NAME` 定义一个关系类型
 - relations 中每条记录的 `from_type`/`to_type` 使用上述元模型类标识，`rel_type` 使用本体关系名
 - `from_name`/`to_name` 使用实体的 name 属性值（或 @identity 标注的标识字段）
+- 每输出一条 relation，必须保证 `entities` 中同时存在对应的源节点和目标节点
+- 如果文本里明显存在关系，但某一端实体尚未列入 `entities`，先补建该实体，再输出 relation
+- 补建实体时，至少补齐该实体的 `type`、`name`，并尽量补充文本中可确定的 `properties`
+- 禁止输出引用不存在实体的 relation；如果无法确定任一端实体，就不要输出这条 relation
 - 从文档的层级结构推断父子归属关系
 - 从文档中的流程描述/关系表推断流程流转关系
 - 标注为"后处理建立"/"postprocess"的关系**跳过**，不在此阶段抽取
@@ -43,7 +48,12 @@ GENERIC_INSTRUCTION = """## 抽取规则
 ### 输出要求
 - 只输出 JSON，不要任何解释、markdown 代码块或额外文字
 - 不要自创本体中不存在的类型、属性或关系名
-- 即使文档中某些字段缺失，也不要编造值"""
+- 即使文档中某些字段缺失，也不要编造值
+
+### 关系与实体一致性示例
+- 正确示例：若输出 `A -[REL]-> B`，则 `entities` 中必须同时有 A 和 B；如果 B 尚未抽出，先把 B 补进 `entities`
+- 错误示例：`entities` 里只有 A，却在 `relations` 里输出 `A -[REL]-> B`
+- 记忆规则：宁可少一条无法落到实体集合中的 relation，也不要输出悬空 relation"""
 
 
 def build_extraction_prompt(ontology: str, text: str) -> str:
@@ -69,6 +79,7 @@ def build_extraction_prompt(ontology: str, text: str) -> str:
 {identity_text}
 - relations 中的 from_name/to_name 必须填写实体的 identity 标识值
 - 若 identity 指定的属性值为空，回退使用实体的 name 属性值
+- 输出 relations 之前，先检查 `entities` 是否已经包含两端实体；没有就先补到 `entities`
 
 {GENERIC_INSTRUCTION}
 
@@ -147,13 +158,13 @@ def _entities_to_graph(extracted: dict) -> dict:
             node = {
                 "uid": uid,
                 "label": etype,
-                "properties": {"name": ename, **props},
+                "properties": build_node_properties(ename, props),
             }
             nodes.append(node)
             node_index[uid] = node
         else:
             # Merge properties
-            node_index[uid]["properties"].update(props)
+            node_index[uid]["properties"] = merge_node_properties(node_index[uid]["properties"], props)
 
     for rel in extracted.get("relations", []):
         from_type = rel.get("from_type", "")
@@ -171,6 +182,11 @@ def _entities_to_graph(extracted: dict) -> dict:
                 "to_uid": to_uid,
                 "type": rel_type,
             })
+
+    relationships = filter_relationships_with_known_nodes(
+        relationships,
+        {str(node.get("uid") or "") for node in nodes if str(node.get("uid") or "")},
+    )
 
     return {
         "nodes": nodes,

@@ -180,6 +180,27 @@ def test_v1_graph_merge_deduplicates_nodes_and_relationships(protocol_module):
     assert len(body["data"]["graph"]["relationships"]) == 1
 
 
+def test_v1_graph_merge_discards_relationships_missing_nodes(protocol_module):
+    body = TestClient(protocol_module.app).post(
+        "/api/v1/graphs/merge",
+        json={
+            "items": [
+                {
+                    "graph": {
+                        "nodes": [{"uid": "Term::a", "label": "Term", "properties": {"name": "A"}}],
+                        "relationships": [{"from_uid": "Term::a", "to_uid": "Term::missing", "type": "RELATED"}],
+                    },
+                }
+            ]
+        },
+    ).json()
+    assert body["code"] == 0
+    assert body["data"]["graph"]["nodes"] == [
+        {"uid": "Term::a", "label": "Term", "properties": {"name": "A"}}
+    ]
+    assert body["data"]["graph"]["relationships"] == []
+
+
 def test_batch_vector_rejects_empty_list(protocol_module):
     response = TestClient(protocol_module.app).post(
         "/api/component/nl2cypher/text-to-vectors",

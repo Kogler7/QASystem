@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,21 @@ def _module(name: str, **attributes: object) -> types.ModuleType:
 
 @pytest.fixture(scope="session")
 def protocol_module():
+    @asynccontextmanager
+    async def _run():
+        yield
+
+    class _MCPStub:
+        session_manager = types.SimpleNamespace(run=_run)
+
+        @staticmethod
+        def streamable_http_app():
+            async def app(_scope, _receive, send):
+                await send({"type": "http.response.start", "status": 404, "headers": []})
+                await send({"type": "http.response.body", "body": b""})
+
+            return app
+
     class DocumentProcessor:
         def process_file(self, *_args, **_kwargs):
             return {"success": True, "content": "# 测试文档\n测试内容", "metadata": {"model_used": "pandas"}}
@@ -54,7 +70,15 @@ def protocol_module():
                     nodes[uid] = {**node, "properties": dict(node.get("properties") or {})}
                 else:
                     nodes[uid]["properties"].update(node.get("properties") or {})
+        valid_uids = {uid for uid in nodes if uid}
+        for item in items:
             for relation in item["graph"].get("relationships", []):
+                from_uid = relation.get("from_uid")
+                to_uid = relation.get("to_uid")
+                if not from_uid or not to_uid:
+                    continue
+                if from_uid not in valid_uids or to_uid not in valid_uids:
+                    continue
                 key = (relation.get("from_uid"), relation.get("to_uid"), relation.get("type"))
                 relationships[key] = relation
         return {"nodes": list(nodes.values()), "relationships": list(relationships.values())}
@@ -125,6 +149,7 @@ def protocol_module():
             },
             close_confidence_resources=lambda: None,
         ),
+        "mcp_services.server": _module("mcp_services.server", mcp=_MCPStub()),
     }
     original = {name: sys.modules.get(name) for name in stubs}
     application_modules = [
