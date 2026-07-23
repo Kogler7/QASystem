@@ -99,7 +99,13 @@ def chunk_document_items(
 ) -> list[dict[str, Any]]:
     """Return ordered chunks with source character ranges."""
     chunks = chunk_document(
-        content, chunk_type, chunk_size, chunk_characters, similarity, chunk_overlap, model_path,
+        content,
+        chunk_type=chunk_type,
+        chunk_size=chunk_size,
+        chunk_characters=chunk_characters,
+        similarity=similarity,
+        chunk_overlap=chunk_overlap,
+        model_path=model_path,
         breakpoint_method=breakpoint_method,
     )
     items: list[dict[str, Any]] = []

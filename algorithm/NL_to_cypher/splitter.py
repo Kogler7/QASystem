@@ -3,11 +3,7 @@ from __future__ import annotations
 import re
 
 from langchain_core.documents import Document
-from langchain_text_splitters import (
-    CharacterTextSplitter,
-    MarkdownTextSplitter,
-    RecursiveCharacterTextSplitter,
-)
+from langchain_text_splitters import MarkdownTextSplitter, RecursiveCharacterTextSplitter
 
 
 def _cosine_similarity(a, b) -> float:
@@ -21,20 +17,6 @@ def _cosine_similarity(a, b) -> float:
     if a_norm == 0.0 or b_norm == 0.0:
         return 0.0
     return float(np.dot(a, b) / (a_norm * b_norm))
-
-
-def split_by_character(
-    documents: list[Document],
-    chunk_size: int = 500,
-    separator: str = "\n",
-    chunk_overlap: int = 0,
-) -> list[Document]:
-    splitter = CharacterTextSplitter(
-        separator=separator,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-    )
-    return splitter.split_documents(documents)
 
 
 def split_by_characters(
