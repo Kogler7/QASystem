@@ -167,6 +167,8 @@ class DocumentChunkingService:
                 options.size,
                 options.separators,
                 options.similarity,
+                options.chunk_overlap,
+                breakpoint_method=options.breakpoint_method,
             )
         except ValueError as exc:
             code = ErrorCode.CHUNK_OFFSET_FAILED if "字符偏移" in str(exc) else ErrorCode.INVALID_CHUNK_CONFIG
