@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,19 @@ from backend.app.services.algorithm_capabilities import (
 class KnowledgeIngestionRequest:
     file_name: str
     content: bytes
+    ontology: str
+    options: PipelineOptions = field(default_factory=PipelineOptions)
+
+
+@dataclass(slots=True)
+class FileItem:
+    file_name: str
+    content: bytes
+
+
+@dataclass(slots=True)
+class BatchKnowledgeIngestionRequest:
+    files: list[FileItem]
     ontology: str
     options: PipelineOptions = field(default_factory=PipelineOptions)
 
@@ -82,6 +96,143 @@ class KnowledgePrecipitationService:
             raise PipelineError(ErrorCode.FILE_SERVICE_FAILED, "文件服务未返回文件 id", stage, result)
         return normalized
 
+    def _run_pipeline(
+        self,
+        markdown: str,
+        upload_stem: str,
+        ontology: str,
+        options: PipelineOptions,
+        origin: dict[str, Any] | None,
+        started: datetime,
+        stats: dict[str, Any],
+    ) -> dict[str, Any]:
+        chunked = self.chunking.chunk(markdown, options.chunking)
+        chunks = chunked["items"]
+        extracted_batch = self.extraction.extract(
+            ontology=ontology,
+            items=[
+                TextChunk(text=item["text"], ranges=item["range"])
+                for item in chunks
+            ],
+            model=options.extraction.model,
+            merge=options.extraction.merge,
+        )
+        extracted_items = extracted_batch.items
+        extracted_result = extracted_batch.pipeline_data()
+        final_graph = extracted_batch.graph
+        final_graphs = extracted_batch.graphs
+        node_count = (
+            len(final_graph.get("nodes", []))
+            if final_graph is not None
+            else sum(len(graph.get("nodes", [])) for graph in final_graphs or [])
+        )
+        relationship_count = (
+            len(final_graph.get("relationships", []))
+            if final_graph is not None
+            else sum(len(graph.get("relationships", [])) for graph in final_graphs or [])
+        )
+        stats["extraction"] = {
+            "chunks_extracted": len(extracted_items),
+            "merge": options.extraction.merge,
+            "nodes_extracted": node_count,
+            "relationships_extracted": relationship_count,
+            "attempts": extracted_batch.attempts,
+            "scheduler": extracted_batch.scheduler,
+        }
+
+        if options.storage.persist_graph:
+            database_result = (
+                store_extraction_to_neo4j(graph=final_graph)
+                if final_graph is not None
+                else {
+                    "success": all(
+                        store_extraction_to_neo4j(graph=item["graph"]).get("success")
+                        for item in extracted_items
+                    ),
+                    "items": [
+                        {"position": i, **store_extraction_to_neo4j(graph=item["graph"])}
+                        for i, item in enumerate(extracted_items)
+                    ],
+                }
+            )
+            stats["extraction"]["database"] = database_result
+            if not database_result.get("success"):
+                raise PipelineError(
+                    ErrorCode.GRAPH_STORAGE_FAILED,
+                    "知识图谱入库失败",
+                    "graph_storage",
+                    database_result,
+                    {"artifacts": {"markdown": origin}} if origin is not None else None,
+                )
+
+        vector_ids = None
+        vector_dimension = None
+        if origin is not None:
+            embedded = self.embeddings.texts(
+                [TextEmbeddingItem(text=item["text"]) for item in chunks]
+            )
+            vector_items = [
+                {"text": chunk["text"], "vector": embedded_item["vector"]}
+                for chunk, embedded_item in zip(chunks, embedded["items"])
+            ]
+            vector_result = store_vectors(
+                vector_items,
+                os.getenv("FILE_SERVICE_URL", "").strip(),
+                options.storage.knowledge_space_id,
+                origin["id"],
+            )
+            if not vector_result.get("success"):
+                raise PipelineError(
+                    ErrorCode.VECTOR_STORE_FAILED,
+                    "向量存储失败",
+                    "vector_storage",
+                    vector_result,
+                    {"artifacts": {"markdown": origin}, "extraction": extracted_result},
+                )
+            vector_ids = vector_result.get("ids")
+            inserted_count = vector_result.get("inserted_count")
+            if not isinstance(vector_ids, list) or inserted_count != len(vector_items) or len(vector_ids) != len(vector_items):
+                raise PipelineError(
+                    ErrorCode.VECTOR_ID_COUNT_MISMATCH,
+                    "向量存储返回的 ids 数量与输入不一致",
+                    "vector_storage",
+                    {
+                        "input_count": len(vector_items),
+                        "inserted_count": inserted_count,
+                        "id_count": len(vector_ids) if isinstance(vector_ids, list) else None,
+                    },
+                    {"artifacts": {"markdown": origin}, "extraction": extracted_result},
+                )
+            vector_dimension = embedded["dimension"]
+            stats["storage"]["vectors"] = {"inserted_count": inserted_count}
+
+        stats["chunking"] = {
+            "chunk_count": chunked["count"],
+            "strategy": options.chunking.strategy,
+            "size": options.chunking.size,
+            "separators": options.chunking.separators,
+            "vector_storage_enabled": origin is not None,
+            "vector_dimension": vector_dimension,
+            "vector_source": "text_chunk",
+        }
+        stats["total_time_seconds"] = round((datetime.now() - started).total_seconds(), 3)
+
+        return {
+            "name": upload_stem,
+            "summary": (
+                generate_understanding(final_graph)
+                if final_graph is not None
+                else f"共抽取 {len(final_graphs or [])} 个分片图谱，包含 {node_count} 个节点实例和 {relationship_count} 条关系实例。"
+            ),
+            "artifacts": (
+                {"markdown": origin, "vector_ids": vector_ids}
+                if origin is not None
+                else None
+            ),
+            "extraction": extracted_result,
+            "stats": stats,
+        }
+
     def process(self, request: KnowledgeIngestionRequest) -> dict[str, Any]:
         if not request.ontology.strip():
             raise PipelineError(ErrorCode.ONTOLOGY_INVALID, "ontology 不能为空", "validation")
@@ -101,151 +252,95 @@ class KnowledgePrecipitationService:
         try:
             parsed = self.parsing.parse(file_name, request.content, request.options.parser)
             markdown = parsed["markdown"]
-            parser_status = parsed["parser"]
             stats["document"].update(
-                {
-                    "content_length": parsed["content_length"],
-                    "parser": parser_status,
-                }
+                {"content_length": parsed["content_length"], "parser": parsed["parser"]}
             )
-
             origin = self._upload_markdown(
                 markdown.encode("utf-8"), f"{stem}.md", "text/markdown", request, "origin_storage"
             )
             if origin is not None:
                 stats["storage"]["origin"] = origin
 
-            chunked = self.chunking.chunk(markdown, request.options.chunking)
-            chunks = chunked["items"]
-            extracted_batch = self.extraction.extract(
-                ontology=request.ontology,
-                items=[
-                    TextChunk(
-                        text=item["text"],
-                        ranges=item["range"],
-                    )
-                    for item in chunks
-                ],
-                model=request.options.extraction.model,
-                merge=request.options.extraction.merge,
+            return self._run_pipeline(
+                markdown, stem, request.ontology, request.options, origin, started, stats,
             )
-            extracted_items = extracted_batch.items
-            extracted_result = extracted_batch.pipeline_data()
-            final_graph = extracted_batch.graph
-            final_graphs = extracted_batch.graphs
-            node_count = (
-                len(final_graph.get("nodes", []))
-                if final_graph is not None
-                else sum(len(graph.get("nodes", [])) for graph in final_graphs or [])
-            )
-            relationship_count = (
-                len(final_graph.get("relationships", []))
-                if final_graph is not None
-                else sum(len(graph.get("relationships", [])) for graph in final_graphs or [])
-            )
-            stats["extraction"] = {
-                "chunks_extracted": len(extracted_items),
-                "merge": request.options.extraction.merge,
-                "nodes_extracted": node_count,
-                "relationships_extracted": relationship_count,
-                "attempts": extracted_batch.attempts,
-                "scheduler": extracted_batch.scheduler,
-            }
-
-            if request.options.storage.persist_graph:
-                if final_graph is not None:
-                    database_result = store_extraction_to_neo4j(graph=final_graph)
-                else:
-                    database_items = [
-                        {"position": position, **store_extraction_to_neo4j(graph=item["graph"])}
-                        for position, item in enumerate(extracted_items)
-                    ]
-                    database_result = {
-                        "success": all(item.get("success") for item in database_items),
-                        "items": database_items,
-                    }
-                stats["extraction"]["database"] = database_result
-                if not database_result.get("success"):
-                    raise PipelineError(
-                        ErrorCode.GRAPH_STORAGE_FAILED,
-                        "知识图谱入库失败",
-                        "graph_storage",
-                        database_result,
-                        {"artifacts": {"markdown": origin}} if origin is not None else None,
-                    )
-
-            vector_ids = None
-            vector_dimension = None
-            if origin is not None:
-                embedded = self.embeddings.texts(
-                    [TextEmbeddingItem(text=item["text"]) for item in chunks]
-                )
-                vector_items = [
-                    {
-                        "text": chunk["text"],
-                        "vector": embedded_item["vector"],
-                    }
-                    for chunk, embedded_item in zip(chunks, embedded["items"])
-                ]
-                vector_result = store_vectors(
-                    vector_items,
-                    os.getenv("FILE_SERVICE_URL", "").strip(),
-                    request.options.storage.knowledge_space_id,
-                    origin["id"],
-                )
-                if not vector_result.get("success"):
-                    raise PipelineError(
-                        ErrorCode.VECTOR_STORE_FAILED,
-                        "向量存储失败",
-                        "vector_storage",
-                        vector_result,
-                        {"artifacts": {"markdown": origin}, "extraction": extracted_result},
-                    )
-                vector_ids = vector_result.get("ids")
-                inserted_count = vector_result.get("inserted_count")
-                if not isinstance(vector_ids, list) or inserted_count != len(vector_items) or len(vector_ids) != len(vector_items):
-                    raise PipelineError(
-                        ErrorCode.VECTOR_ID_COUNT_MISMATCH,
-                        "向量存储返回的 ids 数量与输入不一致",
-                        "vector_storage",
-                        {
-                            "input_count": len(vector_items),
-                            "inserted_count": inserted_count,
-                            "id_count": len(vector_ids) if isinstance(vector_ids, list) else None,
-                        },
-                        {"artifacts": {"markdown": origin}, "extraction": extracted_result},
-                    )
-                vector_dimension = embedded["dimension"]
-                stats["storage"]["vectors"] = {"inserted_count": inserted_count}
-            stats["chunking"] = {
-                "chunk_count": chunked["count"],
-                "strategy": request.options.chunking.strategy,
-                "size": request.options.chunking.size,
-                "separators": request.options.chunking.separators,
-                "vector_storage_enabled": origin is not None,
-                "vector_dimension": vector_dimension,
-                "vector_source": "text_chunk",
-            }
-            stats["total_time_seconds"] = round((datetime.now() - started).total_seconds(), 3)
-
-            result = {
-                "name": stem,
-                "summary": (
-                    generate_understanding(final_graph)
-                    if final_graph is not None
-                    else f"共抽取 {len(final_graphs or [])} 个分片图谱，包含 {node_count} 个节点实例和 {relationship_count} 条关系实例。"
-                ),
-                "artifacts": (
-                    {"markdown": origin, "vector_ids": vector_ids}
-                    if origin is not None
-                    else None
-                ),
-                "extraction": extracted_result,
-                "stats": stats,
-            }
-            return result
         except CapabilityError as exc:
             partial = None
             if stats["storage"].get("origin"):
                 partial = {"artifacts": {"markdown": stats["storage"]["origin"]}}
             raise PipelineError(exc.code, exc.info, exc.stage, exc.details, partial) from exc
+
+    def process_batch(self, request: BatchKnowledgeIngestionRequest) -> dict[str, Any]:
+        if not request.ontology.strip():
+            raise PipelineError(ErrorCode.ONTOLOGY_INVALID, "ontology 不能为空", "validation")
+        if not request.files:
+            raise PipelineError(ErrorCode.INVALID_REQUEST, "至少需要上传一个文件", "validation")
+
+        started = datetime.now()
+        file_parsed: list[tuple[str, dict[str, Any]]] = []
+
+        max_workers = min(len(request.files), os.cpu_count() or 4)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_to_file = {
+                pool.submit(self.parsing.parse, f.file_name, f.content, request.options.parser): f
+                for f in request.files
+            }
+            for future in as_completed(future_to_file):
+                f = future_to_file[future]
+                try:
+                    parsed = future.result()
+                except CapabilityError as exc:
+                    raise PipelineError(
+                        exc.code, f"文件 {f.file_name} 解析失败: {exc.info}", exc.stage, exc.details
+                    ) from exc
+                file_parsed.append((f.file_name, parsed))
+
+        file_parsed.sort(key=lambda x: x[0])
+
+        name_to_size = {f.file_name: len(f.content) for f in request.files}
+        combined_parts: list[str] = []
+        file_stats: list[dict[str, Any]] = []
+        for file_name, parsed in file_parsed:
+            combined_parts.append(f"\n## 文件: {file_name}\n\n{parsed['markdown']}")
+            file_stats.append({
+                "file_name": file_name,
+                "file_size": name_to_size.get(file_name, 0),
+                "file_type": Path(file_name).suffix.lower().lstrip("."),
+                "content_length": parsed["content_length"],
+                "parser": parsed["parser"],
+            })
+
+        combined_markdown = "\n".join(combined_parts)
+        combined_stem = Path(request.files[0].file_name).stem + f"_等{len(request.files)}个文件"
+        stats: dict[str, Any] = {
+            "documents": file_stats,
+            "extraction": {},
+            "chunking": {},
+            "storage": {"enabled": bool(os.getenv("FILE_SERVICE_URL", "").strip())},
+        }
+
+        # Build a dummy single-file request for _upload_markdown compatibility
+        dummy_request = KnowledgeIngestionRequest(
+            file_name=f"{combined_stem}.md",
+            content=combined_markdown.encode("utf-8"),
+            ontology=request.ontology,
+            options=request.options,
+        )
+        origin = self._upload_markdown(
+            combined_markdown.encode("utf-8"),
+            f"{combined_stem}.md",
+            "text/markdown",
+            dummy_request,
+            "origin_storage",
+        )
+        if origin is not None:
+            stats["storage"]["origin"] = origin
+
+        result = self._run_pipeline(
+            combined_markdown, combined_stem, request.ontology, request.options, origin, started, stats,
+        )
+        # Augment summary with file count
+        fc = len(request.files)
+        if result["summary"]:
+            result["summary"] += f"，来源：{fc} 个文件"
+        return result

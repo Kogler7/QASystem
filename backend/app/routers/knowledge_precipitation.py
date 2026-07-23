@@ -14,6 +14,8 @@ from backend.app.services.algorithm_capabilities import (
     graph_extraction_service,
 )
 from backend.app.services.knowledge_precipitation import (
+    BatchKnowledgeIngestionRequest,
+    FileItem,
     KnowledgeIngestionRequest,
     KnowledgePrecipitationService,
     PipelineError,
@@ -34,13 +36,30 @@ def _info(info: str, deprecated: bool) -> str:
     return deprecated_info(info, V1_PATH) if deprecated else info
 
 
+def _collect_files(
+    file: UploadFile | None,
+    files: list[UploadFile] | None,
+) -> list[tuple[str, bytes]]:
+    result: list[tuple[str, bytes]] = []
+    if file is not None and file.filename:
+        result.append((file.filename, file.file.read()))
+        file.file.seek(0)
+    if files:
+        for f in files:
+            if f.filename:
+                result.append((f.filename, f.file.read()))
+                f.file.seek(0)
+    return result
+
+
 @router.post(V1_PATH)
 @router.post("/api/knowledge/precipitation", deprecated=True)
 async def knowledge_ingestion(
     http_request: Request,
-    file: UploadFile = File(...),
     ontology: str = Form(...),
     options: str = Form("{}"),
+    file: UploadFile | None = File(None),
+    files: list[UploadFile] | None = File(None),
 ) -> JSONResponse:
     deprecated = http_request.url.path != V1_PATH
     try:
@@ -54,15 +73,30 @@ async def knowledge_ingestion(
             status_code=400,
         )
 
-    request = KnowledgeIngestionRequest(
-        file_name=file.filename or "upload.bin",
-        content=await file.read(),
-        ontology=ontology,
-        options=config,
-    )
+    collected = [(name, content) for name, content in _collect_files(file, files)]
+    if not collected:
+        return error_response(
+            ErrorCode.INVALID_REQUEST,
+            _info("至少需要上传一个文件（file 或 files）", deprecated),
+            stage="validation",
+            status_code=400,
+        )
+
     try:
-        data = await run_in_threadpool(service.process, request)
-        return JSONResponse(content=payload(data, _info("知识沉淀完成", deprecated)))
+        if len(collected) == 1 and files is None:
+            name, content = collected[0]
+            request = KnowledgeIngestionRequest(
+                file_name=name, content=content, ontology=ontology, options=config,
+            )
+            data = await run_in_threadpool(service.process, request)
+            return JSONResponse(content=payload(data, _info("知识沉淀完成", deprecated)))
+        else:
+            file_items = [FileItem(file_name=name, content=content) for name, content in collected]
+            request = BatchKnowledgeIngestionRequest(
+                files=file_items, ontology=ontology, options=config,
+            )
+            data = await run_in_threadpool(service.process_batch, request)
+            return JSONResponse(content=payload(data, _info("知识沉淀完成", deprecated)))
     except PipelineError as exc:
         return error_response(
             exc.code,
