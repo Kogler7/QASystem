@@ -42,6 +42,33 @@ def test_scanned_pdf_prefers_vlm(tmp_path, monkeypatch):
     assert engine == "vlm"
 
 
+def test_force_selects_requested_engine_even_when_profile_disagrees(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "text", "reason": "test"})
+
+    engine, details = processor.select_engine(str(path), requested="vlm", force=True)
+
+    assert engine == "vlm"
+    assert details["mode"] == "forced"
+    assert details["force"] is True
+    assert details["request_role"] == "forced"
+
+
+def test_force_rejects_incompatible_engine(tmp_path):
+    path = tmp_path / "sample.csv"
+    path.write_text("a,b\n1,2", encoding="utf-8")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+
+    try:
+        processor.select_engine(str(path), requested="vlm", force=True)
+    except ValueError as exc:
+        assert "不支持强制解析引擎" in str(exc)
+    else:
+        raise AssertionError("incompatible forced engine should be rejected")
+
+
 def test_ofd_is_converted_then_uses_pdf_selection(tmp_path, monkeypatch):
     path = tmp_path / "sample.ofd"
     path.write_bytes(b"ofd-test")
@@ -62,7 +89,7 @@ def test_ofd_is_converted_then_uses_pdf_selection(tmp_path, monkeypatch):
     monkeypatch.setattr(
         processor,
         "_run_processor",
-        lambda engine, file_path, suffix, *_args: {
+        lambda engine, file_path, suffix, *_args, **_kwargs: {
             "success": True,
             "content": "parsed",
             "metadata": {"processed_path": file_path, "processed_suffix": suffix, "engine": engine},
@@ -160,7 +187,7 @@ def test_requested_engine_is_preferred_when_primary_engine_fails(tmp_path, monke
     monkeypatch.setattr(processor, "_profile_docx", lambda _path: {"kind": "text", "reason": "test"})
     calls = []
 
-    def fake_run(engine, *_args):
+    def fake_run(engine, *_args, **_kwargs):
         calls.append(engine)
         if engine == "docling":
             return {"success": False, "error": "docling failed"}
@@ -183,7 +210,7 @@ def test_text_pdf_falls_back_to_requested_mineru_when_docling_fails(tmp_path, mo
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "text", "reason": "test"})
     calls = []
 
-    def fake_run(engine, *_args):
+    def fake_run(engine, *_args, **_kwargs):
         calls.append(engine)
         if engine == "docling":
             return {"success": False, "error": "docling model unavailable"}
@@ -209,7 +236,7 @@ def test_no_fallback_is_attempted_without_a_compatible_user_request(tmp_path, mo
     monkeypatch.setattr(processor, "_profile_docx", lambda _path: {"kind": "text", "reason": "test"})
     calls = []
 
-    def fake_run(engine, *_args):
+    def fake_run(engine, *_args, **_kwargs):
         calls.append(engine)
         return {"success": False, "error": "failed"}
 

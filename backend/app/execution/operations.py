@@ -1,0 +1,272 @@
+from __future__ import annotations
+
+import base64
+import os
+from contextlib import contextmanager
+from datetime import datetime
+from functools import lru_cache
+from typing import Any
+
+
+@contextmanager
+def _mcp_activity_context():
+    """Prevent a Worker Activity from submitting itself back to the queue."""
+    previous = os.environ.get("MCP_EXECUTION_MODE")
+    os.environ["MCP_EXECUTION_MODE"] = "inline"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("MCP_EXECUTION_MODE", None)
+        else:
+            os.environ["MCP_EXECUTION_MODE"] = previous
+
+from backend.app.schemas import (
+    ChunkOptions,
+    GraphEmbeddingRequest,
+    GraphExtractionItem,
+    GraphItem,
+    GraphRequest,
+    PipelineOptions,
+    TextChunk,
+    TextEmbeddingItem,
+)
+
+
+def _decode_content(value: Any) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return base64.b64decode(value)
+    if isinstance(value, dict) and "__bytes_base64__" in value:
+        return base64.b64decode(value["__bytes_base64__"])
+    raise ValueError("payload content must be bytes or base64")
+
+
+def _parse_document(payload: dict[str, Any]) -> dict[str, Any]:
+    from .document_sharding import orchestrate_document_parse
+
+    return orchestrate_document_parse(payload)
+
+
+def _parse_document_shard(payload: dict[str, Any]) -> dict[str, Any]:
+    from .document_sharding import parse_document_shard
+
+    return parse_document_shard(payload)
+
+
+def _chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
+    from backend.app.services.algorithm_capabilities import document_chunking_service
+
+    return document_chunking_service.chunk(
+        payload["markdown"], ChunkOptions.model_validate(payload.get("options") or {})
+    )
+
+
+def _extract_graphs(payload: dict[str, Any]) -> dict[str, Any]:
+    from backend.app.services.algorithm_capabilities import graph_extraction_service
+
+    items = [GraphExtractionItem.model_validate(item) for item in payload["items"]]
+    result = graph_extraction_service.extract(
+        payload["ontology"],
+        items,
+        model=(payload.get("options") or {}).get("model"),
+        merge=(payload.get("options") or {}).get("merge", True),
+    )
+    return result.graph_data()
+
+
+def _embed_texts(payload: dict[str, Any]) -> dict[str, Any]:
+    from backend.app.services.algorithm_capabilities import embedding_service
+
+    return embedding_service.texts([TextEmbeddingItem.model_validate(item) for item in payload["items"]])
+
+
+def _embed_graphs(payload: dict[str, Any]) -> dict[str, Any]:
+    from backend.app.services.algorithm_capabilities import embedding_service
+
+    return embedding_service.graphs([GraphItem.model_validate(item) for item in payload["items"]])
+
+
+def _merge_graphs(payload: dict[str, Any]) -> dict[str, Any]:
+    from backend.app.services.algorithm_capabilities import graph_merge_service
+
+    return graph_merge_service([GraphItem.model_validate(item) for item in payload["items"]])
+
+
+def _confidence(payload: dict[str, Any]) -> dict[str, Any]:
+    from algorithm.confidence_calculate.calculator import calculate_graph_confidence
+
+    graph = payload.get("graph") or {}
+    if not graph.get("relationships") and not graph.get("ontology_relations"):
+        return {
+            "evaluation_id": f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+            "total_count": 0,
+            "relationships": [],
+            "ontology_relations": [],
+        }
+    result = calculate_graph_confidence({"graph": graph})
+    return result.get("data")
+
+
+@lru_cache(maxsize=1)
+def _knowledge_service():
+    from backend.app.services.algorithm_capabilities import (
+        document_chunking_service,
+        document_parsing_service,
+        embedding_service,
+        graph_extraction_service,
+    )
+    from backend.app.services.knowledge_precipitation import KnowledgePrecipitationService
+
+    return KnowledgePrecipitationService(
+        parsing=document_parsing_service,
+        chunking=document_chunking_service,
+        extraction=graph_extraction_service,
+        embeddings=embedding_service,
+    )
+
+
+def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
+    from backend.app.services.knowledge_precipitation import (
+        BatchKnowledgeIngestionRequest,
+        FileItem,
+        KnowledgeIngestionRequest,
+    )
+
+    options = PipelineOptions.model_validate(payload.get("options") or {})
+    files = payload.get("files") or []
+    service = _knowledge_service()
+    if len(files) == 1 and not payload.get("batch"):
+        item = files[0]
+        return service.process(
+            KnowledgeIngestionRequest(
+                file_name=item["file_name"],
+                content=_decode_content(item["content"]),
+                ontology=payload["ontology"],
+                options=options,
+            )
+        )
+    return service.process_batch(
+        BatchKnowledgeIngestionRequest(
+            files=[FileItem(file_name=item["file_name"], content=_decode_content(item["content"])) for item in files],
+            ontology=payload["ontology"],
+            options=options,
+        )
+    )
+
+
+def _mcp_execute_sql(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.data.sql import _execute_sql
+
+    from mcp_services.result import ToolCode, normalize_tool_result
+
+    result = _execute_sql(
+        payload["sql"],
+        payload.get("params"),
+        payload.get("database_url"),
+        payload.get("read_only", True),
+    )
+    return normalize_tool_result(result, ToolCode.DATA_FAILED, "SQL 执行")
+
+
+def _mcp_knowledge_extract(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.knowledge.extraction import _extract
+    from mcp_services.result import ToolCode, normalize_tool_result
+
+    result = _extract(payload["ontology"], payload["text"], payload.get("model"), payload.get("base_url"))
+    return normalize_tool_result(result, ToolCode.KNOWLEDGE_FAILED, "知识抽取完成")
+
+
+def _mcp_knowledge_store(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.knowledge.extraction import _store
+    from mcp_services.result import ToolCode, normalize_tool_result
+
+    return normalize_tool_result(_store(payload["graph"]), ToolCode.KNOWLEDGE_FAILED, "知识图谱存储")
+
+
+def _mcp_search_graph(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.retrieval import search_graph
+
+    with _mcp_activity_context():
+        return search_graph(
+            payload["start_entity_id"],
+            question=payload.get("question", ""),
+            depth=payload.get("depth", 1),
+            relationship_types=payload.get("relationship_types"),
+            direction=payload.get("direction", "both"),
+            limit=payload.get("limit", 50),
+        )
+
+
+def _mcp_link_entities(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.retrieval import link_entities
+
+    with _mcp_activity_context():
+        return link_entities(payload.get("keywords", []), question=payload.get("question", ""))
+
+
+def _mcp_query_entity(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.retrieval import query_entity_properties
+
+    with _mcp_activity_context():
+        return query_entity_properties(payload["entity_id"])
+
+
+def _mcp_locate_knowledge_space(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.locator import locate_knowledge_space
+
+    with _mcp_activity_context():
+        return locate_knowledge_space(payload["user_question"], payload.get("app_requirement"))
+
+
+def _mcp_draw_chart(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.visualization.charts import _draw
+
+    method = str(payload.get("method", "")).strip()
+    allowed_methods = {
+        "bar_chart",
+        "pie_chart",
+        "line_chart",
+        "scatter_plot",
+        "histogram",
+        "area_chart",
+        "radar_chart",
+        "box_plot",
+        "bubble_chart",
+        "heatmap",
+    }
+    if method not in allowed_methods:
+        raise ValueError("invalid chart method")
+    arguments = dict(payload.get("arguments") or {})
+    with _mcp_activity_context():
+        return _draw(method, arguments)
+
+
+_OPERATIONS = {
+    "document.parse": _parse_document,
+    "document.parse.shard": _parse_document_shard,
+    "document.chunk": _chunk_document,
+    "graph.extract": _extract_graphs,
+    "embedding.texts": _embed_texts,
+    "embedding.graphs": _embed_graphs,
+    "graph.merge": _merge_graphs,
+    "graph.confidence": _confidence,
+    "knowledge.ingestion": _knowledge_ingestion,
+    "mcp.execute_sql": _mcp_execute_sql,
+    "mcp.knowledge.extract": _mcp_knowledge_extract,
+    "mcp.knowledge.store": _mcp_knowledge_store,
+    "mcp.graph.search": _mcp_search_graph,
+    "mcp.graph.link_entities": _mcp_link_entities,
+    "mcp.graph.query_entity": _mcp_query_entity,
+    "mcp.graph.locate_space": _mcp_locate_knowledge_space,
+    "mcp.visualization.draw": _mcp_draw_chart,
+}
+
+
+def run_operation(operation: str, payload: dict[str, Any]) -> Any:
+    try:
+        handler = _OPERATIONS[operation]
+    except KeyError as exc:
+        raise ValueError(f"unknown execution operation: {operation}") from exc
+    return handler(payload)

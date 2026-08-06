@@ -19,7 +19,17 @@ class ParserConfig(StrictModel):
         "auto", "text", "docling", "vlm", "mineru", "pandas",
         "beautifulsoup", "excel", "bs4", "html",
     ] = "auto"
+    force: bool = False
+    page_sharding: Literal["auto", "on", "off"] = "auto"
+    page_shard_size: int = Field(default=0, ge=0, le=256)
+    max_page_shards: int = Field(default=4, ge=1, le=32)
     mineru_options: MinerUOptions = Field(default_factory=MinerUOptions)
+
+    @model_validator(mode="after")
+    def validate_force(self):
+        if self.force and self.engine == "auto":
+            raise ValueError("force=true 时必须指定 engine")
+        return self
 
 
 class ChunkOptions(StrictModel):

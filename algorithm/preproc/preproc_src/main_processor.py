@@ -151,7 +151,12 @@ class DocumentProcessor:
             profile["profile_error"] = str(exc)
         return profile
 
-    def select_engine(self, file_path: str, requested: Optional[str] = None) -> tuple[str, dict[str, Any]]:
+    def select_engine(
+        self,
+        file_path: str,
+        requested: Optional[str] = None,
+        force: bool = False,
+    ) -> tuple[str, dict[str, Any]]:
         suffix = Path(file_path).suffix.lower()
         allowed = self.ENGINE_MATRIX.get(suffix)
         if not allowed:
@@ -163,12 +168,26 @@ class DocumentProcessor:
         supplied_engine = None if normalized in {"", "auto"} else normalized
         requested_engine = supplied_engine if supplied_engine in allowed else None
 
-        selection: dict[str, Any] = {"mode": "auto", "allowed_engines": list(allowed)}
+        if force and not supplied_engine:
+            raise ValueError("force=true 时必须指定 engine")
+        if force and requested_engine is None:
+            raise ValueError(f"文件类型 {suffix} 不支持强制解析引擎: {supplied_engine}")
+
+        selection: dict[str, Any] = {
+            "mode": "forced" if force else "auto",
+            "allowed_engines": list(allowed),
+        }
         if supplied_engine:
             selection["requested_engine"] = supplied_engine
             selection["request_compatible"] = requested_engine is not None
             if requested_engine is None:
                 selection["request_role"] = "ignored_incompatible"
+
+        if force:
+            selection["force"] = True
+            selection["request_role"] = "forced"
+            selection["request_matched_selection"] = True
+            return requested_engine, selection
 
         if suffix in {".md", ".txt"}:
             if supplied_engine:
@@ -222,6 +241,8 @@ class DocumentProcessor:
         ocr_mode: str = "auto",
         table_enable: bool = True,
         formula_enable: bool = True,
+        start_page_id: int = 0,
+        end_page_id: Optional[int] = None,
     ) -> dict[str, Any]:
         process_path = file_path
         temp_pdf_path = None
@@ -249,7 +270,7 @@ class DocumentProcessor:
 
             kwargs: dict[str, Any] = {}
             if engine in {"mineru", "vlm"}:
-                backend = "pipeline" if engine == "mineru" else "vlm-transformers"
+                backend = "pipeline" if engine == "mineru" else os.getenv("MINERU_VLM_BACKEND", "vlm-transformers")
                 pipeline_method = {"auto": "auto", "on": "ocr", "off": "txt"}[ocr_mode]
                 kwargs = {
                     "output_dir": str(self.output_dir),
@@ -265,9 +286,15 @@ class DocumentProcessor:
                     "dump_model_output": False,
                     "dump_orig_pdf": False,
                     "dump_content_list": False,
-                    "start_page_id": 0,
-                    "end_page_id": None,
+                    "start_page_id": start_page_id,
+                    "end_page_id": end_page_id,
                 }
+                if engine == "vlm":
+                    server_url = os.getenv("MINERU_VLM_SERVER_URL", "").strip()
+                    if server_url:
+                        kwargs["server_url"] = server_url
+                    kwargs["max_concurrency"] = int(os.getenv("MINERU_VLM_MAX_CONCURRENCY", "16"))
+                    kwargs["http_timeout"] = int(os.getenv("MINERU_VLM_HTTP_TIMEOUT_SECONDS", "600"))
             result = self._processor(engine).process(process_path, **kwargs)
             metadata = result.get("metadata") or {}
             if engine == "mineru":
@@ -295,10 +322,13 @@ class DocumentProcessor:
         self,
         file_path: str,
         model_name: Optional[str] = None,
+        force: bool = False,
         lang: str = "ch",
         ocr_mode: str = "auto",
         table_enable: bool = True,
         formula_enable: bool = True,
+        start_page_id: int = 0,
+        end_page_id: Optional[int] = None,
     ) -> dict[str, Any]:
         path = Path(file_path)
         if not path.exists():
@@ -329,7 +359,7 @@ class DocumentProcessor:
                     }
                 process_path = converted_pdf_path
                 process_suffix = ".pdf"
-            engine, selection = self.select_engine(process_path, model_name)
+            engine, selection = self.select_engine(process_path, model_name, force=force)
             if suffix == ".ofd":
                 selection["source_file_type"] = ".ofd"
                 selection["converted_file_type"] = ".pdf"
@@ -344,13 +374,29 @@ class DocumentProcessor:
             }
 
         run_options = (normalized_ocr_mode, table_enable, formula_enable)
-        result = self._run_processor(engine, process_path, process_suffix, lang, *run_options)
+        result = self._run_processor(
+            engine,
+            process_path,
+            process_suffix,
+            lang,
+            *run_options,
+            start_page_id=start_page_id,
+            end_page_id=end_page_id,
+        )
         fallback_from = None
         fallback = selection.get("fallback_engine")
         if not result.get("success") and fallback and fallback != engine:
             fallback_from = {"engine": engine, "error": result.get("error", "解析失败")}
             engine = fallback
-            result = self._run_processor(engine, process_path, process_suffix, lang, *run_options)
+            result = self._run_processor(
+                engine,
+                process_path,
+                process_suffix,
+                lang,
+                *run_options,
+                start_page_id=start_page_id,
+                end_page_id=end_page_id,
+            )
 
         base_metadata = {
             "file_name": path.name,
@@ -360,6 +406,10 @@ class DocumentProcessor:
             "processed_at": datetime.now().isoformat(),
             "engine_selection": selection,
             "model_used": engine,
+            "page_range": {
+                "start_page_id": start_page_id,
+                "end_page_id": end_page_id,
+            },
         }
         if fallback_from:
             base_metadata["fallback_from"] = fallback_from

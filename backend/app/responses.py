@@ -105,8 +105,20 @@ _RETRYABLE = {
 }
 
 
-def payload(data: Any = None, info: str = "success", code: int = 0, error: Any = None) -> dict[str, Any]:
-    return {"code": int(code), "info": info, "data": data, "error": error}
+def payload(
+    data: Any = None,
+    info: str = "success",
+    code: int = 0,
+    error: Any = None,
+    execution: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "code": int(code),
+        "info": info,
+        "data": data,
+        "error": error,
+        "execution": execution,
+    }
 
 
 def deprecated_info(info: str, replacement: str) -> str:
@@ -129,6 +141,7 @@ def error_response(
     details: Any = None,
     data: Any = None,
     status_code: int | None = None,
+    execution: dict[str, Any] | None = None,
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code or default_http_status(code),
@@ -142,5 +155,6 @@ def error_response(
                 "retryable": is_retryable(code),
                 "details": details,
             },
+            execution=execution,
         ),
     )

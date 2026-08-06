@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from starlette.concurrency import run_in_threadpool
 
 from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
+from backend.app.execution.api import ExecutionUnavailable, ManagedExecutionError, dispatch_operation, prefer_wait_seconds
 from backend.app.schemas import (
     ChunkRequest,
     GraphEmbeddingRequest,
@@ -27,17 +27,19 @@ from backend.app.services.algorithm_capabilities import (
 router = APIRouter(tags=["algorithm-capabilities"])
 
 
-def _capability_error(exc: CapabilityError) -> JSONResponse:
+def _capability_error(exc: CapabilityError, execution: dict | None = None) -> JSONResponse:
     return error_response(
         exc.code,
         exc.info,
         stage=exc.stage,
         details=exc.details,
+        execution=execution,
     )
 
 
 @router.post("/api/v1/documents/parse")
 async def parse_document(
+    http_request: Request,
     file: UploadFile = File(...),
     options: str = Form("{}"),
 ) -> JSONResponse:
@@ -52,37 +54,64 @@ async def parse_document(
             status_code=400,
         )
     try:
-        result = await run_in_threadpool(
-            document_parsing_service.parse,
-            file.filename or "upload.bin",
-            await file.read(),
-            config,
+        result = await dispatch_operation(
+            operation="document.parse",
+            resource_class="cpu.document_orchestrator",
+            payload={
+                "file_name": file.filename or "upload.bin",
+                "content": await file.read(),
+                "config": config.model_dump(),
+            },
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
-        return JSONResponse(content=payload(result, "文档解析完成"))
+        return JSONResponse(content=payload(result.data, "文档解析完成", execution=result.execution), status_code=result.status_code)
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        if isinstance(exc.cause, CapabilityError):
+            return _capability_error(exc.cause, exc.execution)
+        return error_response(ErrorCode.INTERNAL_ERROR, "文档解析失败", stage="execution", details={"type": type(exc.cause).__name__, "message": str(exc.cause)}, execution=exc.execution)
     except CapabilityError as exc:
         return _capability_error(exc)
 
 
 @router.post("/api/v1/documents/chunk")
-async def chunk_document(body: ChunkRequest) -> JSONResponse:
+async def chunk_document(http_request: Request, body: ChunkRequest) -> JSONResponse:
     try:
-        data = await run_in_threadpool(document_chunking_service.chunk, body.markdown, body.options)
-        return JSONResponse(content=payload(data, "文档切片完成"))
+        result = await dispatch_operation(
+            operation="document.chunk",
+            resource_class="cpu.chunk",
+            payload=body.model_dump(),
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
+        )
+        return JSONResponse(content=payload(result.data, "文档切片完成", execution=result.execution), status_code=result.status_code)
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        if isinstance(exc.cause, CapabilityError):
+            return _capability_error(exc.cause, exc.execution)
+        return error_response(ErrorCode.INTERNAL_ERROR, "文档切片失败", stage="execution", details={"type": type(exc.cause).__name__, "message": str(exc.cause)}, execution=exc.execution)
     except CapabilityError as exc:
         return _capability_error(exc)
 
 
 @router.post("/api/v1/graphs/extract")
-async def extract_graphs(body: GraphExtractionRequest) -> JSONResponse:
+async def extract_graphs(http_request: Request, body: GraphExtractionRequest) -> JSONResponse:
     try:
-        result = await run_in_threadpool(
-            graph_extraction_service.extract,
-            body.ontology,
-            body.items,
-            model=body.options.model,
-            merge=body.options.merge,
+        result = await dispatch_operation(
+            operation="graph.extract",
+            resource_class="io.llm",
+            payload=body.model_dump(),
+            total_units=len(body.items),
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
-        return JSONResponse(content=payload(result.graph_data(), "分片图谱抽取完成"))
+        return JSONResponse(content=payload(result.data, "分片图谱抽取完成", execution=result.execution), status_code=result.status_code)
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        if isinstance(exc.cause, CapabilityError):
+            return _capability_error(exc.cause, exc.execution)
+        return error_response(ErrorCode.INTERNAL_ERROR, "图谱抽取失败", stage="execution", details={"type": type(exc.cause).__name__, "message": str(exc.cause)}, execution=exc.execution)
     except CapabilityError as exc:
         return _capability_error(exc)
 
@@ -91,28 +120,65 @@ async def extract_graphs(body: GraphExtractionRequest) -> JSONResponse:
 @router.post("/api/component/nl2cypher/text-to-vectors", deprecated=True)
 async def embed_texts(http_request: Request, body: TextEmbeddingRequest) -> JSONResponse:
     try:
-        data = await run_in_threadpool(embedding_service.texts, body.items)
-        info = f"文本向量化完成，共 {data['count']} 个向量"
+        result = await dispatch_operation(
+            operation="embedding.texts",
+            resource_class="gpu.embedding",
+            payload=body.model_dump(),
+            total_units=len(body.items),
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
+        )
+        info = f"文本向量化完成，共 {result.data['count']} 个向量" if isinstance(result.data, dict) and "count" in result.data else "文本向量化任务已提交"
         if http_request.url.path != "/api/v1/embeddings/texts":
             info = deprecated_info(info, "/api/v1/embeddings/texts")
-        return JSONResponse(content=payload(data, info))
+        return JSONResponse(content=payload(result.data, info, execution=result.execution), status_code=result.status_code)
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        if isinstance(exc.cause, CapabilityError):
+            return _capability_error(exc.cause, exc.execution)
+        return error_response(ErrorCode.INTERNAL_ERROR, "文本向量化失败", stage="execution", details={"type": type(exc.cause).__name__, "message": str(exc.cause)}, execution=exc.execution)
     except CapabilityError as exc:
         return _capability_error(exc)
 
 
 @router.post("/api/v1/graphs/merge")
-async def merge_graphs(body: GraphMergeRequest) -> JSONResponse:
+async def merge_graphs(http_request: Request, body: GraphMergeRequest) -> JSONResponse:
     try:
-        data = await run_in_threadpool(graph_merge_service, body.items)
-        return JSONResponse(content=payload(data, "Graph 去重完成"))
+        result = await dispatch_operation(
+            operation="graph.merge",
+            resource_class="cpu.graph",
+            payload=body.model_dump(),
+            total_units=len(body.items),
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
+        )
+        return JSONResponse(content=payload(result.data, "Graph 去重完成", execution=result.execution), status_code=result.status_code)
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        if isinstance(exc.cause, CapabilityError):
+            return _capability_error(exc.cause, exc.execution)
+        return error_response(ErrorCode.INTERNAL_ERROR, "Graph 去重失败", stage="execution", details={"type": type(exc.cause).__name__, "message": str(exc.cause)}, execution=exc.execution)
     except CapabilityError as exc:
         return _capability_error(exc)
 
 
 @router.post("/api/v1/embeddings/graphs")
-async def embed_graphs(body: GraphEmbeddingRequest) -> JSONResponse:
+async def embed_graphs(http_request: Request, body: GraphEmbeddingRequest) -> JSONResponse:
     try:
-        data = await run_in_threadpool(embedding_service.graphs, body.items)
-        return JSONResponse(content=payload(data, f"Graph 向量化完成，共 {data['count']} 个向量"))
+        result = await dispatch_operation(
+            operation="embedding.graphs",
+            resource_class="gpu.embedding",
+            payload=body.model_dump(),
+            total_units=len(body.items),
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
+        )
+        info = f"Graph 向量化完成，共 {result.data['count']} 个向量" if isinstance(result.data, dict) and "count" in result.data else "Graph 向量化任务已提交"
+        return JSONResponse(content=payload(result.data, info, execution=result.execution), status_code=result.status_code)
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        if isinstance(exc.cause, CapabilityError):
+            return _capability_error(exc.cause, exc.execution)
+        return error_response(ErrorCode.INTERNAL_ERROR, "Graph 向量化失败", stage="execution", details={"type": type(exc.cause).__name__, "message": str(exc.cause)}, execution=exc.execution)
     except CapabilityError as exc:
         return _capability_error(exc)

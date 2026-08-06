@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import types
 from contextlib import asynccontextmanager
@@ -151,6 +152,11 @@ def protocol_module():
         ),
         "mcp_services.server": _module("mcp_services.server", mcp=_MCPStub()),
     }
+    original_execution_mode = os.environ.get("EXECUTION_MODE")
+    # Existing protocol tests exercise algorithm contracts without starting
+    # Redis or a Worker. Inline is explicit test configuration, never a
+    # production fallback.
+    os.environ["EXECUTION_MODE"] = "inline"
     original = {name: sys.modules.get(name) for name in stubs}
     application_modules = [
         "backend.app.services.algorithm_capabilities",
@@ -174,6 +180,10 @@ def protocol_module():
         app.include_router(confidence_router)
         yield types.SimpleNamespace(app=app)
     finally:
+        if original_execution_mode is None:
+            os.environ.pop("EXECUTION_MODE", None)
+        else:
+            os.environ["EXECUTION_MODE"] = original_execution_mode
         for name, previous in original.items():
             if previous is None:
                 sys.modules.pop(name, None)

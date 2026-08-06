@@ -5,6 +5,7 @@ from typing import Any
 
 from mcp_services.runtime import mcp
 from mcp_services.result import ToolCode, invoke_tool, tool_success
+from mcp_services.dispatch import maybe_submit
 
 
 @lru_cache(maxsize=1)
@@ -16,6 +17,13 @@ def _executor():
 
 
 def _draw(method: str, data: dict[str, Any]) -> dict[str, Any]:
+    queued = maybe_submit(
+        "mcp.visualization.draw",
+        {"method": method, "arguments": data},
+        resource_class="cpu.chart",
+    )
+    if queued is not None:
+        return queued
     return invoke_tool(
         lambda: getattr(_executor(), method)(data),
         ToolCode.VISUALIZATION_FAILED,

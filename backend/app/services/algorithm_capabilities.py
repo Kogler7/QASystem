@@ -105,6 +105,8 @@ class DocumentParsingService:
         if selection.get("requested_engine"):
             summary["requested_engine"] = selection["requested_engine"]
             summary["request_handling"] = selection.get("request_role")
+            if selection.get("force"):
+                summary["force"] = True
         if metadata.get("fallback_from"):
             fallback = metadata["fallback_from"]
             summary["fallback"] = {
@@ -115,7 +117,16 @@ class DocumentParsingService:
             summary["encoding"] = metadata["encoding"]
         return summary
 
-    def parse(self, file_name: str, content: bytes, config: ParserConfig) -> dict[str, Any]:
+    def parse(
+        self,
+        file_name: str,
+        content: bytes,
+        config: ParserConfig,
+        *,
+        page_range: tuple[int, int] | None = None,
+        shard_index: int | None = None,
+        total_shards: int | None = None,
+    ) -> dict[str, Any]:
         if not content:
             raise CapabilityError(ErrorCode.INVALID_REQUEST, "上传文件不能为空", "validation")
         safe_name = Path(file_name or "upload.bin").name
@@ -129,10 +140,13 @@ class DocumentParsingService:
                 result = self.processor.process_file(
                     temp_path,
                     model_name=config.engine,
+                    force=config.force,
                     lang=config.mineru_options.language,
                     ocr_mode=config.mineru_options.ocr_mode,
                     table_enable=config.mineru_options.table_enable,
                     formula_enable=config.mineru_options.formula_enable,
+                    start_page_id=page_range[0] if page_range else 0,
+                    end_page_id=page_range[1] if page_range else None,
                 )
             if not result.get("success"):
                 reason = str(result.get("error") or "未知原因")
@@ -145,7 +159,7 @@ class DocumentParsingService:
             markdown = normalize_document_content(result.get("content"))
             if not markdown.strip():
                 raise CapabilityError(ErrorCode.DOCUMENT_CONTENT_EMPTY, "文档解析结果为空", "document_parse")
-            return {
+            data = {
                 "file_name": safe_name,
                 "file_size": len(content),
                 "file_type": suffix.lstrip("."),
@@ -153,6 +167,14 @@ class DocumentParsingService:
                 "content_length": len(markdown),
                 "parser": self.parser_summary(result.get("metadata") or {}),
             }
+            if page_range is not None:
+                data["page_range"] = {
+                    "start_page_id": page_range[0],
+                    "end_page_id": page_range[1],
+                    "shard_index": shard_index,
+                    "total_shards": total_shards,
+                }
+            return data
         finally:
             if temp_path and os.path.exists(temp_path):
                 os.unlink(temp_path)

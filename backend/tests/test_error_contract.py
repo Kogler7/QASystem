@@ -26,6 +26,7 @@ def test_error_response_derives_type_retryability_and_http_status():
         "retryable": True,
         "details": {"index": 3},
     }
+    assert body["execution"] is None
 
 
 @pytest.mark.parametrize(

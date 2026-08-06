@@ -171,6 +171,9 @@ class OCRProcessor(BaseProcessor):
                 lang=kwargs.get('lang', 'ch'),
                 backend=kwargs.get('backend', 'pipeline'),
                 method=kwargs.get('method', 'auto'),
+                server_url=kwargs.get('server_url'),
+                max_concurrency=kwargs.get('max_concurrency', 100),
+                http_timeout=kwargs.get('http_timeout', 600),
                 formula_enable=kwargs.get('formula_enable', True),
                 table_enable=kwargs.get('table_enable', True),
                 draw_layout_bbox=kwargs.get('draw_layout_bbox', False),
@@ -232,6 +235,8 @@ class OCRProcessor(BaseProcessor):
         backend: str = "pipeline",
         method: str = "auto",
         server_url: Optional[str] = None,
+        max_concurrency: int = 100,
+        http_timeout: int = 600,
         formula_enable: bool = True,
         table_enable: bool = True,
         draw_layout_bbox: bool = True,
@@ -359,7 +364,9 @@ class OCRProcessor(BaseProcessor):
                     pdf_bytes,
                     image_writer=image_writer,
                     backend=backend,
-                    server_url=server_url
+                    server_url=server_url,
+                    max_concurrency=max_concurrency,
+                    http_timeout=http_timeout,
                 )
 
                 self._process_output(

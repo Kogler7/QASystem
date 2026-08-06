@@ -16,6 +16,7 @@ configure_runtime_environment()
 from .routers.confidence import router as confidence_router
 from .routers.algorithm_capabilities import router as capabilities_router
 from .routers.knowledge_precipitation import router as knowledge_router
+from .routers.execution import router as execution_router
 from mcp_services.server import mcp
 from .responses import ErrorCode, error_response
 
@@ -38,6 +39,7 @@ app = FastAPI(title="QASystem Knowledge Services", lifespan=lifespan)
 app.include_router(capabilities_router)
 app.include_router(knowledge_router)
 app.include_router(confidence_router)
+app.include_router(execution_router)
 
 
 async def _proxy_agent(request: Request, path: str = "") -> StreamingResponse:

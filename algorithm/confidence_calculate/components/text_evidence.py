@@ -1,10 +1,11 @@
 import os
+import logging
 import threading
 import yaml
 import numpy as np
 from pathlib import Path
 from elasticsearch import Elasticsearch
-from sentence_transformers import SentenceTransformer
+from algorithm.embedding_runtime import get_sentence_transformer
 from typing import Dict, Optional
 from dotenv import load_dotenv
 
@@ -12,6 +13,8 @@ from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parents[3] / '.env'
 if env_path.exists():
     load_dotenv(env_path, override=False)
+
+LOGGER = logging.getLogger("qasystem.confidence.text_evidence")
 
 
 class TextEvidence:
@@ -55,9 +58,9 @@ class TextEvidence:
 
         self.es = Elasticsearch(**es_kwargs)
         if not self.es.ping():
-            print("警告: Elasticsearch 连接失败")
+            LOGGER.warning("Elasticsearch 连接失败")
         else:
-            print(f"Elasticsearch 连接成功: {es_hosts}")
+            LOGGER.info("Elasticsearch 连接成功: %s", es_hosts)
 
         self.index_name = os.getenv('CONFIDENCE_ES_INDEX', os.getenv('ES_INDEX', 'documents'))
         self.size = text_config.get('es_size', 50)          # ES 返回的文档数
@@ -66,12 +69,12 @@ class TextEvidence:
         # 加载 SBERT 模型
         model_path = os.getenv('CONFIDENCE_SBERT_MODEL_PATH', os.getenv('SBERT_MODEL_PATH',
                                '/mnt/data3/srv/qasystem/models/sbert_model'))
-        print(f"加载 SBERT 模型: {model_path}")
+        LOGGER.info("加载 SBERT 模型: %s", model_path)
         if not os.path.exists(model_path):
-            print(f"本地模型不存在，使用默认模型 paraphrase-multilingual-MiniLM-L12-v2")
-            self.sbert = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            LOGGER.warning("本地模型不存在，使用默认模型 paraphrase-multilingual-MiniLM-L12-v2")
+            self.sbert = get_sentence_transformer('paraphrase-multilingual-MiniLM-L12-v2', local_files_only=False)
         else:
-            self.sbert = SentenceTransformer(model_path)
+            self.sbert = get_sentence_transformer(model_path, local_files_only=True)
         self._encode_lock = threading.Lock()
 
     def build_query(self, triple: Dict) -> str:
@@ -98,7 +101,7 @@ class TextEvidence:
                 size=self.size
             )
         except Exception as e:
-            print(f"ES 检索失败: {e}")
+            LOGGER.warning("ES 检索失败: %s", e)
             return 0.5
 
         hits = response.get('hits', {}).get('hits', [])

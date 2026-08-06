@@ -2,6 +2,7 @@ from typing import Any
 
 from mcp_services.runtime import mcp
 from mcp_services.result import ToolCode, invoke_tool
+from mcp_services.dispatch import maybe_submit
 
 
 @mcp.tool(name="kg_extract_v2")
@@ -12,6 +13,13 @@ def extract_knowledge(
     base_url: str | None = None,
 ) -> dict[str, Any]:
     """Extract entities and relationships from text using a PlantUML ontology."""
+    queued = maybe_submit(
+        "mcp.knowledge.extract",
+        {"ontology": ontology, "text": text, "model": model, "base_url": base_url},
+        resource_class="io.llm",
+    )
+    if queued is not None:
+        return queued
     return invoke_tool(
         lambda: _extract(ontology, text, model, base_url),
         ToolCode.KNOWLEDGE_FAILED,
@@ -52,6 +60,13 @@ def _initialize(dimension_scales):
 @mcp.tool(name="kg_store_extraction")
 def store_extraction(graph: dict[str, Any]) -> dict[str, Any]:
     """Store an extracted graph in Neo4j, deduplicating nodes by uid."""
+    queued = maybe_submit(
+        "mcp.knowledge.store",
+        {"graph": graph},
+        resource_class="io.graph",
+    )
+    if queued is not None:
+        return queued
     return invoke_tool(lambda: _store(graph), ToolCode.KNOWLEDGE_FAILED, "知识图谱存储")
 
 

@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from mcp_services.result import ToolCode, normalize_tool_result, tool_error, tool_success
 from mcp_services.runtime import mcp
+from mcp_services.dispatch import maybe_submit
 
 
 @lru_cache(maxsize=1)
@@ -24,6 +25,13 @@ def _graph_components():
 @mcp.tool(name="link_entities")
 def link_entities(keywords: list[str] | str, question: str = "") -> dict[str, Any]:
     """Link query terms to graph entity candidates using graph data plus semantic ranking."""
+    queued = maybe_submit(
+        "mcp.graph.link_entities",
+        {"keywords": keywords, "question": question},
+        resource_class="io.graph",
+    )
+    if queued is not None:
+        return queued
     try:
         if isinstance(keywords, str):
             try:
@@ -51,6 +59,13 @@ def link_entities(keywords: list[str] | str, question: str = "") -> dict[str, An
 @mcp.tool(name="query_entity_properties")
 def query_entity_properties(entity_id: str) -> dict[str, Any]:
     """Return labels and complete properties for one graph entity."""
+    queued = maybe_submit(
+        "mcp.graph.query_entity",
+        {"entity_id": entity_id},
+        resource_class="io.graph",
+    )
+    if queued is not None:
+        return queued
     try:
         _client, entity_linker = _graph_components()
         node = entity_linker.get_node_full_info(entity_id)
@@ -81,6 +96,20 @@ def search_graph(
     """Return deterministic one-hop triples, optionally filtered by relation and direction."""
     if depth != 1:
         return tool_error(ToolCode.INVALID_ARGUMENT, "原子图谱搜索仅支持 depth=1，请由 Agent 逐层探索")
+    queued = maybe_submit(
+        "mcp.graph.search",
+        {
+            "start_entity_id": start_entity_id,
+            "question": question,
+            "depth": depth,
+            "relationship_types": relationship_types,
+            "direction": direction,
+            "limit": limit,
+        },
+        resource_class="io.graph",
+    )
+    if queued is not None:
+        return queued
     try:
         client, _entity_linker = _graph_components()
         result = client.client.search_neighbors(

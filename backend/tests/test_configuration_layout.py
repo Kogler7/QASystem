@@ -36,7 +36,6 @@ def test_environment_template_uses_module_specific_llm_keys():
 
 def test_compose_reuses_root_environment_without_variable_duplication():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-    source_mounted_compose = (ROOT / "docker" / "docker-compose.delivery.yml").read_text(encoding="utf-8")
     template = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "- .env" in compose
     assert "QASYSTEM_LOAD_DOTENV=false" in template
@@ -47,14 +46,15 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "INTENT_LLM_" not in compose
     assert "QA_LLM_" not in compose
     assert "AGENT_LLM_" not in compose
-    assert "GPU_DEVICE_IDS=4,5,6,7" in template
+    assert "GPU_DEVICE_IDS=" in template
+    assert "python -m app.execution.supervisor" in compose
     assert "BACKEND_BIND=0.0.0.0" in template
-    assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" in compose
-    assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" in source_mounted_compose
+    assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" not in compose
+    assert "execution-gpu-worker" not in compose
+    assert "execution-vlm-worker" not in compose
+    assert "vllm-0:" not in compose
     assert "AGENT_MCP_URL: http://backend:8000/mcp" in compose
-    assert "AGENT_MCP_URL: http://backend:8000/mcp" in source_mounted_compose
     assert "AGENT_HOST_PORT" not in compose
-    assert "AGENT_HOST_PORT" not in source_mounted_compose
     assert "MCP_PORT" not in template
 
 
@@ -67,10 +67,11 @@ def test_backend_proxies_agent_under_its_public_route():
 
 def test_deploy_script_only_generates_runtime_assets():
     script = (ROOT / "package-deploy.ps1").read_text(encoding="utf-8")
-    assert "qasystem-runtime" in script
+    assert 'layout = "self-contained-image"' in script
+    assert "robocopy" not in script
+    assert "docker-compose.delivery.yml" not in script
     assert "docker-compose.deploy.yml" not in script
     assert ".env.deploy.example" not in script
-    assert '"ofd_converter"' in script
 
 
 def test_dockerfile_performs_complete_runtime_verification():

@@ -3,8 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from starlette.concurrency import run_in_threadpool
 
+from backend.app.execution.api import ExecutionUnavailable, ManagedExecutionError, dispatch_operation, prefer_wait_seconds
 from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
 from backend.app.schemas import PipelineOptions
 from backend.app.services.algorithm_capabilities import (
@@ -81,20 +81,45 @@ async def knowledge_ingestion(
         )
 
     try:
-        if len(collected) == 1 and files is None:
-            name, content = collected[0]
-            request = KnowledgeIngestionRequest(
-                file_name=name, content=content, ontology=ontology, options=config,
+        result = await dispatch_operation(
+            operation="knowledge.ingestion",
+            resource_class="workflow.knowledge",
+            payload={
+                "ontology": ontology,
+                "options": config.model_dump(),
+                "files": [
+                    {"file_name": name, "content": content}
+                    for name, content in collected
+                ],
+                "batch": not (len(collected) == 1 and files is None),
+            },
+            total_units=len(collected),
+            wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
+        )
+        return JSONResponse(
+            content=payload(result.data, _info("知识沉淀完成", deprecated), execution=result.execution),
+            status_code=result.status_code,
+        )
+    except ExecutionUnavailable as exc:
+        return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, _info("执行队列不可用", deprecated), stage="execution", details=str(exc), status_code=503)
+    except ManagedExecutionError as exc:
+        cause = exc.cause
+        if isinstance(cause, PipelineError):
+            return error_response(
+                cause.code,
+                _info(cause.info, deprecated),
+                stage=cause.stage,
+                details=cause.details,
+                data=cause.partial_data,
+                execution=exc.execution,
             )
-            data = await run_in_threadpool(service.process, request)
-            return JSONResponse(content=payload(data, _info("知识沉淀完成", deprecated)))
-        else:
-            file_items = [FileItem(file_name=name, content=content) for name, content in collected]
-            request = BatchKnowledgeIngestionRequest(
-                files=file_items, ontology=ontology, options=config,
-            )
-            data = await run_in_threadpool(service.process_batch, request)
-            return JSONResponse(content=payload(data, _info("知识沉淀完成", deprecated)))
+        return error_response(
+            ErrorCode.INTERNAL_ERROR,
+            _info("知识沉淀处理异常", deprecated),
+            stage="execution",
+            details={"type": type(cause).__name__, "message": str(cause)},
+            execution=exc.execution,
+        )
     except PipelineError as exc:
         return error_response(
             exc.code,

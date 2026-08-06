@@ -3,6 +3,7 @@ from typing import Any
 
 from mcp_services.runtime import mcp
 from mcp_services.result import ToolCode, invoke_tool, tool_error, tool_success
+from mcp_services.dispatch import maybe_submit
 
 
 def _executor(database_url: str | None = None, *, read_only: bool = True):
@@ -22,6 +23,18 @@ def execute_sql(
     read_only: bool = True,
 ) -> dict[str, Any]:
     """Execute SQL against the configured database."""
+    queued = maybe_submit(
+        "mcp.execute_sql",
+        {
+            "sql": sql,
+            "params": params,
+            "database_url": database_url,
+            "read_only": read_only,
+        },
+        resource_class="io.db",
+    )
+    if queued is not None:
+        return queued
     return invoke_tool(
         lambda: _execute_sql(sql, params, database_url, read_only),
         ToolCode.DATA_FAILED,
