@@ -1,15 +1,15 @@
 # 新架构完整镜像部署迁移指引
 
-本文适用于从旧版单进程 Backend 迁移到统一并发执行架构，也可用于在一台全新 GPU 服务器上直接部署。正式交付只有一种拓扑：`backend`、`agent`、`redis` 三个容器。`backend` 使用完整镜像，入口命令为 `python -m app.execution.supervisor`，不挂载源码，也不复用旧版 worker 或 vLLM 容器。
+本文适用于从 `a93e8c4^` 所代表的重构前版本迁移到统一并发执行架构，也可用于在一台全新 GPU 服务器上直接部署。重构前没有独立 vLLM 服务，也没有显式 worker/vLLM services；Backend 入口进程直接运行 MinerU 和其他算法。正式交付只有一种拓扑：`backend`、`agent`、`redis` 三个容器。`backend` 使用完整镜像，入口命令为 `python -m app.execution.supervisor`，不挂载源码。
 
-模型仍由宿主机只读挂载到 `/models`，业务数据由 Docker volume 持久化。一个 Backend 容器获取所有可见 GPU；supervisor 自动探测 GPU，并管理 API 进程、CPU worker、每卡一个常驻 vLLM engine、VLM dispatch worker 和共享 Embedding/Confidence worker。Compose 不枚举这些子进程。
+模型仍由宿主机只读挂载到 `/models`，业务数据由 Docker volume 持久化。目标 8 卡 A40 服务器默认设置 `GPU_DEVICE_IDS=4,5,6,7`，只允许使用后四张卡；supervisor 仅在选中的卡内管理 API 进程、CPU worker、每卡一个常驻 vLLM engine、VLM dispatch worker 和共享 Embedding/Confidence worker。Compose 不枚举这些子进程。
 
 ## 1. 部署前提
 
 - Linux x86_64、Docker Engine 和 Docker Compose v2。
 - NVIDIA 驱动与 NVIDIA Container Toolkit 已安装，`docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi` 可看到目标 GPU。
 - 目标目录有足够空间保存完整 Backend 镜像及模型；不要把大型镜像归档和模型放在空间不足的 home 分区。
-- Redis 必须可用。正式部署固定使用异步执行，Redis 不可用时接口返回 `503`，不会退回 API 进程内执行。
+- Redis 必须可用。正式部署的计算通过异步队列和 Worker 执行，Redis 不可用时接口返回 `503`，不会退回 API 进程内执行；这不改变业务 HTTP API 默认同步返回结果的兼容行为。
 - MySQL、Neo4j、Elasticsearch、文件服务和外部 LLM 地址可从容器访问。
 
 生产目标为 4 张 A40 时，建议先使用默认配置：每卡一个 vLLM engine，`VLLM_GPU_MEMORY_UTILIZATION=0.82`，每卡一个共享辅助 worker。稳定运行后再根据实测显存余量调整，不要一开始把 vLLM 配到接近 100%。
@@ -40,26 +40,25 @@ deploy/
 
 保留旧 `.env` 中的数据库、Neo4j、Elasticsearch、文件服务、LLM、Agent 和密钥配置。不要用 `.env.example` 覆盖真实配置；先备份，再按下表合并。
 
-### 删除或停止使用
+### 基线变量的变化
 
 | 旧变量/做法 | 新架构处理 | 原因 |
 | --- | --- | --- |
-| `CUDA_VISIBLE_DEVICES` | 不在 Compose 中设置 | supervisor 为每个子进程自动绑定 GPU |
-| `GPU_DEVICE_IDS=4,5,6,7` 作为默认值 | 默认留空；仅需限卡时填写 | 空值表示使用容器内所有可见 GPU |
-| `MCP_PORT` | 删除 | MCP 统一由 Backend 的 `/mcp` 提供 |
-| `AGENT_BIND`、`AGENT_HOST_PORT` | 删除 | Agent API 统一由 Backend 的 `/agent` 反向代理 |
-| 手工配置 `VLLM_GPU_DEVICE_*`、vLLM URL 列表 | 删除 | supervisor 自动按卡生成端口和进程环境 |
-| 源码挂载、`source-mounted/` | 删除 | 正式交付只运行完整镜像 |
-| 独立 worker/vLLM Compose services | 删除 | 子进程全部由 Backend supervisor 管理 |
-| `VLLM_IMAGE` | 删除 | vLLM 已包含在完整 Backend 镜像中 |
+| `GPU_DEVICE_IDS=4,5,6,7` | 保留，但不再由 Compose 映射成容器级 `CUDA_VISIBLE_DEVICES` | 旧版让整个 Backend 进程同时看到四卡；新版将它作为 supervisor 的资源边界，再为各子进程绑定单卡 |
+| 数据库、Neo4j、Elasticsearch、文件服务、LLM、Agent 和密钥变量 | 原值迁移 | 外部依赖协议不因执行架构改变 |
+| `MINERU_MODEL_*`、`VECTOR_MODEL_PATH`、`CONFIDENCE_SBERT_MODEL_PATH` | 保留并校验容器内路径 | 模型仍由宿主机只读挂载到 `/models` |
+
+### 不要带入中间实验配置
+
+`a93e8c4^` 基线本身没有独立 vLLM/worker services，也没有 `VLLM_IMAGE`、逐卡 vLLM URL 或 `source-mounted/` 部署。若测试环境曾使用这些中间实验配置，不要合并到新 `.env` 或 Compose：vLLM、Worker 和逐进程 `CUDA_VISIBLE_DEVICES` 均由 Backend supervisor 管理。MCP 继续由 Backend 的 `/mcp` 提供，Agent API 由 Backend 的 `/agent` 反向代理，不需要额外的 `MCP_PORT`、`AGENT_BIND` 或 `AGENT_HOST_PORT`。
 
 ### 必须新增或确认
 
 | 变量 | 建议值 | 语义 |
 | --- | --- | --- |
-| `EXECUTION_MODE` | `async` | HTTP 重任务进入统一执行队列 |
+| `EXECUTION_MODE` | `async` | 业务计算进入统一执行队列；不表示 HTTP 默认立即返回 `202` |
 | `EXECUTION_REDIS_URL` | `redis://redis:6379/1` | 执行状态、队列、事件和租约存储 |
-| `MCP_EXECUTION_MODE` | `async` | MCP 重工具返回持久任务句柄 |
+| `MCP_EXECUTION_MODE` | `sync` | 生产默认；任务进入统一队列并等待完成，返回原 MCP 工具结果 |
 | `HOST_MODELS_DIR` | `./models` | 宿主机模型目录，只读挂载到 `/models` |
 | `VLLM_MODEL_PATH` | `/models/mineru/vlm` | supervisor 启动的 MinerU VLM 模型 |
 | `MINERU_MODEL_SOURCE` | `local` | 禁止运行时下载模型 |
@@ -75,7 +74,7 @@ deploy/
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `GPU_DEVICE_IDS` | 空 | 限制 supervisor 使用的物理卡号，如 `0,1,2,3` |
+| `GPU_DEVICE_IDS` | `4,5,6,7` | supervisor 可使用的物理卡号；目标 8 卡 A40 仅选后四卡 |
 | `API_WORKERS` | `2` | Uvicorn API 进程数 |
 | `EXECUTION_CPU_WORKERS` | `auto` | CPU worker 数；4 卡 32 核机器自动取 8 |
 | `EXECUTION_VLM_WORKERS_PER_GPU` | `auto` | 每卡 VLM dispatch worker 数；4 卡 32 核机器自动取 2 |
@@ -135,7 +134,7 @@ docker load -i qasystem-backend-latest.tar
 docker load -i redis-7-alpine.tar
 ```
 
-将旧 `.env` 按第 3 节合并到新 `.env`，使用本次交付的 `docker-compose.yml`，不要保留旧 Compose 中的 worker、vLLM 或源码挂载 service。确认配置后执行：
+将旧 `.env` 按第 3 节合并到新 `.env`，使用本次交付的 `docker-compose.yml`。重构前 Compose 没有 worker/vLLM services；迁移的核心是将 Backend 入口从 Uvicorn 直接启动替换为 supervisor，并补充统一执行层配置，不是兼容或清理某个中间实验拓扑。确认配置后执行：
 
 ```bash
 docker compose config --quiet
@@ -144,24 +143,27 @@ docker compose ps
 docker compose logs --tail=300 backend
 ```
 
-不要同时运行旧 worker/vLLM 容器和新 supervisor，它们会重复加载模型并争抢 GPU。回滚时恢复 `.env.pre-supervisor.bak` 和旧 Compose，并重新加载旧镜像；Redis 与业务数据库数据不应在迁移中删除。
+回滚时恢复 `.env.pre-supervisor.bak` 和重构前 Compose，并重新加载旧镜像；Redis 与业务数据库数据不应在迁移中删除。
 
 ## 6. API 协议漂移
 
-业务 HTTP 路径和请求主体保持兼容，但默认执行方式发生了有意变化：
+业务 HTTP 路径、请求主体和默认同步返回保持兼容，所有变化均为增量能力：
 
 | 项目 | 旧架构 | 新架构 | 兼容性 |
 | --- | --- | --- | --- |
 | 业务路径 | `/api/v1/...` 及 deprecated aliases | 原路径保留 | 路径兼容 |
-| 重任务响应 | 同步等待，通常 `200` | 默认 `202`，`data={job_id,status}` | 调用流程有漂移 |
-| 有界同步等待 | 无 | `Prefer: wait=N`，`N` 最大 60 秒 | 新增；超时仍返回 `202` |
+| 业务 API 默认响应 | 同步返回原 HTTP 状态和业务 `data` | 保持不变，顶层增加 `execution` | 增量兼容 |
+| 显式异步 | 无 | `Prefer: respond-async` 立即返回 `202` 和任务句柄 | 新增可选能力 |
+| 显式有界等待 | 无 | `Prefer: wait=N`，`N` 最大 60 秒 | 新增；时限内完成返回原结果，否则返回 `202` |
+| 通用 Jobs API | 无 | `POST /api/v1/jobs` 默认返回 `202` | 新增接口 |
 | 响应 envelope | `code/info/data/error` | 增加顶层 `execution` | 加法兼容；严格 schema 客户端需更新 |
 | 强制解析引擎 | `engine` 可能仍参与自动 fallback | `engine` 加同层 `force=true` 才严格强制 | 新增可选字段 |
 | PDF 页段 | 整份 PDF 单任务 | `page_sharding/page_shard_size/max_page_shards` | 新增可选字段，默认 `auto` |
 | 运行日志 | 容器日志为主 | 容器结构化日志和按任务 SSE | 新增 |
-| MCP 重工具 | 直接返回业务结果 | `MCP_EXECUTION_MODE=async` 时返回任务句柄 | 调用流程有漂移 |
+| MCP 重工具默认行为 | 入口进程直接执行并返回业务结果 | `MCP_EXECUTION_MODE=sync`，队列执行后返回原工具结果 | 返回协议兼容 |
+| MCP 显式异步 | 无 | `MCP_EXECUTION_MODE=async` 时返回任务句柄 | 新增可选能力 |
 
-异步请求收到 `202` 后：
+显式异步请求或 Jobs API 收到 `202` 后：
 
 ```bash
 JOB_ID='<响应 data.job_id>'
@@ -171,7 +173,7 @@ curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/executions"
 curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/result"
 ```
 
-`result` 仅在任务 `succeeded` 后返回业务结果，否则返回 `409`。每个统一 JSON 响应的顶层 `execution` 提供任务状态、摘要、事件 URL 和执行明细 URL；页段的 worker、进程实例、GPU、页范围、尝试次数、开始/结束时间可从执行明细和 SSE 获取。
+收到 SSE `job.completed` 后调用 `result_url`。`result` 仅在任务 `succeeded` 后返回包含最终业务 `data` 和顶层 `execution` 的完整 envelope，否则返回 `409`。每个统一 JSON 响应的顶层 `execution` 提供任务状态、摘要、事件 URL、执行明细 URL 和 `result_url`；页段的 worker、进程实例、GPU、页范围、尝试次数、开始/结束时间可从执行明细和 SSE 获取。
 
 文档解析新增配置示例：
 
@@ -198,7 +200,7 @@ curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/result"
 - `page_shard_size=0`：按目标 shard 数均衡分页；大于 0 时作为每段目标页数。
 - `max_page_shards`：单请求页段上限，范围 1 到 32。
 
-旧客户端若必须临时保持同步形态，可发送 `Prefer: wait=60`，但长文档和并发请求必须按 `202 + job_id` 接入，不能依赖同步等待完成。
+旧客户端不发送 `Prefer` 头即可继续同步获取原业务结果。需要释放 HTTP 连接时发送 `Prefer: respond-async`；只愿等待固定时间时发送 `Prefer: wait=60`。新接入方也可直接使用 `POST /api/v1/jobs`。
 
 ## 7. 验收与排障
 
@@ -214,6 +216,6 @@ curl -fsS http://127.0.0.1:8006/api/v1/resources/gpus
 
 - API 返回 `503`：检查 Redis 健康状态和 `EXECUTION_REDIS_URL`。
 - Backend 长时间 `starting`：查看 vLLM 模型路径、显存和 warmup 日志。
-- 只想使用部分 GPU：设置 `GPU_DEVICE_IDS` 后重建 Backend 容器。
+- GPU 选择不符：目标 8 卡 A40 应设置 `GPU_DEVICE_IDS=4,5,6,7`，修改后重建 Backend 容器。
 - 显存不足：先降低 `VLLM_GPU_MEMORY_UTILIZATION` 或 `VLLM_MAX_NUM_SEQS`，不要增加辅助 worker。
 - GPU 利用率低：确认 PDF 使用 `engine=vlm,force=true`，分页没有关闭，并查看 `execution`/SSE 是否发生排队、失败或单卡倾斜。

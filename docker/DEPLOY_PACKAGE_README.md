@@ -37,7 +37,7 @@ curl http://127.0.0.1:8006/agent/health
 
 `.env.example` 默认将 Backend 发布到 `0.0.0.0:8006`，可由其他主机访问。生产环境应通过宿主机防火墙、安全组或反向代理限制来源；只需本机访问时设为 `BACKEND_BIND=127.0.0.1`。
 
-`docker-compose.yml` 将所有可见 GPU 交给 Backend 容器。容器入口自动探测 GPU，在每张卡上启动一个常驻 vLLM engine，并按 CPU/GPU 数量生成 VLM dispatch worker、共享 Embedding/Confidence worker 和 CPU worker。默认无需枚举 GPU 或进程；如需限制用卡或并发规模，可设置 `GPU_DEVICE_IDS`、`EXECUTION_CPU_WORKERS`、`EXECUTION_VLM_WORKERS_PER_GPU` 和 `EXECUTION_AUX_WORKERS_PER_GPU`。
+`docker-compose.yml` 将 GPU 设备能力交给 Backend 容器，但 supervisor 只使用 `GPU_DEVICE_IDS` 选中的卡。目标 8 卡 A40 服务器默认设置 `GPU_DEVICE_IDS=4,5,6,7`，只占用后四卡；入口进程在这四张卡上各启动一个常驻 vLLM engine，并按 CPU/GPU 数量生成 VLM dispatch worker、共享 Embedding/Confidence worker 和 CPU worker。无需在 Compose 中枚举进程；可用 `EXECUTION_CPU_WORKERS`、`EXECUTION_VLM_WORKERS_PER_GPU` 和 `EXECUTION_AUX_WORKERS_PER_GPU` 覆盖自动数量。
 
 ## 模型与外部服务
 
@@ -45,4 +45,4 @@ curl http://127.0.0.1:8006/agent/health
 
 MySQL、Neo4j、Elasticsearch、文件服务和 LLM 服务是外部依赖；部署前将 `.env` 中的地址、账号和密钥替换为目标环境可访问的配置。不要交付包含真实密钥的 `.env`。
 
-只使用文档解析和知识接口时，仍需启动 Redis，但它不会暴露宿主机端口；完整 Agent 异步任务、MCP 重工具和 SSE 流式接口依赖 Redis。默认 `EXECUTION_MODE=async`，Redis 不可用时返回 503，不会回退到 Gateway 内执行。
+只使用文档解析和知识接口时，仍需启动 Redis，但它不会暴露宿主机端口。`EXECUTION_MODE=async` 表示计算由统一队列和 Worker 执行，不表示业务 HTTP API 默认立即返回 `202`：未携带 `Prefer` 时仍同步返回原状态码和原业务 `data`，只新增顶层 `execution`；`Prefer: respond-async` 才立即返回任务句柄，`Prefer: wait=N` 请求显式有界等待。显式异步调用在 SSE `job.completed` 后通过 `execution.result_url` 获取完整最终 envelope。MCP 生产默认 `MCP_EXECUTION_MODE=sync`，同样由队列执行但返回原工具结果；设为 `async` 才返回句柄。Redis 不可用时返回 503，不会回退到 Gateway 内执行。
