@@ -10,9 +10,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = $PSScriptRoot
 $deployDir = Join-Path $repoRoot "deploy"
-$sourceMountedDir = Join-Path $deployDir "source-mounted"
+$obsoleteSourceMountedDir = Join-Path $deployDir "source-mounted"
 $offlineDir = Join-Path $deployDir "offline-validation"
-$runtimeDir = Join-Path $sourceMountedDir "runtime"
 $legacyRuntimeDir = Join-Path $deployDir "qasystem-runtime"
 $resolvedRepoRoot = [System.IO.Path]::GetFullPath($repoRoot)
 $resolvedDeployDir = [System.IO.Path]::GetFullPath($deployDir)
@@ -35,7 +34,6 @@ if (-not $resolvedDeployDir.StartsWith($resolvedRepoRoot + [System.IO.Path]::Dir
 
 New-Item -ItemType Directory -Force -Path $deployDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $deployDir "models") | Out-Null
-New-Item -ItemType Directory -Force -Path $sourceMountedDir | Out-Null
 New-Item -ItemType Directory -Force -Path $offlineDir | Out-Null
 
 foreach ($tempFile in Get-ChildItem -LiteralPath $deployDir -Filter ".tmp-*" -File -ErrorAction SilentlyContinue) {
@@ -45,18 +43,8 @@ foreach ($tempFile in Get-ChildItem -LiteralPath $deployDir -Filter ".tmp-*" -Fi
 if (Test-Path -LiteralPath $legacyRuntimeDir) {
     Remove-Item -LiteralPath $legacyRuntimeDir -Recurse -Force
 }
-if (Test-Path -LiteralPath $runtimeDir) {
-    Remove-Item -LiteralPath $runtimeDir -Recurse -Force
-}
-New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-
-foreach ($directory in @("backend", "algorithm", "agent", "mcp_services", "ofd_converter")) {
-    $source = Join-Path $repoRoot $directory
-    $destination = Join-Path $runtimeDir $directory
-    robocopy $source $destination /E /NFL /NDL /NJH /NJS /NP /XD __pycache__ .venv venv env .pytest_cache .mypy_cache .ruff_cache /XF .env ".env.*" "*.pyc" "*.pyo" "*.log"
-    if ($LASTEXITCODE -ge 8) {
-        throw "Failed to copy $directory (robocopy exit code $LASTEXITCODE)"
-    }
+if (Test-Path -LiteralPath $obsoleteSourceMountedDir) {
+    Remove-Item -LiteralPath $obsoleteSourceMountedDir -Recurse -Force
 }
 
 Copy-Item -LiteralPath (Join-Path $repoRoot "docker-compose.yml") -Destination (Join-Path $deployDir "docker-compose.yml") -Force
@@ -67,14 +55,9 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "docker\docker-compose.offline-test.
 Copy-Item -LiteralPath (Join-Path $repoRoot "docker\OFFLINE_VALIDATION.md") -Destination (Join-Path $offlineDir "README.md") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "test_artifacts\parser") -Destination (Join-Path $offlineDir "parser") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "docker\DEPLOY_PACKAGE_README.md") -Destination (Join-Path $deployDir "README.md") -Force
-Copy-Item -LiteralPath (Join-Path $repoRoot "docker\docker-compose.delivery.yml") -Destination (Join-Path $sourceMountedDir "docker-compose.yml") -Force
-Copy-Item -LiteralPath (Join-Path $repoRoot "docker\DEPLOY_SOURCE_MOUNTED_README.md") -Destination (Join-Path $sourceMountedDir "README.md") -Force
-
 $envTemplate = Get-Content -LiteralPath (Join-Path $repoRoot ".env.example") -Raw
 $selfContainedEnv = $envTemplate -replace "(?m)^HOST_MODELS_DIR=.*$", "HOST_MODELS_DIR=./models"
-$sourceMountedEnv = $envTemplate -replace "(?m)^HOST_MODELS_DIR=.*$", "HOST_MODELS_DIR=../models"
 Set-Content -LiteralPath (Join-Path $deployDir ".env.example") -Value $selfContainedEnv -Encoding utf8
-Set-Content -LiteralPath (Join-Path $sourceMountedDir ".env.example") -Value $sourceMountedEnv -Encoding utf8
 
 $images = @()
 if ($IncludeImage) {
@@ -130,17 +113,16 @@ if ($IncludeImage) {
 $manifest = [ordered]@{
     generated_at_utc = [DateTime]::UtcNow.ToString("o")
     git_commit = (git -C $repoRoot rev-parse HEAD 2>$null)
-    layout = "self-contained-with-source-mounted-alternative"
-    source_mounted_runtime = "source-mounted/runtime/"
-    variants = @("self-contained", "source-mounted")
+    layout = "self-contained-image"
+    variants = @("self-contained")
     images = $images
     files = [ordered]@{}
 }
-foreach ($file in @("docker-compose.yml", "download-models.ps1", "ENV_MIGRATION.md", "run-offline-validation.ps1", ".env.example", "README.md", "source-mounted/docker-compose.yml", "source-mounted/.env.example", "source-mounted/README.md", "offline-validation/docker-compose.offline-test.yml", "offline-validation/README.md")) {
+foreach ($file in @("docker-compose.yml", "download-models.ps1", "ENV_MIGRATION.md", "run-offline-validation.ps1", ".env.example", "README.md", "offline-validation/docker-compose.offline-test.yml", "offline-validation/README.md")) {
     $path = Join-Path $deployDir $file
     $manifest.files[$file] = Get-Sha256 $path
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $deployDir "交付清单.json") -Encoding utf8
 
 Write-Host "Deployment bundle generated at $deployDir"
-Write-Host "Use deploy/ for the self-contained mode, or deploy/source-mounted/ for the external-source mode."
+Write-Host "The bundle uses the self-contained QASystem image; no host source mount is required."

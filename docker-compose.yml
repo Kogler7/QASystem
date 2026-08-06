@@ -12,21 +12,40 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app:/app/agent
-      CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}
+      GPU_DEVICE_IDS: ${GPU_DEVICE_IDS:-}
       LIBREOFFICE_PATH: ${LIBREOFFICE_PATH:-/usr/bin/soffice}
+      EXECUTION_MODE: async
+      EXECUTION_REDIS_URL: ${EXECUTION_REDIS_URL:-redis://redis:6379/1}
+      EXECUTION_DATA_DIR: /app/backend/data/execution
+      EXECUTION_LOG_LEVEL: ${EXECUTION_LOG_LEVEL:-INFO}
+      EXECUTION_CPU_WORKERS: ${EXECUTION_CPU_WORKERS:-auto}
+      EXECUTION_VLM_WORKERS_PER_GPU: ${EXECUTION_VLM_WORKERS_PER_GPU:-auto}
+      EXECUTION_AUX_WORKERS_PER_GPU: ${EXECUTION_AUX_WORKERS_PER_GPU:-1}
+      EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM: ${EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM:-2048}
+      EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING: ${EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING:-2048}
+      EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE: ${EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE:-2048}
+      MCP_EXECUTION_MODE: ${MCP_EXECUTION_MODE:-async}
+      VLLM_MODEL_PATH: ${VLLM_MODEL_PATH:-/models/mineru/vlm}
+      VLLM_GPU_MEMORY_UTILIZATION: ${VLLM_GPU_MEMORY_UTILIZATION:-0.82}
+      VLLM_MAX_NUM_SEQS: ${VLLM_MAX_NUM_SEQS:-32}
+      VLLM_WARMUP_ENABLED: ${VLLM_WARMUP_ENABLED:-true}
+      VLLM_WARMUP_TIMEOUT_SECONDS: ${VLLM_WARMUP_TIMEOUT_SECONDS:-300}
     volumes:
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
       - backend-data:/app/backend/data
     working_dir: /app/backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: python -m app.execution.supervisor
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "${BACKEND_BIND:-0.0.0.0}:${BACKEND_HOST_PORT:-8006}:8000"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
       interval: 30s
       timeout: 15s
-      retries: 5
-      start_period: 240s
+      retries: 10
+      start_period: 120s
 
   agent:
     image: ${BACKEND_IMAGE:-qasystem-backend:latest}
@@ -40,6 +59,7 @@ services:
       PYTHONPATH: /app:/app/agent
       AGENT_MCP_URL: http://backend:8000/mcp
       TASK_STORE_REDIS_URL: redis://redis:6379/0
+      EXECUTION_REDIS_URL: ${EXECUTION_REDIS_URL:-redis://redis:6379/1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

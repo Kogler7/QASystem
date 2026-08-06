@@ -1,8 +1,8 @@
 # QASystem backend and Agent runtime image. Build from the repository root.
 
 ARG NODE_IMAGE=node:20-bullseye-slim
-ARG PYTHON_IMAGE=python:3.12-bookworm
 ARG MAVEN_IMAGE=maven:3.9.9-eclipse-temurin-17
+ARG VLLM_IMAGE=vllm/vllm-openai:v0.11.2
 FROM ${NODE_IMAGE} AS opencode-runtime
 
 ARG OPENCODE_VERSION=1.17.15
@@ -16,7 +16,7 @@ COPY ofd_converter/pom.xml /build/pom.xml
 COPY ofd_converter/src /build/src
 RUN mvn --batch-mode --no-transfer-progress package -DskipTests
 
-FROM ${PYTHON_IMAGE}
+FROM ${VLLM_IMAGE}
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -27,6 +27,7 @@ RUN apt-get -o Acquire::Retries=5 update && \
     apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
     build-essential \
     pkg-config \
+    libcairo2-dev \
     default-libmysqlclient-dev \
     libgl1 \
     libglib2.0-0 \
@@ -62,6 +63,7 @@ RUN apt-get -o Acquire::Retries=5 update && \
     ripgrep \
     tree \
     tini \
+    python-is-python3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -72,7 +74,7 @@ COPY backend/requirements.txt /tmp/qasystem/requirements.txt
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/ https://pypi.doubanio.com/simple/" && \
     pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com pypi.doubanio.com" && \
-    pip install --upgrade pip setuptools wheel && \
+    pip install --upgrade pip "setuptools>=77,<81" wheel pycairo && \
     pip install -r /tmp/qasystem/requirements.txt && \
     pip check
 
@@ -97,6 +99,7 @@ COPY docker/verify_runtime.py /usr/local/bin/verify_qasystem_runtime.py
 COPY docker/download_models.py /usr/local/bin/download_qasystem_models.py
 COPY docker/offline_mock_llm.py /usr/local/bin/offline_mock_llm.py
 COPY docker/offline_validation.py /usr/local/bin/offline_validation.py
+COPY docker/vllm_readiness.py /usr/local/bin/vllm_readiness.py
 COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
@@ -120,4 +123,4 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=5 \
     CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
 ENTRYPOINT ["tini", "--"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "app.execution.supervisor"]
