@@ -12,6 +12,7 @@ from backend.app.execution.resources import GpuSnapshot, ResourceScheduler
 from backend.app.schemas import ParserConfig
 from backend.app.execution.store import MemoryExecutionStore
 from backend.app.execution.supervisor import _auto_cpu_workers, _auto_vlm_workers
+from backend.app.execution.worker import WorkerRuntime
 
 
 def test_page_ranges_are_balanced_contiguous_and_inclusive():
@@ -48,6 +49,40 @@ def test_shard_markdown_is_merged_by_shard_index():
     )
     assert result["markdown"] == "first\n\nsecond"
     assert result["sharding"]["page_ranges"] == [[0, 1], [2, 3]]
+
+
+def test_failed_page_shard_retry_preserves_only_that_child_task():
+    envelope = {
+        "job_id": "child-shard-7",
+        "task_id": "task-child-shard-7",
+        "parent_task_id": "task-parent-document",
+        "operation": "document.parse.shard",
+        "resource_class": "gpu.vlm",
+        "attempt": 1,
+        "shard_index": 7,
+        "page_range": [21, 23],
+        "payload_ref": "artifact://parent/document",
+        "target_worker": "vlm-0-0",
+        "reserved_allocation": {"worker_id": "vlm-0-0"},
+    }
+
+    retry = WorkerRuntime.__new__(WorkerRuntime)._retry_envelope("gpu.vlm", envelope)
+
+    for field in (
+        "job_id",
+        "task_id",
+        "parent_task_id",
+        "operation",
+        "resource_class",
+        "shard_index",
+        "page_range",
+        "payload_ref",
+    ):
+        assert retry[field] == envelope[field]
+    assert retry["attempt"] == 2
+    assert "target_worker" not in retry
+    assert "reserved_allocation" not in retry
+    assert envelope["attempt"] == 1
 
 
 def test_binary_blob_is_written_once_and_removed(tmp_path):

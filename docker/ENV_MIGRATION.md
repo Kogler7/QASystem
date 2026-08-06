@@ -6,6 +6,8 @@
 
 模型仍由宿主机只读挂载到 `/models`，业务数据由 Docker volume 持久化。目标 8 卡 A40 服务器设置 `GPU_DEVICE_IDS=4,5,6,7`，supervisor 只在后四张卡内启动和调度 GPU 进程。
 
+生产任务和执行状态进入 Redis：CPU、I/O、VLM、Embedding 和 Confidence 按资源类别使用共享队列，Worker 通过心跳注册能力。GPU Worker 领取任务时才为自身绑定的 GPU 申请显存预算和 Worker-slot Lease；容量不足时任务回到共享队列，其他可用 Worker 可以继续领取，而不是由 Compose 把任务静态绑定到某个进程。
+
 ## 1. 部署前提
 
 - Linux x86_64、Docker Engine 和 Docker Compose v2。
@@ -92,12 +94,35 @@ qasystem-delivery-20260806/
 
 `EXECUTION_MODE=inline` 只用于单元测试或本地算法断点调试，不是部署兼容模式。
 
+### 自动探测与覆盖规则
+
+supervisor 按以下规则派生进程，部署方不需要在 Compose 中复制服务：
+
+- GPU 范围优先读取 `GPU_DEVICE_IDS`；未配置时才通过 NVIDIA 设备探测获取可用卡。生产必须显式保留 `4,5,6,7`，避免占用前四卡。
+- 每张选中 GPU 固定启动一个 vLLM engine；当前实现不会根据负载动态增减 engine 副本。
+- `EXECUTION_CPU_WORKERS=auto` 时取 `max(2, min(8, CPU逻辑核数 / 4))`。
+- `EXECUTION_VLM_WORKERS_PER_GPU=auto` 时，按每卡 CPU 核数派生 1 到 4 个 dispatch Worker；4 卡、32 逻辑核时为每卡 2 个。
+- `EXECUTION_AUX_WORKERS_PER_GPU` 默认每卡 1 个，Worker 同时声明 `gpu.embedding` 和 `gpu.confidence` 能力。
+- 显式整数值可覆盖上述 Worker 数；修改 `.env` 后重新创建 Backend 容器即可，不需要修改 Compose 或重建镜像。
+
+### 不应迁移或不应手工设置
+
+| 变量/做法 | 当前处理 |
+| --- | --- |
+| 容器级 `CUDA_VISIBLE_DEVICES` | 不再从旧部署复制；Compose 传入 `GPU_DEVICE_IDS`，supervisor 为每个 vLLM/GPU Worker 子进程生成单卡 `CUDA_VISIBLE_DEVICES` |
+| `EXECUTION_VLM_MAX_CONCURRENCY` | 当前代码没有读取；不要配置。实际并发由 Worker 数、Worker-slot Lease、设备 Lease 和 vLLM `VLLM_MAX_NUM_SEQS` 共同限制 |
+| `EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS` | 当前模板和 Compose 中的保留项，运行时代码尚未读取；不要将它视为有效超时。VLM 页段汇聚使用 `EXECUTION_SHARD_TIMEOUT_SECONDS`，默认 3600 秒 |
+| `VLLM_MODEL_VERSION`、`EMBEDDING_MODEL_NAME`、`EMBEDDING_MODEL_VERSION` | 当前仅为预留元数据项，不影响 supervisor 的模型加载和调度，不是迁移必填项 |
+| `EXECUTION_GPU_DEVICE`、`EXECUTION_GPU_DEVICE_IDS`、`EXECUTION_GPU_LEASE_MODE`、`MINERU_VLM_SERVER_URL` | supervisor 注入给具体子进程的内部变量，不应在容器级 `.env` 手工设置 |
+| `VLLM_WARMUP_BASE_URL`、`VLLM_WARMUP_MARKER`、`VLLM_SERVER_PID`、`VLLM_WARMUP_REPORT_FAILURE` | readiness 重试过程的内部变量，不应手工设置 |
+| `DOCLING_ARTIFACTS_PATH` | 已不使用；Docling 固定读取 `/models/docling-models` |
+
 ## 4. 全新目标机部署
 
 在交付目录执行：
 
 ```bash
-cd /path/to/deploy
+cd /path/to/qasystem-delivery-20260806
 sha256sum -c SHA256SUMS 2>/dev/null || true
 docker load -i qasystem-backend-20260806.tar
 docker load -i redis-7-alpine.tar
@@ -114,7 +139,7 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-日志中应先出现 `GPU_DEVICE_IDS` 选中的每张 GPU 的 vLLM 启动信息，再出现各 engine 的 `ready and warm`，最后出现 `runtime ready`。supervisor 在所有 engine 完成 readiness 和最小多模态 warmup 后才启动 GPU Worker 并写入 ready 标记。此之前 `/health` 返回 HTTP `503` 和 `status=starting`；ready 标记写入后，普通 `/health` 返回 `200 {"status":"ok"}`。启动阶段端口尚未监听时的连接拒绝属于内部重试，不代表最终 warmup 失败。
+日志中应先出现 `GPU_DEVICE_IDS` 选中的每张 GPU 的 vLLM 启动信息，再出现各 engine 的 `ready and warm`，最后出现 `runtime ready`。默认 `VLLM_WARMUP_ENABLED=true` 时，supervisor 在所有 engine 完成 readiness 和最小多模态 warmup 后才启动 GPU Worker 并写入 ready 标记；生产不建议关闭该开关。此之前 `/health` 返回 HTTP `503` 和 `status=starting`；ready 标记写入后，普通 `/health` 返回 `200 {"status":"ok"}`。启动阶段端口尚未监听时的连接拒绝属于内部重试，重试过程默认静默，只有 engine 退出或超过启动期限才是最终启动失败。
 
 验证：
 
@@ -164,6 +189,8 @@ docker compose logs --tail=300 backend
 | MCP 重工具默认行为 | 入口进程直接执行并返回业务结果 | `MCP_EXECUTION_MODE=sync`，队列执行后返回原工具结果 | 返回协议兼容 |
 | MCP 显式异步 | 无 | `MCP_EXECUTION_MODE=async` 时返回任务句柄 | 新增可选能力 |
 
+对现有业务 API，未携带 `Prefer` 时不会因为内部使用异步队列而改成 `202`；只有 `Prefer: respond-async` 会立即返回 `202 + job_id`。`Prefer: wait=N` 是另一项显式选择：等待期限内完成则返回业务结果，期限届满才返回同类任务句柄。显式 Jobs API 本身始终是异步入口。
+
 显式异步请求或 Jobs API 收到 `202` 后：
 
 ```bash
@@ -203,6 +230,8 @@ curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/result"
 - `max_page_shards`：可选的单请求页段上限，默认 16，范围 1 到 32。
 
 `EXECUTION_VLM_SHARD_COUNT=auto` 时，服务端按当前存活 VLM Worker 数计算约 1.5 轮页段，即 `ceil(worker_count × 1.5)`，再受 PDF 页数和 `max_page_shards` 限制。页段数用于形成可由空闲 Worker 跨 GPU 领取的 backlog；GPU 显存快照、显存预算和 Lease 控制实际在途并发，不直接决定页段数量。当前实现不包含按页面复杂度预测耗时、运行中二次拆分慢页或动态启动 vLLM 副本。
+
+目标 A40 配置文件 `.env.a40.example` 使用 `GPU_DEVICE_IDS=4,5,6,7` 和 `EXECUTION_VLM_SHARD_COUNT=auto`。其 `VLLM_GPU_MEMORY_UTILIZATION=0.82`、`VLLM_MAX_NUM_SEQS=32`、每卡辅助 Worker 数及各任务显存预算是首轮部署参数，不是自动学习结果；上线前应在目标机用单一长文档和并发混合流量共同压测。
 
 旧客户端不发送 `Prefer` 头即可继续同步获取原业务结果。需要释放 HTTP 连接时发送 `Prefer: respond-async`；只愿等待固定时间时发送 `Prefer: wait=60`。新接入方也可直接使用 `POST /api/v1/jobs`。
 
