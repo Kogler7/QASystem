@@ -12,7 +12,7 @@
 | `download-models.ps1` | 在联网机器将 Docling、MinerU 模型下载到 `models/` |
 | `ENV_MIGRATION.md` | 已有部署更新时需要合并的模型相关 `.env` 变更 |
 | `.env.example` | 脱敏环境变量模板；部署前复制为 `.env` 并填写 |
-| `models/` | 本地模型挂载目录；按启用的能力准备相应模型 |
+| `deploy/models/` | 本地模型挂载目录；按启用的能力准备相应模型 |
 | `交付清单.json` | 文件、镜像标签和 SHA-256 校验信息 |
 
 ## 离线部署
@@ -33,7 +33,7 @@ curl http://127.0.0.1:8006/agent/health
 .\download-models.ps1 -ImageName qasystem-backend:latest
 ```
 
-将生成的 `models/` 目录与镜像和部署文件一并复制到离线服务器。默认下载 Docling、MinerU Pipeline/VLM 和 512 维 BGE-small-zh；BGE-small-zh 同时用于向量化和置信度语义评分。如只使用部分能力，可使用 `-SkipDocling`、`-SkipMineruPipeline`、`-SkipMineruVlm` 或 `-SkipEmbedding` 跳过对应模型。
+将生成的 `deploy/models/` 目录与镜像和部署文件一并复制到离线服务器。默认下载 Docling、MinerU Pipeline/VLM 和 512 维 BGE-small-zh；BGE-small-zh 同时用于向量化和置信度语义评分。如只使用部分能力，可使用 `-SkipDocling`、`-SkipMineruPipeline`、`-SkipMineruVlm` 或 `-SkipEmbedding` 跳过对应模型。
 
 `.env.example` 默认将 Backend 发布到 `0.0.0.0:8006`，可由其他主机访问。生产环境应通过宿主机防火墙、安全组或反向代理限制来源；只需本机访问时设为 `BACKEND_BIND=127.0.0.1`。
 
@@ -41,7 +41,7 @@ curl http://127.0.0.1:8006/agent/health
 
 ## 模型与外部服务
 
-`.env` 中的 `HOST_MODELS_DIR=./models` 指向本目录的模型挂载。模型目录包括 `models/docling-models`、`models/mineru/pipeline`、`models/mineru/vlm` 和 `models/bge-small-zh-v1.5`。
+`.env` 中的 `HOST_MODELS_DIR=./deploy/models` 指向交付目录下的模型挂载。模型目录包括 `deploy/models/docling-models`、`deploy/models/mineru/pipeline`、`deploy/models/mineru/vlm` 和 `deploy/models/bge-small-zh-v1.5`。
 
 MySQL、Neo4j、Elasticsearch、文件服务和 LLM 服务是外部依赖；部署前将 `.env` 中的地址、账号和密钥替换为目标环境可访问的配置。不要交付包含真实密钥的 `.env`。
 
