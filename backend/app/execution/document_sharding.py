@@ -62,8 +62,9 @@ def _configured_shard_count(config: ParserConfig, page_count: int, worker_count:
     raw_count = os.getenv("EXECUTION_VLM_SHARD_COUNT", "auto").strip().lower()
     try:
         if raw_count == "auto":
-            shards_per_worker = max(1, int(os.getenv("EXECUTION_VLM_SHARDS_PER_WORKER", "2")))
-            configured = max(1, worker_count * shards_per_worker)
+            # Keep a second wave queued for work stealing without coupling
+            # document granularity to GPU memory or model residency.
+            configured = max(1, worker_count * 2)
         else:
             configured = max(1, int(raw_count))
     except (TypeError, ValueError):
@@ -235,45 +236,7 @@ def _submit_child(
     shard_index: int,
     total_shards: int,
     execution_plan: dict[str, Any] | None,
-    exclude_workers: set[str] | None = None,
-    exclude_devices: set[str] | None = None,
 ) -> dict[str, Any]:
-    scheduler = manager.scheduler
-    try:
-        wait_seconds = max(1.0, float(os.getenv("EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS", "900")))
-    except (TypeError, ValueError):
-        wait_seconds = 900.0
-    deadline = time.monotonic() + wait_seconds
-    reservation = None
-    wait_event_emitted = False
-    while reservation is None:
-        reservation = scheduler.reserve_worker(
-            "gpu.vlm",
-            exclude_workers=exclude_workers,
-            exclude_devices=exclude_devices,
-        )
-        if reservation is None and (exclude_workers or exclude_devices):
-            reservation = scheduler.reserve_worker("gpu.vlm")
-        if reservation is not None:
-            break
-        current_parent = manager.store.get_job(str(parent.get("job_id"))) or {}
-        if current_parent.get("cancel_requested"):
-            raise PageShardError("文档页段任务已取消")
-        if time.monotonic() >= deadline:
-            raise PageShardError("等待 gpu.vlm worker 容量超时")
-        if not wait_event_emitted:
-            manager.hub.emit(
-                str(parent.get("job_id")),
-                "shard.waiting_for_capacity",
-                workflow_id=parent.get("workflow_id"),
-                operation="document.parse.shard",
-                stage="scheduling",
-                details={"shard_index": shard_index, "page_range": list(page_range) if page_range else None},
-            )
-            wait_event_emitted = True
-        time.sleep(0.2)
-    worker = reservation.get("worker") if reservation else None
-    allocation = reservation.get("allocation") if reservation else None
     child_payload = {
         "file_name": payload.get("file_name", "upload.bin"),
         "content_ref": blob_ref,
@@ -295,8 +258,6 @@ def _submit_child(
         parent_task_id=(payload.get("__execution") or {}).get("task_id"),
         shard_index=shard_index,
         page_range=list(page_range) if page_range else None,
-        target_worker=(worker or {}).get("worker_id") if worker else None,
-        reserved_allocation=allocation,
     )
     return {
         "job_id": submission.job_id,
@@ -304,13 +265,9 @@ def _submit_child(
         "workflow_id": parent.get("workflow_id"),
         "shard_index": shard_index,
         "page_range": list(page_range) if page_range else None,
-        "allocation": allocation,
-        "worker_id": (worker or {}).get("worker_id") if worker else None,
-        "physical_index": (
-            ((allocation or {}).get("gpu_allocations") or [{}])[0].get("physical_index")
-            if allocation
-            else None
-        ),
+        "allocation": None,
+        "worker_id": None,
+        "physical_index": None,
     }
 
 
@@ -364,12 +321,6 @@ def orchestrate_document_parse(payload: dict[str, Any]) -> dict[str, Any]:
             },
         )
         for shard_index, page_range in enumerate(shard_ranges):
-            assigned_workers = {item["worker_id"] for item in specs if item.get("worker_id")}
-            assigned_devices = {
-                str(item["physical_index"])
-                for item in specs
-                if item.get("physical_index") is not None
-            }
             specs.append(
                 _submit_child(
                     manager,
@@ -381,8 +332,6 @@ def orchestrate_document_parse(payload: dict[str, Any]) -> dict[str, Any]:
                     shard_index,
                     len(shard_ranges),
                     execution_plan,
-                    assigned_workers,
-                    assigned_devices,
                 )
             )
         manager.store.update_job(parent_job_id, child_job_ids=[item["job_id"] for item in specs])

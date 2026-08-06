@@ -119,32 +119,38 @@ def test_respond_async_returns_task_handle_without_waiting():
     assert result.data == {"job_id": "job-async", "status": "queued"}
 
 
-def test_async_gpu_submission_reserves_and_targets_worker(tmp_path, monkeypatch):
+def test_async_gpu_submission_enters_shared_queue_before_worker_reservation(tmp_path, monkeypatch):
     monkeypatch.setenv("EXECUTION_ALLOW_MEMORY_QUEUE", "true")
     manager, store = _manager(tmp_path, monkeypatch, mode="async")
-    manager.scheduler.register_worker(
-        worker_id="embedding-0",
-        resource_classes=["gpu.embedding"],
-        gpu_devices=["0"],
-        snapshots=[GpuSnapshot("0", "GPU-0", 48000, 1000, 5, "test")],
-    )
-
     submission = manager.submit(operation="unit.echo", resource_class="gpu.embedding", payload={"value": 1})
 
     job = store.get_job(submission.job_id)
-    assert job["target_worker"] == "embedding-0"
-    assert job["reserved_allocation"]["gpu_allocations"][0]["physical_index"] == "0"
-    assert job["reserved_allocation"]["gpu_allocations"][0]["lease_id"]
-    manager.release_allocation(job["reserved_allocation"])
+    assert job["status"] == "queued"
+    assert "target_worker" not in job
+    assert "reserved_allocation" not in job
     assert not ResourceScheduler._local_leases
 
 
-def test_async_gpu_submission_fails_without_schedulable_worker(tmp_path, monkeypatch):
+def test_async_gpu_submission_queues_when_capacity_is_temporarily_unavailable(tmp_path, monkeypatch):
     monkeypatch.setenv("EXECUTION_ALLOW_MEMORY_QUEUE", "true")
-    manager, _store = _manager(tmp_path, monkeypatch, mode="async")
+    manager, store = _manager(tmp_path, monkeypatch, mode="async")
 
-    with pytest.raises(ExecutionUnavailable, match="没有可用"):
-        manager.submit(operation="unit.echo", resource_class="gpu.embedding", payload={"value": 1})
+    submission = manager.submit(operation="unit.echo", resource_class="gpu.embedding", payload={"value": 1})
+    assert store.get_job(submission.job_id)["status"] == "queued"
+
+
+def test_subtask_view_uses_worker_selected_at_execution_time(tmp_path, monkeypatch):
+    manager, store = _manager(tmp_path, monkeypatch)
+    parent = store.create_job(job_id="parent", mode="async", child_job_ids=["child"])
+    store.create_job(job_id="child", status="running", stage="execution", shard_index=0)
+    store.create_execution(
+        "child",
+        status="running",
+        allocation={"worker_id": "vlm-3-1", "gpu_allocations": [{"physical_index": "3"}]},
+    )
+
+    view = manager.execution_view(parent["job_id"])
+    assert view["subtasks"][0]["target_worker"] == "vlm-3-1"
 
 
 def test_inline_attempt_records_allocation_timeline_and_releases_lease(tmp_path, monkeypatch):

@@ -63,6 +63,8 @@ class RuntimeSupervisor:
         self.gpu_ids = _gpu_ids()
         self.cpu_count = os.cpu_count() or 4
         self.base_port = _env_int("VLLM_BASE_PORT", 8100, minimum=1024, maximum=65000)
+        self.ready_file = Path(os.getenv("EXECUTION_RUNTIME_READY_FILE", "/tmp/qasystem-runtime-ready"))
+        self.ready_file.unlink(missing_ok=True)
 
     def stop(self, *_args) -> None:
         self.stopping = True
@@ -225,6 +227,7 @@ class RuntimeSupervisor:
             vlm_workers,
             auxiliary_workers,
         )
+        self.ready_file.write_text("ready\n", encoding="ascii")
 
     def _terminate(self) -> None:
         for child in reversed(self.children):
@@ -252,6 +255,7 @@ class RuntimeSupervisor:
                 time.sleep(1)
             return 0
         finally:
+            self.ready_file.unlink(missing_ok=True)
             self._terminate()
 
 

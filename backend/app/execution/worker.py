@@ -63,12 +63,31 @@ class WorkerRuntime:
         next_envelope = {**envelope, "attempt": int(envelope.get("attempt", 1)) + 1}
         next_envelope.pop("reserved_allocation", None)
         next_envelope.pop("target_worker", None)
-        if resource_class.startswith("gpu"):
-            reservation = self.manager.scheduler.reserve_worker(resource_class)
-            if reservation:
-                next_envelope["target_worker"] = (reservation.get("worker") or {}).get("worker_id")
-                next_envelope["reserved_allocation"] = reservation.get("allocation")
         return next_envelope
+
+    def _reserve_gpu_capacity(self, resource_class: str, envelope: dict, job: dict) -> bool:
+        if not resource_class.startswith("gpu.") or envelope.get("reserved_allocation"):
+            return True
+        reservation = self.manager.scheduler.reserve_worker(
+            resource_class,
+            required_worker_id=self.worker_id,
+        )
+        if reservation is not None:
+            envelope["target_worker"] = self.worker_id
+            envelope["reserved_allocation"] = reservation.get("allocation")
+            return True
+
+        if job.get("stage") != "waiting_for_capacity":
+            self.manager.store.update_job(job["job_id"], status="queued", stage="waiting_for_capacity")
+            self.manager.hub.emit(
+                job["job_id"],
+                "task.waiting_for_capacity",
+                operation=job.get("operation"),
+                stage="waiting_for_capacity",
+                details={"resource_class": resource_class, "worker_id": self.worker_id},
+            )
+        self.queue.enqueue(resource_class, envelope)
+        return False
 
     def stop(self, *_args) -> None:
         self.stopped = True
@@ -100,6 +119,9 @@ class WorkerRuntime:
                         self.manager.store.update_job(job_id, status="cancelled", stage="cancel")
                         self.manager.hub.emit(job_id, "job.cancelled", operation=job.get("operation"), stage="cancel")
                     else:
+                        if not self._reserve_gpu_capacity(resource_class, envelope, job):
+                            time.sleep(0.05)
+                            continue
                         self.manager.run_attempt(
                             job_id,
                             envelope,

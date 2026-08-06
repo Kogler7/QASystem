@@ -32,7 +32,6 @@ def test_auto_engine_request_shards_when_execution_plan_selects_vlm(monkeypatch)
 
 def test_auto_shard_count_creates_work_stealing_backlog(monkeypatch):
     monkeypatch.setenv("EXECUTION_VLM_SHARD_COUNT", "auto")
-    monkeypatch.setenv("EXECUTION_VLM_SHARDS_PER_WORKER", "2")
     assert _configured_shard_count(ParserConfig(), 33, 8) == 16
 
 
@@ -118,6 +117,25 @@ def test_scheduler_uses_each_worker_slot_before_queueing(monkeypatch):
     assert scheduler.reserve_worker("gpu.vlm") is None
     scheduler.release(first["lease"])
     assert scheduler.reserve_worker("gpu.vlm") is not None
+
+
+def test_worker_can_reserve_only_its_own_gpu_slot(monkeypatch):
+    monkeypatch.setenv("EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM", "0")
+    ResourceScheduler._local_workers.clear()
+    ResourceScheduler._local_leases.clear()
+    ResourceScheduler._local_worker_leases.clear()
+    scheduler = ResourceScheduler(MemoryExecutionStore(), worker_id="coordinator")
+    for worker_id, device in (("vlm-0", "0"), ("vlm-1", "1")):
+        scheduler.register_worker(
+            worker_id=worker_id,
+            resource_classes=["gpu.vlm"],
+            gpu_devices=[device],
+            snapshots=[GpuSnapshot(device, f"GPU-{device}", 24576, 18000, 0, "test")],
+        )
+
+    reservation = scheduler.reserve_worker("gpu.vlm", required_worker_id="vlm-1")
+    assert reservation["worker"]["worker_id"] == "vlm-1"
+    assert reservation["allocation"]["gpu_allocations"][0]["physical_index"] == "1"
 
 
 def test_supervisor_derives_worker_counts_from_cpu_and_gpu(monkeypatch):

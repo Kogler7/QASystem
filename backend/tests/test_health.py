@@ -1,4 +1,9 @@
+import asyncio
+
+from fastapi.responses import JSONResponse
+
 from backend.app import health
+from backend.app.main import health as health_endpoint
 
 
 def test_full_health_reports_failed_runtime_check(monkeypatch):
@@ -14,6 +19,18 @@ def test_full_health_reports_failed_runtime_check(monkeypatch):
     assert result["status"] == "failed"
     assert result["failed"] == ["docling"]
     assert result["checks"]["docling"]["reason"] == "目录不存在或为空"
+
+
+def test_basic_health_waits_for_supervisor_runtime_marker(tmp_path, monkeypatch):
+    marker = tmp_path / "runtime-ready"
+    monkeypatch.setenv("EXECUTION_RUNTIME_READY_FILE", str(marker))
+
+    pending = asyncio.run(health_endpoint(full=False, validate_models=False))
+    assert isinstance(pending, JSONResponse)
+    assert pending.status_code == 503
+
+    marker.write_text("ready\n", encoding="ascii")
+    assert asyncio.run(health_endpoint(full=False, validate_models=False)) == {"status": "ok"}
 
 
 def test_full_health_reports_all_checks_when_runtime_is_ready(monkeypatch):

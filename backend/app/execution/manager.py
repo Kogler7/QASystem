@@ -198,13 +198,6 @@ class ExecutionManager:
         reserved_allocation: dict[str, Any] | None = None,
     ) -> JobSubmission:
         self._ensure_queue_available()
-        if self.is_async and resource_class.startswith("gpu.") and target_worker is None and reserved_allocation is None:
-            reservation = self.scheduler.reserve_worker(resource_class)
-            if reservation is None:
-                raise ExecutionUnavailable(f"没有可用的 {resource_class} worker 或 GPU 显存配额")
-            worker = reservation.get("worker") or {}
-            target_worker = worker.get("worker_id")
-            reserved_allocation = reservation.get("allocation")
         job_id = uuid.uuid4().hex
         try:
             payload_ref = self._write_payload(job_id, payload)
@@ -409,6 +402,7 @@ class ExecutionManager:
             for child_job_id in child_job_ids:
                 child = self.store.get_job(child_job_id) or {}
                 child_executions = self.store.list_executions(child_job_id)
+                latest_allocation = (child_executions[-1].get("allocation") or {}) if child_executions else {}
                 subtasks.append(
                     {
                         "job_id": child_job_id,
@@ -417,7 +411,7 @@ class ExecutionManager:
                         "stage": child.get("stage"),
                         "shard_index": child.get("shard_index"),
                         "page_range": child.get("page_range"),
-                        "target_worker": child.get("target_worker"),
+                        "target_worker": latest_allocation.get("worker_id") or child.get("target_worker"),
                         "executions": child_executions,
                     }
                 )

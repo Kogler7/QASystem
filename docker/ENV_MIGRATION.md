@@ -84,7 +84,8 @@ deploy/
 | `VLLM_WARMUP_ENABLED` | `true` | readiness 后执行多模态小请求预热 |
 | `VLLM_WARMUP_TIMEOUT_SECONDS` | `300` | 单个 engine 预热超时 |
 | `EXECUTION_VLM_SHARD_MIN_PAGES` | `8` | `auto` 分页的最小 PDF 页数 |
-| `EXECUTION_VLM_SHARD_COUNT` | `4` | 默认目标页段数，仍受可用 worker 和请求上限约束 |
+| `EXECUTION_VLM_SHARD_COUNT` | `auto` | 根据存活 VLM worker 自动计算目标页段数 |
+| `EXECUTION_GPU_MAX_LEASES_PER_WORKER` | `1` | 单个 dispatch worker 同时执行的原子任务数 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM` | `2048` | 单个 VLM 原子任务的调度显存预算，不是模型预分配量 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING` | `2048` | Embedding 调度预算 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE` | `2048` | Confidence 调度预算 |
@@ -183,7 +184,7 @@ curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/result"
   "force": true,
   "page_sharding": "auto",
   "page_shard_size": 0,
-  "max_page_shards": 4,
+  "max_page_shards": 16,
   "mineru_options": {
     "language": "ch",
     "ocr_mode": "auto",
@@ -195,10 +196,11 @@ curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/result"
 
 - `force=false`：`engine` 仍可作为首选或 fallback 候选。
 - `force=true`：必须显式指定兼容的非 `auto` 引擎，跳过自动选择和 fallback。
-- `page_sharding=auto`：仅 VLM PDF 且达到最小页数时分页。
+- 不传以上分片字段：服务端仍先解析实际执行路线；VLM PDF 达到最小页数时自动分页并进入 `gpu.vlm` 队列。
+- `page_sharding=auto`：显式采用同样的服务端自动策略。
 - `page_sharding=on/off`：强制启用或关闭分页；非 VLM 或非 PDF 不分页。
 - `page_shard_size=0`：按目标 shard 数均衡分页；大于 0 时作为每段目标页数。
-- `max_page_shards`：单请求页段上限，范围 1 到 32。
+- `max_page_shards`：可选的单请求页段上限，默认 16，范围 1 到 32。
 
 旧客户端不发送 `Prefer` 头即可继续同步获取原业务结果。需要释放 HTTP 连接时发送 `Prefer: respond-async`；只愿等待固定时间时发送 `Prefer: wait=60`。新接入方也可直接使用 `POST /api/v1/jobs`。
 

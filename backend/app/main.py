@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 import httpx
@@ -130,6 +131,9 @@ async def health(
     full: bool = Query(default=False),
     validate_models: bool = Query(default=False),
 ) -> dict | JSONResponse:
+    ready_file = os.getenv("EXECUTION_RUNTIME_READY_FILE", "").strip()
+    if ready_file and not Path(ready_file).is_file():
+        return JSONResponse(status_code=503, content={"status": "starting", "reason": "runtime warmup pending"})
     if full or validate_models:
         result = full_health()
         if result["status"] != "ok":

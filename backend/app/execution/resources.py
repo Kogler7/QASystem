@@ -342,12 +342,18 @@ class ResourceScheduler:
         resource_class: str,
         *,
         memory_request_mb: int | None = None,
+        required_worker_id: str | None = None,
         exclude_workers: set[str] | None = None,
         exclude_devices: set[str] | None = None,
     ) -> dict[str, Any] | None:
         excluded = exclude_workers or set()
         excluded_devices = exclude_devices or set()
-        workers = [item for item in self.list_workers(resource_class) if item.get("worker_id") not in excluded]
+        workers = [
+            item
+            for item in self.list_workers(resource_class)
+            if item.get("worker_id") not in excluded
+            and (required_worker_id is None or item.get("worker_id") == required_worker_id)
+        ]
         candidates: list[tuple[tuple[int, int, int, int, str], dict[str, Any], GpuSnapshot]] = []
         for worker in workers:
             devices = [str(item) for item in (worker.get("gpu_devices") or [])]
