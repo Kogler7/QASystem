@@ -6,11 +6,11 @@
 >
 > 目的：记录生产并发目标、已落地组件边界、GPU 调度原则和后续验收标准
 
-当前代码已经落地单机目标架构：统一 HTTP 作业协议、Redis Streams Worker、Execution Event Hub/SSE、顶层 `execution` 字段、失败关闭策略、GPU 容量与 Lease 调度、MCP 重工具异步提交、VLM PDF page-sharding、vLLM readiness/warmup，以及单 Backend 容器 supervisor 自动管理 API、CPU Worker、每卡一个 vLLM engine、VLM dispatch Worker 和共享 Embedding/Confidence Worker。正式 Compose 不枚举子进程，也不保留源码挂载或旧 distributed 部署兼容层。
+当前代码已经落地单机目标架构：统一 HTTP 作业协议、Redis Streams Worker、Execution Event Hub/SSE、顶层 `execution` 字段、失败关闭策略、GPU 容量与 Lease 调度、MCP 重工具统一排队及可选异步句柄、VLM PDF page-sharding、vLLM readiness/warmup，以及单 Backend 容器 supervisor 自动管理 API、CPU Worker、每卡一个 vLLM engine、VLM dispatch Worker 和共享 Embedding/Confidence Worker。正式 Compose 不枚举子进程，也不保留源码挂载。曾用于验证的显式 worker/vLLM services 不属于迁移基线。
 
 ## 1. 重构前基线
 
-重构前部署是一个 Backend 容器可见四张 NVIDIA A40，Backend 内只有一个 Uvicorn 进程。文档解析、切片、图谱抽取、向量化、置信度计算和 MCP 工具均在入口进程内同步执行或通过进程内线程池执行。
+重构前目标主机有八张 NVIDIA A40，配置选择 `4,5,6,7` 后四卡，但 Backend 内只有一个 Uvicorn 进程。系统没有独立 vLLM 服务或显式 worker/vLLM services，文档解析、切片、图谱抽取、向量化、置信度计算和 MCP 工具均由 Backend 入口进程直接同步执行或通过进程内线程池执行。
 
 当时只完成能力联调，不具备面向多租户并发请求的资源治理能力，主要问题如下：
 
@@ -30,13 +30,13 @@
 
 1. 所有入口服务无状态化，可以部署多个 API/MCP 实例。
 2. 重任务脱离入口进程，通过持久任务或工作流异步执行。
-3. 知识沉淀改为可恢复的多阶段工作流，不再是一个长时间 HTTP 调用。
+3. 知识沉淀改为可恢复的多阶段工作流，同时保留业务 HTTP 默认同步返回，并提供显式异步提交能力。
 4. MinerU 升级到经兼容性验证的新版本，并允许同步升级必要依赖。
 5. MinerU VLM 从进程内 Transformers 推理切换为独立 vLLM 服务。
 6. vLLM 负责单模型实例内部排队、连续批处理和 KV Cache；平台不重复实现这些能力。
 7. 平台统一调度 MinerU VLM、Embedding、Confidence 及后续 GPU 算法。
 8. GPU 分配必须显式、可观测、有显存预算，不能依赖 CUDA 自动选卡。
-9. 对外采用异步作业协议；同步接口只作为有界等待的兼容层。
+9. 对外采用增量协议：现有业务 API 默认同步兼容，`Prefer: respond-async` 和新增 Jobs API 提供显式异步作业协议，`Prefer: wait=N` 提供显式有界等待。
 10. 必须具备租户隔离、优先级、配额、背压、取消、幂等、重试和完整指标。
 11. 每个原子任务及其每次执行尝试都必须记录调度决策、Worker/进程、GPU Lease 和完整时间线，并可通过日志、SSE 和查询接口观察。
 12. 状态和日志通过集中式 Execution Event Hub 输出；业务进程不得直接使用 `print` 作为状态通道。
@@ -403,7 +403,7 @@ accepted → queued → running → succeeded
 | `GET` | `/api/v1/jobs/{job_id}/events` | SSE 任务事件 |
 | `GET` | `/api/v1/jobs/{job_id}/executions` | 分页查询原子任务、执行尝试和资源分配 |
 
-现有业务路径继续保留。重任务默认返回 `202 Accepted` 和 `job_id`。调用方可以通过 `Prefer: wait=<seconds>` 请求有界等待；在时限内完成则返回原业务结果，否则仍返回 `202`，任务继续执行。
+现有业务路径继续保留且默认同步等待，返回原 HTTP 状态和原业务 `data`，顶层只增量增加 `execution`。调用方发送 `Prefer: respond-async` 时立即获得 `202 Accepted` 和 `job_id`；发送 `Prefer: wait=<seconds>` 时请求显式有界等待，在时限内完成则返回原业务结果，否则返回 `202`，任务继续执行。新增 `POST /api/v1/jobs` 是显式任务入口，默认返回 `202`。
 
 服务必须限制最大等待时间，客户端断开不能导致持久任务自动取消。
 
@@ -415,7 +415,7 @@ accepted → queued → running → succeeded
 - 最终结果的响应 envelope 顶层 `execution.summary` 返回总任务数、重试数、总排队/执行时间、参与的逻辑 Worker 和 GPU；
 - 详细记录不嵌入大型业务结果，顶层 `execution` 同时返回 `executions_url`。
 
-所有统一响应都保留原有顶层 `code`、`info`、`data` 和 `error` 字段，并额外增加顶层 `execution` 字段。新增字段不改变 `data` 的业务结构：
+所有统一响应都保留原有顶层 `code`、`info`、`data` 和 `error` 字段，并额外增加顶层 `execution` 字段。新增字段不改变 `data` 的业务结构。以下是调用方显式请求 `Prefer: respond-async` 后的任务句柄示例：
 
 ```json
 {
@@ -437,12 +437,13 @@ accepted → queued → running → succeeded
       "execution_ms": null
     },
     "events_url": "/api/v1/jobs/job-uuid/events",
-    "executions_url": "/api/v1/jobs/job-uuid/executions"
+    "executions_url": "/api/v1/jobs/job-uuid/executions",
+    "result_url": "/api/v1/jobs/job-uuid/result"
   }
 }
 ```
 
-`execution.mode` 为 `async` 时，`data` 可以为空且 HTTP 状态为 `202`；为 `inline` 时表示轻量操作已在入口完成，仍返回统一的执行摘要。原有调用方忽略未知顶层字段即可继续解析 `data`。
+`execution.mode` 描述任务实际由统一执行层调度，不决定业务 HTTP 接口是否立即返回。默认同步业务响应中任务已完成，保留原业务 `data`；只有 `Prefer: respond-async`、有界等待超时或显式 Jobs API 才返回 `202` 和任务句柄。显式异步调用在 SSE `job.completed` 后请求 `execution.result_url`，得到包含最终业务 `data` 与最终 `execution` 的完整 envelope。原有调用方忽略未知顶层 `execution` 字段即可继续解析 `data`。
 
 所有正式 `/api/v1` 接口和 deprecated aliases 都遵循该规则：请求在参数校验或配额检查阶段被拒绝且尚未创建任务时，`execution` 为 `null`；任务一旦接受，后续成功、失败、取消和超时响应都必须保留 `execution` 对象。
 
@@ -697,11 +698,11 @@ GPU Worker readiness 至少验证：
 
 ## 15. 部署演进
 
-### 15.1 单机四卡目标部署
+### 15.1 八卡主机使用后四卡的目标部署
 
-第一目标环境是一台四卡 A40 服务器，交付为一个完整 Backend 镜像加 Agent 和 Redis。Backend supervisor 自动探测容器内可见 GPU，在每卡启动一个常驻 vLLM engine，并根据 CPU/GPU 数量派生 API、CPU、VLM dispatch 和辅助 Worker 数量。运维只管理一个 Backend 容器，不手工枚举子进程；模型以只读宿主机目录挂载，执行数据和 Redis 使用持久卷。
+第一目标环境是一台八卡 A40 服务器，默认 `GPU_DEVICE_IDS=4,5,6,7`，只允许使用后四卡。交付为一个完整 Backend 镜像加 Agent 和 Redis；Backend supervisor 仅在选中的卡内启动每卡一个常驻 vLLM engine，并根据 CPU 和所选 GPU 数量派生 API、CPU、VLM dispatch 和辅助 Worker 数量。运维只管理一个 Backend 容器，不手工枚举子进程；模型以只读宿主机目录挂载，执行数据和 Redis 使用持久卷。
 
-该拓扑已经包含单机生产所需的进程隔离、队列背压、原子任务重试、显存/利用率/Lease 调度和任务级可观测性。`GPU_DEVICE_IDS`、Worker 数量和 vLLM 容量参数仅作为限卡或调优覆盖项，默认由入口进程智能探测。
+该拓扑已经包含单机生产所需的进程隔离、队列背压、原子任务重试、显存/利用率/Lease 调度和任务级可观测性。`GPU_DEVICE_IDS=4,5,6,7` 是目标机资源边界，不由 supervisor 扩展；Worker 数量和 vLLM 容量参数默认由入口进程在这四卡范围内智能派生。
 
 ### 15.2 多节点可选演进
 
@@ -713,7 +714,7 @@ GPU Worker readiness 至少验证：
 
 ## 16. 迁移阶段
 
-迁移按能力闭环推进，正式交付只保留统一架构，不维护旧 inline 生产路径或旧 distributed Compose。
+迁移按能力闭环推进，正式交付只保留统一架构和唯一 Compose，不维护额外部署变体。
 
 ### 阶段 A：建立基线
 
@@ -795,7 +796,7 @@ GPU Worker readiness 至少验证：
 2. A40 上 vLLM 的最优 `gpu_memory_utilization`、批大小、并发序列和精度类型。
 3. PDF 页段大小及跨页元素合并规则。
 4. 各租户的 SLO、优先级、并发和存储配额。
-5. `Prefer: wait` 同步有界等待的使用范围和废弃周期。
+5. `Prefer: respond-async` 和 `Prefer: wait` 的调用方采用范围。
 6. 单机容量不足时是否进入 Kubernetes/Ray Serve 多节点演进。
 
 上述参数必须通过基准测试、故障演练和容量评审确定，不能用默认值直接进入生产。

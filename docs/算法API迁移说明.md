@@ -1,6 +1,8 @@
 # 算法 API v1 迁移说明
 
-> 并发执行架构在保留业务路径和业务 `data` 结构的同时，将生产默认执行方式改为异步。重任务通常返回 `202 + job_id`，调用方需通过 `/api/v1/jobs/{job_id}` 和 `/result` 获取最终结果；完整变化与部署步骤见[新架构完整镜像部署迁移指引](../docker/ENV_MIGRATION.md)。`Prefer: wait=N` 只提供最多 60 秒的有界等待，不应作为长任务的长期兼容方案。
+> 并发执行架构对现有业务 API 采用增量兼容：不发送 `Prefer` 时仍同步返回原 HTTP 状态和原业务 `data`，只新增顶层 `execution`。`Prefer: respond-async` 才立即返回 `202 + job_id`；`Prefer: wait=N` 提供最多 60 秒的显式有界等待。新增 `POST /api/v1/jobs` 默认返回 `202`。完整变化与部署步骤见[新架构完整镜像部署迁移指引](../docker/ENV_MIGRATION.md)。
+
+显式异步调用方应保存 `execution.result_url`，订阅 `execution.events_url`，并在收到 SSE `job.completed` 后通过 `GET /api/v1/jobs/{job_id}/result` 获取完整最终 envelope。最终响应的业务结果仍位于顶层 `data`，不是嵌套在任务句柄内部。
 
 本文面向正在调用历史算法 HTTP API 的开发、联调和测试团队，说明如何迁移到正式 `/api/v1` 接口。完整的新接口定义见[算法接口协议](算法接口协议.md)，错误处理见[错误码协议](错误码协议.md)。
 
