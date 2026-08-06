@@ -6,8 +6,8 @@
 
 | 路径 | 说明 |
 | --- | --- |
-| `qasystem-backend-latest.tar` | QASystem Backend 与 Agent 离线镜像；仅在打包时指定 `-IncludeImage` 时生成 |
-| `redis-7-alpine.tar` | Redis 离线镜像；仅在打包时指定 `-IncludeImage` 时生成 |
+| `qasystem-backend-20260806.tar` | QASystem Backend 与 Agent 完整离线镜像 |
+| `redis-7-alpine.tar` | Redis 7 Alpine 离线镜像 |
 | `docker-compose.yml` | 启动自包含 Backend、Agent 和 Redis；Backend 入口自动管理 API、Worker 与每卡一个 vLLM engine |
 | `download-models.ps1` | 在联网机器将 Docling、MinerU 模型下载到 `models/` |
 | `ENV_MIGRATION.md` | 已有部署更新时需要合并的模型相关 `.env` 变更 |
@@ -18,7 +18,7 @@
 ## 离线部署
 
 ```powershell
-docker load -i .\qasystem-backend-latest.tar
+docker load -i .\qasystem-backend-20260806.tar
 docker load -i .\redis-7-alpine.tar
 Copy-Item .env.example .env
 # 编辑 .env：外部服务地址、LLM 密钥、端口和模型路径
