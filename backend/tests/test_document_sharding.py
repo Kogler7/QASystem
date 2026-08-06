@@ -25,14 +25,14 @@ def test_auto_engine_request_shards_when_execution_plan_selects_vlm(monkeypatch)
     config = ParserConfig()
     page_count, ranges = _requires_sharding("sample.pdf", config, b"pdf", 8, "vlm")
     assert page_count == 33
-    assert len(ranges) == 16
+    assert len(ranges) == 12
     assert ranges[0] == (0, 2)
     assert ranges[-1] == (31, 32)
 
 
 def test_auto_shard_count_creates_work_stealing_backlog(monkeypatch):
     monkeypatch.setenv("EXECUTION_VLM_SHARD_COUNT", "auto")
-    assert _configured_shard_count(ParserConfig(), 33, 8) == 16
+    assert _configured_shard_count(ParserConfig(), 33, 8) == 12
 
 
 def test_shard_markdown_is_merged_by_shard_index():

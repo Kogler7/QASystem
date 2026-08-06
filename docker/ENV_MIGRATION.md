@@ -84,7 +84,7 @@ deploy/
 | `VLLM_WARMUP_ENABLED` | `true` | readiness 后执行多模态小请求预热 |
 | `VLLM_WARMUP_TIMEOUT_SECONDS` | `300` | 单个 engine 预热超时 |
 | `EXECUTION_VLM_SHARD_MIN_PAGES` | `8` | `auto` 分页的最小 PDF 页数 |
-| `EXECUTION_VLM_SHARD_COUNT` | `auto` | 根据存活 VLM worker 自动计算目标页段数 |
+| `EXECUTION_VLM_SHARD_COUNT` | `auto` | 根据存活 VLM worker 自动生成约 1.5 轮页段，兼顾慢页拖尾和分片开销 |
 | `EXECUTION_GPU_MAX_LEASES_PER_WORKER` | `1` | 单个 dispatch worker 同时执行的原子任务数 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM` | `2048` | 单个 VLM 原子任务的调度显存预算，不是模型预分配量 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING` | `2048` | Embedding 调度预算 |

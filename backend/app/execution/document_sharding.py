@@ -62,13 +62,14 @@ def _configured_shard_count(config: ParserConfig, page_count: int, worker_count:
     raw_count = os.getenv("EXECUTION_VLM_SHARD_COUNT", "auto").strip().lower()
     try:
         if raw_count == "auto":
-            # Keep a second wave queued for work stealing without coupling
-            # document granularity to GPU memory or model residency.
-            configured = max(1, worker_count * 2)
+            # Keep a half-wave queued for work stealing without coupling
+            # document granularity to GPU memory or model residency. This
+            # balances slow-page tail latency against per-shard overhead.
+            configured = max(1, math.ceil(worker_count * 1.5))
         else:
             configured = max(1, int(raw_count))
     except (TypeError, ValueError):
-        configured = max(1, worker_count * 2)
+        configured = max(1, math.ceil(worker_count * 1.5))
     count = min(config.max_page_shards, configured, page_count)
     if config.page_shard_size:
         count = max(count, math.ceil(page_count / config.page_shard_size))
