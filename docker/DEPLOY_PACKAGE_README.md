@@ -8,11 +8,10 @@
 | --- | --- |
 | `qasystem-backend-latest.tar` | QASystem Backend 与 Agent 离线镜像；仅在打包时指定 `-IncludeImage` 时生成 |
 | `redis-7-alpine.tar` | Redis 离线镜像；仅在打包时指定 `-IncludeImage` 时生成 |
-| `docker-compose.yml` | 启动 Backend、Agent 和 Redis 的 Compose 文件；仅 Backend 对外发布 HTTP 端口 |
+| `docker-compose.yml` | 启动自包含 Backend、Agent 和 Redis；Backend 入口自动管理 API、Worker 与每卡一个 vLLM engine |
 | `download-models.ps1` | 在联网机器将 Docling、MinerU 模型下载到 `models/` |
 | `ENV_MIGRATION.md` | 已有部署更新时需要合并的模型相关 `.env` 变更 |
 | `.env.example` | 脱敏环境变量模板；部署前复制为 `.env` 并填写 |
-| `source-mounted/` | 可选的源码挂载部署模式；与根目录镜像和 `models/` 共用 |
 | `models/` | 本地模型挂载目录；按启用的能力准备相应模型 |
 | `交付清单.json` | 文件、镜像标签和 SHA-256 校验信息 |
 
@@ -38,14 +37,12 @@ curl http://127.0.0.1:8006/agent/health
 
 `.env.example` 默认将 Backend 发布到 `0.0.0.0:8006`，可由其他主机访问。生产环境应通过宿主机防火墙、安全组或反向代理限制来源；只需本机访问时设为 `BACKEND_BIND=127.0.0.1`。
 
-`docker-compose.yml` 通过 `.env` 中的 `GPU_DEVICE_IDS=4,5,6,7` 设置 Backend 进程的 `CUDA_VISIBLE_DEVICES`，默认只供模型使用宿主机 4、5、6、7 号卡。可改为单张卡，例如 `GPU_DEVICE_IDS=4`；CPU-only 部署时，删除 `backend` 服务中的 `gpus` 配置。VLM/MinerU 能力仍需要根据实际可用硬件与模型配置评估。
+`docker-compose.yml` 将所有可见 GPU 交给 Backend 容器。容器入口自动探测 GPU，在每张卡上启动一个常驻 vLLM engine，并按 CPU/GPU 数量生成 VLM dispatch worker、共享 Embedding/Confidence worker 和 CPU worker。默认无需枚举 GPU 或进程；如需限制用卡或并发规模，可设置 `GPU_DEVICE_IDS`、`EXECUTION_CPU_WORKERS`、`EXECUTION_VLM_WORKERS_PER_GPU` 和 `EXECUTION_AUX_WORKERS_PER_GPU`。
 
 ## 模型与外部服务
 
 `.env` 中的 `HOST_MODELS_DIR=./models` 指向本目录的模型挂载。模型目录包括 `models/docling-models`、`models/mineru/pipeline`、`models/mineru/vlm` 和 `models/bge-small-zh-v1.5`。
 
-如需将应用源码挂载到容器外部，使用 `source-mounted/` 中的 Compose 与环境模板；该模式应与根目录镜像和 `models/` 作为同一版本整体交付。
-
 MySQL、Neo4j、Elasticsearch、文件服务和 LLM 服务是外部依赖；部署前将 `.env` 中的地址、账号和密钥替换为目标环境可访问的配置。不要交付包含真实密钥的 `.env`。
 
-只使用文档解析和知识接口时，仍需启动 Redis，但它不会暴露宿主机端口；完整 Agent 异步任务和 SSE 流式接口依赖 Redis。
+只使用文档解析和知识接口时，仍需启动 Redis，但它不会暴露宿主机端口；完整 Agent 异步任务、MCP 重工具和 SSE 流式接口依赖 Redis。默认 `EXECUTION_MODE=async`，Redis 不可用时返回 503，不会回退到 Gateway 内执行。
