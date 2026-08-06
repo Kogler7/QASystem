@@ -1,8 +1,10 @@
 # 新架构完整镜像部署迁移指引
 
-本文适用于从 `a93e8c4^` 所代表的重构前版本迁移到统一并发执行架构，也可用于在一台全新 GPU 服务器上直接部署。重构前没有独立 vLLM 服务，也没有显式 worker/vLLM services；Backend 入口进程直接运行 MinerU 和其他算法。正式交付只有一种拓扑：`backend`、`agent`、`redis` 三个容器。`backend` 使用完整镜像，入口命令为 `python -m app.execution.supervisor`，不挂载源码。
+本文适用于从重构前版本迁移到统一并发执行架构，也可用于在一台全新 GPU 服务器上直接部署。本文的迁移基线是尚未引入 vLLM 和统一执行层的旧架构：Backend 容器由单个 Uvicorn 进程启动，MinerU 和其他算法在 Backend 入口进程内直接执行，Redis 只承担原有 Agent 任务存储等职责。
 
-模型仍由宿主机只读挂载到 `/models`，业务数据由 Docker volume 持久化。目标 8 卡 A40 服务器默认设置 `GPU_DEVICE_IDS=4,5,6,7`，只允许使用后四张卡；supervisor 仅在选中的卡内管理 API 进程、CPU worker、每卡一个常驻 vLLM engine、VLM dispatch worker 和共享 Embedding/Confidence worker。Compose 不枚举这些子进程。
+当前正式交付只有一种拓扑：`backend`、`agent`、`redis` 三个容器。`backend` 使用完整镜像，入口命令为 `python -m app.execution.supervisor`，不挂载源码。supervisor 自动管理 API、CPU Worker、每张选中 GPU 上的一个常驻 vLLM engine、VLM dispatch Worker 和 Embedding/Confidence 辅助 Worker；Compose 不枚举这些子进程。
+
+模型仍由宿主机只读挂载到 `/models`，业务数据由 Docker volume 持久化。目标 8 卡 A40 服务器设置 `GPU_DEVICE_IDS=4,5,6,7`，supervisor 只在后四张卡内启动和调度 GPU 进程。
 
 ## 1. 部署前提
 
@@ -19,22 +21,25 @@
 交付目录至少包含：
 
 ```text
-deploy/
+qasystem-delivery-20260806/
 ├── docker-compose.yml
 ├── .env.example
 ├── ENV_MIGRATION.md
 ├── README.md
-├── models/
-│   ├── bge-small-zh-v1.5/
-│   ├── docling-models/
-│   └── mineru/
-│       ├── pipeline/
-│       └── vlm/
-├── qasystem-backend-latest.tar
+├── download-models.ps1
+├── SHA256SUMS
+├── deploy/
+│   └── models/
+│       ├── bge-small-zh-v1.5/
+│       ├── docling-models/
+│       └── mineru/
+│           ├── pipeline/
+│           └── vlm/
+├── qasystem-backend-20260806.tar
 └── redis-7-alpine.tar
 ```
 
-完整镜像已包含应用源码、MinerU、vLLM、调度器和 Python/CUDA 运行依赖。目标机不需要 Git 仓库、`runtime/` 源码目录或额外 vLLM 镜像。
+完整镜像已包含应用源码、MinerU、vLLM、调度器和 Python/CUDA 运行依赖，但不包含模型文件。目标机不需要 Git 仓库、外部源码挂载或额外 vLLM 镜像。
 
 ## 3. 环境变量迁移
 
@@ -48,10 +53,6 @@ deploy/
 | 数据库、Neo4j、Elasticsearch、文件服务、LLM、Agent 和密钥变量 | 原值迁移 | 外部依赖协议不因执行架构改变 |
 | `MINERU_MODEL_*`、`VECTOR_MODEL_PATH`、`CONFIDENCE_SBERT_MODEL_PATH` | 保留并校验容器内路径 | 模型仍由宿主机只读挂载到 `/models` |
 
-### 不要带入中间实验配置
-
-`a93e8c4^` 基线本身没有独立 vLLM/worker services，也没有 `VLLM_IMAGE`、逐卡 vLLM URL 或 `source-mounted/` 部署。若测试环境曾使用这些中间实验配置，不要合并到新 `.env` 或 Compose：vLLM、Worker 和逐进程 `CUDA_VISIBLE_DEVICES` 均由 Backend supervisor 管理。MCP 继续由 Backend 的 `/mcp` 提供，Agent API 由 Backend 的 `/agent` 反向代理，不需要额外的 `MCP_PORT`、`AGENT_BIND` 或 `AGENT_HOST_PORT`。
-
 ### 必须新增或确认
 
 | 变量 | 建议值 | 语义 |
@@ -59,14 +60,13 @@ deploy/
 | `EXECUTION_MODE` | `async` | 业务计算进入统一执行队列；不表示 HTTP 默认立即返回 `202` |
 | `EXECUTION_REDIS_URL` | `redis://redis:6379/1` | 执行状态、队列、事件和租约存储 |
 | `MCP_EXECUTION_MODE` | `sync` | 生产默认；任务进入统一队列并等待完成，返回原 MCP 工具结果 |
-| `HOST_MODELS_DIR` | `./models` | 宿主机模型目录，只读挂载到 `/models` |
+| `HOST_MODELS_DIR` | `./deploy/models` | 宿主机模型目录，只读挂载到 `/models`；相对于 `docker-compose.yml` 所在目录 |
 | `VLLM_MODEL_PATH` | `/models/mineru/vlm` | supervisor 启动的 MinerU VLM 模型 |
 | `MINERU_MODEL_SOURCE` | `local` | 禁止运行时下载模型 |
 | `MINERU_MODEL_PIPELINE_PATH` | `/models/mineru/pipeline` | MinerU pipeline 模型路径 |
 | `MINERU_MODEL_VLM_PATH` | `/models/mineru/vlm` | MinerU VLM 模型路径 |
 | `VECTOR_MODEL_PATH` | `/models/bge-small-zh-v1.5` | 文本向量模型 |
 | `CONFIDENCE_SBERT_MODEL_PATH` | `/models/bge-small-zh-v1.5` | 置信度模型，与向量化共享 encoder |
-| `NL2CYPHER_EMBEDDING_MODEL_PATH` | `/models/bge-small-zh-v1.5` | NL2Cypher 向量模型 |
 
 不要设置 `DOCLING_ARTIFACTS_PATH`；Docling 固定读取 `/models/docling-models`。
 
@@ -99,12 +99,12 @@ deploy/
 ```bash
 cd /path/to/deploy
 sha256sum -c SHA256SUMS 2>/dev/null || true
-docker load -i qasystem-backend-latest.tar
+docker load -i qasystem-backend-20260806.tar
 docker load -i redis-7-alpine.tar
 cp .env.example .env
 ```
 
-编辑 `.env`，至少填写外部服务地址、账号、密钥和 `HOST_MODELS_DIR=./models`。然后检查 GPU、模型挂载和 Compose：
+编辑 `.env`，至少填写外部服务地址、账号、密钥，并保持 `HOST_MODELS_DIR=./deploy/models` 与交付目录一致。然后检查 GPU、模型挂载和 Compose：
 
 ```bash
 docker run --rm --gpus all qasystem-backend:latest nvidia-smi
@@ -114,7 +114,7 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-日志中应先出现每张可见 GPU 的 vLLM 启动和 warmup 完成信息，随后出现 runtime ready。首次启动需要加载模型，Backend 健康检查在全部进程可用前可能保持 `starting`。
+日志中应先出现 `GPU_DEVICE_IDS` 选中的每张 GPU 的 vLLM 启动信息，再出现各 engine 的 `ready and warm`，最后出现 `runtime ready`。supervisor 在所有 engine 完成 readiness 和最小多模态 warmup 后才启动 GPU Worker 并写入 ready 标记。此之前 `/health` 返回 HTTP `503` 和 `status=starting`；ready 标记写入后，普通 `/health` 返回 `200 {"status":"ok"}`。启动阶段端口尚未监听时的连接拒绝属于内部重试，不代表最终 warmup 失败。
 
 验证：
 
@@ -131,11 +131,11 @@ curl -fsS http://127.0.0.1:8006/api/v1/resources/gpus
 ```bash
 cp .env .env.pre-supervisor.bak
 docker compose ps
-docker load -i qasystem-backend-latest.tar
+docker load -i qasystem-backend-20260806.tar
 docker load -i redis-7-alpine.tar
 ```
 
-将旧 `.env` 按第 3 节合并到新 `.env`，使用本次交付的 `docker-compose.yml`。重构前 Compose 没有 worker/vLLM services；迁移的核心是将 Backend 入口从 Uvicorn 直接启动替换为 supervisor，并补充统一执行层配置，不是兼容或清理某个中间实验拓扑。确认配置后执行：
+将旧 `.env` 按第 3 节合并到新 `.env`，并使用本次交付的 `docker-compose.yml`。迁移的核心是将 Backend 入口从单 Uvicorn 进程替换为 supervisor，并增加 Redis 执行队列、vLLM 和 Worker 所需配置。确认配置后执行：
 
 ```bash
 docker compose config --quiet
@@ -159,7 +159,7 @@ docker compose logs --tail=300 backend
 | 通用 Jobs API | 无 | `POST /api/v1/jobs` 默认返回 `202` | 新增接口 |
 | 响应 envelope | `code/info/data/error` | 增加顶层 `execution` | 加法兼容；严格 schema 客户端需更新 |
 | 强制解析引擎 | `engine` 可能仍参与自动 fallback | `engine` 加同层 `force=true` 才严格强制 | 新增可选字段 |
-| PDF 页段 | 整份 PDF 单任务 | `page_sharding/page_shard_size/max_page_shards` | 新增可选字段，默认 `auto` |
+| PDF 页段 | 整份 PDF 单任务 | VLM PDF 默认由服务端自动拆分；`page_sharding/page_shard_size/max_page_shards` 可选覆盖 | 默认自动，无需旧客户端新增参数 |
 | 运行日志 | 容器日志为主 | 容器结构化日志和按任务 SSE | 新增 |
 | MCP 重工具默认行为 | 入口进程直接执行并返回业务结果 | `MCP_EXECUTION_MODE=sync`，队列执行后返回原工具结果 | 返回协议兼容 |
 | MCP 显式异步 | 无 | `MCP_EXECUTION_MODE=async` 时返回任务句柄 | 新增可选能力 |
@@ -202,6 +202,8 @@ curl -fsS "http://127.0.0.1:8006/api/v1/jobs/${JOB_ID}/result"
 - `page_shard_size=0`：按目标 shard 数均衡分页；大于 0 时作为每段目标页数。
 - `max_page_shards`：可选的单请求页段上限，默认 16，范围 1 到 32。
 
+`EXECUTION_VLM_SHARD_COUNT=auto` 时，服务端按当前存活 VLM Worker 数计算约 1.5 轮页段，即 `ceil(worker_count × 1.5)`，再受 PDF 页数和 `max_page_shards` 限制。页段数用于形成可由空闲 Worker 跨 GPU 领取的 backlog；GPU 显存快照、显存预算和 Lease 控制实际在途并发，不直接决定页段数量。当前实现不包含按页面复杂度预测耗时、运行中二次拆分慢页或动态启动 vLLM 副本。
+
 旧客户端不发送 `Prefer` 头即可继续同步获取原业务结果。需要释放 HTTP 连接时发送 `Prefer: respond-async`；只愿等待固定时间时发送 `Prefer: wait=60`。新接入方也可直接使用 `POST /api/v1/jobs`。
 
 ## 7. 验收与排障
@@ -218,6 +220,6 @@ curl -fsS http://127.0.0.1:8006/api/v1/resources/gpus
 
 - API 返回 `503`：检查 Redis 健康状态和 `EXECUTION_REDIS_URL`。
 - Backend 长时间 `starting`：查看 vLLM 模型路径、显存和 warmup 日志。
-- GPU 选择不符：目标 8 卡 A40 应设置 `GPU_DEVICE_IDS=4,5,6,7`，修改后重建 Backend 容器。
+- GPU 选择不符：目标 8 卡 A40 应设置 `GPU_DEVICE_IDS=4,5,6,7`，修改后重新创建 Backend 容器；不需要重新构建镜像。
 - 显存不足：先降低 `VLLM_GPU_MEMORY_UTILIZATION` 或 `VLLM_MAX_NUM_SEQS`，不要增加辅助 worker。
-- GPU 利用率低：确认 PDF 使用 `engine=vlm,force=true`，分页没有关闭，并查看 `execution`/SSE 是否发生排队、失败或单卡倾斜。
+- GPU 利用率低：先从返回的解析元数据确认实际引擎是否为 VLM，再检查自动分页是否关闭，并通过 `execution`/SSE 查看容量等待、失败或单卡倾斜。`engine=vlm,force=true` 只用于需要排除自动引擎选择影响的诊断请求，正常调用不需要传入。
