@@ -59,22 +59,32 @@ def _min_pages() -> int:
 
 
 def _configured_shard_count(config: ParserConfig, page_count: int, worker_count: int) -> int:
+    raw_count = os.getenv("EXECUTION_VLM_SHARD_COUNT", "auto").strip().lower()
     try:
-        configured = max(1, int(os.getenv("EXECUTION_VLM_SHARD_COUNT", "4")))
+        if raw_count == "auto":
+            shards_per_worker = max(1, int(os.getenv("EXECUTION_VLM_SHARDS_PER_WORKER", "2")))
+            configured = max(1, worker_count * shards_per_worker)
+        else:
+            configured = max(1, int(raw_count))
     except (TypeError, ValueError):
-        configured = 4
-    available_workers = worker_count if worker_count > 0 else configured
-    count = min(config.max_page_shards, configured, available_workers, page_count)
+        configured = max(1, worker_count * 2)
+    count = min(config.max_page_shards, configured, page_count)
     if config.page_shard_size:
         count = max(count, math.ceil(page_count / config.page_shard_size))
         count = min(count, config.max_page_shards, page_count)
     return max(1, count)
 
 
-def _requires_sharding(file_name: str, config: ParserConfig, content: bytes, worker_count: int) -> tuple[int, list[tuple[int, int]]]:
+def _requires_sharding(
+    file_name: str,
+    config: ParserConfig,
+    content: bytes,
+    worker_count: int,
+    effective_engine: str,
+) -> tuple[int, list[tuple[int, int]]]:
     if Path(file_name).suffix.lower() != ".pdf":
         return 0, []
-    if config.page_sharding == "off" or config.engine != "vlm":
+    if config.page_sharding == "off" or effective_engine != "vlm":
         return 0, []
     page_count = _count_pages(content)
     if config.page_sharding == "auto" and page_count < _min_pages():
@@ -83,12 +93,22 @@ def _requires_sharding(file_name: str, config: ParserConfig, content: bytes, wor
     return page_count, build_page_ranges(page_count, shard_count)
 
 
-def _inline_parse(payload: dict[str, Any], config: ParserConfig, ranges: list[tuple[int, int]]) -> dict[str, Any]:
+def _inline_parse(
+    payload: dict[str, Any],
+    config: ParserConfig,
+    ranges: list[tuple[int, int]],
+    execution_plan: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     from backend.app.services.algorithm_capabilities import document_parsing_service
 
     content = _read_content(payload)
     if not ranges:
-        return document_parsing_service.parse(payload.get("file_name", "upload.bin"), content, config)
+        return document_parsing_service.parse(
+            payload.get("file_name", "upload.bin"),
+            content,
+            config,
+            execution_plan=execution_plan,
+        )
     results = [
         document_parsing_service.parse(
             payload.get("file_name", "upload.bin"),
@@ -97,6 +117,7 @@ def _inline_parse(payload: dict[str, Any], config: ParserConfig, ranges: list[tu
             page_range=page_range,
             shard_index=index,
             total_shards=len(ranges),
+            execution_plan=execution_plan,
         )
         for index, page_range in enumerate(ranges)
     ]
@@ -213,17 +234,44 @@ def _submit_child(
     page_range: tuple[int, int] | None,
     shard_index: int,
     total_shards: int,
+    execution_plan: dict[str, Any] | None,
     exclude_workers: set[str] | None = None,
     exclude_devices: set[str] | None = None,
 ) -> dict[str, Any]:
     scheduler = manager.scheduler
-    reservation = scheduler.reserve_worker(
-        "gpu.vlm",
-        exclude_workers=exclude_workers,
-        exclude_devices=exclude_devices,
-    )
-    if reservation is None and (exclude_workers or exclude_devices):
-        reservation = scheduler.reserve_worker("gpu.vlm")
+    try:
+        wait_seconds = max(1.0, float(os.getenv("EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS", "900")))
+    except (TypeError, ValueError):
+        wait_seconds = 900.0
+    deadline = time.monotonic() + wait_seconds
+    reservation = None
+    wait_event_emitted = False
+    while reservation is None:
+        reservation = scheduler.reserve_worker(
+            "gpu.vlm",
+            exclude_workers=exclude_workers,
+            exclude_devices=exclude_devices,
+        )
+        if reservation is None and (exclude_workers or exclude_devices):
+            reservation = scheduler.reserve_worker("gpu.vlm")
+        if reservation is not None:
+            break
+        current_parent = manager.store.get_job(str(parent.get("job_id"))) or {}
+        if current_parent.get("cancel_requested"):
+            raise PageShardError("文档页段任务已取消")
+        if time.monotonic() >= deadline:
+            raise PageShardError("等待 gpu.vlm worker 容量超时")
+        if not wait_event_emitted:
+            manager.hub.emit(
+                str(parent.get("job_id")),
+                "shard.waiting_for_capacity",
+                workflow_id=parent.get("workflow_id"),
+                operation="document.parse.shard",
+                stage="scheduling",
+                details={"shard_index": shard_index, "page_range": list(page_range) if page_range else None},
+            )
+            wait_event_emitted = True
+        time.sleep(0.2)
     worker = reservation.get("worker") if reservation else None
     allocation = reservation.get("allocation") if reservation else None
     child_payload = {
@@ -234,6 +282,8 @@ def _submit_child(
         "shard_index": shard_index,
         "total_shards": total_shards,
     }
+    if execution_plan:
+        child_payload["execution_plan"] = execution_plan
     submission = manager.submit(
         operation="document.parse.shard",
         resource_class="gpu.vlm",
@@ -270,12 +320,33 @@ def orchestrate_document_parse(payload: dict[str, Any]) -> dict[str, Any]:
     parent_job_id = parent_execution.get("job_id")
     content = _read_content(payload)
     config = ParserConfig.model_validate(payload.get("config") or {})
+    from backend.app.services.algorithm_capabilities import document_parsing_service
+
+    execution_plan = document_parsing_service.resolve_engine_plan(
+        payload.get("file_name", "upload.bin"),
+        content,
+        config,
+    )
     worker_count = len(manager.scheduler.list_workers("gpu.vlm"))
-    page_count, ranges = _requires_sharding(payload.get("file_name", "upload.bin"), config, content, worker_count)
+    page_count, ranges = _requires_sharding(
+        payload.get("file_name", "upload.bin"),
+        config,
+        content,
+        worker_count,
+        str((execution_plan or {}).get("engine") or config.engine),
+    )
     if not ranges:
         ranges = []
     if not parent_job_id or not manager.is_async:
-        return _inline_parse(payload, config, ranges)
+        return _inline_parse(payload, config, ranges, execution_plan)
+
+    if str((execution_plan or {}).get("engine") or config.engine) != "vlm":
+        return document_parsing_service.parse(
+            payload.get("file_name", "upload.bin"),
+            content,
+            config,
+            execution_plan=execution_plan,
+        )
 
     blob_ref = manager.artifacts.write_blob(parent_job_id, content)
     parent = manager.store.get_job(parent_job_id) or {"job_id": parent_job_id}
@@ -309,6 +380,7 @@ def orchestrate_document_parse(payload: dict[str, Any]) -> dict[str, Any]:
                     page_range,
                     shard_index,
                     len(shard_ranges),
+                    execution_plan,
                     assigned_workers,
                     assigned_devices,
                 )
@@ -352,6 +424,7 @@ def parse_document_shard(payload: dict[str, Any]) -> dict[str, Any]:
         page_range=parsed_range,
         shard_index=payload.get("shard_index"),
         total_shards=payload.get("total_shards"),
+        execution_plan=payload.get("execution_plan"),
     )
 
 

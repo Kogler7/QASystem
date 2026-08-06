@@ -46,10 +46,12 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "INTENT_LLM_" not in compose
     assert "QA_LLM_" not in compose
     assert "AGENT_LLM_" not in compose
-    assert "GPU_DEVICE_IDS=" in template
+    assert "GPU_DEVICE_IDS=4,5,6,7" in template
+    assert "MCP_EXECUTION_MODE=sync" in template
+    assert "MCP_EXECUTION_MODE: ${MCP_EXECUTION_MODE:-sync}" in compose
     assert "python -m app.execution.supervisor" in compose
     assert "BACKEND_BIND=0.0.0.0" in template
-    assert "CUDA_VISIBLE_DEVICES: ${GPU_DEVICE_IDS:-4,5,6,7}" not in compose
+    assert "GPU_DEVICE_IDS: ${GPU_DEVICE_IDS:-4,5,6,7}" in compose
     assert "execution-gpu-worker" not in compose
     assert "execution-vlm-worker" not in compose
     assert "vllm-0:" not in compose

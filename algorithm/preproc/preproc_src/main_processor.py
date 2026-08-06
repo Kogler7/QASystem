@@ -329,6 +329,8 @@ class DocumentProcessor:
         formula_enable: bool = True,
         start_page_id: int = 0,
         end_page_id: Optional[int] = None,
+        selected_engine: Optional[str] = None,
+        engine_selection: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         path = Path(file_path)
         if not path.exists():
@@ -359,7 +361,14 @@ class DocumentProcessor:
                     }
                 process_path = converted_pdf_path
                 process_suffix = ".pdf"
-            engine, selection = self.select_engine(process_path, model_name, force=force)
+            if selected_engine:
+                allowed = self.ENGINE_MATRIX.get(process_suffix) or ()
+                if selected_engine not in allowed:
+                    raise ValueError(f"文件类型 {process_suffix} 不支持执行计划引擎: {selected_engine}")
+                engine = selected_engine
+                selection = dict(engine_selection or {})
+            else:
+                engine, selection = self.select_engine(process_path, model_name, force=force)
             if suffix == ".ofd":
                 selection["source_file_type"] = ".ofd"
                 selection["converted_file_type"] = ".pdf"

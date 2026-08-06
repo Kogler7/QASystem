@@ -165,7 +165,7 @@ class ExecutionManager:
             lease_id = item.get("lease_id")
             if not lease_id:
                 continue
-            if self.scheduler.release(item):
+            if self.scheduler.release(item, worker_id=allocation.get("worker_id")):
                 released.append(lease_id)
         if released:
             self.hub.emit(
@@ -198,8 +198,19 @@ class ExecutionManager:
         reserved_allocation: dict[str, Any] | None = None,
     ) -> JobSubmission:
         self._ensure_queue_available()
+        if self.is_async and resource_class.startswith("gpu.") and target_worker is None and reserved_allocation is None:
+            reservation = self.scheduler.reserve_worker(resource_class)
+            if reservation is None:
+                raise ExecutionUnavailable(f"没有可用的 {resource_class} worker 或 GPU 显存配额")
+            worker = reservation.get("worker") or {}
+            target_worker = worker.get("worker_id")
+            reserved_allocation = reservation.get("allocation")
         job_id = uuid.uuid4().hex
-        payload_ref = self._write_payload(job_id, payload)
+        try:
+            payload_ref = self._write_payload(job_id, payload)
+        except Exception:
+            self.release_allocation(reserved_allocation)
+            raise
         job_fields: dict[str, Any] = {
             "tenant_id": tenant_id,
             "operation": operation,
@@ -222,10 +233,14 @@ class ExecutionManager:
             "reserved_allocation": reserved_allocation,
         }
         job_fields.update({key: value for key, value in optional_fields.items() if value is not None})
-        job = self.store.create_job(
-            job_id=job_id,
-            **job_fields,
-        )
+        try:
+            job = self.store.create_job(
+                job_id=job_id,
+                **job_fields,
+            )
+        except Exception:
+            self.release_allocation(reserved_allocation)
+            raise
         self.hub.emit(
             job_id,
             "job.accepted",
@@ -386,6 +401,7 @@ class ExecutionManager:
             "summary": summarize_executions(job, executions),
             "events_url": f"/api/v1/jobs/{job_id}/events",
             "executions_url": f"/api/v1/jobs/{job_id}/executions",
+            "result_url": f"/api/v1/jobs/{job_id}/result",
         }
         child_job_ids = job.get("child_job_ids") or []
         if child_job_ids:
@@ -433,13 +449,14 @@ class ExecutionManager:
         self.hub.emit(job_id, "job.cancelled" if job.get("status") == "queued" else "job.cancelling", operation=job.get("operation"), stage="cancel")
         return self.execution_view(job_id)
 
-    def wait_blocking(self, job_id: str, timeout_seconds: float) -> dict[str, Any]:
-        deadline = time.monotonic() + max(timeout_seconds, 0)
+    def wait_blocking(self, job_id: str, timeout_seconds: float | None) -> dict[str, Any]:
+        deadline = None if timeout_seconds is None else time.monotonic() + max(timeout_seconds, 0)
         while True:
             view = self.execution_view(job_id)
-            if view["status"] in TERMINAL_STATUSES or time.monotonic() >= deadline:
+            if view["status"] in TERMINAL_STATUSES or (deadline is not None and time.monotonic() >= deadline):
                 return view
-            time.sleep(min(0.2, max(deadline - time.monotonic(), 0.01)))
+            delay = 0.2 if deadline is None else min(0.2, max(deadline - time.monotonic(), 0.01))
+            time.sleep(delay)
 
 
 _MANAGER: ExecutionManager | None = None

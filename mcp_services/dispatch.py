@@ -6,9 +6,13 @@ from typing import Any
 from .result import ToolCode, tool_error, tool_success
 
 
-def _async_enabled() -> bool:
+def _execution_mode() -> str:
     value = os.getenv("MCP_EXECUTION_MODE", "inline").strip().lower()
-    return value in {"async", "queued", "durable"}
+    if value in {"async", "queued", "durable"}:
+        return "async"
+    if value in {"sync", "wait", "blocking"}:
+        return "sync"
+    return "inline"
 
 
 def maybe_submit(
@@ -19,13 +23,14 @@ def maybe_submit(
     tenant_id: str = "default",
     priority: int = 50,
 ) -> dict[str, Any] | None:
-    """Return a task handle when MCP durable dispatch is enabled.
+    """Dispatch heavy MCP work without changing its default result contract.
 
-    The default remains inline for direct library use and unit tests. Deployment
-    Compose sets ``MCP_EXECUTION_MODE=async`` so heavy tools leave the MCP
-    process immediately and are executed by the shared Worker layer.
+    Deployment uses ``sync`` so work runs in the shared Worker layer while the
+    caller receives the original tool result. ``async`` is an explicit opt-in
+    for a durable task handle. ``inline`` is reserved for tests and debugging.
     """
-    if not _async_enabled():
+    mode = _execution_mode()
+    if mode == "inline":
         return None
     try:
         from backend.app.execution.manager import ExecutionUnavailable, get_execution_manager
@@ -40,6 +45,22 @@ def maybe_submit(
             tenant_id=tenant_id,
             priority=priority,
         )
+        if mode == "sync":
+            execution = manager.wait_blocking(submission.job_id, None)
+            if execution["status"] == "succeeded":
+                return manager.result(submission.job_id)
+            job = manager.store.get_job(submission.job_id) or {}
+            error = job.get("error") or {}
+            return tool_error(
+                ToolCode.INTERNAL_ERROR,
+                "任务执行失败",
+                {
+                    "type": error.get("type", "ExecutionError"),
+                    "message": error.get("message", f"execution {execution['status']}"),
+                    "execution": execution,
+                },
+            )
+
         execution = manager.execution_view(submission.job_id)
         return tool_success(
             {

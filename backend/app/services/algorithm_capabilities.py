@@ -117,6 +117,29 @@ class DocumentParsingService:
             summary["encoding"] = metadata["encoding"]
         return summary
 
+    def resolve_engine_plan(self, file_name: str, content: bytes, config: ParserConfig) -> dict[str, Any] | None:
+        """Resolve the actual parser once before queue fan-out."""
+        selector = getattr(self.processor, "select_engine", None)
+        if not callable(selector):
+            return None
+        safe_name = Path(file_name or "upload.bin").name
+        suffix = Path(safe_name).suffix.lower()
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
+                handle.write(content)
+                temp_path = handle.name
+            with self._lock:
+                engine, selection = selector(
+                    temp_path,
+                    requested=config.engine,
+                    force=config.force,
+                )
+            return {"engine": engine, "selection": selection}
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.unlink(temp_path)
+
     def parse(
         self,
         file_name: str,
@@ -126,6 +149,7 @@ class DocumentParsingService:
         page_range: tuple[int, int] | None = None,
         shard_index: int | None = None,
         total_shards: int | None = None,
+        execution_plan: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if not content:
             raise CapabilityError(ErrorCode.INVALID_REQUEST, "上传文件不能为空", "validation")
@@ -147,6 +171,8 @@ class DocumentParsingService:
                     formula_enable=config.mineru_options.formula_enable,
                     start_page_id=page_range[0] if page_range else 0,
                     end_page_id=page_range[1] if page_range else None,
+                    selected_engine=(execution_plan or {}).get("engine"),
+                    engine_selection=(execution_plan or {}).get("selection"),
                 )
             if not result.get("success"):
                 reason = str(result.get("error") or "未知原因")

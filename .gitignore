@@ -68,6 +68,7 @@ backend/temp_files/
 backend/chroma_db/
 backend/app.log
 backend/*.log
+/data/execution/
 
 # =============================================================================
 # Docker / Milvus 本地数据

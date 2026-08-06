@@ -46,6 +46,8 @@ def _auto_cpu_workers(cpu_count: int) -> int:
 
 
 def _auto_vlm_workers(cpu_count: int, gpu_count: int) -> int:
+    if gpu_count <= 0:
+        return 0
     configured = os.getenv("EXECUTION_VLM_WORKERS_PER_GPU", "auto").strip().lower()
     if configured != "auto":
         return _env_int("EXECUTION_VLM_WORKERS_PER_GPU", 2, minimum=1, maximum=8)
@@ -121,6 +123,7 @@ class RuntimeSupervisor:
                     "VLLM_WARMUP_BASE_URL": f"http://127.0.0.1:{port}",
                     "VLLM_WARMUP_MARKER": f"/tmp/qasystem-vllm-{port}.done",
                     "VLLM_SERVER_PID": str(process.pid),
+                    "VLLM_WARMUP_REPORT_FAILURE": "false",
                 }
             )
             try:
@@ -138,7 +141,15 @@ class RuntimeSupervisor:
             time.sleep(2)
         raise RuntimeError(f"vLLM engine for GPU {gpu_id} did not become ready")
 
-    def _worker_env(self, gpu_id: str, port: int, worker_id: str) -> dict[str, str]:
+    def _worker_env(
+        self,
+        gpu_id: str,
+        port: int,
+        worker_id: str,
+        *,
+        model: str,
+        vlm_endpoint: bool,
+    ) -> dict[str, str]:
         env = os.environ.copy()
         env.update(
             {
@@ -148,11 +159,18 @@ class RuntimeSupervisor:
                 "EXECUTION_GPU_DEVICE_IDS": gpu_id,
                 "EXECUTION_WORKER_ID": worker_id,
                 "EXECUTION_GPU_LEASE_MODE": "external",
-                "EXECUTION_MODEL": "mineru-vlm",
-                "MINERU_VLM_BACKEND": "vlm-http-client",
-                "MINERU_VLM_SERVER_URL": f"http://127.0.0.1:{port}",
+                "EXECUTION_MODEL": model,
             }
         )
+        if vlm_endpoint:
+            env.update(
+                {
+                    "MINERU_VLM_BACKEND": "vlm-http-client",
+                    "MINERU_VLM_SERVER_URL": f"http://127.0.0.1:{port}",
+                }
+            )
+        else:
+            env.pop("MINERU_VLM_SERVER_URL", None)
         return env
 
     def _start_core_workers(self) -> None:
@@ -179,14 +197,26 @@ class RuntimeSupervisor:
                 self._spawn(
                     worker_id,
                     [sys.executable, "-m", "app.execution.worker", "--resource-class", "gpu.vlm", "--gpu-device", gpu_id],
-                    env=self._worker_env(gpu_id, port, worker_id),
+                    env=self._worker_env(
+                        gpu_id,
+                        port,
+                        worker_id,
+                        model="mineru-vlm",
+                        vlm_endpoint=True,
+                    ),
                 )
             for index in range(auxiliary_workers):
                 worker_id = f"aux-{gpu_id}-{index}"
                 self._spawn(
                     worker_id,
                     [sys.executable, "-m", "app.execution.worker", "--resource-class", "gpu.embedding,gpu.confidence", "--gpu-device", gpu_id],
-                    env=self._worker_env(gpu_id, port, worker_id),
+                    env=self._worker_env(
+                        gpu_id,
+                        port,
+                        worker_id,
+                        model="embedding-confidence",
+                        vlm_endpoint=False,
+                    ),
                 )
         LOGGER.info(
             "runtime ready: gpus=%s cpu_workers=%s vlm_workers_per_gpu=%s auxiliary_workers_per_gpu=%s",

@@ -78,7 +78,8 @@ def main() -> int:
         print(f"vLLM warmup complete in {time.monotonic() - started:.1f}s", flush=True)
         return 0
     except (OSError, ValueError, KeyError, urllib.error.URLError, urllib.error.HTTPError) as exc:
-        print(f"vLLM readiness/warmup failed: {exc}", file=sys.stderr, flush=True)
+        if os.getenv("VLLM_WARMUP_REPORT_FAILURE", "true").strip().lower() not in {"0", "false", "off", "no"}:
+            print(f"vLLM readiness/warmup failed: {exc}", file=sys.stderr, flush=True)
         return 1
 
 

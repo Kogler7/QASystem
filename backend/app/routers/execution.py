@@ -35,6 +35,7 @@ async def submit_job(request: Request, body: dict[str, Any]):
     if not operation or not isinstance(task_payload, dict):
         raise HTTPException(status_code=400, detail="operation 和对象类型 payload 不能为空")
     try:
+        requested_wait = prefer_wait_seconds(request.headers.get("Prefer"))
         result = await dispatch_operation(
             operation=operation,
             resource_class=resource_class,
@@ -42,7 +43,7 @@ async def submit_job(request: Request, body: dict[str, Any]):
             tenant_id=str(body.get("tenant_id", "default")),
             priority=int(body.get("priority", 50)),
             total_units=max(int(body.get("total_units", 1)), 1),
-            wait_seconds=prefer_wait_seconds(request.headers.get("Prefer")),
+            wait_seconds=0.0 if requested_wait is None else requested_wait,
         )
     except ExecutionUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

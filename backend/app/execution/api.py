@@ -25,18 +25,29 @@ class ManagedExecutionError(RuntimeError):
         self.execution = execution
 
 
-def prefer_wait_seconds(value: str | None) -> float:
+def prefer_wait_seconds(value: str | None) -> float | None:
+    """Return the explicit wait budget from Prefer.
+
+    No preference means the existing synchronous HTTP contract: submit to the
+    shared queue and wait for the business result. ``respond-async`` opts into
+    an immediate task handle; ``wait=N`` permits a bounded wait before that
+    handle is returned.
+    """
     if not value:
-        return 0.0
+        return None
+    respond_async = False
     for token in value.split(","):
         name, _, raw = token.strip().partition("=")
+        if name.lower() == "respond-async":
+            respond_async = True
+            continue
         if name.lower() != "wait":
             continue
         try:
             return max(0.0, min(float(raw.strip().strip('"')), 60.0))
         except ValueError:
-            return 0.0
-    return 0.0
+            return None
+    return 0.0 if respond_async else None
 
 
 async def dispatch_operation(
@@ -47,7 +58,7 @@ async def dispatch_operation(
     tenant_id: str = "default",
     priority: int = 50,
     total_units: int = 1,
-    wait_seconds: float = 0.0,
+    wait_seconds: float | None = None,
     manager: ExecutionManager | None = None,
 ) -> ManagedResult:
     manager = manager or get_execution_manager()
@@ -73,12 +84,15 @@ async def dispatch_operation(
             raise ManagedExecutionError(exc, manager.execution_view(submission.job_id)) from exc
         return ManagedResult(data, manager.execution_view(submission.job_id), 200)
 
-    if wait_seconds > 0:
+    if wait_seconds is None or wait_seconds > 0:
         execution = await asyncio.to_thread(manager.wait_blocking, submission.job_id, wait_seconds)
         if execution["status"] == "succeeded":
             return ManagedResult(manager.result(submission.job_id), execution, 200)
         if execution["status"] in {"failed", "cancelled"}:
-            return ManagedResult({"job_id": submission.job_id, "status": execution["status"]}, execution, 200)
+            job = manager.store.get_job(submission.job_id) or {}
+            error = job.get("error") or {}
+            cause = RuntimeError(error.get("message") or f"execution {execution['status']}")
+            raise ManagedExecutionError(cause, execution)
     execution = manager.execution_view(submission.job_id)
     return ManagedResult({"job_id": submission.job_id, "status": execution["status"]}, execution, 202, accepted=True)
 

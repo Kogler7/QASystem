@@ -49,6 +49,7 @@ class GpuLease:
     memory_budget_mb: int
     owner: str
     expires_at: float
+    worker_id: str | None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -62,6 +63,7 @@ class GpuLease:
             "memory_free_mb": self.device.memory_free_mb,
             "utilization_gpu": self.device.utilization_gpu,
             "snapshot_source": self.device.source,
+            "worker_id": self.worker_id,
         }
 
 
@@ -180,6 +182,7 @@ class ResourceScheduler:
 
     _local_lock = threading.Lock()
     _local_leases: dict[str, dict[str, tuple[int, float]]] = {}
+    _local_worker_leases: dict[str, dict[str, float]] = {}
     _local_workers: dict[str, dict[str, Any]] = {}
 
     def __init__(self, store: Any = None, *, worker_id: str | None = None, inventory: GpuInventory | None = None):
@@ -214,6 +217,9 @@ class ResourceScheduler:
 
     def _worker_key(self, worker_id: str) -> str:
         return f"{self.prefix}:workers:{worker_id}"
+
+    def _worker_lease_key(self, worker_id: str) -> str:
+        return f"{self.prefix}:worker-leases:{worker_id}"
 
     def register_worker(
         self,
@@ -313,6 +319,24 @@ class ResourceScheduler:
             active = [budget for budget, expiry in leases.values() if expiry > now]
         return len(active), sum(active)
 
+    def _active_worker_lease_count(self, worker_id: str) -> int:
+        now = time.time()
+        key = self._worker_lease_key(worker_id)
+        if self.redis is not None:
+            try:
+                values = self.redis.hvals(key)
+            except Exception:
+                return 0
+            return sum(1 for raw in values if _parse_number(str(raw)) is not None and float(raw) > now)
+        with self._local_lock:
+            leases = self._local_worker_leases.get(key, {})
+            for lease_id, expiry in list(leases.items()):
+                if expiry <= now:
+                    leases.pop(lease_id, None)
+            if not leases:
+                self._local_worker_leases.pop(key, None)
+            return len(leases)
+
     def reserve_worker(
         self,
         resource_class: str,
@@ -324,7 +348,7 @@ class ResourceScheduler:
         excluded = exclude_workers or set()
         excluded_devices = exclude_devices or set()
         workers = [item for item in self.list_workers(resource_class) if item.get("worker_id") not in excluded]
-        candidates: list[tuple[tuple[int, int, int, str], dict[str, Any], GpuSnapshot]] = []
+        candidates: list[tuple[tuple[int, int, int, int, str], dict[str, Any], GpuSnapshot]] = []
         for worker in workers:
             devices = [str(item) for item in (worker.get("gpu_devices") or [])]
             if not devices:
@@ -334,6 +358,7 @@ class ResourceScheduler:
                     continue
                 snapshot = self._snapshot_from_worker(worker, physical_index)
                 lease_count, leased_mb = self._active_lease_stats(snapshot)
+                worker_lease_count = self._active_worker_lease_count(str(worker.get("worker_id")))
                 effective_free_mb = max(0, (snapshot.memory_free_mb or 0) - leased_mb)
                 candidates.append(
                     (
@@ -341,6 +366,7 @@ class ResourceScheduler:
                             -effective_free_mb,
                             snapshot.utilization_gpu if snapshot.utilization_gpu is not None else 0,
                             lease_count,
+                            worker_lease_count,
                             str(worker.get("worker_id")),
                         ),
                         worker,
@@ -353,7 +379,8 @@ class ResourceScheduler:
             if snapshot.memory_free_mb is not None and snapshot.memory_free_mb < request_mb:
                 continue
             lease_id = uuid.uuid4().hex
-            if not self._reserve(snapshot, lease_id, request_mb):
+            worker_id = str(worker.get("worker_id"))
+            if not self._reserve(snapshot, lease_id, request_mb, worker_id=worker_id):
                 continue
             lease = GpuLease(
                 lease_id=lease_id,
@@ -361,6 +388,7 @@ class ResourceScheduler:
                 memory_budget_mb=request_mb,
                 owner=f"{self.worker_id}:{os.getpid()}",
                 expires_at=time.time() + self.lease_ttl_seconds,
+                worker_id=worker_id,
             )
             allocation = {
                 "scheduler_id": os.getenv("EXECUTION_SCHEDULER_ID", "gpu-capacity-local"),
@@ -376,14 +404,21 @@ class ResourceScheduler:
             return {"worker": worker, "lease": lease, "allocation": allocation}
         return None
 
-    def _reserve(self, device: GpuSnapshot, lease_id: str, budget_mb: int) -> bool:
+    def _reserve(
+        self,
+        device: GpuSnapshot,
+        lease_id: str,
+        budget_mb: int,
+        *,
+        worker_id: str | None = None,
+    ) -> bool:
         capacity_mb = device.memory_free_mb if device.memory_free_mb is not None else (device.memory_total_mb or 0)
         try:
             capacity_mb = max(0, capacity_mb - int(os.getenv("EXECUTION_GPU_SAFETY_MARGIN_MB", "512")))
         except (TypeError, ValueError):
             capacity_mb = max(0, capacity_mb)
         try:
-            default_max = "16" if budget_mb > 0 else "1"
+            default_max = "16"
             max_leases = max(1, int(os.getenv("EXECUTION_GPU_MAX_LEASES_PER_DEVICE", default_max)))
         except (TypeError, ValueError):
             max_leases = 1
@@ -408,24 +443,48 @@ class ResourceScheduler:
             local budget = tonumber(ARGV[2]) or 0
             local capacity = tonumber(ARGV[3]) or 0
             local max_leases = tonumber(ARGV[4]) or 1
-            if count >= max_leases or (capacity > 0 and active + budget > capacity) then
+            local worker_limit = tonumber(ARGV[7]) or 0
+            local worker_count = 0
+            if worker_limit > 0 then
+                local worker_entries = redis.call('hgetall', KEYS[2])
+                for index = 1, #worker_entries, 2 do
+                    local field = worker_entries[index]
+                    local expiry = tonumber(worker_entries[index + 1]) or 0
+                    if expiry <= now then
+                        redis.call('hdel', KEYS[2], field)
+                    else
+                        worker_count = worker_count + 1
+                    end
+                end
+            end
+            if count >= max_leases or (capacity > 0 and active + budget > capacity) or (worker_limit > 0 and worker_count >= worker_limit) then
                 return 0
             end
             redis.call('hset', KEYS[1], ARGV[5], tostring(budget) .. '|' .. tostring(now + tonumber(ARGV[6])))
             redis.call('expire', KEYS[1], tonumber(ARGV[6]))
+            if worker_limit > 0 then
+                redis.call('hset', KEYS[2], ARGV[5], tostring(now + tonumber(ARGV[6])))
+                redis.call('expire', KEYS[2], tonumber(ARGV[6]))
+            end
             return 1
             """
+            try:
+                worker_limit = max(1, int(os.getenv("EXECUTION_GPU_MAX_LEASES_PER_WORKER", "1"))) if worker_id else 0
+            except (TypeError, ValueError):
+                worker_limit = 1 if worker_id else 0
             return bool(
                 redis.eval(
                     script,
-                    1,
+                    2,
                     self._lease_key(device),
+                    self._worker_lease_key(worker_id or "unassigned"),
                     time.time(),
                     budget_mb,
                     capacity_mb,
                     max_leases,
                     lease_id,
                     self.lease_ttl_seconds,
+                    worker_limit,
                 )
             )
         with self._local_lock:
@@ -440,23 +499,46 @@ class ResourceScheduler:
                 if not leases:
                     self._local_leases.pop(key, None)
                 return False
+            if worker_id:
+                worker_key = self._worker_lease_key(worker_id)
+                worker_leases = self._local_worker_leases.setdefault(worker_key, {})
+                for old_id, expiry in list(worker_leases.items()):
+                    if expiry <= now:
+                        worker_leases.pop(old_id, None)
+                try:
+                    worker_limit = max(1, int(os.getenv("EXECUTION_GPU_MAX_LEASES_PER_WORKER", "1")))
+                except (TypeError, ValueError):
+                    worker_limit = 1
+                if len(worker_leases) >= worker_limit:
+                    return False
+                worker_leases[lease_id] = now + self.lease_ttl_seconds
             leases[lease_id] = (budget_mb, now + self.lease_ttl_seconds)
             return True
 
-    def release(self, lease: GpuLease | dict[str, Any] | None) -> bool:
+    def release(self, lease: GpuLease | dict[str, Any] | None, *, worker_id: str | None = None) -> bool:
         if not lease:
             return False
         lease_id = lease.lease_id if isinstance(lease, GpuLease) else lease.get("lease_id")
         physical_index = lease.device.physical_index if isinstance(lease, GpuLease) else str(lease.get("physical_index", ""))
         device_uuid = lease.device.device_uuid if isinstance(lease, GpuLease) else lease.get("device_uuid")
+        worker_id = worker_id or (lease.worker_id if isinstance(lease, GpuLease) else lease.get("worker_id"))
         if not lease_id or not physical_index:
             return False
         device = GpuSnapshot(physical_index, device_uuid, None, None, None, "release")
         redis = self.redis
         if redis is not None:
-            script = "if redis.call('hexists', KEYS[1], ARGV[1]) == 1 then return redis.call('hdel', KEYS[1], ARGV[1]) else return 0 end"
+            script = "local removed = redis.call('hdel', KEYS[1], ARGV[1]); if ARGV[2] ~= '' then redis.call('hdel', KEYS[2], ARGV[1]) end; return removed"
             try:
-                return bool(redis.eval(script, 1, self._lease_key(device), lease_id))
+                return bool(
+                    redis.eval(
+                        script,
+                        2,
+                        self._lease_key(device),
+                        self._worker_lease_key(worker_id or "unassigned"),
+                        lease_id,
+                        worker_id or "",
+                    )
+                )
             except Exception:
                 return False
         with self._local_lock:
@@ -465,6 +547,12 @@ class ResourceScheduler:
             if lease_id not in leases:
                 return False
             del leases[lease_id]
+            if worker_id:
+                worker_key = self._worker_lease_key(worker_id)
+                worker_leases = self._local_worker_leases.get(worker_key) or {}
+                worker_leases.pop(lease_id, None)
+                if not worker_leases:
+                    self._local_worker_leases.pop(worker_key, None)
             if not leases:
                 self._local_leases.pop(key, None)
             return True
@@ -506,6 +594,7 @@ class ResourceScheduler:
                     memory_budget_mb=request_mb,
                     owner=owner,
                     expires_at=time.time() + self.lease_ttl_seconds,
+                    worker_id=None,
                 )
             )
         if len(acquired) != max(1, gpu_count):
