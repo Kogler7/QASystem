@@ -124,7 +124,12 @@ if ($IncludeRedisImage) {
 }
 
 Write-ProgressLog "[5/6] Writing manifest and SHA-256 checksums"
-$excludedNames = @("SHA256SUMS", "交付清单.json")
+$excludedNames = @(
+    "SHA256SUMS",
+    "交付清单.json",
+    "qasystem-runtime-v1.zip",
+    "qasystem-runtime-v1.zip.sha256"
+)
 $deliveryFiles = Get-ChildItem -LiteralPath $deployDir -Recurse -File -Force |
     Where-Object { $_.Name -notin $excludedNames -and -not $_.FullName.StartsWith((Join-Path $deployDir "models")) } |
     Sort-Object FullName
