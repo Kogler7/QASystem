@@ -36,6 +36,7 @@ services:
       - ${QASYSTEM_SOURCE_DIR:-..}/algorithm:/app/algorithm:ro
       - ${QASYSTEM_SOURCE_DIR:-..}/mcp_services:/app/mcp_services:ro
       - ${QASYSTEM_SOURCE_DIR:-..}/agent:/app/agent:ro
+      - ${QASYSTEM_SOURCE_DIR:-..}/external_services:/app/external_services:ro
       - ${HOST_MODELS_DIR:-../deploy/models}:/models:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     networks: [offline]

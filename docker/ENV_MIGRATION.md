@@ -13,11 +13,12 @@ qasystem-deploy/
 │   ├── algorithm/
 │   ├── mcp_services/
 │   ├── agent/
+│   ├── external_services/
 │   └── docker/
 └── models/
 ```
 
-Compose 分别把四个源码目录挂载到容器 `/app` 下。源码挂载为只读；Backend 数据和 Agent 输出继续写入 Docker volume，不写回源码目录。
+Compose 将 Backend、Agent、算法、MCP 与外部应用服务适配器目录挂载到容器 `/app` 下。源码挂载为只读；Backend 数据和 Agent 输出继续写入 Docker volume，不写回源码目录。
 
 ## 首次切换
 

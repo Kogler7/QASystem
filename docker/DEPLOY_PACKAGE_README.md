@@ -9,7 +9,7 @@
 | 路径 | 用途 |
 | --- | --- |
 | `qasystem-env-v1.tar` | 可选环境镜像；只有 `-IncludeEnvImage` 时生成 |
-| `runtime/` | Backend、Agent、算法、MCP 和运行辅助代码 |
+| `runtime/` | Backend、Agent、算法、MCP、外部应用服务适配器和运行辅助代码 |
 | `models/` | 外部模型目录，不纳入镜像 |
 | `docker-compose.yml` | Backend、Agent、Redis 拓扑和只读挂载 |
 | `.env.example` | 唯一运行配置模板 |

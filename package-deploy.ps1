@@ -65,7 +65,7 @@ Set-Content -LiteralPath (Join-Path $deployDir ".env.example") -Value $deliveryE
 
 Write-ProgressLog "[3/6] Creating the read-only runtime source directory"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-foreach ($directory in @("backend", "algorithm", "mcp_services", "agent")) {
+foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
