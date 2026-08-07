@@ -89,6 +89,12 @@ Get-ChildItem -LiteralPath $runtimeDir -Recurse -Directory -Force |
 Get-ChildItem -LiteralPath $runtimeDir -Recurse -File -Force |
     Where-Object { $_.Extension -in @(".pyc", ".pyo", ".log") -or $_.Name -eq ".env" -or $_.Name -like ".env.*" } |
     Remove-Item -Force
+# Remove directories left empty after runtime artifact cleanup (for example
+# local log folders) so the source delivery contains only deployable files.
+Get-ChildItem -LiteralPath $runtimeDir -Recurse -Directory -Force |
+    Sort-Object FullName -Descending |
+    Where-Object { -not (Get-ChildItem -LiteralPath $_.FullName -Force) } |
+    Remove-Item -Force
 Set-Content -LiteralPath (Join-Path $runtimeDir "SOURCE_COMMIT") -Value (git -C $repoRoot rev-parse HEAD 2>$null) -Encoding ascii
 
 $images = @()
