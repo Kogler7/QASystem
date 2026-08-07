@@ -1,4 +1,4 @@
-"""Fail-fast verification for the built QASystem runtime image."""
+"""Fail-fast verification for the QASystem environment and mounted source."""
 
 from __future__ import annotations
 

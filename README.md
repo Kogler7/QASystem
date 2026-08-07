@@ -31,10 +31,9 @@ qasystem/
 ├── algorithm/            # 文档、抽取、向量、置信度及 MCP 业务实现
 ├── mcp_services/         # 统一 MCP Server 与领域工具
 ├── agent/                # Agent 与 MCP 客户端运行时
-├── Dockerfile            # 无应用源码的依赖基础镜像
-├── Dockerfile.runtime    # 在 base 上叠加应用的部署镜像
+├── Dockerfile            # 不含源码和模型的应用环境镜像
 ├── docker-compose.yml    # 唯一容器编排配置
-├── package-deploy.ps1    # 生成小型 runtime context 与按需 base 归档
+├── package-deploy.ps1    # 生成外置源码目录并按需导出 env 镜像
 ├── docs/                 # 架构、部署和协议说明
 └── deploy/               # 交付包与模型，不纳入 Git
 ```

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_root_is_the_only_configuration_source():
     assert (ROOT / ".env.example").is_file()
     assert (ROOT / "Dockerfile").is_file()
-    assert (ROOT / "Dockerfile.runtime").is_file()
+    assert not (ROOT / "Dockerfile.runtime").exists()
     assert (ROOT / "docker-compose.yml").is_file()
     assert (ROOT / "package-deploy.ps1").is_file()
     assert (ROOT / "build-image.ps1").is_file()
@@ -18,9 +18,9 @@ def test_root_is_the_only_configuration_source():
     assert (ROOT / "docker" / "docker-compose.offline-test.yml").is_file()
     assert (ROOT / "docker" / "offline_mock_llm.py").is_file()
     assert (ROOT / "docker" / "offline_validation.py").is_file()
-    assert (ROOT / "docker" / "make-runtime-base.sh").is_file()
-    assert (ROOT / "docker" / "apply-runtime.sh").is_file()
-    assert (ROOT / "docker" / "RUNTIME_BASE.md").is_file()
+    assert not (ROOT / "docker" / "make-runtime-base.sh").exists()
+    assert not (ROOT / "docker" / "apply-runtime.sh").exists()
+    assert not (ROOT / "docker" / "RUNTIME_BASE.md").exists()
     assert (ROOT / "backend" / "app" / "health.py").is_file()
     assert not (ROOT / "agent" / ".env.example").exists()
     assert not (ROOT / "docker" / ".env.deploy.example").exists()
@@ -51,6 +51,8 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "QA_LLM_" not in compose
     assert "AGENT_LLM_" not in compose
     assert "GPU_DEVICE_IDS=4,5,6,7" in template
+    assert "QASYSTEM_ENV_IMAGE=qasystem-env-v1" in template
+    assert "QASYSTEM_SOURCE_DIR=." in template
     assert "MCP_EXECUTION_MODE=sync" in template
     assert "MCP_EXECUTION_MODE: ${MCP_EXECUTION_MODE:-sync}" not in compose
     assert "python -m app.execution.supervisor" in compose
@@ -61,6 +63,7 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "vllm-0:" not in compose
     assert "AGENT_MCP_URL=http://backend:8000/mcp" in template
     assert "environment:" not in compose
+    assert "${QASYSTEM_SOURCE_DIR:-.}/backend:/app/backend:ro" in compose
     assert "AGENT_HOST_PORT" not in compose
     assert "MCP_PORT" not in template
 
@@ -74,9 +77,9 @@ def test_backend_proxies_agent_under_its_public_route():
 
 def test_deploy_script_only_generates_runtime_assets():
     script = (ROOT / "package-deploy.ps1").read_text(encoding="utf-8")
-    assert 'layout = "dependency-base-plus-runtime-overlay"' in script
-    assert 'runtime-context.tar' in script
-    assert 'IncludeBaseImage' in script
+    assert 'layout = "source-free-environment-image-with-read-only-source-mount"' in script
+    assert 'runtime-context.tar' not in script
+    assert 'IncludeEnvImage' in script
     assert 'qasystem-runtime-v1.tar' not in script
     assert 'qasystem-backend-latest.tar' not in script
     assert "robocopy" not in script
@@ -87,7 +90,7 @@ def test_deploy_script_only_generates_runtime_assets():
 
 def test_dockerfile_performs_complete_runtime_verification():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    runtime_dockerfile = (ROOT / "Dockerfile.runtime").read_text(encoding="utf-8")
+    build_script = (ROOT / "build-image.ps1").read_text(encoding="utf-8")
     mineru_requirements = (ROOT / "backend" / "requirements.mineru-extras.txt").read_text(encoding="utf-8")
     verifier = (ROOT / "docker" / "verify_runtime.py").read_text(encoding="utf-8")
     docling_processor = (
@@ -96,17 +99,14 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert "pip check" in dockerfile
     assert "docling-tools models download" not in dockerfile
     assert 'pip install "/app/agent[api]"' not in dockerfile
-    assert 'pip install --no-deps "/app/agent[api]"' in runtime_dockerfile
-    assert "verify_qasystem_runtime.py" in runtime_dockerfile
-    assert "FROM ${BASE_IMAGE}" in runtime_dockerfile
+    assert "verify_qasystem_runtime.py" not in dockerfile
     assert "COPY backend /app/backend" not in dockerfile
     assert "COPY algorithm /app/algorithm" not in dockerfile
-    assert "COPY backend /app/backend" in runtime_dockerfile
     assert "opencv-python==4.11.0.86" in mineru_requirements
     assert "opencv-python-headless==4.11.0.86" in mineru_requirements
-    assert "opencv-python==4.11.0.86" in runtime_dockerfile
     assert '"opencv-python": "4.11.0.86"' in verifier
-    assert "download_qasystem_models.py" in runtime_dockerfile
+    assert "/app/docker/verify_runtime.py" in build_script
+    assert "download_qasystem_models.py" not in dockerfile
     assert "from backend.app.main import app as backend_app" in verifier
     assert "from agentcode.api import app as agent_app" in verifier
     assert '"mcp"' in verifier

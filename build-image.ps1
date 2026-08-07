@@ -1,8 +1,5 @@
 param(
-    [string]$BaseImage = "qasystem-base-v1",
-    [string]$RuntimeImage = "qasystem-runtime-v1",
-    [switch]$BuildBase,
-    [switch]$BaseOnly,
+    [string]$ImageName = "qasystem-env-v1",
     [string]$OpenCodeVersion = "1.17.15",
     [string]$NodeImage = "node:20-bullseye-slim",
     [string]$MavenImage = "maven:3.9.9-eclipse-temurin-17",
@@ -13,6 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = $PSScriptRoot
+$candidateImage = "${ImageName}-candidate"
 
 function Write-ProgressLog([string]$Message) {
     Write-Host "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] $Message"
@@ -20,73 +18,48 @@ function Write-ProgressLog([string]$Message) {
 
 function Invoke-Docker([string[]]$Arguments, [string]$FailureMessage) {
     & docker @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "$FailureMessage (exit code $LASTEXITCODE)"
-    }
-}
-
-function Test-DockerImage([string]$Image) {
-    docker image inspect $Image *> $null
-    return $LASTEXITCODE -eq 0
-}
-
-function Build-And-Promote(
-    [string]$Dockerfile,
-    [string]$TargetImage,
-    [string[]]$BuildArguments,
-    [scriptblock]$Verify
-) {
-    $candidate = "${TargetImage}-candidate"
-    $arguments = @("build", "--progress=plain", "--file", $Dockerfile, "--tag", $candidate)
-    foreach ($item in $BuildArguments) {
-        $arguments += @("--build-arg", $item)
-    }
-    if ($NoCache) { $arguments += "--no-cache" }
-    $arguments += "."
-
-    Write-ProgressLog "Building candidate $candidate from $Dockerfile"
-    Invoke-Docker $arguments "Docker build failed for $candidate"
-    Write-ProgressLog "Verifying candidate $candidate"
-    & $Verify $candidate
-    Invoke-Docker @("tag", $candidate, $TargetImage) "Failed to promote $candidate"
-    $imageId = (docker image inspect $TargetImage --format "{{.Id}}").Trim()
-    if (-not $KeepCandidate) {
-        docker image rm $candidate *> $null
-    }
-    Write-ProgressLog "Promoted $TargetImage ($imageId)"
+    if ($LASTEXITCODE -ne 0) { throw "$FailureMessage (exit code $LASTEXITCODE)" }
 }
 
 Push-Location $repoRoot
 try {
-    if ($BuildBase) {
-        Build-And-Promote "Dockerfile" $BaseImage @(
-            "OPENCODE_VERSION=$OpenCodeVersion",
-            "NODE_IMAGE=$NodeImage",
-            "MAVEN_IMAGE=$MavenImage",
-            "VLLM_IMAGE=$VllmImage"
-        ) {
-            param($candidate)
-            Invoke-Docker @(
-                "run", "--rm", "--entrypoint", "/bin/sh", $candidate, "-c",
-                "python -c 'import fastapi,torch,vllm,cv2,redis,mcp,openai' && test -x /usr/bin/soffice && test -f /opt/qasystem/ofdrw/ofd-to-pdf.jar && command -v tini >/dev/null"
-            ) "Dependency-base verification failed"
-        }
-    }
-    elseif (-not (Test-DockerImage $BaseImage)) {
-        throw "Dependency base not found: $BaseImage. Build it once with .\build-image.ps1 -BuildBase, or create it from the legacy image with docker/make-runtime-base.sh."
-    }
+    $buildArguments = @("build")
+    if ($env:DOCKER_BUILDKIT -ne "0") { $buildArguments += "--progress=plain" }
+    $buildArguments += @(
+        "--file", "Dockerfile", "--tag", $candidateImage,
+        "--build-arg", "OPENCODE_VERSION=$OpenCodeVersion",
+        "--build-arg", "NODE_IMAGE=$NodeImage",
+        "--build-arg", "MAVEN_IMAGE=$MavenImage",
+        "--build-arg", "VLLM_IMAGE=$VllmImage"
+    )
+    if ($NoCache) { $buildArguments += "--no-cache" }
+    $buildArguments += "."
 
-    if ($BaseOnly) {
-        if (-not $BuildBase) { throw "-BaseOnly requires -BuildBase" }
-        Write-ProgressLog "Base-only build completed; runtime image was not rebuilt"
-        return
-    }
+    Write-ProgressLog "[1/4] Building source-free environment image $candidateImage"
+    Invoke-Docker $buildArguments "Environment image build failed"
 
-    Build-And-Promote "Dockerfile.runtime" $RuntimeImage @("BASE_IMAGE=$BaseImage") {
-        param($candidate)
-        Invoke-Docker @("run", "--rm", "--entrypoint", "python", $candidate, "/usr/local/bin/verify_qasystem_runtime.py") "Runtime verification failed"
+    Write-ProgressLog "[2/4] Verifying dependencies with the repository source mounted read-only"
+    $verifyArguments = @("run", "--rm", "--entrypoint", "python")
+    foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "docker")) {
+        $source = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $directory))
+        $verifyArguments += @("--mount", "type=bind,source=$source,target=/app/$directory,readonly")
     }
-    Write-ProgressLog "Done. Normal code releases only rebuild $RuntimeImage; use -BuildBase only when the dependency contract changes."
+    $verifyArguments += @(
+        "--env", "PYTHONPATH=/app:/app/agent",
+        "--env", "LIBREOFFICE_PATH=/usr/bin/soffice",
+        "--env", "OFD_CONVERTER_COMMAND=java -jar /opt/qasystem/ofdrw/ofd-to-pdf.jar",
+        $candidateImage,
+        "/app/docker/verify_runtime.py"
+    )
+    Invoke-Docker $verifyArguments "Mounted-source runtime verification failed"
+
+    Write-ProgressLog "[3/4] Promoting verified image to $ImageName"
+    Invoke-Docker @("tag", $candidateImage, $ImageName) "Failed to promote environment image"
+    if (-not $KeepCandidate) { docker image rm $candidateImage *> $null }
+
+    $imageId = (docker image inspect $ImageName --format "{{.Id}}").Trim()
+    Write-ProgressLog "[4/4] Environment image ready: $ImageName ($imageId)"
+    Write-ProgressLog "Application source and models are not included; Compose loads them from host mounts."
 }
 finally {
     Pop-Location

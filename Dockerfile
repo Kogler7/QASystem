@@ -1,5 +1,5 @@
-# QASystem dependency base. Application source and deployment configuration
-# belong to Dockerfile.runtime and are intentionally absent from this image.
+# QASystem source-free environment image. Application source and models are
+# mounted by Compose at runtime and are intentionally absent from this image.
 
 ARG NODE_IMAGE=node:20-bullseye-slim
 ARG MAVEN_IMAGE=maven:3.9.9-eclipse-temurin-17
@@ -86,7 +86,7 @@ RUN pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-ho
     pip check
 
 # Read Agent dependencies from their canonical pyproject without copying the
-# Agent package into the dependency base. Dockerfile.runtime installs it.
+# Agent package into the environment image. Runtime source is mounted later.
 COPY agent/pyproject.toml /tmp/qasystem/agent-pyproject.toml
 RUN python -c "import subprocess,sys,tomllib; p=tomllib.load(open('/tmp/qasystem/agent-pyproject.toml','rb'))['project']; subprocess.check_call([sys.executable,'-m','pip','install',*(p['dependencies']+p['optional-dependencies']['api'])])" && \
     pip check
@@ -99,9 +99,11 @@ COPY --from=opencode-runtime /usr/local/lib/node_modules /usr/local/lib/node_mod
 RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-# The base is not deployable. Keep only a dependency smoke test here; the
-# application-aware verifier runs while Dockerfile.runtime is built.
+# Application-aware verification is performed by build-image.ps1 with the
+# repository source mounted read-only.
 RUN python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
+    node --version && \
+    opencode --version && \
     test -x /usr/bin/soffice && \
     test -f /opt/qasystem/ofdrw/ofd-to-pdf.jar && \
     command -v tini >/dev/null

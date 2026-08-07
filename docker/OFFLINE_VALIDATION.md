@@ -5,7 +5,7 @@
 准备好最终镜像和 `models/` 后，在仓库根目录运行：
 
 ```powershell
-.\run-offline-validation.ps1 -ImageName qasystem-runtime-v1 -ModelsDir .\deploy\models
+.\run-offline-validation.ps1 -ImageName qasystem-env-v1 -ModelsDir .\deploy\models
 ```
 
 验收使用 `test_artifacts/parser/解析测试数据` 中的 PDF、扫描 PDF、DOC、XLSX、Markdown 和 PNG 样本，并验证：

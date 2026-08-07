@@ -1,15 +1,20 @@
 services:
   backend:
-    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
+    image: ${QASYSTEM_ENV_IMAGE:-qasystem-env-v1}
     pull_policy: never
     container_name: qasystem_backend
     restart: unless-stopped
+    init: true
     gpus: all
     env_file:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - ${QASYSTEM_SOURCE_DIR:-.}/backend:/app/backend:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}/algorithm:/app/algorithm:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}/mcp_services:/app/mcp_services:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}/agent:/app/agent:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
       - backend-data:/app/backend/data
     working_dir: /app/backend
@@ -27,15 +32,20 @@ services:
       start_period: 120s
 
   agent:
-    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
+    image: ${QASYSTEM_ENV_IMAGE:-qasystem-env-v1}
     pull_policy: never
     container_name: qasystem_agent
     restart: unless-stopped
+    init: true
     env_file:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - ${QASYSTEM_SOURCE_DIR:-.}/backend:/app/backend:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}/algorithm:/app/algorithm:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}/mcp_services:/app/mcp_services:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}/agent:/app/agent:ro
       - agent-output:/app/agent/image_result
     working_dir: /app
     command: python -m agentcode.api --host 0.0.0.0 --port 9180
