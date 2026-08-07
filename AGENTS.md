@@ -8,3 +8,6 @@
 - Preserve `GPU_DEVICE_IDS`; the production 8-card A40 host commonly sets `GPU_DEVICE_IDS=4,5,6,7`.
 - Rebuild and resend `qasystem-env-v1` only when environment dependencies change. Ordinary source releases only replace the external source directory and recreate Backend/Agent containers.
 - Build and packaging scripts must print timestamped phase progress during long operations.
+- Use `APPLICATION_SERVICE_URL` for the application-team server and keep `FILE_SERVICE_URL` only as a fallback. Register external endpoints in `external_services/application.py`; do not scatter third-party paths through algorithms.
+- Preserve queue execution for authenticated external calls. Queue records carry only `auth_context_id`; never place Authorization headers in payload artifacts, logs, SSE, `execution`, or results.
+- SQL may retain the configured direct connection compatibility. Do not restore direct Neo4j or Elasticsearch access; unopened graph-write, confidence, and document-evidence capabilities must fail explicitly when invoked.

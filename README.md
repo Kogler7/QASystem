@@ -14,7 +14,7 @@ QASystem 当前提供版本化算法 HTTP 接口、一个统一 MCP 服务，以
 | POST | `/api/v1/graphs/merge` | Graph 确定性去重 |
 | POST | `/api/v1/embeddings/texts` | 多文本向量化 |
 | POST | `/api/v1/embeddings/graphs` | Graph JSON 向量化 |
-| POST | `/api/v1/graphs/confidence` | 图谱关系置信度更新 |
+| POST | `/api/v1/graphs/confidence` | 保留路径；第三方能力开通前返回 503 |
 
 历史接口仅保留 deprecated 路径 aliases，请求和响应字段与 v1 完全一致，`info` 会注明迁移目标。
 
@@ -28,7 +28,8 @@ AgentCode 通过 Backend 的 `/agent` 路由统一对外提供异步任务、任
 ```text
 qasystem/
 ├── backend/              # FastAPI 路由、业务服务编排和契约测试
-├── algorithm/            # 文档、抽取、向量、置信度及 MCP 业务实现
+├── algorithm/            # 文档、抽取、向量及 MCP 业务实现
+├── external_services/    # 应用团队 API 注册、鉴权上下文与统一客户端
 ├── mcp_services/         # 统一 MCP Server 与领域工具
 ├── agent/                # Agent 与 MCP 客户端运行时
 ├── Dockerfile            # 不含源码和模型的应用环境镜像
@@ -58,7 +59,7 @@ cd backend
 
 ## 部署
 
-镜像包含运行环境和业务代码，Compose 不使用宿主机代码覆盖 `/app`；模型单独挂载到 `/models`。
+`qasystem-env-v1` 只包含运行环境，不包含业务源码和模型。Compose 从 `QASYSTEM_SOURCE_DIR` 只读挂载源码，从 `HOST_MODELS_DIR` 只读挂载模型。
 
 ```powershell
 Copy-Item .env.example .env

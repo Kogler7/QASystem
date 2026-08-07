@@ -37,8 +37,12 @@ Backend container
 Redis
 ├── Redis Streams capability queues
 ├── job / execution / event state
+├── short-lived authentication contexts
 ├── worker heartbeat registry
 └── GPU and worker-slot leases
+
+Application service
+└── files / vectors / authorized Cypher query
 ```
 
 supervisor 的启动顺序为：
@@ -64,11 +68,13 @@ API、CPU Worker、每卡 VLM Worker 数量由环境变量控制；其中 CPU �
 | `io.llm` / `io.db` / `io.graph` | 外部 LLM、数据库和图数据库操作 | CPU/I/O Worker |
 | `workflow.knowledge` | 知识沉淀流程 | CPU Worker |
 | `gpu.vlm` | VLM PDF 页面或页段解析 | 各 GPU 的 VLM dispatch Worker |
-| `gpu.embedding` / `gpu.confidence` | 向量化和置信度计算 | 各 GPU 的辅助 Worker |
+| `gpu.embedding` | 向量化 | 各 GPU 的辅助 Worker |
 
 生产模式使用 Redis Streams。普通任务写入资源类别共享 Stream；Worker 优先检查自己的定向 Stream，再从共享 Stream 领取任务。因此任务不会在提交时永久绑定某张卡，任何具备该能力且获得租约的 Worker 都可以处理，形成跨 GPU work stealing。
 
-任务 payload 和结果由 ArtifactStore 持久化，队列消息只携带任务和产物引用。Job、执行尝试、事件、Worker 心跳及 Lease 也保存在 Redis 执行命名空间中。内存队列仅用于单元测试或本地算法调试，不是生产降级路径。
+任务 payload 和结果由 ArtifactStore 持久化，队列消息只携带任务和产物引用。用户鉴权头保存在带 TTL 的独立 Redis KV 中，队列只携带随机 `auth_context_id`；Worker 恢复上下文后调用应用团队 API，凭证不会进入任务结果、SSE 或 `execution`。Job、执行尝试、事件、Worker 心跳及 Lease 也保存在 Redis 执行命名空间中。内存队列仅用于单元测试或本地算法调试，不是生产降级路径。
+
+图谱读取仍进入 `io.graph` 队列，但 Worker 通过应用团队的鉴权 Cypher API 查询，不再连接 Neo4j。SQL 是当前唯一保留的数据库直连兼容能力。图谱写入、置信度和文档证据检索在第三方接口开通前不会注册执行实现，调用时明确返回能力不可用。
 
 ### 3.2 任务生命周期
 

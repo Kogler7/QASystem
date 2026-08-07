@@ -25,8 +25,7 @@ services:
       CONFIDENCE_SBERT_MODEL_PATH: /models/bge-small-zh-v1.5
       NL2CYPHER_EMBEDDING_MODEL_PATH: /models/bge-small-zh-v1.5
       DATABASE_HOST: ""
-      NEO4J_URI: ""
-      CONFIDENCE_ES_HOSTS: ""
+      APPLICATION_SERVICE_URL: ""
       FILE_SERVICE_URL: ""
       KG_EXTRACT_LLM_BASE_URL: http://mock-llm:9000/v1
       KG_EXTRACT_LLM_API_KEY: offline-test

@@ -123,6 +123,7 @@ Desktop.ini
 tmp/
 temp/
 backup/
+/other/
 *.tmp
 *.temp
 *.bak

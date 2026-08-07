@@ -41,8 +41,10 @@ docker compose up -d --force-recreate backend agent redis
 | `EXECUTION_REDIS_URL` | `redis://redis:6379/1` |
 | `TASK_STORE_REDIS_URL` | `redis://redis:6379/0` |
 | `MCP_EXECUTION_MODE` | `sync` |
+| `APPLICATION_SERVICE_URL` | 应用团队统一服务地址；优先于兼容变量 `FILE_SERVICE_URL` |
+| `EXECUTION_AUTH_CONTEXT_TTL_SECONDS` | 队列鉴权上下文 TTL，默认 `3600` |
 
-数据库、Neo4j、Elasticsearch、文件服务、LLM 和模型路径变量保留实际部署值。
+SQL 直连暂时保留 `DATABASE_URL` / `MCP_DATABASE_URL`。删除 `NEO4J_*` 和 `CONFIDENCE_ES_*`：图谱读取改由应用服务的 `/third/cypher/query` 提供，图谱写入、置信度和文档证据检索在第三方接口开通前按不可用处理。旧 `FILE_SERVICE_URL` 可继续使用，但新部署应改为 `APPLICATION_SERVICE_URL`。
 
 ## 代码更新
 

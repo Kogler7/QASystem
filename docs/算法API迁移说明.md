@@ -108,7 +108,7 @@ data.extraction.ranges[i] ↔ data.extraction.graphs[i] ↔ data.artifacts.vecto
 | `chunk_size` | `options.chunking.size` | 默认 `500` |
 | `chunk_type` | `options.chunking.strategy` | 从整数枚举改为字符串枚举 |
 | `similarity` | `options.chunking.similarity` | 当前为预留参数，暂不影响四种现行策略 |
-| `save_to_db` | `options.storage.persist_graph` | 控制是否写入服务端配置的 Neo4j |
+| `save_to_db` | `options.storage.persist_graph` | 字段保留；第三方图谱写入接口开通前必须为 `false` |
 | 无 | `options.extraction.model` | 可选择服务端允许的抽取模型 |
 | 无 | `options.extraction.merge` | 默认 `true`，控制是否合并分片 graph |
 | 无 | `options.storage.knowledge_space_id` | 透传给外部文件和向量服务 |
@@ -194,10 +194,10 @@ curl -X POST 'http://127.0.0.1:8006/api/v1/pipelines/knowledge-ingestion' \
 
 v1 不提供本地文件保存或下载接口：
 
-- 配置 `FILE_SERVICE_URL` 时，解析后的 Markdown 上传到文件服务，文本切片向量写入 `{FILE_SERVICE_URL}/third/vectors/store`。
+- 配置 `APPLICATION_SERVICE_URL` 时，解析后的 Markdown 上传到应用团队服务，文本切片向量写入 `{APPLICATION_SERVICE_URL}/third/vectors/store`；旧 `FILE_SERVICE_URL` 继续作为回退变量。
 - `data.artifacts.markdown` 返回文件服务的 `id`、`name`、`path`、`url`。
 - `data.artifacts.vector_ids` 返回向量存储产生的 ID，顺序与 `ranges` 一致。
-- 未配置 `FILE_SERVICE_URL` 时不上传 Markdown、不执行向量存储，`data.artifacts` 为 `null`。
+- 两个服务地址变量均未配置时不上传 Markdown、不执行向量存储，`data.artifacts` 为 `null`。
 - `_extract.json`、`_vectors.json`、向量 Markdown 等历史产物不再生成。
 
 调用方必须对 `artifacts` 判空：
@@ -307,49 +307,24 @@ v1 响应：
 POST /api/v1/graphs/confidence
 ```
 
-响应不再重复返回整个 graph，也不再把置信度写入 `relationships[].properties`。v1 分别返回两个顺序对齐的评分数组：
+该路径继续保留，但 QASystem 已清理 Neo4j/Elasticsearch 直连。应用团队的置信度接口尚未开通，因此当前固定返回 HTTP `503`：
 
 ```json
 {
-  "code": 0,
-  "info": "置信度评估完成",
-  "data": {
-    "evaluation_id": "EVAL-20260715143000123456",
-    "total_count": 1,
-    "relationships": [
-      {
-        "text_score": 0.8,
-        "path_score": 0.77,
-        "text_weight": 0.7,
-        "path_weight": 0.3,
-        "confidence": 0.791
-      }
-    ],
-    "ontology_relations": []
+  "code": 8002,
+  "info": "置信度评估失败",
+  "data": null,
+  "error": {
+    "type": "EXTERNAL_CAPABILITY_UNAVAILABLE",
+    "stage": "confidence",
+    "retryable": false,
+    "details": {"capability": "confidence.calculate"}
   },
-  "error": null
+  "execution": null
 }
 ```
 
-对应关系：
-
-```text
-request.graph.relationships[i] ↔ response.data.relationships[i]
-request.graph.ontology_relations[i] ↔ response.data.ontology_relations[i]
-```
-
-如果调用方仍需要带置信度的 graph，应在客户端显式合并：
-
-```python
-graph = request_body["graph"]
-scores = response["data"]
-
-for relation, score in zip(graph.get("relationships", []), scores["relationships"]):
-    relation.setdefault("properties", {})["confidence"] = score["confidence"]
-
-for relation, score in zip(graph.get("ontology_relations", []), scores["ontology_relations"]):
-    relation.setdefault("properties", {})["confidence"] = score["confidence"]
-```
+调用方在第三方能力开通前不得依赖该接口产生评分。
 
 ## 7. 错误处理迁移
 
@@ -369,7 +344,7 @@ for relation, score in zip(graph.get("ontology_relations", []), scores["ontology
 4. 将 `understanding/origin_url/vector_url/extract_url/graphs` 的解析逻辑改为 `summary/artifacts/extraction`。
 5. 根据业务选择 `extraction.merge`，不要依赖默认值猜测响应是 `graph` 还是 `graphs`。
 6. 向量化统一改为 `items` 批量协议；单文本也包装为一个 item。
-7. 置信度调用方按顺序读取评分，并在需要时自行写回 graph。
+7. 置信度调用方暂时按 HTTP `503`、业务码 `8002` 处理；等待应用团队开放接口后再恢复评分消费逻辑。
 8. 接入统一错误结构和 `retryable` 重试规则。
 9. 在测试环境覆盖：文件服务已配置/未配置、`merge=true/false`、解析器 fallback、空文本向量、部分抽取失败。
 10. 完成迁移后停止调用 deprecated alias，避免后续移除历史路径时再次改造。
@@ -383,7 +358,8 @@ for relation, score in zip(graph.get("ontology_relations", []), scores["ontology
 - [ ] 代码不再读取 `message`。
 - [ ] `artifacts` 为 `null` 时不会发生空指针错误。
 - [ ] `merge=true` 读取 `extraction.graph`，`merge=false` 读取 `extraction.graphs`。
-- [ ] 使用数组顺序建立切片、graph、vector ID 和置信度的对应关系。
+- [ ] 使用数组顺序建立切片、graph 和 vector ID 的对应关系。
+- [ ] 置信度接口返回 `8002` 时不重试，并向上游明确标记能力暂不可用。
 - [ ] 已验证切片结果，特别是原 `chunk_type=0` 的调用场景。
 - [ ] 已验证解析器 fallback 时读取 `data.stats.document.parser.final_engine`。
 - [ ] 已按 `error.retryable` 设置重试策略和最大重试次数。
