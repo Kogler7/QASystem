@@ -13,6 +13,7 @@ from backend.app.execution.manager import ExecutionManager, ExecutionUnavailable
 from backend.app.execution.resources import GpuInventory, GpuSnapshot, ResourceScheduler
 from backend.app.execution.store import MemoryExecutionStore, _decode, _json
 from backend.app.routers.execution import _parse_cursor
+from external_services.application import capture_user_headers, get_user_headers, reset_user_headers
 
 
 def _manager(tmp_path, monkeypatch, *, mode: str = "inline") -> tuple[ExecutionManager, MemoryExecutionStore]:
@@ -191,6 +192,38 @@ def test_failed_attempt_is_persisted_before_error_bubbles(tmp_path, monkeypatch)
     assert execution["status"] == "failed"
     assert execution["error"]["message"] == "boom"
     assert manager.execution_view(submission.job_id)["status"] == "failed"
+
+
+def test_auth_context_is_referenced_restored_and_deleted(tmp_path, monkeypatch):
+    manager, store = _manager(tmp_path, monkeypatch)
+    token = capture_user_headers(
+        {"authorization": "Bearer secret", "x-tenant-id": "tenant-1", "ignored": "value"}
+    )
+    try:
+        submission = manager.submit(
+            operation="unit.auth",
+            resource_class="cpu.default",
+            payload={"value": 1},
+        )
+    finally:
+        reset_user_headers(token)
+
+    job = store.get_job(submission.job_id)
+    auth_context_id = job["auth_context_id"]
+    assert "secret" not in str(job)
+    assert store.load_auth_context(auth_context_id, submission.job_id) == {
+        "authorization": "Bearer secret",
+        "x-tenant-id": "tenant-1",
+    }
+
+    result = manager.run_inline(
+        submission.job_id,
+        "unit.auth",
+        "cpu.default",
+        lambda _payload: get_user_headers(),
+    )
+    assert result["authorization"] == "Bearer secret"
+    assert store.load_auth_context(auth_context_id, submission.job_id) == {}
 
 
 def test_gpu_scheduler_prefers_free_and_less_utilized_device(monkeypatch):

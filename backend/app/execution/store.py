@@ -42,6 +42,7 @@ class MemoryExecutionStore:
         self.executions: dict[str, list[dict[str, Any]]] = {}
         self.events: dict[str, list[dict[str, Any]]] = {}
         self.settings: dict[str, dict[str, Any]] = {}
+        self.auth_contexts: dict[str, dict[str, Any]] = {}
 
     def create_job(self, **fields: Any) -> dict[str, Any]:
         with self._lock:
@@ -122,6 +123,28 @@ class MemoryExecutionStore:
         with self._lock:
             return deepcopy(self.settings)
 
+    def save_auth_context(self, job_id: str, headers: dict[str, str]) -> str:
+        auth_context_id = uuid.uuid4().hex
+        with self._lock:
+            self.auth_contexts[auth_context_id] = {
+                "job_id": job_id,
+                "headers": deepcopy(headers),
+            }
+        return auth_context_id
+
+    def load_auth_context(self, auth_context_id: str, job_id: str) -> dict[str, str]:
+        with self._lock:
+            context = self.auth_contexts.get(auth_context_id) or {}
+            if context.get("job_id") != job_id:
+                return {}
+            return deepcopy(context.get("headers") or {})
+
+    def delete_auth_context(self, auth_context_id: str | None) -> None:
+        if not auth_context_id:
+            return
+        with self._lock:
+            self.auth_contexts.pop(auth_context_id, None)
+
 
 class RedisExecutionStore:
     def __init__(self, url: str, prefix: str | None = None):
@@ -148,6 +171,9 @@ class RedisExecutionStore:
 
     def _setting_key(self, key: str) -> str:
         return f"{self.prefix}:setting:{key}"
+
+    def _auth_context_key(self, auth_context_id: str) -> str:
+        return f"{self.prefix}:auth:{auth_context_id}"
 
     def create_job(self, **fields: Any) -> dict[str, Any]:
         job_id = fields.pop("job_id", None) or uuid.uuid4().hex
@@ -240,6 +266,25 @@ class RedisExecutionStore:
             if isinstance(value, dict):
                 result[name] = value
         return result
+
+    def save_auth_context(self, job_id: str, headers: dict[str, str]) -> str:
+        auth_context_id = uuid.uuid4().hex
+        self.redis.set(
+            self._auth_context_key(auth_context_id),
+            _json({"job_id": job_id, "headers": headers}),
+            ex=int(os.getenv("EXECUTION_AUTH_CONTEXT_TTL_SECONDS", "3600")),
+        )
+        return auth_context_id
+
+    def load_auth_context(self, auth_context_id: str, job_id: str) -> dict[str, str]:
+        context = _decode(self.redis.get(self._auth_context_key(auth_context_id))) or {}
+        if context.get("job_id") != job_id:
+            return {}
+        return context.get("headers") or {}
+
+    def delete_auth_context(self, auth_context_id: str | None) -> None:
+        if auth_context_id:
+            self.redis.delete(self._auth_context_key(auth_context_id))
 
 
 _MEMORY_STORE = MemoryExecutionStore()

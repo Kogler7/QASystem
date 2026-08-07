@@ -19,6 +19,7 @@ from .routers.algorithm_capabilities import router as capabilities_router
 from .routers.knowledge_precipitation import router as knowledge_router
 from .routers.execution import router as execution_router
 from mcp_services.server import mcp
+from external_services.application import capture_user_headers, reset_user_headers
 from .responses import ErrorCode, error_response
 
 
@@ -27,13 +28,8 @@ mcp_app = mcp.streamable_http_app()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    try:
-        async with mcp.session_manager.run():
-            yield
-    finally:
-        from algorithm.confidence_calculate.calculator import close_confidence_resources
-
-        close_confidence_resources()
+    async with mcp.session_manager.run():
+        yield
 
 
 app = FastAPI(title="QASystem Knowledge Services", lifespan=lifespan)
@@ -41,6 +37,15 @@ app.include_router(capabilities_router)
 app.include_router(knowledge_router)
 app.include_router(confidence_router)
 app.include_router(execution_router)
+
+
+@app.middleware("http")
+async def capture_application_user_context(request: Request, call_next):
+    token = capture_user_headers(dict(request.headers))
+    try:
+        return await call_next(request)
+    finally:
+        reset_user_headers(token)
 
 
 async def _proxy_agent(request: Request, path: str = "") -> StreamingResponse:

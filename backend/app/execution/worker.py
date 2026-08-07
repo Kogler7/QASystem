@@ -12,6 +12,7 @@ from .manager import ExecutionManager
 from .operations import run_operation
 from .queue import RedisTaskQueue
 from .store import RedisExecutionStore
+from external_services.application import bind_user_headers
 
 
 LOGGER = logging.getLogger("qasystem.worker")
@@ -112,9 +113,11 @@ class WorkerRuntime:
                 try:
                     job = self.manager.store.get_job(job_id)
                     if not job:
+                        self.manager.store.delete_auth_context(envelope.get("auth_context_id"))
                         self.manager.release_allocation(envelope.get("reserved_allocation"))
                         continue
                     if job.get("cancel_requested"):
+                        self.manager.store.delete_auth_context(job.get("auth_context_id"))
                         self.manager.release_allocation(envelope.get("reserved_allocation"))
                         self.manager.store.update_job(job_id, status="cancelled", stage="cancel")
                         self.manager.hub.emit(job_id, "job.cancelled", operation=job.get("operation"), stage="cancel")
@@ -122,12 +125,20 @@ class WorkerRuntime:
                         if not self._reserve_gpu_capacity(resource_class, envelope, job):
                             time.sleep(0.05)
                             continue
-                        self.manager.run_attempt(
-                            job_id,
-                            envelope,
-                            lambda payload: run_operation(envelope["operation"], payload),
-                            mark_job_failed=False,
+                        auth_context_id = envelope.get("auth_context_id") or job.get("auth_context_id")
+                        user_headers = (
+                            self.manager.store.load_auth_context(auth_context_id, job_id)
+                            if auth_context_id
+                            else {}
                         )
+                        with bind_user_headers(user_headers):
+                            self.manager.run_attempt(
+                                job_id,
+                                envelope,
+                                lambda payload: run_operation(envelope["operation"], payload),
+                                mark_job_failed=False,
+                            )
+                        self.manager.store.delete_auth_context(auth_context_id)
                 except Exception as exc:
                     attempt = int(envelope.get("attempt", 1))
                     max_attempts = int(os.getenv("EXECUTION_MAX_ATTEMPTS", "3"))
@@ -143,6 +154,7 @@ class WorkerRuntime:
                             raise
                         self.manager.store.update_job(job_id, status="queued", stage="queued")
                     else:
+                        self.manager.store.delete_auth_context(envelope.get("auth_context_id"))
                         self.manager.store.update_job(job_id, status="failed", stage="failed", error={"type": type(exc).__name__, "message": str(exc)})
                         self.manager.hub.emit(job_id, "job.failed", level="ERROR", operation=envelope.get("operation"), stage="failed", details={"type": type(exc).__name__, "message": str(exc)})
                         LOGGER.exception("task failed permanently: job_id=%s", job_id)

@@ -199,9 +199,16 @@ class ExecutionManager:
     ) -> JobSubmission:
         self._ensure_queue_available()
         job_id = uuid.uuid4().hex
+        auth_context_id = None
+        from external_services.application import get_user_headers
+
+        user_headers = get_user_headers()
+        if user_headers:
+            auth_context_id = self.store.save_auth_context(job_id, user_headers)
         try:
             payload_ref = self._write_payload(job_id, payload)
         except Exception:
+            self.store.delete_auth_context(auth_context_id)
             self.release_allocation(reserved_allocation)
             raise
         job_fields: dict[str, Any] = {
@@ -217,6 +224,8 @@ class ExecutionManager:
             "mode": self.mode,
             "cancel_requested": False,
         }
+        if auth_context_id:
+            job_fields["auth_context_id"] = auth_context_id
         optional_fields = {
             "parent_job_id": parent_job_id,
             "parent_task_id": parent_task_id,
@@ -232,6 +241,7 @@ class ExecutionManager:
                 **job_fields,
             )
         except Exception:
+            self.store.delete_auth_context(auth_context_id)
             self.release_allocation(reserved_allocation)
             raise
         self.hub.emit(
@@ -257,6 +267,8 @@ class ExecutionManager:
             for key in ("parent_job_id", "parent_task_id", "shard_index", "page_range", "target_worker", "reserved_allocation"):
                 if key in job_fields:
                     envelope[key] = job_fields[key]
+            if auth_context_id:
+                envelope["auth_context_id"] = auth_context_id
             try:
                 self.queue.enqueue(
                     _resource_queue(resource_class),
@@ -264,6 +276,7 @@ class ExecutionManager:
                     target_worker=target_worker,
                 )
             except Exception as exc:
+                self.store.delete_auth_context(auth_context_id)
                 self.release_allocation(reserved_allocation)
                 self.store.update_job(job_id, status="failed", stage="queue", error={"type": type(exc).__name__, "message": str(exc)})
                 self.hub.emit(job_id, "job.failed", level="ERROR", operation=operation, stage="queue", details={"type": type(exc).__name__, "message": str(exc)})
@@ -378,7 +391,16 @@ class ExecutionManager:
 
     def run_inline(self, job_id: str, operation: str, resource_class: str, runner: Callable[[Any], Any]) -> Any:
         envelope = {"job_id": job_id, "task_id": f"task-{job_id}", "operation": operation, "resource_class": resource_class, "attempt": 1}
-        return self.run_attempt(job_id, envelope, runner)
+        job = self.store.get_job(job_id) or {}
+        auth_context_id = job.get("auth_context_id")
+        headers = self.store.load_auth_context(auth_context_id, job_id) if auth_context_id else {}
+        from external_services.application import bind_user_headers
+
+        try:
+            with bind_user_headers(headers):
+                return self.run_attempt(job_id, envelope, runner)
+        finally:
+            self.store.delete_auth_context(auth_context_id)
 
     def execution_view(self, job_id: str) -> dict[str, Any]:
         job = self.store.get_job(job_id)
@@ -439,6 +461,8 @@ class ExecutionManager:
             raise ExecutionNotFound(job_id)
         if job.get("status") in TERMINAL_STATUSES:
             return self.execution_view(job_id)
+        if job.get("status") == "queued":
+            self.store.delete_auth_context(job.get("auth_context_id"))
         self.store.update_job(job_id, status="cancelled" if job.get("status") == "queued" else "cancelling", cancel_requested=True)
         self.hub.emit(job_id, "job.cancelled" if job.get("status") == "queued" else "job.cancelling", operation=job.get("operation"), stage="cancel")
         return self.execution_view(job_id)
