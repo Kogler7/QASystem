@@ -1,46 +1,30 @@
 """
-知识空间定位工具 V3
-功能：根据用户问题，从根节点逐层下钻定位到知识子空间
+知识空间定位工具 V4（适配知识地图标准模型）
+功能：根据用户问题，定位到知识子空间
 
-核心思路（逐层下钻）：
-1. 从图谱匹配根节点
-2. 查询该根下的5个维度及其刻度
-3. 用md文档描述辅助LLM为每个维度选刻度
-4. 用选中的5个刻度反向图谱查询匹配的子空间
+标准模型结构：
+- KnowledgeApp -[HAS_ROOT_SPACE]-> KnowledgeSpace（空间层级用 HAS_CHILD_SPACE）
+- Dimension -[HAS_SCALE_VALUE]-> ScaleValue（全局维度及其刻度值）
+- KnowledgeSpace -[BOUND_TO_SCALE]-> ScaleValue（空间绑定到刻度）
 """
 
-import os
 import json
 import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
-from algorithm.ans.QA.neo4j_client import Neo4jClient
 from algorithm.ans.QA.utils import run_llm
+from external_services.application import ApplicationServiceError, ExternalCapabilityUnavailable
 
 
 class KnowledgeSpaceLocator:
-    """知识空间定位器 V3 — 逐层下钻定位"""
-
-    # 5个维度名称
-    DIMENSION_NAMES = ["时间", "空间", "抽象层级", "方面", "视角"]
-
-    # 固定默认刻度（无LLM时兜底）
-    DEFAULT_SCALES = {
-        "时间": "年月",
-        "空间": "集团",
-        "抽象层级": "逻辑",
-        "方面": "信息",
-        "视角": "运营"
-    }
+    """知识空间定位器 V4 — 逐层下钻定位（适配标准模型）"""
 
     def __init__(self, args):
         self.args = args
-        self.client = Neo4jClient(
-            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-            os.getenv("NEO4J_USERNAME", "neo4j"),
-            os.getenv("NEO4J_PASSWORD", "neo4j2025")
-        )
+        from algorithm.ans.QA.knowledge_map_client import KnowledgeMapClient
+
+        self.client = KnowledgeMapClient()
         self._md_descriptions = self._load_md_descriptions()
 
     # ==================== 对外接口 ====================
@@ -62,9 +46,9 @@ class KnowledgeSpaceLocator:
             if not root:
                 return self._fallback("未找到根节点")
 
-            # Step 2: 查询该根下的维度及刻度
+            # Step 2: 查询维度及刻度
             dim_tree = self._load_dimensions_info(root)
-            if not dim_tree or len(dim_tree) < 5:
+            if not dim_tree:
                 return self._fallback("维度刻度加载不完整")
 
             # Step 3: LLM逐维度选刻度（用md描述）
@@ -93,33 +77,34 @@ class KnowledgeSpaceLocator:
                 "根节点": root
             }
 
+        except (ApplicationServiceError, ExternalCapabilityUnavailable):
+            raise
         except Exception as e:
             return self._fallback(str(e))
 
     # ==================== Step 1: 匹配根节点 ====================
 
     def _match_root(self, question: str) -> Optional[str]:
-        """从图谱查根节点，用LLM匹配用户问题"""
-        try:
-            result = self.client.execute_cypher('''
-                MATCH (root:KnowledgeSpace)-[:包含|BELONGS_TO]-(d:Dimension)
-                WHERE NOT EXISTS { (parent:KnowledgeSpace)-[:包含]->(root) }
-                RETURN DISTINCT root.name as name, root.description as desc
-                LIMIT 10
-            ''')
-            if not result:
-                return None
+        """从图谱查根节点（无父空间），用LLM匹配用户问题"""
+        result = self.client.execute_cypher(
+            "MATCH (sp:KnowledgeSpace) "
+            "OPTIONAL MATCH (parent:KnowledgeSpace)-[:HAS_CHILD_SPACE]->(sp) "
+            "WITH sp, parent "
+            "WHERE parent IS NULL "
+            "RETURN DISTINCT sp.name AS name, sp.description AS desc "
+            "LIMIT 10",
+            {},
+        )
+        if not result:
+            return None
+        if len(result) == 1:
+            return result[0]["name"]
 
-            # 只有一个根节点，直接返回
-            if len(result) == 1:
-                return result[0]["name"]
-
-            # 多个根节点时，用LLM选择最匹配的
-            roots_text = "\n".join(
-                f"- {r['name']}" + (f"（{r['desc']}）" if r.get('desc') else "")
-                for r in result
-            )
-            prompt = f"""请根据用户问题，选择最匹配的知识根节点。
+        roots_text = "\n".join(
+            f"- {r['name']}" + (f"（{r.get('desc')}）" if r.get('desc') else "")
+            for r in result
+        )
+        prompt = f"""请根据用户问题，选择最匹配的知识根节点。
 
 ## 用户问题
 {question}
@@ -131,46 +116,38 @@ class KnowledgeSpaceLocator:
 ## 输出要求
 
 只输出最匹配的根节点名称，不要其他内容。"""
+        try:
             response = run_llm(prompt, 0.3, 200, self.args.GRAPH_LLM_API_KEY, self.args.GRAPH_LLM_MODEL)
             if response:
                 for r in result:
                     if r["name"] in response:
                         return r["name"]
-            return result[0]["name"]
         except Exception:
             pass
-        return None
+        return result[0]["name"]
 
     # ==================== Step 2: 加载维度及刻度 ====================
 
     def _load_dimensions_info(self, root_name: str) -> Dict:
         """
-        从图谱查询根下的维度及刻度
-
-        Returns:
-            {
-                "时间": {"刻度": ["年月"]},
-                "空间": {"刻度": ["子公司", "集团", "组织"], "描述": "..."},
-                ...
-            }
+        从图谱查询全局维度及其刻度（标准模型：Dimension -[HAS_SCALE_VALUE]-> ScaleValue）
         """
-        dim_tree = {}
-        for dim_name in self.DIMENSION_NAMES:
-            try:
-                result = self.client.execute_cypher(f'''
-                    MATCH (:KnowledgeSpace {{name: '{root_name}'}})-[:包含|BELONGS_TO]-(d:Dimension {{name: '{dim_name}'}})
-                    OPTIONAL MATCH (d)-[:包含|BELONGS_TO]-(scale:Scale)
-                    RETURN d.name as dim,
-                           collect(distinct scale.name) as scales,
-                           d.description as desc
-                ''')
-                if result and result[0]["scales"] and result[0]["scales"][0]:
-                    dim_tree[dim_name] = {
-                        "刻度": sorted(result[0]["scales"]),
-                        "描述": result[0].get("desc") or ""
-                    }
-            except Exception:
-                pass
+        dim_tree: Dict[str, Dict] = {}
+        result = self.client.execute_cypher(
+            "MATCH (d:Dimension)-[r:HAS_SCALE_VALUE]->(s:ScaleValue) "
+            "RETURN d.id AS dim_id, d.name AS dim_name, d.description AS dim_desc, "
+            "       s.id AS scale_id, s.name AS scale_name "
+            "ORDER BY d.name, s.name",
+            {},
+        )
+        for row in result:
+            dim_name = row.get("dim_name") or ""
+            if not dim_name:
+                continue
+            entry = dim_tree.setdefault(dim_name, {"刻度": [], "描述": row.get("dim_desc") or ""})
+            scale_name = row.get("scale_name") or ""
+            if scale_name and scale_name not in entry["刻度"]:
+                entry["刻度"].append(scale_name)
         return dim_tree
 
     # ==================== Step 3: LLM 选刻度 ====================
@@ -182,19 +159,19 @@ class KnowledgeSpaceLocator:
 
         # 构建刻度清单（用md描述补语义）
         dim_choices = []
-        for dim_name in self.DIMENSION_NAMES:
-            info = dim_tree.get(dim_name, {})
+        for dim_name in dim_tree:
+            info = dim_tree[dim_name]
             scales = info.get("刻度", [])
             if not scales:
                 continue
-            lines = [f"### {dim_name}维度"]
+            lines = [f"### {dim_name}"]
             for sc in scales:
                 desc = self._md_descriptions.get(sc, "")
                 lines.append(f"  - {sc}: {desc}")
             dim_choices.append("\n".join(lines))
 
         if not dim_choices:
-            return dict(self.DEFAULT_SCALES)
+            return {}
 
         # 构建请求文本
         req_text = self._build_requirement_text(app_req)
@@ -213,11 +190,8 @@ class KnowledgeSpaceLocator:
 
 请为每个维度选择一个最匹配的刻度。输出JSON格式：
 {{
-    "时间": "年月",
-    "空间": "集团",
-    "抽象层级": "逻辑",
-    "方面": "约束",
-    "视角": "运营",
+    "{list(dim_tree.keys())[0]}": "刻度名",
+    ...
     "reason": "选择原因"
 }}
 
@@ -229,16 +203,15 @@ class KnowledgeSpaceLocator:
             if parsed:
                 self._reason = parsed.pop("reason", "")
                 result = {}
-                for dim_name in self.DIMENSION_NAMES:
-                    if dim_name in parsed:
-                        result[dim_name] = str(parsed[dim_name])
-                    elif dim_name in self.DEFAULT_SCALES:
-                        result[dim_name] = self.DEFAULT_SCALES[dim_name]
+                for dim_name in parsed:
+                    val = str(parsed[dim_name])
+                    if val and val != "null":
+                        result[dim_name] = val
                 return result
         except Exception:
             pass
 
-        return dict(self.DEFAULT_SCALES)
+        return {}
 
     def _build_requirement_text(self, app_req: Optional[Dict]) -> str:
         """构建需求信息的文本描述"""
@@ -273,34 +246,25 @@ class KnowledgeSpaceLocator:
 
     def _match_subspace(self, selected: Dict[str, str]) -> Optional[str]:
         """
-        用选中的刻度反向图谱查询匹配的子空间
-
-        5个刻度都必须指向同一个KnowledgeSpace
+        用选中的刻度反向匹配知识空间（空间需绑定到全部选中刻度）
         """
-        scale_list = [(dim, val) for dim, val in selected.items() if val]
-        if len(scale_list) < 5:
+        scale_names = [val for val in selected.values() if val]
+        if not scale_names:
             return None
-
-        scale_names = [value for _, value in scale_list]
-        query = """
-            MATCH (ks:KnowledgeSpace)-[:BELONGS_TO|包含]-(scale:Scale)
-            WHERE scale.name IN $scale_names
-            WITH ks, count(distinct scale.name) AS matched
-            WHERE matched = $expected
-            RETURN ks.name AS name
-            LIMIT 1
-        """
-
-        try:
-            result = self.client.execute_cypher(
-                query,
-                scale_names=scale_names,
-                expected=len(scale_names),
-            )
-            if result:
-                return result[0]["name"]
-        except Exception:
-            pass
+        query = (
+            "MATCH (sp:KnowledgeSpace)-[:BOUND_TO_SCALE]->(sv:ScaleValue) "
+            "WHERE sv.name IN $scale_names "
+            "WITH sp, count(DISTINCT sv.name) AS matched "
+            "WHERE matched = $expected "
+            "RETURN sp.name AS name "
+            "LIMIT 1"
+        )
+        result = self.client.execute_cypher(
+            query,
+            {"scale_names": scale_names, "expected": len(scale_names)},
+        )
+        if result:
+            return result[0]["name"]
         return None
 
     # ==================== 工具方法 ====================
@@ -337,19 +301,17 @@ class KnowledgeSpaceLocator:
             "可回答": False,
             "信息": f"知识空间定位异常: {error_info}",
             "目标子空间": None,
-            "选中的刻度": dict(self.DEFAULT_SCALES),
+            "选中的刻度": {},
             "置信度": 0.0,
             "定位方法": "兜底",
             "根节点": None
         }
 
     def get_all_subspaces(self) -> List[Dict]:
-        """获取所有维度组合子空间"""
-        try:
-            result = self.client.execute_cypher('''
-                MATCH (ks:KnowledgeSpace)-[:BELONGS_TO|包含]-(scale:Scale)
-                RETURN ks.name as name, collect(distinct scale.name) as scales
-            ''')
-            return [{"子空间名称": r["name"], "关联刻度": r["scales"]} for r in result]
-        except Exception:
-            return []
+        """获取所有知识空间及其绑定刻度"""
+        result = self.client.execute_cypher(
+            "MATCH (sp:KnowledgeSpace)-[:BOUND_TO_SCALE]->(sv:ScaleValue) "
+            "RETURN sp.name AS name, collect(DISTINCT sv.name) AS scales",
+            {},
+        )
+        return [{"子空间名称": r["name"], "关联刻度": r["scales"]} for r in result]

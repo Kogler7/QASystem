@@ -39,6 +39,7 @@ EXPECTED_TOOLS = {
     "list_tables",
     "locate_knowledge_space",
     "get_all_subspaces",
+    "get_stakeholders",
     "query_entity_properties",
     "search_graph",
 }
@@ -137,29 +138,28 @@ def test_graph_locator_uses_standard_envelope(monkeypatch):
 def test_graph_search_failure_uses_graph_error_code(monkeypatch):
     monkeypatch.setattr(
         graph_tools,
-        "_graph_components",
-        lambda: (_ for _ in ()).throw(RuntimeError("neo4j unavailable")),
+        "_search_neighbors",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("application service unavailable")),
     )
     result = graph_tools.search_graph("entity-1")
     assert_envelope(result)
     assert result["code"] == 3200
-    assert "neo4j unavailable" in result["error"]["details"]
+    assert "application service unavailable" in result["error"]["details"]
 
 
 def test_graph_search_passes_atomic_filters(monkeypatch):
-    class Client:
-        def search_neighbors(self, entity_id, **filters):
-            return {
-                "depth": 1,
-                "triples": [],
-                "found_entities": [],
-                "has_more": False,
-                "entity_id": entity_id,
-                "filters": filters,
-            }
+    captured = {}
 
-    wrapper = types.SimpleNamespace(client=Client())
-    monkeypatch.setattr(graph_tools, "_graph_components", lambda: (wrapper, object()))
+    def search(node_id, direction, limit, relationship_types):
+        captured.update(
+            node_id=node_id,
+            direction=direction,
+            limit=limit,
+            relationship_types=relationship_types,
+        )
+        return {"depth": 1, "triples": [], "found_entities": [], "has_more": False}
+
+    monkeypatch.setattr(graph_tools, "_search_neighbors", search)
     result = graph_tools.search_graph(
         "NEO_1",
         relationship_types=["HAS_SOLUTION"],
@@ -167,7 +167,8 @@ def test_graph_search_passes_atomic_filters(monkeypatch):
         limit=10,
     )
     assert result["code"] == 0
-    assert result["data"]["filters"] == {
+    assert captured == {
+        "node_id": "NEO_1",
         "relationship_types": ["HAS_SOLUTION"],
         "direction": "outgoing",
         "limit": 10,
@@ -179,35 +180,7 @@ def test_graph_search_rejects_multi_hop_request():
     assert result["code"] == 3000
 
 
-def test_neo4j_neighbor_search_preserves_edge_direction(monkeypatch):
-    monkeypatch.setitem(
-        sys.modules,
-        "neo4j",
-        types.SimpleNamespace(GraphDatabase=types.SimpleNamespace()),
-    )
-    from algorithm.ans.QA.neo4j_client import Neo4jClient
-
-    client = Neo4jClient.__new__(Neo4jClient)
-    client.execute_cypher = lambda *_args, **_kwargs: [
-        {
-            "start_id": 1,
-            "start_labels": ["ProblemClass"],
-            "start_properties": {"name": "问题类"},
-            "relationship_type": "HAS_SOLUTION",
-            "relationship_properties": {"order": 1},
-            "is_outgoing": True,
-            "neighbor_id": 2,
-            "neighbor_labels": ["SolutionClass"],
-            "neighbor_properties": {"name": "方案类"},
-        }
-    ]
-    result = client.search_neighbors(
-        "NEO_1",
-        relationship_types=["HAS_SOLUTION"],
-        direction="outgoing",
-        limit=10,
-    )
-    triple = result["triples"][0]
-    assert triple["head_entity"]["id"] == "NEO_1"
-    assert triple["tail_entity"]["id"] == "NEO_2"
-    assert triple["relationship_properties"] == {"order": 1}
+def test_graph_write_tools_fail_as_unavailable_without_database_access():
+    result = knowledge_tools.store_extraction({"nodes": [], "relationships": []})
+    assert result["code"] == 3902
+    assert result["error"]["details"]["capability"] == "graph.write"

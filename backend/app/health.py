@@ -73,16 +73,15 @@ def dependency_checks() -> dict[str, Any]:
         database_port_number = int(database_port)
     except ValueError:
         database_port_number = None
-    es_hosts = os.getenv("CONFIDENCE_ES_HOSTS", "").split(",")[0].strip()
+    from external_services.application import get_application_service_url
+
     return {
         "mysql": _tcp_check("mysql", os.getenv("DATABASE_HOST", "").strip(), database_port_number),
-        "neo4j": _url_tcp_check("neo4j", os.getenv("NEO4J_URI", "").strip(), 7687),
-        "elasticsearch": _url_tcp_check("elasticsearch", es_hosts, 9200),
         "knowledge_llm": _url_tcp_check(
             "knowledge_llm", os.getenv("KG_EXTRACT_LLM_BASE_URL", "").strip(), 80
         ),
-        "file_service": _url_tcp_check(
-            "file_service", os.getenv("FILE_SERVICE_URL", "").strip(), 80
+        "application_service": _url_tcp_check(
+            "application_service", get_application_service_url(), 80
         ),
     }
 

@@ -8,12 +8,8 @@ from typing import Any
 
 import yaml
 
-from .components.path_evidence import PathEvidence
-from .components.text_evidence import TextEvidence
-
-
 class ConfidenceCalculator:
-    def __init__(self, text_evidence: TextEvidence | None = None, path_evidence: PathEvidence | None = None):
+    def __init__(self, text_evidence: Any | None = None, path_evidence: Any | None = None):
         config_path = Path(__file__).with_name("config.yaml")
         with config_path.open("r", encoding="utf-8") as handle:
             config = yaml.safe_load(handle) or {}
@@ -24,8 +20,14 @@ class ConfidenceCalculator:
             raise ValueError("置信度权重之和必须大于 0")
         self.text_weight /= total_weight
         self.path_weight /= total_weight
-        self.text_evidence = text_evidence or TextEvidence()
-        self.path_evidence = path_evidence or PathEvidence()
+        if text_evidence is None or path_evidence is None:
+            from external_services.application import ExternalCapabilityUnavailable
+
+            raise ExternalCapabilityUnavailable(
+                "confidence.calculate", "第三方置信度接口尚未开通"
+            )
+        self.text_evidence = text_evidence
+        self.path_evidence = path_evidence
         self._lock = RLock()
 
     def calculate(self, data: dict[str, Any]) -> dict[str, Any]:

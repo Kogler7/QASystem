@@ -19,7 +19,7 @@ def locate_knowledge_space(
     user_question: str,
     app_requirement: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Locate the knowledge subspace that best matches a user question."""
+    """知识空间定位：根据用户问题匹配最合适的知识子空间（业务领域）。内部用LLM辅助判断。定位失败不阻塞后续流程。"""
     queued = maybe_submit(
         "mcp.graph.locate_space",
         {"user_question": user_question, "app_requirement": app_requirement},
@@ -36,7 +36,10 @@ def locate_knowledge_space(
 
 @mcp.tool(name="get_all_subspaces")
 def get_all_subspaces() -> dict[str, Any]:
-    """Return all configured knowledge subspaces."""
+    """获取所有知识子空间：返回系统中全部已配置的知识子空间及刻度。用于locate_knowledge_space定位失败时查看候选。"""
+    queued = maybe_submit("mcp.graph.get_all_subspaces", {}, resource_class="io.graph")
+    if queued is not None:
+        return queued
     return invoke_tool(
         lambda: _locator().get_all_subspaces(),
         ToolCode.GRAPH_FAILED,

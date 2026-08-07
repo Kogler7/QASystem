@@ -25,11 +25,6 @@ def _normalize_host_docker_internal(value: str) -> str:
 class Config:
     """项目配置类"""
 
-    # ===== Neo4j 配置 =====
-    NEO4J_URI: str = "bolt://localhost:7688"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "neo4j2025"  # 默认与 .env.example 一致；生产请通过 .env 或环境变量覆盖
-
     # ===== LLM 配置 =====
     GRAPH_LLM_MODEL: str = "Qwen/Qwen3-8B"
     GRAPH_LLM_API_KEY: str = ""
@@ -37,16 +32,9 @@ class Config:
     @classmethod
     def from_env(cls):
         """从环境变量加载配置"""
-        neo4j_uri = _normalize_host_docker_internal(
-            (os.getenv("NEO4J_URI") or cls.NEO4J_URI).strip()
-        )
-        neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME") or cls.NEO4J_USER
         llm_model = os.getenv("GRAPH_LLM_MODEL") or cls.GRAPH_LLM_MODEL
         llm_api_key = os.getenv("GRAPH_LLM_API_KEY") or cls.GRAPH_LLM_API_KEY
         return cls(
-            NEO4J_URI=neo4j_uri,
-            NEO4J_USER=neo4j_user,
-            NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD", cls.NEO4J_PASSWORD),
             GRAPH_LLM_MODEL=llm_model,
             GRAPH_LLM_API_KEY=llm_api_key,
         )

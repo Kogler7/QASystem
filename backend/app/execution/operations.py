@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import os
 from contextlib import contextmanager
-from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
@@ -95,18 +94,11 @@ def _merge_graphs(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _confidence(payload: dict[str, Any]) -> dict[str, Any]:
-    from algorithm.confidence_calculate.calculator import calculate_graph_confidence
+    from external_services.application import ExternalCapabilityUnavailable
 
-    graph = payload.get("graph") or {}
-    if not graph.get("relationships") and not graph.get("ontology_relations"):
-        return {
-            "evaluation_id": f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
-            "total_count": 0,
-            "relationships": [],
-            "ontology_relations": [],
-        }
-    result = calculate_graph_confidence({"graph": graph})
-    return result.get("data")
+    raise ExternalCapabilityUnavailable(
+        "confidence.calculate", "第三方置信度接口尚未开通"
+    )
 
 
 @lru_cache(maxsize=1)
@@ -179,10 +171,9 @@ def _mcp_knowledge_extract(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _mcp_knowledge_store(payload: dict[str, Any]) -> dict[str, Any]:
-    from mcp_services.domains.knowledge.extraction import _store
-    from mcp_services.result import ToolCode, normalize_tool_result
+    from external_services.application import ExternalCapabilityUnavailable
 
-    return normalize_tool_result(_store(payload["graph"]), ToolCode.KNOWLEDGE_FAILED, "知识图谱存储")
+    raise ExternalCapabilityUnavailable("graph.write", "第三方图谱写入接口尚未开通")
 
 
 def _mcp_search_graph(payload: dict[str, Any]) -> dict[str, Any]:
@@ -196,6 +187,7 @@ def _mcp_search_graph(payload: dict[str, Any]) -> dict[str, Any]:
             relationship_types=payload.get("relationship_types"),
             direction=payload.get("direction", "both"),
             limit=payload.get("limit", 50),
+            prune=payload.get("prune", False),
         )
 
 
@@ -218,6 +210,20 @@ def _mcp_locate_knowledge_space(payload: dict[str, Any]) -> dict[str, Any]:
 
     with _mcp_activity_context():
         return locate_knowledge_space(payload["user_question"], payload.get("app_requirement"))
+
+
+def _mcp_get_all_subspaces(_payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.locator import get_all_subspaces
+
+    with _mcp_activity_context():
+        return get_all_subspaces()
+
+
+def _mcp_get_stakeholders(_payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.retrieval import get_stakeholders
+
+    with _mcp_activity_context():
+        return get_stakeholders()
 
 
 def _mcp_draw_chart(payload: dict[str, Any]) -> dict[str, Any]:
@@ -260,6 +266,8 @@ _OPERATIONS = {
     "mcp.graph.link_entities": _mcp_link_entities,
     "mcp.graph.query_entity": _mcp_query_entity,
     "mcp.graph.locate_space": _mcp_locate_knowledge_space,
+    "mcp.graph.get_all_subspaces": _mcp_get_all_subspaces,
+    "mcp.graph.get_stakeholders": _mcp_get_stakeholders,
     "mcp.visualization.draw": _mcp_draw_chart,
 }
 

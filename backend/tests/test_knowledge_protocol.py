@@ -209,28 +209,30 @@ def test_batch_vector_rejects_empty_list(protocol_module):
     assert response.status_code == 422
 
 
-def test_confidence_contract_without_relationships(protocol_module):
+def test_deprecated_confidence_reports_unavailable_capability(protocol_module):
     graph = {"nodes": [{"uid": "n1", "label": "Term", "properties": {}}], "relationships": []}
-    body = TestClient(protocol_module.app).post(
+    response = TestClient(protocol_module.app).post(
         "/api/component/kg-update/calculate-confidence",
         json={"graph": graph},
-    ).json()
-    assert body["code"] == 0
-    assert body["error"] is None
-    assert body["data"]["total_count"] == 0
-    assert body["data"]["relationships"] == []
-    assert body["data"]["ontology_relations"] == []
-    assert "graph" not in body["data"]
-    assert "details" not in body["data"]
+    )
+    body = response.json()
+    assert response.status_code == 503
+    assert body["code"] == 8002
+    assert body["error"]["type"] == "EXTERNAL_CAPABILITY_UNAVAILABLE"
+    assert body["error"]["retryable"] is False
+    assert "Deprecated" in body["info"]
 
 
-def test_v1_confidence_uses_info_only(protocol_module):
-    body = TestClient(protocol_module.app).post(
+def test_v1_confidence_reports_unavailable_capability(protocol_module):
+    response = TestClient(protocol_module.app).post(
         "/api/v1/graphs/confidence",
         json={"graph": {"nodes": [], "relationships": []}},
-    ).json()
-    assert body["code"] == 0
-    assert body["info"] == "置信度评估完成"
+    )
+    body = response.json()
+    assert response.status_code == 503
+    assert body["code"] == 8002
+    assert body["error"]["type"] == "EXTERNAL_CAPABILITY_UNAVAILABLE"
+    assert body["error"]["details"]["capability"] == "confidence.calculate"
     assert "message" not in body
 
 
@@ -301,20 +303,20 @@ def test_v1_pipeline_can_return_unmerged_chunk_graphs(protocol_module):
     ]
 
 
-def test_unmerged_pipeline_persists_each_graph_independently(protocol_module):
-    body = TestClient(protocol_module.app).post(
+def test_pipeline_reports_graph_write_unavailable(protocol_module):
+    response = TestClient(protocol_module.app).post(
         "/api/v1/pipelines/knowledge-ingestion",
         files={"file": ("sample.csv", b"name\nvalue\n", "text/csv")},
         data={
             "ontology": "class Term",
             "options": '{"extraction":{"merge":false},"storage":{"persist_graph":true}}',
         },
-    ).json()
-    assert body["code"] == 0
-    assert body["data"]["stats"]["extraction"]["database"] == {
-        "success": True,
-        "items": [{"position": 0, "success": True}],
-    }
+    )
+    body = response.json()
+    assert response.status_code == 503
+    assert body["code"] == 8002
+    assert body["error"]["type"] == "EXTERNAL_CAPABILITY_UNAVAILABLE"
+    assert body["error"]["details"]["capability"] == "graph.write"
 
 
 def test_v1_graph_extraction_can_skip_deduplication(protocol_module):

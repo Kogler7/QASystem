@@ -46,9 +46,8 @@ def test_full_health_reports_all_checks_when_runtime_is_ready(monkeypatch):
 def test_dependency_checks_reports_unreachable_configured_service(monkeypatch):
     monkeypatch.setenv("DATABASE_HOST", "mysql.example")
     monkeypatch.setenv("DATABASE_PORT", "3306")
-    monkeypatch.setenv("NEO4J_URI", "")
-    monkeypatch.setenv("CONFIDENCE_ES_HOSTS", "")
     monkeypatch.setenv("KG_EXTRACT_LLM_BASE_URL", "")
+    monkeypatch.setenv("APPLICATION_SERVICE_URL", "")
     monkeypatch.setenv("FILE_SERVICE_URL", "")
     monkeypatch.setattr(
         health.socket,

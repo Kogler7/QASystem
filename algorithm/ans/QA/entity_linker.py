@@ -1,13 +1,17 @@
 import re
 import json
+import logging
 from typing import Dict, List, Tuple, Any
 from algorithm.ans.QA.utils import run_llm
 from algorithm.ans.QA.prompt_list import entity_ranking_prompt
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 class EntityLinker:
-    def __init__(self, wiki_client, args):
-        self.wiki_client = wiki_client
+    def __init__(self, km_client, args):
+        self.km_client = km_client
         self.args = args
         self.llm_cache = {}
 
@@ -339,197 +343,99 @@ class EntityLinker:
         return linked_entities
 
     def _find_entity_in_knowledge_base(self, entity: str) -> str:
-        """在知识库中查找实体"""
-        qids = set()
-
-        #精确匹配
-        query_exact = """
-        MATCH (n {name: $name})
-        RETURN n.name as name, id(n) as id
-        LIMIT 1
-        """
-
-        with self.wiki_client.client.driver.session() as session:
-            # 精确匹配
-            result = session.run(query_exact, name=entity)
-            for record in result:
-                qids.add(f"NEO_{record['id']}")
-
-            # 如果没找到，尝试模糊匹配
-            if not qids:
-                query_fuzzy = """
-                MATCH (n)
-                WHERE n.name CONTAINS $keyword OR 
-                      toLower(n.name) CONTAINS toLower($keyword)
-                RETURN n.name as name, id(n) as id
-                ORDER BY 
-                  CASE WHEN n.name = $keyword THEN 0
-                       WHEN n.name STARTS WITH $keyword THEN 1
-                       ELSE 2 END
-                LIMIT 5
-                """
-
-                result = session.run(query_fuzzy, keyword=entity)
-                for record in result:
-                    qids.add(f"NEO_{record['id']}")
-
-        # 使用标准接口
-        if not qids:
-            try:
-                standard_qids = self.wiki_client.query_all("label2qid", entity)
-                if standard_qids and "Not Found!" not in standard_qids:
-                    for qid in standard_qids:
-                        if qid.startswith("NEO_"):
-                            qids.add(qid)
-            except:
-                pass
-
-        return next(iter(qids)) if qids else None
+        """在知识库中查找实体（KnowledgeUnit，精确匹配优先）"""
+        try:
+            rows = self.km_client.execute_cypher(
+                "MATCH (n:KnowledgeUnit) "
+                "WHERE n.resource_type CONTAINS $term_type "
+                "AND (n.name = $keyword OR n.name CONTAINS $keyword) "
+                "RETURN n.id AS id "
+                "LIMIT 5",
+                {"term_type": "Term", "keyword": entity},
+            )
+            return rows[0]["id"] if rows else None
+        except Exception:
+            return None
 
     def search_entities_with_full_info(self, keyword: str, limit: int = 10) -> List[Dict]:
         """
-        术语对齐搜索：优先精确匹配 name，其次同义词展开，再模糊匹配。
-        匹配策略：name精确匹配 > 同义词匹配 > name包含匹配 > 其他属性匹配
+        实体对齐搜索：在 KnowledgeUnit 中按 name 模糊匹配（CONTAINS 已包含精确匹配），
+        精确匹配项通过 ORDER BY 排在最前面。
         """
-        try:
-            driver = None
-            if hasattr(self.wiki_client, 'client'):
-                driver = self.wiki_client.client.driver
-            else:
-                driver = self.wiki_client.driver
-
-            with driver.session() as session:
-                matches = []
-                seen_ids = set()
-
-                def add_match(node_id, node_data, matched_props):
-                    qid = f"NEO_{node_id}"
-                    if qid not in seen_ids:
-                        seen_ids.add(qid)
-                        matches.append({
-                            "qid": qid,
-                            "properties": node_data,
-                            "matched_properties": matched_props,
-                            "matched_keyword": keyword
-                        })
-
-                # ── 策略1: Term 标签 name 精确匹配（文档: Term 节点就是标准名称和同义词的集合）──
-                query_term = """
-                MATCH (n:Term)
-                WHERE n.name = $keyword
-                RETURN id(n) as node_id, n as node
-                LIMIT $limit
-                """
-                for record in session.run(query_term, keyword=keyword, limit=limit):
-                    node_data = dict(record["node"])
-                    add_match(record["node_id"], node_data,
-                              {"name": node_data.get("name", "")})
-
-                # ── 策略2: name 精确匹配（全类型，兜底）──
-                query_exact = """
-                MATCH (n)
-                WHERE n.name = $keyword
-                RETURN id(n) as node_id, n as node
-                LIMIT $limit
-                """
-                for record in session.run(query_exact, keyword=keyword, limit=limit):
-                    node_data = dict(record["node"])
-                    add_match(record["node_id"], node_data,
-                              {"name": node_data.get("name", "")})
-
-                # ── 策略3: name 包含匹配（原有逻辑，兜底）──
-                if len(matches) < limit:
-                    query_name = """
-                    MATCH (n)
-                    WHERE n.name IS NOT NULL AND (
-                        toLower(n.name) CONTAINS toLower($keyword) OR
-                        toLower($keyword) CONTAINS toLower(replace(n.name, 'CG_00', '')) OR
-                        toLower($keyword) CONTAINS toLower(split(n.name, ' ')[-1]) OR
-                        toLower(replace(n.name, 'CG_00', '')) CONTAINS toLower($keyword) OR
-                        toLower(n.name) CONTAINS toLower(split($keyword, '与')[0]) OR
-                        toLower(n.name) CONTAINS toLower(split($keyword, '与')[1]) OR
-                        toLower(n.name) =~ ('(?i).*' + replace(replace($keyword, '与', '|'), '金额', '') + '.*') OR
-                        toLower(n.name) =~ ('(?i).*' + $keyword + '.*')
-                    )
-                    RETURN id(n) as node_id, n as node
-                    ORDER BY
-                        CASE WHEN n.name CONTAINS $keyword THEN 0 ELSE 1 END,
-                        CASE WHEN replace(n.name, 'CG_00', '') CONTAINS $keyword THEN 0 ELSE 1 END
-                    LIMIT $limit
-                    """
-                    for record in session.run(query_name, keyword=keyword, limit=limit):
-                        node_data = dict(record["node"])
-                        mprops = {k: v for k, v in node_data.items()
-                                  if isinstance(v, str) and keyword.lower() in v.lower()}
-                        add_match(record["node_id"], node_data, mprops)
-
-                # ── 策略4: 其他属性搜索（原有逻辑，兜底）──
-                if len(matches) < 3:
-                    query_other = """
-                    MATCH (n)
-                    WHERE n.name IS NULL OR NOT toLower(n.name) CONTAINS toLower($keyword)
-                    RETURN id(n) as node_id, n as node
-                    LIMIT 50
-                    """
-                    for record in session.run(query_other, keyword=keyword):
-                        node_data = dict(record["node"])
-                        mprops = {k: v for k, v in node_data.items()
-                                  if isinstance(v, str) and keyword.lower() in v.lower()}
-                        if mprops:
-                            add_match(record["node_id"], node_data, mprops)
-                        if len(matches) >= limit:
-                            break
-
-                return matches[:limit]
-        except Exception as e:
-            return []
+        rows = self.km_client.execute_cypher(
+            "MATCH (n:KnowledgeUnit) "
+            "WHERE n.resource_type CONTAINS $term_type AND n.name CONTAINS $keyword "
+            "RETURN n.id AS id, n.name AS name, n.content AS content "
+            "ORDER BY n.name "
+            "LIMIT $limit",
+            {"term_type": "Term", "keyword": keyword, "limit": limit},
+        )
+        matches = []
+        seen_ids = set()
+        for row in rows:
+            qid = row.get("id", "")
+            if not qid or qid in seen_ids:
+                continue
+            seen_ids.add(qid)
+            node_data = {
+                "id": qid,
+                "name": row.get("name", "") or "",
+                "content": row.get("content", "") or "",
+            }
+            mprops = {k: v for k, v in node_data.items()
+                      if isinstance(v, str) and keyword.lower() in v.lower()}
+            matches.append({
+                "qid": qid,
+                "properties": node_data,
+                "labels": ["KnowledgeUnit"],
+                "matched_properties": mprops,
+                "matched_keyword": keyword,
+            })
+        return matches[:limit]
 
     def get_node_full_info(self, qid: str) -> Dict:
-        """根据QID获取节点的完整信息"""
-        try:
-            if not qid.startswith("NEO_"):
-                return None
-            
-            node_id = int(qid.replace("NEO_", ""))
-            
-            # 检查wiki_client的类型
-            driver = None
-            if hasattr(self.wiki_client, 'client'):
-                # 如果是MultiServerWikidataQueryClient包装类
-                driver = self.wiki_client.client.driver
-            else:
-                # 如果是直接的Neo4jClient
-                driver = self.wiki_client.driver
-            
-            with driver.session() as session:
-                query = """
-                MATCH (n)
-                WHERE id(n) = $node_id
-                RETURN id(n) as node_id, labels(n) as labels, properties(n) as properties
-                """
-                
-                result = session.run(query, node_id=node_id)
-                for record in result:
-                    return {
-                        "qid": qid,
-                        "name": record["properties"].get("name", ""),
-                        "labels": record["labels"],
-                        "properties": record["properties"],
-                    }
-        except Exception as e:
+        """根据 QID（KnowledgeUnit 的 UUID）获取节点的完整信息。
+
+        完整信息 = 节点自身字段 + 关联的 KnowledgeProperty 逻辑属性节点。
+        """
+        rows = self.km_client.execute_cypher(
+            "MATCH (n:KnowledgeUnit {id:$id}) "
+            "RETURN n.id AS id, n.name AS name, n.content AS content, "
+            "       n.content_type AS content_type, n.knowledge_status AS knowledge_status, "
+            "       n.logical_properties_json AS logical_properties_json "
+            "LIMIT 1",
+            {"id": qid},
+        )
+        if not rows:
             return None
-        
-        return None
+        row = rows[0]
+        props = {k: v for k, v in row.items() if v is not None}
+        prop_rows = self.km_client.execute_cypher(
+            "MATCH (n:KnowledgeUnit {id:$id})-[:HAS_LOGICAL_PROPERTY]->(p:KnowledgeProperty) "
+            "RETURN p.id AS id, p.name AS name, p.property_type AS property_type, "
+            "       p.properties_json AS properties_json "
+            "LIMIT 50",
+            {"id": qid},
+        )
+        props["logical_properties"] = prop_rows
+        return {
+            "qid": qid,
+            "name": row.get("name", ""),
+            "labels": ["KnowledgeUnit"],
+            "properties": props,
+        }
 
     def _get_entity_label(self, qid: str, default: str) -> str:
-        """获取实体标签"""
+        """获取实体名称（KnowledgeUnit 按 id 查 name）"""
         try:
-            labels = self.wiki_client.query_all("qid2label", qid)
-            if labels and "Not Found!" not in labels:
-                return next(iter(labels))
-        except:
+            rows = self.km_client.execute_cypher(
+                "MATCH (n:KnowledgeUnit {id:$id}) RETURN n.name AS name LIMIT 1",
+                {"id": qid},
+            )
+            if rows and rows[0].get("name"):
+                return rows[0]["name"]
+        except Exception:
             pass
-
         return default
 
     def rank_entities_by_llm(self, question: str, candidates: List[Dict]) -> List[Dict]:
@@ -605,7 +511,7 @@ class EntityLinker:
     def link_entities_with_llm_judge(self, question: str, keywords: list = None) -> Dict[str, Any]:
         if keywords is None:
             keywords = self.recognize_entities(question)
-        print(f"  搜索关键词: {keywords}")
+        LOGGER.debug("linking %d graph keywords", len(keywords))
 
         all_candidates = []
         seen_qids = set()

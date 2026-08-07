@@ -1,7 +1,7 @@
 from typing import Any
 
 from mcp_services.runtime import mcp
-from mcp_services.result import ToolCode, invoke_tool
+from mcp_services.result import ToolCode, invoke_tool, tool_error
 from mcp_services.dispatch import maybe_submit
 
 
@@ -36,41 +36,28 @@ def _extract(ontology, text, model, base_url):
 @mcp.tool(name="kg_get_dimension_scales")
 def get_dimension_scales(dimension: str) -> dict[str, Any]:
     """Return all scales associated with a knowledge-space dimension."""
-    return invoke_tool(lambda: _load_scales(dimension), ToolCode.KNOWLEDGE_FAILED, "维度刻度查询")
-
-
-def _load_scales(dimension):
-    from algorithm.knowledge_extract import get_dimension_scales
-
-    return get_dimension_scales(dimension=dimension)
+    return tool_error(
+        ToolCode.EXTERNAL_CAPABILITY_UNAVAILABLE,
+        "维度刻度查询接口尚未开通",
+        {"capability": "graph.write"},
+    )
 
 
 @mcp.tool(name="kg_init_knowledge_space")
 def init_knowledge_space(dimension_scales: dict[str, list[str]]) -> dict[str, Any]:
     """Create a knowledge space from a dimension-to-scales mapping."""
-    return invoke_tool(lambda: _initialize(dimension_scales), ToolCode.KNOWLEDGE_FAILED, "知识空间初始化")
-
-
-def _initialize(dimension_scales):
-    from algorithm.knowledge_extract import init_knowledge_space
-
-    return init_knowledge_space(dimension_scales=dimension_scales)
+    return tool_error(
+        ToolCode.EXTERNAL_CAPABILITY_UNAVAILABLE,
+        "知识空间写入接口尚未开通",
+        {"capability": "graph.write"},
+    )
 
 
 @mcp.tool(name="kg_store_extraction")
 def store_extraction(graph: dict[str, Any]) -> dict[str, Any]:
-    """Store an extracted graph in Neo4j, deduplicating nodes by uid."""
-    queued = maybe_submit(
-        "mcp.knowledge.store",
-        {"graph": graph},
-        resource_class="io.graph",
+    """Report that application-owned graph persistence is not yet available."""
+    return tool_error(
+        ToolCode.EXTERNAL_CAPABILITY_UNAVAILABLE,
+        "知识图谱写入接口尚未开通",
+        {"capability": "graph.write"},
     )
-    if queued is not None:
-        return queued
-    return invoke_tool(lambda: _store(graph), ToolCode.KNOWLEDGE_FAILED, "知识图谱存储")
-
-
-def _store(graph):
-    from algorithm.knowledge_extract import store_extraction_to_neo4j
-
-    return store_extraction_to_neo4j(graph=graph)

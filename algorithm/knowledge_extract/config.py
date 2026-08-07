@@ -1,4 +1,4 @@
-"""知识抽取 V2 配置：从环境变量读取 LLM API 和 Neo4j 连接参数。"""
+"""Knowledge extraction LLM configuration."""
 import os
 
 
@@ -8,20 +8,6 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
         if v and v.strip():
             return v.strip()
     return default
-
-
-# ── Neo4j ──
-NEO4J_URI = _env("NEO4J_URI", default="bolt://localhost:7687")
-NEO4J_USER = _env("NEO4J_USER", "NEO4J_USERNAME", default="neo4j")
-NEO4J_PASSWORD = _env("NEO4J_PASSWORD", default="neo4j2025")
-
-
-def get_neo4j_config() -> dict:
-    return {
-        "uri": NEO4J_URI,
-        "user": NEO4J_USER,
-        "password": NEO4J_PASSWORD,
-    }
 
 
 # ── LLM API (知识抽取 V2) ──

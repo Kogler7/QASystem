@@ -7,9 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from algorithm.knowledge_extract import store_extraction_to_neo4j
 from algorithm.knowledge_pipeline import generate_understanding, store_vectors, upload_file
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
+from external_services.application import get_application_service_url
 
 from backend.app.responses import ErrorCode
 from backend.app.schemas import PipelineOptions, TextChunk, TextEmbeddingItem
@@ -79,7 +79,7 @@ class KnowledgePrecipitationService:
         request: KnowledgeIngestionRequest,
         stage: str,
     ) -> dict[str, Any] | None:
-        file_service_url = os.getenv("FILE_SERVICE_URL", "").strip()
+        file_service_url = get_application_service_url()
         if not file_service_url:
             return None
         result = upload_file(
@@ -141,29 +141,13 @@ class KnowledgePrecipitationService:
         }
 
         if options.storage.persist_graph:
-            database_result = (
-                store_extraction_to_neo4j(graph=final_graph)
-                if final_graph is not None
-                else {
-                    "success": all(
-                        store_extraction_to_neo4j(graph=item["graph"]).get("success")
-                        for item in extracted_items
-                    ),
-                    "items": [
-                        {"position": i, **store_extraction_to_neo4j(graph=item["graph"])}
-                        for i, item in enumerate(extracted_items)
-                    ],
-                }
+            raise PipelineError(
+                ErrorCode.EXTERNAL_CAPABILITY_UNAVAILABLE,
+                "知识图谱写入接口尚未开通",
+                "graph_storage",
+                {"capability": "graph.write"},
+                {"artifacts": {"markdown": origin}} if origin is not None else None,
             )
-            stats["extraction"]["database"] = database_result
-            if not database_result.get("success"):
-                raise PipelineError(
-                    ErrorCode.GRAPH_STORAGE_FAILED,
-                    "知识图谱入库失败",
-                    "graph_storage",
-                    database_result,
-                    {"artifacts": {"markdown": origin}} if origin is not None else None,
-                )
 
         vector_ids = None
         vector_dimension = None
@@ -177,7 +161,7 @@ class KnowledgePrecipitationService:
             ]
             vector_result = store_vectors(
                 vector_items,
-                os.getenv("FILE_SERVICE_URL", "").strip(),
+                get_application_service_url(),
                 options.storage.knowledge_space_id,
                 origin["id"],
             )
@@ -234,8 +218,6 @@ class KnowledgePrecipitationService:
         }
 
     def process(self, request: KnowledgeIngestionRequest) -> dict[str, Any]:
-        if not request.ontology.strip():
-            raise PipelineError(ErrorCode.ONTOLOGY_INVALID, "ontology 不能为空", "validation")
         if not request.content:
             raise PipelineError(ErrorCode.INVALID_REQUEST, "上传文件不能为空", "validation")
 
@@ -247,7 +229,7 @@ class KnowledgePrecipitationService:
             "document": {"file_name": file_name, "file_size": len(request.content), "file_type": suffix.lstrip(".")},
             "extraction": {},
             "chunking": {},
-            "storage": {"enabled": bool(os.getenv("FILE_SERVICE_URL", "").strip())},
+            "storage": {"enabled": bool(get_application_service_url())},
         }
         try:
             parsed = self.parsing.parse(file_name, request.content, request.options.parser)
@@ -271,8 +253,6 @@ class KnowledgePrecipitationService:
             raise PipelineError(exc.code, exc.info, exc.stage, exc.details, partial) from exc
 
     def process_batch(self, request: BatchKnowledgeIngestionRequest) -> dict[str, Any]:
-        if not request.ontology.strip():
-            raise PipelineError(ErrorCode.ONTOLOGY_INVALID, "ontology 不能为空", "validation")
         if not request.files:
             raise PipelineError(ErrorCode.INVALID_REQUEST, "至少需要上传一个文件", "validation")
 
@@ -316,7 +296,7 @@ class KnowledgePrecipitationService:
             "documents": file_stats,
             "extraction": {},
             "chunking": {},
-            "storage": {"enabled": bool(os.getenv("FILE_SERVICE_URL", "").strip())},
+            "storage": {"enabled": bool(get_application_service_url())},
         }
 
         # Build a dummy single-file request for _upload_markdown compatibility

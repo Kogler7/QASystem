@@ -56,6 +56,55 @@ GENERIC_INSTRUCTION = """## 抽取规则
 - 记忆规则：宁可少一条无法落到实体集合中的 relation，也不要输出悬空 relation"""
 
 
+def build_generic_extraction_prompt(text: str) -> str:
+    """构建通用抽取 prompt（无本体定义时使用），让 LLM 自由识别实体和关系。"""
+
+    return f"""你是一个知识图谱抽取专家。请从以下文本中自由识别实体和关系，构建知识图谱。
+
+## 抽取规则
+
+### 实体抽取
+- 从文本中识别所有有意义的实体（如人员、组织、设备、概念、术语、指标等）
+- 为每个实体选择合适的 type 类型名称（如 Person、Organization、Equipment、Concept、Term、Metric、Document 等）
+- 从文本中提取该实体的 name（名称）和其他可用的属性
+- 属性以键值对形式填入 properties，未提到的属性可省略
+- 只抽取文本中明确提到的实体，不要编造
+
+### 关系抽取
+- 从文本中识别实体之间的关系
+- 为每条关系指定合适的 rel_type（如 "工作于"、"管理"、"包含"、"定义"、"关联"、"属于" 等）
+- from_name/to_name 使用实体的 name 属性值
+- 每输出一条 relation，必须保证 entities 中同时存在对应的源节点和目标节点
+- 不要输出悬空的 relation（引用不存在的实体）
+
+### 输出要求
+- 只输出 JSON，不要任何解释、markdown 代码块或额外文字
+- 不要自创文本中不存在的内容
+
+## 待抽取文本
+{text}
+
+## 输出格式
+{{{{
+  "entities": [
+    {{{{
+      "type": "实体类型",
+      "name": "实体名称",
+      "properties": {{{{ "属性名": "属性值", ... }}}}
+    }}}}
+  ],
+  "relations": [
+    {{{{
+      "from_type": "源实体类型",
+      "from_name": "源实体名称",
+      "rel_type": "关系类型",
+      "to_type": "目标实体类型",
+      "to_name": "目标实体名称"
+    }}}}
+  ]
+}}}}"""
+
+
 def build_extraction_prompt(ontology: str, text: str) -> str:
     """构建本体驱动的抽取 prompt（参考 kg-extract-v7 extract.py::build_prompt）。"""
 
@@ -237,8 +286,6 @@ def extract_v2(
     ontology = (ontology or "").strip()
     text = (text or "").strip()
 
-    if not ontology:
-        raise ValueError("本体定义不能为空")
     if not text:
         return {
             "raw": {},
@@ -262,9 +309,13 @@ def extract_v2(
         len(ontology), len(text), model,
     )
 
-    # 构建 prompt
-    prompt = build_extraction_prompt(ontology, text)
-    system_msg = "你是一个知识图谱抽取专家。严格按照本体定义从文本中抽取实体和关系。只输出JSON，不要任何解释。"
+    # 构建 prompt（有本体按本体抽取，无本体通用抽取）
+    if ontology:
+        prompt = build_extraction_prompt(ontology, text)
+        system_msg = "你是一个知识图谱抽取专家。严格按照本体定义从文本中抽取实体和关系。只输出JSON，不要任何解释。"
+    else:
+        prompt = build_generic_extraction_prompt(text)
+        system_msg = "你是一个知识图谱抽取专家。从文本中自由识别实体和关系。只输出JSON，不要任何解释。"
 
     t0 = time.perf_counter()
 
@@ -349,8 +400,9 @@ def extract_v2(
             "_raw_response": raw_response[:1000] if raw_response else "",
         }
 
-    # 统一通过本体模型解析层规范化类型、属性和关系标识。
-    extracted = OntologySchema.parse(ontology).normalize_extraction(extracted)
+    # 有本体时通过本体模型解析层规范化类型、属性和关系标识；无本体时跳过
+    if ontology:
+        extracted = OntologySchema.parse(ontology).normalize_extraction(extracted)
 
     # 转换为图结构
     graph = _entities_to_graph(extracted)

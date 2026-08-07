@@ -237,8 +237,6 @@ class GraphExtractionService:
         base_url: str | None = None,
         merge: bool = True,
     ) -> GraphExtractionBatch:
-        if not ontology.strip():
-            raise CapabilityError(ErrorCode.ONTOLOGY_INVALID, "ontology 不能为空", "validation")
         results = extract_chunks(
             ontology=ontology,
             chunks=[md_to_text(item.text) for item in items],

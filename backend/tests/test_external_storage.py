@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+import httpx
 
 from algorithm.knowledge_pipeline import storage
 
 
 def test_upload_file_returns_normalized_metadata(monkeypatch):
-    response = SimpleNamespace(
-        raise_for_status=lambda: None,
-        json=lambda: {
+    response = httpx.Response(
+        200,
+        json={
             "code": 0,
             "data": {
                 "id": "file-1",
@@ -17,8 +17,9 @@ def test_upload_file_returns_normalized_metadata(monkeypatch):
                 "file_url": "https://files.example/demo.md",
             },
         },
+        request=httpx.Request("POST", "https://files.example/third/files/upload"),
     )
-    monkeypatch.setattr(storage.requests, "post", lambda *_args, **_kwargs: response)
+    monkeypatch.setattr(httpx, "request", lambda *_args, **_kwargs: response)
 
     result = storage.upload_file(
         b"content",
@@ -39,20 +40,21 @@ def test_upload_file_returns_normalized_metadata(monkeypatch):
 
 def test_store_vectors_posts_expected_payload_and_returns_ids(monkeypatch):
     captured = {}
-    response = SimpleNamespace(
-        raise_for_status=lambda: None,
-        json=lambda: {
+    response = httpx.Response(
+        200,
+        json={
             "code": 0,
             "msg": "success",
             "data": {"inserted_count": 1, "ids": ["vector-1"]},
         },
+        request=httpx.Request("POST", "https://files.example/third/vectors/store"),
     )
 
-    def post(url, **kwargs):
-        captured.update({"url": url, **kwargs})
+    def request(method, url, **kwargs):
+        captured.update({"method": method, "url": url, **kwargs})
         return response
 
-    monkeypatch.setattr(storage.requests, "post", post)
+    monkeypatch.setattr(httpx, "request", request)
     result = storage.store_vectors(
         [{"text": "原始文本切片", "vector": [0.1, 0.2]}],
         "https://files.example",
