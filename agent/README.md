@@ -41,11 +41,11 @@ AgentCode 当前负责：
 
 ### 使用仓库 Compose
 
-先生成运行目录并构建镜像：
+先构建 runtime 并生成交付包；首次本机构建还需给构建命令加 `-BuildBase`：
 
 ```powershell
+.\build-image.ps1
 .\package-deploy.ps1
-docker build -t qasystem-backend:latest .
 docker compose up -d
 ```
 

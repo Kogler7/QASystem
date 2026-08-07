@@ -1,5 +1,5 @@
 param(
-    [string]$ImageName = "qasystem-backend:latest",
+    [string]$ImageName = "qasystem-runtime-v1",
     [string]$ModelsDir = (Join-Path $PSScriptRoot "deploy\models"),
     [string]$SamplesDir = (Join-Path $PSScriptRoot "test_artifacts\parser")
 )

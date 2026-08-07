@@ -1,4 +1,5 @@
-# QASystem backend and Agent runtime image. Build from the repository root.
+# QASystem dependency base. Application source and deployment configuration
+# belong to Dockerfile.runtime and are intentionally absent from this image.
 
 ARG NODE_IMAGE=node:20-bullseye-slim
 ARG MAVEN_IMAGE=maven:3.9.9-eclipse-temurin-17
@@ -20,7 +21,6 @@ FROM ${VLLM_IMAGE}
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get -o Acquire::Retries=5 update && \
@@ -85,21 +85,12 @@ RUN pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-ho
     --retries 8 --timeout 120 -r /tmp/qasystem/requirements.mineru-extras.txt && \
     pip check
 
-# Install Agent with dependency resolution enabled. This makes a future
-# pyproject dependency change fail the image build instead of being hidden.
-COPY agent /app/agent
-RUN pip install "/app/agent[api]" && pip check
+# Read Agent dependencies from their canonical pyproject without copying the
+# Agent package into the dependency base. Dockerfile.runtime installs it.
+COPY agent/pyproject.toml /tmp/qasystem/agent-pyproject.toml
+RUN python -c "import subprocess,sys,tomllib; p=tomllib.load(open('/tmp/qasystem/agent-pyproject.toml','rb'))['project']; subprocess.check_call([sys.executable,'-m','pip','install',*(p['dependencies']+p['optional-dependencies']['api'])])" && \
+    pip check
 
-# Keep the image independently runnable. Compose must not shadow /app with an
-# older host-side source tree.
-COPY backend /app/backend
-COPY algorithm /app/algorithm
-COPY mcp_services /app/mcp_services
-COPY docker/verify_runtime.py /usr/local/bin/verify_qasystem_runtime.py
-COPY docker/download_models.py /usr/local/bin/download_qasystem_models.py
-COPY docker/offline_mock_llm.py /usr/local/bin/offline_mock_llm.py
-COPY docker/offline_validation.py /usr/local/bin/offline_validation.py
-COPY docker/vllm_readiness.py /usr/local/bin/vllm_readiness.py
 COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
@@ -108,19 +99,9 @@ COPY --from=opencode-runtime /usr/local/lib/node_modules /usr/local/lib/node_mod
 RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-ENV PYTHONPATH=/app:/app/agent \
-    LIBREOFFICE_PATH=/usr/bin/soffice \
-    OFD_CONVERTER_COMMAND="java -jar /opt/qasystem/ofdrw/ofd-to-pdf.jar"
-
-# Validate dependencies, native programs and both ASGI entry points while the
-# image is being built. Any missing runtime component aborts the build.
-RUN python /usr/local/bin/verify_qasystem_runtime.py
-
-WORKDIR /app/backend
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=5 \
-    CMD curl -fsS http://127.0.0.1:8000/health || exit 1
-
-ENTRYPOINT ["tini", "--"]
-CMD ["python", "-m", "app.execution.supervisor"]
+# The base is not deployable. Keep only a dependency smoke test here; the
+# application-aware verifier runs while Dockerfile.runtime is built.
+RUN python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
+    test -x /usr/bin/soffice && \
+    test -f /opt/qasystem/ofdrw/ofd-to-pdf.jar && \
+    command -v tini >/dev/null

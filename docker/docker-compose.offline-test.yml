@@ -1,12 +1,12 @@
 services:
   mock-llm:
-    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
     pull_policy: never
     entrypoint: ["python", "/usr/local/bin/offline_mock_llm.py"]
     networks: [offline]
 
   backend:
-    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
     pull_policy: never
     gpus: all
     environment:
@@ -37,7 +37,7 @@ services:
     depends_on: [mock-llm]
 
   verifier:
-    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
     pull_policy: never
     environment:
       PYTHONUNBUFFERED: "1"

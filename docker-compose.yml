@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
     pull_policy: never
     container_name: qasystem_backend
     restart: unless-stopped
@@ -9,32 +9,6 @@ services:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    environment:
-      PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app:/app/agent
-      GPU_DEVICE_IDS: ${GPU_DEVICE_IDS:-4,5,6,7}
-      LIBREOFFICE_PATH: ${LIBREOFFICE_PATH:-/usr/bin/soffice}
-      EXECUTION_MODE: async
-      EXECUTION_REDIS_URL: ${EXECUTION_REDIS_URL:-redis://redis:6379/1}
-      EXECUTION_DATA_DIR: /app/backend/data/execution
-      EXECUTION_LOG_LEVEL: ${EXECUTION_LOG_LEVEL:-INFO}
-      EXECUTION_CPU_WORKERS: ${EXECUTION_CPU_WORKERS:-auto}
-      EXECUTION_VLM_WORKERS_PER_GPU: ${EXECUTION_VLM_WORKERS_PER_GPU:-auto}
-      EXECUTION_AUX_WORKERS_PER_GPU: ${EXECUTION_AUX_WORKERS_PER_GPU:-1}
-      EXECUTION_GPU_MAX_LEASES_PER_DEVICE: ${EXECUTION_GPU_MAX_LEASES_PER_DEVICE:-16}
-      EXECUTION_GPU_MAX_LEASES_PER_WORKER: ${EXECUTION_GPU_MAX_LEASES_PER_WORKER:-1}
-      EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM: ${EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM:-2048}
-      EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING: ${EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING:-2048}
-      EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE: ${EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE:-2048}
-      MCP_EXECUTION_MODE: ${MCP_EXECUTION_MODE:-sync}
-      VLLM_MODEL_PATH: ${VLLM_MODEL_PATH:-/models/mineru/vlm}
-      VLLM_GPU_MEMORY_UTILIZATION: ${VLLM_GPU_MEMORY_UTILIZATION:-0.82}
-      VLLM_MAX_NUM_SEQS: ${VLLM_MAX_NUM_SEQS:-32}
-      VLLM_WARMUP_ENABLED: ${VLLM_WARMUP_ENABLED:-true}
-      VLLM_WARMUP_TIMEOUT_SECONDS: ${VLLM_WARMUP_TIMEOUT_SECONDS:-300}
-      EXECUTION_RUNTIME_READY_FILE: /tmp/qasystem-runtime-ready
-      EXECUTION_VLM_SHARD_COUNT: ${EXECUTION_VLM_SHARD_COUNT:-auto}
-      EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS: ${EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS:-900}
     volumes:
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
       - backend-data:/app/backend/data
@@ -53,18 +27,12 @@ services:
       start_period: 120s
 
   agent:
-    image: ${BACKEND_IMAGE:-qasystem-backend:latest}
+    image: ${BACKEND_IMAGE:-qasystem-runtime-v1}
     pull_policy: never
     container_name: qasystem_agent
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app:/app/agent
-      AGENT_MCP_URL: http://backend:8000/mcp
-      TASK_STORE_REDIS_URL: redis://redis:6379/0
-      EXECUTION_REDIS_URL: ${EXECUTION_REDIS_URL:-redis://redis:6379/1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

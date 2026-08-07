@@ -19,6 +19,7 @@ def test_root_is_the_only_configuration_source():
     assert (ROOT / "docker" / "offline_mock_llm.py").is_file()
     assert (ROOT / "docker" / "offline_validation.py").is_file()
     assert (ROOT / "docker" / "make-runtime-base.sh").is_file()
+    assert (ROOT / "docker" / "apply-runtime.sh").is_file()
     assert (ROOT / "docker" / "RUNTIME_BASE.md").is_file()
     assert (ROOT / "backend" / "app" / "health.py").is_file()
     assert not (ROOT / "agent" / ".env.example").exists()
@@ -51,14 +52,15 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "AGENT_LLM_" not in compose
     assert "GPU_DEVICE_IDS=4,5,6,7" in template
     assert "MCP_EXECUTION_MODE=sync" in template
-    assert "MCP_EXECUTION_MODE: ${MCP_EXECUTION_MODE:-sync}" in compose
+    assert "MCP_EXECUTION_MODE: ${MCP_EXECUTION_MODE:-sync}" not in compose
     assert "python -m app.execution.supervisor" in compose
     assert "BACKEND_BIND=0.0.0.0" in template
-    assert "GPU_DEVICE_IDS: ${GPU_DEVICE_IDS:-4,5,6,7}" in compose
+    assert "GPU_DEVICE_IDS:" not in compose
     assert "execution-gpu-worker" not in compose
     assert "execution-vlm-worker" not in compose
     assert "vllm-0:" not in compose
-    assert "AGENT_MCP_URL: http://backend:8000/mcp" in compose
+    assert "AGENT_MCP_URL=http://backend:8000/mcp" in template
+    assert "environment:" not in compose
     assert "AGENT_HOST_PORT" not in compose
     assert "MCP_PORT" not in template
 
@@ -72,7 +74,11 @@ def test_backend_proxies_agent_under_its_public_route():
 
 def test_deploy_script_only_generates_runtime_assets():
     script = (ROOT / "package-deploy.ps1").read_text(encoding="utf-8")
-    assert 'layout = "self-contained-image"' in script
+    assert 'layout = "dependency-base-plus-runtime-overlay"' in script
+    assert 'runtime-context.tar' in script
+    assert 'IncludeBaseImage' in script
+    assert 'qasystem-runtime-v1.tar' not in script
+    assert 'qasystem-backend-latest.tar' not in script
     assert "robocopy" not in script
     assert "docker-compose.delivery.yml" not in script
     assert "docker-compose.deploy.yml" not in script
@@ -89,15 +95,18 @@ def test_dockerfile_performs_complete_runtime_verification():
     ).read_text(encoding="utf-8")
     assert "pip check" in dockerfile
     assert "docling-tools models download" not in dockerfile
-    assert 'pip install "/app/agent[api]"' in dockerfile
-    assert "--no-deps" not in dockerfile
-    assert "verify_qasystem_runtime.py" in dockerfile
+    assert 'pip install "/app/agent[api]"' not in dockerfile
+    assert 'pip install --no-deps "/app/agent[api]"' in runtime_dockerfile
+    assert "verify_qasystem_runtime.py" in runtime_dockerfile
     assert "FROM ${BASE_IMAGE}" in runtime_dockerfile
+    assert "COPY backend /app/backend" not in dockerfile
+    assert "COPY algorithm /app/algorithm" not in dockerfile
+    assert "COPY backend /app/backend" in runtime_dockerfile
     assert "opencv-python==4.11.0.86" in mineru_requirements
     assert "opencv-python-headless==4.11.0.86" in mineru_requirements
     assert "opencv-python==4.11.0.86" in runtime_dockerfile
     assert '"opencv-python": "4.11.0.86"' in verifier
-    assert "download_qasystem_models.py" in dockerfile
+    assert "download_qasystem_models.py" in runtime_dockerfile
     assert "from backend.app.main import app as backend_app" in verifier
     assert "from agentcode.api import app as agent_app" in verifier
     assert '"mcp"' in verifier

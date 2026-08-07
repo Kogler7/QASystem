@@ -103,7 +103,16 @@ log "Rootfs export completed: $(human_bytes "$(wc -c <"$ROOTFS_TAR" | tr -d ' ')
 # overlay is responsible for the application command and health check.
 IMPORT_ARGS=(--change "ENV QASYSTEM_RUNTIME_BASE_SOURCE=$SOURCE_ID" --change 'WORKDIR /app/backend')
 while IFS= read -r env_line; do
-  [[ -n "$env_line" ]] && IMPORT_ARGS+=(--change "ENV $env_line")
+  [[ -n "$env_line" ]] || continue
+  env_name="${env_line%%=*}"
+  # Preserve CUDA/system dependency metadata but keep all application and
+  # deployment configuration in Dockerfile.runtime plus the deployment .env.
+  case "$env_name" in
+    PYTHONPATH|PYTHONUNBUFFERED|LIBREOFFICE_PATH|OFD_CONVERTER_COMMAND|ENVIRONMENT|BACKEND_IMAGE|HOST_MODELS_DIR|GPU_DEVICE_IDS|QASYSTEM_*|EXECUTION_*|VLLM_*|MINERU_*|MCP_*|AGENT_*|TASK_STORE_*|DATABASE_*|NEO4J_*|CONFIDENCE_*|FILE_SERVICE_*|GRAPH_*|KG_EXTRACT_*|VECTOR_*|EMBEDDING_*)
+      continue
+      ;;
+  esac
+  IMPORT_ARGS+=(--change "ENV $env_line")
 done < <(docker image inspect "$SOURCE_IMAGE" --format '{{range .Config.Env}}{{println .}}{{end}}')
 while IFS= read -r port; do
   [[ -n "$port" ]] && IMPORT_ARGS+=(--change "EXPOSE $port")

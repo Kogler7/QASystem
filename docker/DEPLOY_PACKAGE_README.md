@@ -1,48 +1,69 @@
-# QASystem 部署包
+# QASystem 双镜像交付包
 
-本目录是默认交付模式，可直接复制到目标服务器。运行镜像包含 Backend、Agent、应用源码、系统和 Python 依赖；Compose 不挂载外部源码。
+正式部署由两个镜像契约协同组成：
 
-## 目录内容
+- `qasystem-base-v1`：CUDA、vLLM、Torch、系统程序和 Python 依赖。仅首次部署或依赖契约不兼容升级时交付。
+- `qasystem-runtime-v1`：Backend、Agent、算法和运行入口。每次代码发布都在目标机基于已有 base 构建。
 
-| 路径 | 说明 |
+运行配置不固化在 base，也不在 Compose 中重复枚举，统一放在本目录 `.env`。Compose 通过 `env_file` 将同一份配置注入 Backend 和 Agent。
+
+## 文件
+
+| 文件 | 用途 |
 | --- | --- |
-| `qasystem-backend-20260806.tar` | QASystem Backend 与 Agent 完整离线镜像 |
-| `redis-7-alpine.tar` | Redis 7 Alpine 离线镜像 |
-| `docker-compose.yml` | 启动自包含 Backend、Agent 和 Redis；Backend 入口自动管理 API、Worker 与每卡一个 vLLM engine |
-| `download-models.ps1` | 在联网机器将 Docling、MinerU 模型下载到 `models/` |
-| `ENV_MIGRATION.md` | 已有部署更新时需要合并的模型相关 `.env` 变更 |
-| `.env.example` | 脱敏环境变量模板；部署前复制为 `.env` 并填写 |
-| `deploy/models/` | 本地模型挂载目录；按启用的能力准备相应模型 |
-| `SHA256SUMS` | 离线镜像的 SHA-256 校验信息 |
+| `runtime-context.tar` | 日常发布内容；只含应用源码、运行时 Dockerfile 和校验工具 |
+| `apply-runtime.sh` | 校验、构建、验证、切换服务，失败时恢复旧 runtime 标签 |
+| `qasystem-base-v1.tar` | 可选的一次性基础镜像，仅 `-IncludeBaseImage` 时生成 |
+| `redis-7-alpine.tar` | 可选离线 Redis 镜像，仅 `-IncludeRedisImage` 时生成 |
+| `docker-compose.yml` | Backend、Agent、Redis 拓扑 |
+| `.env.example` | 唯一运行环境变量模板 |
+| `migrate-legacy-image-to-base.sh` | 仅用于把已经传到服务器的旧完整镜像转换为 base |
+| `SHA256SUMS` / `交付清单.json` | 内容校验和版本记录 |
 
-## 离线部署
+`docker save qasystem-runtime-v1` 会连同 30GB 左右的 base 层一起导出，因此正常交付禁止导出 runtime 镜像。传输 `runtime-context.tar` 后在目标机本地构建，Docker 会直接复用已有 base。
 
-```powershell
-docker load -i .\qasystem-backend-20260806.tar
-docker load -i .\redis-7-alpine.tar
-Copy-Item .env.example .env
-# 编辑 .env：外部服务地址、LLM 密钥、端口和模型路径
-docker compose up -d
-curl http://127.0.0.1:8006/health
-curl http://127.0.0.1:8006/agent/health
+## 首次部署
+
+若交付包包含 base 和 Redis：
+
+```bash
+sha256sum -c SHA256SUMS
+docker load -i qasystem-base-v1.tar
+docker load -i redis-7-alpine.tar
+cp .env.example .env
+# 编辑 .env 中的外部服务、密钥、模型路径和 GPU_DEVICE_IDS
+chmod +x apply-runtime.sh
+./apply-runtime.sh
 ```
 
-模型不包含在 Docker 镜像中。请先在可访问模型仓库的机器执行：
+如果大镜像已经以旧完整镜像形式存在，先按 `RUNTIME_BASE.md` 运行迁移脚本生成 `qasystem-base-v1`，无需再次上传 base。
+
+## 日常代码升级
+
+交付方运行：
 
 ```powershell
-.\download-models.ps1 -ImageName qasystem-backend:latest
+.\package-deploy.ps1
 ```
 
-将生成的 `deploy/models/` 目录与镜像和部署文件一并复制到离线服务器。默认下载 Docling、MinerU Pipeline/VLM 和 512 维 BGE-small-zh；BGE-small-zh 同时用于向量化和置信度语义评分。如只使用部分能力，可使用 `-SkipDocling`、`-SkipMineruPipeline`、`-SkipMineruVlm` 或 `-SkipEmbedding` 跳过对应模型。
+只传输新的 `runtime-context.tar`、`SHA256SUMS`、`交付清单.json` 以及有变更的部署文件。目标机保留现有 `.env`，但首次切换双镜像时必须按新 `.env.example` 合并关键变量；`apply-runtime.sh` 会拒绝旧镜像标签、空 GPU 范围或缺失的内部服务变量。然后执行：
 
-`.env.example` 默认将 Backend 发布到 `0.0.0.0:8006`，可由其他主机访问。生产环境应通过宿主机防火墙、安全组或反向代理限制来源；只需本机访问时设为 `BACKEND_BIND=127.0.0.1`。
+```bash
+./apply-runtime.sh
+```
 
-`docker-compose.yml` 将 GPU 设备能力交给 Backend 容器，但 supervisor 只使用 `GPU_DEVICE_IDS` 选中的卡。目标 8 卡 A40 服务器默认设置 `GPU_DEVICE_IDS=4,5,6,7`，只占用后四卡；入口进程在这四张卡上各启动一个常驻 vLLM engine，并按 CPU/GPU 数量生成 VLM dispatch worker、共享 Embedding/Confidence worker 和 CPU worker。无需在 Compose 中枚举进程；可用 `EXECUTION_CPU_WORKERS`、`EXECUTION_VLM_WORKERS_PER_GPU` 和 `EXECUTION_AUX_WORKERS_PER_GPU` 覆盖自动数量。
+脚本先构建候选镜像并执行完整运行时校验，通过后才把固定标签切换到新镜像并重建服务。旧 runtime 会保留带时间戳的 rollback 标签；健康检查失败会自动恢复原标签。
 
-## 模型与外部服务
+只构建和验证镜像、不重启服务：
 
-`.env` 中的 `HOST_MODELS_DIR=./deploy/models` 指向交付目录下的模型挂载。模型目录包括 `deploy/models/docling-models`、`deploy/models/mineru/pipeline`、`deploy/models/mineru/vlm` 和 `deploy/models/bge-small-zh-v1.5`。
+```bash
+./apply-runtime.sh --build-only
+```
 
-MySQL、Neo4j、Elasticsearch、文件服务和 LLM 服务是外部依赖；部署前将 `.env` 中的地址、账号和密钥替换为目标环境可访问的配置。不要交付包含真实密钥的 `.env`。
+## 配置边界
 
-只使用文档解析和知识接口时，仍需启动 Redis，但它不会暴露宿主机端口。`EXECUTION_MODE=async` 表示计算由统一队列和 Worker 执行，不表示业务 HTTP API 默认立即返回 `202`：未携带 `Prefer` 时仍同步返回原状态码和原业务 `data`，只新增顶层 `execution`；`Prefer: respond-async` 才立即返回任务句柄，`Prefer: wait=N` 请求显式有界等待。显式异步调用在 SSE `job.completed` 后通过 `execution.result_url` 获取完整最终 envelope。MCP 生产默认 `MCP_EXECUTION_MODE=sync`，同样由队列执行但返回原工具结果；设为 `async` 才返回句柄。Redis 不可用时返回 503，不会回退到 Gateway 内执行。
+- 生产 8 卡 A40 服务器仅使用后四卡时保留 `GPU_DEVICE_IDS=4,5,6,7`。
+- 普通环境参数修改只需更新 `.env` 并重新创建容器，不需要重建任一镜像。
+- `BACKEND_IMAGE` 保持 `qasystem-runtime-v1`。
+- 模型不在镜像中，继续通过 `HOST_MODELS_DIR` 只读挂载到 `/models`。
+- 只有 CUDA、vLLM、Torch、系统库或 Python 依赖契约不兼容变化时，才同步升级 base/runtime 的版本号。

@@ -2,7 +2,7 @@ param(
     [string]$ModelsDir = (Join-Path $PSScriptRoot "deploy\models"),
     [ValidateSet("modelscope", "huggingface")]
     [string]$Source = "modelscope",
-    [string]$ImageName = "qasystem-backend:latest",
+    [string]$ImageName = "qasystem-runtime-v1",
     [switch]$SkipDocling,
     [switch]$SkipMineruPipeline,
     [switch]$SkipMineruVlm,
