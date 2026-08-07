@@ -8,7 +8,7 @@
 chmod +x ./docker/make-runtime-base.sh
 ./docker/make-runtime-base.sh \
   qasystem-backend:latest \
-  qasystem-backend:runtime-base-20260807
+  qasystem-base-v1
 ```
 
 脚本会检查 Docker 数据目录剩余空间（按源镜像大小约 3 倍加 2 GiB 估算，因为压平期间会同时存在源层、未压缩 rootfs 和新层），创建临时容器，删除 `/app/backend`、`/app/algorithm`、`/app/mcp_services`、`/app/agent` 和缓存，卸载 `agentcode` 自身安装包，然后执行 `docker export/import` 压平为单层。源镜像和目标镜像同时存在期间需要额外磁盘空间；确认新镜像可用后再由运维人员清理旧镜像。
@@ -22,15 +22,26 @@ QASYSTEM_BASE_TMPDIR=/mnt/data3/qasystem-base-tmp \
 
 ## 后续代码更新
 
-代码更新镜像应以生成的 `runtime-base` 为 `FROM`，完整复制上述四个源码目录，并重新复制运行时脚本和 OFD JAR（若它们属于交付内容），最后恢复：
+代码更新镜像统一命名为 `qasystem-runtime-v1`，以 `qasystem-base-v1` 为 `FROM`，完整复制上述四个源码目录，并重新复制运行时脚本和 OFD JAR（若它们属于交付内容），最后恢复：
 
 ```dockerfile
+FROM qasystem-base-v1
+
 WORKDIR /app/backend
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=5 CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 ENTRYPOINT ["tini", "--"]
 CMD ["python", "-m", "app.execution.supervisor"]
 ```
+
+构建与部署时使用固定标签：
+
+```bash
+docker build -t qasystem-runtime-v1 -f Dockerfile.code-overlay .
+BACKEND_IMAGE=qasystem-runtime-v1 docker compose up -d --force-recreate backend agent
+```
+
+`v1` 表示底层 CUDA、vLLM、Torch、系统库和 Python 依赖契约。普通业务代码更新继续覆盖同一个 `qasystem-runtime-v1`；只有底层依赖发生不兼容升级时才创建 `qasystem-base-v2` 和 `qasystem-runtime-v2`。
 
 这一步只新增代码和少量元数据层。不要把新基础镜像导出成 tar 再上传；在同一台服务器本地构建时，Docker 会复用原有 CUDA/vLLM 层。
 

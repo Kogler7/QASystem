@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # runtime base. The source image is never retagged or removed.
 
 SOURCE_IMAGE="${1:-qasystem-backend:latest}"
-TARGET_IMAGE="${2:-qasystem-backend:runtime-base-$(date -u +%Y%m%d)}"
+TARGET_IMAGE="${2:-qasystem-base-v1}"
 KEEP_CONTAINER="${KEEP_CONTAINER:-0}"
 WORK_DIR="${QASYSTEM_BASE_TMPDIR:-${TMPDIR:-/tmp}}"
 
