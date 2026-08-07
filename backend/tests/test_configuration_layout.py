@@ -17,6 +17,8 @@ def test_root_is_the_only_configuration_source():
     assert (ROOT / "docker" / "docker-compose.offline-test.yml").is_file()
     assert (ROOT / "docker" / "offline_mock_llm.py").is_file()
     assert (ROOT / "docker" / "offline_validation.py").is_file()
+    assert (ROOT / "docker" / "make-runtime-base.sh").is_file()
+    assert (ROOT / "docker" / "RUNTIME_BASE.md").is_file()
     assert (ROOT / "backend" / "app" / "health.py").is_file()
     assert not (ROOT / "agent" / ".env.example").exists()
     assert not (ROOT / "docker" / ".env.deploy.example").exists()
