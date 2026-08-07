@@ -344,6 +344,36 @@ def test_mineru_and_vlm_names_select_distinct_backends(tmp_path, monkeypatch):
     assert "mineru_options" not in vlm_result["metadata"]
 
 
+def test_bounded_page_range_accepts_empty_processor_content(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+
+    class EmptyPageRuntime:
+        def process(self, _path, **_kwargs):
+            return {"content": "", "metadata": {"backend": "vlm-http-client"}}
+
+    monkeypatch.setattr(processor, "_processor", lambda _engine: EmptyPageRuntime())
+
+    complete_document = processor._run_processor("vlm", str(path), ".pdf", "ch")
+    page_shard = processor._run_processor(
+        "vlm",
+        str(path),
+        ".pdf",
+        "ch",
+        start_page_id=45,
+        end_page_id=46,
+        allow_empty_content=True,
+    )
+
+    assert complete_document["success"] is False
+    assert page_shard == {
+        "success": True,
+        "content": "",
+        "metadata": {"backend": "vlm-http-client", "empty_content": True},
+    }
+
+
 def test_invalid_ocr_mode_is_rejected(tmp_path):
     path = tmp_path / "sample.pdf"
     path.write_bytes(b"%PDF-test")

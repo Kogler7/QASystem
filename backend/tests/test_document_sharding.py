@@ -10,6 +10,7 @@ from backend.app.execution.document_sharding import (
 from backend.app.execution.queue import MemoryTaskQueue
 from backend.app.execution.resources import GpuSnapshot, ResourceScheduler
 from backend.app.schemas import ParserConfig
+from backend.app.services.algorithm_capabilities import DocumentParsingService
 from backend.app.execution.store import MemoryExecutionStore
 from backend.app.execution.supervisor import _auto_cpu_workers, _auto_vlm_workers
 from backend.app.execution.worker import WorkerRuntime
@@ -49,6 +50,43 @@ def test_shard_markdown_is_merged_by_shard_index():
     )
     assert result["markdown"] == "first\n\nsecond"
     assert result["sharding"]["page_ranges"] == [[0, 1], [2, 3]]
+
+
+def test_empty_trailing_shard_is_accepted_and_reported():
+    ranges = [(0, 1), (2, 3)]
+    result = _merge_results(
+        "sample.pdf",
+        b"pdf",
+        [
+            {"markdown": "content", "parser": {"final_engine": "vlm"}, "page_range": {"shard_index": 0}},
+            {"markdown": "", "empty": True, "parser": {"final_engine": "vlm"}, "page_range": {"shard_index": 1}},
+        ],
+        ranges,
+    )
+    assert result["markdown"] == "content"
+    assert result["sharding"]["empty_shards"] == [1]
+    assert result["parser"]["sharding"]["empty_shards"] == [1]
+
+
+def test_document_service_accepts_empty_content_only_for_page_shard():
+    class EmptyProcessor:
+        def process_file(self, *_args, **_kwargs):
+            return {"success": True, "content": "", "metadata": {"model_used": "vlm"}}
+
+    result = DocumentParsingService(EmptyProcessor).parse(
+        "sample.pdf",
+        b"pdf",
+        ParserConfig(engine="vlm", force=True),
+        page_range=(45, 46),
+        shard_index=15,
+        total_shards=16,
+        execution_plan={"engine": "vlm", "selection": {}},
+    )
+
+    assert result["markdown"] == ""
+    assert result["content_length"] == 0
+    assert result["empty"] is True
+    assert result["page_range"]["shard_index"] == 15
 
 
 def test_failed_page_shard_retry_preserves_only_that_child_task():

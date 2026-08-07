@@ -183,7 +183,8 @@ class DocumentParsingService:
                     result,
                 )
             markdown = normalize_document_content(result.get("content"))
-            if not markdown.strip():
+            empty_content = not markdown.strip()
+            if empty_content and page_range is None:
                 raise CapabilityError(ErrorCode.DOCUMENT_CONTENT_EMPTY, "文档解析结果为空", "document_parse")
             data = {
                 "file_name": safe_name,
@@ -200,6 +201,7 @@ class DocumentParsingService:
                     "shard_index": shard_index,
                     "total_shards": total_shards,
                 }
+                data["empty"] = empty_content
             return data
         finally:
             if temp_path and os.path.exists(temp_path):

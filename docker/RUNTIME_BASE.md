@@ -37,7 +37,7 @@ CMD ["python", "-m", "app.execution.supervisor"]
 构建与部署时使用固定标签：
 
 ```bash
-docker build -t qasystem-runtime-v1 -f Dockerfile.code-overlay .
+docker build -t qasystem-runtime-v1 -f Dockerfile.runtime .
 BACKEND_IMAGE=qasystem-runtime-v1 docker compose up -d --force-recreate backend agent
 ```
 

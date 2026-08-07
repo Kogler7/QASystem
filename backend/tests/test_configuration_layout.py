@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_root_is_the_only_configuration_source():
     assert (ROOT / ".env.example").is_file()
     assert (ROOT / "Dockerfile").is_file()
+    assert (ROOT / "Dockerfile.runtime").is_file()
     assert (ROOT / "docker-compose.yml").is_file()
     assert (ROOT / "package-deploy.ps1").is_file()
     assert (ROOT / "build-image.ps1").is_file()
@@ -80,6 +81,8 @@ def test_deploy_script_only_generates_runtime_assets():
 
 def test_dockerfile_performs_complete_runtime_verification():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    runtime_dockerfile = (ROOT / "Dockerfile.runtime").read_text(encoding="utf-8")
+    mineru_requirements = (ROOT / "backend" / "requirements.mineru-extras.txt").read_text(encoding="utf-8")
     verifier = (ROOT / "docker" / "verify_runtime.py").read_text(encoding="utf-8")
     docling_processor = (
         ROOT / "algorithm" / "preproc" / "preproc_src" / "processors" / "docx_processor.py"
@@ -89,6 +92,11 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert 'pip install "/app/agent[api]"' in dockerfile
     assert "--no-deps" not in dockerfile
     assert "verify_qasystem_runtime.py" in dockerfile
+    assert "FROM ${BASE_IMAGE}" in runtime_dockerfile
+    assert "opencv-python==4.11.0.86" in mineru_requirements
+    assert "opencv-python-headless==4.11.0.86" in mineru_requirements
+    assert "opencv-python==4.11.0.86" in runtime_dockerfile
+    assert '"opencv-python": "4.11.0.86"' in verifier
     assert "download_qasystem_models.py" in dockerfile
     assert "from backend.app.main import app as backend_app" in verifier
     assert "from agentcode.api import app as agent_app" in verifier

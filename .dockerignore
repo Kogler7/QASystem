@@ -37,6 +37,7 @@ backend/*.log
 
 # 文档（不参与运行）
 docs/
+test_artifacts/
 
 # Milvus / 本地编排产生的数据目录
 volumes

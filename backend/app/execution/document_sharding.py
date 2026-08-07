@@ -135,15 +135,22 @@ def _merge_results(
     if not results:
         raise PageShardError("没有可合并的页段结果")
     ordered = sorted(results, key=lambda item: (item.get("page_range") or {}).get("shard_index", 0))
-    markdown = "\n\n".join(str(item.get("markdown", "")).strip() for item in ordered).strip()
+    markdown_parts = [str(item.get("markdown", "")).strip() for item in ordered]
+    markdown = "\n\n".join(part for part in markdown_parts if part).strip()
     if not markdown:
         raise PageShardError("页段合并后内容为空")
+    empty_shards = [
+        (item.get("page_range") or {}).get("shard_index", index)
+        for index, (item, part) in enumerate(zip(ordered, markdown_parts))
+        if not part
+    ]
     parser = dict(ordered[0].get("parser") or {})
     shard_count = len(ranges) or len(ordered)
     parser["sharding"] = {
         "enabled": shard_count > 1,
         "shard_count": shard_count,
         "page_ranges": [[start, end] for start, end in ranges],
+        "empty_shards": empty_shards,
     }
     return {
         "file_name": file_name,
@@ -157,6 +164,7 @@ def _merge_results(
             "page_count": sum(end - start + 1 for start, end in ranges) if ranges else None,
             "shard_count": shard_count,
             "page_ranges": [[start, end] for start, end in ranges],
+            "empty_shards": empty_shards,
         },
     }
 

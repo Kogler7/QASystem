@@ -243,6 +243,7 @@ class DocumentProcessor:
         formula_enable: bool = True,
         start_page_id: int = 0,
         end_page_id: Optional[int] = None,
+        allow_empty_content: bool = False,
     ) -> dict[str, Any]:
         process_path = file_path
         temp_pdf_path = None
@@ -308,6 +309,9 @@ class DocumentProcessor:
             if metadata.get("error"):
                 return {"success": False, "error": str(metadata["error"]), "metadata": metadata}
             if content is None or not str(content).strip():
+                if allow_empty_content:
+                    metadata["empty_content"] = True
+                    return {"success": True, "content": "", "metadata": metadata}
                 return {"success": False, "error": f"{engine} 未生成有效内容", "metadata": metadata}
             return {"success": True, "content": content, "metadata": metadata}
         except ModuleNotFoundError as exc:
@@ -391,6 +395,7 @@ class DocumentProcessor:
             *run_options,
             start_page_id=start_page_id,
             end_page_id=end_page_id,
+            allow_empty_content=end_page_id is not None,
         )
         fallback_from = None
         fallback = selection.get("fallback_engine")
@@ -405,6 +410,7 @@ class DocumentProcessor:
                 *run_options,
                 start_page_id=start_page_id,
                 end_page_id=end_page_id,
+                allow_empty_content=end_page_id is not None,
             )
 
         base_metadata = {

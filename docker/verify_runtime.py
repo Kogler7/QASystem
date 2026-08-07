@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ MODULES = (
     "PIL",
     "agentcode",
     "bs4",
+    "cv2",
     "docling",
     "dotenv",
     "elasticsearch",
@@ -45,6 +47,11 @@ MODULES = (
     "yaml",
 )
 
+EXPECTED_DISTRIBUTIONS = {
+    "opencv-python": "4.11.0.86",
+    "opencv-python-headless": "4.11.0.86",
+}
+
 PROGRAMS = (
     "bash",
     "curl",
@@ -71,6 +78,20 @@ def _check_modules() -> None:
             failures.append(f"{name}: {exc!r}")
     if failures:
         raise RuntimeError("module import failures:\n" + "\n".join(failures))
+
+
+def _check_distribution_versions() -> None:
+    mismatches: list[str] = []
+    for name, expected in EXPECTED_DISTRIBUTIONS.items():
+        try:
+            actual = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            mismatches.append(f"{name}: missing (expected {expected})")
+            continue
+        if actual != expected:
+            mismatches.append(f"{name}: {actual} (expected {expected})")
+    if mismatches:
+        raise RuntimeError("runtime distribution version mismatches:\n" + "\n".join(mismatches))
 
 
 def _check_programs() -> None:
@@ -116,6 +137,7 @@ def _check_application() -> None:
 
 def main() -> int:
     _check_modules()
+    _check_distribution_versions()
     _check_programs()
     _check_application()
     print("QASystem runtime verification passed", flush=True)
