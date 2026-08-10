@@ -5,7 +5,12 @@ from typing import Any, Callable
 
 from .config import get_llm_config
 from .extractor import extract_v2
-from .graph_utils import filter_relationships_with_known_nodes, merge_node_properties
+from .graph_utils import (
+    coerce_non_empty_name,
+    entity_uid,
+    filter_relationships_with_known_nodes,
+    merge_node_properties,
+)
 
 
 def extract_chunks(
@@ -14,6 +19,10 @@ def extract_chunks(
     *,
     model: str | None = None,
     base_url: str | None = None,
+    api_key: str | None = None,
+    document_type: str = "auto",
+    target_types: list[str] | None = None,
+    validation_mode: str = "strict",
     extractor: Callable[..., dict[str, Any]] = extract_v2,
     max_workers: int | None = None,
 ) -> list[dict[str, Any]]:
@@ -27,7 +36,16 @@ def extract_chunks(
     def run(item: tuple[int, str]) -> dict[str, Any]:
         index, text = item
         try:
-            result = extractor(ontology=ontology, text=text, model=model, base_url=base_url)
+            result = extractor(
+                ontology=ontology,
+                text=text,
+                model=model,
+                base_url=base_url,
+                api_key=api_key,
+                document_type=document_type,
+                target_types=target_types,
+                validation_mode=validation_mode,
+            )
         except Exception as exc:
             result = {
                 "raw": {},
@@ -42,6 +60,8 @@ def extract_chunks(
             "raw": result.get("raw", {}),
             "graph": result.get("graph") or {"nodes": [], "relationships": []},
             "attempts": result.get("attempts", []),
+            "warnings": result.get("warnings", []),
+            "profile": result.get("profile", {}),
             "error": result.get("_error") or result.get("error"),
             "error_code": result.get("error_code"),
             "raw_response": result.get("_raw_response", ""),
@@ -52,7 +72,7 @@ def extract_chunks(
 
 
 def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    """Deduplicate per-chunk nodes by uid and relationships by endpoints/type."""
+    """Merge nodes first, then recover valid cross-chunk raw relationships."""
     nodes_by_uid: dict[str, dict[str, Any]] = {}
     relationships: list[dict[str, Any]] = []
     relationship_keys: set[tuple[str, str, str]] = set()
@@ -81,20 +101,41 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
 
     valid_uids = set(nodes_by_uid)
 
+    relationship_candidates: list[dict[str, Any]] = []
     for item in items:
         graph = item.get("graph") or {}
-        for relationship in filter_relationships_with_known_nodes(
-            graph.get("relationships", []),
-            valid_uids,
-        ):
-            key = (
-                str(relationship.get("from_uid") or ""),
-                str(relationship.get("to_uid") or ""),
-                str(relationship.get("type") or ""),
-            )
-            if key in relationship_keys:
+        relationship_candidates.extend(graph.get("relationships", []))
+        raw = item.get("raw") or {}
+        for relation in raw.get("relations", []):
+            if not isinstance(relation, dict):
                 continue
-            relationship_keys.add(key)
-            relationships.append(relationship)
+            from_type = coerce_non_empty_name(relation.get("from_type"))
+            from_name = coerce_non_empty_name(relation.get("from_name"))
+            to_type = coerce_non_empty_name(relation.get("to_type"))
+            to_name = coerce_non_empty_name(relation.get("to_name"))
+            relation_type = coerce_non_empty_name(relation.get("rel_type"))
+            if not all((from_type, from_name, relation_type, to_type, to_name)):
+                continue
+            relationship_candidates.append(
+                {
+                    "from_uid": entity_uid(from_type, from_name, None),
+                    "to_uid": entity_uid(to_type, to_name, None),
+                    "type": relation_type,
+                }
+            )
+
+    for relationship in filter_relationships_with_known_nodes(
+        relationship_candidates,
+        valid_uids,
+    ):
+        key = (
+            str(relationship.get("from_uid") or ""),
+            str(relationship.get("to_uid") or ""),
+            str(relationship.get("type") or ""),
+        )
+        if key in relationship_keys:
+            continue
+        relationship_keys.add(key)
+        relationships.append(relationship)
 
     return {"nodes": list(nodes_by_uid.values()), "relationships": relationships}
