@@ -272,7 +272,7 @@ def _split_into_segments(text: str, separators: list[str] | None = None) -> list
     if current:
         merged.append(current)
 
-    return [s for s in merged if s.strip()]
+    return merged
 
 
 def _split_by_markdown_headers(text: str) -> list[str]:
