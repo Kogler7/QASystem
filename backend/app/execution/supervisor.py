@@ -177,13 +177,22 @@ class RuntimeSupervisor:
 
     def _start_core_workers(self) -> None:
         api_workers = _env_int("API_WORKERS", 2, minimum=1, maximum=16)
+        vlm_endpoints = [f"http://127.0.0.1:{self.base_port + index}" for index in range(len(self.gpu_ids))]
+        api_env = os.environ.copy()
+        if vlm_endpoints:
+            api_env["MINERU_VLM_BACKEND"] = "vlm-http-client"
+            api_env["MINERU_VLM_SERVER_URL"] = vlm_endpoints[0]
         self._spawn(
             "api",
             [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", str(api_workers)],
+            env=api_env,
         )
         for index in range(_auto_cpu_workers(self.cpu_count)):
             env = os.environ.copy()
             env["EXECUTION_WORKER_ID"] = f"cpu-{index}"
+            if vlm_endpoints:
+                env["MINERU_VLM_BACKEND"] = "vlm-http-client"
+                env["MINERU_VLM_SERVER_URL"] = vlm_endpoints[index % len(vlm_endpoints)]
             self._spawn(
                 f"cpu-worker-{index}",
                 [sys.executable, "-m", "app.execution.worker", "--resource-class", CPU_RESOURCE_CLASSES],

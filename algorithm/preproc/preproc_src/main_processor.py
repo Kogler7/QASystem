@@ -271,7 +271,7 @@ class DocumentProcessor:
 
             kwargs: dict[str, Any] = {}
             if engine in {"mineru", "vlm"}:
-                backend = "pipeline" if engine == "mineru" else os.getenv("MINERU_VLM_BACKEND", "vlm-transformers")
+                backend = "pipeline" if engine == "mineru" else os.getenv("MINERU_VLM_BACKEND", "vlm-http-client")
                 pipeline_method = {"auto": "auto", "on": "ocr", "off": "txt"}[ocr_mode]
                 kwargs = {
                     "output_dir": str(self.output_dir),

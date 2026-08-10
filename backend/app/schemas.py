@@ -101,7 +101,7 @@ class ChunkRequest(StrictModel):
 
 
 class GraphExtractionRequest(StrictModel):
-    ontology: str = Field(min_length=1)
+    ontology: str = ""
     items: list[GraphExtractionItem] = Field(min_length=1)
     options: ExtractionOptions = Field(default_factory=ExtractionOptions)
 

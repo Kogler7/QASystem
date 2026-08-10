@@ -413,3 +413,131 @@ def extract_v2(
         "graph": graph,
         "attempts": attempts,
     }
+
+
+# ── 非结构化抽取：切片摘要（无本体时使用，不产图谱）──
+
+SUMMARY_INSTRUCTION = """## 摘要规则
+
+你是文档切片摘要专家。请为给定的文本切片生成简洁、准确的中文摘要。
+
+### 要求
+- 用 2~5 句话概括该切片的主题、关键内容和要点
+- 保留重要事实、数字、专有名词
+- 不添加原文没有的信息，不进行编造
+- 只输出 JSON，不要任何解释、markdown 代码块或额外文字
+
+### 输出格式
+{"summary": "该切片的摘要"}"""
+
+
+def build_summary_prompt(text: str) -> str:
+    """构建切片摘要 prompt（非结构化抽取，不依赖本体/图谱）。"""
+    return f"""{SUMMARY_INSTRUCTION}
+
+## 待概括文本
+{text}"""
+
+
+def summarize_text(
+    text: str,
+    *,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+    json_retries: Optional[int] = None,
+) -> dict[str, Any]:
+    """对单个文本切片生成摘要（非结构化抽取用，不走本体图谱抽取）。"""
+    text = (text or "").strip()
+    if not text:
+        return {"text": "", "summary": "", "_error": "输入文本为空", "error_code": "EMPTY_TEXT"}
+
+    cfg = get_llm_config()
+    base_url = base_url or cfg["base_url"]
+    api_key = api_key or cfg["api_key"]
+    model = model or cfg["model"]
+    max_tokens = max_tokens or cfg["max_tokens"]
+    json_retries = max(
+        0,
+        json_retries
+        if json_retries is not None
+        else int(os.getenv("KG_EXTRACT_LLM_JSON_RETRIES", os.getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
+    )
+
+    logger.info("summarize_text: text_len=%d model=%s", len(text), model)
+
+    prompt = build_summary_prompt(text)
+    system_msg = "你是文档切片摘要专家。只输出 JSON，不要任何解释。"
+
+    client = _build_openai_client(base_url=base_url, api_key=api_key)
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": prompt},
+    ]
+    attempts: list[dict[str, Any]] = []
+    raw_response = ""
+    summary = ""
+
+    for attempt in range(json_retries + 1):
+        try:
+            with get_llm_scheduler().request_slot():
+                stream = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=min(int(max_tokens or 16384), 2048),
+                    timeout=180,
+                    stream=True,
+                )
+                parts: list[str] = []
+                for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        parts.append(content)
+            raw_response = "".join(parts)
+        except Exception as exc:
+            attempts.append({"attempt": attempt + 1, "type": "request", "message": str(exc)})
+            logger.warning("摘要 LLM 调用第 %d 次失败: %s", attempt + 1, exc)
+            if attempt >= json_retries:
+                client.close()
+                return {
+                    "text": text,
+                    "summary": "",
+                    "_error": "摘要 LLM 调用失败",
+                    "error_code": "LLM_REQUEST_FAILED",
+                    "attempts": attempts,
+                }
+            time.sleep(min(2 ** attempt, 4))
+            continue
+
+        parsed = extract_json_from_response(raw_response)
+        if isinstance(parsed, dict) and isinstance(parsed.get("summary"), str):
+            summary = parsed["summary"].strip()
+            if summary:
+                break
+        attempts.append({
+            "attempt": attempt + 1,
+            "type": "json",
+            "message": "响应不是包含 summary 字段的 JSON 对象",
+        })
+        logger.warning("摘要 LLM 响应第 %d 次 JSON 校验失败", attempt + 1)
+        if attempt < json_retries:
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": raw_response[:12000]},
+                {
+                    "role": "user",
+                    "content": "上一次输出不是合法的目标 JSON。请重新输出且只输出包含 summary 字段的 JSON 对象。",
+                },
+            ]
+
+    client.close()
+    result: dict[str, Any] = {"text": text, "summary": summary, "attempts": attempts}
+    if not summary:
+        result["_error"] = "摘要生成结果为空"
+        result["error_code"] = "SUMMARY_EMPTY"
+    return result

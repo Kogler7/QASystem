@@ -340,7 +340,7 @@ def test_mineru_and_vlm_names_select_distinct_backends(tmp_path, monkeypatch):
         "table_enable": False,
         "formula_enable": False,
     }
-    assert calls[1]["backend"] == "vlm-transformers"
+    assert calls[1]["backend"] == "vlm-http-client"
     assert "mineru_options" not in vlm_result["metadata"]
 
 

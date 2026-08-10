@@ -108,46 +108,94 @@ class KnowledgePrecipitationService:
     ) -> dict[str, Any]:
         chunked = self.chunking.chunk(markdown, options.chunking)
         chunks = chunked["items"]
-        extracted_batch = self.extraction.extract(
-            ontology=ontology,
-            items=[
-                TextChunk(text=item["text"], ranges=item["range"])
-                for item in chunks
-            ],
-            model=options.extraction.model,
-            merge=options.extraction.merge,
-        )
-        extracted_items = extracted_batch.items
-        extracted_result = extracted_batch.pipeline_data()
-        final_graph = extracted_batch.graph
-        final_graphs = extracted_batch.graphs
-        node_count = (
-            len(final_graph.get("nodes", []))
-            if final_graph is not None
-            else sum(len(graph.get("nodes", [])) for graph in final_graphs or [])
-        )
-        relationship_count = (
-            len(final_graph.get("relationships", []))
-            if final_graph is not None
-            else sum(len(graph.get("relationships", [])) for graph in final_graphs or [])
-        )
-        stats["extraction"] = {
-            "chunks_extracted": len(extracted_items),
-            "merge": options.extraction.merge,
-            "nodes_extracted": node_count,
-            "relationships_extracted": relationship_count,
-            "attempts": extracted_batch.attempts,
-            "scheduler": extracted_batch.scheduler,
-        }
 
-        if options.storage.persist_graph:
-            raise PipelineError(
-                ErrorCode.EXTERNAL_CAPABILITY_UNAVAILABLE,
-                "知识图谱写入接口尚未开通",
-                "graph_storage",
-                {"capability": "graph.write"},
-                {"artifacts": {"markdown": origin}} if origin is not None else None,
+        # 兼容两种抽取模式：传元模型走本体图谱抽取；不传元模型走非结构化摘要（切片+概要，不产图谱）
+        has_ontology = bool((ontology or "").strip())
+        if has_ontology:
+            extracted_batch = self.extraction.extract(
+                ontology=ontology,
+                items=[
+                    TextChunk(text=item["text"], ranges=item["range"])
+                    for item in chunks
+                ],
+                model=options.extraction.model,
+                merge=options.extraction.merge,
             )
+            extracted_items = extracted_batch.items
+            extracted_result = extracted_batch.pipeline_data()
+            final_graph = extracted_batch.graph
+            final_graphs = extracted_batch.graphs
+            node_count = (
+                len(final_graph.get("nodes", []))
+                if final_graph is not None
+                else sum(len(graph.get("nodes", [])) for graph in final_graphs or [])
+            )
+            relationship_count = (
+                len(final_graph.get("relationships", []))
+                if final_graph is not None
+                else sum(len(graph.get("relationships", [])) for graph in final_graphs or [])
+            )
+            stats["extraction"] = {
+                "chunks_extracted": len(extracted_items),
+                "merge": options.extraction.merge,
+                "nodes_extracted": node_count,
+                "relationships_extracted": relationship_count,
+                "attempts": extracted_batch.attempts,
+                "scheduler": extracted_batch.scheduler,
+            }
+
+            if options.storage.persist_graph:
+                raise PipelineError(
+                    ErrorCode.EXTERNAL_CAPABILITY_UNAVAILABLE,
+                    "知识图谱写入接口尚未开通",
+                    "graph_storage",
+                    {"capability": "graph.write"},
+                    {"artifacts": {"markdown": origin}} if origin is not None else None,
+                )
+        else:
+            from algorithm.knowledge_extract.batch import summarize_chunks
+            from algorithm.knowledge_extract.config import get_llm_config as _get_llm_config
+
+            summaries = summarize_chunks(
+                [item["text"] for item in chunks],
+                model=options.extraction.model,
+            )
+            scheduler_cfg = _get_llm_config()
+            final_graph = None
+            final_graphs = None
+            node_count = 0
+            relationship_count = 0
+            extracted_result = {
+                "mode": "unstructured",
+                "chunks": [
+                    {
+                        "index": item["index"],
+                        "text": item["text"],
+                        "range": chunks[item["index"]]["range"],
+                        "summary": item["summary"],
+                    }
+                    for item in summaries
+                ],
+            }
+            stats["extraction"] = {
+                "mode": "unstructured",
+                "chunks_summarized": len(summaries),
+                "attempts": [
+                    {
+                        "position": item["index"],
+                        "error": item.get("error"),
+                        "error_code": item.get("error_code"),
+                        "attempts": item.get("attempts", []),
+                    }
+                    for item in summaries
+                    if item.get("error") or item.get("attempts")
+                ],
+                "scheduler": {
+                    "max_concurrency": scheduler_cfg["max_concurrency"],
+                    "qps": scheduler_cfg["qps"],
+                    "qpm": scheduler_cfg["qpm"],
+                },
+            }
 
         vector_ids = None
         vector_dimension = None
@@ -201,13 +249,16 @@ class KnowledgePrecipitationService:
         }
         stats["total_time_seconds"] = round((datetime.now() - started).total_seconds(), 3)
 
+        if not has_ontology:
+            summary_text = f"共生成 {len(chunks)} 个切片及摘要。"
+        elif final_graph is not None:
+            summary_text = generate_understanding(final_graph)
+        else:
+            summary_text = f"共抽取 {len(final_graphs or [])} 个分片图谱，包含 {node_count} 个节点实例和 {relationship_count} 条关系实例。"
+
         return {
             "name": upload_stem,
-            "summary": (
-                generate_understanding(final_graph)
-                if final_graph is not None
-                else f"共抽取 {len(final_graphs or [])} 个分片图谱，包含 {node_count} 个节点实例和 {relationship_count} 条关系实例。"
-            ),
+            "summary": summary_text,
             "artifacts": (
                 {"markdown": origin, "vector_ids": vector_ids}
                 if origin is not None

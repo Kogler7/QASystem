@@ -54,7 +54,7 @@ def _collect_files(
 @router.post("/api/knowledge/precipitation", deprecated=True)
 async def knowledge_ingestion(
     http_request: Request,
-    ontology: str = Form(...),
+    ontology: str = Form(""),
     options: str = Form("{}"),
     file: UploadFile | None = File(None),
     files: list[UploadFile] | None = File(None),

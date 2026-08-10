@@ -7,12 +7,12 @@ from mcp_services.dispatch import maybe_submit
 
 @mcp.tool(name="kg_extract_v2")
 def extract_knowledge(
-    ontology: str,
-    text: str,
+    ontology: str = "",
+    text: str = "",
     model: str | None = None,
     base_url: str | None = None,
 ) -> dict[str, Any]:
-    """Extract entities and relationships from text using a PlantUML ontology."""
+    """从文本抽取知识。传 PlantUML ontology 时按元模型抽取实体/关系图谱；不传本体时走非结构化抽取，返回文本摘要。"""
     queued = maybe_submit(
         "mcp.knowledge.extract",
         {"ontology": ontology, "text": text, "model": model, "base_url": base_url},
@@ -28,9 +28,12 @@ def extract_knowledge(
 
 
 def _extract(ontology, text, model, base_url):
-    from algorithm.knowledge_extract import extract_v2
+    from algorithm.knowledge_extract import extract_v2, summarize_text
 
-    return extract_v2(ontology=ontology, text=text, model=model, base_url=base_url)
+    if (ontology or "").strip():
+        return extract_v2(ontology=ontology, text=text, model=model, base_url=base_url)
+    # 非结构化：无本体时不按元模型抽取，直接生成文本摘要
+    return summarize_text(text=text, model=model, base_url=base_url)
 
 
 @mcp.tool(name="kg_get_dimension_scales")

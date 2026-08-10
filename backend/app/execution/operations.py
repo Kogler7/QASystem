@@ -62,12 +62,38 @@ def _chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _unstructured_extract(payload: dict[str, Any]) -> dict[str, Any]:
+    """非结构化抽取：无本体时对每个切片生成摘要，不产图谱。"""
+    from algorithm.knowledge_extract.batch import summarize_chunks
+
+    items = payload.get("items") or []
+    results = summarize_chunks(
+        [item.get("text", "") for item in items],
+        model=(payload.get("options") or {}).get("model"),
+    )
+    chunks = []
+    for source, res in zip(items, results):
+        chunks.append({
+            "index": res["index"],
+            "text": res["text"],
+            "range": source.get("range"),
+            "summary": res["summary"],
+            "error": res.get("error"),
+            "error_code": res.get("error_code"),
+        })
+    return {"mode": "unstructured", "count": len(chunks), "chunks": chunks}
+
+
 def _extract_graphs(payload: dict[str, Any]) -> dict[str, Any]:
     from backend.app.services.algorithm_capabilities import graph_extraction_service
 
+    ontology = str(payload.get("ontology") or "").strip()
     items = [GraphExtractionItem.model_validate(item) for item in payload["items"]]
+    if not ontology:
+        # 兼容：不传元模型时走非结构化抽取（切片+摘要）
+        return _unstructured_extract(payload)
     result = graph_extraction_service.extract(
-        payload["ontology"],
+        ontology,
         items,
         model=(payload.get("options") or {}).get("model"),
         merge=(payload.get("options") or {}).get("merge", True),
@@ -129,20 +155,21 @@ def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
     options = PipelineOptions.model_validate(payload.get("options") or {})
     files = payload.get("files") or []
     service = _knowledge_service()
+    ontology = str(payload.get("ontology") or "")
     if len(files) == 1 and not payload.get("batch"):
         item = files[0]
         return service.process(
             KnowledgeIngestionRequest(
                 file_name=item["file_name"],
                 content=_decode_content(item["content"]),
-                ontology=payload["ontology"],
+                ontology=ontology,
                 options=options,
             )
         )
     return service.process_batch(
         BatchKnowledgeIngestionRequest(
             files=[FileItem(file_name=item["file_name"], content=_decode_content(item["content"])) for item in files],
-            ontology=payload["ontology"],
+            ontology=ontology,
             options=options,
         )
     )
@@ -166,7 +193,12 @@ def _mcp_knowledge_extract(payload: dict[str, Any]) -> dict[str, Any]:
     from mcp_services.domains.knowledge.extraction import _extract
     from mcp_services.result import ToolCode, normalize_tool_result
 
-    result = _extract(payload["ontology"], payload["text"], payload.get("model"), payload.get("base_url"))
+    result = _extract(
+        str(payload.get("ontology") or ""),
+        str(payload.get("text") or ""),
+        payload.get("model"),
+        payload.get("base_url"),
+    )
     return normalize_tool_result(result, ToolCode.KNOWLEDGE_FAILED, "知识抽取完成")
 
 
@@ -253,6 +285,7 @@ _OPERATIONS = {
     "document.parse": _parse_document,
     "document.parse.shard": _parse_document_shard,
     "document.chunk": _chunk_document,
+    "knowledge.unstructured_extract": _unstructured_extract,
     "graph.extract": _extract_graphs,
     "embedding.texts": _embed_texts,
     "embedding.graphs": _embed_graphs,

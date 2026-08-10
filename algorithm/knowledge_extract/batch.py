@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from .config import get_llm_config
-from .extractor import extract_v2
+from .extractor import extract_v2, summarize_text
 from .graph_utils import filter_relationships_with_known_nodes, merge_node_properties
 
 
@@ -48,6 +48,46 @@ def extract_chunks(
         }
 
     with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="kg-extract") as executor:
+        return list(executor.map(run, enumerate(chunks)))
+
+
+def summarize_chunks(
+    chunks: list[str],
+    *,
+    model: str | None = None,
+    base_url: str | None = None,
+    summarizer: Callable[..., dict[str, Any]] = summarize_text,
+    max_workers: int | None = None,
+) -> list[dict[str, Any]]:
+    """对每个切片生成摘要（非结构化抽取），并发执行并保持输入顺序和下标。"""
+    if not chunks:
+        return []
+
+    configured_workers = int(get_llm_config().get("max_concurrency", 4))
+    worker_count = max(1, min(len(chunks), max_workers or configured_workers))
+
+    def run(item: tuple[int, str]) -> dict[str, Any]:
+        index, text = item
+        try:
+            result = summarizer(text=text, model=model, base_url=base_url)
+        except Exception as exc:
+            result = {
+                "text": text,
+                "summary": "",
+                "_error": "摘要生成调用异常",
+                "error_code": "SUMMARY_EXCEPTION",
+                "attempts": [{"attempt": 1, "type": "exception", "message": str(exc)}],
+            }
+        return {
+            "index": index,
+            "text": text,
+            "summary": result.get("summary", ""),
+            "attempts": result.get("attempts", []),
+            "error": result.get("_error") or result.get("error"),
+            "error_code": result.get("error_code"),
+        }
+
+    with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="kg-summary") as executor:
         return list(executor.map(run, enumerate(chunks)))
 
 
