@@ -1,262 +1,407 @@
-"""本体驱动的 LLM 知识抽取（V2），不带模板匹配。
+"""Ontology-driven LLM knowledge extraction.
 
-参考：kg-extract-v7 的抽取方法 — LLM 直接读取 PUML 本体作为抽取 schema。
-直接使用 OpenAI SDK 调用 LLM。
+The language model proposes entities and relations. The local ontology layer is
+the authority: it normalizes identifiers, coerces property values, enforces the
+selected class scope, and rejects invented schema elements before graph output.
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
 import re
 import time
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from openai import OpenAI
 
 from .config import get_llm_config
-from .graph_utils import build_node_properties, filter_relationships_with_known_nodes, merge_node_properties
+from .graph_utils import (
+    build_node_properties,
+    coerce_non_empty_name,
+    entity_uid,
+    filter_relationships_with_known_nodes,
+    merge_node_properties,
+)
 from .ontology_schema import OntologySchema
 from .scheduler import get_llm_scheduler
 
 logger = logging.getLogger(__name__)
 
 
-# ── 通用抽取指令（参考 kg-extract-v7）──
+GENERIC_INSTRUCTION = """## 通用抽取规则
 
-GENERIC_INSTRUCTION = """## 抽取规则
+本体定义中的 PlantUML 类图是唯一 schema，禁止使用本体外知识扩展 schema。
 
-你是知识图谱抽取专家。上方"本体定义"中的 PlantUML 类图就是你唯一的抽取 schema，请严格按本体定义抽取：
+### 实体
+- `type` 只能使用“本次允许的本体标识目录”列出的稳定类型标识。
+- `properties` 的键只能使用目录列出的稳定属性标识；不得输出展示名或自创字段。
+- 严格遵守属性类型：`String[]` 输出 JSON 数组，数值输出 JSON number，`Boolean` 输出 true/false。
+- `name` 按 @identity 属性的优先级填写；没有 identity 值时才回退到实体名称。
+- 只抽取文本明确表达或可由文档结构直接确定的事实，不补写常识，不猜测缺失值。
+- 同一实体在文本多处出现时使用同一个 identity/name，不要创建同义重复节点。
 
-### 实体抽取
-- 本体中每个 class 定义一个实体类型，实体 `type` 必须使用下方“本体标识目录”给出的稳定类型标识
-- 类体中每个 `+属性名: 类型 // 注释` 即为该实体的属性字段，从文档中提取对应值填入 `properties`
-- 属性类型标注为 `String[]` 的用 JSON 数组表示，标注为 `Boolean` 的用 true/false
-- 文档中未提及的属性设为 null 或不包含在 properties 中
-- 可以根据文档结构（## 标题、|| 表格、// 段落、&& 小节等）识别内容边界，将对应内容映射到本体属性
+### 关系
+- `rel_type` 只能使用“本次允许的关系签名”中列出的关系名，方向和两端类型必须匹配签名。
+- `from_name`/`to_name` 必须与 entities 中相应实体的 identity/name 完全一致。
+- 每输出一条关系，当前分片能确定的端点实体应同时加入 entities；跨段引用可保留准确的端点 identity。
+- 从标题层级推断父子关系，从明确的引用、归属、流程或动作描述推断其他关系。
+- 标注为“后处理建立”或 postprocess 的关系不在本阶段抽取。
+- 输出 relations 之前，先检查 `entities` 是否已经包含两端实体；缺失时先补建该实体，再输出 relation。禁止输出引用不存在实体的 relation（不要输出悬空 relation）。
+- 关系端点优先复用已输出的实体 name（identity 值），同一实体不重复创建不同 name 的副本。
 
-### 关系抽取
-- 本体中每条 `A "1" --> "B" : REL_NAME` 定义一个关系类型
-- relations 中每条记录的 `from_type`/`to_type` 使用上述元模型类标识，`rel_type` 使用本体关系名
-- `from_name`/`to_name` 使用实体的 name 属性值（或 @identity 标注的标识字段）
-- 每输出一条 relation，必须保证 `entities` 中同时存在对应的源节点和目标节点
-- 如果文本里明显存在关系，但某一端实体尚未列入 `entities`，先补建该实体，再输出 relation
-- 补建实体时，至少补齐该实体的 `type`、`name`，并尽量补充文本中可确定的 `properties`
-- 禁止输出引用不存在实体的 relation；如果无法确定任一端实体，就不要输出这条 relation
-- 从文档的层级结构推断父子归属关系
-- 从文档中的流程描述/关系表推断流程流转关系
-- 标注为"后处理建立"/"postprocess"的关系**跳过**，不在此阶段抽取
+### 输出
+- 只输出一个 JSON 对象，不输出解释、Markdown 代码块或思考过程。
+- 顶层必须同时包含 `entities` 和 `relations` 两个数组；没有结果时输出空数组。
+- 缺失属性直接省略或使用 null；禁止为了字段完整而编造值。
 
-### 输出要求
-- 只输出 JSON，不要任何解释、markdown 代码块或额外文字
-- 不要自创本体中不存在的类型、属性或关系名
-- 即使文档中某些字段缺失，也不要编造值
-
-### 关系与实体一致性示例
-- 正确示例：若输出 `A -[REL]-> B`，则 `entities` 中必须同时有 A 和 B；如果 B 尚未抽出，先把 B 补进 `entities`
-- 错误示例：`entities` 里只有 A，却在 `relations` 里输出 `A -[REL]-> B`
-- 记忆规则：宁可少一条无法落到实体集合中的 relation，也不要输出悬空 relation"""
-
-
-def build_generic_extraction_prompt(text: str) -> str:
-    """构建通用抽取 prompt（无本体定义时使用），让 LLM 自由识别实体和关系。"""
-
-    return f"""你是一个知识图谱抽取专家。请从以下文本中自由识别实体和关系，构建知识图谱。
-
-## 抽取规则
-
-### 实体抽取
-- 从文本中识别所有有意义的实体（如人员、组织、设备、概念、术语、指标等）
-- 为每个实体选择合适的 type 类型名称（如 Person、Organization、Equipment、Concept、Term、Metric、Document 等）
-- 从文本中提取该实体的 name（名称）和其他可用的属性
-- 属性以键值对形式填入 properties，未提到的属性可省略
-- 只抽取文本中明确提到的实体，不要编造
-
-### 关系抽取
-- 从文本中识别实体之间的关系
-- 为每条关系指定合适的 rel_type（如 "工作于"、"管理"、"包含"、"定义"、"关联"、"属于" 等）
-- from_name/to_name 使用实体的 name 属性值
-- 每输出一条 relation，必须保证 entities 中同时存在对应的源节点和目标节点
-- 不要输出悬空的 relation（引用不存在的实体）
-
-### 输出要求
-- 只输出 JSON，不要任何解释、markdown 代码块或额外文字
-- 不要自创文本中不存在的内容
-
-## 待抽取文本
-{text}
-
-## 输出格式
-{{{{
-  "entities": [
-    {{{{
-      "type": "实体类型",
-      "name": "实体名称",
-      "properties": {{{{ "属性名": "属性值", ... }}}}
-    }}}}
-  ],
-  "relations": [
-    {{{{
-      "from_type": "源实体类型",
-      "from_name": "源实体名称",
-      "rel_type": "关系类型",
-      "to_type": "目标实体类型",
-      "to_name": "目标实体名称"
-    }}}}
-  ]
-}}}}"""
+### 示例
+正确示例：先输出实体，再输出连接它们的 relation（编号与名称为占位符，非真实数据）：
+```json
+{"entities": [{"type": "Clause", "name": "X.Y", "properties": {}}, {"type": "Action", "name": "检验/试验类动作名", "properties": {}}],
+ "relations": [{"from_type": "Clause", "from_name": "X.Y", "rel_type": "describesAction", "to_type": "Action", "to_name": "检验/试验类动作名"}]}
+```
+错误示例：relation 引用了 entities 中不存在的端点（悬空 relation），禁止：
+```json
+{"entities": [{"type": "Clause", "name": "X.Y", "properties": {}}],
+ "relations": [{"from_type": "Clause", "from_name": "X.Y", "rel_type": "describesAction", "to_type": "Action", "to_name": "检验/试验类动作名"}]}
+```"""
 
 
-def build_extraction_prompt(ontology: str, text: str) -> str:
-    """构建本体驱动的抽取 prompt（参考 kg-extract-v7 extract.py::build_prompt）。"""
+DOCUMENT_INSTRUCTIONS = {
+    "standard": """## 标准/规范文档专项规则
+- 保留章、条、款的原始编号、标题和层级；结构条款只填写 `clauseNumber`/`clauseTitle` 等编号属性。
+- 标准本身是 `Standard` 实体，其 `hasStructuralElement` 指向**全部直接结构元素**：既有章，也有章下的条；同时用 `hasSubClause` 表达“章→条”的父子关系。
+- 条款正文中的“应、不得、不应、至少、不超过、不低于、符合”等要求内容，另建一个独立的“要求条款”：
+  - 要求条款是 `Clause`，`uniqueIdentifier` 使用 `IU-{条款编号}-{序号}` 格式，**序号固定三位、补零对齐**（如 001、002），`contentDescription` 填写完整要求原文，`clauseType` 填“要求型”，`constraintType` 填“强制”；
+  - 用 `hasClause` 把要求条款挂到对应编号的结构条款下；同一编号的结构条款与要求条款是不同实体，不合并、不互相覆盖。
+- 特性（`Property`）建模：
+  - 每个被条款“检验/试验”的特性独立建模为 `Property`，`propertyName` **直接采用条款标题中的特性名**，不要用条款正文里出现的其他词（如同义、近似或更具体的术语）替代标题名；
+  - 条款标题用“和/及/、”等连词并列多个特性时，**按并列项拆分为多个独立 Property**（如标题“X 和 Y”→ 两个 Property“X”“Y”），不要合并为一个；
+  - 条款正文中出现的基准性术语（“基准值”“额定值”“标称值”“参考值”等）是约束的**比较基准或限值对象**，不为其单独建 Property；该条款产生的约束全部挂到条款标题对应的特性下；
+  - 对象用 `hasProperty` 挂接其全部特性。
+- 约束建模（`Constraint`）：
+  - `constraintType` 使用语义分类：`枚举值` / `符合性` / `数值区间` / `相对值`，不要使用“应/不得”等规范性助词；
+  - 枚举约束（列举允许状态的“X、Y、Z，且……”式要求）把允许项放入 `allowedValue`（数组）；
+  - 符合性约束（“应符合/满足某文件、某标准”式要求）把依据放入 `conformsTo`；
+  - 数值、单位、比较符要完整保留，数值按原文数值填写（如“100%”填 100，不要换算成 1.0）；`measurementUnit` 填单位（如“%”），`comparedTo` 填比较基准；
+  - 同一句的上限与下限合并为一个数值区间约束（“不低于 A 且不超过 B”→ minValue、maxValue、measurementUnit、comparedTo），**不要把一句里的上下限拆成两个约束**；
+  - 相对值约束（“某对象不应大于/小于某基准的 X%”式要求）用 `constraintTarget` 表示受约束对象、`comparedTo` 表示比较基准、`maxValue` 表示限值；`constraintTarget` 保留原文完整表述；
+  - 同一句有多个独立约束时分别建模为多个 Constraint；**每个受约束的 Property 都各自建一个独立的 Constraint 实例并挂一条 `hasConstraint` 关系**，即使多个 Property 的约束内容完全相同，也不要共享同一实例。
+- 试验方法（`Action`）：
+  - 试验/检验方法条款正文描述的动作建模为 `Action`，`actionName` 使用“{特性名}{检验/试验}”式规范名，`actionDescription` 填写“按对应方法条款规定的方法…”；
+  - `describesAction` 从**要求条款**（IU 编号条款）指向 Action；Action 用 `describedIn` 指向承载它的试验方法条款。两者方向不同，不要颠倒。
+- 交叉引用：识别“按某条款检验/见第 X 章/符合某标准号”等引用，连接要求条款、试验行动、条款和外部文件；不把条款编号误当数值指标，不把比较基准、额定值等基准性术语建模为 Property。
+- 外部文件（`ExternalResource`）：**只有正文中“应符合/满足/按…规定”结构所引用的外部文件**（如“某技术条件”“某规范”式引用）建模为 `ExternalResource`，`fileType` 用原文中的文件类型名，`responsibleParty` 用责任方；文档自身的元数据（标准编号、标题、发布机构、编制单位、发布日期等）不是外部引用，不建模为 ExternalResource；同一外部文件只建模一次。""",
+    "official_document": """## 公文专项规则
+- 优先识别标题、文种、文号、发文机关、主送/抄送机关、发布日期、施行日期、附件和有效状态。
+- 将政策要求、办理事项、责任主体、适用对象、期限、条件和例外分别映射到本体中对应实体和关系。
+- 保留“一、（一）、1.”等层级编号及附件引用；同一责任事项跨段出现时按 identity 合并。
+- “应当、须、严禁、由…负责、于…前完成”等规范性表达必须连同主体、动作和期限一起抽取。""",
+    "analytic": """## 智能问数/数据知识专项规则
+- 区分业务对象、指标、维度、数据表和干系人，不把字段名直接当作业务指标。
+- 指标编码、表名、业务对象 ID 等稳定标识优先作为 identity。
+- SQL、来源表、统计口径、单位、维度和筛选条件只在原文明确出现时填写。""",
+    "general": """## 通用文档专项规则
+- 依据标题、段落、列表和表格边界确定实体作用域。
+- 优先抽取原文明确陈述且能满足本体属性或关系定义的事实。""",
+}
 
-    # Extract @identity lines for entity matching
-    identity_hints = []
-    for line in ontology.split("\n"):
-        if "@identity" in line:
-            identity_hints.append(line.strip())
-    identity_text = "\n".join(identity_hints) if identity_hints else "所有类型默认用 name 属性作为 identity 标识"
-    schema_catalog = OntologySchema.parse(ontology).prompt_catalog()
+_STANDARD_HINTS = (
+    re.compile(r"\b(?:GB|GB/T|GJB|JB/T|ISO|IEC|EN)\s*[A-Z0-9./—-]+", re.IGNORECASE),
+    re.compile(r"(?:规范性引用文件|术语和定义|试验方法|技术要求|标准化对象)"),
+    re.compile(r"(?m)^\s*(?:\d+(?:\.\d+){1,4}|附录\s*[A-ZＡ-Ｚ])\s+\S+"),
+)
+_OFFICIAL_DOCUMENT_HINTS = (
+    re.compile(r"(?:通知|通告|公告|决定|意见|办法|规定|批复|请示|报告|函)$", re.MULTILINE),
+    re.compile(r"(?:发文字号|主送机关|抄送机关|成文日期|印发日期|发文机关)"),
+    re.compile(r"(?:现将有关事项通知如下|特此通知|经研究决定|请遵照执行)"),
+)
+_ANALYTIC_HINTS = (
+    re.compile(r"(?:业务指标|指标编码|统计口径|来源表|数据表|计算SQL|维度|智能问数)", re.IGNORECASE),
+)
+_VALID_DOCUMENT_TYPES = frozenset(DOCUMENT_INSTRUCTIONS)
+_SCHEMA_RETRY_CODES = frozenset(
+    {
+        "UNKNOWN_ENTITY_TYPE",
+        "ENTITY_OUT_OF_SCOPE",
+        "UNKNOWN_PROPERTY",
+        "UNKNOWN_RELATION_ENDPOINT_TYPE",
+        "UNKNOWN_RELATION_TYPE",
+        "RELATION_ENDPOINT_TYPE_MISMATCH",
+        "RELATION_ENDPOINT_NAME_MISSING",
+    }
+)
 
-    return f"""你是一个知识图谱抽取专家。请根据以下本体定义，从文本中抽取实体和关系。
 
-## 本体定义
+def detect_document_type(text: str, requested: str | None = "auto") -> str:
+    """Return a stable extraction profile, auto-detecting when requested."""
+    requested = (requested or "auto").strip().casefold()
+    aliases = {
+        "official": "official_document",
+        "document": "official_document",
+        "公文": "official_document",
+        "标准": "standard",
+        "规范": "standard",
+        "智能问数": "analytic",
+    }
+    requested = aliases.get(requested, requested)
+    if requested != "auto":
+        if requested not in _VALID_DOCUMENT_TYPES:
+            raise ValueError(
+                "document_type 仅支持 auto、standard、official_document、analytic、general"
+            )
+        return requested
+
+    content = text or ""
+    scores = {
+        "standard": sum(bool(pattern.search(content)) for pattern in _STANDARD_HINTS),
+        "official_document": sum(bool(pattern.search(content)) for pattern in _OFFICIAL_DOCUMENT_HINTS),
+        "analytic": sum(bool(pattern.search(content)) for pattern in _ANALYTIC_HINTS),
+    }
+    profile, score = max(scores.items(), key=lambda item: item[1])
+    return profile if score else "general"
+
+
+def _relation_catalog(schema: OntologySchema, allowed_types: set[str]) -> str:
+    lines = [
+        f"- `{relation.source}` -[`{relation.identifier}`]-> `{relation.target}`"
+        for relation in schema.relations
+        if relation.source in allowed_types and relation.target in allowed_types
+    ]
+    return "\n".join(lines) if lines else "本次目标类型之间没有可由模型直接抽取的关系。"
+
+
+def build_extraction_prompt(
+    ontology: str,
+    text: str,
+    *,
+    document_type: str = "auto",
+    target_types: Iterable[str] | None = None,
+) -> str:
+    """Build a schema-constrained prompt adapted to the document genre."""
+    schema = OntologySchema.parse(ontology)
+    profile = detect_document_type(text, document_type)
+    requested_targets = [item for item in (target_types or []) if coerce_non_empty_name(item)]
+    allowed_types = set(schema.target_identifiers(requested_targets))
+    schema_catalog = schema.prompt_catalog(requested_targets)
+    target_text = (
+        "、".join(f"`{identifier}`" for identifier in schema.target_identifiers(requested_targets))
+        if requested_targets
+        else "本体中全部已声明类型"
+    )
+    identity_hints = [line.strip() for line in ontology.splitlines() if "@identity" in line]
+    identity_text = "\n".join(identity_hints) if identity_hints else "未声明 @identity 时使用实体 name"
+
+    return f"""你是知识图谱抽取专家。请从待抽取文本中生成严格符合本体的实体和关系。
+
+## 文档画像
+当前按“{profile}”场景处理。
+{DOCUMENT_INSTRUCTIONS[profile]}
+
+## 本体定义（唯一 schema）
 {ontology}
 
-## 本体标识目录
+## 本次目标类型
+{target_text}
+只允许抽取以上目标类型；当目标是父类时，目录中已自动包含其子类。未列出的本体类也不要输出。
+
+## 本次允许的本体标识目录
 {schema_catalog}
 
-## 实体标识规则
+## identity 声明
 {identity_text}
-- relations 中的 from_name/to_name 必须填写实体的 identity 标识值
-- 若 identity 指定的属性值为空，回退使用实体的 name 属性值
-- 输出 relations 之前，先检查 `entities` 是否已经包含两端实体；没有就先补到 `entities`
+
+## 本次允许的关系签名
+{_relation_catalog(schema, allowed_types)}
 
 {GENERIC_INSTRUCTION}
 
 ## 待抽取文本
 {text}
 
-## 输出格式
+## JSON 输出结构
 {{
   "entities": [
     {{
-      "type": "本体标识目录中定义的稳定类型标识",
-      "name": "实体标识值（按 @identity 规则）",
-      "properties": {{ "属性名": "属性值", ... }}
+      "type": "允许的稳定类型标识",
+      "name": "按 identity 优先级确定的实体标识值",
+      "properties": {{"稳定属性标识": "原文值"}}
     }}
   ],
   "relations": [
     {{
-      "from_type": "源元模型类标识",
-      "from_name": "源实体标识值",
-      "rel_type": "本体中定义的关系名",
-      "to_type": "目标元模型类标识",
-      "to_name": "目标实体标识值"
+      "from_type": "源类型稳定标识",
+      "from_name": "源实体 identity/name",
+      "rel_type": "允许的关系名",
+      "to_type": "目标类型稳定标识",
+      "to_name": "目标实体 identity/name"
     }}
   ]
 }}"""
 
 
-def extract_json_from_response(response: str) -> dict:
-    """从 LLM 响应中提取 JSON 对象（参考 kg-extract-v7 的 extract_json_from_response）。"""
+def extract_json_from_response(response: str) -> dict[str, Any]:
+    """Extract the first complete-looking JSON object from an LLM response."""
     response = (response or "").strip()
     if not response:
         return {}
-
-    # Remove markdown code fences
     if response.startswith("```"):
         lines = response.split("\n")
         response = "\n".join(lines[1:]) if len(lines) > 1 else response
         if response.endswith("```"):
             response = response[:-3].rstrip()
-
-    # Find first { and last }
     start = response.find("{")
     end = response.rfind("}")
     if start >= 0 and end > start:
-        response = response[start:end + 1]
-
+        response = response[start : end + 1]
     try:
-        return json.loads(response)
-    except json.JSONDecodeError as e:
-        logger.warning("JSON 解析失败: %s, 原始响应前 500 字符: %s", e, response[:500])
+        parsed = json.loads(response)
+    except json.JSONDecodeError as exc:
+        logger.warning("JSON 解析失败: %s, 响应前 500 字符: %s", exc, response[:500])
         return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
-def _entities_to_graph(extracted: dict) -> dict:
-    """
-    将抽取结果 { entities, relations } 转换为统一的 graph 结构：
-    { nodes: [...], relationships: [...] }
-    （不再需要 ontology_relations）
-    """
-    nodes = []
-    relationships = []
-
-    # Build uid → node lookup for dedup
-    node_index = {}
+def _entities_to_graph(extracted: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Convert validated extraction JSON to the repository graph contract."""
+    nodes: list[dict[str, Any]] = []
+    relationships: list[dict[str, Any]] = []
+    node_index: dict[str, dict[str, Any]] = {}
 
     for entity in extracted.get("entities", []):
-        etype = entity.get("type", "Element")
-        ename = entity.get("name", "")
-        props = entity.get("properties", {}) or {}
-        if not isinstance(props, dict):
-            props = {}
-
-        uid = f"{etype}::{ename.lower()}" if ename else f"{etype}::{hash(json.dumps(props, sort_keys=True, default=str))}"
-
+        if not isinstance(entity, dict):
+            continue
+        entity_type = coerce_non_empty_name(entity.get("type")) or "Element"
+        entity_name = coerce_non_empty_name(entity.get("name"))
+        properties = entity.get("properties")
+        properties = properties if isinstance(properties, dict) else {}
+        uid = entity_uid(entity_type, entity_name, properties)
+        incoming_properties = build_node_properties(entity_name, properties)
         if uid not in node_index:
-            node = {
-                "uid": uid,
-                "label": etype,
-                "properties": build_node_properties(ename, props),
-            }
+            node = {"uid": uid, "label": entity_type, "properties": incoming_properties}
             nodes.append(node)
             node_index[uid] = node
         else:
-            # Merge properties
-            node_index[uid]["properties"] = merge_node_properties(node_index[uid]["properties"], props)
+            node_index[uid]["properties"] = merge_node_properties(
+                node_index[uid].get("properties"), incoming_properties
+            )
 
-    for rel in extracted.get("relations", []):
-        from_type = rel.get("from_type", "")
-        from_name = rel.get("from_name", "")
-        to_type = rel.get("to_type", "")
-        to_name = rel.get("to_name", "")
-        rel_type = rel.get("rel_type", "RELATED")
+    relationship_keys: set[tuple[str, str, str]] = set()
+    for relation in extracted.get("relations", []):
+        if not isinstance(relation, dict):
+            continue
+        from_type = coerce_non_empty_name(relation.get("from_type"))
+        from_name = coerce_non_empty_name(relation.get("from_name"))
+        to_type = coerce_non_empty_name(relation.get("to_type"))
+        to_name = coerce_non_empty_name(relation.get("to_name"))
+        relation_type = coerce_non_empty_name(relation.get("rel_type"))
+        if not all((from_type, from_name, relation_type, to_type, to_name)):
+            continue
+        from_uid = entity_uid(from_type, from_name, None)
+        to_uid = entity_uid(to_type, to_name, None)
+        key = (from_uid, to_uid, relation_type)
+        if key in relationship_keys:
+            continue
+        relationship_keys.add(key)
+        relationships.append({"from_uid": from_uid, "to_uid": to_uid, "type": relation_type})
 
-        from_uid = f"{from_type}::{from_name.lower()}" if from_name else ""
-        to_uid = f"{to_type}::{to_name.lower()}" if to_name else ""
-
-        if from_uid and to_uid:
-            relationships.append({
-                "from_uid": from_uid,
-                "to_uid": to_uid,
-                "type": rel_type,
-            })
-
-    relationships = filter_relationships_with_known_nodes(
-        relationships,
-        {str(node.get("uid") or "") for node in nodes if str(node.get("uid") or "")},
-    )
-
-    return {
-        "nodes": nodes,
-        "relationships": relationships,
-    }
+    relationships = filter_relationships_with_known_nodes(relationships, set(node_index))
+    return {"nodes": nodes, "relationships": relationships}
 
 
-def _build_openai_client(
-    base_url: str = "",
-    api_key: str = "",
-) -> OpenAI:
-    """创建 OpenAI 客户端。"""
-    kwargs: dict = {}
+def _build_openai_client(base_url: str = "", api_key: str = "") -> OpenAI:
+    kwargs: dict[str, Any] = {}
     if base_url:
         kwargs["base_url"] = base_url
-    if api_key:
-        kwargs["api_key"] = api_key
-    else:
-        # openai 需要 api_key，传占位符避免报错（本地 vLLM 不校验）
-        kwargs["api_key"] = api_key or "not-needed"
+    kwargs["api_key"] = api_key or "not-needed"
     return OpenAI(**kwargs)
+
+
+def _structured_output_rejected(exc: Exception) -> bool:
+    if isinstance(exc, TypeError):
+        return True
+    message = str(exc).casefold()
+    return any(
+        marker in message
+        for marker in (
+            "response_format",
+            "json_object",
+            "structured output",
+            "unsupported parameter",
+            "unknown parameter",
+        )
+    )
+
+
+def _thinking_rejected(exc: Exception) -> bool:
+    """True when the backend rejects the `thinking` control parameter."""
+    message = str(exc).casefold()
+    if "thinking" not in message:
+        return False
+    if isinstance(exc, TypeError):
+        return True
+    return any(
+        marker in message
+        for marker in (
+            "unsupported",
+            "unknown parameter",
+            "unexpected argument",
+            "invalid type",
+            "deserialize",
+            "extra_forbidden",
+        )
+    )
+
+
+def _read_stream(stream: Any) -> str:
+    """Collect streamed content; fall back to reasoning_content when a
+    thinking-mode backend (e.g. DeepSeek) only emits reasoning tokens."""
+    parts: list[str] = []
+    reasoning_parts: list[str] = []
+    for chunk in stream:
+        choices = getattr(chunk, "choices", None)
+        if not choices:
+            continue
+        delta = getattr(choices[0], "delta", None)
+        if delta is None:
+            continue
+        content = getattr(delta, "content", None)
+        if content:
+            parts.append(content)
+        reasoning = getattr(delta, "reasoning_content", None)
+        if reasoning:
+            reasoning_parts.append(reasoning)
+    joined = "".join(parts)
+    if joined:
+        return joined
+    return "".join(reasoning_parts)
+
+
+def _retry_messages(
+    system_message: str,
+    prompt: str,
+    raw_response: str,
+    correction: str,
+) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": prompt},
+        {"role": "assistant", "content": raw_response[:12000]},
+        {"role": "user", "content": correction},
+    ]
+
+
+def _warning_feedback(warnings: list[dict[str, Any]]) -> str:
+    relevant = [warning for warning in warnings if warning.get("code") in _SCHEMA_RETRY_CODES]
+    details = "\n".join(
+        f"- {warning.get('path', '')}: [{warning.get('code')}] {warning.get('message', '')}"
+        for warning in relevant[:20]
+    )
+    return (
+        "上一次 JSON 虽可解析，但违反本体约束。请修正下列问题后重新输出完整 JSON；"
+        "删除无法映射的内容，不要解释：\n" + details
+    )
 
 
 def extract_v2(
@@ -268,35 +413,48 @@ def extract_v2(
     model: Optional[str] = None,
     max_tokens: Optional[int] = None,
     json_retries: Optional[int] = None,
+    document_type: str = "auto",
+    target_types: Iterable[str] | None = None,
+    validation_mode: str = "strict",
 ) -> dict[str, Any]:
-    """
-    本体驱动的知识抽取 V2（无模板匹配）。
-
-    参数：
-        ontology: PUML 本体文本
-        text: 待抽取文本
-        base_url: LLM API 地址，不传则使用环境变量
-        api_key: API 密钥，不传则使用环境变量
-        model: 模型名，不传则使用环境变量
-        max_tokens: 最大输出 token 数
-
-    返回：
-        {"raw": {...}, "graph": {"nodes": [...], "relationships": [...]}}
-    """
+    """Extract a graph while treating the supplied ontology as an allow-list."""
     ontology = (ontology or "").strip()
     text = (text or "").strip()
+    if not ontology:
+        raise ValueError("本体定义不能为空")
+    if validation_mode.casefold() not in {"strict", "permissive"}:
+        raise ValueError("validation_mode 仅支持 strict 或 permissive")
 
+    schema = OntologySchema.parse(ontology)
+    if not schema.classes:
+        raise ValueError("本体中未解析到 class 声明")
+    requested_targets = [item for item in (target_types or []) if coerce_non_empty_name(item)]
+    unknown_targets = [item for item in requested_targets if schema.resolve_class(item) is None]
+    if unknown_targets:
+        raise ValueError(f"目标类型不在本体中: {', '.join(unknown_targets)}")
+    profile = detect_document_type(text, document_type)
+    allowed_types = list(schema.target_identifiers(requested_targets))
+    result_profile = {
+        "document_type": profile,
+        "target_types": allowed_types,
+        "validation_mode": validation_mode.casefold(),
+    }
+    config = get_llm_config()
+    disable_thinking = bool(config.get("disable_thinking", True))
+    result_profile["thinking"] = "disabled" if disable_thinking else "enabled"
     if not text:
         return {
-            "raw": {},
+            "raw": {"entities": [], "relations": []},
             "graph": {"nodes": [], "relationships": []},
+            "warnings": [],
+            "attempts": [],
+            "profile": result_profile,
         }
 
-    cfg = get_llm_config()
-    base_url = base_url or cfg["base_url"]
-    api_key = api_key or cfg["api_key"]
-    model = model or cfg["model"]
-    max_tokens = max_tokens or cfg["max_tokens"]
+    base_url = base_url or config["base_url"]
+    api_key = api_key or config["api_key"]
+    model = model or config["model"]
+    max_tokens = max_tokens or config["max_tokens"]
     json_retries = max(
         0,
         json_retries
@@ -305,112 +463,179 @@ def extract_v2(
     )
 
     logger.info(
-        "extract_v2: ontology_len=%d text_len=%d model=%s",
-        len(ontology), len(text), model,
+        "extract_v2: ontology_len=%d text_len=%d model=%s profile=%s targets=%s",
+        len(ontology),
+        len(text),
+        model,
+        profile,
+        allowed_types,
     )
-
-    # 构建 prompt（有本体按本体抽取，无本体通用抽取）
-    if ontology:
-        prompt = build_extraction_prompt(ontology, text)
-        system_msg = "你是一个知识图谱抽取专家。严格按照本体定义从文本中抽取实体和关系。只输出JSON，不要任何解释。"
-    else:
-        prompt = build_generic_extraction_prompt(text)
-        system_msg = "你是一个知识图谱抽取专家。从文本中自由识别实体和关系。只输出JSON，不要任何解释。"
-
-    t0 = time.perf_counter()
-
-    # 调用 LLM（流式读取，避免等待超大响应一次性返回）
-    client = _build_openai_client(base_url=base_url, api_key=api_key)
-    messages = [
-        {"role": "system", "content": system_msg},
+    prompt = build_extraction_prompt(
+        ontology,
+        text,
+        document_type=profile,
+        target_types=requested_targets,
+    )
+    system_message = (
+        "你是知识图谱抽取专家。本体是唯一 schema。"
+        "只输出包含 entities 和 relations 数组的 JSON 对象。"
+    )
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": system_message},
         {"role": "user", "content": prompt},
     ]
     attempts: list[dict[str, Any]] = []
-    extracted: dict[str, Any] = {}
     raw_response = ""
-    for attempt in range(json_retries + 1):
-        try:
-            with get_llm_scheduler().request_slot():
-                stream = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=0.1,
-                    max_tokens=max_tokens,
-                    timeout=180,
-                    stream=True,
+    extracted: dict[str, Any] = {}
+    final_warnings: list[dict[str, Any]] = []
+    use_structured_output = True
+    client = _build_openai_client(base_url=base_url, api_key=api_key)
+    started = time.perf_counter()
+
+    try:
+        for attempt in range(json_retries + 1):
+            request_kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": max_tokens,
+                "timeout": 180,
+                "stream": True,
+            }
+            if use_structured_output:
+                request_kwargs["response_format"] = {"type": "json_object"}
+            if disable_thinking:
+                request_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+            try:
+                with get_llm_scheduler().request_slot():
+                    while True:
+                        try:
+                            stream = client.chat.completions.create(**request_kwargs)
+                            break
+                        except Exception as exc:
+                            if disable_thinking and _thinking_rejected(exc):
+                                attempts.append(
+                                    {
+                                        "attempt": attempt + 1,
+                                        "type": "thinking_control_fallback",
+                                        "message": str(exc),
+                                    }
+                                )
+                                logger.info("LLM 后端不支持 thinking 控制，改为默认思考模式: %s", exc)
+                                disable_thinking = False
+                                result_profile["thinking"] = "enabled_fallback"
+                                request_kwargs.pop("extra_body", None)
+                                continue
+                            if use_structured_output and _structured_output_rejected(exc):
+                                attempts.append(
+                                    {
+                                        "attempt": attempt + 1,
+                                        "type": "structured_output_fallback",
+                                        "message": str(exc),
+                                    }
+                                )
+                                logger.info("LLM 后端不支持 json_object，降级为纯提示约束: %s", exc)
+                                use_structured_output = False
+                                request_kwargs.pop("response_format", None)
+                                continue
+                            raise
+                    raw_response = _read_stream(stream)
+            except Exception as exc:
+                attempts.append(
+                    {"attempt": attempt + 1, "type": "request", "message": str(exc)}
                 )
-                parts: list[str] = []
-                for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        parts.append(content)
-            raw_response = "".join(parts)
-        except Exception as exc:
-            attempts.append({"attempt": attempt + 1, "type": "request", "message": str(exc)})
-            logger.warning("LLM 调用第 %d 次失败: %s", attempt + 1, exc)
-            if attempt >= json_retries:
-                client.close()
-                return {
-                    "raw": {},
-                    "graph": {"nodes": [], "relationships": []},
-                    "_error": "LLM 调用失败",
-                    "error_code": "LLM_REQUEST_FAILED",
-                    "attempts": attempts,
-                }
-            time.sleep(min(2 ** attempt, 4))
-            continue
+                logger.warning("LLM 调用第 %d 次失败: %s", attempt + 1, exc)
+                if attempt >= json_retries:
+                    return {
+                        "raw": {},
+                        "graph": {"nodes": [], "relationships": []},
+                        "warnings": [],
+                        "profile": {**result_profile, "structured_output": use_structured_output},
+                        "_error": "LLM 调用失败",
+                        "error_code": "LLM_REQUEST_FAILED",
+                        "attempts": attempts,
+                    }
+                time.sleep(min(2**attempt, 4))
+                continue
 
-        extracted = extract_json_from_response(raw_response)
-        entities = extracted.get("entities") if isinstance(extracted, dict) else None
-        relations = extracted.get("relations") if isinstance(extracted, dict) else None
-        if isinstance(entities, list) and isinstance(relations, list):
-            break
+            parsed = extract_json_from_response(raw_response)
+            entities = parsed.get("entities") if isinstance(parsed, dict) else None
+            relations = parsed.get("relations") if isinstance(parsed, dict) else None
+            if not isinstance(entities, list) or not isinstance(relations, list):
+                attempts.append(
+                    {
+                        "attempt": attempt + 1,
+                        "type": "json",
+                        "message": "响应不是同时包含 entities 和 relations 数组的 JSON 对象",
+                    }
+                )
+                if attempt < json_retries:
+                    messages = _retry_messages(
+                        system_message,
+                        prompt,
+                        raw_response,
+                        "上一次输出不是合法目标 JSON。请重新输出完整 JSON，顶层只包含 entities 和 relations 两个数组。",
+                    )
+                continue
 
-        attempts.append({
-            "attempt": attempt + 1,
-            "type": "json",
-            "message": "响应不是包含 entities 和 relations 数组的 JSON 对象",
-        })
-        logger.warning("LLM 响应第 %d 次 JSON 校验失败", attempt + 1)
-        if attempt < json_retries:
-            messages = [
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": prompt},
-                {"role": "assistant", "content": raw_response[:12000]},
-                {
-                    "role": "user",
-                    "content": "上一次输出不是合法的目标 JSON。请重新输出且只输出包含 entities 和 relations 两个数组的 JSON 对象。",
-                },
+            normalized = schema.normalize_extraction(parsed)
+            sanitized, validation_warnings = schema.validate_extraction(
+                normalized,
+                target_types=requested_targets,
+                mode=validation_mode,
+            )
+            extracted = sanitized
+            final_warnings = validation_warnings
+            retryable_warnings = [
+                warning
+                for warning in validation_warnings
+                if warning.get("code") in _SCHEMA_RETRY_CODES
             ]
-
-    elapsed = time.perf_counter() - t0
-    logger.info("extract_v2: LLM call done in %.2fs, response_len=%d", elapsed, len(raw_response or ""))
-
-    if not extracted or not isinstance(extracted.get("entities"), list) or not isinstance(extracted.get("relations"), list):
-        logger.warning("extract_v2: 重试后仍未获得有效 JSON")
+            if retryable_warnings and attempt < json_retries:
+                attempts.append(
+                    {
+                        "attempt": attempt + 1,
+                        "type": "schema_validation",
+                        "message": f"发现 {len(retryable_warnings)} 个本体约束错误",
+                        "codes": sorted({warning["code"] for warning in retryable_warnings}),
+                    }
+                )
+                messages = _retry_messages(
+                    system_message,
+                    prompt,
+                    raw_response,
+                    _warning_feedback(validation_warnings),
+                )
+                continue
+            break
+    finally:
         client.close()
+
+    elapsed = time.perf_counter() - started
+    logger.info("extract_v2: LLM 完成 %.2fs, response_len=%d", elapsed, len(raw_response))
+    result_profile["structured_output"] = use_structured_output
+    result_profile["elapsed_seconds"] = round(elapsed, 3)
+
+    if not extracted and not (
+        isinstance(extracted.get("entities") if isinstance(extracted, dict) else None, list)
+        and isinstance(extracted.get("relations") if isinstance(extracted, dict) else None, list)
+    ):
         return {
             "raw": {},
             "graph": {"nodes": [], "relationships": []},
+            "warnings": final_warnings,
+            "profile": result_profile,
             "_error": "LLM 返回内容无法解析为知识抽取 JSON",
             "error_code": "LLM_JSON_PARSE_FAILED",
             "attempts": attempts,
             "_raw_response": raw_response[:1000] if raw_response else "",
         }
 
-    # 有本体时通过本体模型解析层规范化类型、属性和关系标识；无本体时跳过
-    if ontology:
-        extracted = OntologySchema.parse(ontology).normalize_extraction(extracted)
-
-    # 转换为图结构
-    graph = _entities_to_graph(extracted)
-    client.close()
-
     return {
         "raw": extracted,
-        "graph": graph,
+        "graph": _entities_to_graph(extracted),
+        "warnings": final_warnings,
+        "profile": result_profile,
         "attempts": attempts,
     }
 

@@ -1,4 +1,4 @@
-"""Knowledge extraction LLM configuration."""
+"""知识抽取 V2 配置：从环境变量读取 LLM API 参数。"""
 import os
 
 
@@ -13,11 +13,13 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
 # ── LLM API (知识抽取 V2) ──
 KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_API_URL", default="http://localhost:9999")
 KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY", default="")
-KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="Qwen/Qwen3-8B")
+KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="deepseek-v4-flash-0731")
 KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_MAX_TOKENS", default="16384"))
 KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
 KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
 KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
+# 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启
+KG_EXTRACT_DISABLE_THINKING = _env("KG_EXTRACT_LLM_DISABLE_THINKING", default="1") != "0"
 
 
 def get_llm_config() -> dict:
@@ -29,4 +31,5 @@ def get_llm_config() -> dict:
         "max_concurrency": max(1, KG_EXTRACT_MAX_CONCURRENCY),
         "qps": max(0, KG_EXTRACT_QPS),
         "qpm": max(0, KG_EXTRACT_QPM),
+        "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
     }

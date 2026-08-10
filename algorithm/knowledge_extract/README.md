@@ -32,16 +32,14 @@
                          ▼
               nodes / relationships 图结构
                          │
-                 ┌───────┴────────┐
-                 ▼                ▼
-              接口返回       可选写入 Neo4j
+                 ▼
+              接口返回
 ```
 
 主要实现：
 
 - `ontology_schema.py`：解析本体类、alias、stereotype、属性和稳定标识。
 - `extractor.py`：构建提示词、调用 LLM、校验 JSON、规范化结果并生成图结构。
-- `knowledge_space.py`：知识空间相关能力及 Neo4j 存储。
 - `uml/`：项目内置的本体示例。接口不会自动加载这些文件，调用方仍需传入 `ontology`。
 
 ## 推荐的本体格式
@@ -73,11 +71,11 @@ Terminology "0..*" --> "1" BusinessDomain : BELONGS_TO
 class "术语" as Terminology <<KnowledgeUnit>>
 ```
 
-| 部分 | UML 含义 | 本模块用途 |
-| --- | --- | --- |
-| `"术语"` | 展示名称 | 面向业务人员阅读，也可被解析为该类的输入名称 |
-| `as Terminology` | PlantUML alias | 首选的稳定类型标识，最终用于节点 `label` |
-| `<<KnowledgeUnit>>` | stereotype（构造型） | 表达分类、角色或扩展语义 |
+| 部分                  | UML 含义             | 本模块用途                                   |
+| --------------------- | -------------------- | -------------------------------------------- |
+| `"术语"`            | 展示名称             | 面向业务人员阅读，也可被解析为该类的输入名称 |
+| `as Terminology`    | PlantUML alias       | 首选的稳定类型标识，最终用于节点`label`    |
+| `<<KnowledgeUnit>>` | stereotype（构造型） | 表达分类、角色或扩展语义                     |
 
 推荐新本体使用 `as Alias` 明确稳定类型标识。为兼容现有本体，如果没有 alias，程序会使用第一个 stereotype；两者都没有时使用类名。
 
@@ -102,13 +100,13 @@ class 术语 <<Terminology, KnowledgeUnit>>
 + 术语标准名称 (TermName): String // 术语的标准名称
 ```
 
-| 部分 | 含义 |
-| --- | --- |
-| `+` | UML public 可见性；在本体中表示可抽取的公开属性 |
-| `术语标准名称` | 属性展示名 |
-| `(TermName)` | 稳定属性标识，最终作为 `properties` 的键 |
-| `String` | 属性数据类型 |
-| `// ...` | 属性说明和抽取提示 |
+| 部分             | 含义                                            |
+| ---------------- | ----------------------------------------------- |
+| `+`            | UML public 可见性；在本体中表示可抽取的公开属性 |
+| `术语标准名称` | 属性展示名                                      |
+| `(TermName)`   | 稳定属性标识，最终作为`properties` 的键       |
+| `String`       | 属性数据类型                                    |
+| `// ...`       | 属性说明和抽取提示                              |
 
 支持的可见性符号包括 `+`、`-`、`#`、`~`，当前抽取过程不根据可见性过滤属性。
 
@@ -257,18 +255,19 @@ result = extract_v2(
 
 ## LLM 配置
 
-默认从环境变量读取：
+默认从环境变量读取，模型默认 `deepseek-v4-flash-0731`（与 agent 部分一致），thinking 默认关闭：
 
-| 环境变量 | 用途 |
-| --- | --- |
-| `KG_EXTRACT_LLM_BASE_URL` | OpenAI-compatible API 地址 |
-| `KG_EXTRACT_LLM_API_KEY` | API Key |
-| `KG_EXTRACT_LLM_MODEL` | 模型名称 |
-| `KG_EXTRACT_LLM_MAX_TOKENS` | 最大输出 token 数 |
-| `KG_EXTRACT_LLM_JSON_RETRIES` | JSON 格式错误后的重试次数 |
-| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认 `4` |
-| `KG_EXTRACT_LLM_QPS` | 每秒最大请求数，`0` 表示不限制 |
-| `KG_EXTRACT_LLM_QPM` | 每分钟最大请求数，`0` 表示不限制 |
+| 环境变量                           | 用途                                |
+| ---------------------------------- | ----------------------------------- |
+| `KG_EXTRACT_LLM_BASE_URL`        | OpenAI-compatible API 地址          |
+| `KG_EXTRACT_LLM_API_KEY`         | API Key                             |
+| `KG_EXTRACT_LLM_MODEL`           | 模型名称，默认 `deepseek-v4-flash-0731` |
+| `KG_EXTRACT_LLM_DISABLE_THINKING` | 是否关闭 thinking，默认 `1` 关闭；设 `0` 开启 |
+| `KG_EXTRACT_LLM_MAX_TOKENS`      | 最大输出 token 数                   |
+| `KG_EXTRACT_LLM_JSON_RETRIES`    | JSON 格式错误后的重试次数           |
+| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认`4` |
+| `KG_EXTRACT_LLM_QPS`             | 每秒最大请求数，`0` 表示不限制    |
+| `KG_EXTRACT_LLM_QPM`             | 每分钟最大请求数，`0` 表示不限制  |
 
 部分配置保留旧环境变量作为回退，具体以 `config.py` 和 `extractor.py` 为准。
 
