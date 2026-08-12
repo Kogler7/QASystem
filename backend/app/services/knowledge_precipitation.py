@@ -106,8 +106,16 @@ class KnowledgePrecipitationService:
         started: datetime,
         stats: dict[str, Any],
     ) -> dict[str, Any]:
-        chunked = self.chunking.chunk(markdown, options.chunking)
-        chunks = chunked["items"]
+        threshold = options.chunking.chunk_threshold
+        if len(markdown) <= threshold:
+            chunked: dict[str, Any] = {
+                "count":1,
+                "items": [{"text": markdown,"range": [0, len(markdown)]}]
+            }
+            chunks = chunked["items"]
+        else:
+            chunked = self.chunking.chunk(markdown, options.chunking)
+            chunks = chunked["items"]
 
         # 兼容两种抽取模式：传元模型走本体图谱抽取；不传元模型走非结构化摘要（切片+概要，不产图谱）
         has_ontology = bool((ontology or "").strip())
@@ -243,6 +251,7 @@ class KnowledgePrecipitationService:
             "strategy": options.chunking.strategy,
             "size": options.chunking.size,
             "separators": options.chunking.separators,
+            "threshold":threshold,
             "vector_storage_enabled": origin is not None,
             "vector_dimension": vector_dimension,
             "vector_source": "text_chunk",
