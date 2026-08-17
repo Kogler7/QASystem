@@ -1,0 +1,938 @@
+@startuml ontology
+' 设置全局样式
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 50
+
+' ==========================================
+' 1. 类定义与属性 (Class Definitions & Attributes)
+' ==========================================
+
+class "行动" <<ActionClass>> {
+  类定义：描述可执行模块的程序要素。包含动作、路径、判断条件子类
+}
+
+class "动作" <<Activity>> {
+}
+
+class "附加信息" <<Additional Information>> {
+}
+
+class "附录" <<Annex>> {
+}
+
+class "批准发布阶段" <<Approval and PublicationStage>> {
+}
+
+class "业务对象" <<BusinessObject>> {
+  - 块类型 (BlockType) //业务对象的块类型，例如 "业务实体"。
+  - 块ID (BlockID) //业务对象的唯一标识符，例如 "PARENT-BIM-001"。
+  - 业务对象名称 (BusinessObjectName) //业务对象的标准名称，例如 "招采项目"。
+  - 业务对象属性列表 (BusinessAttributes) //业务对象包含的属性集合，记录属性名称、数据类型及字段说明，例如 bidcot: bigint / 标段数量。
+  - 关联数据表 (RelatedDataTable) //业务对象关联的数据表名称及说明，例如 "电子采购信息汇总表(dws_dzcg_bidsum)"。
+  - 相关指标 (RelatedMetrics) //该业务对象支撑或关联的指标集合，例如 "采购标段数量(ICM-1.1)"。
+  - 业务含义与流程 (BusinessMeaningAndProcess) //业务对象所承载的业务含义、业务流程及业务上下文描述。
+  - 业务对象所关联干系人 (Stakeholders) //与该业务对象相关的业务角色、部门或使用者，例如采购管理部门、需求部门。
+}
+
+class "中国标准文献分类" <<ChineseClassificationofStandard>> {
+  - CCS分类代码 (CCS分类代码) //中国标准文献分类(CCS)代码。值域为枚举类型:根据中国标准文献分类给定的分类代码填写。
+  - CCS分类名称 (CCS分类名称) //中国标准文献分类(CCS)名称。值域为枚举类型:根据中国标准文献分类给定的分类名称填写。
+}
+
+note right of 中国标准文献分类
+  类定义：基于中国标准文献分类(CCS)的标准分类体系
+end note
+
+class "条款" <<Clause>> {
+  - 条款类型 (条款类型) //标识条款类型(如 "要求型"、"推荐型") 注:值域为枚举类型:要求型、推荐型、指示型、允许型、陈述型。
+  - 约束类型 (约束类型) //时间约束、权限约束、安全约束、流程约束、质量约束、合规约束
+}
+
+class "归口部门" <<CompetentDepartment>> {
+}
+
+class "关注点" <<Concern>> {
+  - 关注点标识 (关注点标识) //关注点标识
+  - 关注点名称 (关注点名称) //关注点名称
+  - 关注点类型 (关注点类型) //关注点类型
+  - 关注点描述 (关注点描述) //关注点描述
+}
+
+note right of 关注点
+  类定义：Concern is a matter of importance to a stakeholder.
+end note
+
+class "约束逻辑" <<Constrain>> {
+  - 约束类型 (约束类型) //时间约束、权限约束、安全约束、流程约束、质量约束、合规约束
+  - 最大值 (最大值) //数值约束的最大允许值(如 "100W" )
+  - 最小值 (最小值) //数值约束的最小允许值(如 "80W" )
+  - 阈值范围 (阈值范围) //数值的有效范围(如 "80-100W" )。 (格式:最小值-最大值)
+  - 测量单位 (测量单位) //数值的单位(如 "V" "W" ) 值域为枚举类型:V、W、℃等。
+}
+
+note right of 约束逻辑
+  类定义：描述条款对对象特性施加的限定条件,支持数值范围、枚举值、逻辑表达式等约束形式
+end note
+
+class "征求意见单位" <<Consultation Unit>> {
+}
+
+class "征求意见阶段" <<ConsultationStage>> {
+}
+
+class "要素" <<ContentElement>> {
+  - 要素状态 (要素状态) //标识要素的存在状态。 值域为枚举类型:必备、可选。
+  - 作用范围 (作用范围) //规定要素的适用范围
+}
+
+note right of 要素
+  类定义：标准内容的作用性要素分类
+end note
+
+class "数据本体模型" <<DataModel>> {
+  - 块类型 (BlockType) //数据模型块类型，例如 "单表定义"。
+  - 数据表ID (TableID) //数据表唯一标识，例如 "T01"。
+  - 数据表名称 (TableName) //数据表英文名称，例如 dws_dzcg_bidsum。
+  - 数据表中文名称 (TableChineseName) //数据表中文名称，例如 "电子采购信息汇总表"。
+  - 表类型 (TableType) //数据表类型，例如事实汇总表、维度表、明细表。
+  - 数据主题 (DataSubject) //数据表所属的数据主题，例如电子采购汇总数据。
+  - 适配指标字段 (AdaptedMetricCodes) //该数据表可支撑的指标编码集合，例如 ICM-1.1、ICM-1.2。
+  - 表用途 (TableUsage) //数据表支撑的业务用途或指标计算场景说明。
+  - 逻辑主键 (LogicalPrimaryKey) //数据表的逻辑主键或业务唯一标识字段，例如 id。
+  - 常用统计粒度 (CommonStatisticalGrain) //该表常用于统计聚合的粒度字段，例如 fk_period_1、fk_org_1。
+  - 常用过滤维度 (CommonFilterDimensions) //该表常用于 where 过滤的字段，例如 fk_period_1、fk_procuretype_1、supplier_name。
+  - 常用分组维度 (CommonGroupDimensions) //该表常用于 group by 分组统计的字段，例如 fk_period_1、fk_org_1。
+  - 字段定义 (FieldDefinitions) //数据表字段集合，记录字段名、数据类型、字段说明及字典值，例如 fk_procuretype_1: varchar / 采购分类，物资=1，服务=2，工程=3，设备=4。
+}
+
+class "判断条件" <<DecisionCriteria>> {
+}
+
+class "公文结构单元" <<DocumentUnit>> {
+  - 单元标识 (单元标识) //结构单元标识
+  - 单元标题 (单元标题) //单元标题
+  - 单元类型 (单元类型) //章、节、条、款、项、段落、附件
+  - 原文位置 (原文位置) //原文位置
+  - 原文内容 (原文内容) //原文内容
+  - 顺序号 (顺序号) //顺序号
+}
+
+note right of 公文结构单元
+  类定义：公文内部的章节、条、款、项、附件说明等结构单元，是公文内容解析和证据追溯的基本载体。
+end note
+
+class "领域类别" <<DomainCategory>> {
+}
+
+note right of 领域类别
+  类定义：按标准化领域划分的标准分类，包括国际标准分类、中国标准文献分类子类
+end note
+
+class "起草人" <<Drafter>> {
+}
+
+note right of 起草人
+  类定义：本标准由某人起草
+end note
+
+class "起草单位" <<Drafting Organization>> {
+}
+
+note right of 起草单位
+  类定义：表示标准由某起草单位起草
+end note
+
+class "起草阶段" <<DraftingStage>> {
+}
+
+class "数学公式" <<Equation>> {
+}
+
+class "外部约束" <<ExternalResource>> {
+  - 文件类型 (文件类型) //外部文件的分类(如 "法规"、"专利" ) 注:值域为枚举类型:法规、专利、文献、公共数据库。
+  - 生效时间 (生效时间) //文件的生效日期。 (格式:YYYY-MM-DD)
+  - 责任主体 (责任主体) //文件的责任主体(如 "国家标准化管理委员会" )
+}
+
+note right of 外部约束
+  类定义：与标准有关的其他文件资源。包含法规、专利、文献、公共数据库子类
+end note
+
+class "图" <<Figure>> {
+}
+
+class "组织实施单位" <<Implementing Organization>> {
+}
+
+class "个人" <<Individual>> {
+  - 姓名 (姓名) //个人法定姓名
+  - 所属单位 (所属单位) //个人所属的机构或组织名称
+  - 联系电话 (联系电话) //联系方式，例如：010-51862178
+  - 联系地址 (联系地址)
+}
+
+note right of 个人
+  类定义：表示参与标准化活动的个人实体，包括以下子类：起草人、评审人
+end note
+
+class "信息单元表述形式" <<InformationForm>> {
+}
+
+note right of 信息单元表述形式
+  类定义：信息单元的表现形式分类。包括条文、图、表、数学公式、附录、引用、提示等子类。
+end note
+
+class "信息单元" <<InformationUnit>> {
+  - 唯一标识符 (唯一标识符) //信息单元的唯一编码(如 "IU-001" )
+  - 内容描述 (内容描述) //信息单元的详细描述文本
+}
+
+note right of 信息单元
+  类定义：经过有意义的模块化处理且在句法和语义上自包含的信息片段。包括条款、附加信息（示例、注、脚注、清单、列表等）子类
+end note
+
+class "资料性要素" <<Informative Element>> {
+  - 要素状态 (要素状态) //标识要素的存在状态。 值域为枚举类型:必备、可选。
+  - 作用范围 (作用范围) //规定要素的适用范围
+}
+
+note right of 资料性要素
+  类定义：包括规范性引用文件、参考文献、索引
+end note
+
+class "国际标准分类" <<InternationalClassificationofStandard>> {
+  - ICS分类代码 (ICS分类代码) //国际标准分类(ICS)代码。 值域为枚举类型:根据国际标准分类给定的分类代码填写。
+  - ICS分类名称 (ICS分类名称) //国际标准分类(ICS)名称。 值域为枚举类型:根据国际标准分类给定的分类名称填写。
+}
+
+note right of 国际标准分类
+  类定义：基于国际标准分类法(ICS)的标准分类体系
+end note
+
+class "列项" <<List Item>> {
+}
+
+class "指标" <<Metric>> {
+  - 指标标准编码 (MetricCode) //指标的唯一标准编码，例如 "ICM-1.1"。
+  - 指标标准名称 (MetricName) //指标的标准名称，例如 "采购标段数量"。
+  - 一级分类 (L1) //指标所属一级业务分类，枚举值为：产业链供应链管理。
+  - 二级分类 (L2) //指标所属二级业务分类，枚举值为：采购管理域、供应商管理域、供应链管理域、物流管理域。
+  - 三级分类 (L3) //指标所属三级业务分类，枚举值为：招采过程管理、合同签约管理、集中采购管理、供应商管理、库存管理、物流运输管理、风险监测管理、废旧处置管理、协同及金融管理。
+  - 指标类别 (MetricCategory) //指标类别，例如原子指标、衍生指标。
+  - 指标分类 (MetricType) //指标分类，例如业务运行指标、管理分析指标。
+  - 指标定义 (MetricDefinition) //指标的标准业务定义，用于说明指标统计对象、统计范围和统计含义。
+  - 计量单位 (Unit) //指标统计结果的计量单位，例如 "万个" "万元" "%"。
+  - 维度 (Dimensions) //指标支持的统计维度，例如时间、组织、采购分类、标段状态。
+  - 数仓结果所在表名 (DataWarehouseTable) //指标计算或查询所依赖的数仓表名，例如 dws_dzcg_bidsum。
+  - 来源字段 (SourceField) //指标计算所使用的数据表字段，例如 bidcot、winbid_cot。
+  - 逻辑补充 (LogicSupplement) //指标查询规则、过滤条件、参数替换、SQL选择逻辑等补充说明。
+  - SQL模板 (SQLTemplate) //指标对应的标准SQL或参数化SQL模板，用于生成最终查询语句。
+}
+
+class "规范性要素" <<Normative Element>> {
+  - 要素状态 (要素状态) //标识要素的存在状态。 值域为枚举类型:必备、可选。
+  - 作用范围 (作用范围) //规定要素的适用范围
+}
+
+note right of 规范性要素
+  类定义：包括范围、术语和定义、符号和缩略语、核心技术要素、其他技术要素
+end note
+
+class "提示" <<Note>> {
+}
+
+class "对象" <<Object>> {
+  - 对象名称 (对象名称) //对象的名称(如 "锂电池"、"电机控制器" )
+  - 对象类别 (对象类别) //标识对象类别(如 "设备"、"材料" )
+}
+
+note right of 对象
+  类定义：条款中涉及的实体对象。包含标准对象、指标对象子类
+end note
+
+class "指标对象" <<Object of Measuremen>> {
+  - 对象名称 (对象名称) //对象的名称(如 "锂电池" "电机控制器" )
+  - 对象类别 (对象类别) //标识对象类别(如 "设备" "材料" )
+}
+
+class "公文管理单元" <<OfficialDocument>> {
+  - 领导批示 (领导批示) //领导指示，例如：请相关部门阅办
+  - 联系电话 (联系电话) //联系方式，例如：010-51862178
+  - 缓急 (缓急) //紧急程度，例如：特急/急/平急
+  - 来文字号 (来文字号) //公文原始编号，例如：中车集团办运营〔2026〕17号
+  - 来文单位 (来文单位) //公文来源单位，例如：中国中车集团有限公司
+  - 文件标题 (文件标题) //公文标题，例如：关于印发中国中车2026年数智转型工作要点的通知 [约束：管理单元数量约束 (CUSTOM_EXPRESSION，一篇公文只能抽取出一个公文管理单元) ]
+  - 文件备注 (文件备注) //备注信息
+  - 收文部门 (收文部门) //接收部门，例如：综合管理部
+  - 收文日期 (收文日期) //接收日期，例如：2026-03-18
+  - 收文号 (收文号) //公文接收编号，例如：信息公司收〔2026〕176号
+  - 拟办意见 (拟办意见) //拟办建议，例如：请领导阅批
+  - 抄送 (抄送) //抄送单位列表，例如：相关部门
+  - 密级 (密级) //保密级别，例如：绝密/机密/秘密/内部
+  - 主送 (主送) //主送单位列表，例如：各部门/各单位
+  - 主办部门 (主办部门) //主办部门，例如：信息公司技术中心
+}
+
+note right of 公文管理单元
+  类定义：公文的管理信息，一份公文只抽取出一个公文管理单元
+end note
+
+class "任务活动" <<OperationalActivity>> {
+  - 活动名称 (活动名称) //活动名称
+  - 活动描述 (活动描述) //活动描述
+  - 活动标识 (活动标识) //活动标识
+  - 活动类型 (活动类型) //建设、管理、评估、报送、监督、实施、试点等
+  - 动作词 (动作词) //动作词，如建设、完善、推进、加强、组织
+  - 预期结果 (预期结果) //预期结果
+  - 优先级 (优先级) //重点、一般、长期、紧急
+}
+
+note right of 任务活动
+  类定义：公文中提出的需要执行的任务、行动、建设内容、管理动作或工作安排。 示例： 建设人工智能平台、完善算法治理机制、开展试点应用、加强数据安全管理、建立模型评估机制。
+end note
+
+class "运行主体" <<OperationalAgent>> {
+  - 主体名称 (主体名称) //主体名称
+  - 主体标识 (主体标识) //主体标识
+  - 主体类型 (主体类型) //组织、部门、岗位、角色、外部机构
+  - 组织层级 (组织层级) //集团、子公司、部门、项目组
+  - 职责 (职责) //职责描述
+}
+
+note right of 运行主体
+  类定义：公文中出现的组织、部门、岗位、角色、单位、责任主体、协同主体等。
+end note
+
+class "运行约束条件" <<OperationalConstraint>> {
+  - 强制程度 (强制程度) //必须、应当、原则上、鼓励、禁止
+  - 约束原文 (约束原文) //约束原文
+  - 约束名称 (约束名称) //约束名称
+  - 约束标识 (约束标识) //约束标识
+  - 约束类型 (约束类型) //时间约束、权限约束、安全约束、流程约束、质量约束、合规约束
+  - 校验规则 (校验规则) //校验规则
+}
+
+note right of 运行约束条件
+  类定义：公文中规定的必须遵守的规则、限制、条件、标准、时间要求、合规要求和质量要求。 示例： 按期完成、不得违反数据安全要求、应符合集团统一技术规范、必须报送备案、原则上不得重复建设。
+end note
+
+class "运行交互" <<OperationalExchange>> {
+  - 交互类型 (交互类型) //报送、审批、反馈、协同、监督、通知、备案
+  - 交互标识 (交互标识) //交互标识
+  - 交互描述 (交互描述) //交互描述
+}
+
+note right of 运行交互
+  类定义：公文中表达的主体之间、任务之间、信息之间的传递、协同、报送、审批、反馈、监督等关系。 示例： 子公司向集团报送试点进展；业务部门配合信息化部门开展平台建设；牵头部门组织相关单位完成评估。
+end note
+
+class "运行信息" <<OperationalInformation>> {
+  - 信息标识 (信息标识) //信息对象标识
+  - 信息名称 (信息名称) //信息名称
+  - 信息类型 (信息类型) //术语、指标、报告、材料、数据、附件、依据
+  - 定义 (定义) //定义说明
+  - 来源文本 (来源文本) //来源原文
+}
+
+note right of 运行信息
+  类定义：公文中表达、传递、引用或要求形成的信息内容，包括术语、指标、材料、数据、报告、附件、政策依据等。 示例： 人工智能、算法治理、数据安全、应用场景、试点清单、工作报告、评估指标、政策依据、附件材料。
+end note
+
+class "公文业务对象" <<OperationalObject>> {
+  - 对象类型 (对象类型) //平台、系统、数据、模型、项目、制度、场景
+  - 对象标识 (对象标识) //对象标识
+  - 对象描述 (对象描述) //对象描述
+  - 对象名称 (对象名称) //对象名称
+  - 所属领域 (所属领域) //所属业务领域
+}
+
+note right of 公文业务对象
+  类定义：公文所作用、管理、建设、治理或规范的对象。 示例： 人工智能平台、算法模型、数据资源、业务系统、应用场景、智能化项目、管理制度、技术能力、试点工程。
+end note
+
+class "机构" <<Organization>> {
+  - 相关方名称 (名称) //标识机构的法定或通用名称
+  - 统一信用代码 (统一信用代码) //由18位数字/字母组成的唯一标识符 (正则约束:^[A-Z0-9]{18}$)
+  - 所在地 (所在地) //机构的实际办公或注册地址 (格式:省/市)
+}
+
+note right of 机构
+  类定义：参与标准制定或管理的组织实体，表示参与标准化活动的企业、协会或政府组织等组织实体,包括以下子类：发布机构、提出机构、归口部门、组织实施单位、起草单位、建议方、征求意见单位、出版机构
+end note
+
+class "段" <<Paragraph>> {
+}
+
+class "专利" <<Patent>> {
+}
+
+class "路径" <<Path>> {
+}
+
+class "预备阶段" <<Preliminary Stage>> {
+}
+
+class "问题类" <<Problem>> {
+  - 问题标识 (问题标识) //问题的唯一标识符，用于区分不同问题
+  - 问题名称 (问题名称) //问题的名称
+  - 问题描述 (问题描述) //用户对于问题的自然语言描述
+  - 问题坐标系 (坐标系) //问题所涉及的[维度,刻度]的集合
+  - 问题目标对象 (目标对象) //问题所涉及的目标对象
+  - 问题目标 (问题目标) //问题解决的最终目标，明确描述需要达成的结果或状态
+  - 问题约束条件 (约束条件) //问题所需遵守的约束规则。
+  - 问题干系人 (干系人) //问题相关的干系人
+  - 问题关注点 (关注点) //问题相关干系人的关注点
+  - 问题类型 (问题类型) //问题的类型，问题类型 (基于5W1H，what、when、who、where、why、how扩展的问题分类)。
+  问题类型包括： enum ProblemType { DESCRIPTIVE / / 描述性：What? 发生了什么/现状是什么 Quantitative / / 量化型：How much / How many? DIAGNOSTIC / / 诊断性：Why? 为什么会发生 PREDICTIVE / / 预测性：What if/Future? 如果...会怎样/未来会怎样 PRESCRIPTIVE / / 处方性：How? 应该如何做 EXPLANATORY / / 解释性：So what? 这意味着什么/影响是什么 NORMATIVE / / 规范性：Should? 是否达标/应该是什么样 EXPLORATORY / / 探索性：What else? 还有什么可能性 RETROSPECTIVE / / 溯源性：When? 何时开始/结束/关键节点 ATTRIBUTIONAL / / 分配性：Who/Where? 归因于谁/哪里 Comparative / / 比较性：Which/Compare? 对比/哪个更好/排名 }
+  - 子问题 (子问题) //该问题拆解出来的子问题，形同Problem本体
+}
+
+note right of 问题类
+  类定义：Problem is a gap between current and desired state.
+end note
+
+class "特性" <<Property>> {
+  - 特性名称 (特性名称) //特性的名称(如 "电压"、"功率" )
+  - 特性类型 (特性类型) //标识特性类型(如 "描述型"、"约束型" ) 注:值域为枚举类型:描述型、能力型、约束型.... )
+  - 特性值 (特性值) //特性的具体值(如 "48V" "500W" )
+}
+
+note right of 特性
+  类定义：描述对象的属性特征
+end note
+
+class "立项阶段" <<ProposalStage>> {
+}
+
+class "提出机构" <<Proposing Organization>> {
+}
+
+note right of 提出机构
+  类定义：表示标准由某个单位提出
+end note
+
+class "条文" <<Provision>> {
+}
+
+class "公共数据库" <<PublicDatabase>> {
+}
+
+class "出版阶段" <<PublicationStage>> {
+}
+
+class "出版机构" <<Publisher>> {
+}
+
+class "发布机构" <<Publishing Organization>> {
+}
+
+class "引用" <<Reference>> {
+}
+
+class "文献" <<ReferencedDocuments>> {
+}
+
+class "法规" <<Regulations>> {
+}
+
+class "复审阶段" <<ReviewStage>> {
+}
+
+class "章" <<Section>> {
+  - 章标题 (章标题) //章的标题(如 "质量管理体系" )
+  - 章编号 (章编号) //章的层级编号(如 "4" ) (格式:数字或字母组合)
+}
+
+note right of 章
+  类定义：用于描述逻辑划分文本的实体；层级位置是标准正文的最高层级，一般对应一级标题；章可包含零个或多个条；
+end note
+
+class "方案类" <<Solution>> {
+  - 方案标识 (方案标识) //方案的唯一标识符，用于区分不同方案
+  - 方案名称 (方案名称) //方案的名称
+  - 方案描述 (方案描述) //方案描述
+  - 方案类别 (方案类别) //方案类别包括如下： enum SolutionCategory { DataAnalysis / / 数据分析型解决方案 Classification / / 分类型解决方案 Assessment / / 评估型解决方案 Diagnosis / / 诊断型解决方案 Monitoring / / 监测型解决方案 ConfigurationDesign / / 配置设计型解决方案 Assignment / / 分配型解决方案 Planning / / 规划型解决方案 Scheduling / / 调度型解决方案 }
+  - 解决方案目标 (解决方案目标) //解决方案目标
+  - 输入 (输入) //输入
+  - 输出 (输出) //输出
+  - 方案约束 (方案约束) //方案约束
+  - 方案资源需求 (方案资源需求) //实现该解决方案所需要的资源集，包括知识资源、组件资源等
+  - 方案覆盖的维度 (方案覆盖的维度) //该解决方案所覆盖的维度与刻度
+  - 方案模板 (方案模板) //方案模板是一个活动流程，包括方案步骤以及控制逻辑，方案步骤与Solution本体同形
+  - 方案验证规则 (方案验证规则) //该解决方案成功解决该问题的验证规则
+}
+
+note right of 方案类
+  类定义：Solution is a strategy, algorithm, or process to address a problem.
+end note
+
+class "相关方" <<Stakeholder>> {
+}
+
+note right of 相关方
+  类定义：用于描述与标准化活动有关的角色。它是一个抽象类,根据参与者类型分为 "机构" "个人" 两个核心子类。
+end note
+
+class "标准实体" <<Standard>> {
+  - 文件编号 (文件编号) //符合 GB/T1.1的编号格式,如 "GB/T12345—2023" 。 (格式:标准代号 + 顺序号 + 发布年份)
+  - 文件名称 (文件名称) //标准的完整名称,如 "电动自行车安全技术规范"
+  - 发布日期 (发布日期) //标准的官方发布日期,符合 GB/T7408日期格式。 (格式:YYYY-MM-DD)
+  - 实施日期 (实施日期) //标准开始实施的日期,可能与发布日期不同 (格式:YYYY-MM-DD)
+  - 编制目的 (编制目的) //说明该标准的制定目标,如 "促进技术统一" "保障安全性" 等
+  - 语言版本 (语言版本) //标准发布的语言版本,如中文、英文、多语种； (枚举值:中文/英文等);
+  - 标准状态 (标准状态) //标识标准的状态,如 "草案" "现行" "废止" ； (枚举值:正在起草/征求意见/正在审查/正在批准/即将实施/现行/废止)
+  - 标准约束类型 (约束类型) //规定条款的约束级别(如 "强制" "推荐" ) 注:值域为枚举类型:强制、推荐、描述。
+}
+
+note right of 标准实体
+  类定义：标准化文件的核心根节点,包含标准元数据和技术要素的完整描述。作为标准本体的核心节点,用于表示具有唯一标识的标准化文件实体,通过对象属性聚合元数据、标准结构、技术内容及制定程序。
+  宜依据标准功能类型扩展子类,包括术语标准、符号标准、分类标准、试验标准、规范标准、规程标准、指南标准、评价标准等。
+end note
+
+class "标准化对象" <<StandardizationObject>> {
+  - 主题名称 (主题名称) //标识并被标准化的事物的主题名称
+  - 所属行业 (所属行业) //指明标准化对象所服务的特定行业分类或领域
+}
+
+note right of 标准化对象
+  类定义：用于描述标准化的具体主题或对象
+end note
+
+class "制定程序" <<StandardizationProcess>> {
+  - 阶段代码 (阶段代码) //用于唯一标识和区分标准制定过程中的不同阶段
+  - 开始日期 (开始日期) //指明某个阶段活动开始的具体时间点
+  - 结束日期 (结束日期) //指明某个阶段活动完成的具体时间点
+}
+
+note right of 制定程序
+  类定义：描述一项标准从预备到废止或维护的全生命周期所经历的全部正式阶段、流程和规则。包含预备、立项、起草、征求意见、技术审查、批准发布、出版、复审、废止阶段子类
+end note
+
+class "层次" <<StructuralElement>> {
+}
+
+note right of 层次
+  类定义：标准文本的层级结构实体。包括章、条 (有标题条/无标题条)、段、列项 (无编号/有编号) 等子类
+end note
+
+class "条" <<Subclause>> {
+  - 条标题 (条标题) //有标题条的标题
+  - 条编号 (条编号) //条的层级编号(如 "4.1" ) (格式:数字或字母组合)
+}
+
+note right of 条
+  类定义：包括 "有标题条" 和 "无标题条" 等子类,用于描述逻辑划分文本的实体；是标准 "章" 之下的次级结构单元，用于对于某一主题下的具体要求进行更细致的划分和陈述。 条可以包含子条
+end note
+
+class "标准对象" <<Subject of Standardization>> {
+  - 对象名称 (对象名称) //对象的名称(如 "锂电池" "电机控制器" )
+  - 对象类别 (对象类别) //标识对象类别(如 "设备" "材料" )
+}
+
+class "建议方" <<Suggesting Party>> {
+}
+
+class "表" <<Table>> {
+}
+
+class "技术审查阶段" <<TechnicalReviewStage>> {
+}
+
+class "术语" <<Terminology>> {
+  - 术语标准名称 (TermName) //术语的标准名称，用于统一业务表达，例如 "采购标段数量"。
+  - 术语标准定义 (TermDefinition) //术语的标准业务定义，用于说明该术语在业务场景中的准确含义。
+  - 同义词 (Synonyms) //术语的同义表达、简称、别称或口语化表达，例如 "标段、包、采购标段数、标段数量"。
+}
+
+class "废止阶段" <<WithdrawalStage>> {
+}
+
+class "干系人" <<stakeholder>> {
+  - 干系人标识 (干系人标识) //干系人唯一标识
+  - 干系人名称 (干系人名称) //干系人名称
+  - 干系人所关联角色 (干系人所关联角色) //干系人所关联角色
+  - 干系人所在组织 (干系人所在组织) //干系人所在组织
+  - 干系人利益诉求 (干系人利益诉求) //干系人利益诉求
+  - 干系人责任域 (干系人责任域) //干系人责任域
+}
+
+note right of 干系人
+  类定义：Stakeholder is a role, position, individual, organization, having an interest in an entity.
+end note
+
+' ==========================================
+' 2. 类与子类继承关系 (Inheritance)
+' ==========================================
+
+' 机构相关子类
+"出版机构" --|> "机构"
+"征求意见单位" --|> "机构"
+"建议方" --|> "机构"
+"起草单位" --|> "机构"
+"组织实施单位" --|> "机构"
+"归口部门" --|> "机构"
+"提出机构" --|> "机构"
+"发布机构" --|> "机构"
+
+' 个人相关子类
+"起草人" --|> "个人"
+
+' 标准本体核心继承关系
+"中国标准文献分类" --|> "领域类别"
+"国际标准分类" --|> "领域类别"
+"附加信息" --|> "信息单元"
+"条款" --|> "信息单元"
+"列项" --|> "层次"
+"段" --|> "层次"
+"条" --|> "层次"
+"章" --|> "层次"
+"资料性要素" --|> "要素"
+"规范性要素" --|> "要素"
+"提示" --|> "信息单元表述形式"
+"引用" --|> "信息单元表述形式"
+"附录" --|> "信息单元表述形式"
+"数学公式" --|> "信息单元表述形式"
+"表" --|> "信息单元表述形式"
+"图" --|> "信息单元表述形式"
+"条文" --|> "信息单元表述形式"
+"指标对象" --|> "对象"
+"标准对象" --|> "对象"
+"判断条件" --|> "行动"
+"路径" --|> "行动"
+"动作" --|> "行动"
+"公共数据库" --|> "外部约束"
+"文献" --|> "外部约束"
+"专利" --|> "外部约束"
+"法规" --|> "外部约束"
+"废止阶段" --|> "制定程序"
+"复审阶段" --|> "制定程序"
+"出版阶段" --|> "制定程序"
+"批准发布阶段" --|> "制定程序"
+"技术审查阶段" --|> "制定程序"
+"征求意见阶段" --|> "制定程序"
+"起草阶段" --|> "制定程序"
+"立项阶段" --|> "制定程序"
+"预备阶段" --|> "制定程序"
+
+' ==========================================
+' 3. 对象属性关系 (Object Properties)
+' ==========================================
+
+"任务活动" "1" --> "1" "公文业务对象" : ACTS_ON <<ACTS_ON>>
+"公文管理单元" "1" --> "1" "运行主体" : APPLIES_TO <<APPLIES_TO>>
+"公文管理单元" "1" --> "1" "公文业务对象" : CONCERNS_OBJECT <<CONCERNS_OBJECT>>
+"运行约束条件" "1" --> "1" "任务活动" : CONSTRAINS_ACTIVITY <<CONSTRAINS_ACTIVITY>>
+"运行约束条件" "1" --> "1" "运行主体" : CONSTRAINS_AGENT <<CONSTRAINS_AGENT>>
+"运行约束条件" "1" --> "1" "公文业务对象" : CONSTRAINS_OBJECT <<CONSTRAINS_OBJECT>>
+"公文管理单元" "1" --> "1" "运行信息" : DEFINES <<DEFINES>>
+"运行交互" "1" --> "1" "公文结构单元" : EVIDENCED_BY <<EVIDENCED_BY>>
+"运行约束条件" "1" --> "1" "公文结构单元" : EVIDENCED_BY <<EVIDENCED_BY>>
+"运行信息" "1" --> "1" "公文结构单元" : EVIDENCED_BY <<EVIDENCED_BY>>
+"公文业务对象" "1" --> "1" "公文结构单元" : EVIDENCED_BY <<EVIDENCED_BY>>
+"运行主体" "1" --> "1" "公文结构单元" : EVIDENCED_BY <<EVIDENCED_BY>>
+"任务活动" "1" --> "1" "公文结构单元" : EVIDENCED_BY <<EVIDENCED_BY>>
+"运行交互" "1" --> "1" "运行信息" : EXCHANGES_INFORMATION <<EXCHANGES_INFORMATION>>
+"公文管理单元" "1" --> "1" "公文管理单元" : HAS_DOCUMENT_RELATION <<HAS_DOCUMENT_RELATION>>
+"公文管理单元" "1" --> "1" "运行交互" : HAS_EXCHANGE <<HAS_EXCHANGE>>
+"公文管理单元" "1" --> "1" "运行信息" : HAS_KEY_INFORMATION <<HAS_KEY_INFORMATION>>
+"公文结构单元" "1" --> "1" "公文管理单元" : HAS_PART <<HAS_PART>>
+"公文管理单元" "1" --> "1" "公文结构单元" : HAS_PART <<HAS_PART>>
+"公文管理单元" "1" --> "1" "运行主体" : ISSUED_BY <<ISSUED_BY>>
+"问题类" "1" --> "1" "方案类" : NEED_SOLUTION <<NEED_SOLUTION>>
+"任务活动" "1" --> "1" "运行主体" : PERFORMED_BY <<PERFORMED_BY>>
+"任务活动" "1" --> "1" "任务活动" : PRECEDES <<PRECEDES>>
+"任务活动" "1" --> "1" "运行信息" : PRODUCES <<PRODUCES>>
+"运行信息" "1" --> "1" "运行信息" : RELATED_TO <<RELATED_TO>>
+"公文管理单元" "1" --> "1" "任务活动" : REQUIRES_ACTIVITY <<REQUIRES_ACTIVITY>>
+"运行交互" "1" --> "1" "任务活动" : SUPPORTS_ACTIVITY <<SUPPORTS_ACTIVITY>>
+"任务活动" "1" --> "1" "运行信息" : USES_INFORMATION <<USES_INFORMATION>>
+"标准实体" "1" --> "1" "归口部门" : administeredBy <<administeredBy>>
+
+note on link
+语义说明： 表示标准由某单位归口管理
+end note
+
+"标准实体" "1" --> "1" "标准实体" : adopts <<adopts>>
+note on link
+语义说明：表示本标准采用(等同、修改)了另一个标准的内容
+end note
+
+"标准实体" "1" --> "1" "标准实体" : cites <<cites>>
+note on link
+语义说明：表示标准在内容中引用了另一个标准
+end note
+
+"条款" "1" --> "1" "标准实体" : citesStandard <<citesStandard>>
+note on link
+语义说明：表示条款内容中引用了某个标准
+end note
+
+"标准实体" "1" --> "1" "领域类别" : classifiedUnder <<classifiedUnder>>
+note on link
+语义说明：表示标准按领域分类(如ICS、CCS)
+end note
+
+"约束逻辑" "1" --> "1" "特性" : constrainsCharacteristic <<constrainsCharacteristic>>
+note on link
+语义说明：表示约束条件应用于对象的某个特定特性
+end note
+
+"约束逻辑" "1" --> "1" "对象" : constrainsObject <<constrainsObject>>
+note on link
+语义说明：表示约束条件应用于某个对象(此为细化属性，可用 imposesConstraint和 involvesObject 推理)
+end note
+
+"要素" "1" --> "1" "术语" : defines <<defines>>
+note on link
+语义说明：表示标准或 “术语和定义” 要素界定了某个术语
+end note
+
+"标准实体" "1" --> "1" "术语" : defines <<defines>>
+note on link
+语义说明：表示标准或 “术语和定义” 要素界定了某个术语
+end note
+
+"信息单元" "1" --> "1" "行动" : describesAction <<describesAction>>
+note on link
+语义说明：表示条款规定需执行的动作或步骤
+end note
+
+"标准实体" "1" --> "1" "起草人" : draftedBy <<draftedBy>>
+note on link
+语义说明：表示标准由某起草人起草
+end note
+
+"标准实体" "1" --> "1" "起草单位" : draftedBy <<draftedBy>>
+note on link
+语义说明：表示标准由某起草单位起草
+end note
+
+"对象" "1" --> "1" "特性" : hasCharacteristic <<hasCharacteristic>>
+note on link
+语义说明：表示对象具有某种可量化或描述的属性特征
+end note
+
+"层次" "1" --> "1" "条款" : hasClause <<hasClause>>
+note on link
+语义说明：表示标准的某个结构层次包含了一个具体的条款
+end note
+
+"要素" "1" --> "1" "条款" : hasClause <<hasClause>>
+note on link
+语义说明：表示标准的某个要素包含了一个具体的条款
+end note
+
+"标准实体" "1" --> "1" "制定程序" : hasDevelopmentStage <<hasDevelopmentStage>>
+note on link
+语义说明：表示标准当前所处的生命周期阶段(如征求意见阶段)
+end note
+
+"条款" "1" --> "1" "附加信息" : hasExample <<hasExample>>
+note on link
+语义说明：表示条款关联示例
+end note
+
+"标准实体" "1" --> "1" "要素" : hasNormativeElement <<hasNormativeElement>>
+note on link
+语义说明：表示标准包含规范性要素或资料性要素(如术语、范围)
+end note
+
+"标准实体" "1" --> "1" "要素" : hasNormativeElement <<hasNormativeElement>>
+note on link
+end note
+
+"条款" "1" --> "1" "附加信息" : hasNote <<hasNote>>
+note on link
+语义说明：表示条款关联注
+end note
+
+"标准实体" "1" --> "1" "标准实体" : hasPart <<hasPart>>
+note on link
+语义说明：表示本标准由多个部分系列标准组成,当前标准是其中一个部分。
+end note
+
+"信息单元" "1" --> "1" "信息单元表述形式" : hasRepresentationForm <<hasRepresentationForm>>
+note on link
+语义说明：表示信息单元(条款 等)有内容形式(条文、图、表等)
+end note
+
+"标准实体" "1" --> "1" "层次" : hasStructuralElement <<hasStructuralElement>>
+note on link
+语义说明：表示标准或其内部结构包含章、条、段等层级结构
+end note
+
+"条" "1" --> "1" "条" : hasSubClause <<hasSubClause>>
+note on link
+语义说明：表示条包含子条,用于构建层次结构
+end note
+
+"特性" "1" --> "1" "约束逻辑" : imposesConstraint <<imposesConstraint>>
+note on link
+语义说明：表示条款或特性包含了具体的约束条件(如阈值)
+end note
+
+"信息单元" "1" --> "1" "约束逻辑" : imposesConstraint <<imposesConstraint>>
+note on link
+语义说明：表示条款或特性包含了具体的约束条件(如阈值)
+end note
+
+"制定程序" "1" --> "1" "标准实体" : includesStandard <<includesStandard>>
+note on link
+语义说明：制定程序阶段包含处于该阶段的标准(处于阶段属性的逆向属性)
+end note
+
+"条款" "1" --> "1" "对象" : involvesObject <<involvesObject>>
+note on link
+语义说明：表示条款内容中提及或描述的实体(如人员、设备)
+end note
+
+"条款" "1" --> "1" "专利" : isRelatedToPatent <<isRelatedToPatent>>
+note on link
+语义说明：表示条款的技术内容与某项专利有关
+end note
+
+"关注点" "1" --> "1" "干系人" : is_a_matter_of_importance_to <<is_a_matter_of_importance_to>>
+"标准实体" "1" --> "1" "发布机构" : issuedBy <<issuedBy>>
+note on link
+语义说明：表示标准由某机构正式发布
+end note
+
+"标准实体" "1" --> "1" "提出机构" : proposedBy <<proposedBy>>
+note on link
+语义说明：表示标准由某单位提出
+end note
+
+"标准实体" "1" --> "1" "出版机构" : publishedBy <<publishedBy>>
+note on link
+语义说明：表示标准由某出版机构出版
+end note
+
+"机构" "1" --> "1" "相关方" : rdfs_subClassOf <<rdfs_subClassOf>>
+"个人" "1" --> "1" "相关方" : rdfs_subClassOf <<rdfs_subClassOf>>
+"起草人" "1" --> "1" "个人" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： 起草人 类是 ‘个人’ 类的子类
+end note
+
+"出版机构" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘出版机构’ 类是 ‘机构’ 类的子类
+end note
+
+"征求意见单位" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘征求意见单位’ 类是 ‘机构’ 类的子类
+end note
+
+"建议方" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘建议方’ 类是 ‘机构’ 类的子类
+end note
+
+"起草单位" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘起草单位’ 类是 ‘机构’ 的子类
+end note
+
+"组织实施单位" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘组织实施单位’ 类是 ‘机构’ 的子类
+end note
+
+"归口部门" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘归口部门’ 类是 ‘机构’ 的子类
+end note
+
+"提出机构" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘提出机构’ 类是 ‘机构’ 的子类
+end note
+
+"发布机构" "1" --> "1" "机构" : rdfs_subClassOf <<rdfs_subClassOf>>
+note on link
+语义说明： ‘发布机构’ 类是 ‘机构’ 的子类
+end note
+
+"中国标准文献分类" "1" --> "1" "领域类别" : rdfs_subClassOf <<rdfs_subClassOf>>
+"国际标准分类" "1" --> "1" "领域类别" : rdfs_subClassOf <<rdfs_subClassOf>>
+"附加信息" "1" --> "1" "信息单元" : rdfs_subClassOf <<rdfs_subClassOf>>
+"条款" "1" --> "1" "信息单元" : rdfs_subClassOf <<rdfs_subClassOf>>
+"列项" "1" --> "1" "层次" : rdfs_subClassOf <<rdfs_subClassOf>>
+"段" "1" --> "1" "层次" : rdfs_subClassOf <<rdfs_subClassOf>>
+"条" "1" --> "1" "层次" : rdfs_subClassOf <<rdfs_subClassOf>>
+"章" "1" --> "1" "层次" : rdfs_subClassOf <<rdfs_subClassOf>>
+"资料性要素" "1" --> "1" "要素" : rdfs_subClassOf <<rdfs_subClassOf>>
+"规范性要素" "1" --> "1" "要素" : rdfs_subClassOf <<rdfs_subClassOf>>
+"提示" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"引用" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"附录" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"数学公式" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"表" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"图" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"条文" "1" --> "1" "信息单元表述形式" : rdfs_subClassOf <<rdfs_subClassOf>>
+"指标对象" "1" --> "1" "对象" : rdfs_subClassOf <<rdfs_subClassOf>>
+"标准对象" "1" --> "1" "对象" : rdfs_subClassOf <<rdfs_subClassOf>>
+"判断条件" "1" --> "1" "行动" : rdfs_subClassOf <<rdfs_subClassOf>>
+"路径" "1" --> "1" "行动" : rdfs_subClassOf <<rdfs_subClassOf>>
+"动作" "1" --> "1" "行动" : rdfs_subClassOf <<rdfs_subClassOf>>
+"公共数据库" "1" --> "1" "外部约束" : rdfs_subClassOf <<rdfs_subClassOf>>
+"文献" "1" --> "1" "外部约束" : rdfs_subClassOf <<rdfs_subClassOf>>
+"专利" "1" --> "1" "外部约束" : rdfs_subClassOf <<rdfs_subClassOf>>
+"法规" "1" --> "1" "外部约束" : rdfs_subClassOf <<rdfs_subClassOf>>
+"废止阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"复审阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"出版阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"批准发布阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"技术审查阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"征求意见阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"起草阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"立项阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+"预备阶段" "1" --> "1" "制定程序" : rdfs_subClassOf <<rdfs_subClassOf>>
+
+"标准实体" "1" --> "1" "标准实体" : references <<references>>
+note on link
+语义说明：表示标准资料性参考了另一个标准 (通常在参考文献中列出)
+end note
+
+"信息单元" "1" --> "1" "层次" : referencesClause <<referencesClause>>
+note on link
+语义说明：表示条款引用了本标准内的章、条、段、列项
+end note
+
+"条款" "1" --> "1" "外部约束" : referencesExternalResource <<referencesExternalResource>>
+note on link
+语义说明：表示条款引用了法规、专利、文献等外部资源
+end note
+
+"标准实体" "1" --> "1" "外部约束" : referencesExternalResource <<referencesExternalResource>>
+note on link
+语义说明：表示标准引用了法规、专利、文献等外部资源
+end note
+
+"标准实体" "1" --> "1" "标准实体" : replaces <<replaces>>
+note on link
+语义说明：表示新版 标准 代替 旧版 标准。其逆属性为被代替 (isReplacedBy)
+end note
+
+"运行交互" "1" --> "1" "运行主体" : sourceAgent <<sourceAgent>>
+"条款" "1" --> "1" "特性" : specifiesCharacteristic <<specifiesCharacteristic>>
+note on link
+语义说明：表示条款对某个对象的特性 (参数、指标)做出了规定
+end note
+
+"标准实体" "1" --> "1" "标准化对象" : standardizes <<standardizes>>
+note on link
+语义说明：表示本标准所规范的主题对象
+end note
+
+"运行交互" "1" --> "1" "运行主体" : targetAgent <<targetAgent>>
+"业务对象" "1" --> "1" "数据本体模型" : test <<test>>
+"信息单元" "1" --> "1" "术语" : usesTerm <<usesTerm>>
+note on link
+语义说明：表示信息单元提及了某个术语
+end note
+
+@enduml

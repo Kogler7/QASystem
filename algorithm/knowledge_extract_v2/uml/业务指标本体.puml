@@ -1,0 +1,101 @@
+@startuml
+title 业务指标本体模型 v8
+
+top to bottom direction
+
+skinparam defaultFontName Microsoft YaHei
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty methods
+
+' ============================================
+' 核心：业务指标
+' ============================================
+class Metric <<Metric, KnowledgeUnit>> #LightGreen {
+  +code: String // 指标标准编码，如 ICM-1.1
+  +name: String // 指标标准名称
+  +definition: String // 指标定义
+  +level: String // 指标层级：L1/L2/L3
+  +category: String // 指标类别：原子指标/衍生指标/复合指标
+  +nature: String // 指标分类：业务运行指标/管控要求指标/风险提示指标/管理指标
+  +indicatorType: String // 指标类型：一级指标/二级指标
+  +unit: String // 计量单位：万个/亿元/%
+  +dimensions: String[] // 所属维度列表，如 [时间, 组织, 采购分类]
+  +sourceTable: String // 数仓结果所在表名
+  +sourceField: String // 来源字段
+  +logicSupplement: String // 逻辑补充
+  +sql: String // 计算SQL
+  +recommendedChart: String // 推荐图表
+  +chartDescription: String // 图表说明
+  +visualizable: Boolean // 是否适合可视化生成图表
+  +tags: String[] // 标签
+}
+
+' ============================================
+' 业务对象（业务实体/阶段/活动/决策/模型总述/主题/索引）
+' ============================================
+class BusinessObject <<BusinessEntity, KnowledgeUnit>> #LightYellow {
+  +id: String // 业务实体ID，如 PARENT-BIM-001
+  +name: String // 业务实体名称，如 招采项目
+  +type: String // 块类型：业务实体/业务阶段/业务活动/决策节点/模型总述/主题数据/逻辑关系索引/指标映射索引/关系索引
+  +parentId: String // 父块ID，如 PARENT-BIM-001
+  +domain: String // 领域，如 采购管理域
+  +businessProcess: String // 业务流程，如 采购管理域主业务流程
+  +businessStage: String // 业务阶段
+  +role: String // 所属角色
+  +businessObjects: String[] // 业务对象
+  +description: String // 业务含义与流程描述/活动说明/阶段说明
+  +businessProcessDescription: String // 业务含义与流程（完整段落文本，含干系人信息）
+  +relatedTable: String // 关联数据表名
+  +relatedMetrics: String[] // 相关指标编码列表
+  +stakeholderNames: String[] // 干系人角色名称列表（原始提取值）
+  +keywords: String[] // 关键词
+  +searchHint: String // 检索提示
+  +intentScenario: String // 适配场景
+  +intentTargetObject: String // 适配目标对象
+  +intentGoal: String // 适配目标
+  +intentType: String // 适配意图类型：看趋势/做对比/问极值/看构成/看排名/问归因/做探查/问明细
+  +businessToMetricExpression: String // 业务到指标化表达
+  +tags: String[] // 标签
+}
+
+' ============================================
+' 干系人（利益相关者）
+' ============================================
+class Stakeholder <<Stakeholder>> #LightPink {
+  +stakeholderId: String // 利益相关者标识（抽取时可置空，由后处理统一分配）
+  +name: String // 名称
+  +role: String // 角色
+  +organization: String // 组织
+  +interest: String // 利益诉求
+  +responsibilityDomain: String // 责任域
+}
+
+' ============================================
+' 关系
+' ============================================
+Metric "1" --> "0..1" BusinessObject : BELONGS_TO_ENTITY
+Metric "1" --> "0..*" DataTable : SOURCED_FROM
+BusinessObject "1" --> "0..*" Stakeholder : HAS_STAKEHOLDER
+
+' 业务对象层次：父子关系（按 父块ID 字段）
+BusinessObject "1" --> "0..*" BusinessObject : BELONGS_TO_PARENT
+
+' 业务对象间流程关系（按 业务含义与流程 中描述的流向）
+BusinessObject "1" --> "0..*" BusinessObject : 流程流转
+
+' 跨本体关系（后处理建立 / identity_writer postprocess）:
+' Term -[:TERM_DEFINES_METRIC]-> Metric (term ontology → biz_indicator)
+' BusinessObject -[:HAS_METRIC]-> Metric (biz_indicator internal, auto by identity_writer)
+' Metric -[:SOURCED_FROM]-> DataTable (above ↑ now explicit in diagram, postprocessed by matching sourceTable/sql)
+' 注：SOURCED_FROM 关系由 identity_writer 自动后处理创建：
+'   1) Metric.sourceTable 直接匹配 DataTable.name
+'   2) Metric.sql 中提取 FROM/JOIN 的表名匹配 DataTable.name
+' Stakeholder 节点由 identity_writer 后处理从 BusinessObject.businessProcessDescription
+'   中提取干系人信息创建；stakeholderId 由后处理统一分配
+
+' @identity Metric: code
+' @identity BusinessObject: id
+' @identity Stakeholder: name
+@enduml

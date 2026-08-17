@@ -1,0 +1,325 @@
+# 本体驱动知识抽取模块
+
+`algorithm/knowledge_extract` 使用调用方传入的 PlantUML 类图作为知识抽取 Schema，从文档中抽取实体和关系，并输出统一的图结构。
+
+这里的 PlantUML 不只是给大模型看的说明文本。它同时具有两种作用：
+
+1. **语义约束**：原始 PlantUML 会进入提示词，指导大模型判断可抽取的实体、属性和关系。
+2. **输出规范**：程序解析类和属性标识，对大模型输出做确定性规范化，避免中文名、英文名、alias 和 stereotype 混用。
+
+因此，接口支持的是本文定义的“知识本体类图方言”，不是任意 PlantUML 图形语法。
+
+## 处理流程
+
+```text
+上传文件 + ontology
+        │
+        ├─ 文档解析 → Markdown/纯文本
+        │
+        └─ PlantUML 解析 → 本体标识目录
+                         │
+文档文本 + 原始 PlantUML + 标识目录
+                         │
+                         ▼
+                    LLM 知识抽取
+                         │
+                         ▼
+              entities / relations JSON
+                         │
+                         ▼
+       根据本体规范化类型、属性和关系端点
+                         │
+                         ▼
+              nodes / relationships 图结构
+                         │
+                 ┌───────┴────────┐
+                 ▼                ▼
+              接口返回       可选写入 Neo4j
+```
+
+主要实现：
+
+- `ontology_schema.py`：解析本体类、alias、stereotype、属性和稳定标识。
+- `extractor.py`：构建提示词、调用 LLM、校验 JSON、规范化结果并生成图结构。
+- `knowledge_space.py`：知识空间相关能力及 Neo4j 存储。
+- `uml/`：项目内置的本体示例。接口不会自动加载这些文件，调用方仍需传入 `ontology`。
+
+### Neo4j 连接
+
+通过环境变量 `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` 配置（默认 `bolt://localhost:7687` / `neo4j` / `neo4j2025`，见 `config.py`）。开发环境 Neo4j 地址为 `https://neo4j.zhouhao.work`，真实 Bolt 连接串与凭据见 `knowledge_map_dev` 仓库的 `.env`。
+
+## 推荐的本体格式
+
+```plantuml
+@startuml
+
+class "术语" as Terminology <<KnowledgeUnit>> {
+  + 术语标准名称 (TermName): String // 术语的标准名称
+  + 术语标准定义 (TermDefinition): String // 术语的标准业务定义
+  + 同义词 (Synonyms): String[] // 简称、别称或口语化表达
+}
+
+class "业务域" as BusinessDomain <<KnowledgeUnit>> {
+  + 业务域名称 (DomainName): String
+}
+
+Terminology "0..*" --> "1" BusinessDomain : BELONGS_TO
+
+' @identity Terminology: TermName
+' @identity BusinessDomain: DomainName
+
+@enduml
+```
+
+### 类声明
+
+```plantuml
+class "术语" as Terminology <<KnowledgeUnit>>
+```
+
+| 部分                  | UML 含义             | 本模块用途                                   |
+| --------------------- | -------------------- | -------------------------------------------- |
+| `"术语"`            | 展示名称             | 面向业务人员阅读，也可被解析为该类的输入名称 |
+| `as Terminology`    | PlantUML alias       | 首选的稳定类型标识，最终用于节点`label`    |
+| `<<KnowledgeUnit>>` | stereotype（构造型） | 表达分类、角色或扩展语义                     |
+
+推荐新本体使用 `as Alias` 明确稳定类型标识。为兼容现有本体，如果没有 alias，程序会使用第一个 stereotype；两者都没有时使用类名。
+
+稳定类型标识的优先级为：
+
+```text
+as Alias > 第一个 stereotype > PlantUML 类名
+```
+
+所以下面两种声明都会得到 `label: "Terminology"`：
+
+```plantuml
+class "术语" as Terminology <<KnowledgeUnit>>
+class 术语 <<Terminology, KnowledgeUnit>>
+```
+
+第二种是兼容写法。按照标准 UML 语义，`Terminology` 仍然是 stereotype，不是类名。
+
+### 属性声明
+
+```plantuml
++ 术语标准名称 (TermName): String // 术语的标准名称
+```
+
+| 部分             | 含义                                            |
+| ---------------- | ----------------------------------------------- |
+| `+`            | UML public 可见性；在本体中表示可抽取的公开属性 |
+| `术语标准名称` | 属性展示名                                      |
+| `(TermName)`   | 稳定属性标识，最终作为`properties` 的键       |
+| `String`       | 属性数据类型                                    |
+| `// ...`       | 属性说明和抽取提示                              |
+
+支持的可见性符号包括 `+`、`-`、`#`、`~`，当前抽取过程不根据可见性过滤属性。
+
+建议使用以下基础类型：
+
+- `String`
+- `String[]`
+- `Boolean`
+- `Integer`
+- `Float`
+
+其中 `String[]` 应输出 JSON 数组，`Boolean` 应输出 JSON 布尔值。类型约束目前主要由提示词交给 LLM 执行，程序尚未进行完整的运行时类型校验。
+
+### 关系声明
+
+```plantuml
+Terminology "0..*" --> "1" BusinessDomain : BELONGS_TO
+```
+
+表示多个术语可以属于一个业务域。LLM 输出：
+
+```json
+{
+  "from_type": "Terminology",
+  "from_name": "采购标段数量",
+  "rel_type": "BELONGS_TO",
+  "to_type": "BusinessDomain",
+  "to_name": "采购管理域"
+}
+```
+
+当前版本会根据本体规范化 `from_type` 和 `to_type`。关系名称和基数仍由原始 PlantUML 提供给 LLM 理解，程序尚未对 `rel_type` 和基数做完整的本地语法校验。
+
+### Identity 声明
+
+```plantuml
+' @identity Terminology: TermName
+```
+
+这是项目自定义注释，用于告诉 LLM：`Terminology` 实体优先使用 `TermName` 作为身份值，并把该值写入实体 `name` 以及关系的 `from_name`、`to_name`。
+
+如果没有声明 identity，提示词默认要求模型使用 `name`。当前 identity 由 LLM 执行，程序尚未根据属性值重新计算实体 `name`。
+
+## 输入与输出示例
+
+假设文档包含：
+
+```text
+采购标段数量是指一个采购项目划分的采购标段总数，简称标段数量，属于采购管理域。
+```
+
+LLM 即使返回展示名：
+
+```json
+{
+  "entities": [
+    {
+      "type": "术语",
+      "name": "采购标段数量",
+      "properties": {
+        "术语标准名称": "采购标段数量",
+        "同义词": ["标段数量"]
+      }
+    }
+  ],
+  "relations": []
+}
+```
+
+本体解析层也会将其规范化为：
+
+```json
+{
+  "entities": [
+    {
+      "type": "Terminology",
+      "name": "采购标段数量",
+      "properties": {
+        "TermName": "采购标段数量",
+        "Synonyms": ["标段数量"]
+      }
+    }
+  ],
+  "relations": []
+}
+```
+
+最终图节点为：
+
+```json
+{
+  "uid": "Terminology::采购标段数量",
+  "label": "Terminology",
+  "properties": {
+    "name": "采购标段数量",
+    "TermName": "采购标段数量",
+    "Synonyms": ["标段数量"]
+  }
+}
+```
+
+节点 UID 的当前生成规则为：
+
+```text
+{稳定类型标识}::{实体 name 的小写形式}
+```
+
+## 调用方式
+
+### 知识沉淀接口
+
+```bash
+curl -X POST http://127.0.0.1:8006/api/knowledge/precipitation \
+  -F 'file=@./terms.docx' \
+  -F 'ontology=<./terminology.puml' \
+  -F 'save_to_db=false'
+```
+
+该流程还会执行文档解析、产物存储、文本切片和向量化。切片与向量化直接处理文档内容，不使用本体。
+
+### MCP 工具
+
+工具名：`kg_extract_v2`
+
+参数：
+
+```json
+{
+  "ontology": "@startuml\n...\n@enduml",
+  "text": "待抽取文本",
+  "model": null,
+  "base_url": null
+}
+```
+
+### Python 调用
+
+```python
+from algorithm.knowledge_extract import extract_v2
+
+result = extract_v2(
+    ontology=ontology_text,
+    text=document_text,
+)
+```
+
+## LLM 配置
+
+默认从环境变量读取，模型默认 `deepseek-v4-flash-0731`（与 agent 部分一致），thinking 默认关闭：
+
+| 环境变量                           | 用途                                |
+| ---------------------------------- | ----------------------------------- |
+| `KG_EXTRACT_LLM_BASE_URL`        | OpenAI-compatible API 地址          |
+| `KG_EXTRACT_LLM_API_KEY`         | API Key                             |
+| `KG_EXTRACT_LLM_MODEL`           | 模型名称，默认 `deepseek-v4-flash-0731` |
+| `KG_EXTRACT_LLM_DISABLE_THINKING` | 是否关闭 thinking，默认 `1` 关闭；设 `0` 开启 |
+| `KG_EXTRACT_LLM_MAX_TOKENS`      | 最大输出 token 数                   |
+| `KG_EXTRACT_LLM_JSON_RETRIES`    | JSON 格式错误后的重试次数           |
+| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认`4` |
+| `KG_EXTRACT_LLM_QPS`             | 每秒最大请求数，`0` 表示不限制    |
+| `KG_EXTRACT_LLM_QPM`             | 每分钟最大请求数，`0` 表示不限制  |
+
+部分配置保留旧环境变量作为回退，具体以 `config.py` 和 `extractor.py` 为准。
+
+## 支持范围与边界
+
+本模块当前适合：
+
+- `class` 和 `abstract class` 类声明；
+- 引号展示名及 `as Alias`；
+- 单行类声明中的 stereotype；
+- `{` 与类声明位于同一行的属性块；
+- `属性名: 类型`、`属性展示名 (PropertyId): 类型`；
+- `//` 属性说明；
+- 类之间的常见关系和基数；
+- `@identity` 项目注释。
+
+以下内容可能被 LLM 阅读，但不保证被程序正确解析或校验：
+
+- 时序图、活动图、状态图、用例图和部署图；
+- 宏、函数、动态 PlantUML 和复杂 `!include`；
+- 方法定义、复杂泛型和嵌套类型；
+- 一个文件中混合多种 UML 图；
+- 依赖布局方向表达业务语义；
+- 超大规模本体。
+
+颜色、标题、`skinparam` 和布局指令通常会被本地解析器忽略，不影响抽取，但也不应承载业务约束。
+
+## 本体设计建议
+
+1. 使用英文 alias 作为稳定类型标识，例如 `as Terminology`。
+2. 中文名称只用于展示，不要作为跨系统检索的唯一标识。
+3. 属性使用稳定英文标识，例如 `(TermName)`。
+4. 关系名称使用稳定的大写英文标识，例如 `BELONGS_TO`。
+5. 为每个实体定义明确的 identity 字段。
+6. 属性注释写清楚业务含义和示例，帮助模型区分相似字段。
+7. 单次只传入与当前文档相关的领域本体，避免无关类型干扰模型。
+8. 本体发生不兼容修改时进行版本管理，不要静默复用旧 `label`。
+
+## 当前限制与后续方向
+
+当前实现已经确定性处理类标识、属性标识和关系端点，但还不是完整的 PlantUML 编译器。可以继续增强：
+
+- 解析关系为结构化模型并校验 `rel_type`；
+- 校验关系端点是否存在；
+- 校验属性类型和必填字段；
+- 检测重复 alias、重复类型标识和重复属性标识；
+- 在调用 LLM 前返回明确的本体语法错误；
+- 按本体 identity 在本地统一生成实体 UID；
+- 对大型本体按领域或相关性裁剪后再进入提示词。

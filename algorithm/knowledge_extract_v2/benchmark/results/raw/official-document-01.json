@@ -1,0 +1,1094 @@
+{
+  "raw": {
+    "entities": [
+      {
+        "type": "OfficialDocument",
+        "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "properties": {
+          "documentTitle": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+          "sourceOrganization": "中国中车集团有限公司",
+          "sourceDocumentNumber": "中车集团办科信〔2026〕18号"
+        },
+        "evidence": {
+          "quote": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知"
+        }
+      },
+      {
+        "type": "DocumentUnit",
+        "name": "DU-001",
+        "properties": {
+          "unitId": "DU-001",
+          "unitType": "条",
+          "unitTitle": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+          "unitOrder": 1,
+          "originalText": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。"
+        },
+        "evidence": {
+          "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。"
+        }
+      },
+      {
+        "type": "DocumentUnit",
+        "name": "DU-002",
+        "properties": {
+          "unitId": "DU-002",
+          "unitType": "条",
+          "unitTitle": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+          "unitOrder": 2,
+          "originalText": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。"
+        },
+        "evidence": {
+          "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。"
+        }
+      },
+      {
+        "type": "DocumentUnit",
+        "name": "DU-003",
+        "properties": {
+          "unitId": "DU-003",
+          "unitType": "条",
+          "unitTitle": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+          "unitOrder": 3,
+          "originalText": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+        },
+        "evidence": {
+          "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+        }
+      },
+      {
+        "type": "DocumentUnit",
+        "name": "DU-004",
+        "properties": {
+          "unitId": "DU-004",
+          "unitType": "条",
+          "unitTitle": "四、各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部。",
+          "unitOrder": 4,
+          "originalText": "四、各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部。"
+        },
+        "evidence": {
+          "quote": "四、各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部。"
+        }
+      },
+      {
+        "type": "DocumentUnit",
+        "name": "DU-005",
+        "properties": {
+          "unitId": "DU-005",
+          "unitType": "条",
+          "unitTitle": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+          "unitOrder": 5,
+          "originalText": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。"
+        },
+        "evidence": {
+          "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。"
+        }
+      },
+      {
+        "type": "OperationalAgent",
+        "name": "中国中车集团有限公司",
+        "properties": {
+          "agentName": "中国中车集团有限公司",
+          "agentType": "组织",
+          "organizationLevel": "集团"
+        },
+        "evidence": {
+          "quote": "来文单位：中国中车集团有限公司"
+        }
+      },
+      {
+        "type": "OperationalAgent",
+        "name": "中国中车集团有限公司办公室",
+        "properties": {
+          "agentName": "中国中车集团有限公司办公室",
+          "agentType": "部门",
+          "organizationLevel": "集团"
+        },
+        "evidence": {
+          "quote": "中国中车集团有限公司办公室"
+        }
+      },
+      {
+        "type": "OperationalAgent",
+        "name": "各企业",
+        "properties": {
+          "agentName": "各企业",
+          "agentType": "组织"
+        },
+        "evidence": {
+          "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离"
+        }
+      },
+      {
+        "type": "OperationalAgent",
+        "name": "境外人员",
+        "properties": {
+          "agentName": "境外人员",
+          "agentType": "角色"
+        },
+        "evidence": {
+          "quote": "尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+        }
+      },
+      {
+        "type": "OperationalAgent",
+        "name": "集团科信部",
+        "properties": {
+          "agentName": "集团科信部",
+          "agentType": "部门"
+        },
+        "evidence": {
+          "quote": "通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "type": "OperationalObject",
+        "name": "开源智能体",
+        "properties": {
+          "objectName": "开源智能体",
+          "objectType": "模型"
+        },
+        "evidence": {
+          "quote": "不得部署安装各类开源智能体"
+        }
+      },
+      {
+        "type": "OperationalObject",
+        "name": "网络安全防护等级三级及以上网络系统",
+        "properties": {
+          "objectName": "网络安全防护等级三级及以上网络系统",
+          "objectType": "系统"
+        },
+        "evidence": {
+          "quote": "对于网络安全防护等级三级及以上网络系统"
+        }
+      },
+      {
+        "type": "OperationalObject",
+        "name": "关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+        "properties": {
+          "objectName": "关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+          "objectType": "制度"
+        },
+        "evidence": {
+          "quote": "参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范"
+        }
+      },
+      {
+        "type": "OperationalInformation",
+        "name": "开源智能体安全风险排查情况",
+        "properties": {
+          "informationName": "开源智能体安全风险排查情况",
+          "informationType": "材料"
+        },
+        "evidence": {
+          "quote": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "开展开源智能体安全风险排查",
+        "properties": {
+          "activityName": "开展开源智能体安全风险排查",
+          "activityType": "管理",
+          "actionVerb": "开展",
+          "description": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数",
+          "priority": "重点"
+        },
+        "evidence": {
+          "quote": "决定组织开展专项排查工作。现将有关要求通知如下"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "加强网络和数据安全监测",
+        "properties": {
+          "activityName": "加强网络和数据安全监测",
+          "activityType": "监督",
+          "actionVerb": "加强"
+        },
+        "evidence": {
+          "quote": "五、加强网络和数据安全监测"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "第一时间处置，并向集团报告",
+        "properties": {
+          "activityName": "第一时间处置，并向集团报告",
+          "activityType": "管理",
+          "actionVerb": "处置"
+        },
+        "evidence": {
+          "quote": "第一时间处置，并向集团报告"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "properties": {
+          "activityName": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+          "activityType": "报送",
+          "actionVerb": "报送"
+        },
+        "evidence": {
+          "quote": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "type": "OperationalExchange",
+        "name": "EX-002",
+        "properties": {
+          "exchangeId": "EX-002",
+          "exchangeType": "报送",
+          "description": "报送开源智能体安全风险排查情况"
+        },
+        "evidence": {
+          "quote": "通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "type": "OperationalConstraint",
+        "name": "不得未经批准部署安装开源智能体",
+        "properties": {
+          "constraintName": "不得未经批准部署安装开源智能体",
+          "constraintType": "权限约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体"
+        },
+        "evidence": {
+          "quote": "未经集团批准，不得部署安装各类开源智能体"
+        }
+      },
+      {
+        "type": "OperationalConstraint",
+        "name": "禁止办公设备内、外网混用",
+        "properties": {
+          "constraintName": "禁止办公设备内、外网混用",
+          "constraintType": "安全约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "禁止计算机等办公设备内、外网混用"
+        },
+        "evidence": {
+          "quote": "禁止计算机等办公设备内、外网混用"
+        }
+      },
+      {
+        "type": "OperationalConstraint",
+        "name": "境外人员严禁未经批准安装智能体",
+        "properties": {
+          "constraintName": "境外人员严禁未经批准安装智能体",
+          "constraintType": "安全约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+        },
+        "evidence": {
+          "quote": "境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+        }
+      },
+      {
+        "type": "OperationalConstraint",
+        "name": "风险排查情况报送时限",
+        "properties": {
+          "constraintName": "风险排查情况报送时限",
+          "constraintType": "时间约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+        },
+        "evidence": {
+          "quote": "各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "type": "OperationalConstraint",
+        "name": "建议谨慎使用开源智能体",
+        "properties": {
+          "constraintName": "建议谨慎使用开源智能体",
+          "constraintType": "安全约束",
+          "mandatoryLevel": "鼓励",
+          "constraintText": "其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范"
+        },
+        "evidence": {
+          "quote": "其他网络系统，建议谨慎使用"
+        }
+      }
+    ],
+    "relations": [
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_PART",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-001"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_PART",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-002"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_PART",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-003"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_PART",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-004"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_PART",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-005"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "ISSUED_BY",
+        "to_type": "OperationalAgent",
+        "to_name": "中国中车集团有限公司办公室"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "APPLIES_TO",
+        "to_type": "OperationalAgent",
+        "to_name": "各企业"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "CONCERNS_OBJECT",
+        "to_type": "OperationalObject",
+        "to_name": "开源智能体"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "CONCERNS_OBJECT",
+        "to_type": "OperationalObject",
+        "to_name": "网络安全防护等级三级及以上网络系统"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "REQUIRES_ACTIVITY",
+        "to_type": "OperationalActivity",
+        "to_name": "开展开源智能体安全风险排查"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "REQUIRES_ACTIVITY",
+        "to_type": "OperationalActivity",
+        "to_name": "加强网络和数据安全监测"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "REQUIRES_ACTIVITY",
+        "to_type": "OperationalActivity",
+        "to_name": "第一时间处置，并向集团报告"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "REQUIRES_ACTIVITY",
+        "to_type": "OperationalActivity",
+        "to_name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_CONSTRAINT",
+        "to_type": "OperationalConstraint",
+        "to_name": "不得未经批准部署安装开源智能体"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_CONSTRAINT",
+        "to_type": "OperationalConstraint",
+        "to_name": "禁止办公设备内、外网混用"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_CONSTRAINT",
+        "to_type": "OperationalConstraint",
+        "to_name": "境外人员严禁未经批准安装智能体"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_CONSTRAINT",
+        "to_type": "OperationalConstraint",
+        "to_name": "风险排查情况报送时限"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_CONSTRAINT",
+        "to_type": "OperationalConstraint",
+        "to_name": "建议谨慎使用开源智能体"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_EXCHANGE",
+        "to_type": "OperationalExchange",
+        "to_name": "EX-002"
+      },
+      {
+        "from_type": "OfficialDocument",
+        "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "rel_type": "HAS_KEY_INFORMATION",
+        "to_type": "OperationalInformation",
+        "to_name": "开源智能体安全风险排查情况"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "开展开源智能体安全风险排查",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-001"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "加强网络和数据安全监测",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-005"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "第一时间处置，并向集团报告",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-005"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-004"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "开展开源智能体安全风险排查",
+        "rel_type": "PERFORMED_BY",
+        "to_type": "OperationalAgent",
+        "to_name": "各企业"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "开展开源智能体安全风险排查",
+        "rel_type": "ACTS_ON",
+        "to_type": "OperationalObject",
+        "to_name": "开源智能体"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "加强网络和数据安全监测",
+        "rel_type": "PERFORMED_BY",
+        "to_type": "OperationalAgent",
+        "to_name": "各企业"
+      },
+      {
+        "from_type": "OperationalActivity",
+        "from_name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "rel_type": "USES_INFORMATION",
+        "to_type": "OperationalInformation",
+        "to_name": "开源智能体安全风险排查情况"
+      },
+      {
+        "from_type": "OperationalAgent",
+        "from_name": "各企业",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-002"
+      },
+      {
+        "from_type": "OperationalInformation",
+        "from_name": "开源智能体安全风险排查情况",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-004"
+      },
+      {
+        "from_type": "OperationalExchange",
+        "from_name": "EX-002",
+        "rel_type": "sourceAgent",
+        "to_type": "OperationalAgent",
+        "to_name": "各企业"
+      },
+      {
+        "from_type": "OperationalExchange",
+        "from_name": "EX-002",
+        "rel_type": "targetAgent",
+        "to_type": "OperationalAgent",
+        "to_name": "集团科信部"
+      },
+      {
+        "from_type": "OperationalExchange",
+        "from_name": "EX-002",
+        "rel_type": "EXCHANGES_INFORMATION",
+        "to_type": "OperationalInformation",
+        "to_name": "开源智能体安全风险排查情况"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "不得未经批准部署安装开源智能体",
+        "rel_type": "CONSTRAINS_AGENT",
+        "to_type": "OperationalAgent",
+        "to_name": "各企业"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "不得未经批准部署安装开源智能体",
+        "rel_type": "CONSTRAINS_OBJECT",
+        "to_type": "OperationalObject",
+        "to_name": "开源智能体"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "禁止办公设备内、外网混用",
+        "rel_type": "CONSTRAINS_AGENT",
+        "to_type": "OperationalAgent",
+        "to_name": "各企业"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "境外人员严禁未经批准安装智能体",
+        "rel_type": "CONSTRAINS_AGENT",
+        "to_type": "OperationalAgent",
+        "to_name": "境外人员"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "风险排查情况报送时限",
+        "rel_type": "CONSTRAINS_ACTIVITY",
+        "to_type": "OperationalActivity",
+        "to_name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "不得未经批准部署安装开源智能体",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-003"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "禁止办公设备内、外网混用",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-002"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "境外人员严禁未经批准安装智能体",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-002"
+      },
+      {
+        "from_type": "OperationalConstraint",
+        "from_name": "风险排查情况报送时限",
+        "rel_type": "EVIDENCED_BY",
+        "to_type": "DocumentUnit",
+        "to_name": "DU-004"
+      }
+    ]
+  },
+  "graph": {
+    "nodes": [
+      {
+        "uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "label": "OfficialDocument",
+        "properties": {
+          "documentTitle": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+          "sourceOrganization": "中国中车集团有限公司",
+          "sourceDocumentNumber": "中车集团办科信〔2026〕18号",
+          "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知"
+        }
+      },
+      {
+        "uid": "DocumentUnit::du-001",
+        "label": "DocumentUnit",
+        "properties": {
+          "unitId": "DU-001",
+          "unitType": "条",
+          "unitTitle": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+          "unitOrder": 1,
+          "originalText": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+          "name": "DU-001"
+        }
+      },
+      {
+        "uid": "DocumentUnit::du-002",
+        "label": "DocumentUnit",
+        "properties": {
+          "unitId": "DU-002",
+          "unitType": "条",
+          "unitTitle": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+          "unitOrder": 2,
+          "originalText": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+          "name": "DU-002"
+        }
+      },
+      {
+        "uid": "DocumentUnit::du-003",
+        "label": "DocumentUnit",
+        "properties": {
+          "unitId": "DU-003",
+          "unitType": "条",
+          "unitTitle": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+          "unitOrder": 3,
+          "originalText": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+          "name": "DU-003"
+        }
+      },
+      {
+        "uid": "DocumentUnit::du-004",
+        "label": "DocumentUnit",
+        "properties": {
+          "unitId": "DU-004",
+          "unitType": "条",
+          "unitTitle": "四、各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部。",
+          "unitOrder": 4,
+          "originalText": "四、各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部。",
+          "name": "DU-004"
+        }
+      },
+      {
+        "uid": "DocumentUnit::du-005",
+        "label": "DocumentUnit",
+        "properties": {
+          "unitId": "DU-005",
+          "unitType": "条",
+          "unitTitle": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+          "unitOrder": 5,
+          "originalText": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+          "name": "DU-005"
+        }
+      },
+      {
+        "uid": "OperationalAgent::中国中车集团有限公司",
+        "label": "OperationalAgent",
+        "properties": {
+          "agentName": "中国中车集团有限公司",
+          "agentType": "组织",
+          "organizationLevel": "集团",
+          "name": "中国中车集团有限公司"
+        }
+      },
+      {
+        "uid": "OperationalAgent::中国中车集团有限公司办公室",
+        "label": "OperationalAgent",
+        "properties": {
+          "agentName": "中国中车集团有限公司办公室",
+          "agentType": "部门",
+          "organizationLevel": "集团",
+          "name": "中国中车集团有限公司办公室"
+        }
+      },
+      {
+        "uid": "OperationalAgent::各企业",
+        "label": "OperationalAgent",
+        "properties": {
+          "agentName": "各企业",
+          "agentType": "组织",
+          "name": "各企业"
+        }
+      },
+      {
+        "uid": "OperationalAgent::境外人员",
+        "label": "OperationalAgent",
+        "properties": {
+          "agentName": "境外人员",
+          "agentType": "角色",
+          "name": "境外人员"
+        }
+      },
+      {
+        "uid": "OperationalAgent::集团科信部",
+        "label": "OperationalAgent",
+        "properties": {
+          "agentName": "集团科信部",
+          "agentType": "部门",
+          "name": "集团科信部"
+        }
+      },
+      {
+        "uid": "OperationalObject::开源智能体",
+        "label": "OperationalObject",
+        "properties": {
+          "objectName": "开源智能体",
+          "objectType": "模型",
+          "name": "开源智能体"
+        }
+      },
+      {
+        "uid": "OperationalObject::网络安全防护等级三级及以上网络系统",
+        "label": "OperationalObject",
+        "properties": {
+          "objectName": "网络安全防护等级三级及以上网络系统",
+          "objectType": "系统",
+          "name": "网络安全防护等级三级及以上网络系统"
+        }
+      },
+      {
+        "uid": "OperationalObject::关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+        "label": "OperationalObject",
+        "properties": {
+          "objectName": "关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+          "objectType": "制度",
+          "name": "关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议"
+        }
+      },
+      {
+        "uid": "OperationalInformation::开源智能体安全风险排查情况",
+        "label": "OperationalInformation",
+        "properties": {
+          "informationName": "开源智能体安全风险排查情况",
+          "informationType": "材料",
+          "name": "开源智能体安全风险排查情况"
+        }
+      },
+      {
+        "uid": "OperationalActivity::开展开源智能体安全风险排查",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "开展开源智能体安全风险排查",
+          "activityType": "管理",
+          "actionVerb": "开展",
+          "description": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数",
+          "priority": "重点",
+          "name": "开展开源智能体安全风险排查"
+        }
+      },
+      {
+        "uid": "OperationalActivity::加强网络和数据安全监测",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "加强网络和数据安全监测",
+          "activityType": "监督",
+          "actionVerb": "加强",
+          "name": "加强网络和数据安全监测"
+        }
+      },
+      {
+        "uid": "OperationalActivity::第一时间处置,并向集团报告",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "第一时间处置，并向集团报告",
+          "activityType": "管理",
+          "actionVerb": "处置",
+          "name": "第一时间处置，并向集团报告"
+        }
+      },
+      {
+        "uid": "OperationalActivity::将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+          "activityType": "报送",
+          "actionVerb": "报送",
+          "name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "uid": "OperationalExchange::ex-002",
+        "label": "OperationalExchange",
+        "properties": {
+          "exchangeId": "EX-002",
+          "exchangeType": "报送",
+          "description": "报送开源智能体安全风险排查情况",
+          "name": "EX-002"
+        }
+      },
+      {
+        "uid": "OperationalConstraint::不得未经批准部署安装开源智能体",
+        "label": "OperationalConstraint",
+        "properties": {
+          "constraintName": "不得未经批准部署安装开源智能体",
+          "constraintType": "权限约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+          "name": "不得未经批准部署安装开源智能体"
+        }
+      },
+      {
+        "uid": "OperationalConstraint::禁止办公设备内、外网混用",
+        "label": "OperationalConstraint",
+        "properties": {
+          "constraintName": "禁止办公设备内、外网混用",
+          "constraintType": "安全约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "禁止计算机等办公设备内、外网混用",
+          "name": "禁止办公设备内、外网混用"
+        }
+      },
+      {
+        "uid": "OperationalConstraint::境外人员严禁未经批准安装智能体",
+        "label": "OperationalConstraint",
+        "properties": {
+          "constraintName": "境外人员严禁未经批准安装智能体",
+          "constraintType": "安全约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+          "name": "境外人员严禁未经批准安装智能体"
+        }
+      },
+      {
+        "uid": "OperationalConstraint::风险排查情况报送时限",
+        "label": "OperationalConstraint",
+        "properties": {
+          "constraintName": "风险排查情况报送时限",
+          "constraintType": "时间约束",
+          "mandatoryLevel": "必须",
+          "constraintText": "各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+          "name": "风险排查情况报送时限"
+        }
+      },
+      {
+        "uid": "OperationalConstraint::建议谨慎使用开源智能体",
+        "label": "OperationalConstraint",
+        "properties": {
+          "constraintName": "建议谨慎使用开源智能体",
+          "constraintType": "安全约束",
+          "mandatoryLevel": "鼓励",
+          "constraintText": "其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范",
+          "name": "建议谨慎使用开源智能体"
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "DocumentUnit::du-001",
+        "type": "HAS_PART"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "DocumentUnit::du-002",
+        "type": "HAS_PART"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "DocumentUnit::du-003",
+        "type": "HAS_PART"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "DocumentUnit::du-004",
+        "type": "HAS_PART"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "DocumentUnit::du-005",
+        "type": "HAS_PART"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalAgent::中国中车集团有限公司办公室",
+        "type": "ISSUED_BY"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalAgent::各企业",
+        "type": "APPLIES_TO"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalObject::开源智能体",
+        "type": "CONCERNS_OBJECT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalObject::网络安全防护等级三级及以上网络系统",
+        "type": "CONCERNS_OBJECT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalActivity::开展开源智能体安全风险排查",
+        "type": "REQUIRES_ACTIVITY"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalActivity::加强网络和数据安全监测",
+        "type": "REQUIRES_ACTIVITY"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalActivity::第一时间处置,并向集团报告",
+        "type": "REQUIRES_ACTIVITY"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalActivity::将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+        "type": "REQUIRES_ACTIVITY"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalConstraint::不得未经批准部署安装开源智能体",
+        "type": "HAS_CONSTRAINT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalConstraint::禁止办公设备内、外网混用",
+        "type": "HAS_CONSTRAINT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalConstraint::境外人员严禁未经批准安装智能体",
+        "type": "HAS_CONSTRAINT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalConstraint::风险排查情况报送时限",
+        "type": "HAS_CONSTRAINT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalConstraint::建议谨慎使用开源智能体",
+        "type": "HAS_CONSTRAINT"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalExchange::ex-002",
+        "type": "HAS_EXCHANGE"
+      },
+      {
+        "from_uid": "OfficialDocument::关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+        "to_uid": "OperationalInformation::开源智能体安全风险排查情况",
+        "type": "HAS_KEY_INFORMATION"
+      },
+      {
+        "from_uid": "OperationalActivity::开展开源智能体安全风险排查",
+        "to_uid": "DocumentUnit::du-001",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalActivity::加强网络和数据安全监测",
+        "to_uid": "DocumentUnit::du-005",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalActivity::第一时间处置,并向集团报告",
+        "to_uid": "DocumentUnit::du-005",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalActivity::将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+        "to_uid": "DocumentUnit::du-004",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalActivity::开展开源智能体安全风险排查",
+        "to_uid": "OperationalAgent::各企业",
+        "type": "PERFORMED_BY"
+      },
+      {
+        "from_uid": "OperationalActivity::开展开源智能体安全风险排查",
+        "to_uid": "OperationalObject::开源智能体",
+        "type": "ACTS_ON"
+      },
+      {
+        "from_uid": "OperationalActivity::加强网络和数据安全监测",
+        "to_uid": "OperationalAgent::各企业",
+        "type": "PERFORMED_BY"
+      },
+      {
+        "from_uid": "OperationalActivity::将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+        "to_uid": "OperationalInformation::开源智能体安全风险排查情况",
+        "type": "USES_INFORMATION"
+      },
+      {
+        "from_uid": "OperationalAgent::各企业",
+        "to_uid": "DocumentUnit::du-002",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalInformation::开源智能体安全风险排查情况",
+        "to_uid": "DocumentUnit::du-004",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalExchange::ex-002",
+        "to_uid": "OperationalAgent::各企业",
+        "type": "sourceAgent"
+      },
+      {
+        "from_uid": "OperationalExchange::ex-002",
+        "to_uid": "OperationalAgent::集团科信部",
+        "type": "targetAgent"
+      },
+      {
+        "from_uid": "OperationalExchange::ex-002",
+        "to_uid": "OperationalInformation::开源智能体安全风险排查情况",
+        "type": "EXCHANGES_INFORMATION"
+      },
+      {
+        "from_uid": "OperationalConstraint::不得未经批准部署安装开源智能体",
+        "to_uid": "OperationalAgent::各企业",
+        "type": "CONSTRAINS_AGENT"
+      },
+      {
+        "from_uid": "OperationalConstraint::不得未经批准部署安装开源智能体",
+        "to_uid": "OperationalObject::开源智能体",
+        "type": "CONSTRAINS_OBJECT"
+      },
+      {
+        "from_uid": "OperationalConstraint::禁止办公设备内、外网混用",
+        "to_uid": "OperationalAgent::各企业",
+        "type": "CONSTRAINS_AGENT"
+      },
+      {
+        "from_uid": "OperationalConstraint::境外人员严禁未经批准安装智能体",
+        "to_uid": "OperationalAgent::境外人员",
+        "type": "CONSTRAINS_AGENT"
+      },
+      {
+        "from_uid": "OperationalConstraint::风险排查情况报送时限",
+        "to_uid": "OperationalActivity::将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+        "type": "CONSTRAINS_ACTIVITY"
+      },
+      {
+        "from_uid": "OperationalConstraint::不得未经批准部署安装开源智能体",
+        "to_uid": "DocumentUnit::du-003",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalConstraint::禁止办公设备内、外网混用",
+        "to_uid": "DocumentUnit::du-002",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalConstraint::境外人员严禁未经批准安装智能体",
+        "to_uid": "DocumentUnit::du-002",
+        "type": "EVIDENCED_BY"
+      },
+      {
+        "from_uid": "OperationalConstraint::风险排查情况报送时限",
+        "to_uid": "DocumentUnit::du-004",
+        "type": "EVIDENCED_BY"
+      }
+    ]
+  },
+  "warnings": [],
+  "attempts": [],
+  "profile": {
+    "document_type": "official_document",
+    "stub": "stub:gold"
+  }
+}
