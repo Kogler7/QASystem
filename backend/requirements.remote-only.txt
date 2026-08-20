@@ -1,0 +1,23 @@
+# CPU-only remote inference runtime. Model weights and GPU runtimes are
+# intentionally excluded; model-backed capabilities call external services.
+fastapi==0.135.1
+httpx==0.28.1
+jsonschema==4.26.0
+mcp==1.27.0
+pydantic==2.12.3
+python-dotenv==1.2.2
+python-multipart==0.0.22
+requests==2.32.5
+redis>=5.0,<8
+uvicorn==0.41.0
+openai==2.24.0
+PyYAML==6.0.3
+beautifulsoup4==4.14.3
+langchain-core==1.2.17
+langchain-text-splitters==1.1.1
+loguru==0.7.3
+numpy==2.0.2
+pypdf>=5.0,<7.0
+SQLAlchemy==2.0.48
+PyMySQL==1.1.2
+tiktoken==0.12.0

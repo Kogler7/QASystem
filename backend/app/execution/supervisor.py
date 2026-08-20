@@ -11,6 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+from algorithm.runtime_profile import is_remote_only
+
 from .resources import GpuInventory, configured_gpu_ids
 
 
@@ -32,6 +34,8 @@ def _env_int(name: str, default: int, *, minimum: int = 0, maximum: int = 256) -
 
 
 def _gpu_ids() -> list[str]:
+    if is_remote_only():
+        return []
     configured = configured_gpu_ids()
     if configured:
         return configured
@@ -42,6 +46,8 @@ def _auto_cpu_workers(cpu_count: int) -> int:
     configured = os.getenv("EXECUTION_CPU_WORKERS", "auto").strip().lower()
     if configured != "auto":
         return _env_int("EXECUTION_CPU_WORKERS", 2, minimum=1, maximum=32)
+    if is_remote_only():
+        return 1
     return max(2, min(8, cpu_count // 4))
 
 
@@ -97,6 +103,9 @@ class RuntimeSupervisor:
         return command
 
     def _start_engines(self) -> None:
+        if is_remote_only():
+            LOGGER.info("remote-only profile: skip local vLLM engines")
+            return
         if not self.gpu_ids or os.getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
             LOGGER.warning("no vLLM engine started; detected GPUs=%s", self.gpu_ids)
             return
@@ -176,7 +185,7 @@ class RuntimeSupervisor:
         return env
 
     def _start_core_workers(self) -> None:
-        api_workers = _env_int("API_WORKERS", 2, minimum=1, maximum=16)
+        api_workers = _env_int("API_WORKERS", 1 if is_remote_only() else 2, minimum=1, maximum=16)
         vlm_endpoints = [f"http://127.0.0.1:{self.base_port + index}" for index in range(len(self.gpu_ids))]
         api_env = os.environ.copy()
         if vlm_endpoints:

@@ -4,7 +4,7 @@ import os
 from functools import lru_cache
 from threading import RLock
 
-from sentence_transformers import SentenceTransformer
+from algorithm.runtime_profile import is_remote_only
 
 
 def _binding_device() -> str | None:
@@ -21,8 +21,12 @@ def _binding_device() -> str | None:
 
 
 @lru_cache(maxsize=4)
-def get_sentence_transformer(model_path: str, *, local_files_only: bool = True) -> SentenceTransformer:
+def get_sentence_transformer(model_path: str, *, local_files_only: bool = True):
     """Share one encoder instance per model path inside an auxiliary GPU worker."""
+    if is_remote_only():
+        raise RuntimeError("remote-only 模式禁止加载本地 SentenceTransformer")
+    from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer(
         model_path,
         local_files_only=local_files_only,
@@ -36,6 +40,16 @@ def get_encode_lock(model_path: str) -> RLock:
 
 
 def encode(model_path: str, values, *, local_files_only: bool = True):
+    if is_remote_only():
+        from external_services.models import RemoteEmbeddingClient
+
+        import numpy as np
+
+        items = [values] if isinstance(values, str) else list(values)
+        return np.asarray(
+            RemoteEmbeddingClient(model=os.getenv("EMBEDDING_MODEL") or None).encode(items),
+            dtype=float,
+        )
     model = get_sentence_transformer(model_path, local_files_only=local_files_only)
     with get_encode_lock(model_path):
         return model.encode(values, convert_to_numpy=True)

@@ -35,6 +35,8 @@ ENDPOINTS: dict[str, Endpoint] = {
     "graph.write": Endpoint("POST", None, "APPLICATION_API_GRAPH_WRITE_PATH"),
     "confidence.calculate": Endpoint("POST", None, "APPLICATION_API_CONFIDENCE_PATH"),
     "documents.evidence.search": Endpoint("POST", None, "APPLICATION_API_DOCUMENT_EVIDENCE_PATH"),
+    "models.embeddings.create": Endpoint("POST", "/v1/embeddings", "EMBEDDING_SERVICE_PATH"),
+    "documents.parse": Endpoint("POST", "/v1/documents/parse", "DOCUMENT_PARSE_SERVICE_PATH"),
 }
 
 _current_user_headers: ContextVar[dict[str, str]] = ContextVar(
