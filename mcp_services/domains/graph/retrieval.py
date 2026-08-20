@@ -27,7 +27,7 @@ def _search_neighbors(
     """经知识地图接口查询一跳邻居（自动带权限过滤）。
 
     接口已放开标签要求，故沿用原 search_neighbors 设计：不约束节点类型与关系类型。
-    返回结构与原 search_neighbors 一致，兼容 prune_triples。
+    返回结构与原 search_neighbors 一致。
     """
     from algorithm.ans.QA.knowledge_map_client import KnowledgeMapClient
 
@@ -194,11 +194,10 @@ def search_graph(
     relationship_types: list[str] | None = None,
     direction: Literal["outgoing", "incoming", "both"] = "both",
     limit: int = 50,
-    prune: bool = False,
 ) -> dict[str, Any]:
-    """图谱邻居查询：从指定节点出发沿关系边探索一跳邻居（经知识地图接口，自动带权限过滤）。不约束节点类型与关系类型。prune=true 时使用 LLM 对关系和实体两轮打分剪枝，只返回最相关的少量路径。
+    """图谱邻居查询：从指定节点出发沿关系边探索一跳邻居（经知识地图接口，自动带权限过滤）。不约束节点类型与关系类型。返回全部邻接 triples，由 Agent 自行判断哪些路径与问题相关。
 
-    使用方式：search_graph(start_entity_id="<UUID>", direction="outgoing", prune=true, question=用户问题)"""
+    使用方式：search_graph(start_entity_id="<UUID>", direction="outgoing", question=用户问题)"""
     if depth != 1:
         return tool_error(ToolCode.INVALID_ARGUMENT, "原子图谱搜索仅支持 depth=1，请由 Agent 逐层探索")
     queued = maybe_submit(
@@ -210,7 +209,6 @@ def search_graph(
             "relationship_types": relationship_types,
             "direction": direction,
             "limit": limit,
-            "prune": prune,
         },
         resource_class="io.graph",
     )
@@ -218,45 +216,6 @@ def search_graph(
         return queued
     try:
         result = _search_neighbors(start_entity_id, direction, limit, relationship_types)
-
-        # ── LLM 剪枝 ──
-        if prune and question and result.get("triples"):
-            from algorithm.ans.QA.graph_prune import prune_triples
-            from algorithm.ans.QA.config import Config as QAConfig
-
-            qa_config = QAConfig.load()
-            entity_name = result.get("triples", [{}])[0].get("head_entity", {}).get("name", "")
-            pruned = prune_triples(
-                question=question,
-                triples=result["triples"],
-                entity_name=entity_name,
-                max_relations=3,
-                max_entities_per_relation=3,
-                api_key=qa_config.GRAPH_LLM_API_KEY,
-                model=qa_config.GRAPH_LLM_MODEL,
-            )
-            # 剪枝后精简 triples：只保留 name / id / labels / relation，避免上下文爆炸
-            slim_triples: list[dict[str, Any]] = []
-            slim_entities: list[dict[str, Any]] = []
-            seen_entities: set[str] = set()
-            for triple in pruned:
-                head = triple.get("head_entity", {})
-                tail = triple.get("tail_entity", {})
-                slim_triples.append(
-                    {
-                        "head_entity": {"id": head.get("id"), "name": head.get("name"), "labels": head.get("labels")},
-                        "relation": triple.get("relation"),
-                        "tail_entity": {"id": tail.get("id"), "name": tail.get("name"), "labels": tail.get("labels")},
-                    }
-                )
-                tid = tail.get("id", "")
-                if tid and tid not in seen_entities:
-                    seen_entities.add(tid)
-                    slim_entities.append({"id": tail.get("id"), "name": tail.get("name"), "labels": tail.get("labels")})
-
-            result["triples"] = slim_triples
-            result["found_entities"] = slim_entities
-            result["pruned"] = True
 
         if question:
             result["navigation_context"] = question

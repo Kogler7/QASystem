@@ -219,7 +219,6 @@ def _mcp_search_graph(payload: dict[str, Any]) -> dict[str, Any]:
             relationship_types=payload.get("relationship_types"),
             direction=payload.get("direction", "both"),
             limit=payload.get("limit", 50),
-            prune=payload.get("prune", False),
         )
 
 

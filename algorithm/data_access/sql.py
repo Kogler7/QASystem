@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Generator, Optional, Sequence
 
@@ -54,7 +56,7 @@ class SQLResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "success": self.success,
-            "data": self.data,
+            "data": _json_safe(self.data),
             "rowcount": self.rowcount,
             "columns": self.columns,
             "error_message": self.error_message,
@@ -117,6 +119,30 @@ def _sanitize_url(url: str) -> str:
     except ValueError:
         pass
     return url
+
+
+def _json_safe(value: Any) -> Any:
+    """递归将查询结果中非 JSON 序列化类型转换为安全类型。
+
+    修复 ``Object of type Decimal is not JSON serializable`` 一类错误：
+    - Decimal → float（数值语义保留；超高精度金融字段如需精确可改为 str）
+    - datetime/date/time → ISO 字符串
+    - bytes → utf-8 字符串
+    - dict/list/tuple 递归处理；其余未知类型兜底为 str
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return str(value)
 
 
 class SQLExecutor:
@@ -238,7 +264,10 @@ class SQLExecutor:
                 self._max_row_limit,
                 self._max_row_limit,
             )
-        return [dict(zip(columns, row)) for row in limited], columns, len(rows)
+        return [
+            dict(zip(columns, _json_safe(row)))
+            for row in limited
+        ], columns, len(rows)
 
     def execute(
         self,
