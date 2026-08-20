@@ -13,7 +13,6 @@ from mcp_services.domains.visualization import charts as chart_tools
 
 
 EXPECTED_TOOLS = {
-    "describe_table",
     "draw_area_chart",
     "draw_bar_chart",
     "draw_box_plot",
@@ -27,7 +26,6 @@ EXPECTED_TOOLS = {
     "execute_sql",
     "get_job",
     "get_job_result",
-    "get_database_info",
     "kg_extract_v2",
     "kg_get_dimension_scales",
     "kg_init_knowledge_space",
@@ -35,8 +33,6 @@ EXPECTED_TOOLS = {
     "cancel_job",
     "link_entities",
     "list_chart_types",
-    "list_supported_dialects",
-    "list_tables",
     "locate_knowledge_space",
     "get_all_subspaces",
     "get_stakeholders",
@@ -68,11 +64,8 @@ def assert_envelope(result):
 
 def test_mcp_static_tools_use_standard_envelope():
     chart_result = chart_tools.list_chart_types()
-    dialect_result = sql_tools.list_supported_dialects()
     assert_envelope(chart_result)
-    assert_envelope(dialect_result)
     assert chart_result["code"] == 0
-    assert dialect_result["code"] == 0
 
 
 def test_visualization_failure_uses_standard_envelope(monkeypatch):
