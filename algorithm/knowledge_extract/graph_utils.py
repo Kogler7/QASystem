@@ -38,7 +38,7 @@ def canonical_name(value: Any) -> str:
 
 def entity_uid(entity_type: Any, entity_name: Any, properties: dict[str, Any] | None) -> str:
     """Build a readable, process-stable UID for an extracted entity."""
-    normalized_type = coerce_non_empty_name(entity_type) or "Element"
+    normalized_type = canonical_name(entity_type) or "Element"
     normalized_name = canonical_name(entity_name)
     if normalized_name:
         return f"{normalized_type}::{normalized_name}"
@@ -72,20 +72,21 @@ def merge_node_properties(existing: dict[str, Any] | None, incoming: dict[str, A
             current = merged.get(key)
             if isinstance(current, list) and isinstance(value, list):
                 merged[key] = list(dict.fromkeys([*current, *value]))
-            elif current in (None, "", []):
-                merged[key] = value
-            elif value not in (None, "", []) and isinstance(current, str) and isinstance(value, str):
+            elif value is None:
+                # Never replace an existing value with an explicit null.
+                continue
+            elif isinstance(current, str) and isinstance(value, str):
                 # OCR/chunk boundaries often produce a shorter partial value.
-                merged[key] = value if current in value else current
-            elif key not in merged:
+                if value:
+                    merged[key] = value if current in value else current
+            else:
+                # Scalars (including 0, 0.0, False) use last-write-wins.
                 merged[key] = value
             continue
         incoming_name = coerce_non_empty_name(value)
         existing_name = coerce_non_empty_name(merged.get("name"))
         if incoming_name or not existing_name:
             merged["name"] = incoming_name
-    if "name" not in merged:
-        merged["name"] = ""
     return merged
 
 

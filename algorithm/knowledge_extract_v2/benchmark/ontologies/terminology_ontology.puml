@@ -1,0 +1,16 @@
+@startuml
+' Phase1 Step1 基准集本体：术语知识单元（与 README 推荐本体一致）
+
+class "术语" as Terminology <<KnowledgeUnit>> {
+  + 术语标准名称 (TermName): String // 术语的标准名称
+  + 术语标准定义 (TermDefinition): String // 术语的标准业务定义
+  + 同义词 (Synonyms): String[] // 简称、别称或口语化表达
+}
+class "业务域" as BusinessDomain <<KnowledgeUnit>> {
+  + 业务域名称 (DomainName): String // 业务域名称
+}
+Terminology "0..*" --> "1" BusinessDomain : BELONGS_TO // 属于某个业务域
+
+' @identity Terminology: TermName
+' @identity BusinessDomain: DomainName
+@enduml

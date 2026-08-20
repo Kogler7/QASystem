@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from .config import get_llm_config
-from .extractor import extract_v2, summarize_text
+from .extractor import detect_document_type, extract_v2, summarize_text
 from .graph_utils import (
     coerce_non_empty_name,
     entity_uid,
@@ -32,6 +32,7 @@ def extract_chunks(
 
     configured_workers = int(get_llm_config().get("max_concurrency", 4))
     worker_count = max(1, min(len(chunks), max_workers or configured_workers))
+    effective_document_type = detect_document_type("\n".join(chunks), document_type)
 
     def run(item: tuple[int, str]) -> dict[str, Any]:
         index, text = item
@@ -42,7 +43,7 @@ def extract_chunks(
                 model=model,
                 base_url=base_url,
                 api_key=api_key,
-                document_type=document_type,
+                document_type=effective_document_type,
                 target_types=target_types,
                 validation_mode=validation_mode,
             )

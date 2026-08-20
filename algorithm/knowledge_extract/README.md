@@ -198,7 +198,7 @@ LLM 即使返回展示名：
 
 ```json
 {
-  "uid": "Terminology::采购标段数量",
+  "uid": "terminology::采购标段数量",
   "label": "Terminology",
   "properties": {
     "name": "采购标段数量",
@@ -211,7 +211,7 @@ LLM 即使返回展示名：
 节点 UID 的当前生成规则为：
 
 ```text
-{稳定类型标识}::{实体 name 的小写形式}
+{稳定类型标识的规范化形式}::{实体 name 的小写形式}
 ```
 
 ## 调用方式

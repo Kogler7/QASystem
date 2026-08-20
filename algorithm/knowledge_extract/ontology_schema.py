@@ -53,6 +53,46 @@ _RELATION = re.compile(
     + r'\s*:\s*(?P<label>.+?)\s*$'
 )
 _NUMBER = re.compile(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)')
+_PLACEHOLDER_IDENTITY = re.compile(
+    r"^(?:agent|unit|obj(?:ect)?|act(?:ivity)?|info(?:rmation)?|constraint|ex(?:change)?|"
+    r"entity|node|item|document|clause|section)[-_]?\d+$",
+    re.IGNORECASE,
+)
+_PLACEHOLDER_WORDS = {"无", "待定", "未知", "null", "none", "n/a", "na", "-", "--"}
+_BARE_NUMBER = re.compile(r"^\d+$|^[一二三四五六七八九十百]+$")
+_BARE_ORDINAL = re.compile(
+    r"^(?:第\s*[0-9一二三四五六七八九十百]+|[0-9一二三四五六七八九十百]+"
+    r"(?:\.[0-9一二三四五六七八九十百]+)*|[（(][0-9一二三四五六七八九十百]+[）)])"
+    r"(?:[（(][0-9一二三四五六七八九十百]+[）)]|\.[0-9一二三四五六七八九十百]+|\d+)*"
+    r"[、.．:：\-—]*$"
+)
+_ORDINAL_PREFIX = re.compile(
+    r"^(?:(?:第\s*[0-9一二三四五六七八九十百]+"
+    r"|[0-9一二三四五六七八九十百]+(?:\.[0-9一二三四五六七八九十百]+)*"
+    r"|[（(][0-9一二三四五六七八九十百]+[）)])\s*[、.．:：\-—、．]*)+"
+)
+
+
+def _is_placeholder_identity(value: Any, *, allow_bare_number: bool = False) -> bool:
+    text = canonical_name(coerce_non_empty_name(value))
+    if not text:
+        return True
+    if text.casefold() in _PLACEHOLDER_WORDS:
+        return True
+    if _PLACEHOLDER_IDENTITY.match(text):
+        return True
+    if allow_bare_number and _BARE_NUMBER.match(text):
+        return True
+    return False
+
+
+def _strip_ordinal_prefix(value: Any) -> str:
+    """Remove a leading numbering prefix (``一、``, ``1.``, ``（一）``) from text."""
+    text = coerce_non_empty_name(value)
+    if not text:
+        return ""
+    stripped = _ORDINAL_PREFIX.sub("", text).strip(" ，,。.；;")
+    return stripped or text
 
 
 def _unquote(value: str) -> str:
@@ -436,7 +476,8 @@ class OntologySchema:
             relations = normalized["relations"]
 
         endpoint_names: dict[tuple[str, str], str] = {}
-        for entity in entities:
+        drop_entities: set[int] = set()
+        for entity_index, entity in enumerate(entities):
             if not isinstance(entity, dict):
                 continue
             original_type = entity.get("type", "")
@@ -456,13 +497,83 @@ class OntologySchema:
                     properties[prop.identifier] = self._coerce_value(value, prop.data_type)
             entity["properties"] = properties
 
-            identity_name = ""
-            for identity_property in self.identity_properties_for(ontology_class.identifier):
-                identity_name = coerce_non_empty_name(properties.get(identity_property))
-                if identity_name:
-                    break
+            identity_properties = self.identity_properties_for(ontology_class.identifier)
+            identity_name = next(
+                (
+                    coerce_non_empty_name(properties.get(identity_property))
+                    for identity_property in identity_properties
+                    if coerce_non_empty_name(properties.get(identity_property))
+                ),
+                "",
+            )
             property_name = coerce_non_empty_name(properties.get("name"))
             resolved_name = identity_name or original_name or property_name
+            class_properties = self._properties_for(ontology_class.identifier)
+
+            def _descriptive_candidates() -> Iterable[str]:
+                """Descriptive identity candidates: real names/titles first, then
+                full-text properties with numbering prefixes stripped."""
+                for prop in class_properties:
+                    identifier = prop.identifier.casefold()
+                    if "name" not in identifier and "title" not in identifier:
+                        continue
+                    value = coerce_non_empty_name(properties.get(prop.identifier))
+                    if value and not _is_placeholder_identity(value):
+                        yield value
+                for prop in class_properties:
+                    identifier = prop.identifier.casefold()
+                    if not any(
+                        marker in identifier
+                        for marker in ("text", "content", "description", "originaltext")
+                    ):
+                        continue
+                    value = coerce_non_empty_name(properties.get(prop.identifier))
+                    if not value:
+                        continue
+                    stripped = _strip_ordinal_prefix(value)
+                    if len(stripped) >= 2 and not _is_placeholder_identity(stripped):
+                        yield stripped
+
+            candidates = list(_descriptive_candidates())
+            identity_is_id = any(
+                prop.identifier.casefold().endswith("id") for prop in class_properties
+            )
+            has_title_prop = any(
+                "title" in prop.identifier.casefold() for prop in class_properties
+            )
+            # Bare numbers are placeholder ordinals only for unit-like ids
+            # (DocumentUnit "一/二/三"); numbered structures (Section "5",
+            # Clause "5.1") keep their numbering as the real identity.
+            allow_bare_number = has_title_prop and any(
+                "unit" in prop.casefold() or "number" in prop.casefold()
+                for prop in identity_properties
+            )
+            if identity_is_id and candidates:
+                # Id-like identities (unitId/agentId/...) carry little semantic
+                # content; prefer a descriptive name/title/text value so that
+                # content-equal entities match across chunks and evals.
+                resolved_name = candidates[0]
+            elif _is_placeholder_identity(
+                resolved_name, allow_bare_number=allow_bare_number
+            ) or (
+                identity_is_id
+                and has_title_prop
+                and _is_placeholder_identity(resolved_name, allow_bare_number=True)
+            ):
+                # placeholder identity (agent-1 / unit-1 / 无 / 待定 / bare 序号) ->
+                # fall back to the real name/title/text property when available
+                for prop in class_properties:
+                    identifier = prop.identifier.casefold()
+                    if "name" not in identifier and "title" not in identifier:
+                        continue
+                    candidate = coerce_non_empty_name(properties.get(prop.identifier))
+                    if candidate and not _is_placeholder_identity(candidate):
+                        resolved_name = candidate
+                        break
+                if not resolved_name or resolved_name == identity_name:
+                    for candidate in candidates:
+                        resolved_name = candidate
+                        break
             entity["name"] = resolved_name
             if resolved_name:
                 properties["name"] = resolved_name
@@ -470,6 +581,25 @@ class OntologySchema:
                 endpoint_names[(ontology_class.identifier, canonical_name(original_name))] = resolved_name
             if resolved_name:
                 endpoint_names[(ontology_class.identifier, canonical_name(resolved_name))] = resolved_name
+            # Untitled numbering fragments ("一（一）1") are not meaningful
+            # structure units; drop them when no descriptive text is available.
+            identifier_lower = ontology_class.identifier.casefold()
+            if (
+                "unit" in identifier_lower
+                and _BARE_ORDINAL.match(canonical_name(resolved_name))
+                and not any(
+                    candidate
+                    for candidate in _descriptive_candidates()
+                    if len(candidate) >= 4 and candidate != resolved_name
+                )
+            ):
+                drop_entities.add(entity_index)
+        if drop_entities:
+            normalized["entities"] = [
+                entity
+                for index, entity in enumerate(normalized.get("entities", []))
+                if index not in drop_entities
+            ]
 
         for relation in relations:
             if not isinstance(relation, dict):

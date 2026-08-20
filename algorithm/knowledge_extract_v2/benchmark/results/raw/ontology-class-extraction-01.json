@@ -1,0 +1,106 @@
+{
+  "raw": {
+    "entities": [
+      {
+        "type": "OperationalActivity",
+        "name": "开展开源智能体安全风险排查",
+        "properties": {
+          "activityName": "开展开源智能体安全风险排查",
+          "activityType": "管理",
+          "actionVerb": "开展"
+        },
+        "evidence": {
+          "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "properties": {
+          "activityName": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+          "activityType": "报送",
+          "actionVerb": "报送"
+        },
+        "evidence": {
+          "quote": "四、各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部。"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "加强网络和数据安全监测",
+        "properties": {
+          "activityName": "加强网络和数据安全监测",
+          "activityType": "监督",
+          "actionVerb": "加强"
+        },
+        "evidence": {
+          "quote": "五、加强网络和数据安全监测"
+        }
+      },
+      {
+        "type": "OperationalActivity",
+        "name": "第一时间处置，并向集团报告",
+        "properties": {
+          "activityName": "第一时间处置，并向集团报告",
+          "activityType": "管理",
+          "actionVerb": "处置"
+        },
+        "evidence": {
+          "quote": "第一时间处置，并向集团报告"
+        }
+      }
+    ],
+    "relations": []
+  },
+  "graph": {
+    "nodes": [
+      {
+        "uid": "OperationalActivity::开展开源智能体安全风险排查",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "开展开源智能体安全风险排查",
+          "activityType": "管理",
+          "actionVerb": "开展",
+          "name": "开展开源智能体安全风险排查"
+        }
+      },
+      {
+        "uid": "OperationalActivity::将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+          "activityType": "报送",
+          "actionVerb": "报送",
+          "name": "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+        }
+      },
+      {
+        "uid": "OperationalActivity::加强网络和数据安全监测",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "加强网络和数据安全监测",
+          "activityType": "监督",
+          "actionVerb": "加强",
+          "name": "加强网络和数据安全监测"
+        }
+      },
+      {
+        "uid": "OperationalActivity::第一时间处置,并向集团报告",
+        "label": "OperationalActivity",
+        "properties": {
+          "activityName": "第一时间处置，并向集团报告",
+          "activityType": "管理",
+          "actionVerb": "处置",
+          "name": "第一时间处置，并向集团报告"
+        }
+      }
+    ],
+    "relationships": []
+  },
+  "warnings": [],
+  "attempts": [],
+  "profile": {
+    "document_type": "official_document",
+    "stub": "stub:gold"
+  }
+}
