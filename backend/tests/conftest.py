@@ -118,6 +118,28 @@ def protocol_module():
             "algorithm.knowledge_extract.config",
             get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
         ),
+          "algorithm.knowledge_extract_v2": _module(
+              "algorithm.knowledge_extract_v2",
+              extract_v2=lambda **_kwargs: {"raw": {}, "graph": {"nodes": [], "relationships": []}},
+              extract_chunks=lambda ontology, chunks, **_kwargs: [
+                  {
+                      "index": index,
+                      "text": text,
+                      "raw": {},
+                      "graph": {"nodes": [], "relationships": []},
+                      "attempts": [],
+                      "error": None,
+                      "error_code": None,
+                      "raw_response": "",
+                  }
+                  for index, text in enumerate(chunks)
+              ],
+              deduplicate_chunk_graphs=deduplicate_chunk_graphs,
+          ),
+          "algorithm.knowledge_extract_v2.config": _module(
+              "algorithm.knowledge_extract_v2.config",
+              get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
+          ),
         "algorithm.knowledge_pipeline": _module(
             "algorithm.knowledge_pipeline",
             build_graphs_response=lambda items: {

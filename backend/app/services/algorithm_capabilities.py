@@ -4,13 +4,14 @@ import json
 import os
 import tempfile
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from algorithm.NL_to_cypher.vector import batch_text_to_vectors
-from algorithm.knowledge_extract import deduplicate_chunk_graphs, extract_chunks
-from algorithm.knowledge_extract.config import get_llm_config
+# 临时切换抽取算法：knowledge_extract -> knowledge_extract_v2（official benchmark 评测用）
+from algorithm.knowledge_extract_v2 import deduplicate_chunk_graphs, extract_chunks
+from algorithm.knowledge_extract_v2.config import get_llm_config
 from algorithm.knowledge_pipeline import chunk_document_items, md_to_text, normalize_document_content
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 
@@ -39,6 +40,7 @@ class GraphExtractionBatch:
     items: list[dict[str, Any]]
     attempts: list[dict[str, Any]]
     scheduler: dict[str, Any]
+    failures: list[dict[str, Any]] = field(default_factory=list)
     graph: dict[str, Any] | None = None
     graphs: list[dict[str, Any]] | None = None
 
@@ -48,6 +50,7 @@ class GraphExtractionBatch:
             data["graph"] = self.graph
         else:
             data["graphs"] = self.graphs or []
+        data["failures"] = self.failures
         return data
 
     def pipeline_data(self) -> dict[str, Any]:
@@ -235,6 +238,7 @@ class GraphExtractionService:
         items: list[GraphExtractionItem | TextChunk],
         model: str | None = None,
         base_url: str | None = None,
+        document_type: str = "auto",
         merge: bool = True,
     ) -> GraphExtractionBatch:
         results = extract_chunks(
@@ -242,6 +246,7 @@ class GraphExtractionService:
             chunks=[md_to_text(item.text) for item in items],
             model=model,
             base_url=base_url,
+            document_type=document_type,
         )
         for position, (source, result) in enumerate(zip(items, results)):
             result["index"] = position
@@ -249,23 +254,24 @@ class GraphExtractionService:
             ranges = getattr(source, "ranges", None)
             result["ranges"] = list(ranges) if ranges is not None else None
         failed = [item for item in results if item.get("error")]
-        if failed:
+        failures = [
+            {
+                "position": item["index"],
+                "error_code": item.get("error_code"),
+                "info": item.get("error"),
+                "attempts": item.get("attempts", []),
+                "raw_response": item.get("raw_response", ""),
+            }
+            for item in failed
+        ]
+        if failed and len(failed) == len(results):
             raise CapabilityError(
                 _extraction_error(failed, len(results)),
-                "部分文本切片知识抽取失败",
+                "全部文本切片知识抽取失败",
                 "knowledge_extract",
                 {
                     "failed_count": len(failed),
-                    "failed_items": [
-                        {
-                            "position": item["index"],
-                            "error_code": item.get("error_code"),
-                            "info": item.get("error"),
-                            "attempts": item.get("attempts", []),
-                            "raw_response": item.get("raw_response", ""),
-                        }
-                        for item in failed
-                    ],
+                    "failed_items": failures,
                 },
             )
         config = get_llm_config()
@@ -284,13 +290,17 @@ class GraphExtractionService:
                 items=results,
                 attempts=attempts,
                 scheduler=scheduler,
-                graph=deduplicate_chunk_graphs(results),
+                failures=failures,
+                graph=deduplicate_chunk_graphs(
+                    [item for item in results if not item.get("error")]
+                ),
             )
         return GraphExtractionBatch(
             items=results,
             attempts=attempts,
             scheduler=scheduler,
-            graphs=[item["graph"] for item in results],
+            failures=failures,
+            graphs=[item["graph"] for item in results if not item.get("error")],
         )
 
 

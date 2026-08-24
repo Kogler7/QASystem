@@ -34,13 +34,12 @@ class ParserConfig(StrictModel):
 
 class ChunkOptions(StrictModel):
     strategy: Literal["recursive", "symbols", "custom_recursive", "markdown", "semantic"] = "recursive"
-    size: int = Field(default=4000, gt=0)
+    size: int = Field(default=500, gt=0)
     separators: list[str] | None = None
     similarity: float = Field(default=0.6, ge=0, le=1)
     chunk_overlap: int = Field(default=0, ge=0)
     size_unit: Literal["char", "token"] = "char"
     breakpoint_method: Literal["percentile", "stddev", "none"] = "percentile"
-    chunk_threshold: int = Field(default=12000, ge=0)
 
     @model_validator(mode="after")
     def validate_overlap_lt_size(self):

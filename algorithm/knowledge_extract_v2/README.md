@@ -39,8 +39,10 @@
 
 主要实现：
 
-- `ontology_schema.py`：解析本体类、alias、stereotype、属性和稳定标识。
+- `ontology_schema.py`：解析本体类、alias、stereotype、属性和稳定标识，并清洗关系行尾 `<<...>>`。
 - `extractor.py`：构建提示词、调用 LLM、校验 JSON、规范化结果并生成图结构。
+- `harness_extractor.py`：Harness 入口，负责文档画像、附件过滤、整篇文档级抽取、确定性结构脊梁、类型预算、evidence 绑定与图组装；长文档回退 `split_extractor` two-pass。
+- `split_extractor.py`：长文档 two-pass candidate proposal / resolve / relation validation。
 - `knowledge_space.py`：知识空间相关能力及 Neo4j 存储。
 - `uml/`：项目内置的本体示例。接口不会自动加载这些文件，调用方仍需传入 `ontology`。
 
@@ -271,6 +273,7 @@ result = extract_v2(
 | `KG_EXTRACT_LLM_DISABLE_THINKING` | 是否关闭 thinking，默认 `1` 关闭；设 `0` 开启 |
 | `KG_EXTRACT_LLM_MAX_TOKENS`      | 最大输出 token 数                   |
 | `KG_EXTRACT_LLM_JSON_RETRIES`    | JSON 格式错误后的重试次数           |
+| `KG_EXTRACT_HARNESS_WHOLE_DOC_MAX_CHARS` | 整篇 Harness 抽取最大字符数，默认 `60000`；超过后回退 two-pass |
 | `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认`4` |
 | `KG_EXTRACT_LLM_QPS`             | 每秒最大请求数，`0` 表示不限制    |
 | `KG_EXTRACT_LLM_QPM`             | 每分钟最大请求数，`0` 表示不限制  |

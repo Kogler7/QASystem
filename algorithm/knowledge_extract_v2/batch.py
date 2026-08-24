@@ -30,6 +30,20 @@ def extract_chunks(
     if not chunks:
         return []
 
+    if extractor is extract_v2:
+        from .harness_extractor import extract_harness_items
+
+        return extract_harness_items(
+            ontology,
+            chunks,
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+            document_type=document_type,
+            target_types=target_types,
+            validation_mode=validation_mode,
+        )
+
     configured_workers = int(get_llm_config().get("max_concurrency", 4))
     worker_count = max(1, min(len(chunks), max_workers or configured_workers))
 

@@ -30,10 +30,10 @@ _CLASS_HEADER = re.compile(
 )
 _STEREOTYPE = re.compile(r'<<\s*(.*?)\s*>>')
 _PROPERTY = re.compile(
-    r'^\s*[+\-#~]?\s*(?P<name>.+?)\s*:\s*(?P<data_type>[^/]+?)'
+    r'^\s*[+\-#~]?\s*(?P<name>.+?)\s*(?::\s*(?P<data_type>[^/]+?))?'
     r'(?:\s*//\s*(?P<comment>.*))?\s*$'
 )
-_PROPERTY_ID = re.compile(r'^(?P<display>.*?)\s*\((?P<identifier>[A-Za-z_][\w.]*)\)\s*$')
+_PROPERTY_ID = re.compile(r'^(?P<display>.*?)\s*\((?P<identifier>[^()]+)\)\s*$')
 _IDENTITY = re.compile(
     r"^\s*'\s*@identity\s+(?P<class_name>\"[^\"]+\"|[^:]+?)\s*:\s*(?P<properties>.+?)\s*$",
     re.IGNORECASE,
@@ -62,6 +62,28 @@ def _unquote(value: str) -> str:
     return value
 
 
+def _clean_relation_identifier(value: str) -> str:
+    """Remove PlantUML stereotypes such as ``ACTS_ON <<ACTS_ON>>``.
+
+    The benchmark ontologies commonly write the same stable identifier both
+    as the visible label and as the stereotype.  Keeping the ``<<...>>``
+    suffix made ``resolve_relation("ACTS_ON")`` fail and strict validation
+    silently dropped every relation, which caused the observed relation
+    recall of zero.
+    """
+    value = (value or "").strip().strip('"')
+    if not value:
+        return ""
+    original = value
+    cleaned = re.sub(r"\s*<<\s*.*?>\s*>?\s*$", "", value).strip()
+    if cleaned:
+        return cleaned
+    stereotype = _STEREOTYPE.search(original)
+    if stereotype:
+        return stereotype.group(1).strip()
+    return value
+
+
 def _key(value: Any) -> str:
     return canonical_name(_unquote(coerce_non_empty_name(value)))
 
@@ -83,6 +105,34 @@ class OntologyProperty:
     @property
     def symbols(self) -> set[str]:
         return {self.display_name, self.identifier}
+
+
+def _parse_property_line(line: str) -> OntologyProperty | None:
+    """Parse one PlantUML attribute declaration into an OntologyProperty.
+
+    The parser accepts both the original dialect used by the validation
+    dataset, ``name (identifier) // comment`` (no explicit type), and the
+    documented ``name (identifier): Type // comment`` form. Missing types are
+    treated as ``string`` so validation still recognizes the property.
+    """
+    property_match = _PROPERTY.match(line)
+    if not property_match:
+        return None
+    raw_name = property_match.group("name").strip()
+    raw_name = re.sub(r"^\s*(?:[•●·▪◦-]|&bull;)\s*", "", raw_name).strip()
+    raw_name = re.sub(r"</?(?:b|i|em|strong)>", "", raw_name, flags=re.IGNORECASE)
+    property_id_match = _PROPERTY_ID.match(raw_name)
+    display_name = raw_name
+    identifier = raw_name
+    if property_id_match:
+        display_name = property_id_match.group("display").strip()
+        identifier = property_id_match.group("identifier")
+    return OntologyProperty(
+        display_name=display_name,
+        identifier=identifier,
+        data_type=(property_match.group("data_type") or "").strip() or "string",
+        comment=(property_match.group("comment") or "").strip(),
+    )
 
 
 @dataclass
@@ -173,6 +223,14 @@ class OntologySchema:
                     is_abstract=bool(header.group("abstract")),
                 )
                 classes.append(current)
+                open_brace = line.find("{")
+                close_brace = line.rfind("}")
+                if open_brace != -1 and close_brace > open_brace:
+                    inline_body = line[open_brace + 1 : close_brace]
+                    for inline_line in inline_body.split("\\n"):
+                        prop = _parse_property_line(inline_line)
+                        if prop is not None:
+                            current.properties.append(prop)
                 in_body = "{" in line and "}" not in line
                 continue
 
@@ -183,24 +241,10 @@ class OntologySchema:
                 in_body = False
                 continue
 
-            property_match = _PROPERTY.match(line)
-            if not property_match:
+            prop = _parse_property_line(line)
+            if prop is None:
                 continue
-            raw_name = property_match.group("name").strip()
-            property_id_match = _PROPERTY_ID.match(raw_name)
-            display_name = raw_name
-            identifier = raw_name
-            if property_id_match:
-                display_name = property_id_match.group("display").strip()
-                identifier = property_id_match.group("identifier")
-            current.properties.append(
-                OntologyProperty(
-                    display_name=display_name,
-                    identifier=identifier,
-                    data_type=property_match.group("data_type").strip(),
-                    comment=(property_match.group("comment") or "").strip(),
-                )
-            )
+            current.properties.append(prop)
 
         provisional = cls(classes)
         for line in source.splitlines():
@@ -269,7 +313,7 @@ class OntologySchema:
                         "line": stripped,
                         "source": _unquote(source_symbol),
                         "target": _unquote(target_symbol),
-                        "relation": relation_match.group("label").split("//", 1)[0].strip().strip('"'),
+                        "relation": _clean_relation_identifier(relation_match.group("label").split("//", 1)[0].strip().strip('"')),
                         "unresolved_endpoints": [
                             endpoint
                             for endpoint in (_unquote(source_symbol), _unquote(target_symbol))
@@ -278,7 +322,7 @@ class OntologySchema:
                     }
                 )
                 continue
-            relation_name = relation_match.group("label").split("//", 1)[0].strip().strip('"')
+            relation_name = _clean_relation_identifier(relation_match.group("label").split("//", 1)[0].strip().strip('"'))
             if not relation_name:
                 continue
             reverse = relation_match.group("arrow").startswith("<")
@@ -535,9 +579,12 @@ class OntologySchema:
                     (ontology_class.identifier, canonical_name(name)),
                     name,
                 )
-            matching_relations = self.resolve_relation(relation.get("rel_type", ""))
+            relation_type = _clean_relation_identifier(relation.get("rel_type", ""))
+            matching_relations = self.resolve_relation(relation_type)
             if matching_relations:
                 relation["rel_type"] = matching_relations[0].identifier
+            elif relation_type:
+                relation["rel_type"] = relation_type
         return normalized
 
     def validate_extraction(
@@ -683,7 +730,10 @@ class OntologySchema:
             else:
                 relation["to_type"] = target.identifier
 
-            candidates = self.resolve_relation(relation.get("rel_type", ""))
+            relation_type = _clean_relation_identifier(relation.get("rel_type", ""))
+            if relation_type:
+                relation["rel_type"] = relation_type
+            candidates = self.resolve_relation(relation_type)
             if not candidates:
                 warnings.append(
                     _warning(

@@ -39,7 +39,7 @@ from .graph_utils import (
 from .mapping_scorer import MappingScorer
 from .official_document_strategy import OfficialDocumentExtractionStrategy  # noqa: F401 - 注册到 STRATEGY_REGISTRY
 from .ontology_compiler import ExtractionPlan, compile_plan
-from .ontology_schema import OntologySchema
+from .ontology_schema import OntologySchema, _clean_relation_identifier
 from .scheduler import get_llm_scheduler
 from .standard_strategy import get_strategy
 
@@ -271,7 +271,10 @@ class CandidatePool:
             )
             return None
 
-        matching = self.schema.resolve_relation(candidate.proposed_relation)
+        proposed_relation = _clean_relation_identifier(candidate.proposed_relation)
+        if proposed_relation:
+            candidate.proposed_relation = proposed_relation
+        matching = self.schema.resolve_relation(proposed_relation)
         if not matching:
             candidate.mapping_status = "rejected"
             _append_warning(

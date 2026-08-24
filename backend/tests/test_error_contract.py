@@ -76,7 +76,7 @@ def test_graph_extraction_classifies_invalid_llm_response(monkeypatch):
     assert captured.value.code == ErrorCode.LLM_RESPONSE_INVALID
 
 
-def test_graph_extraction_reports_partial_failure(monkeypatch):
+def test_graph_extraction_tolerates_partial_failure(monkeypatch):
     monkeypatch.setattr(
         capabilities,
         "extract_chunks",
@@ -102,14 +102,42 @@ def test_graph_extraction_reports_partial_failure(monkeypatch):
         ],
     )
 
+    batch = capabilities.GraphExtractionService().extract(
+        "class Term",
+        [TextChunk(text="ok"), TextChunk(text="failed")],
+    )
+
+    assert batch.failures[0]["position"] == 1
+    assert batch.graph_data()["failures"] == batch.failures
+    assert batch.graph == {"nodes": [], "relationships": []}
+
+
+def test_graph_extraction_raises_when_all_chunks_fail(monkeypatch):
+    def failed_item(index, error_code):
+        return {
+            "index": index,
+            "raw": {},
+            "graph": {"nodes": [], "relationships": []},
+            "attempts": [],
+            "error": "请求失败",
+            "error_code": error_code,
+            "raw_response": "",
+        }
+
+    monkeypatch.setattr(
+        capabilities,
+        "extract_chunks",
+        lambda **_kwargs: [failed_item(0, "LLM_REQUEST_FAILED"), failed_item(1, "LLM_REQUEST_FAILED")],
+    )
+
     with pytest.raises(capabilities.CapabilityError) as captured:
         capabilities.GraphExtractionService().extract(
             "class Term",
-            [TextChunk(text="ok"), TextChunk(text="failed")],
+            [TextChunk(text="a"), TextChunk(text="b")],
         )
 
-    assert captured.value.code == ErrorCode.PARTIAL_EXTRACTION_FAILED
-    assert captured.value.details["failed_items"][0]["position"] == 1
+    assert captured.value.code == ErrorCode.LLM_REQUEST_FAILED
+    assert captured.value.info == "全部文本切片知识抽取失败"
 
 
 def test_embedding_detects_vector_count_mismatch(monkeypatch):

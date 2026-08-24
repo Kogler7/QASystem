@@ -1,0 +1,292 @@
+{
+  "entities": [
+    {
+      "type": "OfficialDocument",
+      "name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "properties": {
+        "领导批示": "陈凯（2025-08-17 10:21）：请公司领导阅，请各部门领导阅。中车进一步深化科技体制改革实施方案聚焦中车创新体系构建，对信息公司作为平台公司的定位有了明确的表述。信息公司要按照新的职能定位，发挥好核心功能，聚焦五位一体的创新组织模式，服务于创新资源显著集聚，为构建中车一鼎两环三支撑的大创新体系，发挥好数智化平台的支撑功能。赵清宁（2025-08-18 09:07）：请规划运营部阅研。杨玉欣（2025-08-18 16:35）：已阅，请部门主管阅知信息公司的职能定位。其余人员已传阅签字。",
+        "联系电话": "62043",
+        "缓急": "",
+        "来文字号": "中车集团科信〔2025〕118号",
+        "来文单位": "中国中车集团有限公司",
+        "文件标题": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+        "文件备注": "",
+        "收文部门": "综合管理部（党群工作部、董事会办公室、企业文化部）",
+        "收文日期": "2025-08-13",
+        "收文号": "信息公司收〔2025〕547号",
+        "拟办意见": "请陈凯书记阅批。（白雪峰 2025-08-13 16:48）",
+        "抄送": "公司领导，总师级领导。",
+        "密级": "核心商密（保密期限5年）",
+        "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+        "主办部门": ""
+      }
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "通知正文",
+      "properties": {
+        "单元标题": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+        "单元类型": "正文",
+        "原文位置": "《关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知》正文",
+        "原文内容": "《中国中车集团有限公司进一步深化科技体制改革实施方案》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "顺序号": ""
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "中国中车集团有限公司",
+      "properties": {
+        "主体名称": "中国中车集团有限公司",
+        "主体类型": "组织",
+        "组织层级": "集团",
+        "职责": "印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "各相关单位",
+      "properties": {
+        "主体名称": "各相关单位",
+        "主体类型": "组织",
+        "组织层级": "子公司",
+        "职责": "贯彻执行进一步深化科技体制改革实施方案"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "信息公司",
+      "properties": {
+        "主体名称": "信息公司",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "按照新的职能定位发挥好核心功能，发挥好数智化平台的支撑功能"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "规划运营部",
+      "properties": {
+        "主体名称": "规划运营部",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "阅研进一步深化科技体制改革实施方案"
+      }
+    },
+    {
+      "type": "OperationalObject",
+      "name": "中国中车集团有限公司进一步深化科技体制改革实施方案",
+      "properties": {
+        "对象类型": "制度",
+        "对象描述": "经集团公司党委常委会、总经理办公会审议通过的进一步深化科技体制改革实施方案",
+        "对象名称": "中国中车集团有限公司进一步深化科技体制改革实施方案",
+        "所属领域": "科技体制改革"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "贯彻执行深化科技体制改革实施方案",
+      "properties": {
+        "活动名称": "贯彻执行深化科技体制改革实施方案",
+        "活动描述": "请各单位贯彻执行《中国中车集团有限公司进一步深化科技体制改革实施方案》",
+        "活动类型": "管理",
+        "动作词": "贯彻、执行",
+        "预期结果": "各单位贯彻执行进一步深化科技体制改革实施方案",
+        "优先级": ""
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "发挥数智化平台支撑功能",
+      "properties": {
+        "活动名称": "发挥数智化平台支撑功能",
+        "活动描述": "信息公司按照新的职能定位，发挥好核心功能，服务于构建中车一鼎两环三支撑的大创新体系",
+        "活动类型": "建设",
+        "动作词": "发挥",
+        "预期结果": "按照新的职能定位发挥数智化平台的支撑功能",
+        "优先级": ""
+      }
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "印发进一步深化科技体制改革实施方案",
+      "properties": {
+        "交互类型": "通知",
+        "交互描述": "中国中车集团有限公司印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知"
+      }
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "贯彻执行要求",
+      "properties": {
+        "强制程度": "应当",
+        "约束原文": "请各单位贯彻执行《中国中车集团有限公司进一步深化科技体制改革实施方案》",
+        "约束名称": "贯彻执行要求",
+        "约束类型": "流程约束",
+        "校验规则": ""
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "中国中车集团有限公司进一步深化科技体制改革实施方案"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "贯彻执行深化科技体制改革实施方案"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "发挥数智化平台支撑功能"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车集团有限公司进一步深化科技体制改革实施方案》的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "印发进一步深化科技体制改革实施方案"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "贯彻执行深化科技体制改革实施方案",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "中国中车集团有限公司进一步深化科技体制改革实施方案"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "贯彻执行深化科技体制改革实施方案",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "贯彻执行深化科技体制改革实施方案",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "发挥数智化平台支撑功能",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "中国中车集团有限公司进一步深化科技体制改革实施方案"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "发挥数智化平台支撑功能",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "发挥数智化平台支撑功能",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "贯彻执行要求",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "贯彻执行深化科技体制改革实施方案"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "贯彻执行要求",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "贯彻执行要求",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "中国中车集团有限公司",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "各相关单位",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "中国中车集团有限公司进一步深化科技体制改革实施方案",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发进一步深化科技体制改革实施方案",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发进一步深化科技体制改革实施方案",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发进一步深化科技体制改革实施方案",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发进一步深化科技体制改革实施方案",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "贯彻执行深化科技体制改革实施方案"
+    }
+  ]
+}

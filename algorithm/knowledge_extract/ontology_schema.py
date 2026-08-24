@@ -30,10 +30,10 @@ _CLASS_HEADER = re.compile(
 )
 _STEREOTYPE = re.compile(r'<<\s*(.*?)\s*>>')
 _PROPERTY = re.compile(
-    r'^\s*[+\-#~]?\s*(?P<name>.+?)\s*:\s*(?P<data_type>[^/]+?)'
+    r'^\s*[+\-#~]?\s*(?P<name>.+?)\s*(?::\s*(?P<data_type>[^/]+?))?'
     r'(?:\s*//\s*(?P<comment>.*))?\s*$'
 )
-_PROPERTY_ID = re.compile(r'^(?P<display>.*?)\s*\((?P<identifier>[A-Za-z_][\w.]*)\)\s*$')
+_PROPERTY_ID = re.compile(r'^(?P<display>.*?)\s*\((?P<identifier>[^()]+)\)\s*$')
 _IDENTITY = re.compile(
     r"^\s*'\s*@identity\s+(?P<class_name>\"[^\"]+\"|[^:]+?)\s*:\s*(?P<properties>.+?)\s*$",
     re.IGNORECASE,
@@ -125,6 +125,32 @@ class OntologyProperty:
         return {self.display_name, self.identifier}
 
 
+def _parse_property_line(line: str) -> OntologyProperty | None:
+    """Parse one PlantUML attribute declaration into an OntologyProperty.
+
+    The parser accepts both the original dialect used by the validation
+    dataset, ``name (identifier) // comment`` (no explicit type), and the
+    documented ``name (identifier): Type // comment`` form. Missing types are
+    treated as ``string`` so validation still recognizes the property.
+    """
+    property_match = _PROPERTY.match(line)
+    if not property_match:
+        return None
+    raw_name = property_match.group("name").strip()
+    property_id_match = _PROPERTY_ID.match(raw_name)
+    display_name = raw_name
+    identifier = raw_name
+    if property_id_match:
+        display_name = property_id_match.group("display").strip()
+        identifier = property_id_match.group("identifier")
+    return OntologyProperty(
+        display_name=display_name,
+        identifier=identifier,
+        data_type=(property_match.group("data_type") or "").strip() or "string",
+        comment=(property_match.group("comment") or "").strip(),
+    )
+
+
 @dataclass
 class OntologyClass:
     display_name: str
@@ -210,6 +236,14 @@ class OntologySchema:
                     stereotypes=tuple(stereotype_values),
                 )
                 classes.append(current)
+                open_brace = line.find("{")
+                close_brace = line.rfind("}")
+                if open_brace != -1 and close_brace > open_brace:
+                    inline_body = line[open_brace + 1 : close_brace]
+                    for inline_line in inline_body.split("\\n"):
+                        prop = _parse_property_line(inline_line)
+                        if prop is not None:
+                            current.properties.append(prop)
                 in_body = "{" in line and "}" not in line
                 continue
 
@@ -220,24 +254,10 @@ class OntologySchema:
                 in_body = False
                 continue
 
-            property_match = _PROPERTY.match(line)
-            if not property_match:
+            prop = _parse_property_line(line)
+            if prop is None:
                 continue
-            raw_name = property_match.group("name").strip()
-            property_id_match = _PROPERTY_ID.match(raw_name)
-            display_name = raw_name
-            identifier = raw_name
-            if property_id_match:
-                display_name = property_id_match.group("display").strip()
-                identifier = property_id_match.group("identifier")
-            current.properties.append(
-                OntologyProperty(
-                    display_name=display_name,
-                    identifier=identifier,
-                    data_type=property_match.group("data_type").strip(),
-                    comment=(property_match.group("comment") or "").strip(),
-                )
-            )
+            current.properties.append(prop)
 
         provisional = cls(classes)
         for line in source.splitlines():
