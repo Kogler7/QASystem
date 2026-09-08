@@ -223,3 +223,152 @@ def search_graph(
         return normalize_tool_result(result, ToolCode.GRAPH_FAILED, "图谱搜索完成")
     except Exception as exc:
         return tool_error(ToolCode.GRAPH_FAILED, "图谱搜索失败", str(exc))
+
+
+KNOWLEDGE_RELATION = "KNOWLEDGE_RELATION"
+
+
+def _attach_full_properties(units: list[dict[str, Any]]) -> None:
+    """为候选补齐完整节点属性与逻辑属性（等价于对每个候选执行一次 query_entity_properties）。
+    问题类/方案类节点直接携带的信息很少，详细内容（含 KnowledgeProperty 逻辑属性）
+    需要这一步才能拿到。在工具内一步补齐，避免 Agent 拿到候选后再逐个调属性查询。
+    """
+    try:
+        _client, entity_linker = _graph_components()
+    except Exception:
+        return
+    for unit in units:
+        try:
+            info = entity_linker.get_node_full_info(unit["id"])
+        except Exception:
+            info = None
+        unit["properties"] = (info or {}).get("properties") or {}
+
+
+def _list_neighbor_units(
+    node_id: str,
+    limit: int,
+    relationship_types: list[str] | None = None,
+    direction: str = "both",
+    enrich_properties: bool = True,
+) -> list[dict[str, Any]]:
+    """确定性查询起始单元的一跳邻接知识单元；默认再为每个候选补齐完整属性与逻辑属性。
+
+    供问题类/方案类候选导航复用：一次调用返回候选及其完整属性，
+    Agent 据此直接判类/选候选，无需再逐个 query_entity_properties。
+    默认沿 KNOWLEDGE_RELATION 关系查询。
+    """
+    from algorithm.ans.QA.knowledge_map_client import KnowledgeMapClient
+
+    km = KnowledgeMapClient()
+
+    if direction == "outgoing":
+        pattern = "MATCH (s {id:$id})-[r]->(m) "
+    elif direction == "incoming":
+        pattern = "MATCH (s {id:$id})<-[r]-(m) "
+    else:
+        pattern = "MATCH (s {id:$id})-[r]-(m) "
+
+    params: dict[str, Any] = {"id": node_id, "limit": limit}
+    rels = relationship_types if relationship_types else [KNOWLEDGE_RELATION]
+    params["relationship_types"] = rels
+    statement = (
+        pattern +
+        "WHERE type(r) IN $relationship_types "
+        "RETURN m.id AS id, m.name AS name, m.content AS content, "
+        "labels(m) AS labels, type(r) AS rel_type "
+        "LIMIT $limit"
+    )
+    rows = km.execute_cypher(statement, params)
+
+    units: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for row in rows:
+        mid = row.get("id") or ""
+        if not mid or mid in seen_ids:
+            continue
+        seen_ids.add(mid)
+        units.append(
+            {
+                "id": mid,
+                "name": row.get("name") or "",
+                "labels": row.get("labels") or [],
+                "content": (row.get("content") or "") or "",
+                "rel_type": row.get("rel_type") or "",
+            }
+        )
+
+    if not units and direction != "both":
+        return _list_neighbor_units(node_id, limit, relationship_types, "both", enrich_properties)
+
+    if enrich_properties:
+        _attach_full_properties(units)
+    return units
+
+
+@mcp.tool(name="find_problem_classes")
+def find_problem_classes(
+    stakeholder_id: str,
+    limit: int = 20,
+    relationship_types: list[str] | None = None,
+    direction: str = "both",
+) -> dict[str, Any]:
+    """问题类获取：从干系人出发，沿 KNOWLEDGE_RELATION 取一跳邻接知识单元（标准模型中即该干系人关联的问题类），一步返回每个候选的完整属性（含 content 与 KnowledgeProperty 逻辑属性）。
+
+    使用方式：find_problem_classes(stakeholder_id="<干系人ID>")。返回的每个 candidate 已带完整 properties，
+    Agent 据此直接选出与用户问题相符的问题类，无需再逐个 query_entity_properties。
+    方向不匹配自动回退双向；返回空表示本次未检索到该干系人的问题类。"""
+    queued = maybe_submit(
+        "mcp.graph.find_problem_classes",
+        {
+            "stakeholder_id": stakeholder_id,
+            "limit": limit,
+            "relationship_types": relationship_types,
+            "direction": direction,
+        },
+        resource_class="io.graph",
+    )
+    if queued is not None:
+        return queued
+    try:
+        candidates = _list_neighbor_units(stakeholder_id, limit, relationship_types, direction)
+        return tool_success(
+            {"start_entity_id": stakeholder_id, "candidates": candidates, "count": len(candidates)},
+            "问题类获取完成",
+        )
+    except Exception as exc:
+        return tool_error(ToolCode.GRAPH_FAILED, "问题类获取失败", str(exc))
+
+
+@mcp.tool(name="find_solution_classes")
+def find_solution_classes(
+    problem_id: str,
+    limit: int = 20,
+    relationship_types: list[str] | None = None,
+    direction: str = "both",
+) -> dict[str, Any]:
+    """方案类获取：从问题类出发，沿 KNOWLEDGE_RELATION 取一跳邻接知识单元（标准模型中即该问题的方案类），一步返回每个候选的完整属性（含 content/solutionTemplate/steps 与 KnowledgeProperty 逻辑属性）。
+
+    使用方式：find_solution_classes(problem_id="<问题类ID>")。返回的每个 candidate 已带完整 properties，
+    Agent 据此直接选出对应方案类并按其步骤执行，无需再逐个 query_entity_properties。
+    方向不匹配自动回退双向；返回空表示本次未检索到该问题的方案类。"""
+    queued = maybe_submit(
+        "mcp.graph.find_solution_classes",
+        {
+            "problem_id": problem_id,
+            "limit": limit,
+            "relationship_types": relationship_types,
+            "direction": direction,
+        },
+        resource_class="io.graph",
+    )
+    if queued is not None:
+        return queued
+    try:
+        candidates = _list_neighbor_units(problem_id, limit, relationship_types, direction)
+        return tool_success(
+            {"start_entity_id": problem_id, "candidates": candidates, "count": len(candidates)},
+            "方案类获取完成",
+        )
+    except Exception as exc:
+        return tool_error(ToolCode.GRAPH_FAILED, "方案类获取失败", str(exc))

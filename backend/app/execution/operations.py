@@ -257,6 +257,30 @@ def _mcp_get_stakeholders(_payload: dict[str, Any]) -> dict[str, Any]:
         return get_stakeholders()
 
 
+def _mcp_find_problem_classes(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.retrieval import find_problem_classes
+
+    with _mcp_activity_context():
+        return find_problem_classes(
+            payload["stakeholder_id"],
+            limit=payload.get("limit", 40),
+            relationship_types=payload.get("relationship_types"),
+            direction=payload.get("direction", "both"),
+        )
+
+
+def _mcp_find_solution_classes(payload: dict[str, Any]) -> dict[str, Any]:
+    from mcp_services.domains.graph.retrieval import find_solution_classes
+
+    with _mcp_activity_context():
+        return find_solution_classes(
+            payload["problem_id"],
+            limit=payload.get("limit", 40),
+            relationship_types=payload.get("relationship_types"),
+            direction=payload.get("direction", "both"),
+        )
+
+
 def _mcp_draw_chart(payload: dict[str, Any]) -> dict[str, Any]:
     from mcp_services.domains.visualization.charts import _draw
 
@@ -300,6 +324,8 @@ _OPERATIONS = {
     "mcp.graph.locate_space": _mcp_locate_knowledge_space,
     "mcp.graph.get_all_subspaces": _mcp_get_all_subspaces,
     "mcp.graph.get_stakeholders": _mcp_get_stakeholders,
+    "mcp.graph.find_problem_classes": _mcp_find_problem_classes,
+    "mcp.graph.find_solution_classes": _mcp_find_solution_classes,
     "mcp.visualization.draw": _mcp_draw_chart,
 }
 

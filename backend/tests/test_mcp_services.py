@@ -36,6 +36,8 @@ EXPECTED_TOOLS = {
     "locate_knowledge_space",
     "get_all_subspaces",
     "get_stakeholders",
+    "find_problem_classes",
+    "find_solution_classes",
     "query_entity_properties",
     "search_graph",
 }
