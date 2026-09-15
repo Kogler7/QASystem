@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from algorithm.NL_to_cypher.vector import batch_text_to_vectors
-from algorithm.knowledge_extract import deduplicate_chunk_graphs, extract_chunks
-from algorithm.knowledge_extract.config import get_llm_config
-from algorithm.knowledge_pipeline import chunk_document_items, md_to_text, normalize_document_content
+from algorithm.knowledge_extract_v2 import deduplicate_chunk_graphs
+from algorithm.knowledge_extract_v2.config import get_llm_config
+from algorithm.knowledge_pipeline import chunk_document_items, normalize_document_content
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 
 from backend.app.responses import ErrorCode
@@ -23,6 +23,7 @@ from backend.app.schemas import (
     TextChunk,
     TextEmbeddingItem,
 )
+from backend.app.services.knowledge_extract_adapter import extract_chunks
 
 
 class CapabilityError(Exception):
@@ -70,6 +71,20 @@ def _document_error(reason: str) -> ErrorCode:
     return ErrorCode.DOCUMENT_PARSE_FAILED
 
 
+#: Failure codes meaning "the model produced something we could not use".
+#: Knowledge Extract V2 reports these as LLM_SCHEMA_INVALID /
+#: LLM_RESPONSE_INCOMPLETE / LLM_EMPTY_RESPONSE where V1 only had
+#: LLM_JSON_PARSE_FAILED; they all map onto the same client-facing error.
+_UNUSABLE_RESPONSE_CODES = frozenset(
+    {
+        "LLM_JSON_PARSE_FAILED",
+        "LLM_SCHEMA_INVALID",
+        "LLM_RESPONSE_INCOMPLETE",
+        "LLM_EMPTY_RESPONSE",
+    }
+)
+
+
 def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCode:
     if len(failed) < total_count:
         return ErrorCode.PARTIAL_EXTRACTION_FAILED
@@ -83,7 +98,9 @@ def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCo
         return ErrorCode.LLM_TIMEOUT
     if "429" in messages or "rate limit" in messages or "限流" in messages:
         return ErrorCode.LLM_RATE_LIMITED
-    if error_codes == {"LLM_JSON_PARSE_FAILED"}:
+    if error_codes == {"LLM_TIMEOUT"}:
+        return ErrorCode.LLM_TIMEOUT
+    if error_codes and error_codes <= _UNUSABLE_RESPONSE_CODES:
         return ErrorCode.LLM_RESPONSE_INVALID
     if error_codes == {"LLM_REQUEST_FAILED"}:
         return ErrorCode.LLM_REQUEST_FAILED
@@ -239,7 +256,10 @@ class GraphExtractionService:
     ) -> GraphExtractionBatch:
         results = extract_chunks(
             ontology=ontology,
-            chunks=[md_to_text(item.text) for item in items],
+            # Chunk text is passed through verbatim: Knowledge Extract V2 reads
+            # Markdown structure (numbered headings) to supplement entities, and
+            # md_to_text strips the '#' markers it depends on.
+            chunks=[item.text for item in items],
             model=model,
             base_url=base_url,
         )

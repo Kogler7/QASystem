@@ -1,4 +1,4 @@
-"""知识抽取 V2 配置：从环境变量读取 LLM API 和 Neo4j 连接参数。"""
+"""知识抽取 V2 的 LLM 环境配置。"""
 import os
 
 
@@ -10,28 +10,14 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
     return default
 
 
-# ── Neo4j ──
-NEO4J_URI = _env("NEO4J_URI", default="bolt://localhost:7687")
-NEO4J_USER = _env("NEO4J_USER", "NEO4J_USERNAME", default="neo4j")
-NEO4J_PASSWORD = _env("NEO4J_PASSWORD", default="neo4j2025")
-
-
-def get_neo4j_config() -> dict:
-    return {
-        "uri": NEO4J_URI,
-        "user": NEO4J_USER,
-        "password": NEO4J_PASSWORD,
-    }
-
-
-# ── LLM API (知识抽取 V2) ──
 KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_API_URL", default="http://localhost:9999")
 KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY", default="")
-KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="deepseek-v4-flash-0731")
+KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="deepseek-v4-flash")
 KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_MAX_TOKENS", default="16384"))
 KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
 KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
 KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
+KG_EXTRACT_REQUEST_TIMEOUT = float(_env("KG_EXTRACT_LLM_TIMEOUT_SECONDS", default="300"))
 # 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启
 KG_EXTRACT_DISABLE_THINKING = _env("KG_EXTRACT_LLM_DISABLE_THINKING", default="1") != "0"
 
@@ -45,5 +31,6 @@ def get_llm_config() -> dict:
         "max_concurrency": max(1, KG_EXTRACT_MAX_CONCURRENCY),
         "qps": max(0, KG_EXTRACT_QPS),
         "qpm": max(0, KG_EXTRACT_QPM),
+        "request_timeout": max(1.0, KG_EXTRACT_REQUEST_TIMEOUT),
         "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
     }

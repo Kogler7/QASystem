@@ -28,12 +28,19 @@ def extract_knowledge(
 
 
 def _extract(ontology, text, model, base_url):
-    from algorithm.knowledge_extract import extract_v2, summarize_text
+    if not (ontology or "").strip():
+        # 非结构化：无本体时不按元模型抽取，直接生成文本摘要
+        from algorithm.knowledge_extract import summarize_text
 
-    if (ontology or "").strip():
-        return extract_v2(ontology=ontology, text=text, model=model, base_url=base_url)
-    # 非结构化：无本体时不按元模型抽取，直接生成文本摘要
-    return summarize_text(text=text, model=model, base_url=base_url)
+        return summarize_text(text=text, model=model, base_url=base_url)
+    return _extract_with_ontology(ontology, text, model, base_url)
+
+
+def _extract_with_ontology(ontology, text, model, base_url):
+    """按元模型抽取实体/关系图（Knowledge Extract V2）。"""
+    from backend.app.services.knowledge_extract_adapter import run_single_document
+
+    return run_single_document(ontology, text, model=model, base_url=base_url)
 
 
 @mcp.tool(name="kg_get_dimension_scales")

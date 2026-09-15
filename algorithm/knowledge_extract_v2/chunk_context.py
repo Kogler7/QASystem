@@ -1,19 +1,9 @@
-"""Phase 1 Step 3：ChunkContext 输入契约与上下文管理。
-
-依据 docs/method/Phase1_Knowledge_Extraction_Harness_Design_v3.md：
-- §5 ExtractionRequest / ExtractionChunk：统一接收上游已解析的 ``text/chunks``，
-  只做包装与兼容，不重新解析文档、不重新切片；
-- §6 ChunkContextManager：chunk_id 索引、前后邻接、同结构上下文、
-  evidence 定位与有界拼接（防止每次 LLM 调用无边界地拼接整篇文档）。
-
-本模块不依赖 openai，可独立加载与测试。
-"""
+"""Upstream chunk contract and bounded extraction context."""
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable
-
 
 _WS = re.compile(r"\s+")
 
@@ -81,30 +71,10 @@ class ExtractionChunk:
 
 @dataclass
 class ExtractionRequest:
-    """§5：统一抽取请求。
+    """Extraction options attached to caller-provided chunks."""
 
-    兼容规则：
-    - 只有 ``text``：包装为单个 chunk；
-    - 已有 ``chunks``：直接使用，不重新切片；
-    - ``text + chunks``：chunks 为抽取主输入，text 仅作全局上下文/证据校验来源。
-    """
-
-    ontology: str
-    text: str | None = None
-    chunks: list[ExtractionChunk] | None = None
+    chunks: list[ExtractionChunk]
     target_types: list[str] | None = None
-    include_subclasses: bool = True
-    document_type: str = "auto"
-    validation_mode: str = "strict"
-    runtime_options: dict[str, Any] = field(default_factory=dict)
-
-    def extraction_chunks(self) -> list[ExtractionChunk]:
-        """按 §5 兼容规则返回抽取主输入 chunks。"""
-        if self.chunks:
-            return list(self.chunks)
-        if self.text is not None:
-            return [ExtractionChunk(chunk_id="chunk-0", text=self.text)]
-        return []
 
 
 class ChunkContextManager:
@@ -113,6 +83,7 @@ class ChunkContextManager:
     def __init__(self, chunks: Iterable[ExtractionChunk]):
         self._chunks: dict[str, ExtractionChunk] = {}
         self._order: list[str] = []
+        self._positions: dict[str, int] = {}
         for chunk in chunks:
             chunk_id = (chunk.chunk_id or "").strip()
             if not chunk_id:
@@ -120,21 +91,8 @@ class ChunkContextManager:
             if chunk_id in self._chunks:
                 raise ValueError(f"chunk_id 重复: {chunk_id!r}")
             self._chunks[chunk_id] = chunk
+            self._positions[chunk_id] = len(self._order)
             self._order.append(chunk_id)
-
-    @classmethod
-    def from_request(cls, request: ExtractionRequest) -> "ChunkContextManager":
-        return cls(request.extraction_chunks())
-
-    @classmethod
-    def from_text(
-        cls,
-        text: str,
-        *,
-        chunk_id: str = "chunk-0",
-        document_id: str | None = None,
-    ) -> "ChunkContextManager":
-        return cls([ExtractionChunk(chunk_id=chunk_id, text=text, document_id=document_id)])
 
     @property
     def chunk_ids(self) -> list[str]:
@@ -156,10 +114,7 @@ class ChunkContextManager:
             raise KeyError(f"未知 chunk_id: {chunk_id!r}") from None
 
     def index_of(self, chunk_id: str) -> int | None:
-        try:
-            return self._order.index(chunk_id)
-        except ValueError:
-            return None
+        return self._positions.get(chunk_id)
 
     def _previous_id(self, chunk_id: str) -> str | None:
         chunk = self.get_chunk(chunk_id)

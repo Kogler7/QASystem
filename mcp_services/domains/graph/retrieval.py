@@ -1,10 +1,14 @@
 import json
+import logging
+import os
 from functools import lru_cache
 from typing import Any, Literal
 
 from mcp_services.result import ToolCode, normalize_tool_result, tool_error, tool_success
 from mcp_services.runtime import mcp
 from mcp_services.dispatch import maybe_submit
+
+LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -26,8 +30,8 @@ def _search_neighbors(
 ) -> dict[str, Any]:
     """经知识地图接口查询一跳邻居（自动带权限过滤）。
 
-    接口已放开标签要求，故沿用原 search_neighbors 设计：不约束节点类型与关系类型。
-    返回结构与原 search_neighbors 一致。
+    只返回 KnowledgeUnit 标签的邻居（Term/问题/方案/DataTable 等都是 KnowledgeUnit），
+    避免把知识空间、刻度、逻辑属性等无关节点一并带出。
     """
     from algorithm.ans.QA.knowledge_map_client import KnowledgeMapClient
 
@@ -40,13 +44,15 @@ def _search_neighbors(
     )
     start_name = rows[0].get("name", "") or "" if rows else ""
 
-    # 方向过滤用"有向边模式"而非 startNode()/endNode()——接口受限引擎可能不支持这两个函数
+    # 方向过滤用"有向边模式"而非 startNode()/endNode()——接口受限引擎可能不支持这两个函数。
+    # KnowledgeUnit 标签放在节点模式里约束邻居（Term/问题/方案/DataTable 等都是 KnowledgeUnit），
+    # 避免把知识空间、刻度、逻辑属性等无关节点一起带出。
     if direction == "outgoing":
-        pattern = "MATCH (n {id:$id})-[r]->(m) "
+        pattern = "MATCH (n {id:$id})-[r]->(m:KnowledgeUnit) "
     elif direction == "incoming":
-        pattern = "MATCH (n {id:$id})<-[r]-(m) "
+        pattern = "MATCH (n {id:$id})<-[r]-(m:KnowledgeUnit) "
     else:
-        pattern = "MATCH (n {id:$id})-[r]-(m) "
+        pattern = "MATCH (n {id:$id})-[r]-(m:KnowledgeUnit) "
 
     params: dict[str, Any] = {"id": node_id, "limit": limit}
     if relationship_types:
@@ -55,20 +61,61 @@ def _search_neighbors(
 
     statement = (
         pattern +
-        "RETURN type(r) AS rel, m.id AS id, m.name AS name, labels(m) AS labels "
+        "RETURN type(r) AS rel, m.id AS id, m.name AS name, labels(m) AS labels, "
+        "m.content AS content, m.resource_type AS resource_type "
         "LIMIT $limit"
     )
     rows = km.execute_cypher(statement, params)
 
+    # 批量取邻居的逻辑属性（KnowledgeProperty），避免对每个邻居单独查询
+    logical_by_owner: dict[str, list[dict[str, Any]]] = {}
+    neighbor_ids = [r.get("id") for r in rows if r.get("id")]
+    if neighbor_ids:
+        try:
+            logical_rows = km.execute_cypher(
+                "MATCH (m) WHERE m.id IN $ids "
+                "MATCH (m)-[:HAS_LOGICAL_PROPERTY]->(p:KnowledgeProperty) "
+                "RETURN m.id AS owner_id, p",
+                {"ids": neighbor_ids},
+            )
+            for lrow in logical_rows or []:
+                owner = lrow.get("owner_id")
+                if not owner:
+                    continue
+                entry = {}
+                for k, v in lrow.items():
+                    key = k.split(".", 1)[1] if isinstance(k, str) and "." in k else k
+                    if key in ("owner_id", "properties_json"):
+                        continue  # owner_id 归组用、properties_json 不对外暴露；其余逻辑属性字段全保留
+                    entry[key] = v
+                logical_by_owner.setdefault(str(owner), []).append(entry)
+        except Exception as exc:
+            LOGGER.warning("邻居逻辑属性拉取失败，跳过：%s", exc)
+
     triples: list[dict[str, Any]] = []
     found_entities: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    max_content = int(os.getenv("GRAPH_NEIGHBOR_CONTENT_MAX", "1200"))
     head = {"id": node_id, "name": start_name, "labels": [], "properties": {}}
     for row in rows:
         mid = row.get("id", "")
         mname = row.get("name", "") or ""
         mlabels = row.get("labels") or []
-        tail = {"id": mid, "name": mname, "labels": mlabels, "properties": {}}
+        content = (row.get("content") or "") or ""
+        if len(content) > max_content:
+            content = content[:max_content] + "…"
+        tail = {
+            "id": mid,
+            "name": mname,
+            "labels": mlabels,
+            "content": content,
+            "resource_type": row.get("resource_type") or "",
+            "properties": {
+                "content": content,
+                "resource_type": row.get("resource_type") or "",
+                "logical_properties": logical_by_owner.get(str(mid), []),
+            },
+        }
         triples.append(
             {
                 "head_entity": head,
@@ -95,11 +142,21 @@ def _search_neighbors(
 
 
 @mcp.tool(name="link_entities")
-def link_entities(keywords: list[str] | str, question: str = "") -> dict[str, Any]:
-    """实体链接：将用户关键词对齐到知识图谱中的 KnowledgeUnit 节点。name 模糊匹配（CONTAINS），精确匹配项排最前。返回候选单元列表，含相关性评分和 LLM 判断理由。"""
+def link_entities(
+    keywords: list[str] | str,
+    question: str = "",
+    space_id: str | None = None,
+    space_name: str | None = None,
+) -> dict[str, Any]:
+    """实体链接：将用户关键词对齐到知识图谱中的 KnowledgeUnit 节点。name 模糊匹配（CONTAINS），精确匹配项排最前。返回候选单元列表，含相关性评分和 LLM 判断理由。
+
+    术语范围可用 `space_id` / `space_name` 圈定（对应术语所在的知识空间），
+    此时按空间包含关系（CONTAINS_UNIT）取候选，不再依赖 resource_type 里的固定标识；
+    空间名支持精确/包含模糊匹配，命中多个时会要求用更完整的名称或空间 id 重试。
+    两者都不给时退化为原有行为。"""
     queued = maybe_submit(
         "mcp.graph.link_entities",
-        {"keywords": keywords, "question": question},
+        {"keywords": keywords, "question": question, "space_id": space_id, "space_name": space_name},
         resource_class="io.graph",
     )
     if queued is not None:
@@ -110,8 +167,30 @@ def link_entities(keywords: list[str] | str, question: str = "") -> dict[str, An
                 keywords = json.loads(keywords)
             except json.JSONDecodeError:
                 keywords = [keywords]
+        resolved_space_id = (space_id or "").strip() or None
+        if not resolved_space_id and (space_name or "").strip():
+            # 复用与 search_space_units 相同的空间解析口径（id → 精确名 → 模糊名），
+            # 保证两个工具的报错和消歧行为一致。
+            from mcp_services.domains.graph.locator import _find_space
+
+            space, ambiguous = _find_space(None, space_name)
+            if ambiguous:
+                return tool_error(
+                    ToolCode.INVALID_ARGUMENT,
+                    "知识空间名称不唯一，请用完整名称或空间 id",
+                    {"candidates": ambiguous},
+                )
+            if not space:
+                return tool_error(
+                    ToolCode.GRAPH_FAILED,
+                    "未找到该知识空间",
+                    {"space_id": space_id, "space_name": space_name},
+                )
+            resolved_space_id = space.get("id")
         _client, entity_linker = _graph_components()
-        result = entity_linker.link_entities_with_llm_judge(question, keywords=keywords)
+        result = entity_linker.link_entities_with_llm_judge(
+            question, keywords=keywords, space_id=resolved_space_id
+        )
         candidates = [
             {
                 "name": entity.get("properties", {}).get("name", entity.get("qid", "")),
@@ -190,22 +269,18 @@ def query_entity_properties(entity_id: str) -> dict[str, Any]:
 def search_graph(
     start_entity_id: str,
     question: str = "",
-    depth: Literal[1] = 1,
     relationship_types: list[str] | None = None,
     direction: Literal["outgoing", "incoming", "both"] = "both",
     limit: int = 50,
 ) -> dict[str, Any]:
-    """图谱邻居查询：从指定节点出发沿关系边探索一跳邻居（经知识地图接口，自动带权限过滤）。不约束节点类型与关系类型。返回全部邻接 triples，由 Agent 自行判断哪些路径与问题相关。
+    """图谱邻居查询：从指定节点出发沿关系边探索一跳邻居（经知识地图接口，自动带权限过滤）。固定单跳，没有 depth 参数，不要传 depth；多跳由 Agent 逐层调用本工具。不约束节点类型与关系类型。返回全部邻接 triples，邻居带 name/labels/content/resource_type 与逻辑属性。
 
     使用方式：search_graph(start_entity_id="<UUID>", direction="outgoing", question=用户问题)"""
-    if depth != 1:
-        return tool_error(ToolCode.INVALID_ARGUMENT, "原子图谱搜索仅支持 depth=1，请由 Agent 逐层探索")
     queued = maybe_submit(
         "mcp.graph.search",
         {
             "start_entity_id": start_entity_id,
             "question": question,
-            "depth": depth,
             "relationship_types": relationship_types,
             "direction": direction,
             "limit": limit,
@@ -235,12 +310,14 @@ def _attach_full_properties(units: list[dict[str, Any]]) -> None:
     """
     try:
         _client, entity_linker = _graph_components()
-    except Exception:
+    except Exception as exc:
+        LOGGER.warning("图谱组件初始化失败，候选属性补齐跳过：%s", exc)
         return
     for unit in units:
         try:
             info = entity_linker.get_node_full_info(unit["id"])
-        except Exception:
+        except Exception as exc:
+            LOGGER.warning("补齐候选 %s 完整属性失败：%s", unit.get("id"), exc)
             info = None
         unit["properties"] = (info or {}).get("properties") or {}
 

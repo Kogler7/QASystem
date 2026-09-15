@@ -6,6 +6,10 @@ inject_layer: developer
 
 # 知识图谱驱动的问题求解
 
+## 使用方式（先读）
+
+本 skill 是编排主流程，只负责：建立 ProblemFrame、推进各阶段、门控判断与最终交付。流程中一旦进入“图谱语义对齐与方案获取”和“方案实例化执行”，**必须调用 `Skill` 工具加载 `semantic-align` 与 `plan-execute`，并严格、完整地按其正文执行**——以这两个子 skill 的具体规则为准；本文件里的对应段落只是子 skill 内容不可见时的兜底，**不得用本文件的简写替代子 skill**。
+
 ## 铁律 — 最高优先级
 
 以下每条是硬性规则，违反任一条则整个回答无效：
@@ -15,6 +19,7 @@ inject_layer: developer
 3. **图谱没有的方案 ≠ 你可以设计。** 找不到方案类单元（由 `KNOWLEDGE_RELATION` 关系导航到的方案节点）时，报告"知识图谱尚未沉淀该方案"，禁止自行创造一个替代方案，也禁止绕过方案直接取数。
 4. **图谱返回空 ≠ 不存在。** 只能说"本次未检索到"，不能说"图谱中没有"。
 5. **工具返回 envelope 必须检查。** code ≠ 0 时工具调用失败，按失败策略处理，不得忽略。
+6. **阶段方法在子 skill 里，必须读取。** 本 skill 只负责编排；进入阶段二前用 `Skill` 工具加载并完整读取 `semantic-align`，进入阶段四前加载 `plan-execute`，按其正文执行。本文件里对应的段落只是子 skill 不可见时的兜底，不能替代子 skill。
 
 ## 标准模型映射
 
@@ -45,30 +50,31 @@ inject_layer: developer
 
 ### 阶段一：问题识别
 
-自行理解请求，不调用工具。识别问题，按问题本体字段生成结构：
+自行理解请求，不调用工具。按需生成以下内部结构（字段随图谱的问题本体与问题类型而定，非取数类问题不必强填坐标/取数相关字段）：
 
 ```json
 {
-  "problemId": "Prob-2026-001",
-  "problemName": "2026年各月份公开项目定标金额和公开项目定标比例分布",
-  "problemDescription": "查询2026年各月份公开项目定标金额和公开项目定标比例的分布情况",
-  "coordinates": "Map<时间维度.2026年度.月度>",
-  "targetObject": "目标对象_采购管理系统",
-  "problemGoal": "查看2026年各月份的公开采购金额和比例数据",
-  "constraints": "时间范围为2026年1月至12月",
-  "problemType": "Quantitative",
-  "childProblems": "各月份公开项目定标金额是多少,各月份公开项目定标比例是多少",
-  "search_terms": ["从问题中提取的 2-5 个简洁实体原词（用于实体链接）"]
+  "problemId": "（图谱以“问题”建模时有则填，否则可省略）",
+  "problemName": "对用户问题的概括（示例：某对象的年度变化趋势）",
+  "problemDescription": "对用户请求的重述，用词尽量贴近原问题",
+  "coordinates": "（仅当图谱用坐标维度建模时填，如 Map<时间维度.2024年度.月度>）",
+  "targetObject": "（问题明确指向某目标对象时才填）",
+  "problemGoal": "要达成的目标：查数值 / 看定义 / 理关系等（随领域而定）",
+  "constraints": "时间、范围、口径等约束",
+  "problemType": "（按图谱问题本体的类型填写，拿不准可省略）",
+  "childProblems": "（可选）可拆解的子问题",
+  "search_terms": ["从问题中提取的 2-5 个简洁实体原词（必填）"]
 }
 ```
 
-- **search_terms 从问题中提取简洁的实体/指标短语，使用用户原词，禁止自行添加或改写词语。** 如"今年供应商投标数量是多少" → `["供应商投标数量"]`（不写成"供应商投标数量统计"）；"华东区上周销售额" → `["华东区", "销售额"]`
+- **search_terms 从问题中提取简洁的实体/概念短语，使用用户原词，禁止自行添加或改写词语。** 规则与领域无关：问“某对象/某指标是多少” → `["对象原词", "指标原词"]`；问“A 和 B 什么关系” → `["A", "B"]`
 - 时间、范围、单位等约束放入 `constraints`，不拼进搜索词
-- 不要过度拆分成单字（不是 `["华东","区","上周","销售","额"]`）
+- 不要过度拆分（如把一个整体短语拆成单字，形如 `["东", "区"]`）
+- **保持完整名词短语**：不要为了“好链接”把短语裁短或去掉修饰（如“公开项目定标金额”不要只留“定标金额/金额”）。宁取完整原词，再由 link_entities 的语义/LLM 消歧去筛，缩短反而降准。
 - 歧义仅在会改变知识空间选择或指标口径时才询问用户；其他情况带假设前进并记录
 
 **【自检】**
-- [ ] 问题字段（problemId/problemName/problemDescription/coordinates/targetObject/problemGoal/constraints/problemType/childProblems）是否按问题本体识别完整？
+- [ ] 与图谱问题本体对应的字段是否已按需填写（不强制套用全部字段）？
 - [ ] search_terms 是用户原词的简洁实体短语吗？（没自行加词/改词？）
 - [ ] 时间/范围等约束是否已放入 constraints，而非拼进搜索词？
 - [ ] 歧义是否已正确分类（需消歧 vs 带假设前进）？
@@ -77,16 +83,16 @@ inject_layer: developer
 
 ### 阶段二：图谱语义与方案获取
 
-**必须先加载 `semantic-align` skill 并严格按其流程执行**（获取干系人 → 沿 `KNOWLEDGE_RELATION` 导航 → 读方案步骤）。仅当 skill 内容确实不可见时，才按以下核心步骤执行：
+**必须先调用 `Skill` 工具加载 `semantic-align` skill 并严格按其正文执行**（获取干系人 → 沿 `KNOWLEDGE_RELATION` 定位问题类 → 取方案类完整属性）。仅当子 skill 内容确实不可见时，才按以下兜底步骤执行：
 
-1. **实体链接**：`link_entities` 搜索 KnowledgeUnit（术语对齐用，resource_type 含 Term），按 score 选候选；
+1. **实体链接**：`link_entities` 搜索 KnowledgeUnit（术语对齐；定位成功时传术语库子空间 id 作 space_id，否则按 resource_type 含 Term），按 score 选候选；
 2. **找干系人**：调用 `get_stakeholders` 获取所有干系人，用 LLM 按 `name` 筛选与问题相关的干系人；
 3. **链路导航**：从干系人沿 `KNOWLEDGE_RELATION` 找邻居 → **读属性用 LLM 判断哪个是问题类** → 再沿 `KNOWLEDGE_RELATION` 找邻居 → **读属性判断哪个是方案类**；
 4. 找不到方案类 → 报告"图谱未沉淀该方案"，不编造。
 
 **找到方案类单元后：**
 
-调用 `query_entity_properties(方案单元.ID)` 读取 `content`（或 `solutionTemplate`/`steps` 属性）的**原始文本**。
+`find_solution_classes`（或方案类导航）返回的候选已带完整属性，`content`/`solutionTemplate`/`steps`/口径都在其中——**直接使用，不必再 `query_entity_properties` 重取方案属性**。
 
 > ⚠️ **本阶段不调用 `problem-resolve-path-display`**——该工具在 semantic-align 和 plan-execute 都完成后、展示最终完整路径时才调用。
 
@@ -135,16 +141,16 @@ inject_layer: developer
 
 ### 阶段四：方案执行与验证
 
-> ⚠️ **必须先加载 `plan-execute` skill 并严格按其规则执行**（逐步执行、每步输出、验证）。仅当 skill 内容确实不可见时，才按以下规则执行。
+> ⚠️ **必须先调用 `Skill` 工具加载 `plan-execute` skill 并严格按其正文执行**（逐步执行、每步输出、验证）。仅当子 skill 内容确实不可见时，才按以下兜底规则执行。
 
-拿到方案类单元的方案内容（content 或 solutionTemplate）后，**按步骤顺序逐个执行，禁止跳过或并行**：
+拿到方案类单元的完整属性（content 或 solutionTemplate）后，**按步骤编号顺序逐个执行**（工具逐个调用、返回后再下一个，无并行）：
 
-1. 读取方案内容中的步骤序列（通常有 3-5 个步骤）
-2. 从步骤 1 开始，**编号最小的一定先执行**
-3. 每个步骤：读取 objective → 识别需要什么工具 → 绑定参数（标注 value_source）→ 调用工具 → 等待返回 → 验证结果
-4. 步骤 N 完成并验证通过后，**才允许**执行步骤 N+1
-5. **禁止**在步骤 1 未完成时就执行步骤 3
-6. **禁止**将方案步骤整体描述为"已执行"而不实际调工具
+1. 读取方案内容中的步骤序列（通常 3-5 个步骤）；
+2. 从步骤 1 开始，**编号最小的一定先执行**；
+3. 每个步骤：读取 objective → 识别需要什么工具 → 绑定参数（标注 value_source）→ 调用工具 → 等待返回 → 验证结果；
+4. 步骤 N 完成并验证通过后，**才允许**执行步骤 N+1；
+5. **禁止**在前一步未完成时就执行后面的步骤；
+6. **禁止**把未执行的多步整体描述为"已执行"。
 
 **回退**：
 - 工具连续失败 3 次 → 停止重试该步骤，标记 failed，执行其他独立步骤
@@ -155,15 +161,16 @@ inject_layer: developer
 
 ### 阶段五：交付答案
 
-**先调用 `problem-resolve-path-display` 展示最终方案路径**（此时 semantic-align 和 plan-execute 均已完成）：
+**先调用 `problem-resolve-path-display` 展示方案执行路径**（semantic-align 与 plan-execute 均已完成后再调用；未进入执行阶段则不调用）：
 
 - `question` = 用户原始问题
-- `selected_tools` = 执行时实际使用的工具列表
+- `selected_tools` = 执行时实际使用的工具列表（仅内部参考，不写入 `solution_path`）
 - `tool_list` = 可用工具列表
 - `reasoning_summary` = 对问题求解路径的简要规划说明
-- `solution_path` = **方案类里的步骤描述**（如"步骤1 xxx、步骤2 xxx"）
+- `solution_path` = **方案类 content/solutionTemplate 里保存的步骤文本，严格按模板顺序原样逐条给出**（如"步骤1 xxx、步骤2 xxx"）
 
-> ⚠️ **展示内容只能来自方案类里的步骤描述**。**禁止**把导航路径（干系人 → 问题类 → 方案类）、关系名（`KNOWLEDGE_RELATION`）、节点 ID、执行过程等展示进去。
+> ⚠️ **`solution_path` 必须严格取自方案模板中的步骤**：只展示方案里写明的步骤，按模板顺序原样逐条呈现；不要重写、不要增删步骤、不要用实际执行的工具序列/参数替代模板步骤、不要拼接多余解释。
+> ⚠️ **禁止展示**：导航路径（干系人 → 问题类 → 方案类）、关系名（`KNOWLEDGE_RELATION`）、节点 ID、内部执行过程、工具名或调用参数。执行偏差（deviation）单独记录，不得混入展示。
 
 然后直接回答用户问题，同时保留可审计性：
 
@@ -191,20 +198,27 @@ inject_layer: developer
 
 ## 正确示例
 
-用户："电子采购信息汇总表是什么？"
+用户（知识/关系类示例，领域无关）："某对象是什么？和另一对象什么关系？"
 
 ```
-阶段一 → goal="查询电子采购信息汇总表的定义与属性", search_terms=["电子采购"]
-阶段二 → Skill("semantic-align")
-       → locate_knowledge_space → 定位知识空间
-       → link_entities(["电子采购"]) → KnowledgeUnit "电子采购信息汇总表"(0.9)
-       → query_entity_properties → content（定义）
-       → search_graph 查邻居 → 相关指标/逻辑属性
-       → 沿 KNOWLEDGE_RELATION 定位 问题类 → 方案类（或直接 find_solution_classes）
-       → query_entity_properties(方案类ID) → 读方案 content/步骤
-阶段三 → 知识空间✓  实体✓  方案来源✓  资源✓  无伪造✓ → 通过（或方案类不存在 → 报告缺口）
-阶段四 → Skill("plan-execute") → 按方案执行
-阶段五 → 回答 + 依据 + 置信度
+阶段一 → 按需生成 ProblemFrame，search_terms=["对象原词", "另一对象原词"]
+阶段二 → Skill("semantic-align")：locate → link_entities 命中对象（术语记录）
+       → get_stakeholders 筛选干系人（固定起点）
+       → find_problem_classes(干系人ID) → find_solution_classes(问题类ID) → 方案类完整属性
+阶段三 → 证据门：实体✓ 干系人✓ 方案来源✓ … → 通过
+阶段四 → Skill("plan-execute")：按方案步骤执行（知识/解释类步骤同样按其执行）
+阶段五 → 给出结论 + 依据 + 置信度
+（把“某对象”换成任意领域的术语/制度/流程/指标等，规则不变）
+```
+
+用户（取数/计算类示例）："2024 年各月某指标的值 / 占比"
+
+```
+阶段一 → ProblemFrame：约束=2024、粒度=月；search_terms=[指标原词]
+阶段二 → semantic-align：link 实体（术语记录）→ get_stakeholders 筛干系人 → find_problem_classes(干系人ID) → find_solution_classes(问题类ID)（方案步骤/口径/SQL 已随完整属性返回）
+阶段三 → 证据门通过
+阶段四 → Skill("plan-execute")：按方案步骤执行（如 execute_sql / draw_*）
+阶段五 → 数值/图表结论 + 依据 + 缺口
 ```
 
 ---

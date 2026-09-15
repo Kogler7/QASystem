@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -51,6 +52,36 @@ class PipelineError(Exception):
         self.stage = stage
         self.details = details
         self.partial_data = partial_data
+
+
+def _ontology_digest(ontology: str) -> dict[str, Any]:
+    """回报本次请求实际收到的本体，供前端确认参数是否送达、能否解析。
+
+    前端选了本体却抽不出数据时，第一件要确认的就是"服务端到底收到了什么"。
+    这里把原始文本、长度、指纹和解析结果一并带出；本体为空也如实回报，
+    这样"没收到本体"和"收到了但解析不出类"能一眼区分开。
+    """
+    text = ontology or ""
+    info: dict[str, Any] = {
+        "received": bool(text.strip()),
+        "length": len(text),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16] if text else "",
+        "classes": [],
+        "property_count": 0,
+        "parse_error": None,
+        "text": text,
+    }
+    if not text.strip():
+        return info
+    try:
+        from algorithm.knowledge_extract_v2.ontology_schema import OntologySchema
+
+        schema = OntologySchema.parse(text)
+        info["classes"] = [item.identifier for item in schema.classes]
+        info["property_count"] = sum(len(item.properties) for item in schema.classes)
+    except Exception as exc:  # noqa: BLE001 - 回报解析失败本身就是这个字段的用途
+        info["parse_error"] = f"{type(exc).__name__}: {exc}"
+    return info
 
 
 class KnowledgePrecipitationService:
@@ -162,7 +193,7 @@ class KnowledgePrecipitationService:
                 )
         else:
             from algorithm.knowledge_extract.batch import summarize_chunks
-            from algorithm.knowledge_extract.config import get_llm_config as _get_llm_config
+            from algorithm.knowledge_extract_v2.config import get_llm_config as _get_llm_config
 
             summaries = summarize_chunks(
                 [item["text"] for item in chunks],
@@ -273,6 +304,7 @@ class KnowledgePrecipitationService:
                 if origin is not None
                 else None
             ),
+            "ontology": _ontology_digest(ontology),
             "extraction": extracted_result,
             "stats": stats,
         }

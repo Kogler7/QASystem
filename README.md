@@ -1,83 +1,149 @@
-# QASystem Knowledge Services
+# QASystem 项目说明
 
-QASystem 当前提供版本化算法 HTTP 接口、一个统一 MCP 服务，以及保留的
-`agentcode` Agent 运行时。历史 HTTP 路径作为 deprecated aliases 暂时保留。
+QASystem 是一个**知识图谱驱动的问答/求解系统**：先把文档解析、切片、抽取、向量化沉淀为知识图谱，
+再通过统一的 MCP 工具与 HTTP 接口，对外提供知识空间定位、图谱检索、数据查询与图表生成等能力。
 
-## 对外接口
+本文件介绍**总体框架与各部分作用**；更细的代码说明见：
 
-| 方法 | 路径 | 能力 |
-| --- | --- | --- |
-| POST | `/api/v1/pipelines/knowledge-ingestion` | 文档解析、切片、知识抽取和文本切片向量化聚合流水线 |
-| POST | `/api/v1/documents/parse` | 文档解析为 Markdown |
-| POST | `/api/v1/documents/chunk` | Markdown 切片 |
-| POST | `/api/v1/graphs/extract` | 分片图谱抽取 |
-| POST | `/api/v1/graphs/merge` | Graph 确定性去重 |
-| POST | `/api/v1/embeddings/texts` | 多文本向量化 |
-| POST | `/api/v1/embeddings/graphs` | Graph JSON 向量化 |
-| POST | `/api/v1/graphs/confidence` | 保留路径；第三方能力开通前返回 503 |
+- [`algorithm/README.md`](algorithm/README.md) —— 各算法与业务模块详解
+- [`mcp_services/README.md`](mcp_services/README.md) —— 统一 MCP Server 与各工具契约
+- [`backend/README.md`](backend/README.md) —— HTTP 接口与异步执行框架
+- [`external_services/README.md`](external_services/README.md) —— 第三方接口与模型服务适配
+- [`docs/`](docs/) —— 架构、协议与部署文档
 
-历史接口仅保留 deprecated 路径 aliases，请求和响应字段与 v1 完全一致，`info` 会注明迁移目标。
+---
 
-服务健康检查为 `GET /health`。统一 MCP Streamable HTTP 入口为 `/mcp`。
-Agent 通过 MCP 自主选择知识、图谱检索、数据和可视化工具；仓库不再提供独立意图识别和方案规划 MCP。`problem-solve`、`semantic-align`、`plan-execute` Skills 负责约束求解框架，业务事实与方案仍以知识图谱为唯一知识来源。
+## 1. 总体架构
 
-AgentCode 通过 Backend 的 `/agent` 路由统一对外提供异步任务、任务取消、状态查询和 SSE；部署默认地址为 `http://127.0.0.1:8006/agent/v1/query`。文档入口见 [AgentCode README](agent/README.md)。
-
-## 项目结构
+系统由四层组成，**业务实现集中在 `algorithm/`，对外只通过 MCP 与 HTTP 两种入口暴露**：
 
 ```text
-qasystem/
-├── backend/              # FastAPI 路由、业务服务编排和契约测试
-├── algorithm/            # 文档、抽取、向量及 MCP 业务实现
-├── external_services/    # 应用团队 API 注册、鉴权上下文与统一客户端
-├── mcp_services/         # 统一 MCP Server 与领域工具
-├── agent/                # Agent 与 MCP 客户端运行时
-├── Dockerfile            # 不含源码和模型的应用环境镜像
-├── docker-compose.yml    # 唯一容器编排配置
-├── package-deploy.ps1    # 生成外置源码目录并按需导出 env 镜像
-├── docs/                 # 架构、部署和协议说明
-└── deploy/               # 交付包与模型，不纳入 Git
+┌──────────────────────────────┐        ┌──────────────────────────────┐
+│  MCP 入口  mcp_services/      │        │  HTTP 入口  backend/          │
+│  统一 FastMCP 工具集（薄适配） │        │  FastAPI 路由 + 异步执行队列   │
+└──────────────┬───────────────┘        └──────────────┬───────────────┘
+               │                                        │
+               └────────────────┬───────────────────────┘
+                                ▼
+                 ┌───────────────────────────────┐
+                 │  算法与业务实现  algorithm/     │
+                 │  文档处理 / 抽取 / 向量 / 检索  │
+                 └──────────────┬────────────────┘
+                                ▼
+                 ┌───────────────────────────────┐
+                 │ 应用团队接口适配                │
+                 │ external_services/            │
+                 │ 图谱 Cypher / 向量 / 文件       │
+                 └───────────────────────────────┘
 ```
 
-## 本地运行
+设计约定：
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-$env:PYTHONPATH="$PWD;$PWD\agent"
-cd backend
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+- **知识来自图谱**：业务概念、关系、口径、方案与资源全部由图谱提供，代码不内嵌领域知识；
+- **工具是原子操作**：MCP 工具只做“定位/查询/取数/画图”等可观察动作，不在工具内部隐藏流程决策；
+- **重活可入队**：耗时任务经后端执行队列（按资源类分队列）由 Worker 执行；
+- **第三方能力注册制**：未开通的能力在注册表中标记，调用时才返回明确错误。
+
+---
+
+## 2. 模块职责一览
+
+| 目录 | 职责 | 详见 |
+| --- | --- | --- |
+| `algorithm/` | 全部算法与业务实现：文档解析、切片、知识抽取、向量化、图谱检索、空间定位、实体链接、SQL 执行、图表生成 | [algorithm/README.md](algorithm/README.md) |
+| `mcp_services/` | 统一 MCP Server：注册各领域工具，统一返回契约，按需把任务交给后端队列 | [mcp_services/README.md](mcp_services/README.md) |
+| `backend/` | FastAPI 应用：v1 算法 HTTP 接口、知识沉淀接口、任务状态/取消/SSE，以及异步执行框架（manager/worker/queue/store/hub） | [backend/README.md](backend/README.md) |
+| `external_services/` | 对接应用团队的统一接口客户端：图谱 Cypher 查询、向量写入、文件上传，以及用户鉴权上下文透传 | [external_services/README.md](external_services/README.md) |
+| `docs/` | 架构说明、接口协议、部署与验收文档 | `docs/文档索引.md` |
+| `docker/` | 运行时校验与离线验收脚本/说明 | `docker/OFFLINE_VALIDATION.md` |
+
+---
+
+## 3. `algorithm/` 总览（细分见子文档）
+
+按“入库”和“检索/求解”两条线组织：
+
+**入库线**：`preproc/`（文档→Markdown）→ `knowledge_pipeline/`（语义切片、向量存储）
+→ `knowledge_extract(_v2)/`（按本体抽取知识单元与关系）→ `embedding_runtime.py`（向量化）
+→ `external_services`（写入图谱/向量库）。
+
+**检索与求解线**：
+
+- `ans/QA/tools/knowledge_space_locator.py`：按问题语义定位**根知识空间**，返回其维度刻度与子空间；
+- `ans/QA/entity_linker.py`：术语对齐（词面召回 + 向量召回 + LLM 消歧）；
+- `ans/QA/prompt_list.py`、`graph_prune.py`：检索用提示词与可选的图谱剪枝；
+- `data_access/sql.py`：只读 SQL 执行器（取数环节）；
+- `visualization/charts.py`：十类图表生成；
+- `term_vector/`：Term 语义向量索引的构建与检索，供实体链接的向量召回使用。
+
+---
+
+## 4. `backend/` 说明（简述）
+
+| 路径 | 作用 |
+| --- | --- |
+| `app/main.py` | FastAPI 应用装配：挂载路由、健康检查、MCP 入口 |
+| `app/routers/` | 对外路由：算法能力（文档/图谱/向量/置信度）、知识沉淀、执行任务 |
+| `app/services/` | 路由对应的业务编排 |
+| `app/execution/` | 异步执行框架：任务提交与调度（`manager.py`）、Worker 消费（`worker.py`）、队列与存储（`queue.py`/`store.py`）、事件推送（`hub.py`）、操作映射（`operations.py`）、资源分类（`resources.py`）、监督（`supervisor.py`） |
+| `app/schemas.py` | 请求/响应模型 |
+| `app/environment.py` | 统一加载仓库根 `.env` |
+
+**资源类**（如 `io.graph`、`io.llm`、`io.db`、`cpu.chart`、`gpu.*`）决定任务进入哪个队列；
+`operations.py` 把 MCP 工具名映射为 Worker 可执行的操作。
+
+---
+
+## 5. `external_services/` 说明（简述）
+
+| 文件 | 作用 |
+| --- | --- |
+| `application.py` | `ApplicationServiceClient`：统一 HTTP 调用、用户鉴权头捕获与透传、能力注册表 `ENDPOINTS`、`execute_cypher()` 图谱查询 |
+| `models.py` | 相关数据模型 |
+
+所有第三方能力在注册表中声明；**未开通的能力在调用时才报“能力不可用”**，不影响其它能力运行。
+图谱查询统一走 `graph.cypher.query`，自动携带用户上下文做权限过滤。
+
+---
+
+## 6. 两条主流程
+
+### 6.1 知识入库
+
+```text
+文档 → 解析为 Markdown → 语义切片 → 按本体抽取知识单元/关系 → 向量化 → 写入图谱与向量库
 ```
 
-## 本地测试
+### 6.2 问答与求解
 
-契约测试使用轻量桩，不需要模型、数据库或 Docker：
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.test.txt
-.\.venv\Scripts\python.exe -m pytest -c backend\pytest.ini backend\tests -q
+```text
+用户问题
+ → 知识空间定位       定位根空间（返回维度刻度、子空间）
+ → 实体链接           术语对齐为图谱实体
+ → 干系人 → 问题类 → 方案类   取到方案（候选均带完整属性）
+ → 按方案执行         图谱信息不足则沿图谱继续查；需数据则执行 SQL；需图表则画图
+ → 交付               结论 + 依据 + 知识缺口
 ```
 
-## 部署
+**统一原则**：所有业务信息来自知识图谱；缺字段/缺口径时沿图谱继续查找，
+不查数据库表结构、不读文件、不用模型记忆补。
 
-`qasystem-env-v1` 只包含运行环境，不包含业务源码和模型。Compose 从 `QASYSTEM_SOURCE_DIR` 只读挂载源码，从 `HOST_MODELS_DIR` 只读挂载模型。
+---
 
-```powershell
-Copy-Item .env.example .env
-.\build-image.ps1
-.\download-models.ps1
-docker compose up -d
-```
+## 7. 图谱模型与关键约定
 
-`download-models.ps1` 必须在可访问 ModelScope 或 Hugging Face 的机器运行；它将 Docling 和 MinerU 模型保存到外部 `deploy/models/`，Docker 镜像不包含模型。
+- 业务概念统一是 **`KnowledgeUnit`**（术语、问题类、方案类、数据表等都是 KnowledgeUnit）；
+- 干系人 → 问题类 → 方案类沿 `KNOWLEDGE_RELATION` 连接，**一跳即对应类型**；
+- 逻辑属性是独立的 `KnowledgeProperty` 节点，经 `HAS_LOGICAL_PROPERTY` 连接；
+  工具返回逻辑属性时**不包含原始 `properties_json`**；
+- 知识空间层级：`KnowledgeSpace -[HAS_CHILD_SPACE]-> KnowledgeSpace`、`KnowledgeSpace -[CONTAINS_UNIT]-> KnowledgeUnit`；
+- 图谱中的说明文字（维度/刻度描述等）以**节点属性为准**，代码不维护静态副本。
 
-## 封闭网络验收
+---
 
-目标内网部署前可执行：
+## 8. 对外能力
 
-```powershell
-.\run-offline-validation.ps1
-```
-
-该命令通过内部 Docker 网络、Mock LLM 和 `test_artifacts/parser` 中的真实样本验证完整运行时，详见 [封闭网络验收](docker/OFFLINE_VALIDATION.md)。
-
-文档总入口见[文档索引](docs/文档索引.md)，项目部署见[部署说明](docs/部署说明.md)，接口联调见[算法接口协议](docs/算法接口协议.md)；Agent 专项部署和排障见 [AgentCode 部署运维指南](agent/docs/部署运维指南.md)。
+- **MCP**：单一服务 `qasystem-tools`，HTTP 入口 `/mcp`，工具清单与契约见 [mcp_services/README.md](mcp_services/README.md)；
+- **HTTP v1**：文档解析/切片、图谱抽取/合并、文本与图谱向量化、知识沉淀流水线、置信度（保留）、
+  任务状态/结果/取消与 SSE；
+- **健康检查**：`GET /health`。

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import sys
 import types
 from pathlib import Path
 
@@ -36,6 +35,7 @@ EXPECTED_TOOLS = {
     "locate_knowledge_space",
     "get_all_subspaces",
     "get_stakeholders",
+    "search_space_units",
     "find_problem_classes",
     "find_solution_classes",
     "query_entity_properties",
@@ -82,12 +82,14 @@ def test_visualization_failure_uses_standard_envelope(monkeypatch):
 
 
 def test_knowledge_tool_wraps_algorithm_failure(monkeypatch):
-    fake_module = types.ModuleType("algorithm.knowledge_extract")
-    fake_module.extract_v2 = lambda **_kwargs: {
-        "_error": "JSON 解析失败",
-        "error_code": "LLM_JSON_PARSE_FAILED",
-    }
-    monkeypatch.setitem(sys.modules, "algorithm.knowledge_extract", fake_module)
+    monkeypatch.setattr(
+        knowledge_tools,
+        "_extract_with_ontology",
+        lambda *_args, **_kwargs: {
+            "_error": "JSON 解析失败",
+            "error_code": "LLM_JSON_PARSE_FAILED",
+        },
+    )
     result = knowledge_tools.extract_knowledge("ontology", "text")
     assert_envelope(result)
     assert result["code"] == 3100
@@ -170,9 +172,12 @@ def test_graph_search_passes_atomic_filters(monkeypatch):
     }
 
 
-def test_graph_search_rejects_multi_hop_request():
-    result = graph_tools.search_graph("NEO_1", depth=2)
-    assert result["code"] == 3000
+def test_graph_search_has_no_depth_parameter():
+    tools = asyncio.run(mcp.list_tools())
+    tool = next(t for t in tools if t.name == "search_graph")
+    props = (tool.inputSchema or {}).get("properties", {})
+    assert "depth" not in props
+    assert {"start_entity_id", "direction", "relationship_types", "limit", "question"}.issubset(props)
 
 
 def test_graph_write_tools_fail_as_unavailable_without_database_access():

@@ -358,6 +358,25 @@ class ExcelProcessor(BaseProcessor):
 
         return schemas
 
+    def _render_markdown(self, excel_data: Dict[str, Any]) -> str:
+        """把 process_excel 的结构化结果渲染成 Markdown 表格（文档管线按 Markdown 消费 content）。"""
+        parts: List[str] = []
+        for sheet in excel_data.get('sheets', []):
+            parts.append(f"# {sheet.get('sheet_name', '')}")
+            parts.append("")
+            columns = [str(col) for col in (sheet.get('columns') or [])]
+            if columns:
+                parts.append("| " + " | ".join(columns) + " |")
+                parts.append("| " + " | ".join(["---"] * len(columns)) + " |")
+                for row in sheet.get('data') or []:
+                    cells = [
+                        str(cell).replace("|", "\\|").replace("\n", " ")
+                        for cell in row
+                    ]
+                    parts.append("| " + " | ".join(cells) + " |")
+            parts.append("")
+        return "\n".join(parts).strip()
+
     def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """
         处理Excel或CSV文件，返回包含 content 和 metadata 的字典
@@ -367,7 +386,7 @@ class ExcelProcessor(BaseProcessor):
             'processor': 'pandas',
             'supported_formats': ['.xlsx', '.xls', '.csv']
         }
-        
+
         result = self.process_excel(file_path)
         if 'error' in result:
             metadata['error'] = result['error']
@@ -375,8 +394,8 @@ class ExcelProcessor(BaseProcessor):
                 'content': '',
                 'metadata': metadata
             }
-        
+
         return {
-            'content': result,
+            'content': self._render_markdown(result),
             'metadata': metadata
         }

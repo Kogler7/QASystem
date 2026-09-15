@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .chunk_context import ChunkContextManager
+from .candidate_models import RelationCandidate
 from .evidence import locate_quote
 from .graph_utils import canonical_name
 from .ontology_schema import OntologySchema
@@ -127,8 +128,6 @@ class CompositeElementHandler:
         warnings: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """组装缺失的成员关系并校验复合实例；返回问题列表。"""
-        from .split_extractor import RelationCandidate  # 延迟导入避免循环
-
         issues: list[dict[str, Any]] = []
         for spec in self.specs.values():
             composites = [

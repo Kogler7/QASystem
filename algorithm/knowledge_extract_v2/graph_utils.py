@@ -77,8 +77,6 @@ def merge_node_properties(existing: dict[str, Any] | None, incoming: dict[str, A
             elif value not in (None, "", []) and isinstance(current, str) and isinstance(value, str):
                 # OCR/chunk boundaries often produce a shorter partial value.
                 merged[key] = value if current in value else current
-            elif key not in merged:
-                merged[key] = value
             continue
         incoming_name = coerce_non_empty_name(value)
         existing_name = coerce_non_empty_name(merged.get("name"))
@@ -87,18 +85,6 @@ def merge_node_properties(existing: dict[str, Any] | None, incoming: dict[str, A
     if "name" not in merged:
         merged["name"] = ""
     return merged
-
-
-def iter_persistable_properties(properties: dict[str, Any] | None) -> list[tuple[str, Any]]:
-    """Return node properties that are safe to persist without empty-name overwrite."""
-    persisted: list[tuple[str, Any]] = []
-    for key, value in (properties or {}).items():
-        if value is None:
-            continue
-        if key == "name" and not coerce_non_empty_name(value):
-            continue
-        persisted.append((key, value))
-    return persisted
 
 
 def filter_relationships_with_known_nodes(

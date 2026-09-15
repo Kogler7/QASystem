@@ -107,6 +107,7 @@ def _bind_item_evidence(
     manager: ChunkContextManager,
     *,
     fallback_fields: tuple[str, ...],
+    chunk_ids: Iterable[str] | None = None,
 ) -> None:
     existing = item.get("evidence")
     if isinstance(existing, Evidence):
@@ -115,18 +116,24 @@ def _bind_item_evidence(
         located = locate_quote(
             manager,
             existing["quote"],
-            chunk_ids=existing.get("source_block_ids") or None,
+            chunk_ids=(
+                chunk_ids
+                if chunk_ids is not None
+                else existing.get("source_block_ids") or None
+            ),
         )
         if located is not None:
             item["evidence"] = {**existing, **located.to_dict()}
-        # 未定位到：保留原 evidence，不伪造 span，交由 verify_evidence 报告。
-        return
+            return
+        # 模型偶尔会把 Markdown/LaTeX 中的空格或定界符归一化。
+        # 原 quote 无法定位时，仍可以尝试用实体的逐字 name 作为更小的
+        # 可验证 span；若 fallback 也失败，保留原 evidence 交由 verifier 报告。
 
     for field_name in fallback_fields:
         value = item.get(field_name)
         if not coerce_non_empty_name(value):
             continue
-        located = locate_quote(manager, str(value))
+        located = locate_quote(manager, str(value), chunk_ids=chunk_ids)
         if located is not None:
             item["evidence"] = located.to_dict()
             return
@@ -137,22 +144,35 @@ def bind_evidence(
     chunks: ChunkContextManager | Iterable[ExtractionChunk],
     *,
     fallback_fields: tuple[str, ...] = ("name",),
+    chunk_ids: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """把抽取结果绑定 chunk_id 与 evidence span（§37 Step 3）。
 
     - 已有 evidence.quote：在 chunk 中定位并回填 span_id / source_block_ids /
-      start_char / end_char；定位不到则保留原样，由 verify_evidence 报告；
+      start_char / end_char；定位不到时尝试逐字 fallback field，
+      fallback 仍失败则保留原样，由 verify_evidence 报告；
     - 没有 evidence：按 fallback_fields（实体 name / 关系端点 name）定位原文；
     - 不修改输入之外的语义，不伪造证据。
     """
     manager = _as_manager(chunks)
+    resolved_chunk_ids = tuple(chunk_ids) if chunk_ids is not None else None
     raw = dict(raw or {})
     for entity in raw.get("entities", []):
         if isinstance(entity, dict):
-            _bind_item_evidence(entity, manager, fallback_fields=fallback_fields)
+            _bind_item_evidence(
+                entity,
+                manager,
+                fallback_fields=fallback_fields,
+                chunk_ids=resolved_chunk_ids,
+            )
     for relation in raw.get("relations", []):
         if isinstance(relation, dict):
-            _bind_item_evidence(relation, manager, fallback_fields=("from_name", "to_name"))
+            _bind_item_evidence(
+                relation,
+                manager,
+                fallback_fields=("from_name", "to_name"),
+                chunk_ids=resolved_chunk_ids,
+            )
     return raw
 
 

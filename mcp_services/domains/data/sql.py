@@ -22,7 +22,7 @@ def execute_sql(
     database_url: str | None = None,
     read_only: bool = True,
 ) -> dict[str, Any]:
-    """Execute SQL against the configured database."""
+    """Execute SQL against the configured database. 返回的 data 为 {success, data: 行数组, rowcount, columns, ...}，行是 {列名: 值}；直接按行/表格呈现即可，不要对 data 再做整体 JSON 二次序列化或改写，结果多时只取前若干行并注明 rowcount。"""
     queued = maybe_submit(
         "mcp.execute_sql",
         {

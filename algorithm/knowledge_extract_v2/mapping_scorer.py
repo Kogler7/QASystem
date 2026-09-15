@@ -204,12 +204,4 @@ class MappingScorer:
             return "low_confidence"
         return "rejected"
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "weights": dict(self.weights),
-            "accepted_threshold": self.accepted_threshold,
-            "low_confidence_threshold": self.low_confidence_threshold,
-        }
-
-
 __all__ = ["MappingScore", "MappingScorer"]

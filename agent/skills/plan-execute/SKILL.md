@@ -13,12 +13,14 @@ inject_layer: developer
 3. **图谱没有方案 = 停止。** 若 GraphContext 中没有方案类单元（由 `KNOWLEDGE_RELATION` 关系导航到），停止执行并报告缺口。不得自行设计一个业务方案。
 4. **SQL 默认只读。** INSERT/UPDATE/DELETE/TRUNCATE 必须图谱方案明确要求且用户已授权。缺任一条件 → 暂停并确认。
 5. **参数必须可追溯。** 每个关键参数标注 value_source，不能标注的 → 记录为缺口，不猜测。
+6. **方案类属性已就绪，不重查。** GraphContext.solution_class 已含完整属性（content / solutionTemplate / steps / 指标口径 / SQL 模板），执行中不要为读方案自身内容再调 `query_entity_properties`；确缺字段时才回 semantic-align 补。
+7. **信息来源唯一 = 知识图谱。** 执行所需一切信息（表名、字段、口径、规则、SQL 模板等）都从图谱取得（方案类完整属性 / `search_graph` / `query_entity_properties` 等图谱查询）。**禁止**调用其它途径补信息：不查数据库表结构/元数据、不读文件、不从对话历史或模型记忆补字段。SQL 若缺字段或缺口径，应回图谱找对应定义与表结构信息，而不是直接去数据库查结构。
 
 ## 用途
 
 接收 GraphContext 中的方案类单元和资源节点，将其转化为原子工具调用序列并执行。上游输入为 ProblemFrame + GraphContext（solution_class、resource_nodes、evidence_ledger、gaps），下游输出为 ExecutionReport。
 
-> 方案类单元 = 由 `KNOWLEDGE_RELATION` 关系导航到的方案节点，其方案内容通常在 `content`（或 `solutionTemplate`/`steps` 属性）。
+> 方案类单元 = 由 `KNOWLEDGE_RELATION` 关系导航到的方案节点；其**完整属性**（content / solutionTemplate / steps / 指标口径 / SQL 模板）已在语义对齐阶段由 `find_solution_classes` 一并返回并写入 GraphContext.solution_class，执行阶段**直接使用，不再重复调用 `query_entity_properties` 取方案属性**。
 
 ---
 
@@ -73,13 +75,14 @@ inject_layer: developer
 
 ### 三、按方案步骤获取资源
 
-> semantic-align 已完成方案类定位，但未收集具体资源节点（resource_nodes_deferred: true）。本阶段严格按方案步骤的描述获取资源。
+> semantic-align 已完成方案类定位，且 `find_solution_classes` 返回时已把方案类**完整属性**写入 GraphContext.solution_class——本阶段直接使用，**不要重复 `query_entity_properties` 去取方案自身属性**；确缺字段时才回 semantic-align 补。所需的数据/资源按方案步骤的描述获取。
 
 **核心原则：方案步骤决定工具，不预设工具类型。**
 
-- 步骤需要理解某个业务实体/术语 → 使用 `link_entities`（只链术语节点，用于术语对齐）
+- 步骤需要理解某个业务实体/术语 → **不要在执行中再调 `link_entities`**（它只在语义对齐最初调用一次）；直接用已记录的 aligned_entities，配合 `search_graph` / `query_entity_properties` 沿图谱逐跳查找所需信息
 - 步骤说"从图谱中查询 X 的邻居" → 使用 `search_graph` / `query_entity_properties`
 - 步骤说"查询数据库 Y 表 / 指标数据" → 使用 `execute_sql`；SQL 模板、字段与口径取自图谱方案或图谱资源（表结构查询工具已停用，不调用）
+- **仅当方案步骤明确指明要去某个子空间/库（如“从规则库找信息”）时**，才使用 `search_space_units(space_name=<方案里的空间名/简称>)`（名字支持精确/包含模糊，如“规则库”命中“故障诊断规则库”），一跳取回该空间直接包含的单元（含 content）；空间名对不上时先用 `locate_knowledge_space` 返回的『子空间』列表核对。**智能问数领域暂不使用该工具**（该领域术语与指标之间已相互连接，直接沿图谱关系检索即可，无需按子空间取单元）；也不要用它做泛化探索
 - 步骤不指定工具 → 根据步骤目标选择最合适的工具，记录选择理由
 
 **图谱查询的唯一入口：语义对齐阶段链接的术语节点（aligned_entities）**
@@ -118,7 +121,7 @@ inject_layer: developer
 
 | 场景 | 工具 | 选择条件 |
 |------|------|---------|
-| 图谱信息不足 | 返回 semantic-align，使用 `search_graph` / `query_entity_properties` | 当前缺少步骤必需的信息 |
+| 图谱信息不足（方案自身之外的其它实体/邻居） | 返回 semantic-align，使用 `search_graph` / `query_entity_properties` | 缺步骤所需的其它图谱信息；方案类自身属性缺失则回 semantic-align 补 |
 | 执行只读查询 | `execute_sql` | SQL 完整且参数已绑定（SQL 与字段口径来自图谱） |
 | 生成图表 | `draw_*` 或先调用 `list_chart_types` | 数据已获取 |
 | 知识抽取 | `kg_extract_v2` | 仅当图谱方案明确要求 |
@@ -134,26 +137,20 @@ inject_layer: developer
 
 ### 五、执行调度
 
-1. 根据 `depends_on` 建立 DAG；无依赖且资源互不冲突的步骤可并行。
+工具是逐个调用的（一次一个、返回后再下一个），**不存在并行**；因此严格按方案模板的步骤编号顺序执行：
+
+1. **按方案模板的步骤编号顺序执行**：step-1 → step-2 → …，前一步完成并验证后才执行下一步；禁止跳过、禁止颠倒顺序、禁止跨步骤乱跑。
 2. 每步执行后验证返回 envelope（`code == 0`）、输出结构和业务约束，**并记录该步骤对应的输出/结果**。
 3. 工具失败时最多调整参数重试 2 次（共 3 次尝试），不得用伪造结果继续。
 4. SQL 默认只读。写操作必须：(a) 图谱方案明确要求，(b) 用户已授权。
 5. 前序输出不满足下一步要求时，回退到参数绑定或图谱探索。
 6. 记录实际执行与图谱原方案之间的差异及原因。
 
-> ⚠️ **必须严格按方案步骤逐步执行，每一步都给出对应的输出/结果**，不得合并多步、也不得把整体描述为"已执行"。ExecutionReport 中每一步都要有实际 tool_calls 和 output。
-
-**并行安全判断**：
-
-| 条件 | 可并行？ |
-|------|---------|
-| depends_on 为空且操作不同资源 | 是 |
-| depends_on 为空但操作同一表 | 是（只读）/ 否（写入）|
-| 步骤 B 依赖步骤 A 的输出 | 否 |
-| 步骤 B 使用步骤 A 可能修改的资源 | 否 |
+> ⚠️ **必须严格按方案模板步骤顺序逐步执行，每一步都给出对应的输出/结果**，不得合并多步、也不得把未执行的多步整体描述为"已执行"。ExecutionReport 中每一步都要有实际 tool_calls 和 output。
 
 **【自检】**
-- [ ] 本步实际执行了几个工具调用？（必须 > 0）
+- [ ] 当前是否正按模板编号顺序执行到对应步骤（无跳步、无颠倒）？
+- [ ] 本步实际执行了几个工具调用？（执行步必须 > 0）
 
 ---
 
@@ -205,14 +202,22 @@ inject_layer: developer
 方案类单元步骤: step-1（读取查询所需 SQL 模板与口径）→ step-2（执行查询）
 
 执行:
-1. 验证 → 方案类单元有节点 ID ✓，步骤来自方案内容 ✓
+1. 验证 → 方案类单元有节点 ID ✓，步骤来自方案完整属性 ✓
 2. 规范化 → 识别 depends_on: step-2 依赖 step-1
-3. 执行 step-1: query_entity_properties（方案/指标节点）→ 取得 SQL 模板与字段口径
+3. 执行 step-1: 直接用语义对齐已返回的方案完整属性（content 内的 SQL 模板/口径），不再重查 query_entity_properties
 4. 参数绑定: 用用户约束填充模板占位符，记录 value_source
 5. 执行 step-2: execute_sql → 返回 150 行
 6. 验证: 结果字段与图谱口径一致 ✓，行数合理 ✓
 7. 输出 ExecutionReport(status="completed", ...)
 ```
+
+**示例：信息不足时沿图谱继续找，直到拿全口径**
+用户问的是“物资类A数据”：
+1. 已对齐并找到“A数据”对应的节点，但节点给出的查询口径只到普通口径，**还不能区分“物资类”**；
+2. 此时不知道“物资类”在图谱里如何表示 → **不猜测、不中途调 link_entities、不去数据库查表结构**；
+3. 继续沿图谱用 `search_graph` / `query_entity_properties` 逐跳找，找到相关的数据来源/数据表节点，读取它的**字段定义**属性；
+4. 在字段定义里发现代表“物资类”的字段，用户条件与字段对应上 → **信息完整，才据此执行**；
+5. 确找不到 → 记录缺口，不自行补口径。
 
 ---
 
