@@ -62,6 +62,7 @@ frontend/.vite/
 backend/data/documents/
 backend/data/preproc_output/
 backend/data/preproc_upload/
+backend/data/extraction_snapshots/
 backend/processed/
 backend/processed_files/
 backend/temp_files/

@@ -350,6 +350,13 @@ def _thinking_rejected(exc: Exception) -> bool:
             "invalid type",
             "deserialize",
             "extra_forbidden",
+            # SGLang 等后端用 pydantic 枚举校验拒绝，报 literal_error
+            # 而不是 unsupported parameter，同样要触发降级。
+            "literal_error",
+            "invalid value",
+            "input should be",
+            "should be one of",
+            "must be one of",
         )
     )
 

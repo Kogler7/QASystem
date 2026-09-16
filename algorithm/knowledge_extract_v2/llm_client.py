@@ -5,11 +5,14 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from .config import get_llm_config
 from .prompt_router import ChatMessages
+
+logger = logging.getLogger(__name__)
 
 
 # DeepSeek's Responses strict-schema implementation intentionally supports a
@@ -70,6 +73,47 @@ def _unsupported_parameter(exc: Exception) -> bool:
     return bool(
         re.search(rf"{parameter}[^.;\n]{{0,120}}{unsupported}", message)
         or re.search(rf"{unsupported}[^.;\n]{{0,120}}{parameter}", message)
+    )
+
+
+def _thinking_control_rejected(exc: Exception) -> bool:
+    """Whether the error rejects a thinking-control field we sent.
+
+    Thinking-control fields are provider specific -- DeepSeek documents
+    ``extra_body={"thinking": ...}`` and ``reasoning={"effort": ...}``,
+    Qwen uses ``enable_thinking``, and backends like SGLang validate
+    ``reasoning.effort`` against a literal enum and answer a ``"none"``
+    effort with a pydantic ``literal_error`` instead of an
+    "unsupported parameter" message.  What all rejections share is that the
+    error names the thinking/reasoning/effort field; auth, rate-limit and
+    network errors do not, so they never trigger a semantics-changing retry.
+    """
+    if isinstance(exc, TypeError):
+        return True
+    message = str(exc).casefold()
+    if not re.search(r"reason(?:ing)?|effort|thinking", message):
+        return False
+    return any(
+        marker in message
+        for marker in (
+            "unsupported",
+            "unknown",
+            "unrecognized",
+            "not supported",
+            "not-supported",
+            "unavailable",
+            "extra input",
+            "extra-input",
+            "extra inputs",
+            "extra_forbidden",
+            "not permitted",
+            "literal_error",
+            "invalid value",
+            "input should be",
+            "should be one of",
+            "must be one of",
+            "unexpected argument",
+        )
     )
 
 
@@ -191,6 +235,10 @@ class OpenAICompatibleLLM:
         self.model = model
         self.max_tokens = max_tokens
         self.disable_thinking = disable_thinking
+        # 后端拒绝过 thinking 控制参数就记住（chat / responses 各自独立），
+        # 之后不再发送，避免每次请求都先白白失败一遍。
+        self._chat_thinking_hint_rejected = False
+        self._responses_thinking_hint_rejected = False
 
     def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None) -> Any:
         kwargs: dict[str, Any] = {
@@ -201,21 +249,25 @@ class OpenAICompatibleLLM:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        # OpenAI-compatible SDKs forward provider-specific fields through
+        # ``extra_body``.  Providers spell the thinking toggle differently
+        # (DeepSeek: ``thinking``; Qwen: ``enable_thinking``), so both are
+        # sent and the whole hint is dropped -- and remembered as rejected --
+        # the moment the backend refuses either one.  Thinking control is
+        # best-effort: it must never fail the request.
+        if self.disable_thinking and not self._chat_thinking_hint_rejected:
+            kwargs["extra_body"] = {
+                "thinking": {"type": "disabled"},
+                "enable_thinking": False,
+            }
         try:
-            if self.disable_thinking:
-                return self.client.chat.completions.create(
-                    **kwargs,
-                    # OpenAI-compatible SDKs forward provider-specific fields
-                    # through ``extra_body``.  DeepSeek V4 documents the
-                    # thinking toggle in this location rather than as a
-                    # top-level SDK argument.
-                    extra_body={"thinking": {"type": "disabled"}},
-                )
-            else:
-                return self.client.chat.completions.create(**kwargs)
+            return self.client.chat.completions.create(**kwargs)
         except Exception as exc:  # noqa: BLE001 - compatible providers vary
-            if not self.disable_thinking or not _unsupported_parameter(exc):
+            if "extra_body" not in kwargs or not _thinking_control_rejected(exc):
                 raise
+            logger.info("后端拒绝 chat thinking 控制参数，停用后重试: %s", exc)
+            self._chat_thinking_hint_rejected = True
+            kwargs.pop("extra_body")
             return self.client.chat.completions.create(**kwargs)
 
     @staticmethod
@@ -273,10 +325,22 @@ class OpenAICompatibleLLM:
             "max_output_tokens": self.max_tokens,
             "text": {"format": response_format},
         }
-        # disable_thinking=True 时直接省略 reasoning 字段即可关闭思考：
-        # 部分 OpenAI 兼容的 Responses 实现会拒绝 reasoning 参数，
-        # 不下发它比先下发再回退更稳妥。
-        return create(**kwargs)
+        # Same best-effort rule as ``_create``: DeepSeek's Responses API takes
+        # ``reasoning={"effort": "none"}``, while SGLang validates effort
+        # against low/medium/high and rejects "none" with a literal_error.
+        # Any rejection drops the field for this request and is remembered so
+        # later requests skip it entirely.
+        if self.disable_thinking and not self._responses_thinking_hint_rejected:
+            kwargs["reasoning"] = {"effort": "none"}
+        try:
+            return create(**kwargs)
+        except Exception as exc:  # noqa: BLE001 - compatible providers vary
+            if "reasoning" not in kwargs or not _thinking_control_rejected(exc):
+                raise
+            logger.info("后端拒绝 responses reasoning 控制参数，停用后重试: %s", exc)
+            self._responses_thinking_hint_rejected = True
+            kwargs.pop("reasoning", None)
+            return create(**kwargs)
 
     def _chat_structured(
         self,

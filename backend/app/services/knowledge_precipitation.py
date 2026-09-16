@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import functools
 import hashlib
+import json
+import logging
 import os
+import re
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +26,12 @@ from backend.app.services.algorithm_capabilities import (
     EmbeddingService,
     GraphExtractionService,
 )
+
+logger = logging.getLogger(__name__)
+
+#: 抽取结果快照目录：每次运行落盘一份 JSON、失败时同目录写 *_error.log，供后续比对。
+#: 本地是 backend/data/，容器内挂载在可写的 backend-data 卷（/app/backend/data）。
+EXTRACTION_SNAPSHOT_DIR = Path(__file__).resolve().parents[2] / "data" / "extraction_snapshots"
 
 
 @dataclass(slots=True)
@@ -82,6 +93,85 @@ def _ontology_digest(ontology: str) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - 回报解析失败本身就是这个字段的用途
         info["parse_error"] = f"{type(exc).__name__}: {exc}"
     return info
+
+
+def _snapshot_prefix(label: str) -> str:
+    safe = re.sub(r'[\\/:*?"<>|\s]+', "_", label)[:80] or "upload"
+    return f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}_{safe}"
+
+
+def _save_extraction_snapshot(
+    label: str,
+    mode: str,
+    extraction: dict[str, Any],
+    stats: dict[str, Any],
+    ontology: str,
+) -> None:
+    """把本次提取后的结果原样落盘，供不同运行之间比对。"""
+    try:
+        EXTRACTION_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        path = EXTRACTION_SNAPSHOT_DIR / f"{_snapshot_prefix(label)}.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "saved_at": datetime.now().isoformat(timespec="seconds"),
+                    "file": label,
+                    "mode": mode,
+                    "ontology": _ontology_digest(ontology),
+                    "extraction": extraction,
+                    "stats": stats,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception as exc:  # noqa: BLE001 - 快照写不进去不应让整条流水线失败
+        logger.error("抽取结果快照写入失败: %s", exc)
+
+
+def _save_error_log(label: str, exc: Exception) -> None:
+    """流水线任意阶段失败时，把报错现场写进快照目录。"""
+    try:
+        EXTRACTION_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        path = EXTRACTION_SNAPSHOT_DIR / f"{_snapshot_prefix(label)}_error.log"
+        lines = [
+            f"[{datetime.now().isoformat(timespec='seconds')}] 知识沉淀处理失败",
+            f"file: {label}",
+        ]
+        if isinstance(exc, PipelineError):
+            lines += [
+                f"stage: {exc.stage}",
+                f"code: {exc.code.name}({exc.code})",
+                f"info: {exc.info}",
+                f"details: {json.dumps(exc.details, ensure_ascii=False, default=str) if exc.details is not None else None}",
+            ]
+        lines += [f"error: {type(exc).__name__}: {exc}", "", "traceback:", traceback.format_exc()]
+        path.write_text("\n".join(lines), encoding="utf-8")
+    except Exception as write_exc:  # noqa: BLE001 - 写日志失败不能吞掉原始异常
+        logger.error("报错日志写入失败: %s", write_exc)
+
+
+def _log_pipeline_failure(method):
+    """process / process_batch 的统一失败出口：先落盘报错日志再原样抛出。"""
+
+    @functools.wraps(method)
+    def wrapper(self, request):
+        try:
+            return method(self, request)
+        except Exception as exc:
+            if isinstance(request, BatchKnowledgeIngestionRequest):
+                label = (
+                    Path(request.files[0].file_name).stem + f"_等{len(request.files)}个文件"
+                    if request.files
+                    else "batch"
+                )
+            else:
+                label = request.file_name
+            _save_error_log(label, exc)
+            raise
+
+    return wrapper
 
 
 class KnowledgePrecipitationService:
@@ -236,6 +326,15 @@ class KnowledgePrecipitationService:
                 },
             }
 
+        # 提取后立刻落盘快照：下游（向量化/图谱存储）失败也不丢本次抽取结果
+        _save_extraction_snapshot(
+            upload_stem,
+            "ontology" if has_ontology else "unstructured",
+            extracted_result,
+            stats,
+            ontology,
+        )
+
         vector_ids = None
         vector_dimension = None
         if origin is not None:
@@ -309,6 +408,7 @@ class KnowledgePrecipitationService:
             "stats": stats,
         }
 
+    @_log_pipeline_failure
     def process(self, request: KnowledgeIngestionRequest) -> dict[str, Any]:
         if not request.content:
             raise PipelineError(ErrorCode.INVALID_REQUEST, "上传文件不能为空", "validation")
@@ -344,6 +444,7 @@ class KnowledgePrecipitationService:
                 partial = {"artifacts": {"markdown": stats["storage"]["origin"]}}
             raise PipelineError(exc.code, exc.info, exc.stage, exc.details, partial) from exc
 
+    @_log_pipeline_failure
     def process_batch(self, request: BatchKnowledgeIngestionRequest) -> dict[str, Any]:
         if not request.files:
             raise PipelineError(ErrorCode.INVALID_REQUEST, "至少需要上传一个文件", "validation")
