@@ -1,0 +1,2346 @@
+{
+  "metadata": {
+    "task": "以知识单元元模型0603.puml为本体，对基于故障规则的故障诊断.docx重新进行无ID知识抽取",
+    "ontologyFile": "知识单元元模型0603.puml",
+    "sourceFile": "基于故障规则的故障诊断.docx",
+    "relationRepresentation": "headClass + head + relation + tailClass + tail",
+    "identifierPolicy": "抽取阶段不生成或使用对象ID/边ID；关系端点使用语义名称与本体类定位。后续确认、消歧与去重完成后再统一赋ID。",
+    "counts": {
+      "objects": 75,
+      "relations": 55,
+      "terms": 23,
+      "rules": 3
+    }
+  },
+  "objectsByClass": {
+    "Dimension": [
+      {
+        "ontologyClass": "Dimension",
+        "name": "时间",
+        "properties": {
+          "dimensionName": "时间"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 3
+        }
+      },
+      {
+        "ontologyClass": "Dimension",
+        "name": "空间",
+        "properties": {
+          "dimensionName": "空间"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 4
+        }
+      },
+      {
+        "ontologyClass": "Dimension",
+        "name": "抽象层级",
+        "properties": {
+          "dimensionName": "抽象层级"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 5
+        }
+      },
+      {
+        "ontologyClass": "Dimension",
+        "name": "运营视角",
+        "properties": {
+          "dimensionName": "运营视角"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 6
+        }
+      },
+      {
+        "ontologyClass": "Dimension",
+        "name": "约束方面",
+        "properties": {
+          "dimensionName": "约束方面"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 7
+        }
+      }
+    ],
+    "Scale": [
+      {
+        "ontologyClass": "Scale",
+        "name": "年月",
+        "properties": {
+          "scaleName": "年月",
+          "scaleType": "年月",
+          "scaleValue": "年月"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 9
+        }
+      },
+      {
+        "ontologyClass": "Scale",
+        "name": "子公司",
+        "properties": {
+          "scaleName": "子公司",
+          "scaleType": "组织",
+          "scaleValue": "子公司"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 10
+        }
+      },
+      {
+        "ontologyClass": "Scale",
+        "name": "逻辑",
+        "properties": {
+          "scaleName": "逻辑",
+          "scaleType": "层级",
+          "scaleValue": "逻辑"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 11
+        }
+      },
+      {
+        "ontologyClass": "Scale",
+        "name": "运维诊断域",
+        "properties": {
+          "scaleName": "运维诊断域",
+          "scaleType": "领域",
+          "scaleValue": "运维诊断域"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 12
+        }
+      },
+      {
+        "ontologyClass": "Scale",
+        "name": "规则",
+        "properties": {
+          "scaleName": "规则",
+          "scaleType": "规则",
+          "scaleValue": "规则"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 13
+        }
+      }
+    ],
+    "KnowledgeSpace": [
+      {
+        "ontologyClass": "KnowledgeSpace",
+        "name": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+        "properties": {
+          "spaceName": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 15
+        }
+      }
+    ],
+    "Stakeholder": [
+      {
+        "ontologyClass": "Stakeholder",
+        "name": "信号维修工程师",
+        "properties": {
+          "name": "信号维修工程师",
+          "role": "故障诊断与维修执行人员",
+          "organization": "轨道交通装备维护部门",
+          "interest": "根据故障现象快速定位故障原因，并获得可执行的维修建议",
+          "responsibilityDomain": "系统故障诊断与处理"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 20,
+          "paragraph_end": 27
+        }
+      }
+    ],
+    "Concern": [
+      {
+        "ontologyClass": "Concern",
+        "name": "基于故障现象的故障原因定位",
+        "properties": {
+          "name": "基于故障现象的故障原因定位",
+          "type": "故障诊断关注点",
+          "description": "针对故障样例数据中的故障状况、所属系统、故障详细分类等信息，利用故障规则推理可能的故障原因。"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 29,
+          "paragraph_end": 34
+        }
+      }
+    ],
+    "TargetObject": [
+      {
+        "ontologyClass": "TargetObject",
+        "name": "故障事件",
+        "properties": {
+          "TargetObjectName": "故障事件"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 162
+        }
+      },
+      {
+        "ontologyClass": "TargetObject",
+        "name": "故障现象",
+        "properties": {
+          "TargetObjectName": "故障现象"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 162
+        }
+      },
+      {
+        "ontologyClass": "TargetObject",
+        "name": "故障规则",
+        "properties": {
+          "TargetObjectName": "故障规则"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 162
+        }
+      },
+      {
+        "ontologyClass": "TargetObject",
+        "name": "故障原因",
+        "properties": {
+          "TargetObjectName": "故障原因"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph": 162
+        }
+      }
+    ],
+    "Problem": [
+      {
+        "ontologyClass": "Problem",
+        "name": "基于故障规则的故障原因诊断",
+        "properties": {
+          "ProblemName": "基于故障规则的故障原因诊断",
+          "ProblemDescription": "面向轨道交通运维诊断场景，基于故障样例数据中抽取的故障规则，根据输入的故障现象、所属系统、故障详细分类、故障地点等信息，匹配相应诊断规则，推理可能的故障原因。",
+          "Coordinates": [
+            {
+              "dimension": "时间",
+              "scale": "年月",
+              "sourceExpression": "时间.年月"
+            },
+            {
+              "dimension": "空间",
+              "scale": "子公司",
+              "sourceExpression": "空间.子公司"
+            },
+            {
+              "dimension": "抽象层级",
+              "scale": "逻辑",
+              "sourceExpression": "抽象层级.逻辑"
+            },
+            {
+              "dimension": "运营视角",
+              "scale": "运维诊断域",
+              "sourceExpression": "运营.运维诊断域",
+              "normalizationNote": "源文档坐标中写“运营”，按同文档已声明维度“运营视角”做语义对齐。"
+            },
+            {
+              "dimension": "约束方面",
+              "scale": "规则",
+              "sourceExpression": "约束方面.规则"
+            }
+          ],
+          "TargetObject": [
+            "故障事件",
+            "故障现象",
+            "故障规则",
+            "故障原因"
+          ],
+          "ProblemGoal": "根据已知故障现象，利用故障规则推理并输出可能的故障原因，为维修人员提供可解释的诊断依据。",
+          "Constraints": "诊断过程必须基于已抽取的故障规则；规则匹配需考虑所属系统、故障详细分类、故障地点、时间等条件；诊断结果应能够追溯到对应规则和原始故障样例；同一故障现象可输出一个或多个候选故障原因。",
+          "Stakeholder": "信号维修工程师",
+          "Concern": "基于故障现象的故障原因定位",
+          "ProblemType": "DIAGNOSTIC",
+          "ChildernProblem": [
+            "故障现象识别问题",
+            "故障规则匹配问题",
+            "故障原因推理问题",
+            "诊断结果解释问题"
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 151,
+          "paragraph_end": 174
+        }
+      },
+      {
+        "ontologyClass": "Problem",
+        "name": "故障现象识别问题",
+        "properties": {
+          "ProblemName": "故障现象识别问题"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraphs": [
+            169,
+            170,
+            171,
+            172
+          ]
+        },
+        "referenceOnly": true
+      },
+      {
+        "ontologyClass": "Problem",
+        "name": "故障规则匹配问题",
+        "properties": {
+          "ProblemName": "故障规则匹配问题"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraphs": [
+            169,
+            170,
+            171,
+            172
+          ]
+        },
+        "referenceOnly": true
+      },
+      {
+        "ontologyClass": "Problem",
+        "name": "故障原因推理问题",
+        "properties": {
+          "ProblemName": "故障原因推理问题"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraphs": [
+            169,
+            170,
+            171,
+            172
+          ]
+        },
+        "referenceOnly": true
+      },
+      {
+        "ontologyClass": "Problem",
+        "name": "诊断结果解释问题",
+        "properties": {
+          "ProblemName": "诊断结果解释问题"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraphs": [
+            169,
+            170,
+            171,
+            172
+          ]
+        },
+        "referenceOnly": true
+      }
+    ],
+    "Solution": [
+      {
+        "ontologyClass": "Solution",
+        "name": "基于故障规则的故障诊断方案",
+        "properties": {
+          "solutionName": "基于故障规则的故障诊断方案",
+          "solutionDescription": "面向轨道交通运维诊断场景，基于故障样例数据中抽取形成的故障规则，将输入的故障现象、所属系统、故障详细分类、故障地点等信息与规则库进行匹配，推理可能的故障原因，并输出对应的诊断依据和处理建议。",
+          "SolutionCategory": "Diagnosis",
+          "SolutionGoal": "根据已知故障现象快速定位可能故障原因，实现由故障现象到故障原因的规则化、可解释诊断。",
+          "Input": "故障现象、所属系统、故障详细分类、故障地点、故障时间、车次、是否晚点等故障记录信息",
+          "Output": "候选故障原因、匹配到的故障规则、诊断置信依据、建议处理方法",
+          "Constraint": "诊断结果必须来源于已建立的故障规则；规则匹配应优先考虑所属系统、故障详细分类和故障现象；当多个规则同时匹配时，应输出多个候选原因并保留规则依据；诊断结果应能够追溯到原始故障样例数据。",
+          "resourceRequirements": "故障术语、故障规则",
+          "coverDimensions": [
+            "时间.年月",
+            "空间.子公司",
+            "抽象层级.逻辑",
+            "运营.运维诊断域",
+            "约束方面.规则"
+          ],
+          "SolutionTemple": [
+            "步骤1：故障规则匹配",
+            "输入：故障规则匹配条件集、故障规则库",
+            "处理：匹配规则前件",
+            "输出：匹配到的故障规则集合",
+            "约束：多条规则匹配时保留全部候选规则",
+            "步骤2：故障原因推理",
+            "输入：匹配到的故障规则集合",
+            "处理：读取规则后件并推理候选原因",
+            "输出：候选故障原因集合",
+            "约束：故障原因必须来源于规则后件",
+            "步骤3：诊断结果生成",
+            "输入：候选故障原因、匹配规则",
+            "处理：生成结构化诊断结果",
+            "输出：故障诊断报告",
+            "约束：结果必须可解释、可追溯"
+          ],
+          "valaditionRule": "若输入故障现象能够匹配到至少一条有效故障规则，并输出与规则后件一致的故障原因，同时诊断结果能够追溯到对应规则和原始样例，则认为该方案有效。"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 176,
+          "paragraph_end": 214
+        }
+      }
+    ],
+    "KnowledgeUnitManagement": [
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "故障现象",
+        "properties": {
+          "name": "故障现象",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 36,
+          "paragraph_end": 39
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "所属系统",
+        "properties": {
+          "name": "所属系统",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 41,
+          "paragraph_end": 44
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "故障原因",
+        "properties": {
+          "name": "故障原因",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 46,
+          "paragraph_end": 49
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "处理方法",
+        "properties": {
+          "name": "处理方法",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 51,
+          "paragraph_end": 54
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "故障详细分类",
+        "properties": {
+          "name": "故障详细分类",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 56,
+          "paragraph_end": 59
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "故障地点",
+        "properties": {
+          "name": "故障地点",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 61,
+          "paragraph_end": 64
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "车次",
+        "properties": {
+          "name": "车次",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 66,
+          "paragraph_end": 69
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "是否晚点",
+        "properties": {
+          "name": "是否晚点",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 71,
+          "paragraph_end": 74
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "故障次数",
+        "properties": {
+          "name": "故障次数",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 76,
+          "paragraph_end": 79
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "对标不准",
+        "properties": {
+          "name": "对标不准",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 81,
+          "paragraph_end": 84
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "屏蔽门不能联动",
+        "properties": {
+          "name": "屏蔽门不能联动",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 86,
+          "paragraph_end": 89
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "轨道电路异常",
+        "properties": {
+          "name": "轨道电路异常",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 91,
+          "paragraph_end": 94
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "RTU 报警",
+        "properties": {
+          "name": "RTU 报警",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 96,
+          "paragraph_end": 99
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "电源板异常",
+        "properties": {
+          "name": "电源板异常",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 101,
+          "paragraph_end": 104
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "运营停车点不能自动取消",
+        "properties": {
+          "name": "运营停车点不能自动取消",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 106,
+          "paragraph_end": 109
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "开门使能信号异常",
+        "properties": {
+          "name": "开门使能信号异常",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 111,
+          "paragraph_end": 114
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "同步环线检测板异常",
+        "properties": {
+          "name": "同步环线检测板异常",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 116,
+          "paragraph_end": 119
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "同步环线报警板异常",
+        "properties": {
+          "name": "同步环线报警板异常",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 121,
+          "paragraph_end": 124
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "多路接收器 CPU850 工作不稳定",
+        "properties": {
+          "name": "多路接收器 CPU850 工作不稳定",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 126,
+          "paragraph_end": 129
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "接收端轨旁盒潮湿",
+        "properties": {
+          "name": "接收端轨旁盒潮湿",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 131,
+          "paragraph_end": 134
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "ATP/ATO 系统",
+        "properties": {
+          "name": "ATP/ATO 系统",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 136,
+          "paragraph_end": 139
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "ATS 系统",
+        "properties": {
+          "name": "ATS 系统",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 141,
+          "paragraph_end": 144
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "SICAS 系统",
+        "properties": {
+          "name": "SICAS 系统",
+          "resourceType": "术语"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 146,
+          "paragraph_end": 149
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "ATO对标-40cm→屏蔽门不同步",
+        "properties": {
+          "name": "ATO对标-40cm→屏蔽门不同步",
+          "resourceType": "规则",
+          "version": "v1.0@2025-01-01",
+          "置信度": "0.9",
+          "space": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "page": 2,
+          "embedded_image": "word/media/image1.png",
+          "location": "规则表第1条"
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "CPU850不稳→屏蔽门不同步",
+        "properties": {
+          "name": "CPU850不稳→屏蔽门不同步",
+          "resourceType": "规则",
+          "version": "v1.0@2025-01-01",
+          "置信度": "0.9",
+          "space": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "page": 2,
+          "embedded_image": "word/media/image1.png",
+          "location": "规则表第2条"
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitManagement",
+        "name": "屏蔽门不同步复合诊断规则",
+        "properties": {
+          "name": "屏蔽门不同步复合诊断规则",
+          "resourceType": "规则",
+          "version": "v1.0@2025-01-01",
+          "置信度": "0.85",
+          "space": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则"
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "page": 2,
+          "embedded_image": "word/media/image1.png",
+          "location": "规则表第3条"
+        }
+      }
+    ],
+    "KnowledgeUnitLogic": [
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "故障现象__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "故障发生时在现场被观察、记录或感知到的异常状态、异常行为或异常事件，是故障诊断过程中的主要输入信息。通常包括故障发生时间、地点、列车或设备对象、运行状态、异常表现及初步处置情况等内容，用于支持后续基于规则、知识图谱或专家经验的故障原因推理。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "故障状况",
+                "故障描述",
+                "异常现象",
+                "故障表现",
+                "现场故障记录",
+                "故障事件描述"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 36,
+          "paragraph_end": 39
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "所属系统__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "故障现象或故障事件归属的设备系统或业务系统，用于明确故障诊断的对象范围和专业边界。在轨道交通信号设备故障诊断中，所属系统可包括 ATP/ATO、ATS、SICAS 等系统。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "故障系统",
+                "设备系统",
+                "子系统",
+                "系统类别",
+                "故障所属专业"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 41,
+          "paragraph_end": 44
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "故障原因__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "导致故障现象发生的直接原因或根本原因，是故障诊断推理的目标结果。故障原因可来源于设备部件失效、环境影响、通信异常、电源异常、控制逻辑异常或其他运行条件异常等。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "原因",
+                "故障成因",
+                "失效原因",
+                "根本原因",
+                "直接原因",
+                "诊断原因"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 46,
+          "paragraph_end": 49
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "处理方法__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "针对已发生故障采取的维修、调整、复位、更换、重启或其他恢复措施，用于消除故障影响、恢复系统正常运行，并可作为后续维修方案生成和知识复用的依据。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "处置方法",
+                "维修措施",
+                "处理措施",
+                "恢复方法",
+                "解决方案",
+                "故障处理办法"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 51,
+          "paragraph_end": 54
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "故障详细分类__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "根据故障现象、故障对象、故障部件或故障表现对故障事件进行细粒度划分的类别信息，用于故障统计、规则抽取、诊断匹配和知识图谱分类管理。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "故障类型",
+                "故障类别",
+                "详细故障类别",
+                "故障小类",
+                "故障分类项"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 56,
+          "paragraph_end": 59
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "故障地点__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "故障事件发生或被发现的空间位置，通常包括车站、区间、线路、联锁区、轨道区段或设备安装位置等，用于支持故障定位、区域统计和现场维修派工。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "发生地点",
+                "故障位置",
+                "故障发生位置",
+                "站点",
+                "区段",
+                "设备位置"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 61,
+          "paragraph_end": 64
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "车次__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "发生故障或受故障影响的运营列车编号或运行车次，用于关联故障事件与具体列车运行任务，支持故障追踪、运行影响分析和维修记录管理。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "列车号",
+                "运营车次",
+                "车辆编号",
+                "列车编号",
+                "故障车次"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 66,
+          "paragraph_end": 69
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "是否晚点__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "用于标识故障事件是否对列车运行造成晚点或延误影响的状态信息，是评估故障运行影响程度和服务质量影响的重要指标。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "晚点标识",
+                "是否延误",
+                "运行影响标识",
+                "延误状态"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 71,
+          "paragraph_end": 74
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "故障次数__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "在指定统计周期、指定系统、指定地点或指定故障类别下，故障事件发生的累计数量，用于故障频次分析、可靠性评估和重点故障识别。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "发生次数",
+                "故障发生次数",
+                "故障数量",
+                "故障频次",
+                "事件次数"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 76,
+          "paragraph_end": 79
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "对标不准__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "列车在车站停车时，实际停车位置与规定停车标位置之间存在明显偏差，导致列车车门、站台门或屏蔽门联动条件异常，可能引起车门无法正常打开、屏蔽门无法联动或开门使能信号异常等问题。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "停车对标不准",
+                "停车位置偏差",
+                "对位偏差",
+                "列车停车偏差",
+                "停车精度异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 81,
+          "paragraph_end": 84
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "屏蔽门不能联动__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "列车到站停车并满足开关门条件后，屏蔽门未能按照联动控制逻辑随列车车门同步打开或关闭的异常现象。该类故障可能与对标偏差、开门使能信号异常、多路接收器工作不稳定或相关控制板卡异常有关。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "屏蔽门联动失败",
+                "屏蔽门未联动",
+                "站台门不能联动",
+                "屏蔽门不能联动打开",
+                "屏蔽门不能联动关闭"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 86,
+          "paragraph_end": 89
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "轨道电路异常__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "轨道电路区段状态显示异常或占用状态异常的故障现象，可能表现为红光带、粉红光带、区段异常占用或逻辑空闲后恢复等情况。该类故障通常用于判断轨道区段检测、接收端设备、调谐单元或环境状态是否存在异常。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "轨道电路故障",
+                "红光带",
+                "粉红光带",
+                "轨道区段异常",
+                "轨道区段占用异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 91,
+          "paragraph_end": 94
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "RTU 报警__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "远程终端单元 RTU 在运行、巡检或监控过程中产生报警信息，表示现场设备采集、通信、状态监测或控制链路存在异常，需要通过重启、检查通信链路或进一步诊断确认故障原因。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "RTU告警",
+                "RTU报警信息",
+                "远程终端报警",
+                "远程终端单元告警"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 96,
+          "paragraph_end": 99
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "电源板异常__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "设备电源板或电源模块在供电过程中出现输出不稳定、电压异常或工作状态异常，可能导致信号屏黑屏、ATO灯不亮、设备复位或系统功能异常等故障现象。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "电源板故障",
+                "电源模块异常",
+                "5V电源板异常",
+                "电源板工作不稳定",
+                "供电板卡异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 101,
+          "paragraph_end": 104
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "运营停车点不能自动取消__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "列车运行过程中，系统设置的运营停车点在满足取消条件后未能自动取消，导致列车运行控制或调度组织受到影响，需要通过信号人员处理、系统检查或相关逻辑恢复操作使其恢复正常。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "运营停车点未自动取消",
+                "停车点不能取消",
+                "停车点取消失败",
+                "运营停车点异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 106,
+          "paragraph_end": 109
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "开门使能信号异常__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "列车到站后未能正常接收或输出开门使能信号，导致车门或屏蔽门无法按正常逻辑打开，需要通过人工强制开门按钮、信号复位或相关设备检查进行处理。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "开门使能信号缺失",
+                "未收到开门使能信号",
+                "开门授权异常",
+                "车门使能异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 111,
+          "paragraph_end": 114
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "同步环线检测板异常__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "同步环线检测板在列车定位、站台门联动或相关信号检测过程中出现工作异常，可能导致列车对标偏差、屏蔽门无法联动或站台门控制异常等故障现象。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "同步环线检测板故障",
+                "同步环线板卡异常",
+                "检测板异常",
+                "同步环线检测异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 116,
+          "paragraph_end": 119
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "同步环线报警板异常__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "同步环线报警板在监测或报警过程中出现异常，可能影响列车与站台设备之间的联动判断、报警反馈或开门控制逻辑，导致对标不准、开门使能异常或屏蔽门联动异常等现象。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "同步环线报警板故障",
+                "报警板异常",
+                "同步环线报警异常",
+                "同步环线板卡故障"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 121,
+          "paragraph_end": 124
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "多路接收器 CPU850 工作不稳定__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "多路接收器中的 CPU850 模块在运行过程中出现工作状态不稳定，导致相关信号接收、处理或联动控制异常，可能引发屏蔽门不能联动打开或关闭等故障现象。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "CPU850工作不稳定",
+                "多路接收器异常",
+                "CPU850模块异常",
+                "多路接收器CPU异常"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 126,
+          "paragraph_end": 129
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "接收端轨旁盒潮湿__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "轨道电路接收端轨旁盒内部存在潮湿、受潮或环境湿度异常情况，可能影响接收端调谐单元、转换单元或相关电气部件的正常工作，导致轨道电路区段状态异常。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "轨旁盒潮湿",
+                "接收端受潮",
+                "轨旁设备受潮",
+                "接收端环境潮湿"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 131,
+          "paragraph_end": 134
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "ATP/ATO 系统__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "列车自动防护系统与列车自动运行系统的组合，用于保障列车运行安全、速度控制、停车控制、自动驾驶以及与车门、屏蔽门等设备之间的联动控制。附件样例中，对标不准、屏蔽门不能联动、电源板异常等故障均归属于该系统。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "ATP/ATO",
+                "列车自动防护与自动运行系统",
+                "自动防护自动运行系统",
+                "列控系统"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 136,
+          "paragraph_end": 139
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "ATS 系统__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "列车自动监控系统，用于对列车运行状态、运营停车点、调度控制和现场设备状态进行监视与控制。附件样例中，RTU报警、运营停车点不能自动取消等故障归属于该系统。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "ATS",
+                "列车自动监控系统",
+                "自动监控系统",
+                "调度监控系统"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 141,
+          "paragraph_end": 144
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "SICAS 系统__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "术语定义",
+          "knowledgeContent": "计算机联锁系统，用于实现车站或线路区段内进路、信号机、道岔、轨道电路等设备之间的联锁控制与状态监测。附件样例中，轨道电路红光带、粉红光带等异常归属于该系统。",
+          "Attributes": [
+            {
+              "name": "同义词",
+              "value": [
+                "SICAS",
+                "计算机联锁系统",
+                "联锁系统",
+                "信号联锁系统"
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "paragraph_start": 146,
+          "paragraph_end": 149
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "ATO对标-40cm→屏蔽门不同步__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "规则结构(JSON)",
+          "knowledgeContent": "{\"RuleName\": \"ATO对标-40cm→屏蔽门不同步\", \"Terminology\": [\"ATP/ATO\", \"屏蔽门联动\", \"对标偏差\"], \"RuleTypeBody\": \"ImplicationRuleType\", \"KnowledgeSource\": \"故障案例库-来源序号1\", \"Examples\": \"ImplicationRuleTypeTemplate：如果 [前提条件]，那么 [结论/结果]\", \"Credibility\": 0.9, \"VersionInformation\": \"v1.0@2025-01-01\", \"Antecedent\": \"ATP/ATO上行对标-40cm\", \"consequent\": \"屏蔽门没有联动\", \"connectionSymbol\": \"导致\"}",
+          "Attributes": [
+            {
+              "name": "RuleName",
+              "value": "ATO对标-40cm→屏蔽门不同步"
+            },
+            {
+              "name": "Terminology",
+              "value": [
+                "ATP/ATO",
+                "屏蔽门联动",
+                "对标偏差"
+              ]
+            },
+            {
+              "name": "RuleTypeBody",
+              "value": "ImplicationRuleType"
+            },
+            {
+              "name": "KnowledgeSource",
+              "value": "故障案例库-来源序号1"
+            },
+            {
+              "name": "Examples",
+              "value": "ImplicationRuleTypeTemplate：如果 [前提条件]，那么 [结论/结果]"
+            },
+            {
+              "name": "Credibility",
+              "value": 0.9
+            },
+            {
+              "name": "VersionInformation",
+              "value": "v1.0@2025-01-01"
+            },
+            {
+              "name": "Antecedent",
+              "value": "ATP/ATO上行对标-40cm"
+            },
+            {
+              "name": "consequent",
+              "value": "屏蔽门没有联动"
+            },
+            {
+              "name": "connectionSymbol",
+              "value": "导致"
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "page": 2,
+          "embedded_image": "word/media/image1.png",
+          "location": "规则表第1条"
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "CPU850不稳→屏蔽门不同步__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "规则结构(JSON)",
+          "knowledgeContent": "{\"RuleName\": \"CPU850不稳→屏蔽门不同步\", \"Terminology\": [\"ATP/ATO\", \"CPU850\", \"屏蔽门联动\"], \"RuleTypeBody\": \"ImplicationRuleType\", \"KnowledgeSource\": \"故障案例库-来源序号10\", \"Examples\": \"ImplicationRuleTypeTemplate：如果 [前提条件]，那么 [结论/结果]\", \"Credibility\": 0.9, \"VersionInformation\": \"v1.0@2025-01-01\", \"Antecedent\": \"CPU850工作不稳定\", \"consequent\": \"屏蔽门不能联动打开\", \"connectionSymbol\": \"导致\"}",
+          "Attributes": [
+            {
+              "name": "RuleName",
+              "value": "CPU850不稳→屏蔽门不同步"
+            },
+            {
+              "name": "Terminology",
+              "value": [
+                "ATP/ATO",
+                "CPU850",
+                "屏蔽门联动"
+              ]
+            },
+            {
+              "name": "RuleTypeBody",
+              "value": "ImplicationRuleType"
+            },
+            {
+              "name": "KnowledgeSource",
+              "value": "故障案例库-来源序号10"
+            },
+            {
+              "name": "Examples",
+              "value": "ImplicationRuleTypeTemplate：如果 [前提条件]，那么 [结论/结果]"
+            },
+            {
+              "name": "Credibility",
+              "value": 0.9
+            },
+            {
+              "name": "VersionInformation",
+              "value": "v1.0@2025-01-01"
+            },
+            {
+              "name": "Antecedent",
+              "value": "CPU850工作不稳定"
+            },
+            {
+              "name": "consequent",
+              "value": "屏蔽门不能联动打开"
+            },
+            {
+              "name": "connectionSymbol",
+              "value": "导致"
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "page": 2,
+          "embedded_image": "word/media/image1.png",
+          "location": "规则表第2条"
+        }
+      },
+      {
+        "ontologyClass": "KnowledgeUnitLogic",
+        "name": "屏蔽门不同步复合诊断规则__逻辑属性",
+        "properties": {
+          "language": "zh-CN",
+          "knowledgeContentFormat": "规则结构(JSON)",
+          "knowledgeContent": "{\"RuleName\": \"屏蔽门不同步复合诊断规则\", \"Terminology\": [\"ATP/ATO\", \"CPU850\", \"屏蔽门联动\", \"对标偏差\"], \"RuleTypeBody\": \"CompositeRuleType\", \"KnowledgeSource\": \"综合故障案例库-来源序号1、10\", \"Examples\": \"CompositeRuleTypeTemplate：如果 满足 [条件1] 或 [条件2]，那么 [综合结论]\", \"Credibility\": 0.85, \"VersionInformation\": \"v1.0@2025-01-01\", \"CombinationType\": \"OR\"}",
+          "Attributes": [
+            {
+              "name": "RuleName",
+              "value": "屏蔽门不同步复合诊断规则"
+            },
+            {
+              "name": "Terminology",
+              "value": [
+                "ATP/ATO",
+                "CPU850",
+                "屏蔽门联动",
+                "对标偏差"
+              ]
+            },
+            {
+              "name": "RuleTypeBody",
+              "value": "CompositeRuleType"
+            },
+            {
+              "name": "KnowledgeSource",
+              "value": "综合故障案例库-来源序号1、10"
+            },
+            {
+              "name": "Examples",
+              "value": "CompositeRuleTypeTemplate：如果 满足 [条件1] 或 [条件2]，那么 [综合结论]"
+            },
+            {
+              "name": "Credibility",
+              "value": 0.85
+            },
+            {
+              "name": "VersionInformation",
+              "value": "v1.0@2025-01-01"
+            },
+            {
+              "name": "CombinationType",
+              "value": "OR"
+            }
+          ]
+        },
+        "evidence": {
+          "source": "基于故障规则的故障诊断.docx",
+          "page": 2,
+          "embedded_image": "word/media/image1.png",
+          "location": "规则表第3条"
+        }
+      }
+    ]
+  },
+  "relations": [
+    {
+      "headClass": "Dimension",
+      "head": "时间",
+      "relation": "包含",
+      "tailClass": "Scale",
+      "tail": "年月",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "context": "所需维度、所需刻度类型、知识空间"
+      },
+      "note": "按源文档维度顺序、刻度顺序及知识空间表达进行语义配对。"
+    },
+    {
+      "headClass": "Dimension",
+      "head": "空间",
+      "relation": "包含",
+      "tailClass": "Scale",
+      "tail": "子公司",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "context": "所需维度、所需刻度类型、知识空间"
+      },
+      "note": "按源文档维度顺序、刻度顺序及知识空间表达进行语义配对。"
+    },
+    {
+      "headClass": "Dimension",
+      "head": "抽象层级",
+      "relation": "包含",
+      "tailClass": "Scale",
+      "tail": "逻辑",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "context": "所需维度、所需刻度类型、知识空间"
+      },
+      "note": "按源文档维度顺序、刻度顺序及知识空间表达进行语义配对。"
+    },
+    {
+      "headClass": "Dimension",
+      "head": "运营视角",
+      "relation": "包含",
+      "tailClass": "Scale",
+      "tail": "运维诊断域",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "context": "所需维度、所需刻度类型、知识空间"
+      },
+      "note": "按源文档维度顺序、刻度顺序及知识空间表达进行语义配对。"
+    },
+    {
+      "headClass": "Dimension",
+      "head": "约束方面",
+      "relation": "包含",
+      "tailClass": "Scale",
+      "tail": "规则",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "context": "所需维度、所需刻度类型、知识空间"
+      },
+      "note": "按源文档维度顺序、刻度顺序及知识空间表达进行语义配对。"
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "引用维度",
+      "tailClass": "Dimension",
+      "tail": "时间",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "引用维度",
+      "tailClass": "Dimension",
+      "tail": "空间",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "引用维度",
+      "tailClass": "Dimension",
+      "tail": "抽象层级",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "引用维度",
+      "tailClass": "Dimension",
+      "tail": "运营视角",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "引用维度",
+      "tailClass": "Dimension",
+      "tail": "约束方面",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "指定刻度",
+      "tailClass": "Scale",
+      "tail": "年月",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "指定刻度",
+      "tailClass": "Scale",
+      "tail": "子公司",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "指定刻度",
+      "tailClass": "Scale",
+      "tail": "逻辑",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "指定刻度",
+      "tailClass": "Scale",
+      "tail": "运维诊断域",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "KnowledgeSpace",
+      "head": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relation": "指定刻度",
+      "tailClass": "Scale",
+      "tail": "规则",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 15
+      }
+    },
+    {
+      "headClass": "Stakeholder",
+      "head": "信号维修工程师",
+      "relation": "提出问题",
+      "tailClass": "Problem",
+      "tail": "基于故障规则的故障原因诊断",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 165
+      },
+      "note": "由 Problem.Stakeholder 的源文档引用映射到 PUML 关系。"
+    },
+    {
+      "headClass": "Concern",
+      "head": "基于故障现象的故障原因定位",
+      "relation": "关联问题",
+      "tailClass": "Problem",
+      "tail": "基于故障规则的故障原因诊断",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 166
+      },
+      "note": "由 Problem.Concern 的源文档引用映射到 PUML 关系。"
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "需要方案",
+      "tailClass": "Solution",
+      "tail": "基于故障规则的故障诊断方案",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "inferred",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "context": [
+          "问题类",
+          "方案类"
+        ]
+      },
+      "note": "源文档在同一故障诊断场景给出唯一问题与唯一方案，但没有显式互引，因此保留为推断关系。"
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "TargetObject",
+      "tailClass": "TargetObject",
+      "tail": "故障事件",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 162
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "TargetObject",
+      "tailClass": "TargetObject",
+      "tail": "故障现象",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 162
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "TargetObject",
+      "tailClass": "TargetObject",
+      "tail": "故障规则",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 162
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "TargetObject",
+      "tailClass": "TargetObject",
+      "tail": "故障原因",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph": 162
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "ChildernProblem",
+      "tailClass": "Problem",
+      "tail": "故障现象识别问题",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraphs": [
+          169,
+          170,
+          171,
+          172
+        ]
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "ChildernProblem",
+      "tailClass": "Problem",
+      "tail": "故障规则匹配问题",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraphs": [
+          169,
+          170,
+          171,
+          172
+        ]
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "ChildernProblem",
+      "tailClass": "Problem",
+      "tail": "故障原因推理问题",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraphs": [
+          169,
+          170,
+          171,
+          172
+        ]
+      }
+    },
+    {
+      "headClass": "Problem",
+      "head": "基于故障规则的故障原因诊断",
+      "relation": "ChildernProblem",
+      "tailClass": "Problem",
+      "tail": "诊断结果解释问题",
+      "relationOrigin": "class_attribute",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraphs": [
+          169,
+          170,
+          171,
+          172
+        ]
+      }
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "故障现象",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "故障现象__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 36,
+        "paragraph_end": 39
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "所属系统",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "所属系统__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 41,
+        "paragraph_end": 44
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "故障原因",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "故障原因__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 46,
+        "paragraph_end": 49
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "处理方法",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "处理方法__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 51,
+        "paragraph_end": 54
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "故障详细分类",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "故障详细分类__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 56,
+        "paragraph_end": 59
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "故障地点",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "故障地点__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 61,
+        "paragraph_end": 64
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "车次",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "车次__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 66,
+        "paragraph_end": 69
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "是否晚点",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "是否晚点__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 71,
+        "paragraph_end": 74
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "故障次数",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "故障次数__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 76,
+        "paragraph_end": 79
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "对标不准",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "对标不准__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 81,
+        "paragraph_end": 84
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "屏蔽门不能联动",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "屏蔽门不能联动__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 86,
+        "paragraph_end": 89
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "轨道电路异常",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "轨道电路异常__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 91,
+        "paragraph_end": 94
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "RTU 报警",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "RTU 报警__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 96,
+        "paragraph_end": 99
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "电源板异常",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "电源板异常__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 101,
+        "paragraph_end": 104
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "运营停车点不能自动取消",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "运营停车点不能自动取消__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 106,
+        "paragraph_end": 109
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "开门使能信号异常",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "开门使能信号异常__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 111,
+        "paragraph_end": 114
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "同步环线检测板异常",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "同步环线检测板异常__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 116,
+        "paragraph_end": 119
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "同步环线报警板异常",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "同步环线报警板异常__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 121,
+        "paragraph_end": 124
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "多路接收器 CPU850 工作不稳定",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "多路接收器 CPU850 工作不稳定__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 126,
+        "paragraph_end": 129
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "接收端轨旁盒潮湿",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "接收端轨旁盒潮湿__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 131,
+        "paragraph_end": 134
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "ATP/ATO 系统",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "ATP/ATO 系统__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 136,
+        "paragraph_end": 139
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "ATS 系统",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "ATS 系统__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 141,
+        "paragraph_end": 144
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "SICAS 系统",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "SICAS 系统__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "paragraph_start": 146,
+        "paragraph_end": 149
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "ATO对标-40cm→屏蔽门不同步",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "ATO对标-40cm→屏蔽门不同步__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "page": 2,
+        "embedded_image": "word/media/image1.png",
+        "location": "规则表第1条"
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "CPU850不稳→屏蔽门不同步",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "CPU850不稳→屏蔽门不同步__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "page": 2,
+        "embedded_image": "word/media/image1.png",
+        "location": "规则表第2条"
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "屏蔽门不同步复合诊断规则",
+      "relation": "索引/定位逻辑属性",
+      "tailClass": "KnowledgeUnitLogic",
+      "tail": "屏蔽门不同步复合诊断规则__逻辑属性",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "structural_normalization",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "page": 2,
+        "embedded_image": "word/media/image1.png",
+        "location": "规则表第3条"
+      },
+      "note": "同一知识资源的管理层与逻辑层按名称语义绑定，不使用临时 ID。"
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "ATO对标-40cm→屏蔽门不同步",
+      "relation": "存放在",
+      "tailClass": "KnowledgeSpace",
+      "tail": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "page": 2,
+        "context": "知识空间 + 知识单元：故障规则"
+      }
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "CPU850不稳→屏蔽门不同步",
+      "relation": "存放在",
+      "tailClass": "KnowledgeSpace",
+      "tail": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "page": 2,
+        "context": "知识空间 + 知识单元：故障规则"
+      }
+    },
+    {
+      "headClass": "KnowledgeUnitManagement",
+      "head": "屏蔽门不同步复合诊断规则",
+      "relation": "存放在",
+      "tailClass": "KnowledgeSpace",
+      "tail": "时间.年月+空间.子公司+抽象层级.逻辑+运营视角.运维诊断域+约束方面.规则",
+      "relationOrigin": "puml_relation",
+      "evidenceMode": "explicit",
+      "evidence": {
+        "source": "基于故障规则的故障诊断.docx",
+        "page": 2,
+        "context": "知识空间 + 知识单元：故障规则"
+      }
+    }
+  ],
+  "validation": {
+    "noGeneratedIdentifiers": true,
+    "relationshipEndpointsUseSemanticNames": true,
+    "relationshipEndpointClassesIncluded": true,
+    "inferredRelationsExplicitlyMarked": true,
+    "notes": [
+      "PUML 中各类定义的 xxxId 属性属于本体定义，但本次抽取实例不输出这些标识字段。",
+      "规则表中的源编号也未进入本次中间对象模型；后续如需保留来源编号，可在确认后单独作为 source identifier 加入。",
+      "Solution.resourceRequirements 原文为“故障术语、故障规则”，未扩展成对全部术语/规则实例的逐条“需要资源”关系，避免过度推断。"
+    ]
+  }
+}

@@ -1,10 +1,9 @@
 from collections.abc import Iterable
 from typing import Any
 
-from .batch import deduplicate_chunk_graphs, extract_chunks
+from .batch import deduplicate_chunk_graphs
 from .chunk_context import ExtractionChunk
-from .extractor import extract_v2
-from .harness_extractor import extract_harness, extract_harness_items
+from .harness_extractor import extract_harness
 from .result_contract import to_public_result
 from .split_extractor import extract_split
 
@@ -22,7 +21,5 @@ __all__ = [
     "extract",
     "extract_split",
     "extract_harness",
-    "extract_harness_items",
-    "extract_chunks",
     "deduplicate_chunk_graphs",
 ]

@@ -13,6 +13,11 @@ from .ontology_schema import OntologySchema, _clean_relation_identifier
 
 DETERMINISTIC_RELATION_IDS = frozenset(
     {
+        # Structural links whose endpoints follow from document position/span
+        # rather than from language understanding; the pipeline assembles them
+        # directly in ``hierarchy`` instead of asking the relation classifier.
+        "haspart",
+        "evidencedby",
         "hassubclause",
         "hasstructuralelement",
         "hasclause",
@@ -68,17 +73,25 @@ def enumerate_relation_pairs(plan: Any, entities: Iterable[Any]) -> list[dict[st
     entity_rows.sort(key=lambda row: (row["id"], row["type"], row["name"]))
     seen: set[tuple[str, str, str, str]] = set()
 
-    def assignable(actual: str, expected: str) -> bool:
-        if canonical_name(actual) == canonical_name(expected):
-            return True
-        pending = [actual]
-        visited: set[str] = set()
+    # The ontology already declares each relation's source/target class, so we
+    # expand every entity type to itself + all ancestors once and bucket the
+    # entities by the class they are assignable to.  Relation pairs can then be
+    # generated one signature at a time (source class x target class) instead of
+    # scanning every entity pair against every relation.
+    ancestors_cache: dict[str, frozenset[str]] = {}
+
+    def ancestors(type_id: str) -> frozenset[str]:
+        cached = ancestors_cache.get(type_id)
+        if cached is not None:
+            return cached
+        result: set[str] = set()
+        pending = [type_id]
         while pending:
             current = pending.pop()
             key = canonical_name(current)
-            if key in visited:
+            if key in result:
                 continue
-            visited.add(key)
+            result.add(key)
             spec = plan.class_specs.get(current)
             if spec is None:
                 spec = next(
@@ -86,27 +99,39 @@ def enumerate_relation_pairs(plan: Any, entities: Iterable[Any]) -> list[dict[st
                     None,
                 )
             for parent in (spec.parents if spec else ()):
-                if canonical_name(parent) == canonical_name(expected):
-                    return True
                 pending.append(parent)
-        return False
+        frozen = frozenset(result)
+        ancestors_cache[type_id] = frozen
+        return frozen
 
-    for source in entity_rows:
-        for target in entity_rows:
-            if source["id"] == target["id"]:
+    class_rows_cache: dict[str, list[dict[str, Any]]] = {}
+
+    def rows_assignable_to(expected: str) -> list[dict[str, Any]]:
+        class_key = canonical_name(expected)
+        cached = class_rows_cache.get(class_key)
+        if cached is None:
+            cached = [row for row in entity_rows if class_key in ancestors(row["type"])]
+            class_rows_cache[class_key] = cached
+        return cached
+
+    for specs in plan.relation_specs.values():
+        for spec in specs:
+            # relation_specs is keyed by canonical relation ID; use the same
+            # stable spelling in the pair contract.
+            relation_id = canonical_name(spec.relation_id)
+            if canonical_name(relation_id) in DETERMINISTIC_RELATION_IDS:
                 continue
-            for specs in plan.relation_specs.values():
-                for spec in specs:
-                    # relation_specs is keyed by canonical relation ID; use
-                    # the same stable spelling in the pair contract.
-                    relation_id = canonical_name(spec.relation_id)
-                    if canonical_name(relation_id) in DETERMINISTIC_RELATION_IDS:
+            sources = rows_assignable_to(spec.source)
+            if not sources:
+                continue
+            targets = rows_assignable_to(spec.target)
+            if not targets:
+                continue
+            signature = spec.signature
+            for source in sources:
+                for target in targets:
+                    if source["id"] == target["id"]:
                         continue
-                    if not assignable(source["type"], spec.source):
-                        continue
-                    if not assignable(target["type"], spec.target):
-                        continue
-                    signature = spec.signature
                     key = (source["id"], relation_id, target["id"], signature)
                     if key in seen:
                         continue

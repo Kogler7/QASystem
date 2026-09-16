@@ -19,6 +19,15 @@
         "密级": "",
         "主送": "总部各部门，信息公司",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 64,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -30,17 +39,35 @@
         "原文位置": "《关于印发2026年总部信息化项目工作计划及管理要求的通知》正文",
         "原文内容": "为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2）。2026年共收集到信息化项目建设需求33项，经评审最终确定列入2026年工作计划33项，共涉及总部14个部门，总投资预算11315.4万元，计划于2026年6月至2027年12月分批完成建设。相关要求：（一）落实数智转型要求；（二）系统梳理业务流程；（三）加强项目质量管理；（四）规范项目启动与过程管控。保障措施：所有项目必须严格遵循“先设计、后开发”原则。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 109,
+        "end_char": 276,
+        "support": "explicit"
       }
     },
     {
       "type": "DocumentUnit",
-      "name": "附件说明",
+      "name": "附件列表",
       "properties": {
         "单元标题": "附件",
         "单元类型": "附件说明",
         "原文位置": "《关于印发2026年总部信息化项目工作计划及管理要求的通知》附件",
         "原文内容": "附件：2026年总部信息化项目工作计划（A类项目）；2026年总部信息化项目工作计划（B类项目）；A、B类信息化项目建设方案模板；项目建设任务书模板；信息化项目变更申请表",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 41,
+        "line_end": 41,
+        "start_char": 2334,
+        "end_char": 2361,
+        "support": "explicit"
       }
     },
     {
@@ -51,6 +78,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "印发2026年总部信息化项目工作计划及管理要求的通知"
+      },
+      "evidence": {
+        "quote": "印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 66,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -61,6 +97,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "严格按照总部信息化项目管理办法要求，高质量推进各项目投资建设"
+      },
+      "evidence": {
+        "quote": "请各部门、信息公司严格按照《中国中车总部信息化项目管理办法》《总部信息化资产集中统一管理实施方案》相关要求，高质量推进各项目投资建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 278,
+        "end_char": 345,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -71,6 +116,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "信息系统建设主要承担单位，对项目质量、进度、投资预算进行严格管理"
+      },
+      "evidence": {
+        "quote": "收文号: 信息公司收(2026)167号",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 100,
+        "end_char": 120,
+        "support": "explicit"
       }
     },
     {
@@ -81,6 +135,15 @@
         "主体类型": "部门",
         "组织层级": "总部部门",
         "职责": "数智转型总体工作方案制定及落实的牵头机构，组织A类项目评审"
+      },
+      "evidence": {
+        "quote": "A类项目由数智办、业务部门及信息公司三方签订；",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1681,
+        "end_char": 1704,
+        "support": "explicit"
       }
     },
     {
@@ -91,6 +154,15 @@
         "主体类型": "部门",
         "组织层级": "总部部门",
         "职责": "组织需求征集和B类项目评审，统筹项目过程监督"
+      },
+      "evidence": {
+        "quote": "B类项目由科信部与信息公司签订。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1704,
+        "end_char": 1720,
+        "support": "explicit"
       }
     },
     {
@@ -101,6 +173,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "组织实施各自负责项目，保障项目按期保质完成"
+      },
+      "evidence": {
+        "quote": "白雪峰 2026-03-12 17:01</td></tr><tr><td colspan=\"4\">领导批示: 请公司领导阅,请系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目,保障各项目按期保质完成。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 621,
+        "end_char": 734,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -111,6 +192,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "组织实施各自负责项目，保障项目按期保质完成"
+      },
+      "evidence": {
+        "quote": "白雪峰 2026-03-12 17:01</td></tr><tr><td colspan=\"4\">领导批示: 请公司领导阅,请系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目,保障各项目按期保质完成。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 621,
+        "end_char": 734,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -121,6 +211,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "组织实施各自负责项目，保障项目按期保质完成"
+      },
+      "evidence": {
+        "quote": "白雪峰 2026-03-12 17:01</td></tr><tr><td colspan=\"4\">领导批示: 请公司领导阅,请系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目,保障各项目按期保质完成。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 621,
+        "end_char": 734,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -131,6 +230,15 @@
         "对象描述": "2026年总部信息化项目33项，共涉及总部14个部门，总投资预算11315.4万元，计划于2026年6月至2027年12月分批完成建设",
         "对象名称": "2026年总部信息化项目工作计划",
         "所属领域": "信息化"
+      },
+      "evidence": {
+        "quote": "2026 年共收集到信息化项目建设需求 33 项，经评审组评审，最终确定列入 2026 年工作计划 33 项，共涉及总部 14 个部门，总投资预算 11315.4 万元，计划于 2026 年 6 月至 2027 年 12 月分批完成建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 367,
+        "end_char": 486,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -143,6 +251,15 @@
         "动作词": "组织、实施",
         "预期结果": "保障各项目按期保质完成",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 685,
+        "end_char": 721,
+        "support": "explicit"
       }
     },
     {
@@ -155,6 +272,15 @@
         "动作词": "落实",
         "预期结果": "围绕统一应用架构框架和数据架构框架推进数据治理和系统建设",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "（一）落实数智转型要求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 770,
+        "end_char": 782,
+        "support": "explicit"
       }
     },
     {
@@ -167,6 +293,15 @@
         "动作词": "梳理",
         "预期结果": "形成清晰的业务架构图与流程图",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "请各业务部门立足本领域核心职能，围绕数智转型目标，深入梳理业务流程、业务规则及协同关系，以集团统一的业务架构（16个一级业务域、69个二级业务组、609个三级业务能力/流程）为指引，形成清晰的业务架构图与流程图，厘清业务痛点、优化节点及数字化需求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 1200,
+        "end_char": 1324,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -179,6 +314,15 @@
         "动作词": "管理",
         "预期结果": "确保项目符合集团整体数字化转型战略布局",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "针对各项目要明确项目负责人，对项目的质量、进度、投资预算进行严格管理，定期汇报项目进度，建设方案制定、系统上线、项目验收等重大节点须向数智办和科信部申请评审，确保项目符合集团整体数字化转型战略布局。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 1424,
+        "end_char": 1523,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -191,6 +335,15 @@
         "动作词": "规范",
         "预期结果": "完成任务书签订并严格执行变更管理流程",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "(四) 规范项目启动与过程管控。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1635,
+        "end_char": 1651,
+        "support": "explicit"
       }
     },
     {
@@ -201,6 +354,15 @@
         "信息类型": "附件",
         "定义": "A类项目（应用系统开发类）共26项，预算8090.4万元",
         "来源文本": "附件1"
+      },
+      "evidence": {
+        "quote": "附件：1.2026年总部信息化项目工作计划（A类项目）",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 39,
+        "line_end": 39,
+        "start_char": 2305,
+        "end_char": 2332,
+        "support": "explicit"
       }
     },
     {
@@ -211,6 +373,15 @@
         "信息类型": "附件",
         "定义": "B类项目（标准软硬件采购类）共7项，预算3225万元",
         "来源文本": "附件2"
+      },
+      "evidence": {
+        "quote": "B类项目（标准软硬件采购类）由科信部组织评审，共7项，预算3225万元，主要包括：信创实验云（四期）、信创基础软件采购、计算机终端采购、数据安全能力建设、统一互联网出口设备升级等。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 667,
+        "end_char": 757,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -221,6 +392,15 @@
         "信息类型": "附件",
         "定义": "A、B类项目建设方案制定模板",
         "来源文本": "附件3"
+      },
+      "evidence": {
+        "quote": "3. A、B 类信息化项目建设方案模板",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 43,
+        "line_end": 43,
+        "start_char": 2363,
+        "end_char": 2382,
+        "support": "explicit"
       }
     },
     {
@@ -231,6 +411,15 @@
         "信息类型": "附件",
         "定义": "项目正式启动、验收和考核的依据模板",
         "来源文本": "附件4"
+      },
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订，作为项目正式启动、验收和考核的依据。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1777,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -241,6 +430,15 @@
         "信息类型": "附件",
         "定义": "项目范围、内容、进度或预算调整的变更申请表",
         "来源文本": "附件5"
+      },
+      "evidence": {
+        "quote": "5. 信息化项目变更申请表",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 47,
+        "line_end": 47,
+        "start_char": 2398,
+        "end_char": 2411,
+        "support": "explicit"
       }
     },
     {
@@ -249,6 +447,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司向总部各部门、信息公司印发2026年总部信息化项目工作计划及管理要求的通知"
+      },
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -260,6 +467,15 @@
         "约束名称": "先设计后开发原则",
         "约束类型": "流程约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "所有项目必须严格遵循“先设计、后开发”原则，在完成5A架构设计并通过数智办、科信部联合审核后，方可启动系统建设开发工作",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 2076,
+        "end_char": 2135,
+        "support": "explicit"
       }
     },
     {
@@ -271,6 +487,15 @@
         "约束名称": "项目任务书签订时限要求",
         "约束类型": "时间约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1758,
+        "support": "explicit"
       }
     }
   ],
@@ -280,385 +505,880 @@
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发 2026 年总部信息化项目工作计划及管理要求的通知\n\n总部各部门，信息公司：\n\n为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 64,
+        "end_char": 276,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 41,
+        "line_end": 41,
+        "start_char": 2334,
+        "end_char": 2361,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 64,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "关于印发 2026 年总部信息化项目工作计划及管理要求的通知\n\n总部各部门，信息公司：\n\n为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2）。请各部门、信息公司严格按照《中国中车总部信息化项目管理办法》《总部信息化资产集中统一管理实施方案》相关要求，高质量推进各项目投资建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 64,
+        "end_char": 345,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "2026年总部信息化项目工作计划"
+      "to_name": "2026年总部信息化项目工作计划",
+      "evidence": {
+        "quote": "关于印发 2026 年总部信息化项目工作计划及管理要求的通知\n\n总部各部门，信息公司：\n\n为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2）。请各部门、信息公司严格按照《中国中车总部信息化项目管理办法》《总部信息化资产集中统一管理实施方案》相关要求，高质量推进各项目投资建设。有关要求通知如下：\n\n## 一、总体情况\n\n2026 年共收集到信息化项目建设需求 33 项，经评审组评审，最终确定列入 2026 年工作计划 33 项，共涉及总部 14 个部门，总投资预算 11315.4 万元，计划于 2026 年 6 月至 2027 年 12 月分批完成建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 15,
+        "start_char": 64,
+        "end_char": 486,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "2026年总部信息化项目工作计划（A类项目）"
+      "to_name": "2026年总部信息化项目工作计划（A类项目）",
+      "evidence": {
+        "quote": "附件：1.2026年总部信息化项目工作计划（A类项目）",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 39,
+        "line_end": 39,
+        "start_char": 2305,
+        "end_char": 2332,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "2026年总部信息化项目工作计划（A类项目）"
+      "to_name": "2026年总部信息化项目工作计划（A类项目）",
+      "evidence": {
+        "quote": "附件：1.2026年总部信息化项目工作计划（A类项目）",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 39,
+        "line_end": 39,
+        "start_char": 2305,
+        "end_char": 2332,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "2026年总部信息化项目工作计划（B类项目）"
+      "to_name": "2026年总部信息化项目工作计划（B类项目）",
+      "evidence": {
+        "quote": "B类项目（标准软硬件采购类）由科信部组织评审，共7项，预算3225万元，主要包括：信创实验云（四期）、信创基础软件采购、计算机终端采购、数据安全能力建设、统一互联网出口设备升级等。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 667,
+        "end_char": 757,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "2026年总部信息化项目工作计划（B类项目）"
+      "to_name": "2026年总部信息化项目工作计划（B类项目）",
+      "evidence": {
+        "quote": "B类项目（标准软硬件采购类）由科信部组织评审，共7项，预算3225万元，主要包括：信创实验云（四期）、信创基础软件采购、计算机终端采购、数据安全能力建设、统一互联网出口设备升级等。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 667,
+        "end_char": 757,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "A、B类信息化项目建设方案模板"
+      "to_name": "A、B类信息化项目建设方案模板",
+      "evidence": {
+        "quote": "3. A、B 类信息化项目建设方案模板",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 43,
+        "line_end": 43,
+        "start_char": 2363,
+        "end_char": 2382,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "A、B类信息化项目建设方案模板"
+      "to_name": "A、B类信息化项目建设方案模板",
+      "evidence": {
+        "quote": "3. A、B 类信息化项目建设方案模板",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 43,
+        "line_end": 43,
+        "start_char": 2363,
+        "end_char": 2382,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "项目建设任务书模板"
+      "to_name": "项目建设任务书模板",
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订，作为项目正式启动、验收和考核的依据。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1777,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "项目建设任务书模板"
+      "to_name": "项目建设任务书模板",
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订，作为项目正式启动、验收和考核的依据。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1777,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "信息化项目变更申请表"
+      "to_name": "信息化项目变更申请表",
+      "evidence": {
+        "quote": "5. 信息化项目变更申请表",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 47,
+        "line_end": 47,
+        "start_char": 2398,
+        "end_char": 2411,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "信息化项目变更申请表"
+      "to_name": "信息化项目变更申请表",
+      "evidence": {
+        "quote": "5. 信息化项目变更申请表",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 47,
+        "line_end": 47,
+        "start_char": 2398,
+        "end_char": 2411,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "组织实施各自负责项目"
+      "to_name": "组织实施各自负责项目",
+      "evidence": {
+        "quote": "系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 685,
+        "end_char": 721,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "落实数智转型要求"
+      "to_name": "落实数智转型要求",
+      "evidence": {
+        "quote": "（一）落实数智转型要求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 770,
+        "end_char": 782,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "系统梳理业务流程"
+      "to_name": "系统梳理业务流程",
+      "evidence": {
+        "quote": "请各业务部门立足本领域核心职能，围绕数智转型目标，深入梳理业务流程、业务规则及协同关系，以集团统一的业务架构（16个一级业务域、69个二级业务组、609个三级业务能力/流程）为指引，形成清晰的业务架构图与流程图，厘清业务痛点、优化节点及数字化需求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 1200,
+        "end_char": 1324,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "加强项目质量管理"
+      "to_name": "加强项目质量管理",
+      "evidence": {
+        "quote": "针对各项目要明确项目负责人，对项目的质量、进度、投资预算进行严格管理，定期汇报项目进度，建设方案制定、系统上线、项目验收等重大节点须向数智办和科信部申请评审，确保项目符合集团整体数字化转型战略布局。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 1424,
+        "end_char": 1523,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "规范项目启动与过程管控"
+      "to_name": "规范项目启动与过程管控",
+      "evidence": {
+        "quote": "(四) 规范项目启动与过程管控。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1635,
+        "end_char": 1651,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发2026年总部信息化项目工作计划通知"
+      "to_name": "印发2026年总部信息化项目工作计划通知",
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织实施各自负责项目",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "2026年总部信息化项目工作计划"
+      "to_name": "2026年总部信息化项目工作计划",
+      "evidence": {
+        "quote": "系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 685,
+        "end_char": 721,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织实施各自负责项目",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 685,
+        "end_char": 721,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织实施各自负责项目",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "系统开发中心、资源服务中心、安全服务中心,智能事业部组织实施各自负责项目",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 685,
+        "end_char": 721,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实数智转型要求",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "2026年总部信息化项目工作计划"
+      "to_name": "2026年总部信息化项目工作计划",
+      "evidence": {
+        "quote": "2026 年共收集到信息化项目建设需求 33 项，经评审组评审，最终确定列入 2026 年工作计划 33 项，共涉及总部 14 个部门，总投资预算 11315.4 万元，计划于 2026 年 6 月至 2027 年 12 月分批完成建设。其中：\n\nA类项目（应用系统开发类）由运营部（数智办）组织评审，共26项，预算8090.4万元，覆盖15个业务域，涉及21项转型任务、29项子任务，主要包括：数智董事会平台、外事系统数智化改造、数字档案馆子系统、数智党建项目、战略投资数智化转型项目、运营管理数智化平台、环境风险监测预警平台、财务大共享系统、科技管理系统、线索到回款（LTC）数据应用项目等；\n\nB类项目（标准软硬件采购类）由科信部组织评审，共7项，预算3225万元，主要包括：信创实验云（四期）、信创基础软件采购、计算机终端采购、数据安全能力建设、统一互联网出口设备升级等。\n\n## 二、相关要求\n\n（一）落实数智转型要求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 15,
+        "line_end": 23,
+        "start_char": 367,
+        "end_char": 782,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实数智转型要求",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "（一）落实数智转型要求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 770,
+        "end_char": 782,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实数智转型要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "（一）落实数智转型要求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 770,
+        "end_char": 782,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "系统梳理业务流程",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "2026年总部信息化项目工作计划"
+      "to_name": "2026年总部信息化项目工作计划",
+      "evidence": {
+        "quote": "请各业务部门立足本领域核心职能，围绕数智转型目标，深入梳理业务流程、业务规则及协同关系，以集团统一的业务架构（16个一级业务域、69个二级业务组、609个三级业务能力/流程）为指引，形成清晰的业务架构图与流程图，厘清业务痛点、优化节点及数字化需求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 1200,
+        "end_char": 1324,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "系统梳理业务流程",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "请各业务部门立足本领域核心职能，围绕数智转型目标，深入梳理业务流程、业务规则及协同关系，以集团统一的业务架构（16个一级业务域、69个二级业务组、609个三级业务能力/流程）为指引，形成清晰的业务架构图与流程图，厘清业务痛点、优化节点及数字化需求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 1200,
+        "end_char": 1324,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "系统梳理业务流程",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "请各业务部门立足本领域核心职能，围绕数智转型目标，深入梳理业务流程、业务规则及协同关系，以集团统一的业务架构（16个一级业务域、69个二级业务组、609个三级业务能力/流程）为指引，形成清晰的业务架构图与流程图，厘清业务痛点、优化节点及数字化需求。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 1200,
+        "end_char": 1324,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "加强项目质量管理",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "2026年总部信息化项目工作计划"
+      "to_name": "2026年总部信息化项目工作计划",
+      "evidence": {
+        "quote": "针对各项目要明确项目负责人，对项目的质量、进度、投资预算进行严格管理，定期汇报项目进度，建设方案制定、系统上线、项目验收等重大节点须向数智办和科信部申请评审，确保项目符合集团整体数字化转型战略布局。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 1424,
+        "end_char": 1523,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "加强项目质量管理",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "针对各项目要明确项目负责人，对项目的质量、进度、投资预算进行严格管理，定期汇报项目进度，建设方案制定、系统上线、项目验收等重大节点须向数智办和科信部申请评审，确保项目符合集团整体数字化转型战略布局。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 1424,
+        "end_char": 1523,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "加强项目质量管理",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "针对各项目要明确项目负责人，对项目的质量、进度、投资预算进行严格管理，定期汇报项目进度，建设方案制定、系统上线、项目验收等重大节点须向数智办和科信部申请评审，确保项目符合集团整体数字化转型战略布局。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 1424,
+        "end_char": 1523,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "规范项目启动与过程管控",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "2026年总部信息化项目工作计划"
+      "to_name": "2026年总部信息化项目工作计划",
+      "evidence": {
+        "quote": "(四) 规范项目启动与过程管控。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1635,
+        "end_char": 1651,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "规范项目启动与过程管控",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "(四) 规范项目启动与过程管控。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1635,
+        "end_char": 1651,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "规范项目启动与过程管控",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "(四) 规范项目启动与过程管控。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1635,
+        "end_char": 1651,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "先设计后开发原则",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "组织实施各自负责项目"
+      "to_name": "组织实施各自负责项目",
+      "evidence": {
+        "quote": "所有项目必须严格遵循“先设计、后开发”原则，在完成5A架构设计并通过数智办、科信部联合审核后，方可启动系统建设开发工作",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 2076,
+        "end_char": 2135,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "先设计后开发原则",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "所有项目必须严格遵循“先设计、后开发”原则，在完成5A架构设计并通过数智办、科信部联合审核后，方可启动系统建设开发工作",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 2076,
+        "end_char": 2135,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "先设计后开发原则",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "所有项目必须严格遵循“先设计、后开发”原则，在完成5A架构设计并通过数智办、科信部联合审核后，方可启动系统建设开发工作",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 2076,
+        "end_char": 2135,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "项目任务书签订时限要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "组织实施各自负责项目"
+      "to_name": "组织实施各自负责项目",
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1758,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "项目任务书签订时限要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1758,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "项目任务书签订时限要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1758,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车集团有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "印发 2026 年总部信息化项目工作计划及管理要求的通知\n\n总部各部门，信息公司：\n\n为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 66,
+        "end_char": 276,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2）。请各部门、信息公司严格按照《中国中车总部信息化项目管理办法》《总部信息化资产集中统一管理实施方案》相关要求，高质量推进各项目投资建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 109,
+        "end_char": 345,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "2026年总部信息化项目工作计划",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2）。请各部门、信息公司严格按照《中国中车总部信息化项目管理办法》《总部信息化资产集中统一管理实施方案》相关要求，高质量推进各项目投资建设。有关要求通知如下：\n\n## 一、总体情况\n\n2026 年共收集到信息化项目建设需求 33 项，经评审组评审，最终确定列入 2026 年工作计划 33 项，共涉及总部 14 个部门，总投资预算 11315.4 万元，计划于 2026 年 6 月至 2027 年 12 月分批完成建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 109,
+        "end_char": 486,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "2026年总部信息化项目工作计划（A类项目）",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "附件：1.2026年总部信息化项目工作计划（A类项目）\n\n2. 2026 年总部信息化项目工作计划（B 类项目）",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 39,
+        "line_end": 41,
+        "start_char": 2305,
+        "end_char": 2361,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "2026年总部信息化项目工作计划（B类项目）",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "B类项目（标准软硬件采购类）由科信部组织评审，共7项，预算3225万元，主要包括：信创实验云（四期）、信创基础软件采购、计算机终端采购、数据安全能力建设、统一互联网出口设备升级等。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 667,
+        "end_char": 757,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "A、B类信息化项目建设方案模板",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）\n\n3. A、B 类信息化项目建设方案模板",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 41,
+        "line_end": 43,
+        "start_char": 2334,
+        "end_char": 2382,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "项目建设任务书模板",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订，作为项目正式启动、验收和考核的依据。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 1720,
+        "end_char": 1777,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "信息化项目变更申请表",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）\n\n3. A、B 类信息化项目建设方案模板\n\n4. 项目建设任务书模板\n\n5. 信息化项目变更申请表",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 41,
+        "line_end": 47,
+        "start_char": 2334,
+        "end_char": 2411,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2026年总部信息化项目工作计划通知",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知\n\n总部各部门，信息公司：\n\n为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 276,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2026年总部信息化项目工作计划通知",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2026年总部信息化项目工作计划通知",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知\n\n总部各部门，信息公司：\n\n为贯彻落实《中国中车数智转型总体方案》《中国中车总部信息化项目管理办法》，围绕中车数智化转型“1116N”整体规划及数智转型任务全景图，科信部组织开展了2026年总部信息化项目需求征集工作，并与运营部（数智办）组织公司办、战略部、财务部、审计风险部等部门对申报项目进行了联合评审，现印发2026年总部信息化项目工作计划（详见附件1、2）。请各部门、信息公司严格按照《中国中车总部信息化项目管理办法》《总部信息化资产集中统一管理实施方案》相关要求，高质量推进各项目投资建设。",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 345,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2026年总部信息化项目工作计划通知",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "组织实施各自负责项目"
+      "to_name": "组织实施各自负责项目",
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2026年总部信息化项目工作计划通知",
       "rel_type": "EXCHANGES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "2026年总部信息化项目工作计划（A类项目）"
+      "to_name": "2026年总部信息化项目工作计划（A类项目）",
+      "evidence": {
+        "quote": "# 关于印发 2026 年总部信息化项目工作计划及管理要求的通知",
+        "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "endpoint_context"
+      }
     }
   ]
 }

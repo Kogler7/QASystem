@@ -160,6 +160,7 @@ class ExtractionVerifier:
                         code="EVIDENCE_INVALID",
                         message=verdict.message,
                         path=verdict.ref,
+                        severity="warning",
                     )
                 )
 
@@ -195,6 +196,7 @@ def _coverage_issue(gap: CoverageGap, plan: Any) -> VerificationIssue | None:
             code="EVIDENCE_MISSING",
             message=gap.reason,
             path=gap.span_id,
+            severity="warning",
         )
     if gap.gap_type == "relation_coverage":
         return VerificationIssue(

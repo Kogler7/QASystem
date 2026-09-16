@@ -6,6 +6,7 @@ the structural/relational support required by that ontology role.
 """
 from __future__ import annotations
 
+import json
 import re
 from collections import defaultdict
 from collections.abc import Iterable
@@ -134,6 +135,28 @@ def _paragraph_bounds(text: str, start: int, end: int) -> tuple[int, int]:
     before = text.rfind("\n\n", 0, max(0, start))
     after = text.find("\n\n", min(len(text), max(start, end)))
     return (0 if before < 0 else before + 2, len(text) if after < 0 else after)
+
+
+def _is_structured_chunk(text: str) -> bool:
+    """Whether *text* is machine-structured data rather than prose paragraphs.
+
+    A JSON array/object or a tab-separated dump already gives every record its
+    own structural boundary, so the "dense prose enumeration" heuristic must not
+    run on it — otherwise a table of N records is treated as one long paragraph
+    and rejected wholesale.  Detection is content-based on purpose: a JSON table
+    is often stored with a ``.md`` extension.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    if stripped[0] in "[{":
+        try:
+            json.loads(stripped)
+            return True
+        except (ValueError, TypeError):
+            return False
+    lines = [line for line in stripped.splitlines() if line.strip()]
+    return bool(len(lines) >= 3 and all("\t" in line for line in lines[:8]))
 
 
 def _evidence_units(candidate: Any, manager: Any) -> list[tuple[str, int, int, str]]:
@@ -509,9 +532,13 @@ class CandidateSelector:
             for block_id, start, end, _ in _evidence_units(candidate, self.manager):
                 groups[(block_id, start, end, canonical_name(_type(candidate)))].append(candidate)
 
-        for group in groups.values():
+        for (block_id, _, _, _), group in groups.items():
             unique = list({id(candidate): candidate for candidate in group}.values())
             if len(unique) < 5:
+                continue
+            # JSON / TSV 等机器结构化内容（不限文件后缀）里每条记录本身就是独立
+            # 结构单元，不能按"同一散文段落里的高密度枚举"处理。
+            if _is_structured_chunk(_chunk_text(self.manager, block_id)):
                 continue
             unit = _evidence_units(unique[0], self.manager)
             unit_text = unit[0][3] if unit else ""

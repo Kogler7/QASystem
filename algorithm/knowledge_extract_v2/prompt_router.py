@@ -22,12 +22,40 @@ class ChatMessage(TypedDict):
 ChatMessages = list[ChatMessage]
 
 
-BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v1
+BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。
-必须遵守：只使用 ontology 中允许的 type/property/relation；每个事实必须有当前 chunk 的逐字 evidence quote；
-禁止补写常识、禁止猜测缺失字段、禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。"""
+只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。
 
-OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v4
+[核心原则]
+- 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。
+- mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。
+- evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。
+- 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。
+
+[实体提取规则]
+- 优先提取显式命名的实体。
+- 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。
+- 同类型实体的 mention 长度应合理（避免截断或过度包含）。
+- 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。
+- 数值、单位、标量属性值、字段标签和修饰词不是独立实体。
+- 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。
+
+[关系提取规则]
+- 只提取原文明确表达的关系。
+- 避免推测性关系，不得虚构端点。
+- 关系必须符合 ontology 声明的签名。
+- 结构/证据类关系（如 HAS_PART、EVIDENCED_BY、sourceAgent、targetAgent）在 ontology 签名允许时应输出。
+
+[属性提取规则]
+- 字面属性（编号、名称、日期、数值、单位、原文引文等）必须逐字或按本体规范化值来自原文。
+- 描述、目的、职责、范围、类别、预期结果等语义属性可忠实归纳，但不得引入证据之外的新事实。
+- ICS/CCS 分类名称等公认标准编码值可依据规范编码表补全，但不得臆造编码或分类名。
+- 避免填充原文不支持的属性；原文确实为空/缺失时按本轮 schema 允许的空值表达，不要臆造。
+- 枚举属性多项时尽量全部提取。
+- 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。
+"""
+
+OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v5
 领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。
 这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
@@ -36,15 +64,18 @@ OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v4
 - 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit，而不是拆成多个 OperationalActivity。
 - 公文中明确提到的附件、材料、反馈表、报告等信息对象应抽取为 OperationalInformation，例如“附件1 六要六不要建议”“附件2 排查反馈表”“排查情况反馈信息”。
 - 发布通知、报送反馈、安全事件报告等明确传递/报送行为应抽取为 OperationalExchange。
-- 公文中一条工作事项通常应聚合成一个高层级 OperationalActivity，不要把一个动作句的状语、否定词、结果短语拆成多个活动；例如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“高等级网络系统部署管控”“其他网络系统风险防范”“安全监测与事件处置”“报送排查反馈表”应各为一个活动，而不是“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”等互相拆分。
+- OperationalActivity 以“动宾工作事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合成一个活动；但原文中并列出现的多个动宾事项必须分别抽取，不得只取其中一个或强行合并。
+  · 例如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“高等级网络系统部署管控”“其他网络系统风险防范”“安全监测与事件处置”“报送排查反馈表”各为一个活动。
+  · 又如“……按照任务分工进行分解落实、健全项目管理机制、加强资源投入、确保按计划完成项目实施、打造人工智能高质量数据集建设标杆示范”这类并列动宾，应各自抽为一个活动。
+  · 不要把“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”这类同一动宾事项的状语/结果短语再拆成独立活动。
 - 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不应把其中的动作短语拆成 OperationalActivity。
 - 不要把风险描述中的“病毒”“内部系统”“邮箱”等普通名词都抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。
 
 公文表单/收文处理单规则：
-- “收文处理单”“表单”“审批单”等公文登记/流转材料不是 DocumentUnit、OperationalAgent 或独立业务实体，它只是同一份公文的属性与处理信息载体。
+- “收文处理单”“表单”“审批单”等公文登记/流转材料本身不是 DocumentUnit 或独立业务实体，它是同一份公文的属性与处理信息载体；但表单文字中明确承担职责的部门/单位，以及明确的工作事项、要求、报送行为仍应正常抽取为 operational 实体。
 - 表单中的字段（收文号、来文字号、来文单位、收文日期、收文部门、拟办意见、领导批示、联系电话、主送、抄送、主办部门等）应作为对应 OfficialDocument 或相关主体的属性/证据，不应为字段名或字段值单独建实体。
 - 不要在审批流转记录中为每个“已阅/批示/签名”的人名单独创建 OperationalAgent，除非该人承担了 ontology 中明确要求抽取的主体职责。
-- 不要把拟办意见、领导批示、审批意见或流转记录中的每个句子分别建为 OperationalActivity/OperationalConstraint/OperationalExchange；只有正文中明确的工作任务、约束、交互才需要抽取。
+- 拟办意见、领导批示中明确承担职责的部门/单位/角色，以及明确的动宾工作事项、要求或报送/通知/反馈行为，应分别抽取为 OperationalAgent / OperationalActivity / OperationalConstraint / OperationalExchange；“已阅/签名”的个人姓名和纯流转记录不抽。
 - 遇到表单时优先抑制低价值候选：姓名、日期、联系方式、部门名单独出现但无明确主体职责时，不应成为实体。"""
 
 STANDARD_PROMPT_EXTENSION = """STANDARD_PROMPT_EXTENSION v2
@@ -398,11 +429,12 @@ def _chunk_text(chunk: ExtractionChunk) -> str:
 _OFFICIAL_FORM_RULES = """
 ### 当前 chunk 是公文表单/收文处理单，必须执行以下特殊约束
 - 该 chunk 不是公文正文，不要抽取 DocumentUnit。
-- 不要为“已阅/批示/签名”的人员创建 OperationalAgent；这些名字只是审批流转记录，不是主体。
-- 不要为拟办意见、领导批示、审批意见中的句子创建 OperationalActivity、OperationalConstraint 或 OperationalExchange。
-- 表单中的字段标签（收文号、来文字号、来文单位、收文日期、联系电话、拟办意见、领导批示、主送、抄送等）不是实体，也不要为字段值单独建实体。
-- 当前表单文本在实体任务中最多输出 1 个实体：与公文标题对应的 OfficialDocument mention；只有该表单中存在明确承担主体职责、且必须有对应实体的极少数内容时，才可额外输出。
-- 如果没有可靠公文标题 mention，输出空数组。"""
+- 表单字段标签（收文号、来文字号、来文单位、收文日期、联系电话、拟办意见、领导批示、主送、抄送、主办部门等）不是实体，也不要为纯字段值单独建实体。
+- 不要为“已阅/签名”的个人姓名创建 OperationalAgent；审批流转记录中的个人不是主体。
+- 但拟办意见/领导批示中明确承担职责的部门、单位、角色（如“技术中心”“规划运营部”“信息公司”“数科公司”）应抽取为 OperationalAgent，并在“职责”属性中归纳其被指派的职责。
+- 拟办意见/领导批示中明确的动宾工作事项（如“明确工作承担部门与责任人”“将任务分工纳入部门重点工作”）应抽取为 OperationalActivity；明确的要求/限制抽取为 OperationalConstraint；明确的报送/通知/反馈行为抽取为 OperationalExchange。
+- 上述抽取必须逐条对应表单原文并有证据，不得把同一句话拆成大量碎片，也不得臆造未出现的主体。
+- 表单提供的公文标题/文号等元数据可作为对应 OfficialDocument 的属性/证据；没有可靠标题 mention 时也可以只输出上述 operational 实体。"""
 
 
 def _looks_like_official_form(chunk: ExtractionChunk) -> bool:
@@ -477,9 +509,10 @@ def build_chat_messages(
         context_section = "（实体任务禁止从 local_context 抽取；仅使用 current chunk）"
         entity_rules = """
 - 每项只能包含 type、mention、start_char、end_char、evidence.quote；禁止 name、properties 或其他键。
-- mention 必须是 current chunk.text 中逐字连续的原文片段；start_char/end_char 是 chunk-relative、左闭右开区间。
+- mention 可以是 current chunk.text 中逐字连续的原文片段，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。
+- start_char/end_char 是 chunk-relative、左闭右开区间；mention 无法逐字定位时填 0，系统会按 evidence.quote 兜底。
 - 数值、单位、标量属性值、字段标签和修饰词不是独立实体；同一 type + 完全相同 mention 每个 chunk 只输出一次。
-- 不得从 local_context 或 ontology 属性名推导实体；没有明确原文 mention 时输出空数组。"""
+- 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。"""
         if _looks_like_official_form(chunk):
             entity_rules += _OFFICIAL_FORM_RULES
     else:
@@ -553,7 +586,7 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
 
 ## output constraints
 - 只输出 JSON object；没有结果时输出 {top_level}。
-- evidence.quote 必须逐字来自 current chunk.text。
+- evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。
  - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。
 {entity_rules}"""
     return [

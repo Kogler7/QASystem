@@ -196,13 +196,9 @@ class RuntimeSupervisor:
             [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", str(api_workers)],
             env=api_env,
         )
-        parse_gpus = [token.strip() for token in os.getenv("DOCPARSE_GPU_IDS", "4,5,6,7").split(",") if token.strip()]
         for index in range(_auto_cpu_workers(self.cpu_count)):
             env = os.environ.copy()
             env["EXECUTION_WORKER_ID"] = f"cpu-{index}"
-            if parse_gpus:
-                env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-                env["CUDA_VISIBLE_DEVICES"] = parse_gpus[index % len(parse_gpus)]
             if vlm_endpoints:
                 env["MINERU_VLM_BACKEND"] = "vlm-http-client"
                 env["MINERU_VLM_SERVER_URL"] = vlm_endpoints[index % len(vlm_endpoints)]

@@ -18,7 +18,6 @@ services:
       - ${QASYSTEM_SOURCE_DIR:-.}/external_services:/app/external_services:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
       - backend-data:/app/backend/data
-      - backend-processed:/app/backend/processed
     working_dir: /app/backend
     command: python -m app.execution.supervisor
     depends_on:
@@ -80,5 +79,4 @@ services:
 volumes:
   agent-redis-data:
   backend-data:
-  backend-processed:
   agent-output:

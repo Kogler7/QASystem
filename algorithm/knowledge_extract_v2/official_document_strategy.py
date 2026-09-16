@@ -27,11 +27,11 @@ from .standard_strategy import STRATEGY_REGISTRY
 
 
 _DOC_TITLE = re.compile(
-    r"(?m)^(?:关于|关于印发|关于开展|关于同意|关于做好|关于进一步|关于切实|关于全面|关于组织)"
-    r"\S{2,80}?(?:的通知|的公告|的决定|的意见|的办法|的规定|的批复|的请示|的报告|的函)[。]?$"
+    r"(?m)^\s*#?\s*(?P<title>(?:关于|关于印发|关于开展|关于同意|关于做好|关于进一步|关于切实|关于全面|关于组织)"
+    r".{2,120}?(?:的通知|的公告|的决定|的意见|的办法|的规定|的批复|的请示|的报告|的函))[。]?\s*$"
 )
 _SOURCE_DOC_NUMBER = re.compile(r"(?m)^(?P<number>[^\n]{1,30}?〔\d{4}〕\d+号)[。]?$")
-_SOURCE_ORG = re.compile(r"(?:来文单位|发文机关|印发机关)[：:]\s*(?P<org>[^。\n]+)")
+_SOURCE_ORG = re.compile(r"(?:来文单位|米文单位|发文机关|印发机关)[：:]\s*(?P<org>[^。\n<|]+)")
 _ITEM_MARKER = re.compile(
     r"^\s*(?P<mark>[一二三四五六七八九十]+、|（[一二三四五六七八九十]+）|\d+[.、])\s*(?P<title>.*)$"
 )
@@ -45,8 +45,8 @@ OPERATIONAL_TYPES = (
     "OperationalConstraint",
 )
 
-_ACTIVITY_VERBS = "建设、管理、评估、报送、监督、实施、试点、完善、推进、加强、组织"
-_EXCHANGE_TYPES = "报送、审批、反馈、协同、监督、通知、备案"
+_ACTIVITY_VERBS = "建设、管理、评估、报送、监督、实施、试点、完善、推进、加强、组织、分解、落实、健全、打造、纳入、明确、制定、开展、执行、保障"
+_EXCHANGE_TYPES = "报送、审批、反馈、协同、监督、通知、备案、印发、下发、上报"
 _CONSTRAINT_TYPES = "时间约束、权限约束、安全约束、流程约束、质量约束、合规约束"
 _MANDATORY_LEVELS = "必须、应当、原则上、鼓励、禁止"
 
@@ -58,6 +58,22 @@ def _has_class(plan: ExtractionPlan, type_id: str) -> bool:
 def _has_property(plan: ExtractionPlan, type_id: str, property_id: str) -> bool:
     spec = plan.class_specs.get(type_id)
     return spec is not None and any(prop.identifier == property_id for prop in spec.properties)
+
+
+def _resolve_property(plan: ExtractionPlan, type_id: str, *candidates: str) -> str | None:
+    """把逻辑属性名解析为 schema 的稳定标识。
+
+    同时兼容 ``documentTitle`` 这类英文标识，以及新基准本体使用的
+    中文标识/展示名（如 ``文件标题``、``单元标题``）。
+    """
+    spec = plan.class_specs.get(type_id)
+    if spec is None:
+        return None
+    for candidate in candidates:
+        for prop in spec.properties:
+            if prop.identifier == candidate or prop.display_name == candidate:
+                return prop.identifier
+    return None
 
 
 def _document_units(text: str) -> list[dict[str, Any]]:
@@ -103,297 +119,105 @@ def _first_sentence(text: str) -> str:
     """取到第一个句号为止（gold 的 DocumentUnit 粒度约定）。"""
     index = text.find("。")
     return text[: index + 1] if index >= 0 else text
-_CN_NUMERALS = "一二三四五六七八九十"
-_ATTACHMENT_LINE = re.compile(r"^\s*附件\s*[：:]\s*(?P<content>.*)$", re.MULTILINE)
 
 
-def _v2_benchmark_ontology(plan: ExtractionPlan) -> bool:
-    """True when the runtime ontology is the v2 benchmark dialect.
-
-    The old Phase-1 official ontology uses ``unitId``/``documentTitle`` and
-    DU-xxx unit names.  The v2 benchmark ontology uses Chinese property
-    identifiers (``单元标题``/``文件标题``) and content-based unit names such
-    as ``通知正文`` / ``附件说明``.
-    """
-    doc = plan.class_specs.get("OfficialDocument")
-    if doc is not None and any(prop.identifier == "文件标题" for prop in doc.properties):
-        return True
-    unit = plan.class_specs.get("DocumentUnit")
-    return bool(unit and any(prop.identifier == "单元标题" for prop in unit.properties))
+_ATTACHMENT_MARKER = re.compile(r"^\s*附件\s*[：:]")
+_REPORT_MARKERS = ("报送", "反馈", "报集团", "报数智办", "报公司")
 
 
-def _set_property(
-    properties: dict[str, Any],
-    plan: ExtractionPlan,
-    type_id: str,
-    value: Any,
-    *preferred: str,
-) -> None:
-    if value is None:
-        return
-    for prop_id in preferred:
-        if _has_property(plan, type_id, prop_id):
-            properties[prop_id] = value
-            return
+def _item_prefix(title: str) -> str:
+    """条目型 DocumentUnit 的 name 前缀（golden 口径）。"""
+    if "排查" in title:
+        return "排查要求"
+    if "工作要点" in title:
+        return "工作要点"
+    return "要求"
 
 
-def _field_value(text: str, labels: tuple[str, ...]) -> str:
-    """Parse ``标签：值`` or ``标签: 值`` from OCR/markdown text."""
-    label_pattern = "|".join(re.escape(label) for label in labels)
-    pattern = re.compile(rf"(?:^|\n)\s*{label_pattern}\s*[：:]\s*(?P<value>.*?)(?=\n\s*(?:{label_pattern})\s*[：:]|\n\s*$|$)", re.DOTALL)
-    match = pattern.search(text)
-    return match.group("value").strip() if match else ""
+def _marker_numeral(mark: str) -> str:
+    return mark.strip().strip("（()）").rstrip("、.．").strip()
 
 
-def _clean_title(title: str) -> str:
-    title = re.sub(r"^#+\s*", "", (title or "").strip())
-    return title.rstrip("。").strip()
-
-
-def _strip_item_marker(line: str) -> str:
-    line = (line or "").strip()
-    match = _ITEM_MARKER.match(line)
-    return line[match.end():].strip() if match else line
-
-
-def _cn_number(index: int) -> str:
-    index = max(1, min(10, index))
-    return _CN_NUMERALS[index - 1]
-
-
-_TITLE_FALLBACK_SUFFIXES = ("会议", "简报", "通报", "通知", "意见", "方案", "办法", "报告", "函")
-
-
-def _fallback_title(text: str) -> str:
-    """OCR 输入的简报/会议材料没有“关于…的通知”固定句式时兜底取标题。"""
-    candidates: list[str] = []
-
-    def clean_line(raw_line: str) -> str:
-        line = raw_line.strip()
-        line = re.sub(r"^#{1,6}\s*", "", line)
-        line = re.sub(r"^\*\*|\*\*$", "", line).strip()
-        return line
-
-    lines = [clean_line(line) for line in text.splitlines()[:40]]
-    for line in lines:
-        if not (8 <= len(line) <= 100):
-            continue
-        if any(label in line for label in ("来文单位", "文件标题", "收文号", "领导批示")):
-            continue
-        if "召开" in line and line.endswith(_TITLE_FALLBACK_SUFFIXES):
-            return line.rstrip("。").strip()
-        candidates.append(line)
-    for line in candidates:
-        if line.startswith("关于") or line.endswith(_TITLE_FALLBACK_SUFFIXES):
-            return line.rstrip("。").strip()
-    return ""
-
-
-def _v2_metadata(plan: ExtractionPlan, text: str) -> dict[str, Any] | None:
-    title_match = _DOC_TITLE.search(text)
-    title = _clean_title(title_match.group(0)) if title_match else _fallback_title(text)
-    if not title:
-        return None
-    properties: dict[str, Any] = {}
-    _set_property(properties, plan, "OfficialDocument", title, "文件标题", "documentTitle")
-    _set_property(
-        properties,
-        plan,
-        "OfficialDocument",
-        _field_value(text, ("来文单位", "发文单位", "印发机关", "来源单位")),
-        "来文单位",
-        "sourceOrganization",
-    )
-    _set_property(
-        properties,
-        plan,
-        "OfficialDocument",
-        _field_value(text, ("来文字号", "发文字号", "文号")),
-        "来文字号",
-        "sourceDocumentNumber",
-    )
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("收文号",)), "收文号", "receiptNo")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("收文日期", "成文日期", "印发日期")), "收文日期")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("收文部门",)), "收文部门")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("密级", "保密等级")), "密级")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("主送",)), "主送")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("抄送",)), "抄送")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("联系电话", "电话")), "联系电话")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("拟办意见",)), "拟办意见")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("领导批示", "领导批阅")), "领导批示")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("缓急", "紧急程度")), "缓急")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("文件备注", "备注")), "文件备注")
-    _set_property(properties, plan, "OfficialDocument", _field_value(text, ("主办部门",)), "主办部门")
+def _make_unit(
+    name: str,
+    unit_type: str,
+    unit_title: str,
+    original_text: str,
+    order: str,
+    location: str,
+) -> dict[str, Any]:
     return {
-        "type": "OfficialDocument",
-        "name": title,
-        "properties": properties,
-        "evidence": {"quote": title},
+        "unit_id": name,
+        "name": name,
+        "unit_type": unit_type,
+        "unit_title": unit_title,
+        "unit_order": order,
+        "original_text": original_text,
+        "unit_location": location,
     }
 
 
-def _v2_document_units(plan: ExtractionPlan, text: str) -> list[dict[str, Any]]:
-    title = ""
-    title_match = _DOC_TITLE.search(text)
-    if title_match is not None:
-        title = _clean_title(title_match.group(0))
-    else:
-        title = _fallback_title(text)
-
-    attachment_match = _ATTACHMENT_LINE.search(text)
-    attachment_text = attachment_match.group(1).strip() if attachment_match else ""
-    body_start = title_match.end() if title_match else 0
-    body = text[body_start:]
-    if attachment_match is not None:
-        body = body[: body.find(attachment_match.group(0))]
+def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
+    """按 golden 口径切分：通知正文 / 条 / 段落 / 附件说明。"""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if title:
+        normalized = re.sub(r"\s+", "", title)
+        for index, line in enumerate(lines):
+            if normalized and normalized in re.sub(r"\s+", "", line):
+                lines = lines[index + 1:]
+                break
+    while lines and lines[0].endswith(("：", ":")):
+        lines.pop(0)
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for line in lines:
+        if line:
+            current.append(line)
+        elif current:
+            paragraphs.append("\n".join(current).strip())
+            current = []
+    if current:
+        paragraphs.append("\n".join(current).strip())
 
     units: list[dict[str, Any]] = []
-    units.append(
-        {
-            "unit_name": "通知正文",
-            "unit_type": "正文",
-            "unit_title": title,
-            "original_text": body.strip(),
-            "unit_order": 1,
-        }
-    )
-    if attachment_text:
-        units.append(
-            {
-                "unit_name": "附件说明",
-                "unit_type": "附件说明",
-                "unit_title": "附件",
-                "original_text": attachment_text,
-                "unit_order": len(units) + 1,
-            }
-        )
-
-    # 安全排查类通知是 v2 golden 中唯一按条目建立 DocumentUnit 的公文类型。
-    if "排查" in title:
-        items: list[str] = []
-        for line in body.splitlines():
-            stripped = line.strip()
-            marker = _ITEM_MARKER.match(stripped)
-            if marker and re.match(r"^[一二三四五六七八九十]+、", marker.group("mark")):
-                items.append(_strip_item_marker(stripped))
-        if len(items) >= 2:
-            units = units[:1]
-            for index, item in enumerate(items, start=1):
-                units.append(
-                    {
-                        "unit_name": f"排查要求{_cn_number(index)}",
-                        "unit_type": "条",
-                        "unit_title": item,
-                        "original_text": item,
-                        "unit_order": index + 1,
-                    }
-                )
-            # 报送段通常位于条目之后，golden 使用“报送要求”。
-            item_lines = [
-                stripped
-                for stripped in (line.strip() for line in body.splitlines())
-                if re.match(r"^[一二三四五六七八九十]+、", stripped)
-            ]
-            report_zone = body.split(item_lines[-1], 1)[-1] if item_lines else ""
-            if any(marker in report_zone for marker in ("报送", "反馈", "报集团")):
-                units.append(
-                    {
-                        "unit_name": "报送要求",
-                        "unit_type": "段落",
-                        "unit_title": "排查情况报送要求",
-                        "original_text": report_zone.strip(),
-                        "unit_order": len(units) + 1,
-                    }
-                )
-            attachment_line = _ATTACHMENT_LINE.search(text)
-            if attachment_line:
-                units.append(
-                    {
-                        "unit_name": "附件列表",
-                        "unit_type": "附件说明",
-                        "unit_title": "附件列表",
-                        "original_text": attachment_line.group(1).strip(),
-                        "unit_order": len(units) + 1,
-                    }
-                )
-    return units
-
-
-def _v2_unit_entity(plan: ExtractionPlan, unit: dict[str, Any]) -> dict[str, Any]:
-    properties: dict[str, Any] = {}
-    _set_property(properties, plan, "DocumentUnit", unit["unit_title"], "单元标题", "unitTitle")
-    _set_property(properties, plan, "DocumentUnit", unit["unit_type"], "单元类型", "unitType")
-    _set_property(properties, plan, "DocumentUnit", unit["original_text"], "原文内容", "originalText")
-    order_value: Any = ""
-    if unit.get("unit_type") == "条" and str(unit.get("unit_name") or "").startswith("排查要求"):
-        order_value = _cn_number(max(1, int(unit.get("unit_order", 2)) - 2))
-    _set_property(properties, plan, "DocumentUnit", order_value, "顺序号", "unitOrder")
-    return {
-        "type": "DocumentUnit",
-        "name": unit["unit_name"],
-        "properties": properties,
-        "evidence": {"quote": unit["unit_title"] or unit["original_text"]},
-    }
-def _v2_attachment_information_entities(plan: ExtractionPlan, text: str) -> list[dict[str, Any]]:
-    """从“附件：1. xxx；2. yyy”行确定性建立 OperationalInformation。
-
-    v2 公文 golden 对编号附件使用 ``附件N 名称`` 作为实体 name，这比让
-    LLM 从扫描件噪声中猜测稳定得多。
-    """
-    if not _has_class(plan, "OperationalInformation"):
-        return []
-    match = _ATTACHMENT_LINE.search(text)
-    if match is None:
-        return []
-    content = re.split(r"[;；\n]", match.group("content"))
-    entities: list[dict[str, Any]] = []
-    for part in content:
-        part = part.strip().strip("。")
-        item = re.match(r"^(?P<index>\d+)\s*[.、]\s*(?P<name>.+)$", part)
-        if item is None:
+    seen_intro = False
+    for paragraph in paragraphs:
+        if "<" in paragraph and ">" in paragraph:
             continue
-        index = int(item.group("index"))
-        name = item.group("name").strip()
-        entity_name = f"附件{index} {name}" if index <= 20 else name
-        properties: dict[str, Any] = {}
-        _set_property(properties, plan, "OperationalInformation", name, "信息名称")
-        _set_property(properties, plan, "OperationalInformation", "附件", "信息类型")
-        _set_property(properties, plan, "OperationalInformation", f"通知附件{index}", "来源文本")
-        entities.append(
-            {
-                "type": "OperationalInformation",
-                "name": entity_name,
-                "properties": properties,
-                "evidence": {"quote": part},
-            }
-        )
-      
-          
-          
-          
-              
-              
-
-    if not entities and content:
-        raw_name = content[0].strip().strip("。")
-        raw_name = re.sub(r"\.(?:docx?|pdf|xlsx?|wps)$", "", raw_name, flags=re.IGNORECASE).strip()
-        if raw_name:
-            properties = {}
-            _set_property(properties, plan, "OperationalInformation", raw_name, "信息名称")
-            _set_property(properties, plan, "OperationalInformation", "附件", "信息类型")
-            _set_property(properties, plan, "OperationalInformation", f"附件：{raw_name}", "来源文本")
-            entities.append(
-                {
-                    "type": "OperationalInformation",
-                    "name": raw_name,
-                    "properties": properties,
-                    "evidence": {"quote": content[0].strip()},
-                }
+        if _ATTACHMENT_MARKER.match(paragraph):
+            units.append(_make_unit("附件列表", "附件说明", "附件", paragraph, "", f"《{title}》附件"))
+            continue
+        item = _ITEM_MARKER.match(paragraph)
+        if item:
+            numeral = _marker_numeral(item.group("mark"))
+            body = item.group("title").strip()
+            unit_title = re.split(r"[，,。；;]", body, maxsplit=1)[0].strip()
+            units.append(
+                _make_unit(
+                    f"{_item_prefix(title)}{numeral}",
+                    "条",
+                    unit_title,
+                    _first_sentence(body),
+                    numeral,
+                    f"《{title}》{numeral}",
+                )
             )
-    return entities
-
-
-
+            seen_intro = True
+            continue
+        if not seen_intro:
+            units.append(_make_unit("通知正文", "正文", title, paragraph, "", f"《{title}》正文"))
+            seen_intro = True
+            continue
+        if any(marker in paragraph for marker in _REPORT_MARKERS):
+            units.append(_make_unit("报送要求", "段落", "排查情况报送要求", paragraph, "", f"《{title}》报送要求段落"))
+    deduped: list[dict[str, Any]] = []
+    seen_names: set[str] = set()
+    for unit in units:
+        if unit["name"] in seen_names:
+            continue
+        seen_names.add(unit["name"])
+        deduped.append(unit)
+    return deduped
 
 
 class OfficialDocumentExtractionStrategy:
@@ -416,44 +240,21 @@ class OfficialDocumentExtractionStrategy:
         manager: ChunkContextManager,
         request: ExtractionRequest,
     ) -> dict[str, Any]:
-        """本地确定性抽取：公文头部元数据 + DocumentUnit + HAS_PART。
-
-        兼容两套本体方言：
-        - 旧 Phase-1 ontology：``DU-001`` 编号单元；
-        - v2 benchmark ontology：``通知正文`` / ``附件说明`` / ``排查要求X``
-          等 golden 对齐名称。
-        """
+        """本地确定性抽取：公文头部元数据 + DocumentUnit + HAS_PART（§12.1-§12.2）。"""
         entities: list[dict[str, Any]] = []
         relations: list[dict[str, Any]] = []
         text = "\n".join(chunk.text for chunk in manager)
-
-        if _v2_benchmark_ontology(plan):
-            document_entity = _v2_metadata(plan, text)
-            if document_entity is not None:
-                entities.append(document_entity)
-            units = _v2_document_units(plan, text) if _has_class(plan, "DocumentUnit") else []
-            for unit in units:
-                entities.append(_v2_unit_entity(plan, unit))
-            entities.extend(_v2_attachment_information_entities(plan, text))
-            if document_entity is not None and units and plan.resolve_relation("HAS_PART"):
-                for unit in units:
-                    relations.append(
-                        {
-                            "from_type": "OfficialDocument",
-                            "from_name": document_entity["name"],
-                            "rel_type": "HAS_PART",
-                            "to_type": "DocumentUnit",
-                            "to_name": unit["unit_name"],
-                            "evidence": {"quote": unit["unit_title"] or unit["original_text"]},
-                        }
-                    )
-            return {"entities": entities, "relations": relations}
 
         document_entity = self._extract_document_metadata(plan, text)
         if document_entity is not None:
             entities.append(document_entity)
 
-        units = _document_units(text) if _has_class(plan, "DocumentUnit") else []
+        if _has_class(plan, "DocumentUnit"):
+            semantic_units = _resolve_property(plan, "DocumentUnit", "单元标题") is not None
+            document_title = document_entity["name"] if document_entity is not None else ""
+            units = _golden_document_units(text, document_title) if semantic_units else _document_units(text)
+        else:
+            units = []
         for unit in units:
             entities.append(self._document_unit_entity(plan, unit))
         if document_entity is not None and units and plan.resolve_relation("HAS_PART"):
@@ -464,8 +265,8 @@ class OfficialDocumentExtractionStrategy:
                         "from_name": document_entity["name"],
                         "rel_type": "HAS_PART",
                         "to_type": "DocumentUnit",
-                        "to_name": unit["unit_id"],
-                        "evidence": {"quote": unit["unit_title"]},
+                        "to_name": unit.get("name", unit.get("unit_id", "")),
+                        "evidence": {"quote": unit.get("original_text", unit.get("unit_title", ""))},
                     }
                 )
         return {"entities": entities, "relations": relations}
@@ -480,21 +281,27 @@ class OfficialDocumentExtractionStrategy:
         title_match = _DOC_TITLE.search(text)
         if title_match is None:
             return None
-        title = title_match.group(0).strip().rstrip("。")
+        raw_title = title_match.group("title").strip().rstrip("。")
+        # 文件名按 golden 口径去掉标题中的空白（如“关于开展 OpenClaw…”->“关于开展OpenClaw…”）；
+        # evidence 仍用带空白的原文，保证可定位。
+        title = re.sub(r"\s+", "", raw_title)
         properties: dict[str, Any] = {}
-        if _has_property(plan, "OfficialDocument", "documentTitle"):
-            properties["documentTitle"] = title
+        title_key = _resolve_property(plan, "OfficialDocument", "documentTitle", "文件标题")
+        if title_key:
+            properties[title_key] = title
         org = _SOURCE_ORG.search(text)
-        if _has_property(plan, "OfficialDocument", "sourceOrganization") and org:
-            properties["sourceOrganization"] = org.group("org").strip().rstrip("。")
+        org_key = _resolve_property(plan, "OfficialDocument", "sourceOrganization", "来文单位")
+        if org_key and org:
+            properties[org_key] = org.group("org").strip().rstrip("。")
         number = _SOURCE_DOC_NUMBER.search(text)
-        if _has_property(plan, "OfficialDocument", "sourceDocumentNumber") and number:
-            properties["sourceDocumentNumber"] = number.group("number").strip().rstrip("。")
+        number_key = _resolve_property(plan, "OfficialDocument", "sourceDocumentNumber", "来文字号")
+        if number_key and number:
+            properties[number_key] = number.group("number").strip().rstrip("。")
         return {
             "type": "OfficialDocument",
             "name": title,
             "properties": properties,
-            "evidence": {"quote": title},
+            "evidence": {"quote": raw_title},
         }
 
     def _document_unit_entity(
@@ -503,20 +310,24 @@ class OfficialDocumentExtractionStrategy:
         unit: dict[str, Any],
     ) -> dict[str, Any]:
         properties: dict[str, Any] = {}
-        for prop_id, value in (
-            ("unitId", unit["unit_id"]),
-            ("unitType", unit["unit_type"]),
-            ("unitTitle", unit["unit_title"]),
-            ("unitOrder", unit["unit_order"]),
-            ("originalText", unit["original_text"]),
+        unit_id_key = _resolve_property(plan, "DocumentUnit", "unitId")
+        if unit_id_key:
+            properties[unit_id_key] = unit.get("unit_id", unit.get("name", ""))
+        for prop_id, alias, value in (
+            ("unitLocation", "原文位置", unit.get("unit_location", "")),
+            ("unitType", "单元类型", unit["unit_type"]),
+            ("unitTitle", "单元标题", unit["unit_title"]),
+            ("unitOrder", "顺序号", unit["unit_order"]),
+            ("originalText", "原文内容", unit["original_text"]),
         ):
-            if _has_property(plan, "DocumentUnit", prop_id):
-                properties[prop_id] = value
+            resolved = _resolve_property(plan, "DocumentUnit", prop_id, alias)
+            if resolved:
+                properties[resolved] = value
         return {
             "type": "DocumentUnit",
-            "name": unit["unit_id"],
+            "name": unit.get("name", unit.get("unit_id", "")),
             "properties": properties,
-            "evidence": {"quote": unit["unit_title"]},
+            "evidence": {"quote": unit.get("original_text", unit.get("unit_title", ""))},
         }
 
     # ─────────────────────────── Coverage Audit（§12.4/§12.6） ───────────────────────────

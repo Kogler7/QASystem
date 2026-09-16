@@ -19,6 +19,15 @@
         "密级": "",
         "主送": "中车电动公司，齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所、时代新材、信息公司、中车研究院、广州公司、天津公司、山东风电公司",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 99,
+        "end_char": 136,
+        "support": "explicit"
       }
     },
     {
@@ -30,17 +39,35 @@
         "原文位置": "《关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知》正文",
         "原文内容": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年）》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。方案围绕1个中心任务、1套评估体系、4个层级梯度体系、6个方面建设任务，推进基础级、先进级、卓越级和领航级智能工厂梯度培育。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 266,
+        "end_char": 399,
+        "support": "semantic_alignment"
       }
     },
     {
       "type": "DocumentUnit",
-      "name": "附件说明",
+      "name": "附件列表",
       "properties": {
         "单元标题": "附件",
         "单元类型": "附件说明",
         "原文位置": "《关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知》附件",
         "原文内容": "附件：中车智能工厂梯度培育重点工作任务",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 266,
+        "end_char": 399,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -51,6 +78,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知"
+      },
+      "evidence": {
+        "quote": "印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 101,
+        "end_char": 136,
+        "support": "explicit"
       }
     },
     {
@@ -61,6 +97,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "认真贯彻执行智能工厂梯度培育实施方案，参与智能工厂建设"
+      },
+      "evidence": {
+        "quote": "第二个 “1” 即形成 1 套评估体系：依据工信部《智能工厂梯度培育行动实施方案》《智能工厂梯度培育要素条件》等要求，形成一套中车特色的智能工厂评价体系。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 76,
+        "line_end": 76,
+        "start_char": 4659,
+        "end_char": 4736,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -71,6 +116,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "阅知并参与智能工厂建设相关规划运营工作"
+      },
+      "evidence": {
+        "quote": "领导批示: 请公司领导阅,请规划运营部、技术中心和各事业部阅。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 729,
+        "end_char": 760,
+        "support": "explicit"
       }
     },
     {
@@ -81,6 +135,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "参与智能工厂建设，发挥公司信息技术支撑作用"
+      },
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "explicit"
       }
     },
     {
@@ -91,6 +154,15 @@
         "对象描述": "构建智能工厂、解决方案、标准体系“三位一体”工作体系的实施方案",
         "对象名称": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
         "所属领域": "智能制造"
+      },
+      "evidence": {
+        "quote": "中国中车智能工厂梯度培育实施方案(2025-2030年",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 195,
+        "end_char": 222,
+        "support": "explicit"
       }
     },
     {
@@ -103,6 +175,15 @@
         "动作词": "贯彻、执行",
         "预期结果": "认真贯彻执行智能工厂梯度培育实施方案",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "## 一、战略背景与实施基础",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 28,
+        "line_end": 28,
+        "start_char": 806,
+        "end_char": 820,
+        "support": "explicit"
       }
     },
     {
@@ -115,6 +196,15 @@
         "动作词": "参与",
         "预期结果": "积极参与企业联系和智能工厂建设",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "explicit"
       }
     },
     {
@@ -127,6 +217,15 @@
         "动作词": "打造",
         "预期结果": "沉淀经验，打造专版软件和解决方案",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 778,
+        "end_char": 807,
+        "support": "explicit"
       }
     },
     {
@@ -139,6 +238,15 @@
         "动作词": "推动",
         "预期结果": "推动数智产业发展",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "explicit"
       }
     },
     {
@@ -149,6 +257,15 @@
         "信息类型": "附件",
         "定义": "中车智能工厂梯度培育22个重点工作任务",
         "来源文本": "附件"
+      },
+      "evidence": {
+        "quote": "具体任务见附件《中车智能工厂梯度培育重点工作任务》。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 100,
+        "line_end": 100,
+        "start_char": 5934,
+        "end_char": 5960,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -157,6 +274,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 136,
+        "support": "explicit"
       }
     },
     {
@@ -168,6 +294,15 @@
         "约束名称": "贯彻执行要求",
         "约束类型": "流程约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 266,
+        "end_char": 399,
+        "support": "semantic_alignment"
       }
     }
   ],
@@ -177,252 +312,576 @@
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知\n\n中车电动公司，齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所、时代新材、信息公司、中车研究院、广州公司、天津公司、山东风电公司：\n\n根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 99,
+        "end_char": 399,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知\n\n中车电动公司，齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所、时代新材、信息公司、中车研究院、广州公司、天津公司、山东风电公司：\n\n根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 99,
+        "end_char": 399,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 99,
+        "end_char": 136,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "第二个 “1” 即形成 1 套评估体系：依据工信部《智能工厂梯度培育行动实施方案》《智能工厂梯度培育要素条件》等要求，形成一套中车特色的智能工厂评价体系。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 76,
+        "line_end": 76,
+        "start_char": 4659,
+        "end_char": 4736,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）"
+      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
+      "evidence": {
+        "quote": "中国中车智能工厂梯度培育实施方案(2025-2030年",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 195,
+        "end_char": 222,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中车智能工厂梯度培育重点工作任务"
+      "to_name": "中车智能工厂梯度培育重点工作任务",
+      "evidence": {
+        "quote": "具体任务见附件《中车智能工厂梯度培育重点工作任务》。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 100,
+        "line_end": 100,
+        "start_char": 5934,
+        "end_char": 5960,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中车智能工厂梯度培育重点工作任务"
+      "to_name": "中车智能工厂梯度培育重点工作任务",
+      "evidence": {
+        "quote": "具体任务见附件《中车智能工厂梯度培育重点工作任务》。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 100,
+        "line_end": 100,
+        "start_char": 5934,
+        "end_char": 5960,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行智能工厂梯度培育实施方案"
+      "to_name": "贯彻执行智能工厂梯度培育实施方案",
+      "evidence": {
+        "quote": "## 一、战略背景与实施基础",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 28,
+        "line_end": 28,
+        "start_char": 806,
+        "end_char": 820,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "参与智能工厂建设"
+      "to_name": "参与智能工厂建设",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "打造专版软件和解决方案"
+      "to_name": "打造专版软件和解决方案",
+      "evidence": {
+        "quote": "发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 778,
+        "end_char": 807,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "推动数智产业发展"
+      "to_name": "推动数智产业发展",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发智能工厂梯度培育实施方案"
+      "to_name": "印发智能工厂梯度培育实施方案",
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 136,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行智能工厂梯度培育实施方案",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）"
+      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
+      "evidence": {
+        "quote": "## 一、战略背景与实施基础",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 28,
+        "line_end": 28,
+        "start_char": 806,
+        "end_char": 820,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行智能工厂梯度培育实施方案",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "## 一、战略背景与实施基础",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 28,
+        "line_end": 28,
+        "start_char": 806,
+        "end_char": 820,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行智能工厂梯度培育实施方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "## 一、战略背景与实施基础",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 28,
+        "line_end": 28,
+        "start_char": 806,
+        "end_char": 820,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "参与智能工厂建设",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）"
+      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "参与智能工厂建设",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "参与智能工厂建设",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "打造专版软件和解决方案",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）"
+      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
+      "evidence": {
+        "quote": "发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 778,
+        "end_char": 807,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "打造专版软件和解决方案",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 778,
+        "end_char": 807,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "打造专版软件和解决方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 778,
+        "end_char": 807,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "推动数智产业发展",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）"
+      "to_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "推动数智产业发展",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "推动数智产业发展",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "积极参与企业联系,参与智能工厂建设,发挥公司信息技术支撑作用,沉淀经验,打造专版软件和解决方案,推动数智产业发展。",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 760,
+        "end_char": 817,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行智能工厂梯度培育实施方案"
+      "to_name": "贯彻执行智能工厂梯度培育实施方案",
+      "evidence": {
+        "quote": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 266,
+        "end_char": 399,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 266,
+        "end_char": 399,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 266,
+        "end_char": 399,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车集团有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知\n\n中车电动公司，齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所、时代新材、信息公司、中车研究院、广州公司、天津公司、山东风电公司：\n\n根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 101,
+        "end_char": 399,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "第二个 “1” 即形成 1 套评估体系：依据工信部《智能工厂梯度培育行动实施方案》《智能工厂梯度培育要素条件》等要求，形成一套中车特色的智能工厂评价体系。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 76,
+        "line_end": 76,
+        "start_char": 4659,
+        "end_char": 4736,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "中国中车智能工厂梯度培育实施方案（2025—2030年）",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "中国中车智能工厂梯度培育实施方案(2025-2030年",
+        "document": "表单.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 195,
+        "end_char": 222,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中车智能工厂梯度培育重点工作任务",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "具体任务见附件《中车智能工厂梯度培育重点工作任务》。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 100,
+        "line_end": 100,
+        "start_char": 5934,
+        "end_char": 5960,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发智能工厂梯度培育实施方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知\n\n中车电动公司，齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所、时代新材、信息公司、中车研究院、广州公司、天津公司、山东风电公司：\n\n根据工业和信息化部《关于做好2025年度智能工厂梯度培育有关工作的函》（工通装函〔2025〕97号）要求，集团公司研究制定了《中国中车智能工厂梯度培育实施方案（2025—2030年)》，已经集团公司2025年第12次总经理办公会审议通过，现予以印发，请认真贯彻执行。",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 97,
+        "end_char": 399,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发智能工厂梯度培育实施方案",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 136,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发智能工厂梯度培育实施方案",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 136,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发智能工厂梯度培育实施方案",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行智能工厂梯度培育实施方案"
+      "to_name": "贯彻执行智能工厂梯度培育实施方案",
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 136,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发智能工厂梯度培育实施方案",
       "rel_type": "EXCHANGES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中车智能工厂梯度培育重点工作任务"
+      "to_name": "中车智能工厂梯度培育重点工作任务",
+      "evidence": {
+        "quote": "# 关于印发《中国中车智能工厂梯度培育实施方案（2025—2030年）》的通知",
+        "document": "关于印发《中国中车智能工厂梯度培育实施方案(2025—2030年)》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 136,
+        "support": "endpoint_context"
+      }
     }
   ]
 }

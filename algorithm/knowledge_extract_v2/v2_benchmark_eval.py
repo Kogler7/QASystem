@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""knowledge_extract_v2 benchmark test script (official + standard).
+"""knowledge_extract_v2 benchmark test script (official + standard + simple).
 
 该脚本用于在服务器上评测 knowledge_extract_v2 算法：
 
-- 数据集：benchmark/official 与 benchmark/standard
+- 数据集：自动发现 benchmark/ 下所有数据集目录（默认含 official/standard/simple，
+  新增如 tmp_problem 的数据集无需改代码，用 --datasets 指定或自动纳入）
+  * 多 case 数据集：`benchmark/<dataset>/<case>/{docs,ontology,extract}`；
+  * 单 case 数据集：`benchmark/<dataset>/{docs,ontology,extract}`（如 simple / tmp_problem）；
+  * `extract/golden.json` 可选：缺失时仅抽取并保存预测，不参与指标统计。
 - 输入：每个 case 的 ontology/*.puml|uml 与 docs/*.md
 - 标准答案：每个 case 的 extract/golden.json
 - 评测方式：默认使用大模型（LLM judge）判断 prediction 是否相对于 golden 抽对；
   也可以使用 --match-mode identity 做精确集合匹配。
   * LLM 判断：实体/关系允许同义表达、别名、规范名等语义等价。
   * identity：实体按 (type, name)，关系按 (from_type, from_name, rel_type, to_type, to_name) 精确匹配。
+  * evidence 一律剔除、不参与评分（正常抽取结果不含 evidence）；
+  * identity 模式按 type/name（关系按端点+rel_type）；LLM judge 还会比较 properties。
 - 输出：实体 precision / recall / F1，关系 precision / recall / F1，
   并保存到带时间戳的目录中。
 
@@ -140,6 +146,19 @@ def _relation_key(relation: Any) -> tuple[str, str, str, str, str] | None:
     return keys  # type: ignore[return-value]
 
 
+def _strip_evidence(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop ``evidence`` before scoring（properties 保留）。
+
+    正常抽取结果不含 evidence，评测也从不比较 evidence；这里显式剥离，确保
+    任何 scoring / judge 路径都看不到它。
+    """
+    return [
+        {key: value for key, value in item.items() if key != "evidence"}
+        for item in items
+        if isinstance(item, dict)
+    ]
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8-sig") as handle:
         data = json.load(handle)
@@ -159,39 +178,79 @@ def _read_text(path: Path) -> str:
     raise RuntimeError(f"无法识别文档编码: {path}")
 
 
+def _case_entry(group: str, root: Path) -> dict[str, Any] | None:
+    """Build a case record when *root* has docs/ and ontology/.
+
+    ``extract/golden.json`` is optional so an in-progress dataset can still be
+    extracted; the case is then reported as "unscored" instead of scored.
+    """
+    docs_dir = root / "docs"
+    ontology_dir = root / "ontology"
+    if not (docs_dir.is_dir() and ontology_dir.is_dir()):
+        return None
+    golden_file = root / "extract" / "golden.json"
+    return {
+        "group": group,
+        "case": root.name,
+        "path": root,
+        "docs_dir": docs_dir,
+        "ontology_dir": ontology_dir,
+        "golden_file": golden_file if golden_file.is_file() else None,
+    }
+
+
+
 def discover_cases(
     benchmark_dir: Path,
     datasets: list[str],
 ) -> list[dict[str, Any]]:
-    """枚举 benchmark 下 official / standard 的完整 case。"""
+    """枚举 benchmark 下各数据集的完整 case（extract/golden.json 可选）。"""
     cases: list[dict[str, Any]] = []
     for group in datasets:
         group_dir = benchmark_dir / group
         if not group_dir.is_dir():
             print(f"[warning] 不存在数据集目录: {group_dir}")
             continue
+        direct = _case_entry(group, group_dir)
+        if direct is not None:
+            # simple 等数据集本身就是单个 case（docs/ontology/extract 直接位于组目录下）。
+            cases.append(direct)
+            continue
         for child in sorted(group_dir.iterdir()):
             if not child.is_dir():
                 continue
             if child.name.startswith(".") or child.name.startswith("_"):
                 continue
-            docs_dir = child / "docs"
-            ontology_dir = child / "ontology"
-            golden_file = child / "extract" / "golden.json"
-            if not (docs_dir.is_dir() and ontology_dir.is_dir() and golden_file.is_file()):
+            entry = _case_entry(group, child)
+            if entry is None:
                 print(f"[warning] 目录结构不完整，跳过: {child}")
                 continue
-            cases.append(
-                {
-                    "group": group,
-                    "case": child.name,
-                    "path": child,
-                    "docs_dir": docs_dir,
-                    "ontology_dir": ontology_dir,
-                    "golden_file": golden_file,
-                }
-            )
+            cases.append(entry)
     return cases
+
+
+def discover_datasets(benchmark_dir: Path) -> list[str]:
+    """Return every dataset group under *benchmark_dir* that contains a case.
+
+    A group is either a single case (``<group>/docs`` + ``<group>/ontology``) or
+    a directory of cases (``<group>/<case>/...``).  New datasets therefore need
+    no code change: dropping a directory under ``benchmark/`` is enough.
+    """
+    datasets: list[str] = []
+    if not benchmark_dir.is_dir():
+        return datasets
+    for child in sorted(benchmark_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith((".", "_")):
+            continue
+        if _case_entry(child.name, child) is not None:
+            datasets.append(child.name)
+            continue
+        if any(
+            grand.is_dir() and _case_entry(child.name, grand) is not None
+            for grand in child.iterdir()
+        ):
+            datasets.append(child.name)
+    return datasets
 
 
 def build_ontology_text(ontology_dir: Path) -> str:
@@ -327,6 +386,19 @@ def call_extract(
                 raise RuntimeError(
                     f"抽取内部失败: {json.dumps(failures[:3], ensure_ascii=False, default=str)}"
                 )
+    if not entities:
+        warning_codes = sorted(
+            {
+                str(item.get("code"))
+                for item in (result.get("warnings") or [])
+                if isinstance(item, dict) and item.get("code")
+            }
+        )
+        selection = dict((result.get("profile") or {}).get("candidate_selection") or {})
+        print(
+            f"[extract][diagnose] {case['group']}/{case['case']} 实体为空；"
+            f"candidate_selection={selection}; warnings={', '.join(warning_codes[:15]) or '(none)'}"
+        )
     return entities, relations
 
 
@@ -335,13 +407,13 @@ def build_sets(
     relations: list[dict[str, Any]],
 ) -> tuple[set[Any], set[Any]]:
     entity_set: set[Any] = set()
-    for entity in entities:
+    for entity in _strip_evidence(entities):
         key = _entity_key(entity)
         if key is not None:
             entity_set.add(key)
 
     relation_set: set[Any] = set()
-    for relation in relations:
+    for relation in _strip_evidence(relations):
         key = _relation_key(relation)
         if key is not None:
             relation_set.add(key)
@@ -462,25 +534,32 @@ def _judge_schema(collection_name: str) -> dict[str, Any]:
 
 
 def _simple_entities(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """LLM judge 可见的实体字段：type / name / properties（不含 evidence）。"""
     simplified = []
     for entity in entities:
         simplified.append({
             "type": entity.get("type"),
             "name": entity.get("name"),
+            "properties": dict(entity.get("properties") or {}),
         })
     return simplified
 
 
 def _simple_relations(relations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """LLM judge 可见的关系字段：端点 / rel_type（若带 properties 也一并给出）。"""
     simplified = []
     for relation in relations:
-        simplified.append({
+        item = {
             "from_type": relation.get("from_type"),
             "from_name": relation.get("from_name"),
             "rel_type": relation.get("rel_type"),
             "to_type": relation.get("to_type"),
             "to_name": relation.get("to_name"),
-        })
+        }
+        properties = relation.get("properties")
+        if isinstance(properties, dict) and properties:
+            item["properties"] = dict(properties)
+        simplified.append(item)
     return simplified
 
 
@@ -495,20 +574,22 @@ def _build_judge_messages(
 判断规则：
 1. 预测实体的 type 与 golden type 指向同一个本体类型即可，不要求字符串完全一致。
 2. name 指向同一实体即可，允许同义表达、别名、规范名、标点/空格/全半角差异。
-3. 不比较 properties 是否完整，也不要求 evidence。
-4. 匹配必须是一对一：每个 golden 最多匹配一个 predicted，每个 predicted 最多匹配一个 golden。
-5. 只要输出匹配 pair；没有匹配到的一律不要列出。
-6. 输出 JSON，不要输出解释。"""
+3. 同时比较 properties：两侧都出现的属性，键与值应一致（值允许同义/规范化差异，如日期格式、全半角、数值 100 与 100.0）；golden 没有的属性不会因为多出而判错，但关键属性缺失或冲突会降低匹配置信度。
+4. 不比较 evidence。
+5. 匹配必须是一对一：每个 golden 最多匹配一个 predicted，每个 predicted 最多匹配一个 golden。
+6. 只要输出匹配 pair；没有匹配到的一律不要列出。
+7. 输出 JSON，不要输出解释。"""
     else:
         system = """你是知识抽取评测员。请判断 predicted 关系是否相对 golden 算“抽对了”。
 
 判断规则：
 1. 预测关系的 rel_type 与 golden rel_type 等价即可，允许同义关系表达。
-2. from/to 两个端点必须分别对应到 golden 中同一实体，方向不能反。
-3. 不要求 evidence。
-4. 匹配必须是一对一：每个 golden 最多匹配一个 predicted，每个 predicted 最多匹配一个 golden。
-5. 只要输出匹配 pair；没有匹配到的一律不要列出。
-6. 输出 JSON，不要输出解释。"""
+2. from/to 两个端点必须分别对应到 golden 中同一实体，方向不能反；端点用 type/name 判断（允许别名/同义）。
+3. 若关系带有 properties，两侧都出现的属性键与值应一致（允许同义/规范化差异）。
+4. 不比较 evidence。
+5. 匹配必须是一对一：每个 golden 最多匹配一个 predicted，每个 predicted 最多匹配一个 golden。
+6. 只要输出匹配 pair；没有匹配到的一律不要列出。
+7. 输出 JSON，不要输出解释。"""
 
     golden_items = (
         _simple_entities(golden_items)
@@ -660,7 +741,15 @@ def llm_judge_score_case(
     predicted_relations: list[dict[str, Any]],
     judge_client: Any,
 ) -> dict[str, Any]:
-    """使用大模型判断 semantic match，并计算实体的 P/R/F1 与关系的 P/R/F1。"""
+    """使用大模型判断 semantic match，并计算实体的 P/R/F1 与关系的 P/R/F1。
+
+    比较实体 type/name/properties、关系端点/rel_type（如有 properties 也参与）；
+    evidence 一律剔除。
+    """
+    golden_entities = _strip_evidence(golden_entities)
+    golden_relations = _strip_evidence(golden_relations)
+    predicted_entities = _strip_evidence(predicted_entities)
+    predicted_relations = _strip_evidence(predicted_relations)
     entity_pairs = [
         (g, p) for g, p in _judge_collection(
             judge_client,
@@ -756,7 +845,7 @@ def load_predicted(output_dir: Path, case: dict[str, Any]) -> tuple[list[dict[st
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="knowledge_extract_v2 official/standard 评测（identity 或 LLM judge）",
+        description="knowledge_extract_v2 benchmark 评测（数据集自动发现；identity 或 LLM judge）",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -768,9 +857,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--datasets",
         nargs="+",
-        choices=["official", "standard"],
-        default=["official", "standard"],
-        help="要评测的数据集，默认 official standard",
+        default=None,
+        help="要评测的数据集名（benchmark/<name>）；不传则自动发现 benchmark 下全部数据集（含 tmp_problem 等新数据集）",
     )
     parser.add_argument(
         "--match-mode",
@@ -868,7 +956,44 @@ def print_summary(summary: dict[str, Any]) -> None:
         print("\n---------- 失败/跳过 ----------")
         for error in summary["errors"]:
             print(f"  - {error['case']}: {error['error']}")
+    if summary.get("unscored"):
+        print("\n---------- 未评测（缺少 golden） ----------")
+        for item in summary["unscored"]:
+            print(f"  - {item['group']}/{item['case']}")
     print()
+
+
+def format_case_metrics(item: dict[str, Any]) -> str:
+    """把单个已抽取 case 的评测指标渲染成一行。"""
+    ent = item["entities"]
+    rel = item["relations"]
+    return (
+        f"{item['group']}/{item['case']}: "
+        f"实体 P/R/F1={ent['precision']:.3f}/{ent['recall']:.3f}/{ent['f1']:.3f} "
+        f"({ent['tp']}/{ent['golden']}/{ent['predicted']}) | "
+        f"关系 P/R/F1={rel['precision']:.3f}/{rel['recall']:.3f}/{rel['f1']:.3f} "
+        f"({rel['tp']}/{rel['golden']}/{rel['predicted']})"
+    )
+
+
+def save_case_metrics(output_dir: Path, item: dict[str, Any]) -> Path:
+    """每个抽取任务评测完成后，立即落盘该 case 的指标。"""
+    out_path = output_dir / "metrics" / item["group"] / f"{item['case']}.metrics.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(item, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out_path
+
+
+def format_running_overall(metric_list: list[dict[str, Any]], *, completed: int) -> str:
+    """已完成评测 case 的 micro 累计指标（增量总览）。"""
+    running = aggregate_metrics(metric_list)
+    ent = running["entities"]
+    rel = running["relations"]
+    return (
+        f"累计 {completed} 个 case："
+        f"实体 P/R/F1={ent['precision']:.3f}/{ent['recall']:.3f}/{ent['f1']:.3f} | "
+        f"关系 P/R/F1={rel['precision']:.3f}/{rel['recall']:.3f}/{rel['f1']:.3f}"
+    )
 
 
 def main() -> int:
@@ -878,6 +1003,14 @@ def main() -> int:
         pass
 
     args = parse_args()
+
+    # 未显式指定数据集时，自动发现 benchmark 下所有可用的数据集目录，新数据集无需改代码。
+    datasets = list(args.datasets) if args.datasets else discover_datasets(args.benchmark_dir)
+    if not datasets:
+        print(f"[error] 在 {args.benchmark_dir} 下没有发现任何数据集。")
+        return 1
+    args.datasets = datasets
+    print(f"[info] 数据集: {', '.join(datasets)}")
 
     if args.output_dir is not None:
         output_dir = args.output_dir
@@ -914,12 +1047,18 @@ def main() -> int:
 
     per_case: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
+    unscored: list[dict[str, Any]] = []
 
     for idx, case in enumerate(cases, start=1):
         print(f"\n[{idx}/{len(cases)}] 开始 {case['group']}/{case['case']}")
-        golden = _load_json(case["golden_file"])
-        golden_entities = golden.get("entities") or []
-        golden_relations = golden.get("relations") or []
+        golden_file = case.get("golden_file")
+        if golden_file is not None:
+            golden = _load_json(golden_file)
+            golden_entities = golden.get("entities") or []
+            golden_relations = golden.get("relations") or []
+        else:
+            golden_entities = None
+            golden_relations = None
 
         if args.skip_extract:
             loaded = load_predicted(output_dir, case)
@@ -949,6 +1088,12 @@ def main() -> int:
                 )
             except Exception as exc:
                 message = f"{type(exc).__name__}: {exc}"
+                details = getattr(exc, "details", None)
+                if details:
+                    # 例如 ontology strict validation failed 的 schema QA 明细。
+                    message += "\n" + json.dumps(
+                        details, ensure_ascii=False, default=str, indent=2
+                    )
                 print(f"[extract] 失败: {message}")
                 errors.append({"case": case["case"], "error": message})
                 continue
@@ -957,6 +1102,14 @@ def main() -> int:
                 print(f"[save] 预测结果已保存: {saved}")
             except Exception as exc:
                 print(f"[warning] 保存预测结果失败: {exc}")
+
+        if golden_entities is None:
+            print(
+                f"[eval] {case['group']}/{case['case']} 缺少 extract/golden.json，"
+                "已抽取并保存预测，但不参与指标统计。"
+            )
+            unscored.append({"group": case["group"], "case": case["case"]})
+            continue
 
         try:
             if args.match_mode == "llm":
@@ -991,7 +1144,16 @@ def main() -> int:
             item["judge_pairs"] = metrics["judge_pairs"]
         per_case.append(item)
 
-    if not per_case:
+        # 每完成一个抽取任务就立即评测并输出该 case 的结果。
+        print(f"[eval] {format_case_metrics(item)}")
+        try:
+            metrics_path = save_case_metrics(output_dir, item)
+            print(f"[eval] 单条指标已保存: {metrics_path}")
+        except Exception as exc:  # noqa: BLE001 - 指标落盘失败不应中断评测
+            print(f"[warning] 保存单条指标失败: {exc}")
+        print(f"[eval] {format_running_overall(per_case, completed=len(per_case))}")
+
+    if not per_case and not unscored:
         print("没有获取到任何可评测的预测结果。")
         return 1
 
@@ -1011,6 +1173,7 @@ def main() -> int:
         "datasets": {},
         "per_case": per_case,
         "errors": errors,
+        "unscored": unscored,
     }
     for group in args.datasets:
         group_cases = [item for item in per_case if item["group"] == group]

@@ -185,3 +185,9 @@ intent/results_v3/
 intent/dataset
 test_docs/中车待抽取pdf/
 test_docs/抽取结果md/
+
+algorithm/knowledge_extract_v2/benchmark/
+algorithm/knowledge_extract_v2/tests/
+# 本地编辑器与运行时产物（勿提交）
+.claude/settings.local.json
+backend/data/execution/

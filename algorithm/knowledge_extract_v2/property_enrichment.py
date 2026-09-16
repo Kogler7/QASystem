@@ -187,12 +187,8 @@ def _valid_update(
     # 允许字符串属性显式置为空字符串，用于表示“原文无值/缺失”，不删除属性。
     if value == "":
         return bool(quote and chunk.text)
-    if _IDENTIFIER.search(f"{prop.identifier} {prop.display_name}") and not _literal_supported(value, quote):
-        return False
-    if _requires_literal(prop) and not _literal_supported(value, quote):
-        return False
-    # The quote was already located in this exact chunk.  Semantic properties
-    # may be a conservative paraphrase/classification of that quote.
+    # 不再强制字面属性逐字：证据 quote 已定位到当前 chunk，属性值可以是对该
+    # quote 的忠实归纳（含编号/名称等）。
     return bool(quote and chunk.text)
 
 
@@ -231,8 +227,13 @@ def enrich_entity_properties(
             continue
         declared = _declared_properties(plan, entity)
         anchor = _entity_anchor_chunk(entity, manager)
-        if not declared or anchor is None:
+        if not declared:
             continue
+        if anchor is None:
+            if not manager.chunk_ids:
+                continue
+            # 没有可绑定 span 的实体用首个 chunk 作为归纳上下文。
+            anchor = manager.chunk_ids[0]
         grouped[anchor].append(entity)
         allowed_by_id[str(entity.candidate_id)] = declared
 

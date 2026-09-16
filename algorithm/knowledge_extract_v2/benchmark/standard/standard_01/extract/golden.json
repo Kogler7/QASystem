@@ -1,271 +1,4379 @@
 {
   "entities": [
-    {"type":"Standard","name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","properties":{"文件编号":"GB/T 31486—2024","文件名称":"电动汽车用动力蓄电池电性能要求及试验方法","发布日期":"2024-09-29","实施日期":"2025-04-01","编制目的":"规定电动汽车用动力蓄电池单体的电性能要求，描述相应的试验方法。","语言版本":"中文","标准状态":"现行","标准约束类型":"推荐"}},
-    {"type":"InternationalClassificationofStandard","name":"ICS 43.120","properties":{"ICS分类代码":"43.120","ICS分类名称":"道路车辆"}},
-    {"type":"ChineseClassificationofStandard","name":"CCS T 47","properties":{"CCS分类代码":"T 47","CCS分类名称":"汽车"}},
-    {"type":"Publishing Organization","name":"国家市场监督管理总局","properties":{"相关方名称":"国家市场监督管理总局"}},
-    {"type":"Publishing Organization","name":"国家标准化管理委员会","properties":{"相关方名称":"国家标准化管理委员会"}},
-    {"type":"Proposing Organization","name":"中华人民共和国工业和信息化部","properties":{"相关方名称":"中华人民共和国工业和信息化部"}},
-    {"type":"CompetentDepartment","name":"全国汽车标准化技术委员会（SAC/TC 114）","properties":{"相关方名称":"全国汽车标准化技术委员会（SAC/TC 114）"}},
-    {"type":"StandardizationObject","name":"电动汽车用动力蓄电池单体","properties":{"主题名称":"电动汽车用动力蓄电池单体","所属行业":"汽车制造业"}},
-    {"type":"Approval and PublicationStage","name":"批准发布阶段","properties":{"阶段代码":"60","开始日期":"2024-09-29","结束日期":"2024-09-29"}},
-    {"type":"Normative Element","name":"范围","properties":{"要素状态":"必备","作用范围":"规定适用对象、技术内容及适用边界"}},
-    {"type":"Normative Element","name":"规范性引用文件","properties":{"要素状态":"必备","作用范围":"规定构成本文件不可缺少条款的引用文件"}},
-    {"type":"Normative Element","name":"术语和定义","properties":{"要素状态":"必备","作用范围":"界定本文件使用的术语和定义"}},
-    {"type":"Normative Element","name":"符号","properties":{"要素状态":"可选","作用范围":"规定本文件使用的符号"}},
-    {"type":"Normative Element","name":"性能要求","properties":{"要素状态":"必备","作用范围":"规定动力蓄电池单体应满足的电性能要求"}},
-    {"type":"Normative Element","name":"试验方法","properties":{"要素状态":"必备","作用范围":"描述验证动力蓄电池单体电性能的试验方法"}},
-    {"type":"Normative Element","name":"附录A 高低温试验箱试验工装","properties":{"要素状态":"必备","作用范围":"规定高低温试验箱试验工装要求"}},
-    {"type":"Informative Element","name":"参考文献","properties":{"要素状态":"可选","作用范围":"提供编制和使用本文件的参考资料"}},
-    {"type":"Section","name":"1 范围","properties":{"章编号":"1","章标题":"范围"}},
-    {"type":"Section","name":"2 规范性引用文件","properties":{"章编号":"2","章标题":"规范性引用文件"}},
-    {"type":"Section","name":"3 术语和定义","properties":{"章编号":"3","章标题":"术语和定义"}},
-    {"type":"Section","name":"4 符号","properties":{"章编号":"4","章标题":"符号"}},
-    {"type":"Section","name":"5 性能要求","properties":{"章编号":"5","章标题":"性能要求"}},
-    {"type":"Section","name":"6 试验方法","properties":{"章编号":"6","章标题":"试验方法"}},
-    {"type":"Subclause","name":"3.1 高能量电池","properties":{"条编号":"3.1","条标题":"高能量电池"}},
-    {"type":"Subclause","name":"3.2 高功率电池","properties":{"条编号":"3.2","条标题":"高功率电池"}},
-    {"type":"Subclause","name":"3.3 额定容量","properties":{"条编号":"3.3","条标题":"额定容量"}},
-    {"type":"Subclause","name":"3.4 额定能量","properties":{"条编号":"3.4","条标题":"额定能量"}},
-    {"type":"Subclause","name":"3.5 初始容量","properties":{"条编号":"3.5","条标题":"初始容量"}},
-    {"type":"Subclause","name":"5.1 外观","properties":{"条编号":"5.1","条标题":"外观"}},
-    {"type":"Subclause","name":"5.2 极性标识","properties":{"条编号":"5.2","条标题":"极性标识"}},
-    {"type":"Subclause","name":"5.3 质量和外形尺寸","properties":{"条编号":"5.3","条标题":"质量和外形尺寸"}},
-    {"type":"Subclause","name":"5.4 室温放电容量","properties":{"条编号":"5.4","条标题":"室温放电容量"}},
-    {"type":"Subclause","name":"5.5 室温倍率放电容量","properties":{"条编号":"5.5","条标题":"室温倍率放电容量"}},
-    {"type":"Subclause","name":"5.6 室温倍率充电性能","properties":{"条编号":"5.6","条标题":"室温倍率充电性能"}},
-    {"type":"Subclause","name":"5.7 低温放电容量","properties":{"条编号":"5.7","条标题":"低温放电容量"}},
-    {"type":"Subclause","name":"5.8 高温放电容量","properties":{"条编号":"5.8","条标题":"高温放电容量"}},
-    {"type":"Subclause","name":"5.9 荷电保持与容量恢复能力","properties":{"条编号":"5.9","条标题":"荷电保持与容量恢复能力"}},
-    {"type":"Subclause","name":"5.10 储存","properties":{"条编号":"5.10","条标题":"储存"}},
-    {"type":"Subclause","name":"6.1 试验条件","properties":{"条编号":"6.1","条标题":"试验条件"}},
-    {"type":"Subclause","name":"6.1.1 一般条件","properties":{"条编号":"6.1.1","条标题":"一般条件"}},
-    {"type":"Subclause","name":"6.1.2 测量仪器、仪表准确度","properties":{"条编号":"6.1.2","条标题":"测量仪器、仪表准确度"}},
-    {"type":"Subclause","name":"6.1.3 测试过程误差","properties":{"条编号":"6.1.3","条标题":"测试过程误差"}},
-    {"type":"Subclause","name":"6.1.4 数据记录与记录间隔","properties":{"条编号":"6.1.4","条标题":"数据记录与记录间隔"}},
-    {"type":"Subclause","name":"6.2 试验方法","properties":{"条编号":"6.2","条标题":"试验方法"}},
-    {"type":"Subclause","name":"6.2.1 外观","properties":{"条编号":"6.2.1","条标题":"外观"}},
-    {"type":"Subclause","name":"6.2.2 极性标识","properties":{"条编号":"6.2.2","条标题":"极性标识"}},
-    {"type":"Subclause","name":"6.2.3 质量和外形尺寸","properties":{"条编号":"6.2.3","条标题":"质量和外形尺寸"}},
-    {"type":"Subclause","name":"6.2.4 标准充电","properties":{"条编号":"6.2.4","条标题":"标准充电"}},
-    {"type":"Subclause","name":"6.2.5 室温放电容量","properties":{"条编号":"6.2.5","条标题":"室温放电容量"}},
-    {"type":"Subclause","name":"6.2.6 室温倍率放电容量","properties":{"条编号":"6.2.6","条标题":"室温倍率放电容量"}},
-    {"type":"Subclause","name":"6.2.6.1 高能量电池","properties":{"条编号":"6.2.6.1","条标题":"高能量电池"}},
-    {"type":"Subclause","name":"6.2.6.2 高功率电池","properties":{"条编号":"6.2.6.2","条标题":"高功率电池"}},
-    {"type":"Subclause","name":"6.2.7 室温倍率充电性能","properties":{"条编号":"6.2.7","条标题":"室温倍率充电性能"}},
-    {"type":"Subclause","name":"6.2.8 低温放电容量","properties":{"条编号":"6.2.8","条标题":"低温放电容量"}},
-    {"type":"Subclause","name":"6.2.9 高温放电容量","properties":{"条编号":"6.2.9","条标题":"高温放电容量"}},
-    {"type":"Subclause","name":"6.2.10 荷电保持与容量恢复能力","properties":{"条编号":"6.2.10","条标题":"荷电保持与容量恢复能力"}},
-    {"type":"Subclause","name":"6.2.10.1 室温荷电保持与容量恢复能力","properties":{"条编号":"6.2.10.1","条标题":"室温荷电保持与容量恢复能力"}},
-    {"type":"Subclause","name":"6.2.10.2 高温荷电保持与容量恢复能力","properties":{"条编号":"6.2.10.2","条标题":"高温荷电保持与容量恢复能力"}},
-    {"type":"Subclause","name":"6.2.11 储存","properties":{"条编号":"6.2.11","条标题":"储存"}},
-    {"type":"Subclause","name":"6.3 试验项目","properties":{"条编号":"6.3","条标题":"试验项目"}},
-    {"type":"Terminology","name":"高能量电池","properties":{"术语标准名称":"高能量电池","术语标准定义":"室温下最大允许输出电功率与3I3倍率放电能量比值低于10的电池。","同义词":"high energy battery"}},
-    {"type":"Terminology","name":"高功率电池","properties":{"术语标准名称":"高功率电池","术语标准定义":"室温下最大允许输出电功率与1I1倍率放电能量比值不低于10的电池。","同义词":"high power battery"}},
-    {"type":"Terminology","name":"额定容量","properties":{"术语标准名称":"额定容量","术语标准定义":"完全充电后以规定放电电流测得并由制造商申明的容量值。","同义词":"rated capacity"}},
-    {"type":"Terminology","name":"额定能量","properties":{"术语标准名称":"额定能量","术语标准定义":"完全充电后以规定放电电流测得并由制造商申明的能量值。","同义词":"rated energy"}},
-    {"type":"Terminology","name":"初始容量","properties":{"术语标准名称":"初始容量","术语标准定义":"新出厂动力电池完全充电后以规定电流放电至制造商规定终止条件时所放出的容量。","同义词":"initial capacity"}},
-    {"type":"Terminology","name":"I3","properties":{"术语标准名称":"I3","术语标准定义":"3h率放电电流，其数值等于额定容量值的1/3。","同义词":"3h率放电电流"}},
-    {"type":"Terminology","name":"I1","properties":{"术语标准名称":"I1","术语标准定义":"1h率放电电流，其数值等于额定容量值。","同义词":"1h率放电电流"}},
-    {"type":"Clause","name":"1 范围条款","properties":{"唯一标识符":"IU-1-001","内容描述":"本文件规定电动汽车用动力蓄电池单体的电性能要求和相应试验方法，适用于装载在电动汽车上的锂离子电池和金属氢化物镍电池单体，其他类型电池参照执行。","条款类型":"陈述型","约束类型":"合规约束"}},
-    {"type":"Clause","name":"2 规范性引用文件条款","properties":{"唯一标识符":"IU-2-001","内容描述":"规范性引用文件包括GB/T 10592—2023、GB/T 19596和GB 38031。","条款类型":"陈述型","约束类型":"合规约束"}},
-    {"type":"Clause","name":"5.1 外观要求","properties":{"唯一标识符":"IU-5.1-001","内容描述":"电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.2 极性标识要求","properties":{"唯一标识符":"IU-5.2-001","内容描述":"电池单体按6.2.2检验，端子极性标识应正确、清晰。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.3 质量和外形尺寸要求","properties":{"唯一标识符":"IU-5.3-001","内容描述":"电池单体按6.2.3检验，质量、外形尺寸应符合制造商提供的产品技术条件。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.4 室温放电容量要求","properties":{"唯一标识符":"IU-5.4-001","内容描述":"初始容量不得低于额定容量且不得超过额定容量的110%，初始容量极差不得大于初始容量平均值的5%。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.5 室温倍率放电容量要求","properties":{"唯一标识符":"IU-5.5-001","内容描述":"高能量电池放电容量不得低于初始容量的95%；高功率电池不得低于初始容量的80%。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.6 室温倍率充电性能要求","properties":{"唯一标识符":"IU-5.6-001","内容描述":"电池单体放电容量不得低于初始容量的80%。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.7 低温放电容量要求","properties":{"唯一标识符":"IU-5.7-001","内容描述":"锂离子电池放电容量不得低于初始容量的70%；金属氢化物镍电池不得低于初始容量的80%。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.8 高温放电容量要求","properties":{"唯一标识符":"IU-5.8-001","内容描述":"电池单体放电容量不得低于初始容量的95%。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.9 荷电保持与容量恢复能力要求","properties":{"唯一标识符":"IU-5.9-001","内容描述":"对锂离子和金属氢化物镍电池分别规定荷电保持容量、恢复容量及容量和能量效率极差要求。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"5.10 储存要求","properties":{"唯一标识符":"IU-5.10-001","内容描述":"恢复容量不得低于初始容量的95%，恢复容量极差和能量效率极差不得大于相应平均值的5%。","条款类型":"要求型","约束类型":"质量约束"}},
-    {"type":"Clause","name":"6.1 试验条件条款","properties":{"唯一标识符":"IU-6.1-001","内容描述":"规定试验环境、仪器仪表准确度、测试过程误差及数据记录间隔。","条款类型":"要求型","约束类型":"流程约束"}},
-    {"type":"Clause","name":"6.2 试验方法条款","properties":{"唯一标识符":"IU-6.2-001","内容描述":"规定外观、极性、质量尺寸、标准充电及各项容量、荷电保持和储存试验方法。","条款类型":"要求型","约束类型":"流程约束"}},
-    {"type":"Clause","name":"6.3 试验项目条款","properties":{"唯一标识符":"IU-6.3-001","内容描述":"表1规定各试验项目对应的试验方法章条号、样品数量及编号。","条款类型":"陈述型","约束类型":"流程约束"}},
-    {"type":"Clause","name":"附录A 工装要求","properties":{"唯一标识符":"IU-A-001","内容描述":"规定高低温试验箱工装的负载、材料、结构和使用要求。","条款类型":"推荐型","约束类型":"安全约束"}},
-    {"type":"Subject of Standardization","name":"电池单体","properties":{"对象名称":"电池单体","对象类别":"产品"}},
-    {"type":"Subject of Standardization","name":"锂离子电池单体","properties":{"对象名称":"锂离子电池单体","对象类别":"产品"}},
-    {"type":"Subject of Standardization","name":"金属氢化物镍电池单体","properties":{"对象名称":"金属氢化物镍电池单体","对象类别":"产品"}},
-    {"type":"Property","name":"初始容量","properties":{"特性名称":"初始容量","特性类型":"能力型"}},
-    {"type":"Property","name":"放电容量","properties":{"特性名称":"放电容量","特性类型":"能力型"}},
-    {"type":"Property","name":"荷电保持容量","properties":{"特性名称":"荷电保持容量","特性类型":"能力型"}},
-    {"type":"Property","name":"恢复容量","properties":{"特性名称":"恢复容量","特性类型":"能力型"}},
-    {"type":"Property","name":"能量效率","properties":{"特性名称":"能量效率","特性类型":"能力型"}},
-    {"type":"Property","name":"外观","properties":{"特性名称":"外观","特性类型":"描述型"}},
-    {"type":"Property","name":"极性标识","properties":{"特性名称":"极性标识","特性类型":"描述型"}},
-    {"type":"Property","name":"质量","properties":{"特性名称":"质量","特性类型":"描述型"}},
-    {"type":"Property","name":"外形尺寸","properties":{"特性名称":"外形尺寸","特性类型":"描述型"}},
-    {"type":"Constrain","name":"初始容量相对额定容量约束","properties":{"约束类型":"质量约束","最小值":"100","最大值":"110","阈值范围":"100-110","测量单位":"%"}},
-    {"type":"Constrain","name":"初始容量极差约束","properties":{"约束类型":"质量约束","最大值":"5","测量单位":"%"}},
-    {"type":"Constrain","name":"室温倍率放电容量约束","properties":{"约束类型":"质量约束","最小值":"95","测量单位":"%"}},
-    {"type":"Constrain","name":"高功率倍率放电容量约束","properties":{"约束类型":"质量约束","最小值":"80","测量单位":"%"}},
-    {"type":"Constrain","name":"低温锂离子放电容量约束","properties":{"约束类型":"质量约束","最小值":"70","测量单位":"%"}},
-    {"type":"Constrain","name":"高温放电容量约束","properties":{"约束类型":"质量约束","最小值":"95","测量单位":"%"}},
-    {"type":"Constrain","name":"恢复容量约束","properties":{"约束类型":"质量约束","最小值":"95","测量单位":"%"}},
-    {"type":"ActionClass","name":"外观检验","properties":{}},
-    {"type":"ActionClass","name":"极性标识检验","properties":{}},
-    {"type":"ActionClass","name":"质量和外形尺寸检验","properties":{}},
-    {"type":"ActionClass","name":"标准充电","properties":{}},
-    {"type":"ActionClass","name":"室温放电容量试验","properties":{}},
-    {"type":"ActionClass","name":"室温倍率放电容量试验","properties":{}},
-    {"type":"ActionClass","name":"室温倍率充电性能试验","properties":{}},
-    {"type":"ActionClass","name":"低温放电容量试验","properties":{}},
-    {"type":"ActionClass","name":"高温放电容量试验","properties":{}},
-    {"type":"ActionClass","name":"荷电保持与容量恢复能力试验","properties":{}},
-    {"type":"ActionClass","name":"储存试验","properties":{}},
-    {"type":"Standard","name":"GB/T 10592—2023 高低温试验箱技术条件","properties":{"文件编号":"GB/T 10592—2023","文件名称":"高低温试验箱技术条件","标准状态":"现行"}},
-    {"type":"Standard","name":"GB/T 19596 电动汽车术语","properties":{"文件编号":"GB/T 19596","文件名称":"电动汽车术语","标准状态":"现行"}},
-    {"type":"Standard","name":"GB 38031 电动汽车用动力蓄电池安全要求","properties":{"文件编号":"GB 38031","文件名称":"电动汽车用动力蓄电池安全要求","标准状态":"现行"}},
-    {"type":"ExternalResource","name":"制造商提供的产品技术条件","properties":{"文件类型":"文献","责任主体":"制造商"}},
-    {"type":"Annex","name":"附录A 高低温试验箱试验工装","properties":{}},
-    {"type":"Table","name":"表1 试验项目、样品数量及编号","properties":{}},
-    {"type":"Equation","name":"公式（1）能量效率","properties":{}},
-    {"type":"Reference","name":"参考文献 GB/T 19596—2017 电动汽车术语","properties":{}},
-    {"type":"Clause","name":"参考文献条款","properties":{"唯一标识符":"IU-REF-001","内容描述":"参考文献为GB/T 19596—2017《电动汽车术语》。","条款类型":"陈述型","约束类型":"合规约束"}}
+    {
+      "type": "Standard",
+      "name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "properties": {
+        "文件编号": "GB/T 31486—2024",
+        "文件名称": "电动汽车用动力蓄电池电性能要求及试验方法",
+        "发布日期": "2024-09-29",
+        "实施日期": "2025-04-01",
+        "编制目的": "规定电动汽车用动力蓄电池单体的电性能要求，描述相应的试验方法。",
+        "语言版本": "中文",
+        "标准状态": "现行",
+        "标准约束类型": "推荐"
+      },
+      "evidence": {
+        "quote": "# 电动汽车用动力蓄电池电性能要求 及试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 132,
+        "end_char": 155,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "InternationalClassificationofStandard",
+      "name": "ICS 43.120",
+      "properties": {
+        "ICS分类代码": "43.120",
+        "ICS分类名称": "道路车辆"
+      },
+      "evidence": {
+        "quote": "ICS 43.120",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 5,
+        "line_end": 5,
+        "start_char": 60,
+        "end_char": 70,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ChineseClassificationofStandard",
+      "name": "CCS T 47",
+      "properties": {
+        "CCS分类代码": "T 47",
+        "CCS分类名称": "汽车"
+      },
+      "evidence": {
+        "quote": "CCS T 47",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 72,
+        "end_char": 80,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Publishing Organization",
+      "name": "国家市场监督管理总局",
+      "properties": {
+        "相关方名称": "国家市场监督管理总局"
+      },
+      "evidence": {
+        "quote": "国家市场监督管理总局发布",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 286,
+        "end_char": 298,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Publishing Organization",
+      "name": "国家标准化管理委员会",
+      "properties": {
+        "相关方名称": "国家标准化管理委员会"
+      },
+      "evidence": {
+        "quote": "国家标准化管理委员会",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 300,
+        "end_char": 310,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Proposing Organization",
+      "name": "中华人民共和国工业和信息化部",
+      "properties": {
+        "相关方名称": "中华人民共和国工业和信息化部"
+      },
+      "evidence": {
+        "quote": "本文件由中华人民共和国工业和信息化部提出。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 94,
+        "line_end": 94,
+        "start_char": 1651,
+        "end_char": 1672,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "CompetentDepartment",
+      "name": "全国汽车标准化技术委员会（SAC/TC 114）",
+      "properties": {
+        "相关方名称": "全国汽车标准化技术委员会（SAC/TC 114）"
+      },
+      "evidence": {
+        "quote": "本文件由全国汽车标准化技术委员会（SAC/TC 114）归口。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 96,
+        "line_end": 96,
+        "start_char": 1674,
+        "end_char": 1705,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "StandardizationObject",
+      "name": "电动汽车用动力蓄电池单体",
+      "properties": {
+        "主题名称": "电动汽车用动力蓄电池单体",
+        "所属行业": "汽车制造业"
+      },
+      "evidence": {
+        "quote": "本文件规定了电动汽车用动力蓄电池单体（以下简称“电池单体”）的电性能要求，描述了相应的试验方法。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 113,
+        "line_end": 113,
+        "start_char": 2384,
+        "end_char": 2432,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Approval and PublicationStage",
+      "name": "批准发布阶段",
+      "properties": {
+        "阶段代码": "60",
+        "开始日期": "2024-09-29",
+        "结束日期": "2024-09-29"
+      },
+      "evidence": {
+        "quote": "noteId: \"1a73e6609fbb11f1a8b4b7b00d1a4660\"",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 2,
+        "line_end": 2,
+        "start_char": 4,
+        "end_char": 46,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "范围",
+      "properties": {
+        "要素状态": "必备",
+        "作用范围": "规定适用对象、技术内容及适用边界"
+      },
+      "evidence": {
+        "quote": "## 1 范围",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 2375,
+        "end_char": 2382,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "规范性引用文件",
+      "properties": {
+        "要素状态": "必备",
+        "作用范围": "规定构成本文件不可缺少条款的引用文件"
+      },
+      "evidence": {
+        "quote": "## 2 规范性引用文件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 117,
+        "line_end": 117,
+        "start_char": 2479,
+        "end_char": 2491,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "术语和定义",
+      "properties": {
+        "要素状态": "必备",
+        "作用范围": "界定本文件使用的术语和定义"
+      },
+      "evidence": {
+        "quote": "## 3 术语和定义",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 127,
+        "start_char": 2659,
+        "end_char": 2669,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "符号",
+      "properties": {
+        "要素状态": "可选",
+        "作用范围": "规定本文件使用的符号"
+      },
+      "evidence": {
+        "quote": "## 4 符号",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 164,
+        "line_end": 164,
+        "start_char": 3440,
+        "end_char": 3447,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "性能要求",
+      "properties": {
+        "要素状态": "必备",
+        "作用范围": "规定动力蓄电池单体应满足的电性能要求"
+      },
+      "evidence": {
+        "quote": "本文件规定了电动汽车用动力蓄电池单体（以下简称“电池单体”）的电性能要求，描述了相应的试验方法。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 113,
+        "line_end": 113,
+        "start_char": 2384,
+        "end_char": 2432,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "试验方法",
+      "properties": {
+        "要素状态": "必备",
+        "作用范围": "描述验证动力蓄电池单体电性能的试验方法"
+      },
+      "evidence": {
+        "quote": "本文件规定了电动汽车用动力蓄电池单体（以下简称“电池单体”）的电性能要求，描述了相应的试验方法。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 113,
+        "line_end": 113,
+        "start_char": 2384,
+        "end_char": 2432,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Normative Element",
+      "name": "附录A 高低温试验箱试验工装",
+      "properties": {
+        "要素状态": "必备",
+        "作用范围": "规定高低温试验箱试验工装要求"
+      },
+      "evidence": {
+        "quote": "6.1.1.3 高低温试验箱风速不应大于1.7 m/s，或采用符合附录A要求的试验工装。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 236,
+        "line_end": 236,
+        "start_char": 4828,
+        "end_char": 4872,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Informative Element",
+      "name": "参考文献",
+      "properties": {
+        "要素状态": "可选",
+        "作用范围": "提供编制和使用本文件的参考资料"
+      },
+      "evidence": {
+        "quote": "# 参 考 文 献",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 477,
+        "line_end": 477,
+        "start_char": 10906,
+        "end_char": 10915,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Section",
+      "name": "1 范围",
+      "properties": {
+        "章编号": "1",
+        "章标题": "范围"
+      },
+      "evidence": {
+        "quote": "## 1 范围",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 2375,
+        "end_char": 2382,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Section",
+      "name": "2 规范性引用文件",
+      "properties": {
+        "章编号": "2",
+        "章标题": "规范性引用文件"
+      },
+      "evidence": {
+        "quote": "## 2 规范性引用文件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 117,
+        "line_end": 117,
+        "start_char": 2479,
+        "end_char": 2491,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Section",
+      "name": "3 术语和定义",
+      "properties": {
+        "章编号": "3",
+        "章标题": "术语和定义"
+      },
+      "evidence": {
+        "quote": "## 3 术语和定义",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 127,
+        "start_char": 2659,
+        "end_char": 2669,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Section",
+      "name": "4 符号",
+      "properties": {
+        "章编号": "4",
+        "章标题": "符号"
+      },
+      "evidence": {
+        "quote": "## 4 符号",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 164,
+        "line_end": 164,
+        "start_char": 3440,
+        "end_char": 3447,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Section",
+      "name": "5 性能要求",
+      "properties": {
+        "章编号": "5",
+        "章标题": "性能要求"
+      },
+      "evidence": {
+        "quote": "## 5 性能要求",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 172,
+        "start_char": 3541,
+        "end_char": 3550,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Section",
+      "name": "6 试验方法",
+      "properties": {
+        "章编号": "6",
+        "章标题": "试验方法"
+      },
+      "evidence": {
+        "quote": "## 6 试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 222,
+        "line_end": 222,
+        "start_char": 4515,
+        "end_char": 4524,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "3.1 高能量电池",
+      "properties": {
+        "条编号": "3.1",
+        "条标题": "高能量电池"
+      },
+      "evidence": {
+        "quote": "##### 6.2.6.1 高能量电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 310,
+        "line_end": 310,
+        "start_char": 6131,
+        "end_char": 6150,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "3.2 高功率电池",
+      "properties": {
+        "条编号": "3.2",
+        "条标题": "高功率电池"
+      },
+      "evidence": {
+        "quote": "##### 6.2.6.2 高功率电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 322,
+        "line_end": 322,
+        "start_char": 6313,
+        "end_char": 6332,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "3.3 额定容量",
+      "properties": {
+        "条编号": "3.3",
+        "条标题": "额定容量"
+      },
+      "evidence": {
+        "quote": " 额定容量 rated capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 147,
+        "line_end": 147,
+        "start_char": 3025,
+        "end_char": 3045,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "3.4 额定能量",
+      "properties": {
+        "条编号": "3.4",
+        "条标题": "额定能量"
+      },
+      "evidence": {
+        "quote": " 额定能量 rated energy",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 153,
+        "line_end": 153,
+        "start_char": 3160,
+        "end_char": 3178,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "3.5 初始容量",
+      "properties": {
+        "条编号": "3.5",
+        "条标题": "初始容量"
+      },
+      "evidence": {
+        "quote": "### 3.5 初始容量 initial capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 158,
+        "line_end": 158,
+        "start_char": 3286,
+        "end_char": 3315,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.1 外观",
+      "properties": {
+        "条编号": "5.1",
+        "条标题": "外观"
+      },
+      "evidence": {
+        "quote": "### 5.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 174,
+        "line_end": 174,
+        "start_char": 3552,
+        "end_char": 3562,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.2 极性标识",
+      "properties": {
+        "条编号": "5.2",
+        "条标题": "极性标识"
+      },
+      "evidence": {
+        "quote": "### 5.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 178,
+        "start_char": 3619,
+        "end_char": 3631,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.3 质量和外形尺寸",
+      "properties": {
+        "条编号": "5.3",
+        "条标题": "质量和外形尺寸"
+      },
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 182,
+        "start_char": 3661,
+        "end_char": 3676,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.4 室温放电容量",
+      "properties": {
+        "条编号": "5.4",
+        "条标题": "室温放电容量"
+      },
+      "evidence": {
+        "quote": "### 5.4 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 186,
+        "start_char": 3718,
+        "end_char": 3732,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.5 室温倍率放电容量",
+      "properties": {
+        "条编号": "5.5",
+        "条标题": "室温倍率放电容量"
+      },
+      "evidence": {
+        "quote": "### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 192,
+        "line_end": 192,
+        "start_char": 3829,
+        "end_char": 3845,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.6 室温倍率充电性能",
+      "properties": {
+        "条编号": "5.6",
+        "条标题": "室温倍率充电性能"
+      },
+      "evidence": {
+        "quote": "### 5.6 室温倍率充电性能",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 198,
+        "line_end": 198,
+        "start_char": 3923,
+        "end_char": 3939,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.7 低温放电容量",
+      "properties": {
+        "条编号": "5.7",
+        "条标题": "低温放电容量"
+      },
+      "evidence": {
+        "quote": "### 5.7 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 202,
+        "line_end": 202,
+        "start_char": 3974,
+        "end_char": 3988,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.8 高温放电容量",
+      "properties": {
+        "条编号": "5.8",
+        "条标题": "高温放电容量"
+      },
+      "evidence": {
+        "quote": "### 5.8 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 208,
+        "line_end": 208,
+        "start_char": 4065,
+        "end_char": 4079,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.9 荷电保持与容量恢复能力",
+      "properties": {
+        "条编号": "5.9",
+        "条标题": "荷电保持与容量恢复能力"
+      },
+      "evidence": {
+        "quote": "### 5.9 荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 212,
+        "line_end": 212,
+        "start_char": 4114,
+        "end_char": 4133,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "5.10 储存",
+      "properties": {
+        "条编号": "5.10",
+        "条标题": "储存"
+      },
+      "evidence": {
+        "quote": "### 5.10 储存",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 218,
+        "line_end": 218,
+        "start_char": 4412,
+        "end_char": 4423,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.1 试验条件",
+      "properties": {
+        "条编号": "6.1",
+        "条标题": "试验条件"
+      },
+      "evidence": {
+        "quote": "### 6.1 试验条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 224,
+        "line_end": 224,
+        "start_char": 4526,
+        "end_char": 4538,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.1.1 一般条件",
+      "properties": {
+        "条编号": "6.1.1",
+        "条标题": "一般条件"
+      },
+      "evidence": {
+        "quote": "#### 6.1.1 一般条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 226,
+        "line_end": 226,
+        "start_char": 4540,
+        "end_char": 4555,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.1.2 测量仪器、仪表准确度",
+      "properties": {
+        "条编号": "6.1.2",
+        "条标题": "测量仪器、仪表准确度"
+      },
+      "evidence": {
+        "quote": "#### 6.1.2 测量仪器、仪表准确度",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 240,
+        "line_end": 240,
+        "start_char": 4921,
+        "end_char": 4942,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.1.3 测试过程误差",
+      "properties": {
+        "条编号": "6.1.3",
+        "条标题": "测试过程误差"
+      },
+      "evidence": {
+        "quote": "#### 6.1.3 测试过程误差",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 258,
+        "line_end": 258,
+        "start_char": 5127,
+        "end_char": 5144,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.1.4 数据记录与记录间隔",
+      "properties": {
+        "条编号": "6.1.4",
+        "条标题": "数据记录与记录间隔"
+      },
+      "evidence": {
+        "quote": "#### 6.1.4 数据记录与记录间隔",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 268,
+        "line_end": 268,
+        "start_char": 5237,
+        "end_char": 5257,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2 试验方法",
+      "properties": {
+        "条编号": "6.2",
+        "条标题": "试验方法"
+      },
+      "evidence": {
+        "quote": "### 6.2 试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 272,
+        "start_char": 5313,
+        "end_char": 5325,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.1 外观",
+      "properties": {
+        "条编号": "6.2.1",
+        "条标题": "外观"
+      },
+      "evidence": {
+        "quote": "#### 6.2.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 274,
+        "line_end": 274,
+        "start_char": 5327,
+        "end_char": 5340,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.2 极性标识",
+      "properties": {
+        "条编号": "6.2.2",
+        "条标题": "极性标识"
+      },
+      "evidence": {
+        "quote": "#### 6.2.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 278,
+        "line_end": 278,
+        "start_char": 5368,
+        "end_char": 5383,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.3 质量和外形尺寸",
+      "properties": {
+        "条编号": "6.2.3",
+        "条标题": "质量和外形尺寸"
+      },
+      "evidence": {
+        "quote": "#### 6.2.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 282,
+        "line_end": 282,
+        "start_char": 5416,
+        "end_char": 5434,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.4 标准充电",
+      "properties": {
+        "条编号": "6.2.4",
+        "条标题": "标准充电"
+      },
+      "evidence": {
+        "quote": "#### 6.2.4 标准充电",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 288,
+        "line_end": 288,
+        "start_char": 5498,
+        "end_char": 5513,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.5 室温放电容量",
+      "properties": {
+        "条编号": "6.2.5",
+        "条标题": "室温放电容量"
+      },
+      "evidence": {
+        "quote": "#### 6.2.5 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 296,
+        "line_end": 296,
+        "start_char": 5860,
+        "end_char": 5877,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.6 室温倍率放电容量",
+      "properties": {
+        "条编号": "6.2.6",
+        "条标题": "室温倍率放电容量"
+      },
+      "evidence": {
+        "quote": "#### 6.2.6 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 308,
+        "line_end": 308,
+        "start_char": 6110,
+        "end_char": 6129,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.6.1 高能量电池",
+      "properties": {
+        "条编号": "6.2.6.1",
+        "条标题": "高能量电池"
+      },
+      "evidence": {
+        "quote": "##### 6.2.6.1 高能量电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 310,
+        "line_end": 310,
+        "start_char": 6131,
+        "end_char": 6150,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.6.2 高功率电池",
+      "properties": {
+        "条编号": "6.2.6.2",
+        "条标题": "高功率电池"
+      },
+      "evidence": {
+        "quote": "##### 6.2.6.2 高功率电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 322,
+        "line_end": 322,
+        "start_char": 6313,
+        "end_char": 6332,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.7 室温倍率充电性能",
+      "properties": {
+        "条编号": "6.2.7",
+        "条标题": "室温倍率充电性能"
+      },
+      "evidence": {
+        "quote": "#### 6.2.7 室温倍率充电性能",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 334,
+        "line_end": 334,
+        "start_char": 6514,
+        "end_char": 6533,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.8 低温放电容量",
+      "properties": {
+        "条编号": "6.2.8",
+        "条标题": "低温放电容量"
+      },
+      "evidence": {
+        "quote": "#### 6.2.8 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 346,
+        "line_end": 346,
+        "start_char": 6787,
+        "end_char": 6804,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.9 高温放电容量",
+      "properties": {
+        "条编号": "6.2.9",
+        "条标题": "高温放电容量"
+      },
+      "evidence": {
+        "quote": "#### 6.2.9 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 358,
+        "line_end": 358,
+        "start_char": 6993,
+        "end_char": 7010,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.10 荷电保持与容量恢复能力",
+      "properties": {
+        "条编号": "6.2.10",
+        "条标题": "荷电保持与容量恢复能力"
+      },
+      "evidence": {
+        "quote": "#### 6.2.10 荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 370,
+        "line_end": 370,
+        "start_char": 7201,
+        "end_char": 7224,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.10.1 室温荷电保持与容量恢复能力",
+      "properties": {
+        "条编号": "6.2.10.1",
+        "条标题": "室温荷电保持与容量恢复能力"
+      },
+      "evidence": {
+        "quote": "##### 6.2.10.1 室温荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 372,
+        "line_end": 372,
+        "start_char": 7226,
+        "end_char": 7254,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.10.2 高温荷电保持与容量恢复能力",
+      "properties": {
+        "条编号": "6.2.10.2",
+        "条标题": "高温荷电保持与容量恢复能力"
+      },
+      "evidence": {
+        "quote": "##### 6.2.10.2 高温荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 389,
+        "line_end": 389,
+        "start_char": 7525,
+        "end_char": 7553,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.2.11 储存",
+      "properties": {
+        "条编号": "6.2.11",
+        "条标题": "储存"
+      },
+      "evidence": {
+        "quote": "#### 6.2.11 储存",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 422,
+        "line_end": 422,
+        "start_char": 8041,
+        "end_char": 8055,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subclause",
+      "name": "6.3 试验项目",
+      "properties": {
+        "条编号": "6.3",
+        "条标题": "试验项目"
+      },
+      "evidence": {
+        "quote": "### 6.3 试验项目",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 444,
+        "line_end": 444,
+        "start_char": 8473,
+        "end_char": 8485,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "高能量电池",
+      "properties": {
+        "术语标准名称": "高能量电池",
+        "术语标准定义": "室温下最大允许输出电功率与3I3倍率放电能量比值低于10的电池。",
+        "同义词": "high energy battery"
+      },
+      "evidence": {
+        "quote": "室温下，最大允许输出电功率(W)和 $ 3I_{3} $倍率放电能量(Wh)的比值低于10的电池。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 133,
+        "line_end": 133,
+        "start_char": 2749,
+        "end_char": 2798,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "高功率电池",
+      "properties": {
+        "术语标准名称": "高功率电池",
+        "术语标准定义": "室温下最大允许输出电功率与1I1倍率放电能量比值不低于10的电池。",
+        "同义词": "high power battery"
+      },
+      "evidence": {
+        "quote": "室温下，最大允许输出电功率(W)和 $ 1I_{1} $倍率放电能量(Wh)的比值不低于10的电池。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 141,
+        "line_end": 141,
+        "start_char": 2904,
+        "end_char": 2954,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "额定容量",
+      "properties": {
+        "术语标准名称": "额定容量",
+        "术语标准定义": "完全充电后以规定放电电流测得并由制造商申明的容量值。",
+        "同义词": "rated capacity"
+      },
+      "evidence": {
+        "quote": "室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的放电电流测得并由制造商申明的容量值(Ah)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 149,
+        "line_end": 149,
+        "start_char": 3047,
+        "end_char": 3115,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "额定能量",
+      "properties": {
+        "术语标准名称": "额定能量",
+        "术语标准定义": "完全充电后以规定放电电流测得并由制造商申明的能量值。",
+        "同义词": "rated energy"
+      },
+      "evidence": {
+        "quote": "室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的放电电流测得并由制造商申明的能量值(Wh)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 155,
+        "line_end": 155,
+        "start_char": 3180,
+        "end_char": 3248,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "初始容量",
+      "properties": {
+        "术语标准名称": "初始容量",
+        "术语标准定义": "新出厂动力电池完全充电后以规定电流放电至制造商规定终止条件时所放出的容量。",
+        "同义词": "initial capacity"
+      },
+      "evidence": {
+        "quote": "新出厂的动力电池，在室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的电流放电至制造商规定的放电终止条件时所放出的容量(Ah)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 160,
+        "line_end": 160,
+        "start_char": 3317,
+        "end_char": 3402,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "I3",
+      "properties": {
+        "术语标准名称": "I3",
+        "术语标准定义": "3h率放电电流，其数值等于额定容量值的1/3。",
+        "同义词": "3h率放电电流"
+      },
+      "evidence": {
+        "quote": "$ I_{3} $:3 h 率放电电流(A)，其数值等于额定容量值的1/3。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 168,
+        "line_end": 168,
+        "start_char": 3463,
+        "end_char": 3501,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Terminology",
+      "name": "I1",
+      "properties": {
+        "术语标准名称": "I1",
+        "术语标准定义": "1h率放电电流，其数值等于额定容量值。",
+        "同义词": "1h率放电电流"
+      },
+      "evidence": {
+        "quote": "$ I_{1} $: 1 h 率放电电流(A)，其数值等于额定容量值。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 170,
+        "line_end": 170,
+        "start_char": 3504,
+        "end_char": 3539,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "1 范围条款",
+      "properties": {
+        "唯一标识符": "IU-1-001",
+        "内容描述": "本文件规定电动汽车用动力蓄电池单体的电性能要求和相应试验方法，适用于装载在电动汽车上的锂离子电池和金属氢化物镍电池单体，其他类型电池参照执行。",
+        "条款类型": "陈述型",
+        "约束类型": "合规约束"
+      },
+      "evidence": {
+        "quote": "## 1 范围",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 2375,
+        "end_char": 2382,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "2 规范性引用文件条款",
+      "properties": {
+        "唯一标识符": "IU-2-001",
+        "内容描述": "规范性引用文件包括GB/T 10592—2023、GB/T 19596和GB 38031。",
+        "条款类型": "陈述型",
+        "约束类型": "合规约束"
+      },
+      "evidence": {
+        "quote": "## 2 规范性引用文件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 117,
+        "line_end": 117,
+        "start_char": 2479,
+        "end_char": 2491,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.1 外观要求",
+      "properties": {
+        "唯一标识符": "IU-5.1-001",
+        "内容描述": "电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 176,
+        "line_end": 176,
+        "start_char": 3564,
+        "end_char": 3616,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.2 极性标识要求",
+      "properties": {
+        "唯一标识符": "IU-5.2-001",
+        "内容描述": "电池单体按6.2.2检验，端子极性标识应正确、清晰。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "电池单体按6.2.2检验，端子极性标识应正确、清晰",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 180,
+        "line_end": 180,
+        "start_char": 3633,
+        "end_char": 3658,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.3 质量和外形尺寸要求",
+      "properties": {
+        "唯一标识符": "IU-5.3-001",
+        "内容描述": "电池单体按6.2.3检验，质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 184,
+        "line_end": 184,
+        "start_char": 3678,
+        "end_char": 3716,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.4 室温放电容量要求",
+      "properties": {
+        "唯一标识符": "IU-5.4-001",
+        "内容描述": "初始容量不得低于额定容量且不得超过额定容量的110%，初始容量极差不得大于初始容量平均值的5%。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 188,
+        "line_end": 188,
+        "start_char": 3734,
+        "end_char": 3805,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.5 室温倍率放电容量要求",
+      "properties": {
+        "唯一标识符": "IU-5.5-001",
+        "内容描述": "高能量电池放电容量不得低于初始容量的95%；高功率电池不得低于初始容量的80%。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 192,
+        "line_end": 192,
+        "start_char": 3829,
+        "end_char": 3845,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.6 室温倍率充电性能要求",
+      "properties": {
+        "唯一标识符": "IU-5.6-001",
+        "内容描述": "电池单体放电容量不得低于初始容量的80%。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 196,
+        "line_end": 196,
+        "start_char": 3885,
+        "end_char": 3921,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.7 低温放电容量要求",
+      "properties": {
+        "唯一标识符": "IU-5.7-001",
+        "内容描述": "锂离子电池放电容量不得低于初始容量的70%；金属氢化物镍电池不得低于初始容量的80%。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "### 5.7 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 202,
+        "line_end": 202,
+        "start_char": 3974,
+        "end_char": 3988,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.8 高温放电容量要求",
+      "properties": {
+        "唯一标识符": "IU-5.8-001",
+        "内容描述": "电池单体放电容量不得低于初始容量的95%。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "高能量电池单体按6.2.6.1试验，其放电容量不应低于初始容量的95%；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 194,
+        "line_end": 194,
+        "start_char": 3847,
+        "end_char": 3883,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.9 荷电保持与容量恢复能力要求",
+      "properties": {
+        "唯一标识符": "IU-5.9-001",
+        "内容描述": "对锂离子和金属氢化物镍电池分别规定荷电保持容量、恢复容量及容量和能量效率极差要求。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "金属氢化物镍电池单体按6.2.10试验，其室温荷电保持容量不应低于初始容量的83%，高温荷电保持容量不应低于初始容量的70%，恢复容量不应低于初始容量的95%，同时所有测试对象高温荷电保持容量、高温恢复容量极差不应大于初始容量平均值的5%，能量效率极差不应大于所有测试对象能量效率平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 216,
+        "line_end": 216,
+        "start_char": 4263,
+        "end_char": 4410,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "5.10 储存要求",
+      "properties": {
+        "唯一标识符": "IU-5.10-001",
+        "内容描述": "恢复容量不得低于初始容量的95%，恢复容量极差和能量效率极差不得大于相应平均值的5%。",
+        "条款类型": "要求型",
+        "约束类型": "质量约束"
+      },
+      "evidence": {
+        "quote": "锂离子电池单体按6.2.10试验，其室温及高温荷电保持容量不应低于初始容量的90%，恢复容量不应低于初始容量的95%，同时所有测试对象高温荷电保持容量、高温恢复容量极差不应大于初始容量平均值的5%，能量效率极差不应大于所有测试对象能量效率平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 214,
+        "line_end": 214,
+        "start_char": 4135,
+        "end_char": 4261,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "6.1 试验条件条款",
+      "properties": {
+        "唯一标识符": "IU-6.1-001",
+        "内容描述": "规定试验环境、仪器仪表准确度、测试过程误差及数据记录间隔。",
+        "条款类型": "要求型",
+        "约束类型": "流程约束"
+      },
+      "evidence": {
+        "quote": "### 6.1 试验条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 224,
+        "line_end": 224,
+        "start_char": 4526,
+        "end_char": 4538,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "6.2 试验方法条款",
+      "properties": {
+        "唯一标识符": "IU-6.2-001",
+        "内容描述": "规定外观、极性、质量尺寸、标准充电及各项容量、荷电保持和储存试验方法。",
+        "条款类型": "要求型",
+        "约束类型": "流程约束"
+      },
+      "evidence": {
+        "quote": "### 6.2 试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 272,
+        "start_char": 5313,
+        "end_char": 5325,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "6.3 试验项目条款",
+      "properties": {
+        "唯一标识符": "IU-6.3-001",
+        "内容描述": "表1规定各试验项目对应的试验方法章条号、样品数量及编号。",
+        "条款类型": "陈述型",
+        "约束类型": "流程约束"
+      },
+      "evidence": {
+        "quote": "### 6.3 试验项目",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 444,
+        "line_end": 444,
+        "start_char": 8473,
+        "end_char": 8485,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "附录A 工装要求",
+      "properties": {
+        "唯一标识符": "IU-A-001",
+        "内容描述": "规定高低温试验箱工装的负载、材料、结构和使用要求。",
+        "条款类型": "推荐型",
+        "约束类型": "安全约束"
+      },
+      "evidence": {
+        "quote": "## 附录 A",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 450,
+        "line_end": 450,
+        "start_char": 10607,
+        "end_char": 10614,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Subject of Standardization",
+      "name": "电池单体",
+      "properties": {
+        "对象名称": "电池单体",
+        "对象类别": "产品"
+      },
+      "evidence": {
+        "quote": "a）电池单体按6.2.4方法充电；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 300,
+        "line_end": 300,
+        "start_char": 5898,
+        "end_char": 5915,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subject of Standardization",
+      "name": "锂离子电池单体",
+      "properties": {
+        "对象名称": "锂离子电池单体",
+        "对象类别": "产品"
+      },
+      "evidence": {
+        "quote": "锂离子电池单体按6.2.8试验，其放电容量不应低于初始容量的70%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 204,
+        "line_end": 204,
+        "start_char": 3990,
+        "end_char": 4024,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Subject of Standardization",
+      "name": "金属氢化物镍电池单体",
+      "properties": {
+        "对象名称": "金属氢化物镍电池单体",
+        "对象类别": "产品"
+      },
+      "evidence": {
+        "quote": "金属氢化物镍电池单体按6.2.8试验，其放电容量不应低于初始容量的80%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 206,
+        "line_end": 206,
+        "start_char": 4026,
+        "end_char": 4063,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "初始容量",
+      "properties": {
+        "特性名称": "初始容量",
+        "特性类型": "能力型"
+      },
+      "evidence": {
+        "quote": " 初始容量 initial capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 158,
+        "line_end": 158,
+        "start_char": 3293,
+        "end_char": 3315,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "放电容量",
+      "properties": {
+        "特性名称": "放电容量",
+        "特性类型": "能力型"
+      },
+      "evidence": {
+        "quote": "### 5.4 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 186,
+        "start_char": 3718,
+        "end_char": 3732,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "荷电保持容量",
+      "properties": {
+        "特性名称": "荷电保持容量",
+        "特性类型": "能力型"
+      },
+      "evidence": {
+        "quote": "d）计量荷电保持容量（以Ah计）；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 381,
+        "line_end": 381,
+        "start_char": 7392,
+        "end_char": 7409,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "恢复容量",
+      "properties": {
+        "特性名称": "恢复容量",
+        "特性类型": "能力型"
+      },
+      "evidence": {
+        "quote": "g）计量恢复容量(以 Ah 计)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 387,
+        "line_end": 387,
+        "start_char": 7506,
+        "end_char": 7523,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "能量效率",
+      "properties": {
+        "特性名称": "能量效率",
+        "特性类型": "能力型"
+      },
+      "evidence": {
+        "quote": "$ \\eta $ ——能量效率；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 416,
+        "line_end": 416,
+        "start_char": 7965,
+        "end_char": 7981,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "外观",
+      "properties": {
+        "特性名称": "外观",
+        "特性类型": "描述型"
+      },
+      "evidence": {
+        "quote": "### 5.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 174,
+        "line_end": 174,
+        "start_char": 3552,
+        "end_char": 3562,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "极性标识",
+      "properties": {
+        "特性名称": "极性标识",
+        "特性类型": "描述型"
+      },
+      "evidence": {
+        "quote": "### 5.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 178,
+        "start_char": 3619,
+        "end_char": 3631,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "质量",
+      "properties": {
+        "特性名称": "质量",
+        "特性类型": "描述型"
+      },
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 182,
+        "start_char": 3661,
+        "end_char": 3676,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Property",
+      "name": "外形尺寸",
+      "properties": {
+        "特性名称": "外形尺寸",
+        "特性类型": "描述型"
+      },
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 182,
+        "start_char": 3661,
+        "end_char": 3676,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "初始容量相对额定容量约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最小值": "100",
+        "最大值": "110",
+        "阈值范围": "100-110",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "\\eta=\\frac{E_{d}}{E_{c}}\\times100\\%",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 410,
+        "line_end": 410,
+        "start_char": 7918,
+        "end_char": 7953,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "初始容量极差约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最大值": "5",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 188,
+        "line_end": 188,
+        "start_char": 3734,
+        "end_char": 3805,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "室温倍率放电容量约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最小值": "95",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 192,
+        "line_end": 192,
+        "start_char": 3829,
+        "end_char": 3845,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "高功率倍率放电容量约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最小值": "80",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "GB 38031 电动汽车用动力蓄电池安全要求",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 125,
+        "line_end": 125,
+        "start_char": 2634,
+        "end_char": 2657,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "低温锂离子放电容量约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最小值": "70",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "锂离子电池单体按6.2.8试验，其放电容量不应低于初始容量的70%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 204,
+        "line_end": 204,
+        "start_char": 3990,
+        "end_char": 4024,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "高温放电容量约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最小值": "95",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "### 5.8 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 208,
+        "line_end": 208,
+        "start_char": 4065,
+        "end_char": 4079,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Constrain",
+      "name": "恢复容量约束",
+      "properties": {
+        "约束类型": "质量约束",
+        "最小值": "95",
+        "测量单位": "%"
+      },
+      "evidence": {
+        "quote": "g）计量恢复容量(以 Ah 计)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 387,
+        "line_end": 387,
+        "start_char": 7506,
+        "end_char": 7523,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "外观检验",
+      "properties": {},
+      "evidence": {
+        "quote": "电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 176,
+        "line_end": 176,
+        "start_char": 3564,
+        "end_char": 3616,
+        "support": "incident_relation_context"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "极性标识检验",
+      "properties": {},
+      "evidence": {
+        "quote": "### 5.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 178,
+        "start_char": 3619,
+        "end_char": 3631,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "质量和外形尺寸检验",
+      "properties": {},
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 182,
+        "start_char": 3661,
+        "end_char": 3676,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "标准充电",
+      "properties": {},
+      "evidence": {
+        "quote": "#### 6.2.4 标准充电",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 288,
+        "line_end": 288,
+        "start_char": 5498,
+        "end_char": 5513,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "室温放电容量试验",
+      "properties": {},
+      "evidence": {
+        "quote": "室温放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 298,
+        "line_end": 298,
+        "start_char": 5879,
+        "end_char": 5896,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "室温倍率放电容量试验",
+      "properties": {},
+      "evidence": {
+        "quote": "6.2.6.1.2 室温倍率放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 314,
+        "line_end": 314,
+        "start_char": 6192,
+        "end_char": 6221,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "室温倍率充电性能试验",
+      "properties": {},
+      "evidence": {
+        "quote": "室温倍率充电性能试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 336,
+        "line_end": 336,
+        "start_char": 6535,
+        "end_char": 6554,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "低温放电容量试验",
+      "properties": {},
+      "evidence": {
+        "quote": "低温放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 348,
+        "line_end": 348,
+        "start_char": 6806,
+        "end_char": 6823,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "高温放电容量试验",
+      "properties": {},
+      "evidence": {
+        "quote": "高温放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 360,
+        "line_end": 360,
+        "start_char": 7012,
+        "end_char": 7029,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "荷电保持与容量恢复能力试验",
+      "properties": {},
+      "evidence": {
+        "quote": "室温荷电保持与容量恢复能力试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 374,
+        "line_end": 374,
+        "start_char": 7256,
+        "end_char": 7280,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ActionClass",
+      "name": "储存试验",
+      "properties": {},
+      "evidence": {
+        "quote": "储存试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 424,
+        "line_end": 424,
+        "start_char": 8057,
+        "end_char": 8070,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Standard",
+      "name": "GB/T 10592—2023 高低温试验箱技术条件",
+      "properties": {
+        "文件编号": "GB/T 10592—2023",
+        "文件名称": "高低温试验箱技术条件",
+        "标准状态": "现行"
+      },
+      "evidence": {
+        "quote": "GB/T 10592—2023 高低温试验箱技术条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 121,
+        "line_end": 121,
+        "start_char": 2587,
+        "end_char": 2613,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Standard",
+      "name": "GB/T 19596 电动汽车术语",
+      "properties": {
+        "文件编号": "GB/T 19596",
+        "文件名称": "电动汽车术语",
+        "标准状态": "现行"
+      },
+      "evidence": {
+        "quote": "GB/T 19596 电动汽车术语",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 123,
+        "line_end": 123,
+        "start_char": 2615,
+        "end_char": 2632,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Standard",
+      "name": "GB 38031 电动汽车用动力蓄电池安全要求",
+      "properties": {
+        "文件编号": "GB 38031",
+        "文件名称": "电动汽车用动力蓄电池安全要求",
+        "标准状态": "现行"
+      },
+      "evidence": {
+        "quote": "GB 38031 电动汽车用动力蓄电池安全要求",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 125,
+        "line_end": 125,
+        "start_char": 2634,
+        "end_char": 2657,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "ExternalResource",
+      "name": "制造商提供的产品技术条件",
+      "properties": {
+        "文件类型": "文献",
+        "责任主体": "制造商"
+      },
+      "evidence": {
+        "quote": "电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 184,
+        "line_end": 184,
+        "start_char": 3678,
+        "end_char": 3716,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Annex",
+      "name": "附录A 高低温试验箱试验工装",
+      "properties": {},
+      "evidence": {
+        "quote": " 高低温试验箱试验工装",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 49,
+        "line_end": 49,
+        "start_char": 673,
+        "end_char": 684,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Table",
+      "name": "表1 试验项目、样品数量及编号",
+      "properties": {},
+      "evidence": {
+        "quote": "表1 试验项目、样品数量及编号",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 447,
+        "line_end": 447,
+        "start_char": 8504,
+        "end_char": 8519,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Equation",
+      "name": "公式（1）能量效率",
+      "properties": {},
+      "evidence": {
+        "quote": "$ \\eta $ ——能量效率；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 416,
+        "line_end": 416,
+        "start_char": 7965,
+        "end_char": 7981,
+        "support": "structural_inference"
+      }
+    },
+    {
+      "type": "Reference",
+      "name": "参考文献 GB/T 19596—2017 电动汽车术语",
+      "properties": {},
+      "evidence": {
+        "quote": "[1] GB/T 19596—2017 电动汽车术语",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 479,
+        "line_end": 479,
+        "start_char": 10917,
+        "end_char": 10943,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "Clause",
+      "name": "参考文献条款",
+      "properties": {
+        "唯一标识符": "IU-REF-001",
+        "内容描述": "参考文献为GB/T 19596—2017《电动汽车术语》。",
+        "条款类型": "陈述型",
+        "约束类型": "合规约束"
+      },
+      "evidence": {
+        "quote": "下列文件中的内容通过文中的规范性引用而构成本文件必不可少的条款。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 119,
+        "line_end": 119,
+        "start_char": 2493,
+        "end_char": 2525,
+        "support": "explicit"
+      }
+    }
   ],
   "relations": [
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"classifiedUnder","to_type":"InternationalClassificationofStandard","to_name":"ICS 43.120"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"classifiedUnder","to_type":"ChineseClassificationofStandard","to_name":"CCS T 47"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"issuedBy","to_type":"Publishing Organization","to_name":"国家市场监督管理总局"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"issuedBy","to_type":"Publishing Organization","to_name":"国家标准化管理委员会"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"proposedBy","to_type":"Proposing Organization","to_name":"中华人民共和国工业和信息化部"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"administeredBy","to_type":"CompetentDepartment","to_name":"全国汽车标准化技术委员会（SAC/TC 114）"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"standardizes","to_type":"StandardizationObject","to_name":"电动汽车用动力蓄电池单体"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasDevelopmentStage","to_type":"Approval and PublicationStage","to_name":"批准发布阶段"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"cites","to_type":"Standard","to_name":"GB/T 10592—2023 高低温试验箱技术条件"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"cites","to_type":"Standard","to_name":"GB/T 19596 电动汽车术语"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"cites","to_type":"Standard","to_name":"GB 38031 电动汽车用动力蓄电池安全要求"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"范围"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"规范性引用文件"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"术语和定义"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"符号"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"性能要求"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"试验方法"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Normative Element","to_name":"附录A 高低温试验箱试验工装"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasNormativeElement","to_type":"Informative Element","to_name":"参考文献"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasStructuralElement","to_type":"Section","to_name":"1 范围"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasStructuralElement","to_type":"Section","to_name":"2 规范性引用文件"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasStructuralElement","to_type":"Section","to_name":"3 术语和定义"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasStructuralElement","to_type":"Section","to_name":"4 符号"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasStructuralElement","to_type":"Section","to_name":"5 性能要求"},
-    {"from_type":"Standard","from_name":"GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法","rel_type":"hasStructuralElement","to_type":"Section","to_name":"6 试验方法"},
-    {"from_type":"Section","from_name":"3 术语和定义","rel_type":"hasSubClause","to_type":"Subclause","to_name":"3.1 高能量电池"},
-    {"from_type":"Section","from_name":"3 术语和定义","rel_type":"hasSubClause","to_type":"Subclause","to_name":"3.2 高功率电池"},
-    {"from_type":"Section","from_name":"3 术语和定义","rel_type":"hasSubClause","to_type":"Subclause","to_name":"3.3 额定容量"},
-    {"from_type":"Section","from_name":"3 术语和定义","rel_type":"hasSubClause","to_type":"Subclause","to_name":"3.4 额定能量"},
-    {"from_type":"Section","from_name":"3 术语和定义","rel_type":"hasSubClause","to_type":"Subclause","to_name":"3.5 初始容量"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.1 外观"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.2 极性标识"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.3 质量和外形尺寸"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.4 室温放电容量"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.5 室温倍率放电容量"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.6 室温倍率充电性能"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.7 低温放电容量"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.8 高温放电容量"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.9 荷电保持与容量恢复能力"},
-    {"from_type":"Section","from_name":"5 性能要求","rel_type":"hasSubClause","to_type":"Subclause","to_name":"5.10 储存"},
-    {"from_type":"Section","from_name":"6 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.1 试验条件"},
-    {"from_type":"Section","from_name":"6 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2 试验方法"},
-    {"from_type":"Section","from_name":"6 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.3 试验项目"},
-    {"from_type":"Subclause","from_name":"6.1 试验条件","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.1.1 一般条件"},
-    {"from_type":"Subclause","from_name":"6.1 试验条件","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.1.2 测量仪器、仪表准确度"},
-    {"from_type":"Subclause","from_name":"6.1 试验条件","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.1.3 测试过程误差"},
-    {"from_type":"Subclause","from_name":"6.1 试验条件","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.1.4 数据记录与记录间隔"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.1 外观"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.2 极性标识"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.3 质量和外形尺寸"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.4 标准充电"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.5 室温放电容量"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.6 室温倍率放电容量"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.7 室温倍率充电性能"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.8 低温放电容量"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.9 高温放电容量"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.10 荷电保持与容量恢复能力"},
-    {"from_type":"Subclause","from_name":"6.2 试验方法","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.11 储存"},
-    {"from_type":"Subclause","from_name":"6.2.6 室温倍率放电容量","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.6.1 高能量电池"},
-    {"from_type":"Subclause","from_name":"6.2.6 室温倍率放电容量","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.6.2 高功率电池"},
-    {"from_type":"Subclause","from_name":"6.2.10 荷电保持与容量恢复能力","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.10.1 室温荷电保持与容量恢复能力"},
-    {"from_type":"Subclause","from_name":"6.2.10 荷电保持与容量恢复能力","rel_type":"hasSubClause","to_type":"Subclause","to_name":"6.2.10.2 高温荷电保持与容量恢复能力"},
-    {"from_type":"Section","from_name":"1 范围","rel_type":"hasClause","to_type":"Clause","to_name":"1 范围条款"},
-    {"from_type":"Section","from_name":"2 规范性引用文件","rel_type":"hasClause","to_type":"Clause","to_name":"2 规范性引用文件条款"},
-    {"from_type":"Subclause","from_name":"5.1 外观","rel_type":"hasClause","to_type":"Clause","to_name":"5.1 外观要求"},
-    {"from_type":"Subclause","from_name":"5.2 极性标识","rel_type":"hasClause","to_type":"Clause","to_name":"5.2 极性标识要求"},
-    {"from_type":"Subclause","from_name":"5.3 质量和外形尺寸","rel_type":"hasClause","to_type":"Clause","to_name":"5.3 质量和外形尺寸要求"},
-    {"from_type":"Subclause","from_name":"5.4 室温放电容量","rel_type":"hasClause","to_type":"Clause","to_name":"5.4 室温放电容量要求"},
-    {"from_type":"Subclause","from_name":"5.5 室温倍率放电容量","rel_type":"hasClause","to_type":"Clause","to_name":"5.5 室温倍率放电容量要求"},
-    {"from_type":"Subclause","from_name":"5.6 室温倍率充电性能","rel_type":"hasClause","to_type":"Clause","to_name":"5.6 室温倍率充电性能要求"},
-    {"from_type":"Subclause","from_name":"5.7 低温放电容量","rel_type":"hasClause","to_type":"Clause","to_name":"5.7 低温放电容量要求"},
-    {"from_type":"Subclause","from_name":"5.8 高温放电容量","rel_type":"hasClause","to_type":"Clause","to_name":"5.8 高温放电容量要求"},
-    {"from_type":"Subclause","from_name":"5.9 荷电保持与容量恢复能力","rel_type":"hasClause","to_type":"Clause","to_name":"5.9 荷电保持与容量恢复能力要求"},
-    {"from_type":"Subclause","from_name":"5.10 储存","rel_type":"hasClause","to_type":"Clause","to_name":"5.10 储存要求"},
-    {"from_type":"Section","from_name":"6 试验方法","rel_type":"hasClause","to_type":"Clause","to_name":"6.1 试验条件条款"},
-    {"from_type":"Section","from_name":"6 试验方法","rel_type":"hasClause","to_type":"Clause","to_name":"6.2 试验方法条款"},
-    {"from_type":"Section","from_name":"6 试验方法","rel_type":"hasClause","to_type":"Clause","to_name":"6.3 试验项目条款"},
-    {"from_type":"Normative Element","from_name":"附录A 高低温试验箱试验工装","rel_type":"hasClause","to_type":"Clause","to_name":"附录A 工装要求"},
-    {"from_type":"Normative Element","from_name":"术语和定义","rel_type":"defines","to_type":"Terminology","to_name":"高能量电池"},
-    {"from_type":"Normative Element","from_name":"术语和定义","rel_type":"defines","to_type":"Terminology","to_name":"高功率电池"},
-    {"from_type":"Normative Element","from_name":"术语和定义","rel_type":"defines","to_type":"Terminology","to_name":"额定容量"},
-    {"from_type":"Normative Element","from_name":"术语和定义","rel_type":"defines","to_type":"Terminology","to_name":"额定能量"},
-    {"from_type":"Normative Element","from_name":"术语和定义","rel_type":"defines","to_type":"Terminology","to_name":"初始容量"},
-    {"from_type":"Normative Element","from_name":"符号","rel_type":"defines","to_type":"Terminology","to_name":"I3"},
-    {"from_type":"Normative Element","from_name":"符号","rel_type":"defines","to_type":"Terminology","to_name":"I1"},
-    {"from_type":"Clause","from_name":"5.1 外观要求","rel_type":"involvesObject","to_type":"Subject of Standardization","to_name":"电池单体"},
-    {"from_type":"Clause","from_name":"5.2 极性标识要求","rel_type":"involvesObject","to_type":"Subject of Standardization","to_name":"电池单体"},
-    {"from_type":"Clause","from_name":"5.3 质量和外形尺寸要求","rel_type":"involvesObject","to_type":"Subject of Standardization","to_name":"电池单体"},
-    {"from_type":"Clause","from_name":"5.1 外观要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"外观"},
-    {"from_type":"Clause","from_name":"5.2 极性标识要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"极性标识"},
-    {"from_type":"Clause","from_name":"5.3 质量和外形尺寸要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"质量"},
-    {"from_type":"Clause","from_name":"5.3 质量和外形尺寸要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"外形尺寸"},
-    {"from_type":"Clause","from_name":"5.4 室温放电容量要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"初始容量"},
-    {"from_type":"Clause","from_name":"5.5 室温倍率放电容量要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"放电容量"},
-    {"from_type":"Clause","from_name":"5.9 荷电保持与容量恢复能力要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"荷电保持容量"},
-    {"from_type":"Clause","from_name":"5.9 荷电保持与容量恢复能力要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"恢复容量"},
-    {"from_type":"Clause","from_name":"5.9 荷电保持与容量恢复能力要求","rel_type":"specifiesCharacteristic","to_type":"Property","to_name":"能量效率"},
-    {"from_type":"Property","from_name":"初始容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"初始容量相对额定容量约束"},
-    {"from_type":"Property","from_name":"初始容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"初始容量极差约束"},
-    {"from_type":"Property","from_name":"放电容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"室温倍率放电容量约束"},
-    {"from_type":"Property","from_name":"放电容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"高功率倍率放电容量约束"},
-    {"from_type":"Property","from_name":"放电容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"低温锂离子放电容量约束"},
-    {"from_type":"Property","from_name":"放电容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"高温放电容量约束"},
-    {"from_type":"Property","from_name":"恢复容量","rel_type":"imposesConstraint","to_type":"Constrain","to_name":"恢复容量约束"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"初始容量"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"放电容量"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"荷电保持容量"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"恢复容量"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"能量效率"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"外观"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"极性标识"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"质量"},
-    {"from_type":"Subject of Standardization","from_name":"电池单体","rel_type":"hasCharacteristic","to_type":"Property","to_name":"外形尺寸"},
-    {"from_type":"Clause","from_name":"5.4 室温放电容量要求","rel_type":"usesTerm","to_type":"Terminology","to_name":"额定容量"},
-    {"from_type":"Clause","from_name":"5.4 室温放电容量要求","rel_type":"usesTerm","to_type":"Terminology","to_name":"初始容量"},
-    {"from_type":"Clause","from_name":"5.5 室温倍率放电容量要求","rel_type":"usesTerm","to_type":"Terminology","to_name":"高能量电池"},
-    {"from_type":"Clause","from_name":"5.5 室温倍率放电容量要求","rel_type":"usesTerm","to_type":"Terminology","to_name":"高功率电池"},
-    {"from_type":"Clause","from_name":"5.1 外观要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.1 外观"},
-    {"from_type":"Clause","from_name":"5.2 极性标识要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.2 极性标识"},
-    {"from_type":"Clause","from_name":"5.3 质量和外形尺寸要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.3 质量和外形尺寸"},
-    {"from_type":"Clause","from_name":"5.4 室温放电容量要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.5 室温放电容量"},
-    {"from_type":"Clause","from_name":"5.5 室温倍率放电容量要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.6 室温倍率放电容量"},
-    {"from_type":"Clause","from_name":"5.6 室温倍率充电性能要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.7 室温倍率充电性能"},
-    {"from_type":"Clause","from_name":"5.7 低温放电容量要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.8 低温放电容量"},
-    {"from_type":"Clause","from_name":"5.8 高温放电容量要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.9 高温放电容量"},
-    {"from_type":"Clause","from_name":"5.9 荷电保持与容量恢复能力要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.10 荷电保持与容量恢复能力"},
-    {"from_type":"Clause","from_name":"5.10 储存要求","rel_type":"referencesClause","to_type":"Subclause","to_name":"6.2.11 储存"},
-    {"from_type":"Clause","from_name":"5.3 质量和外形尺寸要求","rel_type":"referencesExternalResource","to_type":"ExternalResource","to_name":"制造商提供的产品技术条件"},
-    {"from_type":"Clause","from_name":"5.1 外观要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"外观检验"},
-    {"from_type":"Clause","from_name":"5.2 极性标识要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"极性标识检验"},
-    {"from_type":"Clause","from_name":"5.3 质量和外形尺寸要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"质量和外形尺寸检验"},
-    {"from_type":"Clause","from_name":"5.4 室温放电容量要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"室温放电容量试验"},
-    {"from_type":"Clause","from_name":"5.5 室温倍率放电容量要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"室温倍率放电容量试验"},
-    {"from_type":"Clause","from_name":"5.6 室温倍率充电性能要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"室温倍率充电性能试验"},
-    {"from_type":"Clause","from_name":"5.7 低温放电容量要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"低温放电容量试验"},
-    {"from_type":"Clause","from_name":"5.8 高温放电容量要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"高温放电容量试验"},
-    {"from_type":"Clause","from_name":"5.9 荷电保持与容量恢复能力要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"荷电保持与容量恢复能力试验"},
-    {"from_type":"Clause","from_name":"5.10 储存要求","rel_type":"describesAction","to_type":"ActionClass","to_name":"储存试验"},
-    {"from_type":"Clause","from_name":"附录A 工装要求","rel_type":"hasRepresentationForm","to_type":"Annex","to_name":"附录A 高低温试验箱试验工装"},
-    {"from_type":"Clause","from_name":"6.3 试验项目条款","rel_type":"hasRepresentationForm","to_type":"Table","to_name":"表1 试验项目、样品数量及编号"},
-    {"from_type":"Clause","from_name":"6.2 试验方法条款","rel_type":"hasRepresentationForm","to_type":"Equation","to_name":"公式（1）能量效率"},
-    {"from_type":"Informative Element","from_name":"参考文献","rel_type":"hasClause","to_type":"Clause","to_name":"参考文献条款"},
-    {"from_type":"Clause","from_name":"参考文献条款","rel_type":"hasRepresentationForm","to_type":"Reference","to_name":"参考文献 GB/T 19596—2017 电动汽车术语"}
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "classifiedUnder",
+      "to_type": "InternationalClassificationofStandard",
+      "to_name": "ICS 43.120",
+      "evidence": {
+        "quote": "ICS 43.120\n\nCCS T 47\n\n中华人民共和国国家标准\n\nGB/T 31486—2024\n\n代替 GB/T 31486—2015\n\n# 电动汽车用动力蓄电池电性能要求 及试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 5,
+        "line_end": 15,
+        "start_char": 60,
+        "end_char": 155,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "classifiedUnder",
+      "to_type": "ChineseClassificationofStandard",
+      "to_name": "CCS T 47",
+      "evidence": {
+        "quote": "CCS T 47\n\n中华人民共和国国家标准\n\nGB/T 31486—2024\n\n代替 GB/T 31486—2015\n\n# 电动汽车用动力蓄电池电性能要求 及试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 7,
+        "line_end": 15,
+        "start_char": 72,
+        "end_char": 155,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "issuedBy",
+      "to_type": "Publishing Organization",
+      "to_name": "国家市场监督管理总局",
+      "evidence": {
+        "quote": "# 电动汽车用动力蓄电池电性能要求 及试验方法\n\n**Electrical performance requirements and test methods for traction battery of electric vehicle**\n\n2024-09-29 发布\n\n2025-04-01 实施\n\n国家市场监督管理总局发布",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 15,
+        "line_end": 23,
+        "start_char": 132,
+        "end_char": 298,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "issuedBy",
+      "to_type": "Publishing Organization",
+      "to_name": "国家标准化管理委员会",
+      "evidence": {
+        "quote": "# 电动汽车用动力蓄电池电性能要求 及试验方法\n\n**Electrical performance requirements and test methods for traction battery of electric vehicle**\n\n2024-09-29 发布\n\n2025-04-01 实施\n\n国家市场监督管理总局发布\n\n国家标准化管理委员会",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 15,
+        "line_end": 25,
+        "start_char": 132,
+        "end_char": 310,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "proposedBy",
+      "to_type": "Proposing Organization",
+      "to_name": "中华人民共和国工业和信息化部",
+      "evidence": {
+        "quote": "本文件由中华人民共和国工业和信息化部提出。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 94,
+        "line_end": 94,
+        "start_char": 1651,
+        "end_char": 1672,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "administeredBy",
+      "to_type": "CompetentDepartment",
+      "to_name": "全国汽车标准化技术委员会（SAC/TC 114）",
+      "evidence": {
+        "quote": "本文件由全国汽车标准化技术委员会（SAC/TC 114）归口。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 96,
+        "line_end": 96,
+        "start_char": 1674,
+        "end_char": 1705,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "standardizes",
+      "to_type": "StandardizationObject",
+      "to_name": "电动汽车用动力蓄电池单体",
+      "evidence": {
+        "quote": "本文件规定了电动汽车用动力蓄电池单体（以下简称“电池单体”）的电性能要求，描述了相应的试验方法。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 113,
+        "line_end": 113,
+        "start_char": 2384,
+        "end_char": 2432,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasDevelopmentStage",
+      "to_type": "Approval and PublicationStage",
+      "to_name": "批准发布阶段",
+      "evidence": {
+        "quote": "noteId: \"1a73e6609fbb11f1a8b4b7b00d1a4660\"\ntags: []\n---\nICS 43.120\n\nCCS T 47\n\n中华人民共和国国家标准\n\nGB/T 31486—2024\n\n代替 GB/T 31486—2015\n\n# 电动汽车用动力蓄电池电性能要求 及试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 2,
+        "line_end": 15,
+        "start_char": 4,
+        "end_char": 155,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "cites",
+      "to_type": "Standard",
+      "to_name": "GB/T 10592—2023 高低温试验箱技术条件",
+      "evidence": {
+        "quote": "GB/T 10592—2023 高低温试验箱技术条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 121,
+        "line_end": 121,
+        "start_char": 2587,
+        "end_char": 2613,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "cites",
+      "to_type": "Standard",
+      "to_name": "GB/T 19596 电动汽车术语",
+      "evidence": {
+        "quote": "GB/T 19596 电动汽车术语",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 123,
+        "line_end": 123,
+        "start_char": 2615,
+        "end_char": 2632,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "cites",
+      "to_type": "Standard",
+      "to_name": "GB 38031 电动汽车用动力蓄电池安全要求",
+      "evidence": {
+        "quote": "GB 38031 电动汽车用动力蓄电池安全要求",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 125,
+        "line_end": 125,
+        "start_char": 2634,
+        "end_char": 2657,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "范围",
+      "evidence": {
+        "quote": "## 1 范围",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 2375,
+        "end_char": 2382,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "规范性引用文件",
+      "evidence": {
+        "quote": "## 2 规范性引用文件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 117,
+        "line_end": 117,
+        "start_char": 2479,
+        "end_char": 2491,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "术语和定义",
+      "evidence": {
+        "quote": "## 3 术语和定义",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 127,
+        "start_char": 2659,
+        "end_char": 2669,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "符号",
+      "evidence": {
+        "quote": "## 4 符号",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 164,
+        "line_end": 164,
+        "start_char": 3440,
+        "end_char": 3447,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "性能要求",
+      "evidence": {
+        "quote": "本文件规定了电动汽车用动力蓄电池单体（以下简称“电池单体”）的电性能要求，描述了相应的试验方法。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 113,
+        "line_end": 113,
+        "start_char": 2384,
+        "end_char": 2432,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "试验方法",
+      "evidence": {
+        "quote": "本文件规定了电动汽车用动力蓄电池单体（以下简称“电池单体”）的电性能要求，描述了相应的试验方法。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 113,
+        "line_end": 113,
+        "start_char": 2384,
+        "end_char": 2432,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Normative Element",
+      "to_name": "附录A 高低温试验箱试验工装",
+      "evidence": {
+        "quote": "6.1.1.3 高低温试验箱风速不应大于1.7 m/s，或采用符合附录A要求的试验工装。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 236,
+        "line_end": 236,
+        "start_char": 4828,
+        "end_char": 4872,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasNormativeElement",
+      "to_type": "Informative Element",
+      "to_name": "参考文献",
+      "evidence": {
+        "quote": "# 参 考 文 献",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 477,
+        "line_end": 477,
+        "start_char": 10906,
+        "end_char": 10915,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasStructuralElement",
+      "to_type": "Section",
+      "to_name": "1 范围",
+      "evidence": {
+        "quote": "## 1 范围",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 2375,
+        "end_char": 2382,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasStructuralElement",
+      "to_type": "Section",
+      "to_name": "2 规范性引用文件",
+      "evidence": {
+        "quote": "## 2 规范性引用文件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 117,
+        "line_end": 117,
+        "start_char": 2479,
+        "end_char": 2491,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasStructuralElement",
+      "to_type": "Section",
+      "to_name": "3 术语和定义",
+      "evidence": {
+        "quote": "## 3 术语和定义",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 127,
+        "start_char": 2659,
+        "end_char": 2669,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasStructuralElement",
+      "to_type": "Section",
+      "to_name": "4 符号",
+      "evidence": {
+        "quote": "## 4 符号",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 164,
+        "line_end": 164,
+        "start_char": 3440,
+        "end_char": 3447,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasStructuralElement",
+      "to_type": "Section",
+      "to_name": "5 性能要求",
+      "evidence": {
+        "quote": "## 5 性能要求",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 172,
+        "start_char": 3541,
+        "end_char": 3550,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Standard",
+      "from_name": "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法",
+      "rel_type": "hasStructuralElement",
+      "to_type": "Section",
+      "to_name": "6 试验方法",
+      "evidence": {
+        "quote": "## 6 试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 222,
+        "line_end": 222,
+        "start_char": 4515,
+        "end_char": 4524,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "3 术语和定义",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "3.1 高能量电池",
+      "evidence": {
+        "quote": "##### 6.2.6.1 高能量电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 310,
+        "line_end": 310,
+        "start_char": 6131,
+        "end_char": 6150,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "3 术语和定义",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "3.2 高功率电池",
+      "evidence": {
+        "quote": "##### 6.2.6.2 高功率电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 322,
+        "line_end": 322,
+        "start_char": 6313,
+        "end_char": 6332,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "3 术语和定义",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "3.3 额定容量",
+      "evidence": {
+        "quote": "## 3 术语和定义\n\nGB/T 19596 和 GB 38031 界定的以及下列术语和定义适用于本文件。\n\n### 3.1 高能量电池 high energy battery\n\n室温下，最大允许输出电功率(W)和 $ 3I_{3} $倍率放电能量(Wh)的比值低于10的电池。\n\n注：高能量电池一般应用于纯电动汽车和插电式混合动力电动汽车。\n\n[来源：GB/T 19596—2017，3.3.1.1.1.3，有修改]\n\n### 3.2 高功率电池 high power battery\n\n室温下，最大允许输出电功率(W)和 $ 1I_{1} $倍率放电能量(Wh)的比值不低于10的电池。\n\n注：高功率电池一般应用于混合动力电动汽车。\n\n[来源：GB/T 19596—2017, 3.3.1.1.1.4，有修改]\n\n### 3.3 额定容量 rated capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 147,
+        "start_char": 2659,
+        "end_char": 3045,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "3 术语和定义",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "3.4 额定能量",
+      "evidence": {
+        "quote": " 额定能量 rated energy",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 153,
+        "line_end": 153,
+        "start_char": 3160,
+        "end_char": 3178,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "3 术语和定义",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "3.5 初始容量",
+      "evidence": {
+        "quote": "### 3.5 初始容量 initial capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 158,
+        "line_end": 158,
+        "start_char": 3286,
+        "end_char": 3315,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.1 外观",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 174,
+        "start_char": 3541,
+        "end_char": 3562,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.2 极性标识",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。\n\n### 5.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 178,
+        "start_char": 3541,
+        "end_char": 3631,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.3 质量和外形尺寸",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。\n\n### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰。\n\n### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 182,
+        "start_char": 3541,
+        "end_char": 3676,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.4 室温放电容量",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。\n\n### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰。\n\n### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。\n\n### 5.4 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 186,
+        "start_char": 3541,
+        "end_char": 3732,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.5 室温倍率放电容量",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。\n\n### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰。\n\n### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。\n\n### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 192,
+        "start_char": 3541,
+        "end_char": 3845,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.6 室温倍率充电性能",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。\n\n### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰。\n\n### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。\n\n### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量\n\n高能量电池单体按6.2.6.1试验，其放电容量不应低于初始容量的95%；\n\n高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。\n\n### 5.6 室温倍率充电性能",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 198,
+        "start_char": 3541,
+        "end_char": 3939,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.7 低温放电容量",
+      "evidence": {
+        "quote": "## 5 性能要求\n\n### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志。\n\n### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰。\n\n### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。\n\n### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量\n\n高能量电池单体按6.2.6.1试验，其放电容量不应低于初始容量的95%；\n\n高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。\n\n### 5.6 室温倍率充电性能\n\n电池单体按6.2.7试验，其放电容量不应低于初始容量的80%。\n\n### 5.7 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 172,
+        "line_end": 202,
+        "start_char": 3541,
+        "end_char": 3988,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.8 高温放电容量",
+      "evidence": {
+        "quote": "### 5.8 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 208,
+        "line_end": 208,
+        "start_char": 4065,
+        "end_char": 4079,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.9 荷电保持与容量恢复能力",
+      "evidence": {
+        "quote": "### 5.9 荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 212,
+        "line_end": 212,
+        "start_char": 4114,
+        "end_char": 4133,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "5 性能要求",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "5.10 储存",
+      "evidence": {
+        "quote": "### 5.10 储存",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 218,
+        "line_end": 218,
+        "start_char": 4412,
+        "end_char": 4423,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "6 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.1 试验条件",
+      "evidence": {
+        "quote": "## 6 试验方法\n\n### 6.1 试验条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 222,
+        "line_end": 224,
+        "start_char": 4515,
+        "end_char": 4538,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "6 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2 试验方法",
+      "evidence": {
+        "quote": "### 6.2 试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 272,
+        "start_char": 5313,
+        "end_char": 5325,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "6 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.3 试验项目",
+      "evidence": {
+        "quote": "### 6.3 试验项目",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 444,
+        "line_end": 444,
+        "start_char": 8473,
+        "end_char": 8485,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.1 试验条件",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.1.1 一般条件",
+      "evidence": {
+        "quote": "### 6.1 试验条件\n\n#### 6.1.1 一般条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 224,
+        "line_end": 226,
+        "start_char": 4526,
+        "end_char": 4555,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.1 试验条件",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.1.2 测量仪器、仪表准确度",
+      "evidence": {
+        "quote": "### 6.1 试验条件\n\n#### 6.1.1 一般条件\n\n6.1.1.1 除另有规定外，试验应在温度为室温  $ 25\\ ^{\\circ} $C  $ \\pm $ 2  $ ^{\\circ} $C，相对湿度为 10%～90%，大气压力为 86 kPa～106 kPa 的环境中进行。\n\n6.1.1.2 测试目标环境温度改变时，在进行测试前电池单体应在目标环境温度下静置12 h完成环境适应，同时满足以下条件可提前结束：\n\na）电池单体温度与目标环境温度差值不超过 $ 2^{\\circ}C $；\n\nb）电池单体温度至少 $ 30\\ min $内变化率不大于 $ 1\\ ^{\\circ}C/h $。\n\n6.1.1.3 高低温试验箱风速不应大于1.7 m/s，或采用符合附录A要求的试验工装。\n\n6.1.1.4 试验前，制造商应提供额定容量、额定能量、充电终止电压、放电终止电压等参数。\n\n#### 6.1.2 测量仪器、仪表准确度",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 224,
+        "line_end": 240,
+        "start_char": 4526,
+        "end_char": 4942,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.1 试验条件",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.1.3 测试过程误差",
+      "evidence": {
+        "quote": "#### 6.1.3 测试过程误差",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 258,
+        "line_end": 258,
+        "start_char": 5127,
+        "end_char": 5144,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.1 试验条件",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.1.4 数据记录与记录间隔",
+      "evidence": {
+        "quote": "#### 6.1.4 数据记录与记录间隔",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 268,
+        "line_end": 268,
+        "start_char": 5237,
+        "end_char": 5257,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.1 外观",
+      "evidence": {
+        "quote": "### 6.2 试验方法\n\n#### 6.2.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 274,
+        "start_char": 5313,
+        "end_char": 5340,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.2 极性标识",
+      "evidence": {
+        "quote": "### 6.2 试验方法\n\n#### 6.2.1 外观\n\n在良好的光线条件下，用目测法检查电池单体的外观。\n\n#### 6.2.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 278,
+        "start_char": 5313,
+        "end_char": 5383,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.3 质量和外形尺寸",
+      "evidence": {
+        "quote": "### 6.2 试验方法\n\n#### 6.2.1 外观\n\n在良好的光线条件下，用目测法检查电池单体的外观。\n\n#### 6.2.2 极性标识\n\n用电压表检测电池单体极性，检查电池极性标识是否正确和清晰。\n\n#### 6.2.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 282,
+        "start_char": 5313,
+        "end_char": 5434,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.4 标准充电",
+      "evidence": {
+        "quote": "### 6.2 试验方法\n\n#### 6.2.1 外观\n\n在良好的光线条件下，用目测法检查电池单体的外观。\n\n#### 6.2.2 极性标识\n\n用电压表检测电池单体极性，检查电池极性标识是否正确和清晰。\n\n#### 6.2.3 质量和外形尺寸\n\n用衡器和量具测量电池单体质量及不含极柱的外形尺寸。\n\n注：方形和软包电池测量长、宽、高尺寸，圆柱电池测量直径和高度尺寸。\n\n#### 6.2.4 标准充电",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 288,
+        "start_char": 5313,
+        "end_char": 5513,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.5 室温放电容量",
+      "evidence": {
+        "quote": "#### 6.2.5 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 296,
+        "line_end": 296,
+        "start_char": 5860,
+        "end_char": 5877,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.6 室温倍率放电容量",
+      "evidence": {
+        "quote": "#### 6.2.6 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 308,
+        "line_end": 308,
+        "start_char": 6110,
+        "end_char": 6129,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.7 室温倍率充电性能",
+      "evidence": {
+        "quote": "#### 6.2.7 室温倍率充电性能",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 334,
+        "line_end": 334,
+        "start_char": 6514,
+        "end_char": 6533,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.8 低温放电容量",
+      "evidence": {
+        "quote": "#### 6.2.8 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 346,
+        "line_end": 346,
+        "start_char": 6787,
+        "end_char": 6804,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.9 高温放电容量",
+      "evidence": {
+        "quote": "#### 6.2.9 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 358,
+        "line_end": 358,
+        "start_char": 6993,
+        "end_char": 7010,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.10 荷电保持与容量恢复能力",
+      "evidence": {
+        "quote": "#### 6.2.10 荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 370,
+        "line_end": 370,
+        "start_char": 7201,
+        "end_char": 7224,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2 试验方法",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.11 储存",
+      "evidence": {
+        "quote": "#### 6.2.11 储存",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 422,
+        "line_end": 422,
+        "start_char": 8041,
+        "end_char": 8055,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2.6 室温倍率放电容量",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.6.1 高能量电池",
+      "evidence": {
+        "quote": "#### 6.2.6 室温倍率放电容量\n\n##### 6.2.6.1 高能量电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 308,
+        "line_end": 310,
+        "start_char": 6110,
+        "end_char": 6150,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2.6 室温倍率放电容量",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.6.2 高功率电池",
+      "evidence": {
+        "quote": "#### 6.2.6 室温倍率放电容量\n\n##### 6.2.6.1 高能量电池\n\n6.2.6.1.1 室温倍率放电容量试验的数据记录间隔不应大于100 ms。\n\n6.2.6.1.2 室温倍率放电容量试验按照如下步骤进行：\n\na）电池单体按6.2.4方法充电；\n\nb）室温下，电池单体以 $ 3I_{3} $电流放电，直到放电至制造商技术条件中规定的放电终止电压；\n\nc）计量放电容量（以 Ah 计）。\n\n##### 6.2.6.2 高功率电池",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 308,
+        "line_end": 322,
+        "start_char": 6110,
+        "end_char": 6332,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2.10 荷电保持与容量恢复能力",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.10.1 室温荷电保持与容量恢复能力",
+      "evidence": {
+        "quote": "#### 6.2.10 荷电保持与容量恢复能力\n\n##### 6.2.10.1 室温荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 370,
+        "line_end": 372,
+        "start_char": 7201,
+        "end_char": 7254,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "6.2.10 荷电保持与容量恢复能力",
+      "rel_type": "hasSubClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.10.2 高温荷电保持与容量恢复能力",
+      "evidence": {
+        "quote": "#### 6.2.10 荷电保持与容量恢复能力\n\n##### 6.2.10.1 室温荷电保持与容量恢复能力\n\n室温荷电保持与容量恢复能力试验按照如下步骤进行：\n\na）电池单体按6.2.4方法充电；\n\nb）电池单体在室温下储存 30 d;\n\nc）室温下，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的电流放电，直到放电至制造商技术条件中规定的放电终止电压；\nd）计量荷电保持容量（以Ah计）；\n\ne）电池单体再按6.2.4方法充电；\n\nf）室温下，高能量电池以  $ 1I_{3} $、高功率电池以  $ 1I_{1} $ 的电流放电，直到放电至制造商技术条件中规定的放电终止电压；\n\ng）计量恢复容量(以 Ah 计)。\n\n##### 6.2.10.2 高温荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 370,
+        "line_end": 389,
+        "start_char": 7201,
+        "end_char": 7553,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "1 范围",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "1 范围条款",
+      "evidence": {
+        "quote": "## 1 范围",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 2375,
+        "end_char": 2382,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "2 规范性引用文件",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "2 规范性引用文件条款",
+      "evidence": {
+        "quote": "## 2 规范性引用文件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 117,
+        "line_end": 117,
+        "start_char": 2479,
+        "end_char": 2491,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.1 外观",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.1 外观要求",
+      "evidence": {
+        "quote": "### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 174,
+        "line_end": 176,
+        "start_char": 3552,
+        "end_char": 3616,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.2 极性标识",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.2 极性标识要求",
+      "evidence": {
+        "quote": "### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 180,
+        "start_char": 3619,
+        "end_char": 3658,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.3 质量和外形尺寸",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.3 质量和外形尺寸要求",
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 184,
+        "start_char": 3661,
+        "end_char": 3716,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.4 室温放电容量",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.4 室温放电容量要求",
+      "evidence": {
+        "quote": "### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 188,
+        "start_char": 3718,
+        "end_char": 3805,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.5 室温倍率放电容量",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.5 室温倍率放电容量要求",
+      "evidence": {
+        "quote": "### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 192,
+        "line_end": 192,
+        "start_char": 3829,
+        "end_char": 3845,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.6 室温倍率充电性能",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.6 室温倍率充电性能要求",
+      "evidence": {
+        "quote": "高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。\n\n### 5.6 室温倍率充电性能",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 196,
+        "line_end": 198,
+        "start_char": 3885,
+        "end_char": 3939,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.7 低温放电容量",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.7 低温放电容量要求",
+      "evidence": {
+        "quote": "### 5.7 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 202,
+        "line_end": 202,
+        "start_char": 3974,
+        "end_char": 3988,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.8 高温放电容量",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.8 高温放电容量要求",
+      "evidence": {
+        "quote": "高能量电池单体按6.2.6.1试验，其放电容量不应低于初始容量的95%；\n\n高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。\n\n### 5.6 室温倍率充电性能\n\n电池单体按6.2.7试验，其放电容量不应低于初始容量的80%。\n\n### 5.7 低温放电容量\n\n锂离子电池单体按6.2.8试验，其放电容量不应低于初始容量的70%。\n\n金属氢化物镍电池单体按6.2.8试验，其放电容量不应低于初始容量的80%。\n\n### 5.8 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 194,
+        "line_end": 208,
+        "start_char": 3847,
+        "end_char": 4079,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.9 荷电保持与容量恢复能力",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.9 荷电保持与容量恢复能力要求",
+      "evidence": {
+        "quote": "### 5.9 荷电保持与容量恢复能力\n\n锂离子电池单体按6.2.10试验，其室温及高温荷电保持容量不应低于初始容量的90%，恢复容量不应低于初始容量的95%，同时所有测试对象高温荷电保持容量、高温恢复容量极差不应大于初始容量平均值的5%，能量效率极差不应大于所有测试对象能量效率平均值的5%。\n\n金属氢化物镍电池单体按6.2.10试验，其室温荷电保持容量不应低于初始容量的83%，高温荷电保持容量不应低于初始容量的70%，恢复容量不应低于初始容量的95%，同时所有测试对象高温荷电保持容量、高温恢复容量极差不应大于初始容量平均值的5%，能量效率极差不应大于所有测试对象能量效率平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 212,
+        "line_end": 216,
+        "start_char": 4114,
+        "end_char": 4410,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subclause",
+      "from_name": "5.10 储存",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "5.10 储存要求",
+      "evidence": {
+        "quote": "锂离子电池单体按6.2.10试验，其室温及高温荷电保持容量不应低于初始容量的90%，恢复容量不应低于初始容量的95%，同时所有测试对象高温荷电保持容量、高温恢复容量极差不应大于初始容量平均值的5%，能量效率极差不应大于所有测试对象能量效率平均值的5%。\n\n金属氢化物镍电池单体按6.2.10试验，其室温荷电保持容量不应低于初始容量的83%，高温荷电保持容量不应低于初始容量的70%，恢复容量不应低于初始容量的95%，同时所有测试对象高温荷电保持容量、高温恢复容量极差不应大于初始容量平均值的5%，能量效率极差不应大于所有测试对象能量效率平均值的5%。\n\n### 5.10 储存",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 214,
+        "line_end": 218,
+        "start_char": 4135,
+        "end_char": 4423,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "6 试验方法",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "6.1 试验条件条款",
+      "evidence": {
+        "quote": "## 6 试验方法\n\n### 6.1 试验条件",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 222,
+        "line_end": 224,
+        "start_char": 4515,
+        "end_char": 4538,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "6 试验方法",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "6.2 试验方法条款",
+      "evidence": {
+        "quote": "### 6.2 试验方法",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 272,
+        "line_end": 272,
+        "start_char": 5313,
+        "end_char": 5325,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Section",
+      "from_name": "6 试验方法",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "6.3 试验项目条款",
+      "evidence": {
+        "quote": "### 6.3 试验项目",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 444,
+        "line_end": 444,
+        "start_char": 8473,
+        "end_char": 8485,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "附录A 高低温试验箱试验工装",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "附录A 工装要求",
+      "evidence": {
+        "quote": "## 附录 A",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 450,
+        "line_end": 450,
+        "start_char": 10607,
+        "end_char": 10614,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "术语和定义",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "高能量电池",
+      "evidence": {
+        "quote": "## 3 术语和定义\n\nGB/T 19596 和 GB 38031 界定的以及下列术语和定义适用于本文件。\n\n### 3.1 高能量电池 high energy battery\n\n室温下，最大允许输出电功率(W)和 $ 3I_{3} $倍率放电能量(Wh)的比值低于10的电池。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 133,
+        "start_char": 2659,
+        "end_char": 2798,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "术语和定义",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "高功率电池",
+      "evidence": {
+        "quote": "## 3 术语和定义\n\nGB/T 19596 和 GB 38031 界定的以及下列术语和定义适用于本文件。\n\n### 3.1 高能量电池 high energy battery\n\n室温下，最大允许输出电功率(W)和 $ 3I_{3} $倍率放电能量(Wh)的比值低于10的电池。\n\n注：高能量电池一般应用于纯电动汽车和插电式混合动力电动汽车。\n\n[来源：GB/T 19596—2017，3.3.1.1.1.3，有修改]\n\n### 3.2 高功率电池 high power battery\n\n室温下，最大允许输出电功率(W)和 $ 1I_{1} $倍率放电能量(Wh)的比值不低于10的电池。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 141,
+        "start_char": 2659,
+        "end_char": 2954,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "术语和定义",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "额定容量",
+      "evidence": {
+        "quote": "## 3 术语和定义\n\nGB/T 19596 和 GB 38031 界定的以及下列术语和定义适用于本文件。\n\n### 3.1 高能量电池 high energy battery\n\n室温下，最大允许输出电功率(W)和 $ 3I_{3} $倍率放电能量(Wh)的比值低于10的电池。\n\n注：高能量电池一般应用于纯电动汽车和插电式混合动力电动汽车。\n\n[来源：GB/T 19596—2017，3.3.1.1.1.3，有修改]\n\n### 3.2 高功率电池 high power battery\n\n室温下，最大允许输出电功率(W)和 $ 1I_{1} $倍率放电能量(Wh)的比值不低于10的电池。\n\n注：高功率电池一般应用于混合动力电动汽车。\n\n[来源：GB/T 19596—2017, 3.3.1.1.1.4，有修改]\n\n### 3.3 额定容量 rated capacity\n\n室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的放电电流测得并由制造商申明的容量值(Ah)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 127,
+        "line_end": 149,
+        "start_char": 2659,
+        "end_char": 3115,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "术语和定义",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "额定能量",
+      "evidence": {
+        "quote": "室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的放电电流测得并由制造商申明的能量值(Wh)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 155,
+        "line_end": 155,
+        "start_char": 3180,
+        "end_char": 3248,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "术语和定义",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "初始容量",
+      "evidence": {
+        "quote": "新出厂的动力电池，在室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的电流放电至制造商规定的放电终止条件时所放出的容量(Ah)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 160,
+        "line_end": 160,
+        "start_char": 3317,
+        "end_char": 3402,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "符号",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "I3",
+      "evidence": {
+        "quote": "## 4 符号\n\n下列符号适用于本文件。\n\n $ I_{3} $:3 h 率放电电流(A)，其数值等于额定容量值的1/3。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 164,
+        "line_end": 168,
+        "start_char": 3440,
+        "end_char": 3501,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Normative Element",
+      "from_name": "符号",
+      "rel_type": "defines",
+      "to_type": "Terminology",
+      "to_name": "I1",
+      "evidence": {
+        "quote": "## 4 符号\n\n下列符号适用于本文件。\n\n $ I_{3} $:3 h 率放电电流(A)，其数值等于额定容量值的1/3。\n\n $ I_{1} $: 1 h 率放电电流(A)，其数值等于额定容量值。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 164,
+        "line_end": 170,
+        "start_char": 3440,
+        "end_char": 3539,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.1 外观要求",
+      "rel_type": "involvesObject",
+      "to_type": "Subject of Standardization",
+      "to_name": "电池单体",
+      "evidence": {
+        "quote": "a）电池单体按6.2.4方法充电；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 300,
+        "line_end": 300,
+        "start_char": 5898,
+        "end_char": 5915,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.2 极性标识要求",
+      "rel_type": "involvesObject",
+      "to_type": "Subject of Standardization",
+      "to_name": "电池单体",
+      "evidence": {
+        "quote": "a）电池单体按6.2.4方法充电；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 300,
+        "line_end": 300,
+        "start_char": 5898,
+        "end_char": 5915,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.3 质量和外形尺寸要求",
+      "rel_type": "involvesObject",
+      "to_type": "Subject of Standardization",
+      "to_name": "电池单体",
+      "evidence": {
+        "quote": "a）电池单体按6.2.4方法充电；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 300,
+        "line_end": 300,
+        "start_char": 5898,
+        "end_char": 5915,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.1 外观要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "外观",
+      "evidence": {
+        "quote": "### 5.1 外观\n\n电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 174,
+        "line_end": 176,
+        "start_char": 3552,
+        "end_char": 3616,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.2 极性标识要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "极性标识",
+      "evidence": {
+        "quote": "### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 180,
+        "start_char": 3619,
+        "end_char": 3658,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.3 质量和外形尺寸要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "质量",
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 184,
+        "start_char": 3661,
+        "end_char": 3716,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.3 质量和外形尺寸要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "外形尺寸",
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 184,
+        "start_char": 3661,
+        "end_char": 3716,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.4 室温放电容量要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "初始容量",
+      "evidence": {
+        "quote": " 初始容量 initial capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 158,
+        "line_end": 158,
+        "start_char": 3293,
+        "end_char": 3315,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.5 室温倍率放电容量要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "放电容量",
+      "evidence": {
+        "quote": "### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 192,
+        "start_char": 3718,
+        "end_char": 3845,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.9 荷电保持与容量恢复能力要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "荷电保持容量",
+      "evidence": {
+        "quote": "d）计量荷电保持容量（以Ah计）；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 381,
+        "line_end": 381,
+        "start_char": 7392,
+        "end_char": 7409,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.9 荷电保持与容量恢复能力要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "恢复容量",
+      "evidence": {
+        "quote": "g）计量恢复容量(以 Ah 计)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 387,
+        "line_end": 387,
+        "start_char": 7506,
+        "end_char": 7523,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.9 荷电保持与容量恢复能力要求",
+      "rel_type": "specifiesCharacteristic",
+      "to_type": "Property",
+      "to_name": "能量效率",
+      "evidence": {
+        "quote": "$ \\eta $ ——能量效率；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 416,
+        "line_end": 416,
+        "start_char": 7965,
+        "end_char": 7981,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "初始容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "初始容量相对额定容量约束",
+      "evidence": {
+        "quote": "\\eta=\\frac{E_{d}}{E_{c}}\\times100\\%",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 410,
+        "line_end": 410,
+        "start_char": 7918,
+        "end_char": 7953,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "初始容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "初始容量极差约束",
+      "evidence": {
+        "quote": "电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 188,
+        "line_end": 188,
+        "start_char": 3734,
+        "end_char": 3805,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "放电容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "室温倍率放电容量约束",
+      "evidence": {
+        "quote": "### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 192,
+        "start_char": 3718,
+        "end_char": 3845,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "放电容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "高功率倍率放电容量约束",
+      "evidence": {
+        "quote": "GB 38031 电动汽车用动力蓄电池安全要求",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 125,
+        "line_end": 125,
+        "start_char": 2634,
+        "end_char": 2657,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "放电容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "低温锂离子放电容量约束",
+      "evidence": {
+        "quote": "### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量\n\n高能量电池单体按6.2.6.1试验，其放电容量不应低于初始容量的95%；\n\n高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。\n\n### 5.6 室温倍率充电性能\n\n电池单体按6.2.7试验，其放电容量不应低于初始容量的80%。\n\n### 5.7 低温放电容量\n\n锂离子电池单体按6.2.8试验，其放电容量不应低于初始容量的70%。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 204,
+        "start_char": 3718,
+        "end_char": 4024,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "放电容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "高温放电容量约束",
+      "evidence": {
+        "quote": "### 5.4 室温放电容量\n\n电池单体按6.2.5试验，其初始容量不应低于额定容量，并且不超过额定容量的110%，同时所有测试对象初始容量极差不应大于初始容量平均值的5%。\n\n注：极差是所有样本的最大值和最小值之差。\n\n### 5.5 室温倍率放电容量\n\n高能量电池单体按6.2.6.1试验，其放电容量不应低于初始容量的95%；\n\n高功率电池单体按6.2.6.2试验，其放电容量不应低于初始容量的80%。\n\n### 5.6 室温倍率充电性能\n\n电池单体按6.2.7试验，其放电容量不应低于初始容量的80%。\n\n### 5.7 低温放电容量\n\n锂离子电池单体按6.2.8试验，其放电容量不应低于初始容量的70%。\n\n金属氢化物镍电池单体按6.2.8试验，其放电容量不应低于初始容量的80%。\n\n### 5.8 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 208,
+        "start_char": 3718,
+        "end_char": 4079,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Property",
+      "from_name": "恢复容量",
+      "rel_type": "imposesConstraint",
+      "to_type": "Constrain",
+      "to_name": "恢复容量约束",
+      "evidence": {
+        "quote": "g）计量恢复容量(以 Ah 计)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 387,
+        "line_end": 387,
+        "start_char": 7506,
+        "end_char": 7523,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "初始容量",
+      "evidence": {
+        "quote": " 初始容量 initial capacity",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 158,
+        "line_end": 158,
+        "start_char": 3293,
+        "end_char": 3315,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "放电容量",
+      "evidence": {
+        "quote": "### 5.4 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 186,
+        "line_end": 186,
+        "start_char": 3718,
+        "end_char": 3732,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "荷电保持容量",
+      "evidence": {
+        "quote": "d）计量荷电保持容量（以Ah计）；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 381,
+        "line_end": 381,
+        "start_char": 7392,
+        "end_char": 7409,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "恢复容量",
+      "evidence": {
+        "quote": "g）计量恢复容量(以 Ah 计)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 387,
+        "line_end": 387,
+        "start_char": 7506,
+        "end_char": 7523,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "能量效率",
+      "evidence": {
+        "quote": "$ \\eta $ ——能量效率；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 416,
+        "line_end": 416,
+        "start_char": 7965,
+        "end_char": 7981,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "外观",
+      "evidence": {
+        "quote": "### 5.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 174,
+        "line_end": 174,
+        "start_char": 3552,
+        "end_char": 3562,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "极性标识",
+      "evidence": {
+        "quote": "### 5.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 178,
+        "start_char": 3619,
+        "end_char": 3631,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "质量",
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 182,
+        "start_char": 3661,
+        "end_char": 3676,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Subject of Standardization",
+      "from_name": "电池单体",
+      "rel_type": "hasCharacteristic",
+      "to_type": "Property",
+      "to_name": "外形尺寸",
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 182,
+        "start_char": 3661,
+        "end_char": 3676,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.4 室温放电容量要求",
+      "rel_type": "usesTerm",
+      "to_type": "Terminology",
+      "to_name": "额定容量",
+      "evidence": {
+        "quote": "室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的放电电流测得并由制造商申明的容量值(Ah)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 149,
+        "line_end": 149,
+        "start_char": 3047,
+        "end_char": 3115,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.4 室温放电容量要求",
+      "rel_type": "usesTerm",
+      "to_type": "Terminology",
+      "to_name": "初始容量",
+      "evidence": {
+        "quote": "新出厂的动力电池，在室温下，完全充电后，高能量电池以 $ 1I_{3} $、高功率电池以 $ 1I_{1} $的电流放电至制造商规定的放电终止条件时所放出的容量(Ah)。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 160,
+        "line_end": 160,
+        "start_char": 3317,
+        "end_char": 3402,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.5 室温倍率放电容量要求",
+      "rel_type": "usesTerm",
+      "to_type": "Terminology",
+      "to_name": "高能量电池",
+      "evidence": {
+        "quote": "室温下，最大允许输出电功率(W)和 $ 3I_{3} $倍率放电能量(Wh)的比值低于10的电池。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 133,
+        "line_end": 133,
+        "start_char": 2749,
+        "end_char": 2798,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.5 室温倍率放电容量要求",
+      "rel_type": "usesTerm",
+      "to_type": "Terminology",
+      "to_name": "高功率电池",
+      "evidence": {
+        "quote": "室温下，最大允许输出电功率(W)和 $ 1I_{1} $倍率放电能量(Wh)的比值不低于10的电池。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 141,
+        "line_end": 141,
+        "start_char": 2904,
+        "end_char": 2954,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.1 外观要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.1 外观",
+      "evidence": {
+        "quote": "#### 6.2.1 外观",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 274,
+        "line_end": 274,
+        "start_char": 5327,
+        "end_char": 5340,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.2 极性标识要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.2 极性标识",
+      "evidence": {
+        "quote": "#### 6.2.2 极性标识",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 278,
+        "line_end": 278,
+        "start_char": 5368,
+        "end_char": 5383,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.3 质量和外形尺寸要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.3 质量和外形尺寸",
+      "evidence": {
+        "quote": "#### 6.2.3 质量和外形尺寸",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 282,
+        "line_end": 282,
+        "start_char": 5416,
+        "end_char": 5434,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.4 室温放电容量要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.5 室温放电容量",
+      "evidence": {
+        "quote": "#### 6.2.5 室温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 296,
+        "line_end": 296,
+        "start_char": 5860,
+        "end_char": 5877,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.5 室温倍率放电容量要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.6 室温倍率放电容量",
+      "evidence": {
+        "quote": "#### 6.2.6 室温倍率放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 308,
+        "line_end": 308,
+        "start_char": 6110,
+        "end_char": 6129,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.6 室温倍率充电性能要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.7 室温倍率充电性能",
+      "evidence": {
+        "quote": "#### 6.2.7 室温倍率充电性能",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 334,
+        "line_end": 334,
+        "start_char": 6514,
+        "end_char": 6533,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.7 低温放电容量要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.8 低温放电容量",
+      "evidence": {
+        "quote": "#### 6.2.8 低温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 346,
+        "line_end": 346,
+        "start_char": 6787,
+        "end_char": 6804,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.8 高温放电容量要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.9 高温放电容量",
+      "evidence": {
+        "quote": "#### 6.2.9 高温放电容量",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 358,
+        "line_end": 358,
+        "start_char": 6993,
+        "end_char": 7010,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.9 荷电保持与容量恢复能力要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.10 荷电保持与容量恢复能力",
+      "evidence": {
+        "quote": "#### 6.2.10 荷电保持与容量恢复能力",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 370,
+        "line_end": 370,
+        "start_char": 7201,
+        "end_char": 7224,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.10 储存要求",
+      "rel_type": "referencesClause",
+      "to_type": "Subclause",
+      "to_name": "6.2.11 储存",
+      "evidence": {
+        "quote": "#### 6.2.11 储存",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 422,
+        "line_end": 422,
+        "start_char": 8041,
+        "end_char": 8055,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.3 质量和外形尺寸要求",
+      "rel_type": "referencesExternalResource",
+      "to_type": "ExternalResource",
+      "to_name": "制造商提供的产品技术条件",
+      "evidence": {
+        "quote": "电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 184,
+        "line_end": 184,
+        "start_char": 3678,
+        "end_char": 3716,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.1 外观要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "外观检验",
+      "evidence": {
+        "quote": "电池单体按6.2.1检验，外观应无变形及裂纹，表面应无毛刺、干燥、无外伤、无污物，且应有清晰、正确的标志",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 176,
+        "line_end": 176,
+        "start_char": 3564,
+        "end_char": 3616,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.2 极性标识要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "极性标识检验",
+      "evidence": {
+        "quote": "### 5.2 极性标识\n\n电池单体按6.2.2检验，端子极性标识应正确、清晰",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 178,
+        "line_end": 180,
+        "start_char": 3619,
+        "end_char": 3658,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.3 质量和外形尺寸要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "质量和外形尺寸检验",
+      "evidence": {
+        "quote": "### 5.3 质量和外形尺寸\n\n电池单体按6.2.3检验，电池质量、外形尺寸应符合制造商提供的产品技术条件。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 182,
+        "line_end": 184,
+        "start_char": 3661,
+        "end_char": 3716,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.4 室温放电容量要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "室温放电容量试验",
+      "evidence": {
+        "quote": "室温放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 298,
+        "line_end": 298,
+        "start_char": 5879,
+        "end_char": 5896,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.5 室温倍率放电容量要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "室温倍率放电容量试验",
+      "evidence": {
+        "quote": "6.2.6.1.2 室温倍率放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 314,
+        "line_end": 314,
+        "start_char": 6192,
+        "end_char": 6221,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.6 室温倍率充电性能要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "室温倍率充电性能试验",
+      "evidence": {
+        "quote": "室温倍率充电性能试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 336,
+        "line_end": 336,
+        "start_char": 6535,
+        "end_char": 6554,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.7 低温放电容量要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "低温放电容量试验",
+      "evidence": {
+        "quote": "低温放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 348,
+        "line_end": 348,
+        "start_char": 6806,
+        "end_char": 6823,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.8 高温放电容量要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "高温放电容量试验",
+      "evidence": {
+        "quote": "高温放电容量试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 360,
+        "line_end": 360,
+        "start_char": 7012,
+        "end_char": 7029,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.9 荷电保持与容量恢复能力要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "荷电保持与容量恢复能力试验",
+      "evidence": {
+        "quote": "室温荷电保持与容量恢复能力试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 374,
+        "line_end": 374,
+        "start_char": 7256,
+        "end_char": 7280,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "5.10 储存要求",
+      "rel_type": "describesAction",
+      "to_type": "ActionClass",
+      "to_name": "储存试验",
+      "evidence": {
+        "quote": "储存试验按照如下步骤进行：",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 424,
+        "line_end": 424,
+        "start_char": 8057,
+        "end_char": 8070,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "附录A 工装要求",
+      "rel_type": "hasRepresentationForm",
+      "to_type": "Annex",
+      "to_name": "附录A 高低温试验箱试验工装",
+      "evidence": {
+        "quote": "## 附录 A（规范性） 高低温试验箱试验工装",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 450,
+        "line_end": 450,
+        "start_char": 10607,
+        "end_char": 10630,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "6.3 试验项目条款",
+      "rel_type": "hasRepresentationForm",
+      "to_type": "Table",
+      "to_name": "表1 试验项目、样品数量及编号",
+      "evidence": {
+        "quote": "### 6.3 试验项目\n\n试验项目、样品数量及编号见表1。\n表1 试验项目、样品数量及编号",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 444,
+        "line_end": 447,
+        "start_char": 8473,
+        "end_char": 8519,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "6.2 试验方法条款",
+      "rel_type": "hasRepresentationForm",
+      "to_type": "Equation",
+      "to_name": "公式（1）能量效率",
+      "evidence": {
+        "quote": "$ \\eta $ ——能量效率；",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 416,
+        "line_end": 416,
+        "start_char": 7965,
+        "end_char": 7981,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Informative Element",
+      "from_name": "参考文献",
+      "rel_type": "hasClause",
+      "to_type": "Clause",
+      "to_name": "参考文献条款",
+      "evidence": {
+        "quote": "下列文件中的内容通过文中的规范性引用而构成本文件必不可少的条款。",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 119,
+        "line_end": 119,
+        "start_char": 2493,
+        "end_char": 2525,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "Clause",
+      "from_name": "参考文献条款",
+      "rel_type": "hasRepresentationForm",
+      "to_type": "Reference",
+      "to_name": "参考文献 GB/T 19596—2017 电动汽车术语",
+      "evidence": {
+        "quote": "[1] GB/T 19596—2017 电动汽车术语",
+        "document": "GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).md",
+        "line_start": 479,
+        "line_end": 479,
+        "start_char": 10917,
+        "end_char": 10943,
+        "support": "endpoint_context"
+      }
+    }
   ]
 }

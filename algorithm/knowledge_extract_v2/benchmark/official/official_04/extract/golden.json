@@ -19,6 +19,15 @@
         "密级": "核心商密（保密期限3年）",
         "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 95,
+        "end_char": 125,
+        "support": "explicit"
       }
     },
     {
@@ -30,17 +39,35 @@
         "原文位置": "《关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知》正文",
         "原文内容": "为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。请结合实际，认真贯彻执行。工作目标：2025年完成习近平总书记重要指示批示落实领域系统建设和完善工作，完成党建落实、财务监管、考核激励、战新和未来产业、产权管理、科技创新、安全支撑、产业布局等8个领域系统建设和完善工作；2026年完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等9个领域系统建设和完善工作。工作要求：各领域负责部门按照方案任务内容和计划要求，全面启动本领域国资监管系统智能化升级工作任务；各子企业按照方案任务内容和计划要求，制定向下穿透的实施方案，于8月15日前报数智办。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 425,
+        "end_char": 498,
+        "support": "explicit"
       }
     },
     {
       "type": "DocumentUnit",
-      "name": "附件说明",
+      "name": "附件列表",
       "properties": {
         "单元标题": "附件",
         "单元类型": "附件说明",
         "原文位置": "《关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知》附件",
         "原文内容": "附件：中国中车国资监管系统智能化升级三年行动方案；中国中车国资监管智能化升级系统指标清单；中国中车国资监管智能化升级各业务领域分工",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "附件：1. 中国中车国资监管系统智能化升级三年行动方案",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 699,
+        "end_char": 726,
+        "support": "explicit"
       }
     },
     {
@@ -51,6 +78,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "印发《中国中车国资监管系统智能化升级三年行动方案》的通知"
+      },
+      "evidence": {
+        "quote": "印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 125,
+        "support": "explicit"
       }
     },
     {
@@ -61,6 +97,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "按照方案任务内容和计划要求，制定向下穿透的实施方案并报数智办"
+      },
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -71,6 +116,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "牵头资产事业部、产业链事业部配合制定建设方案"
+      },
+      "evidence": {
+        "quote": "白雪峰 2025-07-24 09:27</td></tr><tr><td colspan=\"4\">领导批示: 请公司班子各位领导阅,请信服事业部牵头资产事业部、产业链事业部配合,2025年建设内容要获得总部书面输入,制定建设方案。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 636,
+        "end_char": 752,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -81,6 +135,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "把好架构关，按照多租户模式和自主可控要求设计"
+      },
+      "evidence": {
+        "quote": "请技术中心(技术委员会)把好架构关,按照多租户模式和自主可控要求设计,确保后续可扩展。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 752,
+        "end_char": 795,
+        "support": "explicit"
       }
     },
     {
@@ -91,6 +154,15 @@
         "主体类型": "部门",
         "组织层级": "总部部门",
         "职责": "接收各子企业向下穿透实施方案"
+      },
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -101,6 +173,15 @@
         "对象描述": "围绕国资监管系统全面智能化升级要求制定的三年行动方案",
         "对象名称": "中国中车国资监管系统智能化升级三年行动方案",
         "所属领域": "国资监管"
+      },
+      "evidence": {
+        "quote": "为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 169,
+        "end_char": 233,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -113,6 +194,15 @@
         "动作词": "启动",
         "预期结果": "各领域负责部门按照方案任务内容和计划要求全面启动本领域工作任务",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 551,
+        "end_char": 599,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -125,6 +215,15 @@
         "动作词": "制定",
         "预期结果": "各子企业结合企业实际制定向下穿透的实施方案并报数智办",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -137,6 +236,15 @@
         "动作词": "制定",
         "预期结果": "2025年建设内容获得总部书面输入并制定建设方案",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "白雪峰 2025-07-24 09:27</td></tr><tr><td colspan=\"4\">领导批示: 请公司班子各位领导阅,请信服事业部牵头资产事业部、产业链事业部配合,2025年建设内容要获得总部书面输入,制定建设方案。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 636,
+        "end_char": 752,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -149,6 +257,15 @@
         "动作词": "做好",
         "预期结果": "做好信息公司和数科公司智能化监管工作",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "平台事业部、各部门阅,做好信息公司和数科公司智能化监管工作",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 796,
+        "end_char": 825,
+        "support": "explicit"
       }
     },
     {
@@ -159,6 +276,15 @@
         "信息类型": "附件",
         "定义": "国资监管系统全面智能化升级三年行动方案",
         "来源文本": "附件1"
+      },
+      "evidence": {
+        "quote": "为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 169,
+        "end_char": 233,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -169,6 +295,15 @@
         "信息类型": "附件",
         "定义": "国资监管智能化升级系统指标清单",
         "来源文本": "附件2"
+      },
+      "evidence": {
+        "quote": "2. 中国中车国资监管智能化升级系统指标清单",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 35,
+        "line_end": 35,
+        "start_char": 728,
+        "end_char": 750,
+        "support": "explicit"
       }
     },
     {
@@ -179,6 +314,15 @@
         "信息类型": "附件",
         "定义": "各业务领域国资监管智能化升级任务分工",
         "来源文本": "附件3"
+      },
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 551,
+        "end_char": 599,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -187,6 +331,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司印发《中国中车国资监管系统智能化升级三年行动方案》的通知"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 93,
+        "end_char": 125,
+        "support": "explicit"
       }
     },
     {
@@ -198,6 +351,15 @@
         "约束名称": "实施方案报送时限要求",
         "约束类型": "时间约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "semantic_alignment"
       }
     }
   ],
@@ -207,294 +369,672 @@
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。请结合实际，认真贯彻执行。\n\n## 一、工作目标\n\n1. 2025 年，完成习近平总书记重要指示批示落实领域系统建设和完善工作，实现子企业数据贯通。\n\n2. 2025 年，完成党建落实、财务监管、考核激励、战新和未来产业、产权管理、科技创新、安全支撑、产业布局等 8 个领域系统建设和完善工作，实现试点企业系统集成和数据贯通；2026 年，完成其余子企业系统集成和数据贯通。\n\n3. 2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 23,
+        "start_char": 95,
+        "end_char": 498,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "附件：1. 中国中车国资监管系统智能化升级三年行动方案",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 699,
+        "end_char": 726,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 95,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 95,
+        "end_char": 233,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 95,
+        "end_char": 233,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 95,
+        "end_char": 233,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管智能化升级系统指标清单"
+      "to_name": "中国中车国资监管智能化升级系统指标清单",
+      "evidence": {
+        "quote": "2. 中国中车国资监管智能化升级系统指标清单",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 35,
+        "line_end": 35,
+        "start_char": 728,
+        "end_char": 750,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管智能化升级系统指标清单"
+      "to_name": "中国中车国资监管智能化升级系统指标清单",
+      "evidence": {
+        "quote": "2. 中国中车国资监管智能化升级系统指标清单",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 35,
+        "line_end": 35,
+        "start_char": 728,
+        "end_char": 750,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管智能化升级各业务领域分工"
+      "to_name": "中国中车国资监管智能化升级各业务领域分工",
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 551,
+        "end_char": 599,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管智能化升级各业务领域分工"
+      "to_name": "中国中车国资监管智能化升级各业务领域分工",
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 551,
+        "end_char": 599,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "全面启动国资监管系统智能化升级任务"
+      "to_name": "全面启动国资监管系统智能化升级任务",
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 551,
+        "end_char": 599,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "制定向下穿透实施方案"
+      "to_name": "制定向下穿透实施方案",
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "制定建设方案"
+      "to_name": "制定建设方案",
+      "evidence": {
+        "quote": "白雪峰 2025-07-24 09:27</td></tr><tr><td colspan=\"4\">领导批示: 请公司班子各位领导阅,请信服事业部牵头资产事业部、产业链事业部配合,2025年建设内容要获得总部书面输入,制定建设方案。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 636,
+        "end_char": 752,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "做好公司智能化监管工作"
+      "to_name": "做好公司智能化监管工作",
+      "evidence": {
+        "quote": "平台事业部、各部门阅,做好信息公司和数科公司智能化监管工作",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 796,
+        "end_char": 825,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发国资监管系统智能化升级三年行动方案"
+      "to_name": "印发国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 93,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "全面启动国资监管系统智能化升级任务",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。请结合实际，认真贯彻执行。\n\n## 一、工作目标\n\n1. 2025 年，完成习近平总书记重要指示批示落实领域系统建设和完善工作，实现子企业数据贯通。\n\n2. 2025 年，完成党建落实、财务监管、考核激励、战新和未来产业、产权管理、科技创新、安全支撑、产业布局等 8 个领域系统建设和完善工作，实现试点企业系统集成和数据贯通；2026 年，完成其余子企业系统集成和数据贯通。\n\n3. 2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作，实现试点企业系统集成及数据贯通；2027年，完成其余子企业系统集成和数据贯通。\n\n## 二、工作要求\n\n1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 15,
+        "line_end": 27,
+        "start_char": 169,
+        "end_char": 599,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "全面启动国资监管系统智能化升级任务",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。\n\n2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 29,
+        "start_char": 551,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "全面启动国资监管系统智能化升级任务",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作，实现试点企业系统集成及数据贯通；2027年，完成其余子企业系统集成和数据贯通。\n\n## 二、工作要求\n\n1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 23,
+        "line_end": 27,
+        "start_char": 425,
+        "end_char": 599,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "制定向下穿透实施方案",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "制定向下穿透实施方案",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "制定向下穿透实施方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作，实现试点企业系统集成及数据贯通；2027年，完成其余子企业系统集成和数据贯通。\n\n## 二、工作要求\n\n1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。\n\n2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 23,
+        "line_end": 29,
+        "start_char": 425,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "制定建设方案",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "白雪峰 2025-07-24 09:27</td></tr><tr><td colspan=\"4\">领导批示: 请公司班子各位领导阅,请信服事业部牵头资产事业部、产业链事业部配合,2025年建设内容要获得总部书面输入,制定建设方案。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 636,
+        "end_char": 752,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "制定建设方案",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "白雪峰 2025-07-24 09:27</td></tr><tr><td colspan=\"4\">领导批示: 请公司班子各位领导阅,请信服事业部牵头资产事业部、产业链事业部配合,2025年建设内容要获得总部书面输入,制定建设方案。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 636,
+        "end_char": 752,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "制定建设方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "白雪峰 2025-07-24 09:27</td></tr><tr><td colspan=\"4\">领导批示: 请公司班子各位领导阅,请信服事业部牵头资产事业部、产业链事业部配合,2025年建设内容要获得总部书面输入,制定建设方案。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 636,
+        "end_char": 752,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "做好公司智能化监管工作",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "平台事业部、各部门阅,做好信息公司和数科公司智能化监管工作",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 796,
+        "end_char": 825,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "做好公司智能化监管工作",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "平台事业部、各部门阅,做好信息公司和数科公司智能化监管工作",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 796,
+        "end_char": 825,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "做好公司智能化监管工作",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "平台事业部、各部门阅,做好信息公司和数科公司智能化监管工作",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 796,
+        "end_char": 825,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "实施方案报送时限要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "全面启动国资监管系统智能化升级任务"
+      "to_name": "全面启动国资监管系统智能化升级任务",
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。\n\n2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 29,
+        "start_char": 551,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "实施方案报送时限要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 29,
+        "line_end": 29,
+        "start_char": 601,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "实施方案报送时限要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作，实现试点企业系统集成及数据贯通；2027年，完成其余子企业系统集成和数据贯通。\n\n## 二、工作要求\n\n1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。\n\n2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 23,
+        "line_end": 29,
+        "start_char": 425,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车集团有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。请结合实际，认真贯彻执行。\n\n## 一、工作目标\n\n1. 2025 年，完成习近平总书记重要指示批示落实领域系统建设和完善工作，实现子企业数据贯通。\n\n2. 2025 年，完成党建落实、财务监管、考核激励、战新和未来产业、产权管理、科技创新、安全支撑、产业布局等 8 个领域系统建设和完善工作，实现试点企业系统集成和数据贯通；2026 年，完成其余子企业系统集成和数据贯通。\n\n3. 2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 23,
+        "start_char": 97,
+        "end_char": 498,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作，实现试点企业系统集成及数据贯通；2027年，完成其余子企业系统集成和数据贯通。\n\n## 二、工作要求\n\n1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。\n\n2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 23,
+        "line_end": 29,
+        "start_char": 425,
+        "end_char": 661,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "中国中车国资监管系统智能化升级三年行动方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。请结合实际，认真贯彻执行。\n\n## 一、工作目标\n\n1. 2025 年，完成习近平总书记重要指示批示落实领域系统建设和完善工作，实现子企业数据贯通。\n\n2. 2025 年，完成党建落实、财务监管、考核激励、战新和未来产业、产权管理、科技创新、安全支撑、产业布局等 8 个领域系统建设和完善工作，实现试点企业系统集成和数据贯通；2026 年，完成其余子企业系统集成和数据贯通。\n\n3. 2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 15,
+        "line_end": 23,
+        "start_char": 169,
+        "end_char": 498,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中国中车国资监管系统智能化升级三年行动方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 169,
+        "end_char": 233,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中国中车国资监管智能化升级系统指标清单",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "附件：1. 中国中车国资监管系统智能化升级三年行动方案\n\n2. 中国中车国资监管智能化升级系统指标清单",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 33,
+        "line_end": 35,
+        "start_char": 699,
+        "end_char": 750,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中国中车国资监管智能化升级各业务领域分工",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "1. 各领域负责部门按照方案任务内容和计划要求, 全面启动本领域国资监管系统智能化升级工作任务。\n\n2. 各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。\n\n联系人：马忠明，邮箱 010099900481@crccgc.cc。\n\n附件：1. 中国中车国资监管系统智能化升级三年行动方案",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 27,
+        "line_end": 33,
+        "start_char": 551,
+        "end_char": 726,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发国资监管系统智能化升级三年行动方案",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。请结合实际，认真贯彻执行。\n\n## 一、工作目标\n\n1. 2025 年，完成习近平总书记重要指示批示落实领域系统建设和完善工作，实现子企业数据贯通。\n\n2. 2025 年，完成党建落实、财务监管、考核激励、战新和未来产业、产权管理、科技创新、安全支撑、产业布局等 8 个领域系统建设和完善工作，实现试点企业系统集成和数据贯通；2026 年，完成其余子企业系统集成和数据贯通。\n\n3. 2026 年，完成国企改革、法律合规、经济运行分析、公司治理、大监督协同、干部管理、人才工作、社会责任、国际化经营等 9 个领域系统建设和完善工作",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 23,
+        "start_char": 93,
+        "end_char": 498,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发国资监管系统智能化升级三年行动方案",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 93,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发国资监管系统智能化升级三年行动方案",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 93,
+        "end_char": 125,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发国资监管系统智能化升级三年行动方案",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "全面启动国资监管系统智能化升级任务"
+      "to_name": "全面启动国资监管系统智能化升级任务",
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 93,
+        "end_char": 125,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发国资监管系统智能化升级三年行动方案",
       "rel_type": "EXCHANGES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车国资监管系统智能化升级三年行动方案"
+      "to_name": "中国中车国资监管系统智能化升级三年行动方案",
+      "evidence": {
+        "quote": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n为贯彻落实国务院国资委关于国资监管系统全面智能化升级工作要求，组织制定《中国中车国资监管系统智能化升级三年行动方案》，现予印发。",
+        "document": "关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 93,
+        "end_char": 233,
+        "support": "explicit_endpoints"
+      }
     }
   ]
 }

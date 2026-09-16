@@ -19,6 +19,15 @@
         "密级": "",
         "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 64,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -30,6 +39,15 @@
         "原文位置": "《关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知》正文",
         "原文内容": "《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 139,
+        "end_char": 210,
+        "support": "explicit"
       }
     },
     {
@@ -40,6 +58,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "印发《中国中车集团有限公司大创新体系建设指导意见》的通知"
+      },
+      "evidence": {
+        "quote": "印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 66,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -50,6 +77,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "贯彻执行大创新体系建设指导意见，全面融入中车大创新体系建设"
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 96,
+        "end_char": 136,
+        "support": "explicit"
       }
     },
     {
@@ -60,6 +96,15 @@
         "对象描述": "经集团公司党委常委会、总经理办公会审议通过的大创新体系建设指导意见",
         "对象名称": "中国中车集团有限公司大创新体系建设指导意见",
         "所属领域": "科技创新"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -72,6 +117,15 @@
         "动作词": "贯彻、执行",
         "预期结果": "各单位贯彻执行大创新体系建设指导意见",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 138,
+        "end_char": 211,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -84,6 +138,15 @@
         "动作词": "融入",
         "预期结果": "以中车专版PLM为切入点，全面融入中车大创新体系建设",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "以中车专版PLM为切入点,各事业部要发挥各自业务特长,聚焦数字化研发流程及项目管理成本管理、产业链研发协同、研发数据架构设计、数智化研发工作平台构建,全面融入中车大创新体系建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 706,
+        "end_char": 795,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -92,6 +155,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司印发《中国中车集团有限公司大创新体系建设指导意见》的通知"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -103,6 +175,15 @@
         "约束名称": "贯彻执行要求",
         "约束类型": "流程约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 138,
+        "end_char": 211,
+        "support": "semantic_alignment"
       }
     }
   ],
@@ -112,161 +193,368 @@
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 64,
+        "end_char": 210,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 64,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 9,
+        "start_char": 64,
+        "end_char": 136,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "中国中车集团有限公司大创新体系建设指导意见"
+      "to_name": "中国中车集团有限公司大创新体系建设指导意见",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行大创新体系建设指导意见"
+      "to_name": "贯彻执行大创新体系建设指导意见",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 64,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "全面融入中车大创新体系建设"
+      "to_name": "全面融入中车大创新体系建设",
+      "evidence": {
+        "quote": "以中车专版PLM为切入点,各事业部要发挥各自业务特长,聚焦数字化研发流程及项目管理成本管理、产业链研发协同、研发数据架构设计、数智化研发工作平台构建,全面融入中车大创新体系建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 706,
+        "end_char": 795,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发大创新体系建设指导意见"
+      "to_name": "印发大创新体系建设指导意见",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行大创新体系建设指导意见",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车集团有限公司大创新体系建设指导意见"
+      "to_name": "中国中车集团有限公司大创新体系建设指导意见",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行大创新体系建设指导意见",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 9,
+        "line_end": 11,
+        "start_char": 96,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行大创新体系建设指导意见",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 138,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "全面融入中车大创新体系建设",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车集团有限公司大创新体系建设指导意见"
+      "to_name": "中国中车集团有限公司大创新体系建设指导意见",
+      "evidence": {
+        "quote": "以中车专版PLM为切入点,各事业部要发挥各自业务特长,聚焦数字化研发流程及项目管理成本管理、产业链研发协同、研发数据架构设计、数智化研发工作平台构建,全面融入中车大创新体系建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 706,
+        "end_char": 795,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "全面融入中车大创新体系建设",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "以中车专版PLM为切入点,各事业部要发挥各自业务特长,聚焦数字化研发流程及项目管理成本管理、产业链研发协同、研发数据架构设计、数智化研发工作平台构建,全面融入中车大创新体系建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 706,
+        "end_char": 795,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "全面融入中车大创新体系建设",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "以中车专版PLM为切入点,各事业部要发挥各自业务特长,聚焦数字化研发流程及项目管理成本管理、产业链研发协同、研发数据架构设计、数智化研发工作平台构建,全面融入中车大创新体系建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 706,
+        "end_char": 795,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行大创新体系建设指导意见"
+      "to_name": "贯彻执行大创新体系建设指导意见",
+      "evidence": {
+        "quote": "《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 138,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 9,
+        "line_end": 11,
+        "start_char": 96,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 138,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车集团有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 66,
+        "end_char": 210,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 9,
+        "line_end": 11,
+        "start_char": 96,
+        "end_char": 210,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "中国中车集团有限公司大创新体系建设指导意见",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 210,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发大创新体系建设指导意见",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 210,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发大创新体系建设指导意见",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 94,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发大创新体系建设指导意见",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 9,
+        "start_char": 62,
+        "end_char": 136,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发大创新体系建设指导意见",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行大创新体系建设指导意见"
+      "to_name": "贯彻执行大创新体系建设指导意见",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     }
   ]
 }

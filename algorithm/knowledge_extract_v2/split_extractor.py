@@ -62,6 +62,7 @@ from .graph_assembler import GraphAssembler
 from .graph_utils import canonical_name
 from .hierarchy import (
     assemble_document_relations,
+    assemble_document_unit_relations,
     assemble_numbered_hierarchy_relations,
     assemble_standard_semantic_relations,
     assemble_standard_technical_relations,
@@ -655,6 +656,13 @@ def extract_split(
         warnings=warnings,
     )
     numbered_hierarchy_relations = assemble_numbered_hierarchy_relations(
+        pool,
+        manager,
+        warnings=warnings,
+    )
+    # HAS_PART / EVIDENCED_BY are determined by the document-unit span, so they
+    # are assembled here instead of being enumerated for the relation classifier.
+    document_unit_relations = assemble_document_unit_relations(
         pool,
         manager,
         warnings=warnings,

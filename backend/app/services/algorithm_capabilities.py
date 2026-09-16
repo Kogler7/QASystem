@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +40,6 @@ class GraphExtractionBatch:
     items: list[dict[str, Any]]
     attempts: list[dict[str, Any]]
     scheduler: dict[str, Any]
-    failures: list[dict[str, Any]] = field(default_factory=list)
     graph: dict[str, Any] | None = None
     graphs: list[dict[str, Any]] | None = None
 
@@ -50,7 +49,6 @@ class GraphExtractionBatch:
             data["graph"] = self.graph
         else:
             data["graphs"] = self.graphs or []
-        data["failures"] = self.failures
         return data
 
     def pipeline_data(self) -> dict[str, Any]:
@@ -273,24 +271,23 @@ class GraphExtractionService:
             ranges = getattr(source, "ranges", None)
             result["ranges"] = list(ranges) if ranges is not None else None
         failed = [item for item in results if item.get("error")]
-        failures = [
-            {
-                "position": item["index"],
-                "error_code": item.get("error_code"),
-                "info": item.get("error"),
-                "attempts": item.get("attempts", []),
-                "raw_response": item.get("raw_response", ""),
-            }
-            for item in failed
-        ]
-        if failed and len(failed) == len(results):
+        if failed:
             raise CapabilityError(
                 _extraction_error(failed, len(results)),
-                "全部文本切片知识抽取失败",
+                "部分文本切片知识抽取失败",
                 "knowledge_extract",
                 {
                     "failed_count": len(failed),
-                    "failed_items": failures,
+                    "failed_items": [
+                        {
+                            "position": item["index"],
+                            "error_code": item.get("error_code"),
+                            "info": item.get("error"),
+                            "attempts": item.get("attempts", []),
+                            "raw_response": item.get("raw_response", ""),
+                        }
+                        for item in failed
+                    ],
                 },
             )
         config = get_llm_config()
@@ -309,17 +306,13 @@ class GraphExtractionService:
                 items=results,
                 attempts=attempts,
                 scheduler=scheduler,
-                failures=failures,
-                graph=deduplicate_chunk_graphs(
-                    [item for item in results if not item.get("error")]
-                ),
+                graph=deduplicate_chunk_graphs(results),
             )
         return GraphExtractionBatch(
             items=results,
             attempts=attempts,
             scheduler=scheduler,
-            failures=failures,
-            graphs=[item["graph"] for item in results if not item.get("error")],
+            graphs=[item["graph"] for item in results],
         )
 
 

@@ -597,9 +597,11 @@ def _normalize_span_entities(
 ) -> list[dict[str, Any]]:
     """Turn strict span candidates into the legacy graph entity contract.
 
-    The model never supplies canonical names or properties.  All accepted
-    names are copied from the current chunk, and all grounding decisions are
-    made here so malformed offsets cannot create a plausible-looking node.
+    The model never supplies canonical names or properties.  A name may be a
+    faithful abstraction of the source (e.g. an inferred rule name), but every
+    accepted fact must still carry an ``evidence.quote`` locatable in the chunk,
+    and all grounding decisions are made here so malformed offsets cannot create
+    a plausible-looking node.
     """
     raw_entities = parsed.get("entities", []) if isinstance(parsed, dict) else []
     if not isinstance(raw_entities, list):
@@ -616,49 +618,90 @@ def _normalize_span_entities(
             _append_warning(warnings, "INVALID_ENTITY", "实体必须是对象", path)
             continue
         ontology_class = schema.resolve_class(raw.get("type"))
-        mention = raw.get("mention")
-        quote = (raw.get("evidence") or {}).get("quote") if isinstance(raw.get("evidence"), dict) else None
         if ontology_class is None:
             _append_warning(warnings, "UNKNOWN_ENTITY_TYPE", "实体类型不在 ontology 中", f"{path}.type", raw.get("type"))
             continue
         if requested and not any(schema.is_assignable(ontology_class.identifier, item.identifier) for item in requested):
             _append_warning(warnings, "ENTITY_OUT_OF_SCOPE", "实体类型不在目标范围内", f"{path}.type", ontology_class.identifier)
             continue
-        if not isinstance(mention, str) or not mention:
+        evidence = raw.get("evidence") if isinstance(raw.get("evidence"), dict) else {}
+        raw_mention = raw.get("mention")
+        raw_name = raw.get("name")
+        name = next(
+            (
+                value.strip()
+                for value in (raw_mention, raw_name)
+                if isinstance(value, str) and value.strip()
+            ),
+            "",
+        )
+        quote = evidence.get("quote") if isinstance(evidence.get("quote"), str) else ""
+        if not name:
             _append_warning(warnings, "INVALID_ENTITY_MENTION", "mention 必须是非空字符串", f"{path}.mention")
             continue
-        if not isinstance(quote, str) or not quote or mention not in quote or quote not in text:
-            _append_warning(warnings, "ENTITY_SPAN_UNGROUNDED", "mention/quote 必须逐字定位到当前 chunk", f"{path}.evidence")
-            continue
-        starts = [match.start() for match in re.finditer(re.escape(mention), text)]
+
+        # 实体名允许是归纳得到的（如规则名），不要求逐字；但证据必须落到原文，
+        # 因此 name 或 evidence.quote 至少有一个能在当前 chunk 中逐字定位。
+        name_in_text = name in text
+        quote_in_text = bool(quote) and quote in text
         start = raw.get("start_char")
         end = raw.get("end_char")
-        offsets_match = isinstance(start, int) and isinstance(end, int) and 0 <= start <= end <= len(text) and text[start:end] == mention
-        if not offsets_match:
-            # quote 已通过逐字校验（quote ⊆ text 且 mention ⊆ quote），本身就是
-            # 可靠锚点；mention 在文中多次出现（如"标题 + 术语名称行"各一次）时，
-            # 模型的字符偏移几乎总是错的，按 quote 定位是唯一可靠的恢复方式。
-            quote_start = text.find(quote)
-            in_quote = quote.find(mention) if quote_start >= 0 else -1
-            if in_quote >= 0:
-                start = quote_start + in_quote
-                end = start + len(mention)
-                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与逐字 mention 不一致，已按证据 quote 定位纠正", path)
-            elif len(starts) != 1:
-                _append_warning(warnings, "ENTITY_SPAN_INVALID", "offset 错误且 mention 无法唯一定位", f"{path}.start_char")
-                continue
+        offsets_match = (
+            isinstance(start, int)
+            and isinstance(end, int)
+            and 0 <= start <= end <= len(text)
+            and text[start:end] == name
+        )
+        if name_in_text:
+            starts = [match.start() for match in re.finditer(re.escape(name), text)]
+            if offsets_match:
+                pass
+            elif len(starts) == 1:
+                start = starts[0]
+                end = start + len(name)
+                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与 mention 不一致，已按唯一原文位置纠正", path)
+            elif quote_in_text and name in quote:
+                quote_start = text.find(quote)
+                start = quote_start + quote.index(name)
+                end = start + len(name)
+                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与 mention 不一致，已按证据 quote 定位纠正", path)
             else:
                 start = starts[0]
-                end = start + len(mention)
-                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与逐字 mention 不一致，已按唯一原文位置纠正", path)
-        key = (ontology_class.identifier, mention)
+                end = start + len(name)
+                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与 mention 不一致，已按首个原文位置纠正", path)
+        elif quote_in_text:
+            # 归纳型实体名：用逐字 evidence.quote 承载证据 span。
+            quote_start = text.find(quote)
+            start = quote_start
+            end = quote_start + len(quote)
+            _append_warning(
+                warnings,
+                "ENTITY_NAME_UNGROUNDED",
+                "mention 无法逐字定位，已保留归纳型实体名并以 evidence.quote 作为证据 span",
+                path,
+                name,
+            )
+        else:
+            # 不再强制 span-first：实体名/证据都不是原文逐字片段时（例如由多条
+            # 记录归纳出的规则）同样保留，证据问题只作为告警。
+            _append_warning(
+                warnings,
+                "ENTITY_UNGROUNDED",
+                "mention 与 evidence.quote 均非原文片段，按生成式实体保留",
+                path,
+                name,
+            )
+            start = start if isinstance(start, int) and start >= 0 else 0
+            end = end if isinstance(end, int) and end >= start else start
+
+        key = (ontology_class.identifier, name)
         if key in seen:
             _append_warning(warnings, "ENTITY_DUPLICATE_MENTION", "同一 type+mention 在 chunk 内重复，已去重", path)
             continue
         seen.add(key)
         accepted.append({
             "type": ontology_class.identifier,
-            "name": mention,
+            "name": name,
             "properties": {},
             "evidence": {"quote": quote, "start_char": start, "end_char": end},
         })
@@ -807,6 +850,8 @@ def entity_pass(
                 f"{chunk.chunk_id}.entities[{index}].evidence",
                 quote,
             )
+            # 不再强制证据绑定：无法定位的实体同样保留，问题只作为告警。
+            grounded_entities.append(entity)
         return (
             chunk.chunk_id,
             grounded_entities,
@@ -903,7 +948,13 @@ def relation_pass(
         ]
         if not local_catalog:
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
-        pairs = enumerate_relation_pairs(plan, entity_objects)
+        # Enumerate only among entities permitted for this chunk; pairs outside
+        # this set are dropped by the filters below anyway.
+        permitted_objects = [
+            entity for entity in entity_objects
+            if entity.candidate_id in permitted_ids
+        ]
+        pairs = enumerate_relation_pairs(plan, permitted_objects)
         anchor_types = {
             canonical_name(entity.canonical_type)
             for entity in entity_objects

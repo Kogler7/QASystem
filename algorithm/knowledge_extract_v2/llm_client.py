@@ -73,25 +73,6 @@ def _unsupported_parameter(exc: Exception) -> bool:
     )
 
 
-def _reasoning_capability_error(exc: Exception) -> bool:
-    """Whether a Responses error explicitly rejects the reasoning field.
-
-    The Responses retry is deliberately narrower than the general structured
-    output capability fallback: a validation/service error must not cause us
-    to silently issue a second request with different semantics.
-    """
-    message = str(exc).casefold()
-    if not re.search(r"\breason(?:ing)?\b", message):
-        return False
-    return bool(
-        re.search(
-            r"(unsupported|unknown|unrecognized|not[- ]supported|"
-            r"unavailable|extra[- ]input|extra input|extra inputs|not permitted)",
-            message,
-        )
-    )
-
-
 def _field(value: Any, name: str, default: Any = None) -> Any:
     """Read an SDK field from either a model object or a plain mapping."""
     if isinstance(value, dict):
@@ -292,15 +273,10 @@ class OpenAICompatibleLLM:
             "max_output_tokens": self.max_tokens,
             "text": {"format": response_format},
         }
-        if self.disable_thinking and _is_deepseek_model(self.model):
-            kwargs["reasoning"] = {"effort": "none"}
-        try:
-            return create(**kwargs)
-        except Exception as exc:  # noqa: BLE001 - compatible providers vary
-            if not self.disable_thinking or not _reasoning_capability_error(exc):
-                raise
-            kwargs.pop("reasoning", None)
-            return create(**kwargs)
+        # disable_thinking=True 时直接省略 reasoning 字段即可关闭思考：
+        # 部分 OpenAI 兼容的 Responses 实现会拒绝 reasoning 参数，
+        # 不下发它比先下发再回退更稳妥。
+        return create(**kwargs)
 
     def _chat_structured(
         self,

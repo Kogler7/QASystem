@@ -4,9 +4,6 @@
       "type": "Term",
       "name": "故障现象",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "故障发生时在现场被观察、记录或感知到的异常状态、异常行为或异常事件，是故障诊断过程中的主要输入信息。通常包括故障发生时间、地点、列车或设备对象、运行状态、异常表现及初步处置情况等内容，用于支持后续基于规则、知识图谱或专家经验的故障原因推理。",
         "synonyms": [
           "故障状况",
           "故障描述",
@@ -14,32 +11,46 @@
           "故障表现",
           "现场故障记录",
           "故障事件描述"
-        ]
+        ],
+        "definition": "故障发生时在现场被观察、记录或感知到的异常状态、异常行为或异常事件，是故障诊断过程中的主要输入信息。通常包括故障发生时间、地点、列车或设备对象、运行状态、异常表现及初步处置情况等内容，用于支持后续基于规则、知识图谱或专家经验的故障原因推理。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 故障现象",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 26,
+        "line_end": 26,
+        "start_char": 539,
+        "end_char": 552,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "所属系统",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "故障现象或故障事件归属的设备系统或业务系统，用于明确故障诊断的对象范围和专业边界。在轨道交通信号设备故障诊断中，所属系统可包括 ATP/ATO、ATS、SICAS 等系统。",
         "synonyms": [
           "故障系统",
           "设备系统",
           "子系统",
           "系统类别",
           "故障所属专业"
-        ]
+        ],
+        "definition": "故障现象或故障事件归属的设备系统或业务系统，用于明确故障诊断的对象范围和专业边界。在轨道交通信号设备故障诊断中，所属系统可包括 ATP/ATO、ATS、SICAS 等系统。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 所属系统",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 31,
+        "line_end": 31,
+        "start_char": 735,
+        "end_char": 748,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "故障原因",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "导致故障现象发生的直接原因或根本原因，是故障诊断推理的目标结果。故障原因可来源于设备部件失效、环境影响、通信异常、电源异常、控制逻辑异常或其他运行条件异常等。",
         "synonyms": [
           "原因",
           "故障成因",
@@ -47,16 +58,23 @@
           "根本原因",
           "直接原因",
           "诊断原因"
-        ]
+        ],
+        "definition": "导致故障现象发生的直接原因或根本原因，是故障诊断推理的目标结果。故障原因可来源于设备部件失效、环境影响、通信异常、电源异常、控制逻辑异常或其他运行条件异常等。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 故障原因",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 36,
+        "line_end": 36,
+        "start_char": 889,
+        "end_char": 902,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "处理方法",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "针对已发生故障采取的维修、调整、复位、更换、重启或其他恢复措施，用于消除故障影响、恢复系统正常运行，并可作为后续维修方案生成和知识复用的依据。",
         "synonyms": [
           "处置方法",
           "维修措施",
@@ -64,32 +82,46 @@
           "恢复方法",
           "解决方案",
           "故障处理办法"
-        ]
+        ],
+        "definition": "针对已发生故障采取的维修、调整、复位、更换、重启或其他恢复措施，用于消除故障影响、恢复系统正常运行，并可作为后续维修方案生成和知识复用的依据。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 处理方法",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 41,
+        "line_end": 41,
+        "start_char": 1038,
+        "end_char": 1051,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "故障详细分类",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "根据故障现象、故障对象、故障部件或故障表现对故障事件进行细粒度划分的类别信息，用于故障统计、规则抽取、诊断匹配和知识图谱分类管理。",
         "synonyms": [
           "故障类型",
           "故障类别",
           "详细故障类别",
           "故障小类",
           "故障分类项"
-        ]
+        ],
+        "definition": "根据故障现象、故障对象、故障部件或故障表现对故障事件进行细粒度划分的类别信息，用于故障统计、规则抽取、诊断匹配和知识图谱分类管理。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 故障详细分类",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 46,
+        "line_end": 46,
+        "start_char": 1183,
+        "end_char": 1198,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "故障地点",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "故障事件发生或被发现的空间位置，通常包括车站、区间、线路、联锁区、轨道区段或设备安装位置等，用于支持故障定位、区域统计和现场维修派工。",
         "synonyms": [
           "发生地点",
           "故障位置",
@@ -97,268 +129,397 @@
           "站点",
           "区段",
           "设备位置"
-        ]
+        ],
+        "definition": "故障事件发生或被发现的空间位置，通常包括车站、区间、线路、联锁区、轨道区段或设备安装位置等，用于支持故障定位、区域统计和现场维修派工。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 故障地点",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 51,
+        "line_end": 51,
+        "start_char": 1320,
+        "end_char": 1333,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "车次",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "发生故障或受故障影响的运营列车编号或运行车次，用于关联故障事件与具体列车运行任务，支持故障追踪、运行影响分析和维修记录管理。",
         "synonyms": [
           "列车号",
           "运营车次",
           "车辆编号",
           "列车编号",
           "故障车次"
-        ]
+        ],
+        "definition": "发生故障或受故障影响的运营列车编号或运行车次，用于关联故障事件与具体列车运行任务，支持故障追踪、运行影响分析和维修记录管理。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 车次",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 56,
+        "line_end": 56,
+        "start_char": 1457,
+        "end_char": 1468,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "是否晚点",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "用于标识故障事件是否对列车运行造成晚点或延误影响的状态信息，是评估故障运行影响程度和服务质量影响的重要指标。",
         "synonyms": [
           "晚点标识",
           "是否延误",
           "运行影响标识",
           "延误状态"
-        ]
+        ],
+        "definition": "用于标识故障事件是否对列车运行造成晚点或延误影响的状态信息，是评估故障运行影响程度和服务质量影响的重要指标。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 是否晚点",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 61,
+        "line_end": 61,
+        "start_char": 1583,
+        "end_char": 1596,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "故障次数",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "在指定统计周期、指定系统、指定地点或指定故障类别下，故障事件发生的累计数量，用于故障频次分析、可靠性评估和重点故障识别。",
         "synonyms": [
           "发生次数",
           "故障发生次数",
           "故障数量",
           "故障频次",
           "事件次数"
-        ]
+        ],
+        "definition": "在指定统计周期、指定系统、指定地点或指定故障类别下，故障事件发生的累计数量，用于故障频次分析、可靠性评估和重点故障识别。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 故障次数",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 66,
+        "line_end": 66,
+        "start_char": 1701,
+        "end_char": 1714,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "对标不准",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "列车在车站停车时，实际停车位置与规定停车标位置之间存在明显偏差，导致列车车门、站台门或屏蔽门联动条件异常，可能引起车门无法正常打开、屏蔽门无法联动或开门使能信号异常等问题。",
         "synonyms": [
           "停车对标不准",
           "停车位置偏差",
           "对位偏差",
           "列车停车偏差",
           "停车精度异常"
-        ]
+        ],
+        "definition": "列车在车站停车时，实际停车位置与规定停车标位置之间存在明显偏差，导致列车车门、站台门或屏蔽门联动条件异常，可能引起车门无法正常打开、屏蔽门无法联动或开门使能信号异常等问题。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 对标不准",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 71,
+        "line_end": 71,
+        "start_char": 1830,
+        "end_char": 1843,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "屏蔽门不能联动",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "列车到站停车并满足开关门条件后，屏蔽门未能按照联动控制逻辑随列车车门同步打开或关闭的异常现象。该类故障可能与对标偏差、开门使能信号异常、多路接收器工作不稳定或相关控制板卡异常有关。",
         "synonyms": [
           "屏蔽门联动失败",
           "屏蔽门未联动",
           "站台门不能联动",
           "屏蔽门不能联动打开",
           "屏蔽门不能联动关闭"
-        ]
+        ],
+        "definition": "列车到站停车并满足开关门条件后，屏蔽门未能按照联动控制逻辑随列车车门同步打开或关闭的异常现象。该类故障可能与对标偏差、开门使能信号异常、多路接收器工作不稳定或相关控制板卡异常有关。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 屏蔽门不能联动",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 76,
+        "line_end": 76,
+        "start_char": 1991,
+        "end_char": 2007,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "轨道电路异常",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "轨道电路区段状态显示异常或占用状态异常的故障现象，可能表现为红光带、粉红光带、区段异常占用或逻辑空闲后恢复等情况。该类故障通常用于判断轨道区段检测、接收端设备、调谐单元或环境状态是否存在异常。",
         "synonyms": [
           "轨道电路故障",
           "红光带",
           "粉红光带",
           "轨道区段异常",
           "轨道区段占用异常"
-        ]
+        ],
+        "definition": "轨道电路区段状态显示异常或占用状态异常的故障现象，可能表现为红光带、粉红光带、区段异常占用或逻辑空闲后恢复等情况。该类故障通常用于判断轨道区段检测、接收端设备、调谐单元或环境状态是否存在异常。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 轨道电路异常",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 81,
+        "line_end": 81,
+        "start_char": 2169,
+        "end_char": 2184,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "RTU 报警",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "远程终端单元 RTU 在运行、巡检或监控过程中产生报警信息，表示现场设备采集、通信、状态监测或控制链路存在异常，需要通过重启、检查通信链路或进一步诊断确认故障原因。",
         "synonyms": [
           "RTU告警",
           "RTU报警信息",
           "远程终端报警",
           "远程终端单元告警"
-        ]
+        ],
+        "definition": "远程终端单元 RTU 在运行、巡检或监控过程中产生报警信息，表示现场设备采集、通信、状态监测或控制链路存在异常，需要通过重启、检查通信链路或进一步诊断确认故障原因。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: RTU报警",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 86,
+        "line_end": 86,
+        "start_char": 2341,
+        "end_char": 2355,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "电源板异常",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "设备电源板或电源模块在供电过程中出现输出不稳定、电压异常或工作状态异常，可能导致信号屏黑屏、ATO灯不亮、设备复位或系统功能异常等故障现象。",
         "synonyms": [
           "电源板故障",
           "电源模块异常",
           "5V电源板异常",
           "电源板工作不稳定",
           "供电板卡异常"
-        ]
+        ],
+        "definition": "设备电源板或电源模块在供电过程中出现输出不稳定、电压异常或工作状态异常，可能导致信号屏黑屏、ATO灯不亮、设备复位或系统功能异常等故障现象。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 电源板异常",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 91,
+        "line_end": 91,
+        "start_char": 2496,
+        "end_char": 2510,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "运营停车点不能自动取消",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "列车运行过程中，系统设置的运营停车点在满足取消条件后未能自动取消，导致列车运行控制或调度组织受到影响，需要通过信号人员处理、系统检查或相关逻辑恢复操作使其恢复正常。",
         "synonyms": [
           "运营停车点未自动取消",
           "停车点不能取消",
           "停车点取消失败",
           "运营停车点异常"
-        ]
+        ],
+        "definition": "列车运行过程中，系统设置的运营停车点在满足取消条件后未能自动取消，导致列车运行控制或调度组织受到影响，需要通过信号人员处理、系统检查或相关逻辑恢复操作使其恢复正常。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 运营停车点不能自动取消",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 96,
+        "line_end": 96,
+        "start_char": 2646,
+        "end_char": 2666,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "开门使能信号异常",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "列车到站后未能正常接收或输出开门使能信号，导致车门或屏蔽门无法按正常逻辑打开，需要通过人工强制开门按钮、信号复位或相关设备检查进行处理。",
         "synonyms": [
           "开门使能信号缺失",
           "未收到开门使能信号",
           "开门授权异常",
           "车门使能异常"
-        ]
+        ],
+        "definition": "列车到站后未能正常接收或输出开门使能信号，导致车门或屏蔽门无法按正常逻辑打开，需要通过人工强制开门按钮、信号复位或相关设备检查进行处理。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 开门使能信号异常",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 101,
+        "line_end": 101,
+        "start_char": 2812,
+        "end_char": 2829,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "同步环线检测板异常",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "同步环线检测板在列车定位、站台门联动或相关信号检测过程中出现工作异常，可能导致列车对标偏差、屏蔽门无法联动或站台门控制异常等故障现象。",
         "synonyms": [
           "同步环线检测板故障",
           "同步环线板卡异常",
           "检测板异常",
           "同步环线检测异常"
-        ]
+        ],
+        "definition": "同步环线检测板在列车定位、站台门联动或相关信号检测过程中出现工作异常，可能导致列车对标偏差、屏蔽门无法联动或站台门控制异常等故障现象。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 同步环线检测板异常",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 106,
+        "line_end": 106,
+        "start_char": 2959,
+        "end_char": 2977,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "同步环线报警板异常",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "同步环线报警板在监测或报警过程中出现异常，可能影响列车与站台设备之间的联动判断、报警反馈或开门控制逻辑，导致对标不准、开门使能异常或屏蔽门联动异常等现象。",
         "synonyms": [
           "同步环线报警板故障",
           "报警板异常",
           "同步环线报警异常",
           "同步环线板卡故障"
-        ]
+        ],
+        "definition": "同步环线报警板在监测或报警过程中出现异常，可能影响列车与站台设备之间的联动判断、报警反馈或开门控制逻辑，导致对标不准、开门使能异常或屏蔽门联动异常等现象。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 同步环线报警板异常",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 111,
+        "line_end": 111,
+        "start_char": 3107,
+        "end_char": 3125,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "多路接收器 CPU850 工作不稳定",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "多路接收器中的 CPU850 模块在运行过程中出现工作状态不稳定，导致相关信号接收、处理或联动控制异常，可能引发屏蔽门不能联动打开或关闭等故障现象。",
         "synonyms": [
           "CPU850工作不稳定",
           "多路接收器异常",
           "CPU850模块异常",
           "多路接收器CPU异常"
-        ]
+        ],
+        "definition": "多路接收器中的 CPU850 模块在运行过程中出现工作状态不稳定，导致相关信号接收、处理或联动控制异常，可能引发屏蔽门不能联动打开或关闭等故障现象。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 多路接收器CPU850工作不稳定",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 116,
+        "line_end": 116,
+        "start_char": 3265,
+        "end_char": 3290,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "接收端轨旁盒潮湿",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "轨道电路接收端轨旁盒内部存在潮湿、受潮或环境湿度异常情况，可能影响接收端调谐单元、转换单元或相关电气部件的正常工作，导致轨道电路区段状态异常。",
         "synonyms": [
           "轨旁盒潮湿",
           "接收端受潮",
           "轨旁设备受潮",
           "接收端环境潮湿"
-        ]
+        ],
+        "definition": "轨道电路接收端轨旁盒内部存在潮湿、受潮或环境湿度异常情况，可能影响接收端调谐单元、转换单元或相关电气部件的正常工作，导致轨道电路区段状态异常。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: 接收端轨旁盒潮湿",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 121,
+        "line_end": 121,
+        "start_char": 3435,
+        "end_char": 3452,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "ATP/ATO 系统",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "列车自动防护系统与列车自动运行系统的组合，用于保障列车运行安全、速度控制、停车控制、自动驾驶以及与车门、屏蔽门等设备之间的联动控制。附件样例中，对标不准、屏蔽门不能联动、电源板异常等故障均归属于该系统。",
         "synonyms": [
           "ATP/ATO",
           "列车自动防护与自动运行系统",
           "自动防护自动运行系统",
           "列控系统"
-        ]
+        ],
+        "definition": "列车自动防护系统与列车自动运行系统的组合，用于保障列车运行安全、速度控制、停车控制、自动驾驶以及与车门、屏蔽门等设备之间的联动控制。附件样例中，对标不准、屏蔽门不能联动、电源板异常等故障均归属于该系统。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: ATP/ATO系统",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 126,
+        "line_end": 126,
+        "start_char": 3579,
+        "end_char": 3597,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "ATS 系统",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "列车自动监控系统，用于对列车运行状态、运营停车点、调度控制和现场设备状态进行监视与控制。附件样例中，RTU报警、运营停车点不能自动取消等故障归属于该系统。",
         "synonyms": [
           "ATS",
           "列车自动监控系统",
           "自动监控系统",
           "调度监控系统"
-        ]
+        ],
+        "definition": "列车自动监控系统，用于对列车运行状态、运营停车点、调度控制和现场设备状态进行监视与控制。附件样例中，RTU报警、运营停车点不能自动取消等故障归属于该系统。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: ATS系统",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 131,
+        "line_end": 131,
+        "start_char": 3765,
+        "end_char": 3779,
+        "support": "explicit"
       }
     },
     {
       "type": "Term",
       "name": "SICAS 系统",
       "properties": {
-        "language": "zh-CN",
-        "knowledgeContentFormat": "术语定义",
-        "knowledgeContent": "计算机联锁系统，用于实现车站或线路区段内进路、信号机、道岔、轨道电路等设备之间的联锁控制与状态监测。附件样例中，轨道电路红光带、粉红光带等异常归属于该系统。",
         "synonyms": [
           "SICAS",
           "计算机联锁系统",
           "联锁系统",
           "信号联锁系统"
-        ]
+        ],
+        "definition": "计算机联锁系统，用于实现车站或线路区段内进路、信号机、道岔、轨道电路等设备之间的联锁控制与状态监测。附件样例中，轨道电路红光带、粉红光带等异常归属于该系统。"
+      },
+      "evidence": {
+        "quote": "// 术语名称: SICAS系统",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 136,
+        "line_end": 136,
+        "start_char": 3912,
+        "end_char": 3928,
+        "support": "explicit"
       }
     },
     {
@@ -371,6 +532,15 @@
         "organization": "轨道交通装备维护部门",
         "interest": "根据故障现象快速定位故障原因，并获得可执行的维修建议",
         "responsibilityDomain": "系统故障诊断与处理"
+      },
+      "evidence": {
+        "quote": "object 信号维修工程师_01",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 10,
+        "line_end": 10,
+        "start_char": 77,
+        "end_char": 94,
+        "support": "explicit"
       }
     },
     {
@@ -381,6 +551,15 @@
         "name": "基于故障现象的故障原因定位",
         "type": "故障诊断关注点",
         "description": "针对故障样例数据中的故障状况、所属系统、故障详细分类等信息，利用故障规则推理可能的故障原因。"
+      },
+      "evidence": {
+        "quote": "名称 (name) = \"基于故障现象的故障原因定位\"",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 411,
+        "end_char": 438,
+        "support": "explicit"
       }
     },
     {
@@ -403,6 +582,15 @@
           "故障原因推理问题_01",
           "诊断结果解释问题_01"
         ]
+      },
+      "evidence": {
+        "quote": "PROB_FAULT_DIAG_RULE_001",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 142,
+        "line_end": 142,
+        "start_char": 4125,
+        "end_char": 4149,
+        "support": "explicit"
       }
     },
     {
@@ -443,30 +631,34 @@
           "约束：结果必须可解释、可追溯"
         ],
         "valaditionRule": "若输入故障现象能够匹配到至少一条有效故障规则，并输出与规则后件一致的故障原因，同时诊断结果能够追溯到对应规则和原始样例，则认为该方案有效。"
+      },
+      "evidence": {
+        "quote": "object 基于故障规则的故障诊断方案_01",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 166,
+        "line_end": 166,
+        "start_char": 4844,
+        "end_char": 4867,
+        "support": "explicit"
       }
     }
   ],
   "relations": [
     {
-      "from_type": "Stakeholder",
-      "from_name": "信号维修工程师_01",
-      "rel_type": "提出问题",
-      "to_type": "Problem",
-      "to_name": "基于故障规则的故障诊断问题_01"
-    },
-    {
-      "from_type": "Concern",
-      "from_name": "故障原因定位_01",
-      "rel_type": "关联问题",
-      "to_type": "Problem",
-      "to_name": "基于故障规则的故障诊断问题_01"
-    },
-    {
       "from_type": "Problem",
       "from_name": "基于故障规则的故障诊断问题_01",
       "rel_type": "需要方案",
       "to_type": "Solution",
-      "to_name": "基于故障规则的故障诊断方案_01"
+      "to_name": "基于故障规则的故障诊断方案_01",
+      "evidence": {
+        "quote": "object 基于故障规则的故障诊断方案_01",
+        "document": "Simple_故障规则的诊断.md",
+        "line_start": 166,
+        "line_end": 166,
+        "start_char": 4844,
+        "end_char": 4867,
+        "support": "endpoint_context"
+      }
     }
   ]
 }
