@@ -435,40 +435,6 @@ class OntologySchema:
                 return inherited
         return ()
 
-    def target_identifiers(self, target_types: Iterable[str] | None = None) -> tuple[str, ...]:
-        requested = [item for item in (target_types or []) if coerce_non_empty_name(item)]
-        if not requested:
-            return tuple(ontology_class.identifier for ontology_class in self.classes)
-        targets = [self.resolve_class(item) for item in requested]
-        targets = [item for item in targets if item is not None]
-        return tuple(
-            ontology_class.identifier
-            for ontology_class in self.classes
-            if any(self.is_assignable(ontology_class.identifier, target.identifier) for target in targets)
-        )
-
-    def prompt_catalog(self, target_types: Iterable[str] | None = None) -> str:
-        if not self.classes:
-            return "未解析到类声明。"
-        allowed = set(self.target_identifiers(target_types))
-        lines: list[str] = []
-        for ontology_class in self.classes:
-            if ontology_class.identifier not in allowed:
-                continue
-            aliases = sorted(ontology_class.symbols - {ontology_class.identifier})
-            line = f'- `{ontology_class.display_name}` -> type `{ontology_class.identifier}`'
-            if aliases:
-                line += f"（可解析名称：{', '.join(aliases)}）"
-            identities = self.identity_properties_for(ontology_class.identifier)
-            if identities:
-                line += f"；identity 优先级：{', '.join(identities)}"
-            lines.append(line)
-            for prop in self._properties_for(ontology_class.identifier):
-                lines.append(
-                    f"  - 属性 `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type})"
-                )
-        return "\n".join(lines) if lines else "目标类型未匹配到本体类。"
-
     @staticmethod
     def _coerce_value(value: Any, data_type: str) -> Any:
         if value is None:

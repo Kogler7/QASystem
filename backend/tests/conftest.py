@@ -95,9 +95,36 @@ def protocol_module():
             "algorithm.NL_to_cypher.vector",
             batch_text_to_vectors=lambda texts: [[float(index), 1.0] for index, _ in enumerate(texts)],
         ),
+        # V1 now only serves the no-ontology summary paths.
         "algorithm.knowledge_extract": _module(
             "algorithm.knowledge_extract",
-            extract_v2=lambda **_kwargs: {"raw": {}, "graph": {"nodes": [], "relationships": []}},
+            summarize_text=lambda **kwargs: {
+                "text": kwargs.get("text", ""),
+                "summary": "摘要",
+                "attempts": [],
+            },
+            store_extraction_to_neo4j=lambda **_kwargs: {"success": True},
+        ),
+        "algorithm.knowledge_extract.batch": _module(
+            "algorithm.knowledge_extract.batch",
+            summarize_chunks=lambda chunks, **_kwargs: [
+                {"index": index, "text": text, "summary": "摘要", "attempts": []}
+                for index, text in enumerate(chunks)
+            ],
+        ),
+        "algorithm.knowledge_extract_v2": _module(
+            "algorithm.knowledge_extract_v2",
+            deduplicate_chunk_graphs=deduplicate_chunk_graphs,
+        ),
+        "algorithm.knowledge_extract_v2.config": _module(
+            "algorithm.knowledge_extract_v2.config",
+            get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
+        ),
+        # Production extraction runs Knowledge Extract V2 through this adapter,
+        # which would reach the LLM.  Protocol tests stay hermetic by stubbing
+        # the adapter instead of the algorithm package.
+        "backend.app.services.knowledge_extract_adapter": _module(
+            "backend.app.services.knowledge_extract_adapter",
             extract_chunks=lambda ontology, chunks, **_kwargs: [
                 {
                     "index": index,
@@ -105,41 +132,15 @@ def protocol_module():
                     "raw": {},
                     "graph": {"nodes": [], "relationships": []},
                     "attempts": [],
+                    "warnings": [],
+                    "profile": {},
                     "error": None,
                     "error_code": None,
                     "raw_response": "",
                 }
                 for index, text in enumerate(chunks)
             ],
-            deduplicate_chunk_graphs=deduplicate_chunk_graphs,
-            store_extraction_to_neo4j=lambda **_kwargs: {"success": True},
         ),
-        "algorithm.knowledge_extract.config": _module(
-            "algorithm.knowledge_extract.config",
-            get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
-        ),
-          "algorithm.knowledge_extract_v2": _module(
-              "algorithm.knowledge_extract_v2",
-              extract_v2=lambda **_kwargs: {"raw": {}, "graph": {"nodes": [], "relationships": []}},
-              extract_chunks=lambda ontology, chunks, **_kwargs: [
-                  {
-                      "index": index,
-                      "text": text,
-                      "raw": {},
-                      "graph": {"nodes": [], "relationships": []},
-                      "attempts": [],
-                      "error": None,
-                      "error_code": None,
-                      "raw_response": "",
-                  }
-                  for index, text in enumerate(chunks)
-              ],
-              deduplicate_chunk_graphs=deduplicate_chunk_graphs,
-          ),
-          "algorithm.knowledge_extract_v2.config": _module(
-              "algorithm.knowledge_extract_v2.config",
-              get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
-          ),
         "algorithm.knowledge_pipeline": _module(
             "algorithm.knowledge_pipeline",
             build_graphs_response=lambda items: {

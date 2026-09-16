@@ -1,12 +1,11 @@
 """Phase 1：Coverage Gap 模型（§22）与通用 Coverage Auditor（§23 / Step 9）。
 
-Step 5 / Step 6 的策略审计复用同一模型；Step 9 的通用 CoverageAuditor
 实现 §23 的五类覆盖检查（只发现 gap，不自动修复）。
 """
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .graph_utils import canonical_name
@@ -114,7 +113,7 @@ class CoverageAuditor:
             missing = [spec for spec in intrinsic if spec.identifier not in provided]
             if not missing:
                 continue
-            hard = any(spec.required is True for spec in intrinsic)
+            hard = any(spec.required is True for spec in missing)
             gaps.append(
                 self._next_gap(
                     "feature_coverage",
@@ -141,14 +140,23 @@ class CoverageAuditor:
         relations: list[dict[str, Any]],
     ) -> list[CoverageGap]:
         gaps: list[CoverageGap] = []
-        relation_rows = [
-            spec
+        relation_rows = {
+            (
+                spec.relation_id,
+                spec.source,
+                spec.target,
+                spec.source_cardinality,
+                spec.target_cardinality,
+            ): spec
             for specs in plan.relation_specs.values()
             for spec in specs
             if spec.source in plan.allowed_types or spec.target in plan.allowed_types
-        ]
-        for spec in relation_rows:
-            if _cardinality_min_one(spec.source_cardinality):
+        }
+        for spec in relation_rows.values():
+            # PlantUML multiplicity is written next to the endpoint it counts:
+            # target cardinality constrains targets per source, while source
+            # cardinality constrains sources per target.
+            if _cardinality_min_one(spec.target_cardinality):
                 for entity in entities:
                     if entity.get("type") != spec.source:
                         continue
@@ -161,12 +169,12 @@ class CoverageAuditor:
                                 evidence=str(entity.get("name") or ""),
                                 reason=(
                                     f"{spec.source}::{entity.get('name')} 缺少必需关系 "
-                                    f"{spec.relation_id}（源端基数 {spec.source_cardinality}）"
+                                    f"{spec.relation_id}（目标端基数 {spec.target_cardinality}）"
                                 ),
                                 expected_relations=(spec.relation_id,),
                             )
                         )
-            if _cardinality_min_one(spec.target_cardinality):
+            if _cardinality_min_one(spec.source_cardinality):
                 for entity in entities:
                     if entity.get("type") != spec.target:
                         continue
@@ -179,7 +187,7 @@ class CoverageAuditor:
                                 evidence=str(entity.get("name") or ""),
                                 reason=(
                                     f"{spec.target}::{entity.get('name')} 缺少入向必需关系 "
-                                    f"{spec.relation_id}（目标端基数 {spec.target_cardinality}）"
+                                    f"{spec.relation_id}（源端基数 {spec.source_cardinality}）"
                                 ),
                                 expected_relations=(spec.relation_id,),
                             )

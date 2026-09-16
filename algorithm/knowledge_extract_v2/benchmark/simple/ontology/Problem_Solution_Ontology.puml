@@ -12,7 +12,7 @@ package "III. 问题-方案属性包\n(Problem-Solution)" <<Rectangle>> #FCE4EC 
     • 问题目标 (ProblemGoal): String // 问题解决的最终目标，明确描述需要达成的结果或状态
     • 约束条件 (Constraints): String // 问题所需遵守的约束规则。
     • 干系人 (Stakeholder): Stakeholder // 主体干系人
-    • 关注点（Concern）：Concern // 问题的关注点
+    • 关注点 (Concern): Concern // 问题的关注点
     • 问题类型 (ProblemType): problemType // 问题类型（基于5W1H扩展的问题分类）
     • 子问题(ChildernProblem) : Problem[] // 该问题拆解出来的子问题，形同Problem本体
     ---
@@ -28,9 +28,9 @@ package "III. 问题-方案属性包\n(Problem-Solution)" <<Rectangle>> #FCE4EC 
     • 方案描述 (solutionDescription): String
     • 方案类别(SolutionCategory): SolutionCategory
     • 解决方案目标(SolutionGoal): String
-    • 输入(Input)：String
-    • 输出(Output)：String
-    • 约束(Constraint)：String
+    • 输入 (Input): String
+    • 输出 (Output): String
+    • 约束 (Constraint): String
     • 资源需求 (resourceRequirements): KnowledgeResource //实现该解决方案所需要的资源集，包括知识资源、组件资源等
     • 覆盖的维度 (coverDimensions): Map<DimensionID.ScaleID> //该解决方案所覆盖的维度与刻度
     • 方案模板 (SolutionTemple): ActivityDiagram //方案模板是一个活动流程，包括方案步骤以及控制逻辑，方案步骤与Solution本体同形

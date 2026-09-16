@@ -7,8 +7,7 @@ hide empty methods
 package "III. 技术要求、试验与外部资源包" <<Rectangle>> #FFF3E0 {
   ' 本模块可独立抽取技术条款、对象、特性、约束、试验及外部资源。
   ' Clause 与 InformationUnit 是最小上下文，不依赖内容结构模块。
-  class "信息单元" <<InformationUnit>> { - 唯一标识符 (唯一标识符)\n- 内容描述 (内容描述) }
-  class "条款" <<Clause>> { - 条款类型 (条款类型)\n- 约束类型 (约束类型) }
+  ' InformationUnit 与 Clause 由 Standard_Content_Structure_Ontology.puml 唯一定义。
   class "对象" <<Object>> { - 对象名称 (对象名称)\n- 对象类别 (对象类别) }
   class "标准对象" <<Subject of Standardization>>
   class "特性" <<Property>> { - 特性名称 (特性名称)\n- 特性类型 (特性类型)\n- 特性值 (特性值) }

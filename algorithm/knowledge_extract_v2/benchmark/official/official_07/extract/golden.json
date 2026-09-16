@@ -19,6 +19,15 @@
         "密级": "",
         "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 100,
+        "end_char": 138,
+        "support": "explicit"
       }
     },
     {
@@ -30,17 +39,35 @@
         "原文位置": "《关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知》正文",
         "原文内容": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 183,
+        "end_char": 300,
+        "support": "explicit"
       }
     },
     {
       "type": "DocumentUnit",
-      "name": "附件说明",
+      "name": "附件列表",
       "properties": {
         "单元标题": "附件",
         "单元类型": "附件说明",
         "原文位置": "《关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知》附件",
         "原文内容": "附件：中国中车集团有限公司科技研究开发计划管理办法；中国中车集团有限公司设计开发评审管理办法；中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 182,
+        "end_char": 301,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -51,6 +78,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "印发科技研究开发计划管理办法等3项管理制度的通知"
+      },
+      "evidence": {
+        "quote": "**中国中车集团有限公司文件",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 7,
+        "line_end": 7,
+        "start_char": 62,
+        "end_char": 76,
+        "support": "explicit"
       }
     },
     {
@@ -61,6 +97,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "认真贯彻落实科技研究开发计划管理办法等3项管理制度"
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 140,
+        "end_char": 180,
+        "support": "explicit"
       }
     },
     {
@@ -71,6 +116,15 @@
         "对象描述": "经集团公司2023年第31次总经理办公会审议通过的科技研究开发计划管理制度",
         "对象名称": "中国中车集团有限公司科技研究开发计划管理办法",
         "所属领域": "科研管理"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit"
       }
     },
     {
@@ -81,6 +135,15 @@
         "对象描述": "经集团公司2023年第31次总经理办公会审议通过的设计开发评审管理制度",
         "对象名称": "中国中车集团有限公司设计开发评审管理办法",
         "所属领域": "科研管理"
+      },
+      "evidence": {
+        "quote": "2. 中国中车集团有限公司设计开发评审管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 333,
+        "end_char": 356,
+        "support": "explicit"
       }
     },
     {
@@ -91,6 +154,15 @@
         "对象描述": "经集团公司2023年第31次总经理办公会审议通过的重大科研项目绩效跟踪评价管理制度",
         "对象名称": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
         "所属领域": "科研管理"
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 229,
+        "end_char": 255,
+        "support": "explicit"
       }
     },
     {
@@ -103,6 +175,15 @@
         "动作词": "贯彻、落实",
         "预期结果": "认真贯彻落实科技研究开发计划管理办法等3项管理制度",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit"
       }
     },
     {
@@ -113,6 +194,15 @@
         "信息类型": "附件",
         "定义": "科技研究开发计划管理制度",
         "来源文本": "附件1"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit"
       }
     },
     {
@@ -123,6 +213,15 @@
         "信息类型": "附件",
         "定义": "设计开发评审管理制度",
         "来源文本": "附件2"
+      },
+      "evidence": {
+        "quote": "2. 中国中车集团有限公司设计开发评审管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 333,
+        "end_char": 356,
+        "support": "explicit"
       }
     },
     {
@@ -133,6 +232,15 @@
         "信息类型": "附件",
         "定义": "重大科研项目绩效跟踪评价管理制度",
         "来源文本": "附件3"
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 229,
+        "end_char": 255,
+        "support": "explicit"
       }
     },
     {
@@ -141,6 +249,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司印发科技研究开发计划管理办法等3项管理制度的通知"
+      },
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 182,
+        "end_char": 301,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -152,6 +269,15 @@
         "约束名称": "认真贯彻落实要求",
         "约束类型": "流程约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 182,
+        "end_char": 301,
+        "support": "structural_inference"
       }
     }
   ],
@@ -161,210 +287,480 @@
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 100,
+        "end_char": 300,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 100,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "**中国中车集团有限公司文件**\n\n中车集团科信〔2023〕199号\n\n# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 7,
+        "line_end": 11,
+        "start_char": 62,
+        "end_char": 138,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 100,
+        "end_char": 180,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "中国中车集团有限公司科技研究开发计划管理办法"
+      "to_name": "中国中车集团有限公司科技研究开发计划管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司科技研究开发计划管理办法"
+      "to_name": "中国中车集团有限公司科技研究开发计划管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司科技研究开发计划管理办法"
+      "to_name": "中国中车集团有限公司科技研究开发计划管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司设计开发评审管理办法"
+      "to_name": "中国中车集团有限公司设计开发评审管理办法",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。\n\n附件：1. 中国中车集团有限公司科技研究开发计划管理办法\n\n2. 中国中车集团有限公司设计开发评审管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 19,
+        "start_char": 100,
+        "end_char": 356,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司设计开发评审管理办法"
+      "to_name": "中国中车集团有限公司设计开发评审管理办法",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。\n\n附件：1. 中国中车集团有限公司科技研究开发计划管理办法\n\n2. 中国中车集团有限公司设计开发评审管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 19,
+        "start_char": 100,
+        "end_char": 356,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法"
+      "to_name": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 100,
+        "end_char": 255,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法"
+      "to_name": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 100,
+        "end_char": 255,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "认真贯彻落实3项管理制度"
+      "to_name": "认真贯彻落实3项管理制度",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发3项科研管理制度"
+      "to_name": "印发3项科研管理制度",
+      "evidence": {
+        "quote": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 100,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "认真贯彻落实3项管理制度",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车集团有限公司科技研究开发计划管理办法"
+      "to_name": "中国中车集团有限公司科技研究开发计划管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 98,
+        "end_char": 138,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "认真贯彻落实3项管理制度",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 98,
+        "end_char": 180,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "认真贯彻落实3项管理制度",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 98,
+        "end_char": 300,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "认真贯彻落实要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "认真贯彻落实3项管理制度"
+      "to_name": "认真贯彻落实3项管理制度",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 98,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "认真贯彻落实要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 140,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "认真贯彻落实要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 182,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车集团有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "**中国中车集团有限公司文件**\n\n中车集团科信〔2023〕199号\n\n# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 7,
+        "line_end": 15,
+        "start_char": 62,
+        "end_char": 300,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 140,
+        "end_char": 300,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "中国中车集团有限公司科技研究开发计划管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 98,
+        "end_char": 300,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中国中车集团有限公司科技研究开发计划管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 98,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中国中车集团有限公司设计开发评审管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。\n\n附件：1. 中国中车集团有限公司科技研究开发计划管理办法\n\n2. 中国中车集团有限公司设计开发评审管理办法",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 19,
+        "start_char": 182,
+        "end_char": 356,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "中国中车集团有限公司重大科研项目绩效跟踪评价管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 182,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发3项科研管理制度",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 182,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发3项科研管理制度",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "**中国中车集团有限公司文件**\n\n中车集团科信〔2023〕199号\n\n# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 7,
+        "line_end": 15,
+        "start_char": 62,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发3项科研管理制度",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 140,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发3项科研管理制度",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "认真贯彻落实3项管理制度"
+      "to_name": "认真贯彻落实3项管理制度",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 98,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发3项科研管理制度",
       "rel_type": "EXCHANGES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "中国中车集团有限公司科技研究开发计划管理办法"
+      "to_name": "中国中车集团有限公司科技研究开发计划管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司科技研究开发计划管理办法》《中国中车集团有限公司设计开发评审管理办法》《中国中车集团有限公司重大科研项目绩效跟踪评价管理办法》已经中国中车集团有限公司2023年第31次总经理办公会审议通过，现予印发，请认真贯彻落实。",
+        "document": "关于印发《中国中车集团有限公司科技研究开发计划管理办法》等3项管理制度的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 98,
+        "end_char": 301,
+        "support": "explicit_endpoints"
+      }
     }
   ]
 }

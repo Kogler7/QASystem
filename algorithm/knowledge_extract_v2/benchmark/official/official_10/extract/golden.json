@@ -19,6 +19,15 @@
         "密级": "",
         "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 82,
+        "end_char": 112,
+        "support": "explicit"
       }
     },
     {
@@ -30,17 +39,35 @@
         "原文位置": "《关于印发中国中车2025年科技质量与信息化工作要点的通知》正文",
         "原文内容": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。2025年科技质量与信息化工作的总体思路是：聚焦集团公司“引领新质”党建工作主题和经营工作“13579”总体思路，瞄准科技创新、质量管控、数智转型三大方向，抓紧抓实科技体制改革、大研发体系建设、质量体系升级、产品品质跃升、数智转型赋能、“人工智能+”六大任务，稳步实现“五个显著”。2025年科技质量信息化工作思路可以概括为“13612”。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "2025年科技质量与信息化工作的总体思路是: 以习近平新时代中国特色社会主义思想为指导, 贯彻落实党中央和国家决策部署, 聚焦集团公司“引领新质”党建工作主题和经营工作“13579”总体思路, 瞄准科技创新、质量管控、数智转型三大方向, 抓紧抓实科技体制改革、大研发体系建设、质量体系升级、产品品质跃升、数智转型赋能、“人工智能+”六大任务, 稳步实现“五个显著”, 为“十四五”决胜收官、“十五五”良好开局, 全面迈向高质量发展新征程注入强劲动力。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 26,
+        "line_end": 26,
+        "start_char": 439,
+        "end_char": 664,
+        "support": "semantic_alignment"
       }
     },
     {
       "type": "DocumentUnit",
-      "name": "附件说明",
+      "name": "附件列表",
       "properties": {
         "单元标题": "附件",
         "单元类型": "附件说明",
         "原文位置": "《关于印发中国中车2025年科技质量与信息化工作要点的通知》附件",
         "原文内容": "附件：工作要点分解表",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "附件：工作要点分解表",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 205,
+        "end_char": 215,
+        "support": "explicit"
       }
     },
     {
@@ -51,6 +78,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "印发中国中车2025年科技质量与信息化工作要点"
+      },
+      "evidence": {
+        "quote": "印发中国中车 2025 年科技质量与信息化工作要点",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 84,
+        "end_char": 109,
+        "support": "explicit"
       }
     },
     {
@@ -61,6 +97,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "结合本单位实际认真贯彻落实2025年科技质量与信息化工作要点"
+      },
+      "evidence": {
+        "quote": "建立“战略-管理-执行”分层分级“集团-子公司-项目”三级联动的研发指标体系。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 54,
+        "line_end": 54,
+        "start_char": 2179,
+        "end_char": 2218,
+        "support": "explicit"
       }
     },
     {
@@ -71,6 +116,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "阅研2025年科技质量与信息化工作要点"
+      },
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -81,6 +135,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "阅2025年科技质量与信息化工作要点"
+      },
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -91,6 +154,15 @@
         "对象描述": "2025年科技质量与信息化工作要点，工作思路概括为“13612”",
         "对象名称": "中国中车2025年科技质量与信息化工作要点",
         "所属领域": "科技质量与信息化"
+      },
+      "evidence": {
+        "quote": "## 中国中车 2025 年科技质量与信息化工作要点",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 24,
+        "line_end": 24,
+        "start_char": 411,
+        "end_char": 437,
+        "support": "explicit"
       }
     },
     {
@@ -103,6 +175,15 @@
         "动作词": "贯彻、落实",
         "预期结果": "结合本单位实际认真贯彻落实",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "explicit"
       }
     },
     {
@@ -115,6 +196,15 @@
         "动作词": "落实",
         "预期结果": "落实双平台公司作用",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "发挥数智转型赋能平台和人工智能业务支撑单位的职责",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 750,
+        "end_char": 774,
+        "support": "explicit"
       }
     },
     {
@@ -127,6 +217,15 @@
         "动作词": "助力",
         "预期结果": "助力大研发体系建设",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "explicit"
       }
     },
     {
@@ -139,6 +238,15 @@
         "动作词": "推动",
         "预期结果": "持续推动焕新行动",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "explicit"
       }
     },
     {
@@ -151,6 +259,15 @@
         "动作词": "打造",
         "预期结果": "全面打造数智产业，做好未来产业布局",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "explicit"
       }
     },
     {
@@ -161,6 +278,15 @@
         "信息类型": "附件",
         "定义": "2025年科技质量与信息化工作要点分解表",
         "来源文本": "附件"
+      },
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -169,6 +295,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司印发中国中车2025年科技质量与信息化工作要点的通知"
+      },
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 80,
+        "end_char": 112,
+        "support": "explicit"
       }
     },
     {
@@ -180,6 +315,15 @@
         "约束名称": "贯彻落实要求",
         "约束类型": "流程约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "structural_inference"
       }
     }
   ],
@@ -189,280 +333,640 @@
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "2025年科技质量与信息化工作的总体思路是: 以习近平新时代中国特色社会主义思想为指导, 贯彻落实党中央和国家决策部署, 聚焦集团公司“引领新质”党建工作主题和经营工作“13579”总体思路, 瞄准科技创新、质量管控、数智转型三大方向, 抓紧抓实科技体制改革、大研发体系建设、质量体系升级、产品品质跃升、数智转型赋能、“人工智能+”六大任务, 稳步实现“五个显著”, 为“十四五”决胜收官、“十五五”良好开局, 全面迈向高质量发展新征程注入强劲动力。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 26,
+        "line_end": 26,
+        "start_char": 439,
+        "end_char": 664,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。\n\n附件：工作要点分解表",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 15,
+        "start_char": 82,
+        "end_char": 215,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 82,
+        "end_char": 112,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "建立“战略-管理-执行”分层分级“集团-子公司-项目”三级联动的研发指标体系。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 54,
+        "line_end": 54,
+        "start_char": 2179,
+        "end_char": 2218,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "中国中车2025年科技质量与信息化工作要点"
+      "to_name": "中国中车2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。\n\n附件：工作要点分解表\n\n中国中车集团有限公司\n\n![image](https://cdn-mineru.openxlab.org.cn/result/2026-08-24/f8f10b10-1f68-47a3-8ae9-3c59ff0fcbfa/2a29361b92a65b28308d16c91fa86540f008c4e1e1bc82668756c7306d44afbc.jpg)\n\n\n2025年4月4日\n\n## 中国中车 2025 年科技质量与信息化工作要点",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 24,
+        "start_char": 82,
+        "end_char": 437,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "工作要点分解表"
+      "to_name": "工作要点分解表",
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 13,
+        "start_char": 82,
+        "end_char": 203,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "工作要点分解表"
+      "to_name": "工作要点分解表",
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 13,
+        "start_char": 82,
+        "end_char": 203,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻落实2025年科技质量与信息化工作要点"
+      "to_name": "贯彻落实2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 13,
+        "start_char": 82,
+        "end_char": 203,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "落实双平台公司作用"
+      "to_name": "落实双平台公司作用",
+      "evidence": {
+        "quote": "发挥数智转型赋能平台和人工智能业务支撑单位的职责",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 750,
+        "end_char": 774,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "助力大研发体系建设"
+      "to_name": "助力大研发体系建设",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "持续推动焕新行动"
+      "to_name": "持续推动焕新行动",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "打造数智产业"
+      "to_name": "打造数智产业",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发中国中车2025年科技质量与信息化工作要点的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发2025年科技质量与信息化工作要点"
+      "to_name": "印发2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 80,
+        "end_char": 112,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻落实2025年科技质量与信息化工作要点",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车2025年科技质量与信息化工作要点"
+      "to_name": "中国中车2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。\n\n附件：工作要点分解表\n\n中国中车集团有限公司\n\n![image](https://cdn-mineru.openxlab.org.cn/result/2026-08-24/f8f10b10-1f68-47a3-8ae9-3c59ff0fcbfa/2a29361b92a65b28308d16c91fa86540f008c4e1e1bc82668756c7306d44afbc.jpg)\n\n\n2025年4月4日\n\n## 中国中车 2025 年科技质量与信息化工作要点",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 24,
+        "start_char": 156,
+        "end_char": 437,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻落实2025年科技质量与信息化工作要点",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻落实2025年科技质量与信息化工作要点",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实双平台公司作用",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车2025年科技质量与信息化工作要点"
+      "to_name": "中国中车2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "发挥数智转型赋能平台和人工智能业务支撑单位的职责",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 750,
+        "end_char": 774,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实双平台公司作用",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "发挥数智转型赋能平台和人工智能业务支撑单位的职责",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 750,
+        "end_char": 774,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实双平台公司作用",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "发挥数智转型赋能平台和人工智能业务支撑单位的职责",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 750,
+        "end_char": 774,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "助力大研发体系建设",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车2025年科技质量与信息化工作要点"
+      "to_name": "中国中车2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "助力大研发体系建设",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "助力大研发体系建设",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "持续推动焕新行动",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车2025年科技质量与信息化工作要点"
+      "to_name": "中国中车2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "持续推动焕新行动",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "持续推动焕新行动",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "打造数智产业",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车2025年科技质量与信息化工作要点"
+      "to_name": "中国中车2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "打造数智产业",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "打造数智产业",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "结合公司战略规划,围绕年度13612工作思路,落实双平台公司作用,发挥数智转型赋能平台和人工智能业务支撑单位的职责,助力大研发体系建设,持续推动焕新行动,全面打造数智产业,做好未来产业布局。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 717,
+        "end_char": 812,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻落实要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻落实2025年科技质量与信息化工作要点"
+      "to_name": "贯彻落实2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻落实要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻落实要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 156,
+        "end_char": 203,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车集团有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "印发中国中车 2025 年科技质量与信息化工作要点",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 84,
+        "end_char": 109,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "建立“战略-管理-执行”分层分级“集团-子公司-项目”三级联动的研发指标体系。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 54,
+        "line_end": 54,
+        "start_char": 2179,
+        "end_char": 2218,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "中国中车2025年科技质量与信息化工作要点",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "## 中国中车 2025 年科技质量与信息化工作要点\n\n2025年科技质量与信息化工作的总体思路是: 以习近平新时代中国特色社会主义思想为指导, 贯彻落实党中央和国家决策部署, 聚焦集团公司“引领新质”党建工作主题和经营工作“13579”总体思路, 瞄准科技创新、质量管控、数智转型三大方向, 抓紧抓实科技体制改革、大研发体系建设、质量体系升级、产品品质跃升、数智转型赋能、“人工智能+”六大任务, 稳步实现“五个显著”, 为“十四五”决胜收官、“十五五”良好开局, 全面迈向高质量发展新征程注入强劲动力。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 24,
+        "line_end": 26,
+        "start_char": 411,
+        "end_char": 664,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "工作要点分解表",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件说明"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。\n\n附件：工作要点分解表",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 156,
+        "end_char": 215,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2025年科技质量与信息化工作要点",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 80,
+        "end_char": 112,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2025年科技质量与信息化工作要点",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 80,
+        "end_char": 112,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2025年科技质量与信息化工作要点",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 9,
+        "start_char": 80,
+        "end_char": 112,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2025年科技质量与信息化工作要点",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻落实2025年科技质量与信息化工作要点"
+      "to_name": "贯彻落实2025年科技质量与信息化工作要点",
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 13,
+        "start_char": 80,
+        "end_char": 203,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发2025年科技质量与信息化工作要点",
       "rel_type": "EXCHANGES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "工作要点分解表"
+      "to_name": "工作要点分解表",
+      "evidence": {
+        "quote": "# 关于印发中国中车 2025 年科技质量与信息化工作要点的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n现将《中国中车2025年科技质量与信息化工作要点》印发给你们，请结合本单位实际，认真贯彻落实。",
+        "document": "关于印发中国中车2025年科技质量与信息化工作要点的通知.md",
+        "line_start": 9,
+        "line_end": 13,
+        "start_char": 80,
+        "end_char": 203,
+        "support": "explicit_endpoints"
+      }
     }
   ]
 }

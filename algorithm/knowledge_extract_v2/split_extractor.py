@@ -14,8 +14,8 @@
   canonical identity 生成（普通属性不参与 UID）；
 - AC-2 目标范围纪律、AC-7 无悬空关系。
 
-LLM 通过注入的 ``llm(prompt) -> str`` callable 调用，本模块不依赖 openai；
-live 环境可用 ``llm_client.create_llm_client()`` 生成适配器。
+LLM 通过标准 chat messages 调用，本模块不依赖 openai；live 环境可用
+``llm_client.create_llm_client()`` 生成适配器。
 """
 from __future__ import annotations
 
@@ -23,28 +23,79 @@ import json
 import re
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from copy import deepcopy
+from functools import lru_cache
+from typing import Any
 
+from .candidate_generation import (
+    _normalize_span_entities,
+    relation_catalog_for_context,
+)
+from .candidate_generation import (
+    bind_entity_evidence as _bind_entity_evidence,
+)
+from .candidate_generation import (
+    bind_relation_evidence as _bind_relation_evidence,
+)
+from .candidate_generation import (
+    entity_pass as _entity_pass,
+)
+from .candidate_generation import (
+    generate_structured as _generate_structured,
+)
+from .candidate_generation import (
+    output_schema_for_types as _output_schema_for_types,
+)
+from .candidate_generation import (
+    relation_pass as _relation_pass,
+)
+from .candidate_models import EntityCandidate, RelationCandidate
+from .candidate_selector import CandidateSelector
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .composite import CompositeElementHandler
 from .coverage import CoverageAuditor
-from .evidence import Evidence, bind_evidence, evidence_coverage, locate_quote, verify_evidence
+from .document_entities import enrich_document_entities
+from .entity_resolver import CandidatePool
+from .evidence import Evidence, evidence_coverage, locate_quote, verify_evidence
 from .graph_assembler import GraphAssembler
-from .graph_utils import (
-    canonical_name,
-    merge_node_properties,
+from .graph_utils import canonical_name
+from .hierarchy import (
+    assemble_document_relations,
+    assemble_document_unit_relations,
+    assemble_numbered_hierarchy_relations,
+    assemble_standard_semantic_relations,
+    assemble_standard_technical_relations,
 )
 from .mapping_scorer import MappingScorer
-from .official_document_strategy import OfficialDocumentExtractionStrategy  # noqa: F401 - 注册到 STRATEGY_REGISTRY
 from .ontology_compiler import ExtractionPlan, compile_plan
-from .ontology_schema import OntologySchema, _clean_relation_identifier
-from .scheduler import get_llm_scheduler
-from .standard_strategy import get_strategy
+from .ontology_schema import OntologySchema
+from .orchestrator import TargetedRepairOrchestrator
+from .prompt_router import DocumentRoute, build_chat_messages, resolve_document_route
+from .property_enrichment import enrich_entity_properties
+from .run_state import ExtractionRun, ExtractionValidationError
+from .standard_semantics import enrich_standard_semantics
+from .structure_entities import add_structural_heading_entities
+from .verification import ExtractionVerifier
 
 
-LLM_CALLABLE = Callable[[str], str]
+@lru_cache(maxsize=32)
+def _compile_runtime(
+    ontology: str,
+    target_types: tuple[str, ...] | None,
+    include_subclasses: bool,
+    mode: str,
+    unknown_content_policy: str,
+) -> tuple[ExtractionPlan, OntologySchema]:
+    """Reuse immutable ontology artifacts across repeated harness runs."""
+    plan = compile_plan(
+        ontology,
+        target_types=target_types,
+        include_subclasses=include_subclasses,
+        mode=mode,
+        unknown_content_policy=unknown_content_policy,
+    )
+    return plan, OntologySchema.parse(ontology or "")
 
 
 def _append_warning(
@@ -62,665 +113,53 @@ def _append_warning(
     warnings.append(warning)
 
 
-def extract_json_from_response(response: str) -> dict[str, Any]:
-    """从 LLM 响应中提取第一个完整 JSON 对象。"""
-    response = (response or "").strip()
-    if not response:
-        return {}
-    if response.startswith("```"):
-        lines = response.split("\n")
-        response = "\n".join(lines[1:]) if len(lines) > 1 else response
-        if response.endswith("```"):
-            response = response[:-3].rstrip()
-    start = response.find("{")
-    end = response.rfind("}")
-    if start >= 0 and end > start:
-        response = response[start : end + 1]
-    try:
-        parsed = json.loads(response)
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-@dataclass
-class EntityCandidate:
-    """§14.1：实体候选。"""
-
-    candidate_id: str
-    proposed_type: str
-    canonical_type: str | None
-    name: str
-    properties: dict[str, Any]
-    evidence: list[Evidence]
-    source: str
-    extraction_pass: str = "entity"
-    mapping_score: float | None = None
-    mapping_status: str = "accepted"
-    warnings: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "type": self.canonical_type or self.proposed_type,
-            "name": self.name,
-            "properties": dict(self.properties),
-            "candidate_id": self.candidate_id,
-        }
-        if self.evidence:
-            payload["evidence"] = self.evidence[0].to_dict()
-        return payload
-
-    def object_model(self, features: dict[str, Any]) -> dict[str, Any]:
-        """§25 O1 object 形态。"""
-        return {
-            "id": self.candidate_id,
-            "type": self.canonical_type or self.proposed_type,
-            "identity": self.name,
-            "properties": dict(self.properties),
-            "features": features,
-            "evidence": [evidence.to_dict() for evidence in self.evidence],
-            "mapping": {"score": self.mapping_score, "status": self.mapping_status},
-        }
-
-
-@dataclass
-class RelationCandidate:
-    """§14.2：关系候选（端点引用实体候选 id）。"""
-
-    candidate_id: str
-    from_candidate_id: str
-    to_candidate_id: str
-    proposed_relation: str
-    canonical_relation: str | None
-    evidence: list[Evidence]
-    from_name: str = ""
-    to_name: str = ""
-    from_type: str = ""
-    to_type: str = ""
-    mapping_score: float | None = None
-    mapping_status: str = "accepted"
-    warnings: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "from_id": self.from_candidate_id,
-            "from_type": self.from_type,
-            "from_name": self.from_name,
-            "rel_type": self.canonical_relation or self.proposed_relation,
-            "to_type": self.to_type,
-            "to_name": self.to_name,
-            "to_id": self.to_candidate_id,
-        }
-        if self.evidence:
-            payload["evidence"] = self.evidence[0].to_dict()
-        return payload
-
-
-def _cardinality_is_single(cardinality: str) -> bool:
-    normalized = (cardinality or "").strip()
-    return normalized in {"1", "0..1", "1..1"}
-
-
-class CandidatePool:
-    """实体解析/去重（§20）与关系候选校验/去重（§19、AC-7）。"""
-
-    def __init__(self, schema: OntologySchema, *, allowed_types: Iterable[str] | None = None):
-        self.schema = schema
-        self.allowed_types = set(allowed_types or ()) or {
-            ontology_class.identifier for ontology_class in schema.classes
-        }
-        self._entities: list[EntityCandidate] = []
-        self._entity_by_id: dict[str, EntityCandidate] = {}
-        self._entity_index: dict[tuple[str, str], EntityCandidate] = {}
-        self._relations: list[RelationCandidate] = []
-        self._relation_by_key: dict[tuple[str, str, str], RelationCandidate] = {}
-        self._next_entity_id = 0
-        self._next_relation_id = 0
-
-    def add_entity(
-        self,
-        candidate: EntityCandidate,
-        *,
-        warnings: list[dict[str, Any]] | None = None,
-    ) -> EntityCandidate | None:
-        """添加实体候选；类型一致 + 规范化 identity 一致时合并（§20）。"""
-        ontology_class = self.schema.resolve_class(candidate.canonical_type or candidate.proposed_type)
-        if ontology_class is None:
-            _append_warning(
-                warnings,
-                "UNKNOWN_ENTITY_TYPE",
-                f"实体类型 {candidate.proposed_type!r} 不在本体中",
-                "entities",
-                candidate.proposed_type,
-            )
-            return None
-        if ontology_class.identifier not in self.allowed_types:
-            _append_warning(
-                warnings,
-                "ENTITY_OUT_OF_SCOPE",
-                f"实体类型 {ontology_class.identifier} 不在目标类型范围内",
-                "entities",
-                ontology_class.identifier,
-            )
-            return None
-
-        candidate.canonical_type = ontology_class.identifier
-        key = (ontology_class.identifier, canonical_name(candidate.name))
-        existing = self._entity_index.get(key)
-        if existing is None:
-            candidate.candidate_id = f"entity-{self._next_entity_id}"
-            self._next_entity_id += 1
-            self._entities.append(candidate)
-            self._entity_by_id[candidate.candidate_id] = candidate
-            self._entity_index[key] = candidate
-            return candidate
-
-        # §20 merge：类型与规范化 identity 已一致，合并属性与证据（不凭 LLM 主观判断）。
-        existing.properties = merge_node_properties(existing.properties, candidate.properties)
-        for evidence in candidate.evidence:
-            if not any(evidence.span_id == item.span_id for item in existing.evidence):
-                existing.evidence.append(evidence)
-        existing.warnings.extend(candidate.warnings)
-        return existing
-
-    def resolve_entity(self, candidate_id: str) -> EntityCandidate | None:
-        return self._entity_by_id.get(candidate_id)
-
-    def find_entity(self, type_id: str, name: str) -> EntityCandidate | None:
-        """按稳定类型 + 名称（canonical）查找已入池实体。"""
-        ontology_class = self.schema.resolve_class(type_id)
-        if ontology_class is None:
-            return None
-        return self._entity_index.get((ontology_class.identifier, canonical_name(name)))
-
-    def accepted_entities(self) -> list[EntityCandidate]:
-        return [entity for entity in self._entities if entity.mapping_status == "accepted"]
-
-    def entity_catalog(self) -> list[dict[str, Any]]:
-        """§15.2：供第二次 LLM pass 引用的已确认实体目录。"""
-        return [
-            {
-                "id": entity.candidate_id,
-                "type": entity.canonical_type,
-                "name": entity.name,
-                "properties": {key: value for key, value in entity.properties.items() if key != "name"},
-            }
-            for entity in self.accepted_entities()
-        ]
-
-    def add_relation(
-        self,
-        candidate: RelationCandidate,
-        *,
-        warnings: list[dict[str, Any]] | None = None,
-    ) -> RelationCandidate | None:
-        """校验关系端点存在、签名匹配、cardinality 去重；失败则拒绝（AC-7）。"""
-        from_entity = self.resolve_entity(candidate.from_candidate_id)
-        to_entity = self.resolve_entity(candidate.to_candidate_id)
-        if from_entity is None or to_entity is None:
-            candidate.mapping_status = "rejected"
-            _append_warning(
-                warnings,
-                "UNKNOWN_RELATION_ENDPOINT_ID",
-                (
-                    f"关系 {candidate.proposed_relation!r} 引用不存在的候选端点: "
-                    f"{candidate.from_candidate_id!r} -> {candidate.to_candidate_id!r}"
-                ),
-                "relations",
-                [candidate.from_candidate_id, candidate.to_candidate_id],
-            )
-            return None
-
-        proposed_relation = _clean_relation_identifier(candidate.proposed_relation)
-        if proposed_relation:
-            candidate.proposed_relation = proposed_relation
-        matching = self.schema.resolve_relation(proposed_relation)
-        if not matching:
-            candidate.mapping_status = "rejected"
-            _append_warning(
-                warnings,
-                "UNKNOWN_RELATION_TYPE",
-                f"关系类型 {candidate.proposed_relation!r} 未在本体中定义",
-                "relations",
-                candidate.proposed_relation,
-            )
-            return None
-        signature = next(
-            (
-                relation
-                for relation in matching
-                if self.schema.is_assignable(from_entity.canonical_type or "", relation.source)
-                and self.schema.is_assignable(to_entity.canonical_type or "", relation.target)
-            ),
-            None,
-        )
-        if signature is None:
-            candidate.mapping_status = "rejected"
-            _append_warning(
-                warnings,
-                "RELATION_ENDPOINT_TYPE_MISMATCH",
-                (
-                    f"关系 {candidate.proposed_relation!r} 的端点 "
-                    f"{from_entity.canonical_type} -> {to_entity.canonical_type} 不符合本体签名"
-                ),
-                "relations",
-            )
-            return None
-
-        candidate.canonical_relation = signature.identifier
-        candidate.from_name = from_entity.name
-        candidate.to_name = to_entity.name
-        candidate.from_type = from_entity.canonical_type or ""
-        candidate.to_type = to_entity.canonical_type or ""
-
-        key = (candidate.from_candidate_id, candidate.canonical_relation, candidate.to_candidate_id)
-        existing = self._relation_by_key.get(key)
-        if existing is not None:
-            for evidence in candidate.evidence:
-                if not any(evidence.span_id == item.span_id for item in existing.evidence):
-                    existing.evidence.append(evidence)
-            return existing
-
-        # §19：cardinality 作为结构 validator；max=1 的端出现多个不同对端时告警。
-        if _cardinality_is_single(signature.target_cardinality):
-            for other in self._relations:
-                if (
-                    other.from_candidate_id == candidate.from_candidate_id
-                    and other.canonical_relation == candidate.canonical_relation
-                    and other.to_candidate_id != candidate.to_candidate_id
-                ):
-                    _append_warning(
-                        warnings,
-                        "RELATION_CARDINALITY_EXCEEDED",
-                        (
-                            f"关系 {candidate.canonical_relation} 目标端基数 "
-                            f"{signature.target_cardinality} 为单值，但出现多个目标端点"
-                        ),
-                        "relations",
-                        candidate.canonical_relation,
-                    )
-                    candidate.warnings.append("RELATION_CARDINALITY_EXCEEDED")
-        if _cardinality_is_single(signature.source_cardinality):
-            for other in self._relations:
-                if (
-                    other.to_candidate_id == candidate.to_candidate_id
-                    and other.canonical_relation == candidate.canonical_relation
-                    and other.from_candidate_id != candidate.from_candidate_id
-                ):
-                    _append_warning(
-                        warnings,
-                        "RELATION_CARDINALITY_EXCEEDED",
-                        (
-                            f"关系 {candidate.canonical_relation} 源端基数 "
-                            f"{signature.source_cardinality} 为单值，但出现多个源端点"
-                        ),
-                        "relations",
-                        candidate.canonical_relation,
-                    )
-                    candidate.warnings.append("RELATION_CARDINALITY_EXCEEDED")
-
-        candidate.candidate_id = f"relation-{self._next_relation_id}"
-        self._next_relation_id += 1
-        self._relations.append(candidate)
-        self._relation_by_key[key] = candidate
-        return candidate
-
-    def accepted_relations(self) -> list[RelationCandidate]:
-        return [relation for relation in self._relations if relation.mapping_status == "accepted"]
-
-
-def _feature_lines(plan: ExtractionPlan) -> str:
-    lines: list[str] = []
-    for type_id in sorted(plan.allowed_types):
-        specs = plan.feature_specs.get(type_id, ())
-        intrinsic = [spec for spec in specs if spec.kind == "intrinsic"]
-        if not intrinsic:
-            continue
-        lines.append(f"- `{type_id}`：")
-        for spec in intrinsic:
-            lines.append(f"    - `{spec.identifier}` ({spec.datatype})")
-    return "\n".join(lines) if lines else "（无特性声明）"
-
-
-def _signature_lines(plan: ExtractionPlan) -> str:
-    lines = sorted(
-        {
-            f"`{spec.source}` -[`{spec.relation_id}`]-> `{spec.target}`"
-            for specs in plan.relation_specs.values()
-            for spec in specs
-            if spec.source in plan.allowed_types and spec.target in plan.allowed_types
-        }
-    )
-    return "\n".join(lines) if lines else "（目标类型之间没有关系签名）"
-
-
-def _catalog_lines(catalog: list[dict[str, Any]]) -> str:
-    if not catalog:
-        return "（无已确认实体）"
-    lines = ["| id | type | name | 关键属性 |", "| --- | --- | --- | --- |"]
-    for entry in catalog:
-        properties = ", ".join(f"{key}={value}" for key, value in entry["properties"].items())
-        lines.append(f"| `{entry['id']}` | `{entry['type']}` | {entry['name']} | {properties or '-'} |")
-    return "\n".join(lines)
-
-
-def _catalog_text(plan: ExtractionPlan) -> str:
-    """从 ExtractionPlan 生成本体标识目录（与 schema.prompt_catalog 同构）。"""
-    lines: list[str] = []
-    for type_id in sorted(plan.allowed_types):
-        spec = plan.class_specs.get(type_id)
-        if spec is None:
-            continue
-        line = f"- `{spec.display_name}` -> type `{type_id}`"
-        if spec.identity_properties:
-            line += f"；identity 优先级：{', '.join(spec.identity_properties)}"
-        lines.append(line)
-        for prop in spec.properties:
-            lines.append(f"  - 属性 `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type})")
-    return "\n".join(lines) if lines else "目标类型未匹配到本体类。"
-
-
-def build_entity_prompt(
-    plan: ExtractionPlan,
-    chunk_text: str,
+def _repair_context_chunks(
+    issues: Iterable[dict[str, Any]],
+    manager: ChunkContextManager,
     *,
-    local_context: str = "",
-    document_type: str = "auto",
-    known_entities: list[dict[str, Any]] | None = None,
-    hints: str = "",
-) -> str:
-    """§15.1：第一次 LLM pass——实体 + 特性候选提议（禁止输出关系）。"""
-    targets = (
-        "、".join(f"`{identifier}`" for identifier in sorted(plan.allowed_types))
-        if plan.allowed_types
-        else "本体中全部已声明类型"
-    )
-    catalog = _catalog_text(plan) if plan.class_specs else "未解析到类声明。"
-    known_text = _catalog_lines(known_entities or []) if known_entities else "（无）"
-    return f"""你是知识图谱抽取专家。本阶段只做**实体候选提议**，禁止输出关系。
-
-## 文档画像
-{document_type}
-
-## 本次目标类型（已含子类展开，AC-2 范围纪律）
-{targets}
-
-## 本次允许的本体标识目录（唯一 schema）
-{catalog}
-
-## 每类特征（FeatureSpec，intrinsic）
-{_feature_lines(plan)}
-
-## 已确认实体（确定性抽取结果，请勿重复输出；可用其 identity 对齐）
-{known_text}
-
-{hints}
-
-## 待抽取文本（当前 chunk）
-{chunk_text}
-
-## 局部上下文（仅参考，禁止据此编造当前 chunk 没有的事实）
-{local_context or "（无）"}
-
-## 输出要求
-- 只输出一个 JSON 对象：{{"entities": [...]}}，禁止输出 relations 或其他顶层键。
-- 每个实体必须：
-  - `type` 只能使用目录中的稳定类型标识；
-  - `name` 按 @identity 优先级填写，同一实体复用同一 identity/name；
-  - `properties` 键只能使用目录中的稳定属性标识，值符合 datatype；
-  - 必须携带 `evidence: {{"quote": "原文片段"}}`，quote 必须是待抽取文本中的原文字符串；
-  - 只抽取文本明确表达的事实，不补写常识、不猜测缺失值。
-- 没有结果时输出 {{"entities": []}}。"""
-
-
-def build_relation_prompt(
-    plan: ExtractionPlan,
-    catalog: list[dict[str, Any]],
-    chunk_text: str,
-    *,
-    local_context: str = "",
-    document_type: str = "auto",
-) -> str:
-    """§15.2：第二次 LLM pass——关系候选提议（端点引用已确认实体目录 id）。"""
-    return f"""你是知识图谱抽取专家。本阶段只做**关系候选提议**，禁止输出实体。
-
-## 文档画像
-{document_type}
-
-## 已确认实体目录（关系端点只能引用这里的 id，禁止编造）
-{_catalog_lines(catalog)}
-
-## 本次允许的关系签名（方向和端点类型必须匹配）
-{_signature_lines(plan)}
-
-## 待抽取文本（当前 chunk）
-{chunk_text}
-
-## 局部上下文（仅参考）
-{local_context or "（无）"}
-
-## 输出要求
-- 只输出一个 JSON 对象：{{"relations": [...]}}。
-- 每条 relation 必须：
-  - `from_id` / `to_id` 引用目录中的 id；
-  - `rel_type` 只能使用列出的关系名，方向与端点类型必须匹配签名；
-  - 必须携带 `evidence: {{"quote": "原文片段"}}`，quote 必须来自待抽取文本；
-  - 不要为输出关系而编造实体。
-- 没有结果时输出 {{"relations": []}}。"""
-
-
-def _call_llm(
-    llm: LLM_CALLABLE,
-    prompt: str,
-    *,
-    use_scheduler: bool,
-    attempts: list[dict[str, Any]],
-    pass_name: str,
-    chunk_id: str,
-) -> str:
-    try:
-        if use_scheduler:
-            with get_llm_scheduler().request_slot():
-                response = llm(prompt)
-        else:
-            response = llm(prompt)
-    except Exception as exc:  # noqa: BLE001 - 请求失败归因，不中断整体抽取
-        attempts.append(
-            {
-                "attempt": 1,
-                "type": "request",
-                "pass": pass_name,
-                "chunk": chunk_id,
-                "message": str(exc),
-            }
-        )
-        return ""
-    return response or ""
-
-
-def _normalize_entities(
-    parsed: dict[str, Any],
-    schema: OntologySchema,
-    target_types: Iterable[str] | None,
-    warnings: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    sanitized, validation_warnings = schema.validate_extraction(
-        parsed,
-        target_types=target_types,
-        mode="strict",
-    )
-    warnings.extend(validation_warnings)
-    normalized = schema.normalize_extraction(sanitized)
-    return normalized.get("entities", [])
-
-
-def _bind_entity_evidence(
     entities: list[dict[str, Any]],
-    manager: ChunkContextManager,
-) -> list[dict[str, Any]]:
-    bound = bind_evidence({"entities": entities, "relations": []}, manager)
-    return bound.get("entities", [])
+    relations: list[dict[str, Any]],
+    max_chunks: int = 6,
+) -> list[ExtractionChunk]:
+    """Resolve verifier issues to evidence chunks without guessing document prefixes."""
+    known_ids = set(manager.chunk_ids)
+    selected: set[str] = set()
 
+    def collect(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in {"source_block_ids", "chunk_ids"} and isinstance(item, list):
+                    selected.update(str(chunk_id) for chunk_id in item if str(chunk_id) in known_ids)
+                else:
+                    collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+        elif isinstance(value, str):
+            for chunk_id in known_ids:
+                if value == chunk_id or value.startswith(f"{chunk_id}:"):
+                    selected.add(chunk_id)
 
-def _bind_relation_evidence(
-    raw_relation: dict[str, Any],
-    candidate: RelationCandidate,
-    manager: ChunkContextManager,
-) -> Evidence | None:
-    quote = (raw_relation.get("evidence") or {}).get("quote")
-    if quote:
-        located = locate_quote(manager, quote)
-        if located is not None:
-            return located
-    for name in (candidate.from_name, candidate.to_name):
-        located = locate_quote(manager, name)
-        if located is not None:
-            return located
-    return None
+    issue_rows = list(issues)
+    for row in issue_rows:
+        path = str(row.get("path") or "")
+        collect(path)
+        collect(row.get("context"))
+        match = re.match(r"^(entities|relations)\[(\d+)\]", path)
+        if match is None:
+            continue
+        facts = entities if match.group(1) == "entities" else relations
+        index = int(match.group(2))
+        if index < len(facts):
+            collect(facts[index])
 
-
-def _entity_pass(
-    plan: ExtractionPlan,
-    schema: OntologySchema,
-    manager: ChunkContextManager,
-    request: ExtractionRequest,
-    llm: LLM_CALLABLE,
-    *,
-    max_workers: int,
-    use_scheduler: bool,
-    attempts: list[dict[str, Any]],
-    warnings: list[dict[str, Any]],
-    local_previous: int,
-    local_next: int,
-    same_section: bool,
-    known_entities: list[dict[str, Any]] | None = None,
-    hints: str = "",
-) -> list[tuple[str, list[dict[str, Any]]]]:
-    chunks = request.extraction_chunks()
-
-    def run(chunk: ExtractionChunk) -> tuple[str, list[dict[str, Any]]]:
-        neighbors = [
-            item
-            for item in manager.local_context(
-                chunk.chunk_id,
-                previous=local_previous,
-                next=local_next,
-                same_section=same_section,
-            )
-            if item.chunk_id != chunk.chunk_id
-        ]
-        local_context = "\n".join(item.text for item in neighbors)
-        prompt = build_entity_prompt(
-            plan,
-            chunk.text,
-            local_context=local_context,
-            document_type=request.document_type,
-            known_entities=known_entities,
-            hints=hints,
-        )
-        response = _call_llm(
-            llm,
-            prompt,
-            use_scheduler=use_scheduler,
-            attempts=attempts,
-            pass_name="entity",
-            chunk_id=chunk.chunk_id,
-        )
-        parsed = extract_json_from_response(response)
-        if not parsed:
-            attempts.append(
-                {
-                    "attempt": 1,
-                    "type": "json",
-                    "pass": "entity",
-                    "chunk": chunk.chunk_id,
-                    "message": "entity pass JSON 解析失败",
-                }
-            )
-            return chunk.chunk_id, []
-        entities = _normalize_entities(parsed, schema, request.target_types, warnings)
-        entities = _bind_entity_evidence(entities, manager)
-        return chunk.chunk_id, entities
-
-    worker_count = max(1, max_workers)
-    if worker_count == 1:
-        return [run(chunk) for chunk in chunks]
-    with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ke-entity") as executor:
-        return list(executor.map(run, chunks))
-
-
-def _relation_pass(
-    plan: ExtractionPlan,
-    manager: ChunkContextManager,
-    request: ExtractionRequest,
-    llm: LLM_CALLABLE,
-    pool: CandidatePool,
-    *,
-    max_workers: int,
-    use_scheduler: bool,
-    attempts: list[dict[str, Any]],
-    warnings: list[dict[str, Any]],
-    local_previous: int,
-    local_next: int,
-    same_section: bool,
-) -> list[tuple[str, list[dict[str, Any]]]]:
-    """第二次 pass：worker 只返回原始关系候选，入池统一在收集后按 chunk 顺序进行。"""
-    chunks = request.extraction_chunks()
-    catalog = pool.entity_catalog()
-
-    def run(chunk: ExtractionChunk) -> tuple[str, list[dict[str, Any]]]:
-        neighbors = [
-            item
-            for item in manager.local_context(
-                chunk.chunk_id,
-                previous=local_previous,
-                next=local_next,
-                same_section=same_section,
-            )
-            if item.chunk_id != chunk.chunk_id
-        ]
-        local_context = "\n".join(item.text for item in neighbors)
-        prompt = build_relation_prompt(
-            plan,
-            catalog,
-            chunk.text,
-            local_context=local_context,
-            document_type=request.document_type,
-        )
-        response = _call_llm(
-            llm,
-            prompt,
-            use_scheduler=use_scheduler,
-            attempts=attempts,
-            pass_name="relation",
-            chunk_id=chunk.chunk_id,
-        )
-        parsed = extract_json_from_response(response)
-        if not parsed:
-            attempts.append(
-                {
-                    "attempt": 1,
-                    "type": "json",
-                    "pass": "relation",
-                    "chunk": chunk.chunk_id,
-                    "message": "relation pass JSON 解析失败",
-                }
-            )
-            return chunk.chunk_id, []
-
-        accepted: list[dict[str, Any]] = []
-        for index, raw_relation in enumerate(parsed.get("relations", [])):
-            if not isinstance(raw_relation, dict):
-                _append_warning(warnings, "INVALID_RELATION", "关系必须是对象", f"relations[{index}]")
-                continue
-            accepted.append(raw_relation)
-        return chunk.chunk_id, accepted
-
-    worker_count = max(1, max_workers)
-    if worker_count == 1:
-        return [run(chunk) for chunk in chunks]
-    with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ke-relation") as executor:
-        return list(executor.map(run, chunks))
+    if not selected and len(manager.chunk_ids) <= 3:
+        selected.update(manager.chunk_ids)
+    return [
+        manager.get_chunk(chunk_id)
+        for chunk_id in manager.chunk_ids
+        if chunk_id in selected
+    ][: max(1, max_chunks)]
 
 
 def _object_features(entity: EntityCandidate, feature_specs: tuple[Any, ...]) -> dict[str, Any]:
@@ -734,6 +173,21 @@ def _object_features(entity: EntityCandidate, feature_specs: tuple[Any, ...]) ->
     return {"intrinsic": intrinsic, "relation": relation_features, "context": {}}
 
 
+def _compat_properties(entity: EntityCandidate, plan: ExtractionPlan) -> dict[str, Any]:
+    """Map stable property IDs to ontology display labels for legacy raw output."""
+    spec = plan.class_specs.get(entity.canonical_type or "")
+    if spec is None:
+        return dict(entity.properties)
+    labels = {
+        canonical_name(prop.identifier): str(prop.display_name or prop.identifier)
+        for prop in spec.properties
+    }
+    return {
+        labels.get(canonical_name(key), key): value
+        for key, value in entity.properties.items()
+    }
+
+
 def build_intermediate_model(
     pool: CandidatePool,
     plan: ExtractionPlan,
@@ -741,10 +195,42 @@ def build_intermediate_model(
     run_id: str = "",
 ) -> dict[str, Any]:
     """§25：O1 中间对象模型（只含 accepted candidates）。"""
+    accepted_entities = sorted(
+        pool.accepted_entities(),
+        key=lambda entity: (
+            canonical_name(entity.canonical_type),
+            canonical_name(entity.identity_value or entity.name),
+            entity.candidate_id,
+        ),
+    )
     objects: list[dict[str, Any]] = []
-    for entity in pool.accepted_entities():
+    for entity in accepted_entities:
         features = _object_features(entity, plan.feature_specs.get(entity.canonical_type or "", ()))
-        objects.append(entity.object_model(features))
+        obj = entity.object_model(features)
+        obj["compat_properties"] = _compat_properties(entity, plan)
+        objects.append(obj)
+    entity_keys = {
+        entity.candidate_id: (
+            canonical_name(entity.canonical_type),
+            canonical_name(entity.identity_value or entity.name),
+        )
+        for entity in accepted_entities
+    }
+    accepted_entity_ids = set(entity_keys)
+    accepted_relations = sorted(
+        (
+            relation
+            for relation in pool.accepted_relations()
+            if relation.from_candidate_id in accepted_entity_ids
+            and relation.to_candidate_id in accepted_entity_ids
+        ),
+        key=lambda relation: (
+            entity_keys.get(relation.from_candidate_id, ("", "")),
+            canonical_name(relation.canonical_relation),
+            entity_keys.get(relation.to_candidate_id, ("", "")),
+            relation.candidate_id,
+        ),
+    )
     relations = [
         {
             "id": relation.candidate_id,
@@ -754,7 +240,7 @@ def build_intermediate_model(
             "evidence": [evidence.to_dict() for evidence in relation.evidence],
             "mapping": {"score": relation.mapping_score, "status": relation.mapping_status},
         }
-        for relation in pool.accepted_relations()
+        for relation in accepted_relations
     ]
     return {
         "run_id": run_id,
@@ -770,43 +256,124 @@ def build_intermediate_model(
     }
 
 
-def _build_graph(
-    entities: list[EntityCandidate],
-    relations: list[RelationCandidate],
-) -> dict[str, list[dict[str, Any]]]:
-    """§26/§27：O2 graph（委托 GraphAssembler，UID 只由稳定类型 + identity 生成）。"""
-    objects = [
-        {
-            "id": entity.candidate_id,
-            "type": entity.canonical_type or entity.proposed_type,
-            "identity": entity.name,
-            "properties": entity.properties,
-        }
-        for entity in entities
-    ]
-    relation_payloads = [
-        {
-            "id": relation.candidate_id,
-            "type": relation.canonical_relation or relation.proposed_relation,
-            "from": relation.from_candidate_id,
-            "to": relation.to_candidate_id,
-        }
-        for relation in relations
-    ]
-    return GraphAssembler().build_graph(objects, relation_payloads)
+def _pool_fact_keys(pool: CandidatePool) -> set[str]:
+    keys = {
+        "entity:"
+        + json.dumps(
+            {
+                "type": entity.canonical_type,
+                "identity": entity.identity_value or entity.name,
+                "properties": entity.properties,
+                "evidence": sorted(item.span_id for item in entity.evidence),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        for entity in pool.accepted_entities()
+    }
+    keys.update(
+        f"relation:{relation.from_candidate_id}:{relation.canonical_relation}:{relation.to_candidate_id}"
+        for relation in pool.accepted_relations()
+    )
+    return keys
 
 
-def _triples(graph: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    return GraphAssembler().build_triples(graph)
+def _apply_repair_proposal(
+    pool: CandidatePool,
+    proposal: dict[str, Any] | None,
+    manager: ChunkContextManager,
+    warnings: list[dict[str, Any]],
+) -> int:
+    before = _pool_fact_keys(pool)
+    payload = proposal if isinstance(proposal, dict) else {}
+    entities = _bind_entity_evidence(payload.get("entities") or [], manager)
+    for index, entity in enumerate(entities):
+        bound_evidence = Evidence.from_dict(entity.get("evidence"))
+        if (
+            bound_evidence is None
+            or not bound_evidence.span_id
+            or not bound_evidence.source_block_ids
+            or locate_quote(
+                manager,
+                bound_evidence.quote,
+                chunk_ids=bound_evidence.source_block_ids,
+            )
+            is None
+        ):
+            _append_warning(
+                warnings,
+                "REPAIR_ENTITY_EVIDENCE_INVALID",
+                "修复候选实体无法绑定到原始 chunk，已丢弃",
+                f"repair.entities[{index}].evidence",
+                (entity.get("evidence") or {}).get("quote"),
+            )
+            continue
+        pool.add_entity(
+            EntityCandidate(
+                candidate_id="",
+                proposed_type=str(entity.get("type") or ""),
+                canonical_type=entity.get("type"),
+                name=str(entity.get("name") or ""),
+                properties=dict(entity.get("properties") or {}),
+                evidence=[bound_evidence],
+                source="repair",
+            ),
+            warnings=warnings,
+        )
+
+    for index, relation in enumerate(payload.get("relations") or []):
+        if not isinstance(relation, dict):
+            continue
+        evidence = _bind_relation_evidence(relation, manager)
+        if evidence is None:
+            _append_warning(
+                warnings,
+                "REPAIR_RELATION_EVIDENCE_INVALID",
+                "修复候选关系无法绑定到原始 chunk，已丢弃",
+                f"repair.relations[{index}].evidence",
+                (relation.get("evidence") or {}).get("quote"),
+            )
+            continue
+        from_id = str(relation.get("from_id") or "")
+        to_id = str(relation.get("to_id") or "")
+        if not from_id:
+            entity = pool.find_entity(
+                str(relation.get("from_type") or ""),
+                str(relation.get("from_name") or ""),
+            )
+            from_id = entity.candidate_id if entity is not None else ""
+        if not to_id:
+            entity = pool.find_entity(
+                str(relation.get("to_type") or ""),
+                str(relation.get("to_name") or ""),
+            )
+            to_id = entity.candidate_id if entity is not None else ""
+        candidate = RelationCandidate(
+            candidate_id="",
+            from_candidate_id=from_id,
+            to_candidate_id=to_id,
+            proposed_relation=str(relation.get("rel_type") or ""),
+            canonical_relation=None,
+            evidence=[evidence],
+        )
+        resolved = pool.add_relation(candidate, warnings=warnings)
+        if resolved is not None:
+            resolved.evidence = [evidence]
+    return len(_pool_fact_keys(pool) - before)
 
 
 def _empty_result(
     plan: ExtractionPlan,
     *,
+    route: DocumentRoute,
     warnings: list[dict[str, Any]],
     attempts: list[dict[str, Any]],
     run_id: str,
+    run: ExtractionRun,
 ) -> dict[str, Any]:
+    run.absorb_attempts(attempts)
+    run.finish(accepted_entities=0, accepted_relations=0, stop_reason="empty_input")
     empty = {"nodes": [], "relationships": []}
     return {
         "raw": {"entities": [], "relations": []},
@@ -835,22 +402,40 @@ def _empty_result(
             "low_confidence": 0,
             "rejected": 0,
         },
-        "profile": {"document_type": "auto", "pipeline": "two_pass", "chunks": 0},
-        "error_code": None,
+        "profile": {
+            "document_route": route.to_dict(),
+            "pipeline": "two_pass",
+            "chunks": 0,
+            "repair_rounds": [],
+            "repair_stop_reason": "empty_input",
+        },
+        "verification": {
+            "valid": True,
+            "hard_issue_count": 0,
+            "repairable_issue_count": 0,
+            "issues": [],
+            "coverage_gaps": [],
+        },
+        "status": run.status.value,
+        "run_trace": {
+            **run.to_trace(),
+            "calls": [],
+            "repair_rounds": [],
+            "verification": {"valid": True, "hard_issue_count": 0},
+        },
+        "error_code": run.error_code,
     }
 
 
 def extract_split(
     ontology: str,
-    text: str | None = None,
-    chunks: Iterable[ExtractionChunk] | None = None,
+    chunks: Iterable[ExtractionChunk],
     *,
     target_types: Iterable[str] | None = None,
     include_subclasses: bool = True,
-    document_type: str = "auto",
     validation_mode: str = "strict",
-    llm: LLM_CALLABLE,
-    mode: str = "strict",
+    llm: Any,
+    model: str = "",
     unknown_content_policy: str = "ignore",
     local_previous: int = 1,
     local_next: int = 1,
@@ -858,69 +443,92 @@ def extract_split(
     max_workers: int = 1,
     use_scheduler: bool = False,
     run_id: str = "",
-    strategy: str | None = None,
     mapping_weights: dict[str, float] | None = None,
     mapping_accepted_threshold: float = 0.85,
     mapping_low_confidence_threshold: float = 0.70,
     apply_mapping_threshold: bool = False,
+    best_effort: bool = False,
+    repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
+    max_repair_rounds: int = 2,
+    max_attempts: int = 3,
+    retry_base_seconds: float = 0.05,
 ) -> dict[str, Any]:
     """§37 Step 4：entity candidate -> resolve -> relation candidate 两段式抽取。
 
-    ``llm`` 是 ``prompt -> response_text`` 的 callable；返回契约兼容现有
+    ``llm`` 是接收标准 ChatMessages 的 callable；返回契约兼容现有
     extractor（raw / graph / warnings / attempts / profile / error_code），
     并附带 triples / intermediate_model / evidence_coverage。
     """
-    plan = compile_plan(
+    if isinstance(chunks, (str, bytes, dict)):
+        raise TypeError("chunks 必须是 ExtractionChunk 序列，不能是完整文本或单个字典")
+    resolved_chunks = list(chunks)
+    if any(not isinstance(chunk, ExtractionChunk) for chunk in resolved_chunks):
+        raise TypeError("extract_split 只接收 ExtractionChunk 序列")
+    resolved_validation_mode = (validation_mode or "strict").casefold()
+    if resolved_validation_mode not in {"strict", "permissive"}:
+        raise ValueError("validation_mode 仅支持 strict 或 permissive")
+
+    resolved_target_types = tuple(target_types) if target_types is not None else None
+    plan, schema = _compile_runtime(
         ontology,
-        target_types=target_types,
-        include_subclasses=include_subclasses,
-        mode=mode,
-        unknown_content_policy=unknown_content_policy,
+        resolved_target_types,
+        include_subclasses,
+        resolved_validation_mode,
+        unknown_content_policy,
     )
-    schema = OntologySchema.parse(ontology or "")
+    compile_errors = [warning for warning in plan.schema_warnings if warning.severity == "error"]
+    if resolved_validation_mode == "strict" and compile_errors:
+        raise ExtractionValidationError(
+            "ontology strict validation failed",
+            stage="ontology_compile",
+            details={"warnings": [warning.to_dict() for warning in compile_errors]},
+        )
     request = ExtractionRequest(
-        ontology=ontology,
-        text=text,
-        chunks=list(chunks) if chunks is not None else None,
-        target_types=list(target_types) if target_types is not None else None,
-        include_subclasses=include_subclasses,
-        document_type=document_type,
-        validation_mode=validation_mode,
+        chunks=resolved_chunks,
+        target_types=list(resolved_target_types) if resolved_target_types is not None else None,
     )
-    manager = ChunkContextManager.from_request(request)
+    extraction_chunks = list(request.chunks)
+    manager = ChunkContextManager(extraction_chunks)
+    route = resolve_document_route(plan, extraction_chunks)
     warnings: list[dict[str, Any]] = [warning.to_dict() for warning in plan.schema_warnings]
     attempts: list[dict[str, Any]] = []
+    call_metrics: list[dict[str, Any]] = []
     resolved_run_id = run_id or f"ke-{int(time.time())}-{uuid.uuid4().hex[:6]}"
-    resolved_strategy = get_strategy(request.document_type, strategy)
-    strategy_hints = (
-        resolved_strategy.prompt_hints() if hasattr(resolved_strategy, "prompt_hints") else ""
+    run = ExtractionRun.create(
+        run_id=resolved_run_id,
+        ontology=ontology,
+        markdown="\n".join(chunk.text for chunk in extraction_chunks),
+        model=model,
+        prompt_version="knowledge-extract-v2-two-pass-v1",
+        best_effort=best_effort,
     )
-
-    if not request.extraction_chunks():
-        _append_warning(warnings, "EMPTY_INPUT", "请求没有 text 或 chunks", "text/chunks")
-        return _empty_result(plan, warnings=warnings, attempts=attempts, run_id=resolved_run_id)
-
-    # 策略确定性抽取（§11.1）：先入池并注入实体 pass，防止 LLM 重复抽取
-    pool = CandidatePool(schema, allowed_types=plan.allowed_types)
-    deterministic = resolved_strategy.deterministic_extraction(plan, manager, request)
-    deterministic_entities = _bind_entity_evidence(
-        deterministic.get("entities", []),
-        manager,
-    )
-    for entity in deterministic_entities:
-        evidence = [item for item in [Evidence.from_dict(entity.get("evidence"))] if item is not None]
-        pool.add_entity(
-            EntityCandidate(
-                candidate_id="",
-                proposed_type=entity.get("type", ""),
-                canonical_type=entity.get("type"),
-                name=entity.get("name", ""),
-                properties=entity.get("properties") or {},
-                evidence=evidence,
-                source="deterministic",
-            ),
-            warnings=warnings,
+    run.start()
+    for chunk in manager:
+        metadata = chunk.metadata or {}
+        run.register_block(
+            chunk.chunk_id,
+            block_id=str(metadata.get("block_id") or chunk.chunk_id),
+            kind=str(metadata.get("block_kind") or "chunk"),
         )
+
+    if not extraction_chunks:
+        _append_warning(warnings, "EMPTY_INPUT", "请求没有 chunks", "chunks")
+        return _empty_result(
+            plan,
+            route=route,
+            warnings=warnings,
+            attempts=attempts,
+            run_id=resolved_run_id,
+            run=run,
+        )
+
+    pool = CandidatePool(
+        schema,
+        allowed_types=plan.allowed_types,
+        manager=manager,
+        adjudicator=entity_adjudicator,
+    )
     known_entities = pool.entity_catalog()
 
     # Pass 1：实体候选（LLM）
@@ -930,6 +538,7 @@ def extract_split(
         manager,
         request,
         llm,
+        route=route,
         max_workers=max_workers,
         use_scheduler=use_scheduler,
         attempts=attempts,
@@ -938,7 +547,9 @@ def extract_split(
         local_next=local_next,
         same_section=same_section,
         known_entities=known_entities,
-        hints=strategy_hints,
+        max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds,
+        call_metrics=call_metrics,
     )
     for _, entities in entity_results:
         for entity in entities:
@@ -956,26 +567,51 @@ def extract_split(
                 warnings=warnings,
             )
 
-    # 策略确定性关系（§11.1：hasStructuralElement / hasSubClause）
-    for relation in deterministic.get("relations", []):
-        from_entity = pool.find_entity(relation.get("from_type", ""), relation.get("from_name", ""))
-        to_entity = pool.find_entity(relation.get("to_type", ""), relation.get("to_name", ""))
-        if from_entity is None or to_entity is None:
-            continue
-        candidate = RelationCandidate(
-            candidate_id="",
-            from_candidate_id=from_entity.candidate_id,
-            to_candidate_id=to_entity.candidate_id,
-            proposed_relation=relation.get("rel_type", ""),
-            canonical_relation=None,
-            evidence=[],
-        )
-        resolved = pool.add_relation(candidate, warnings=warnings)
-        if resolved is None:
-            continue
-        evidence = _bind_relation_evidence(relation, resolved, manager)
-        if evidence is not None:
-            resolved.evidence = [evidence]
+    # Deterministic supplement: the cover and normative-reference section
+    # define the complete document-entity set before semantic relations.
+    document_entities = enrich_document_entities(
+        pool,
+        manager,
+        plan,
+        warnings=warnings,
+    )
+
+    # Deterministic supplement: numbered Markdown headings are structural
+    # evidence, and must be present before relation candidates are proposed.
+    add_structural_heading_entities(
+        pool,
+        manager,
+        allowed_types=plan.allowed_types,
+        warnings=warnings,
+    )
+    standard_semantics = (
+        enrich_standard_semantics(pool, manager, plan, warnings=warnings)
+        if route.kind == "standard"
+        else {}
+    )
+
+    selector = CandidateSelector(plan, manager, warnings)
+    selector.pre_relation(pool.entity_candidates())
+
+    # Closed-world property pass: entity identities/types are frozen here.
+    # The model can only fill missing ontology-declared properties on the
+    # accepted candidate-id enum and must cite the current source chunk.
+    property_enrichment = enrich_entity_properties(
+        pool,
+        manager,
+        plan,
+        llm,
+        route=route,
+        attempts=attempts,
+        warnings=warnings,
+        call_metrics=call_metrics,
+        use_scheduler=use_scheduler,
+        local_previous=local_previous,
+        local_next=local_next,
+        same_section=same_section,
+        max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds,
+    )
 
     # Pass 2：关系候选（LLM，基于 accepted/resolved 实体目录）
     relation_results = _relation_pass(
@@ -984,6 +620,7 @@ def extract_split(
         request,
         llm,
         pool,
+        route=route,
         max_workers=max_workers,
         use_scheduler=use_scheduler,
         attempts=attempts,
@@ -991,6 +628,9 @@ def extract_split(
         local_previous=local_previous,
         local_next=local_next,
         same_section=same_section,
+        max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds,
+        call_metrics=call_metrics,
     )
     for _, raw_relations in relation_results:
         for raw_relation in raw_relations:
@@ -1005,13 +645,204 @@ def extract_split(
             resolved = pool.add_relation(candidate, warnings=warnings)
             if resolved is None:
                 continue
-            evidence = _bind_relation_evidence(raw_relation, resolved, manager)
+            evidence = _bind_relation_evidence(raw_relation, manager)
             if evidence is not None:
                 resolved.evidence = [evidence]
+
+    document_relations = assemble_document_relations(
+        pool,
+        manager,
+        document_entities,
+        warnings=warnings,
+    )
+    numbered_hierarchy_relations = assemble_numbered_hierarchy_relations(
+        pool,
+        manager,
+        warnings=warnings,
+    )
+    # HAS_PART / EVIDENCED_BY are determined by the document-unit span, so they
+    # are assembled here instead of being enumerated for the relation classifier.
+    document_unit_relations = assemble_document_unit_relations(
+        pool,
+        manager,
+        warnings=warnings,
+    )
+    standard_semantic_relations = (
+        assemble_standard_semantic_relations(
+            pool,
+            manager,
+            document_entities,
+            warnings=warnings,
+        )
+        if route.kind == "standard"
+        else {}
+    )
+    standard_technical_relations = (
+        assemble_standard_technical_relations(pool, manager, warnings=warnings)
+        if route.kind == "standard"
+        else {}
+    )
 
     # §21/AC-6：复合元素确定性组装与校验（补建 hasSubRule 成员关系）
     composite_handler = CompositeElementHandler.from_plan(plan)
     composite_issues = composite_handler.assemble(pool, plan, manager, warnings=warnings)
+    selector.post_relation(pool.entity_candidates(), pool.relation_candidates())
+
+    repair_rounds: list[dict[str, Any]] = []
+    repair_stop_reason = "validation_complete"
+    verifier = ExtractionVerifier()
+
+    def verify_pool(current_pool: CandidatePool):
+        model = build_intermediate_model(current_pool, plan, run_id=resolved_run_id)
+        current_raw = GraphAssembler().compat_raw(model["objects"], model["relations"])
+        return verifier.verify(
+            plan,
+            schema,
+            manager,
+            request,
+            current_raw["entities"],
+            current_raw["relations"],
+            rejected_warnings=current_pool.unresolved_relation_rejections(),
+        )
+
+    def builtin_repair(payload: dict[str, Any]) -> dict[str, Any]:
+        issue_rows = payload["issues"]
+        entity_repairs = {
+            "required_property",
+            "dangling_relation_endpoint",
+            "uncovered_block",
+        }
+        needs_entity_pass = any(row.get("repair_type") in entity_repairs for row in issue_rows)
+        referenced_chunks = _repair_context_chunks(
+            issue_rows,
+            manager,
+            entities=payload.get("entities") or [],
+            relations=payload.get("relations") or [],
+        )
+        if not referenced_chunks:
+            _append_warning(
+                warnings,
+                "REPAIR_CONTEXT_UNRESOLVED",
+                "verifier issue 无法定位到证据 chunk，已跳过本轮修复",
+                f"repair[{payload['round']}]",
+            )
+            return {"entities": [], "relations": []}
+        repair_text = "\n\n".join(chunk.text for chunk in referenced_chunks)
+        repair_chunk = ExtractionChunk(
+            chunk_id=f"repair-{payload['round']}",
+            text=repair_text,
+            metadata={"block_id": f"repair-{payload['round']}", "block_kind": "repair"},
+        )
+        repair_catalog = relation_catalog_for_context(
+            pool.entity_catalog(),
+            referenced_chunks[0],
+            referenced_chunks[1:],
+        )
+
+        if needs_entity_pass:
+            output_schema = _output_schema_for_types(
+                plan,
+                "entity_candidates",
+                plan.relevant_types(repair_text),
+            )
+            messages = build_chat_messages(
+                task="repair",
+                plan=plan,
+                route=route,
+                chunk=repair_chunk,
+                known_entities=repair_catalog,
+                output_schema=output_schema,
+                repair_issues=issue_rows,
+            )
+            parsed = _generate_structured(
+                llm,
+                messages,
+                output_schema,
+                use_scheduler=use_scheduler,
+                attempts=attempts,
+                pass_name="repair_entity",
+                chunk_id=f"repair-{payload['round']}",
+                max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds,
+                call_metrics=call_metrics,
+            )
+            normalized_entities = _normalize_span_entities(
+                parsed or {},
+                chunk=repair_chunk,
+                schema=schema,
+                target_types=request.target_types,
+                warnings=warnings,
+            )
+            return {"entities": normalized_entities, "relations": []}
+
+        if not repair_catalog:
+            _append_warning(
+                warnings,
+                "REPAIR_ENDPOINT_CONTEXT_EMPTY",
+                "关系修复上下文中没有可引用实体，已跳过本轮修复",
+                f"repair[{payload['round']}]",
+            )
+            return {"entities": [], "relations": []}
+        output_schema = _output_schema_for_types(
+            plan,
+            "relation_candidates",
+            {str(entry.get("type") or "") for entry in repair_catalog},
+        )
+        messages = build_chat_messages(
+            task="repair",
+            plan=plan,
+            route=route,
+            chunk=repair_chunk,
+            known_entities=repair_catalog,
+            output_schema=output_schema,
+            repair_issues=issue_rows,
+        )
+        parsed = _generate_structured(
+            llm,
+            messages,
+            output_schema,
+            use_scheduler=use_scheduler,
+            attempts=attempts,
+            pass_name="repair_relation",
+            chunk_id=f"repair-{payload['round']}",
+            max_attempts=max_attempts,
+            retry_base_seconds=retry_base_seconds,
+            call_metrics=call_metrics,
+        )
+        return parsed or {"entities": [], "relations": []}
+
+    resolved_repairer = repairer or builtin_repair
+
+    def request_repair(current_pool: CandidatePool, issues, round_number: int):
+        model = build_intermediate_model(current_pool, plan, run_id=resolved_run_id)
+        current_raw = GraphAssembler().compat_raw(model["objects"], model["relations"])
+        return resolved_repairer(
+            {
+                "round": round_number,
+                "issues": [issue.to_dict() for issue in issues],
+                "entities": current_pool.entity_catalog(),
+                "relations": current_raw["relations"],
+                "chunks": [chunk.to_dict() for chunk in manager],
+                "schemas": deepcopy(plan.output_schemas),
+            }
+        )
+
+    repair_result = TargetedRepairOrchestrator(max_rounds=max_repair_rounds).run(
+        pool,
+        verify=verify_pool,
+        repair=request_repair,
+        apply=lambda current_pool, proposal: (
+            current_pool,
+            _apply_repair_proposal(current_pool, proposal, manager, warnings),
+        ),
+    )
+    repair_rounds = [item.to_dict() for item in repair_result.rounds]
+    repair_stop_reason = repair_result.stop_reason
+
+    # Repair proposals pass through the same acceptance boundary.  This also
+    # cascades any repaired relation whose endpoint was previously rejected.
+    selector.pre_relation(pool.entity_candidates())
+    selector.post_relation(pool.entity_candidates(), pool.relation_candidates())
 
     # §17-§19：Mapping Scorer（默认注释模式；apply_mapping_threshold 开启后按阈值过滤）
     scorer = MappingScorer(
@@ -1108,7 +939,7 @@ def extract_split(
     raw = assembler.compat_raw(intermediate_model["objects"], intermediate_model["relations"])
     graph = assembler.build_graph(intermediate_model["objects"], intermediate_model["relations"])
     triples = assembler.build_triples(graph)
-    # §23 / AC-8：通用 Coverage Auditor（只发现 gap）+ 策略专项审计
+    # §23 / AC-8：通用 Coverage Auditor（只发现 gap）
     coverage_gaps = CoverageAuditor().audit(
         plan,
         manager,
@@ -1116,13 +947,6 @@ def extract_split(
         raw["entities"],
         raw["relations"],
     )
-    coverage_gaps.extend(resolved_strategy.coverage_audit(
-        plan,
-        manager,
-        request,
-        raw["entities"],
-        raw["relations"],
-    ))
     intermediate_model["coverage_gaps"] = [gap.to_dict() for gap in coverage_gaps]
 
     # Evidence 验证（L1/L2）与覆盖（AC-4）
@@ -1137,13 +961,69 @@ def extract_split(
             )
     coverage = evidence_coverage(raw)
 
-    error_code = None
-    if any(attempt.get("type") == "request" for attempt in attempts):
-        error_code = "LLM_REQUEST_FAILED"
-    elif any(attempt.get("type") == "json" for attempt in attempts):
-        error_code = "LLM_JSON_PARSE_FAILED"
+    verification_report = ExtractionVerifier().verify(
+        plan,
+        schema,
+        manager,
+        request,
+        raw["entities"],
+        raw["relations"],
+        rejected_warnings=pool.unresolved_relation_rejections(),
+    )
+    if resolved_validation_mode == "strict" and verification_report.hard_issues:
+        attempts.append(
+            {
+                "attempt": 1,
+                "type": "schema_validation",
+                "pass": "verification",
+                "chunk": "final",
+                "message": "; ".join(
+                    f"{issue.code}: {issue.message}"
+                    for issue in verification_report.hard_issues[:5]
+                ),
+                "terminal": True,
+            }
+        )
 
-    return {
+    terminal_failures = {
+        (str(attempt.get("pass") or ""), str(attempt.get("chunk") or ""))
+        for attempt in attempts
+        if attempt.get("terminal") is True
+    }
+    for chunk in manager:
+        run.mark_chunk_scan(
+            chunk.chunk_id,
+            "entity",
+            completed=("entity", chunk.chunk_id) not in terminal_failures,
+        )
+        run.mark_chunk_scan(
+            chunk.chunk_id,
+            "relation",
+            completed=("relation", chunk.chunk_id) not in terminal_failures,
+        )
+
+    run.absorb_attempts(attempts)
+    run.finish(
+        accepted_entities=len(accepted_entities),
+        accepted_relations=len(accepted_relations),
+        stop_reason=repair_stop_reason,
+    )
+    run_trace = run.to_trace()
+    run_trace["calls"] = sorted(
+        call_metrics,
+        key=lambda call: (
+            str(call.get("pass") or ""),
+            str(call.get("chunk") or ""),
+            int(call.get("attempt") or 0),
+        ),
+    )
+    run_trace["repair_rounds"] = repair_rounds
+    run_trace["verification"] = {
+        "valid": verification_report.valid,
+        "hard_issue_count": len(verification_report.hard_issues),
+        "repairable_issue_count": len(verification_report.repairable_issues),
+    }
+    result = {
         "raw": raw,
         "graph": graph,
         "triples": triples,
@@ -1152,32 +1032,56 @@ def extract_split(
         "attempts": attempts,
         "evidence_coverage": coverage,
         "coverage_gaps": [gap.to_dict() for gap in coverage_gaps],
+        "verification": verification_report.to_dict(),
         "mapping": mapping_summary,
         "profile": {
-            "document_type": request.document_type,
+            "document_route": route.to_dict(),
             "pipeline": "two_pass",
-            "chunks": len(request.extraction_chunks()),
-            "entity_candidates": len(pool._entities),
-            "relation_candidates": len(pool._relations),
+            "chunks": len(extraction_chunks),
+            "entity_candidates": pool.entity_candidate_count,
+            "relation_candidates": pool.relation_candidate_count,
             "accepted_entities": len(accepted_entities),
             "accepted_relations": len(accepted_relations),
-            "strategy": resolved_strategy.document_type,
+            "numbered_hierarchy_relations": numbered_hierarchy_relations,
+            "document_entities": document_entities,
+            "standard_semantics": standard_semantics,
+            "property_enrichment": property_enrichment,
+            "document_relations": document_relations,
+            "standard_semantic_relations": standard_semantic_relations,
+            "standard_technical_relations": standard_technical_relations,
             "composite_auto_memberships": sum(
                 1 for issue in composite_issues if issue.get("code") == "AUTO_MEMBERSHIP_ESTABLISHED"
             ),
             "mapping_mode": "enforce" if apply_mapping_threshold else "annotate",
+            "candidate_selection": {
+                "rejected_entities": sum(
+                    1
+                    for entity in pool.entity_candidates()
+                    if entity.mapping_status == "rejected"
+                ),
+                "rejected_relations": sum(
+                    1
+                    for relation in pool.relation_candidates()
+                    if relation.mapping_status == "rejected"
+                ),
+            },
+            "repair_rounds": repair_rounds,
+            "repair_stop_reason": repair_stop_reason,
+            "llm_calls": len(call_metrics),
         },
-        "error_code": error_code,
+        "status": run.status.value,
+        "run_trace": run_trace,
+        "error_code": run.error_code,
     }
+    if run.error:
+        result["_error"] = run.error
+    return result
 
 
 __all__ = [
     "CandidatePool",
     "EntityCandidate",
     "RelationCandidate",
-    "build_entity_prompt",
     "build_intermediate_model",
-    "build_relation_prompt",
-    "extract_json_from_response",
     "extract_split",
 ]

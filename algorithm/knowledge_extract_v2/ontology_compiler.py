@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Iterable
 
 from .graph_utils import canonical_name, coerce_non_empty_name
@@ -118,6 +118,20 @@ class FeatureSpec:
 
 
 @dataclass(frozen=True)
+class SchemaPartition:
+    partition_id: str
+    class_ids: tuple[str, ...]
+    relation_signatures: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "partition_id": self.partition_id,
+            "class_ids": list(self.class_ids),
+            "relation_signatures": list(self.relation_signatures),
+        }
+
+
+@dataclass(frozen=True)
 class TargetScope:
     """§9：目标类型展开结果。"""
 
@@ -150,7 +164,8 @@ class ExtractionPlan:
     target_scope: TargetScope
     feature_specs: dict[str, tuple[FeatureSpec, ...]]
     composite_specs: dict[str, CompositeSpec]
-    document_strategy: str = "generic"
+    output_schemas: dict[str, dict[str, Any]]
+    schema_partitions: tuple[SchemaPartition, ...]
     schema_warnings: tuple[SchemaWarning, ...] = ()
 
     def resolve_relation(self, identifier: Any) -> tuple[RelationSpec, ...]:
@@ -161,14 +176,20 @@ class ExtractionPlan:
         """目标范围是否允许指定类型（AC-2）。"""
         return self.target_scope.allows(class_id)
 
-    def relations_in_scope(self) -> tuple[RelationSpec, ...]:
-        """返回两端都落在 expanded target scope 的关系签名。"""
-        return tuple(
-            spec
-            for specs in self.relation_specs.values()
-            for spec in specs
-            if spec.source in self.allowed_types and spec.target in self.allowed_types
-        )
+    def relevant_types(self, text: str) -> frozenset[str]:
+        """Select connected schema partitions using ontology-owned lexical cues."""
+        normalized = canonical_name(text)
+        selected: set[str] = set()
+        for partition in self.schema_partitions:
+            cues: set[str] = set()
+            for class_id in partition.class_ids:
+                spec = self.class_specs[class_id]
+                cues.update((canonical_name(class_id), canonical_name(spec.display_name)))
+                for prop in spec.properties:
+                    cues.update((canonical_name(prop.identifier), canonical_name(prop.display_name)))
+            if any(cue and cue in normalized for cue in cues):
+                selected.update(partition.class_ids)
+        return frozenset(selected or self.allowed_types)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -178,7 +199,8 @@ class ExtractionPlan:
             "classes": len(self.class_specs),
             "relations": sum(len(specs) for specs in self.relation_specs.values()),
             "relation_ids": sorted(self.relation_specs),
-            "document_strategy": self.document_strategy,
+            "output_schemas": sorted(self.output_schemas),
+            "schema_partitions": [partition.to_dict() for partition in self.schema_partitions],
             "warnings": [warning.to_dict() for warning in self.schema_warnings],
         }
 
@@ -455,11 +477,44 @@ def _derive_ontology_id(source: str) -> str:
     return f"ontology-{digest}"
 
 
-def _compile_class_specs(schema: OntologySchema) -> dict[str, ClassSpec]:
+def _parse_required_properties(source: str, schema: OntologySchema) -> dict[str, set[str]]:
+    required: dict[str, set[str]] = {}
+    pattern = re.compile(r"^\s*'\s*@required\s+(?P<class>[^:]+):(?P<properties>.+)$", re.I)
+    for line in (source or "").splitlines():
+        match = pattern.match(line)
+        if match is None:
+            continue
+        ontology_class = schema.resolve_class(match.group("class").strip())
+        if ontology_class is None:
+            continue
+        for symbol in re.split(r"[,，]", match.group("properties")):
+            prop = schema.resolve_property(ontology_class.identifier, symbol.strip())
+            if prop is not None:
+                required.setdefault(ontology_class.identifier, set()).add(prop.identifier)
+    return required
+
+
+def _compile_class_specs(
+    schema: OntologySchema,
+    required_properties: dict[str, set[str]] | None = None,
+) -> dict[str, ClassSpec]:
+    required_properties = required_properties or {}
     children: dict[str, list[str]] = {}
     for identifier, parents in schema.parents.items():
         for parent in parents:
             children.setdefault(parent, []).append(identifier)
+
+    def is_required(class_id: str, property_id: str, trail: set[str] | None = None) -> bool:
+        if property_id in required_properties.get(class_id, set()):
+            return True
+        visited = set(trail or ())
+        if class_id in visited:
+            return False
+        visited.add(class_id)
+        return any(
+            is_required(parent, property_id, visited)
+            for parent in schema.parents.get(class_id, ())
+        )
 
     specs: dict[str, ClassSpec] = {}
     for ontology_class in schema.classes:
@@ -471,6 +526,7 @@ def _compile_class_specs(schema: OntologySchema) -> dict[str, ClassSpec]:
                 data_type=prop.data_type,
                 source_class=identifier,
                 comment=prop.comment,
+                required=True if is_required(identifier, prop.identifier) else None,
             )
             for prop in ontology_class.properties
         )
@@ -492,6 +548,7 @@ def _compile_class_specs(schema: OntologySchema) -> dict[str, ClassSpec]:
                         source_class=parent,
                         comment=prop.comment,
                         inherited=True,
+                        required=True if is_required(identifier, prop.identifier) else None,
                     )
                 )
         specs[identifier] = ClassSpec(
@@ -536,14 +593,13 @@ def _compile_identity_specs(schema: OntologySchema) -> dict[str, IdentitySpec]:
 
 
 def _compile_feature_specs(
-    schema: OntologySchema,
+    class_specs: dict[str, ClassSpec],
     relation_specs: dict[str, tuple[RelationSpec, ...]],
 ) -> dict[str, tuple[FeatureSpec, ...]]:
     """§8：从本体确定性推导 intrinsic 与 relation 特征，缺省元数据保持 None。"""
     features: dict[str, list[FeatureSpec]] = {}
-    for ontology_class in schema.classes:
-        identifier = ontology_class.identifier
-        for prop in ontology_class.properties:
+    for identifier, class_spec in class_specs.items():
+        for prop in class_spec.properties:
             features.setdefault(identifier, []).append(
                 FeatureSpec(
                     feature_id=f"{identifier}.{prop.identifier}",
@@ -551,7 +607,7 @@ def _compile_feature_specs(
                     kind="intrinsic",
                     identifier=prop.identifier,
                     datatype=prop.data_type,
-                    required=None,
+                    required=prop.required,
                     multi_value=None,
                     context_inferable=None,
                     lexical_patterns=(),
@@ -583,6 +639,124 @@ def _compile_feature_specs(
     return {key: tuple(value) for key, value in features.items()}
 
 
+def _compile_output_schemas(
+    class_specs: dict[str, ClassSpec],
+    allowed_types: frozenset[str],
+    relation_specs: dict[str, tuple[RelationSpec, ...]],
+) -> dict[str, dict[str, Any]]:
+    """Build the provider-neutral schemas used by both extraction passes."""
+    concrete_types = sorted(
+        class_id
+        for class_id in allowed_types
+        if class_id in class_specs and not class_specs[class_id].is_abstract
+    )
+    in_scope_relations = sorted(
+        {
+            spec.relation_id
+            for specs in relation_specs.values()
+            for spec in specs
+            if spec.source in allowed_types and spec.target in allowed_types
+        }
+    )
+    # Keep the provider-facing schema deliberately small.  DeepSeek's strict
+    # structured-output dialect rejects several JSON Schema keywords (such as
+    # minLength), so non-empty/grounding checks belong to the deterministic
+    # candidate normalizer instead of the schema.
+    evidence_schema = {
+        "type": "object",
+        "properties": {"quote": {"type": "string"}},
+        "required": ["quote"],
+        "additionalProperties": False,
+    }
+    entity_item = {
+        "type": "object",
+        "properties": {
+            "type": {"type": "string", "enum": concrete_types},
+            "mention": {"type": "string"},
+            "start_char": {"type": "integer"},
+            "end_char": {"type": "integer"},
+            "evidence": evidence_schema,
+        },
+        "required": ["type", "mention", "start_char", "end_char", "evidence"],
+        "additionalProperties": False,
+    }
+    relation_item = {
+        "type": "object",
+        "properties": {
+            "from_id": {"type": "string", "pattern": r"^entity-\d+$"},
+            "rel_type": {"type": "string", "enum": in_scope_relations},
+            "to_id": {"type": "string", "pattern": r"^entity-\d+$"},
+            "evidence": evidence_schema,
+        },
+        "required": ["from_id", "rel_type", "to_id", "evidence"],
+        "additionalProperties": False,
+    }
+    return {
+        "entity_candidates": {
+            "type": "object",
+            "properties": {"entities": {"type": "array", "items": entity_item}},
+            "required": ["entities"],
+            "additionalProperties": False,
+        },
+        "relation_candidates": {
+            "type": "object",
+            "properties": {"relations": {"type": "array", "items": relation_item}},
+            "required": ["relations"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def _compile_schema_partitions(
+    class_specs: dict[str, ClassSpec],
+    allowed_types: frozenset[str],
+    relation_specs: dict[str, tuple[RelationSpec, ...]],
+) -> tuple[SchemaPartition, ...]:
+    adjacency = {class_id: set() for class_id in allowed_types if class_id in class_specs}
+    for class_id, spec in class_specs.items():
+        if class_id not in adjacency:
+            continue
+        for related in (*spec.parents, *spec.children):
+            if related in adjacency:
+                adjacency[class_id].add(related)
+                adjacency[related].add(class_id)
+    scoped_relations: list[RelationSpec] = []
+    for specs in relation_specs.values():
+        for spec in specs:
+            if spec.source in adjacency and spec.target in adjacency:
+                adjacency[spec.source].add(spec.target)
+                adjacency[spec.target].add(spec.source)
+                scoped_relations.append(spec)
+
+    components: list[tuple[str, ...]] = []
+    unseen = set(adjacency)
+    while unseen:
+        start = min(unseen)
+        stack = [start]
+        component: set[str] = set()
+        while stack:
+            current = stack.pop()
+            if current in component:
+                continue
+            component.add(current)
+            unseen.discard(current)
+            stack.extend(sorted(adjacency[current] - component, reverse=True))
+        components.append(tuple(sorted(component)))
+    components.sort()
+    return tuple(
+        SchemaPartition(
+            partition_id=f"partition-{index:03d}",
+            class_ids=component,
+            relation_signatures=tuple(
+                sorted(
+                    spec.signature
+                    for spec in scoped_relations
+                    if spec.source in component and spec.target in component
+                )
+            ),
+        )
+        for index, component in enumerate(components)
+    )
 class OntologyCompiler:
     """§7 Ontology Compiler：本体 + 目标范围 → ExtractionPlan。"""
 
@@ -611,10 +785,13 @@ class OntologyCompiler:
         )
         warnings.extend(run_schema_qa(schema, mode=self.mode))
 
-        class_specs = _compile_class_specs(schema)
+        required_properties = _parse_required_properties(ontology, schema)
+        class_specs = _compile_class_specs(schema, required_properties)
         relation_specs = _compile_relation_specs(schema)
         identity_specs = _compile_identity_specs(schema)
-        feature_specs = _compile_feature_specs(schema, relation_specs)
+        feature_specs = _compile_feature_specs(class_specs, relation_specs)
+        output_schemas = _compile_output_schemas(class_specs, scope.expanded_types, relation_specs)
+        schema_partitions = _compile_schema_partitions(class_specs, scope.expanded_types, relation_specs)
         return ExtractionPlan(
             ontology_id=ontology_id or _derive_ontology_id(ontology or ""),
             allowed_types=scope.expanded_types,
@@ -624,7 +801,8 @@ class OntologyCompiler:
             target_scope=scope,
             feature_specs=feature_specs,
             composite_specs=discover_composite_specs(schema),
-            document_strategy="generic",
+            output_schemas=output_schemas,
+            schema_partitions=schema_partitions,
             schema_warnings=tuple(warnings),
         )
 

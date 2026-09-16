@@ -19,6 +19,15 @@
         "文件备注": "",
         "抄送": "公司领导，总师级领导，纪委副书记，工会副主席",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 88,
+        "end_char": 124,
+        "support": "explicit"
       }
     },
     {
@@ -30,6 +39,15 @@
         "原文内容": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。",
         "顺序号": "",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》正文"
+      },
+      "evidence": {
+        "quote": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 168,
+        "end_char": 344,
+        "support": "explicit"
       }
     },
     {
@@ -41,6 +59,15 @@
         "原文内容": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
         "顺序号": "一",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》一"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -52,6 +79,15 @@
         "原文内容": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
         "顺序号": "二",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》二"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -63,6 +99,15 @@
         "原文内容": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
         "顺序号": "三",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》三"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -74,6 +119,15 @@
         "原文内容": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
         "顺序号": "四",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》四"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -85,6 +139,15 @@
         "原文内容": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
         "顺序号": "五",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》五"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -96,6 +159,15 @@
         "原文内容": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
         "顺序号": "",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》报送要求段落"
+      },
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 772,
+        "support": "explicit"
       }
     },
     {
@@ -107,6 +179,15 @@
         "原文内容": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议；2. “龙虾”等开源智能体安全风险排查反馈表。",
         "顺序号": "",
         "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》附件"
+      },
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 33,
+        "start_char": 828,
+        "end_char": 895,
+        "support": "explicit"
       }
     },
     {
@@ -117,6 +198,15 @@
         "主体类型": "组织",
         "组织层级": "集团",
         "职责": "发布专项排查通知，组织集团及各子企业开展开源智能体安全风险排查"
+      },
+      "evidence": {
+        "quote": "来文单位: 中国中车集团有限公司",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 222,
+        "end_char": 238,
+        "support": "explicit"
       }
     },
     {
@@ -127,6 +217,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "落实通知要求，梳理本企业开源智能体使用情况，于2026年4月10日前报送排查反馈表"
+      },
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 126,
+        "end_char": 166,
+        "support": "explicit"
       }
     },
     {
@@ -137,6 +236,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "牵头组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作"
+      },
+      "evidence": {
+        "quote": "王元元 2026-03-30 09:26</td></tr><tr><td colspan=\"3\">请技术中心牵头、安全中心配合,组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作,填报反馈表经公司领导审核后报集团,并修订有关制度,从技术和管理两方面着手,严格杜绝此类现象发生。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 946,
+        "end_char": 1094,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -147,6 +255,15 @@
         "主体类型": "部门",
         "组织层级": "集团部门",
         "职责": "归口接收各企业排查情况反馈（内网办公邮箱：010099900594@crccgc.cc）"
+      },
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -157,6 +274,15 @@
         "主体类型": "组织",
         "组织层级": "境外机构",
         "职责": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+      },
+      "evidence": {
+        "quote": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 438,
+        "end_char": 464,
+        "support": "explicit"
       }
     },
     {
@@ -167,6 +293,15 @@
         "对象类型": "模型",
         "所属领域": "网络安全",
         "对象描述": "存在较高安全风险的开源智能体及相关衍生组件，被引入内部系统后极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒"
+      },
+      "evidence": {
+        "quote": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 168,
+        "end_char": 265,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -177,6 +312,15 @@
         "对象类型": "设备",
         "所属领域": "办公信息化",
         "对象描述": "计算机等办公设备、办公电脑、办公移动设备，须严格执行内外网隔离，禁止内外网混用"
+      },
+      "evidence": {
+        "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 384,
+        "end_char": 426,
+        "support": "explicit"
       }
     },
     {
@@ -187,6 +331,15 @@
         "对象类型": "系统",
         "所属领域": "网络安全",
         "对象描述": "网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经充分论证、安全测试和集团批准不得部署开源智能体"
+      },
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 474,
+        "end_char": 550,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -197,6 +350,15 @@
         "对象类型": "系统",
         "所属领域": "信息化",
         "对象描述": "除等保三级及以上网络系统之外的其他网络系统，建议谨慎使用并参照附件1做好针对性风险防范"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "explicit"
       }
     },
     {
@@ -209,6 +371,15 @@
         "优先级": "重点",
         "活动描述": "梳理本企业使用开源智能体情况，摸清安全风险底数",
         "预期结果": "梳理本企业使用开源智能体情况，摸清安全风险底数"
+      },
+      "evidence": {
+        "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 17,
+        "line_end": 17,
+        "start_char": 347,
+        "end_char": 382,
+        "support": "explicit"
       }
     },
     {
@@ -221,6 +392,15 @@
         "优先级": "重点",
         "活动描述": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
         "预期结果": "办公设备内、外网有效隔离，严控各类风险"
+      },
+      "evidence": {
+        "quote": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 390,
+        "end_char": 425,
+        "support": "explicit"
       }
     },
     {
@@ -233,6 +413,15 @@
         "优先级": "重点",
         "活动描述": "对等保三级及以上或存储重要、核心数据的网络系统，未经充分论证、安全测试和集团批准不得部署开源智能体",
         "预期结果": "未经本企业充分论证和安全测试、未经集团批准，不得部署安装各类开源智能体"
+      },
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 474,
+        "end_char": 550,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -245,6 +434,15 @@
         "优先级": "一般",
         "活动描述": "对其他网络系统谨慎使用，参照附件1《六要六不要建议》做好针对性风险防范",
         "预期结果": "参照附件1《六要六不要建议》做好针对性风险防范"
+      },
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -257,6 +455,15 @@
         "优先级": "重点",
         "活动描述": "加强网络和数据安全监测，发现开源智能体引发的安全事件第一时间处置并向集团报告",
         "预期结果": "发现或获知开源智能体引发的本企业安全事件，第一时间处置并向集团报告"
+      },
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -269,6 +476,15 @@
         "优先级": "紧急",
         "活动描述": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
         "预期结果": "2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+      },
+      "evidence": {
+        "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 699,
+        "end_char": 744,
+        "support": "explicit"
       }
     },
     {
@@ -279,6 +495,15 @@
         "信息类型": "附件",
         "定义": "其他网络系统风险防范参照的规范建议",
         "来源文本": "通知附件1"
+      },
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 31,
+        "start_char": 828,
+        "end_char": 871,
+        "support": "explicit"
       }
     },
     {
@@ -289,6 +514,15 @@
         "信息类型": "附件",
         "定义": "各企业报送排查情况使用的反馈表",
         "来源文本": "通知附件2"
+      },
+      "evidence": {
+        "quote": "2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 873,
+        "end_char": 895,
+        "support": "explicit"
       }
     },
     {
@@ -299,6 +533,15 @@
         "信息类型": "报告",
         "定义": "各企业于2026年4月10日前通过内网办公邮箱报送的排查情况",
         "来源文本": "通知报送要求"
+      },
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -307,6 +550,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车集团有限公司向各一级子公司发布关于开展开源智能体安全风险排查工作的通知"
+      },
+      "evidence": {
+        "quote": "# 关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 86,
+        "end_char": 124,
+        "support": "explicit"
       }
     },
     {
@@ -315,6 +567,15 @@
       "properties": {
         "交互类型": "报送",
         "交互描述": "各一级子公司于2026年4月10日前通过内网办公邮箱向集团科信部报送排查反馈表"
+      },
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -323,6 +584,15 @@
       "properties": {
         "交互类型": "报告",
         "交互描述": "发现或获知开源智能体引发的本企业安全事件后第一时间处置，并向集团报告"
+      },
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -334,6 +604,15 @@
         "强制程度": "必须",
         "约束原文": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 386,
+        "end_char": 425,
+        "support": "explicit"
       }
     },
     {
@@ -345,6 +624,15 @@
         "强制程度": "禁止",
         "约束原文": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 429,
+        "end_char": 464,
+        "support": "explicit"
       }
     },
     {
@@ -356,6 +644,15 @@
         "强制程度": "禁止",
         "约束原文": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 476,
+        "end_char": 549,
+        "support": "explicit"
       }
     },
     {
@@ -367,6 +664,15 @@
         "强制程度": "必须",
         "约束原文": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 744,
+        "support": "explicit"
       }
     }
   ],
@@ -376,525 +682,1200 @@
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 88,
+        "end_char": 344,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求一"
+      "to_name": "排查要求一",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求二"
+      "to_name": "排查要求二",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求三"
+      "to_name": "排查要求三",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求四"
+      "to_name": "排查要求四",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求五"
+      "to_name": "排查要求五",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "报送要求"
+      "to_name": "报送要求",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 772,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 33,
+        "start_char": 828,
+        "end_char": 895,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "来文单位: 中国中车集团有限公司",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 222,
+        "end_char": 238,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 88,
+        "end_char": 166,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "OpenClaw（“龙虾”）等开源智能体"
+      "to_name": "OpenClaw（“龙虾”）等开源智能体",
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 88,
+        "end_char": 265,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议"
+      "to_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 31,
+        "start_char": 828,
+        "end_char": 871,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "DEFINES",
       "to_type": "OperationalInformation",
-      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
+      "evidence": {
+        "quote": "2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 33,
+        "line_end": 33,
+        "start_char": 873,
+        "end_char": 895,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_KEY_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "排查情况反馈信息"
+      "to_name": "排查情况反馈信息",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "structural_inference"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "组织开展开源智能体专项排查"
+      "to_name": "组织开展开源智能体专项排查",
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 17,
+        "start_char": 88,
+        "end_char": 382,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "落实办公网与互联网隔离"
+      "to_name": "落实办公网与互联网隔离",
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\n\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 19,
+        "start_char": 88,
+        "end_char": 425,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "高等级网络系统部署管控"
+      "to_name": "高等级网络系统部署管控",
+      "evidence": {
+        "quote": "关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\n\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 21,
+        "start_char": 88,
+        "end_char": 550,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "其他网络系统风险防范"
+      "to_name": "其他网络系统风险防范",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "安全监测与事件处置"
+      "to_name": "安全监测与事件处置",
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "报送排查反馈表"
+      "to_name": "报送排查反馈表",
+      "evidence": {
+        "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 699,
+        "end_char": 744,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "发布专项排查通知"
+      "to_name": "发布专项排查通知",
+      "evidence": {
+        "quote": "# 关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 86,
+        "end_char": 124,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "报送排查反馈"
+      "to_name": "报送排查反馈",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "安全事件报告"
+      "to_name": "安全事件报告",
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织开展开源智能体专项排查",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "OpenClaw（“龙虾”）等开源智能体"
+      "to_name": "OpenClaw（“龙虾”）等开源智能体",
+      "evidence": {
+        "quote": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 15,
+        "line_end": 17,
+        "start_char": 168,
+        "end_char": 382,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实办公网与互联网隔离",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "办公设备与终端"
+      "to_name": "办公设备与终端",
+      "evidence": {
+        "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 384,
+        "end_char": 426,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "高等级网络系统部署管控",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "等保三级及以上网络系统"
+      "to_name": "等保三级及以上网络系统",
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 474,
+        "end_char": 550,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "其他网络系统风险防范",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "其他网络系统"
+      "to_name": "其他网络系统",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织开展开源智能体专项排查",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 13,
+        "line_end": 17,
+        "start_char": 126,
+        "end_char": 382,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织开展开源智能体专项排查",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "信息公司技术中心"
+      "to_name": "信息公司技术中心",
+      "evidence": {
+        "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 17,
+        "line_end": 17,
+        "start_char": 347,
+        "end_char": 382,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "报送排查反馈表",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 699,
+        "end_char": 744,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织开展开源智能体专项排查",
       "rel_type": "PRECEDES",
       "to_type": "OperationalActivity",
-      "to_name": "报送排查反馈表"
+      "to_name": "报送排查反馈表",
+      "evidence": {
+        "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\n\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。\n\n五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。\n\n各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 17,
+        "line_end": 27,
+        "start_char": 347,
+        "end_char": 744,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "其他网络系统风险防范",
       "rel_type": "USES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议"
+      "to_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。\n\n五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。\n\n各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。\n\n联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011。\n\n附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 31,
+        "start_char": 552,
+        "end_char": 871,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "报送排查反馈表",
       "rel_type": "USES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
+      "evidence": {
+        "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。\n\n联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011。\n\n附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 33,
+        "start_char": 699,
+        "end_char": 895,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "报送排查反馈表",
       "rel_type": "PRODUCES",
       "to_type": "OperationalInformation",
-      "to_name": "排查情况反馈信息"
+      "to_name": "排查情况反馈信息",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "办公网络内外网隔离约束",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "落实办公网与互联网隔离"
+      "to_name": "落实办公网与互联网隔离",
+      "evidence": {
+        "quote": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 386,
+        "end_char": 425,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "境外机构与人员智能体安装管控约束",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "落实办公网与互联网隔离"
+      "to_name": "落实办公网与互联网隔离",
+      "evidence": {
+        "quote": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 390,
+        "end_char": 464,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "高等级网络系统部署约束",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "高等级网络系统部署管控"
+      "to_name": "高等级网络系统部署管控",
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 474,
+        "end_char": 550,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "排查反馈报送时限约束",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "报送排查反馈表"
+      "to_name": "报送排查反馈表",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 744,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "办公网络内外网隔离约束",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\n\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 13,
+        "line_end": 19,
+        "start_char": 126,
+        "end_char": 425,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "境外机构与人员智能体安装管控约束",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "境外企业与人员"
+      "to_name": "境外企业与人员",
+      "evidence": {
+        "quote": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 429,
+        "end_char": 464,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "高等级网络系统部署约束",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\n\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 13,
+        "line_end": 21,
+        "start_char": 126,
+        "end_char": 549,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "排查反馈报送时限约束",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 744,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "办公网络内外网隔离约束",
       "rel_type": "CONSTRAINS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "办公设备与终端"
+      "to_name": "办公设备与终端",
+      "evidence": {
+        "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 19,
+        "start_char": 384,
+        "end_char": 426,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "高等级网络系统部署约束",
       "rel_type": "CONSTRAINS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "等保三级及以上网络系统"
+      "to_name": "等保三级及以上网络系统",
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 21,
+        "start_char": 474,
+        "end_char": 550,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "组织开展开源智能体专项排查",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求一"
+      "to_name": "排查要求一",
+      "evidence": {
+        "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\n\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 17,
+        "line_end": 23,
+        "start_char": 347,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "落实办公网与互联网隔离",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求二"
+      "to_name": "排查要求二",
+      "evidence": {
+        "quote": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 23,
+        "start_char": 390,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "高等级网络系统部署管控",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求三"
+      "to_name": "排查要求三",
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 23,
+        "start_char": 474,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "其他网络系统风险防范",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求四"
+      "to_name": "排查要求四",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "安全监测与事件处置",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求五"
+      "to_name": "排查要求五",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。\n\n五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 25,
+        "start_char": 552,
+        "end_char": 684,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "报送排查反馈表",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "报送要求"
+      "to_name": "报送要求",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 772,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "办公网络内外网隔离约束",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求二"
+      "to_name": "排查要求二",
+      "evidence": {
+        "quote": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 23,
+        "start_char": 386,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "境外机构与人员智能体安装管控约束",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求二"
+      "to_name": "排查要求二",
+      "evidence": {
+        "quote": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 23,
+        "start_char": 429,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "高等级网络系统部署约束",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求三"
+      "to_name": "排查要求三",
+      "evidence": {
+        "quote": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 23,
+        "start_char": 476,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "排查反馈报送时限约束",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "报送要求"
+      "to_name": "报送要求",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 772,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各一级子公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 126,
+        "end_char": 344,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 33,
+        "start_char": 828,
+        "end_char": 895,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表"
+      "to_name": "附件列表",
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 33,
+        "start_char": 828,
+        "end_char": 895,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "OpenClaw（“龙虾”）等开源智能体",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 168,
+        "end_char": 344,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "等保三级及以上网络系统",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求三"
+      "to_name": "排查要求三",
+      "evidence": {
+        "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 21,
+        "line_end": 23,
+        "start_char": 474,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "办公设备与终端",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求二"
+      "to_name": "排查要求二",
+      "evidence": {
+        "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\n\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\n\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 19,
+        "line_end": 23,
+        "start_char": 384,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "其他网络系统",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求四"
+      "to_name": "排查要求四",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 23,
+        "start_char": 552,
+        "end_char": 631,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "发布专项排查通知",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 86,
+        "end_char": 344,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "报送排查反馈",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "报送要求"
+      "to_name": "报送要求",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "安全事件报告",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "排查要求五"
+      "to_name": "排查要求五",
+      "evidence": {
+        "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。\n\n五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 23,
+        "line_end": 25,
+        "start_char": 552,
+        "end_char": 684,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "发布专项排查通知",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "# 关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 86,
+        "end_char": 124,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "发布专项排查通知",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "# 关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 86,
+        "end_char": 166,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "报送排查反馈",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "报送排查反馈",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "集团科信部"
+      "to_name": "集团科信部",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "安全事件报告",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各一级子公司"
+      "to_name": "各一级子公司",
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "安全事件报告",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车集团有限公司"
+      "to_name": "中国中车集团有限公司",
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "报送排查反馈",
       "rel_type": "EXCHANGES_INFORMATION",
       "to_type": "OperationalInformation",
-      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。\n\n联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011。\n\n附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 33,
+        "start_char": 686,
+        "end_char": 895,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "发布专项排查通知",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "组织开展开源智能体专项排查"
+      "to_name": "组织开展开源智能体专项排查",
+      "evidence": {
+        "quote": "# 关于开展 OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\n\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 11,
+        "line_end": 17,
+        "start_char": 86,
+        "end_char": 382,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "报送排查反馈",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "报送排查反馈表"
+      "to_name": "报送排查反馈表",
+      "evidence": {
+        "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 27,
+        "line_end": 27,
+        "start_char": 686,
+        "end_char": 774,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "安全事件报告",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "安全监测与事件处置"
+      "to_name": "安全监测与事件处置",
+      "evidence": {
+        "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 25,
+        "line_end": 25,
+        "start_char": 633,
+        "end_char": 684,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalInformation",
       "from_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
       "rel_type": "RELATED_TO",
       "to_type": "OperationalInformation",
-      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+      "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
+      "evidence": {
+        "quote": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2. “龙虾”等开源智能体安全风险排查反馈表",
+        "document": "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md",
+        "line_start": 31,
+        "line_end": 33,
+        "start_char": 828,
+        "end_char": 895,
+        "support": "explicit_endpoints"
+      }
     }
   ]
 }

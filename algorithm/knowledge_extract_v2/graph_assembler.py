@@ -14,7 +14,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from .graph_utils import build_node_properties, entity_uid, filter_relationships_with_known_nodes
+from .graph_utils import build_node_properties, entity_uid
+
+
+class GraphIntegrityError(ValueError):
+    """Final reconciliation found an internal referential-integrity bug."""
 
 
 class GraphAssembler:
@@ -38,12 +42,15 @@ class GraphAssembler:
             identity = str(obj.get("identity") or "")
             uid = self.uid_for(type_id, identity)
             if uid not in node_index:
+                compat_properties = obj.get("compat_properties")
                 node = {
                     "uid": uid,
                     "label": type_id,
                     "properties": build_node_properties(
-                        identity,
-                        obj.get("properties") or {},
+                        obj.get("display_name") or identity,
+                        compat_properties
+                        if isinstance(compat_properties, dict)
+                        else obj.get("properties") or {},
                     ),
                 }
                 nodes.append(node)
@@ -56,7 +63,10 @@ class GraphAssembler:
             from_obj = by_id.get(relation.get("from"))
             to_obj = by_id.get(relation.get("to"))
             if from_obj is None or to_obj is None:
-                continue
+                raise GraphIntegrityError(
+                    "relation references a non-accepted entity: "
+                    f"{relation.get('from')!r} -> {relation.get('to')!r}"
+                )
             from_uid = self.uid_for(str(from_obj.get("type") or ""), str(from_obj.get("identity") or ""))
             to_uid = self.uid_for(str(to_obj.get("type") or ""), str(to_obj.get("identity") or ""))
             relation_type = str(relation.get("type") or "")
@@ -66,7 +76,6 @@ class GraphAssembler:
             relationship_keys.add(key)
             relationships.append({"from_uid": from_uid, "to_uid": to_uid, "type": relation_type})
 
-        relationships = filter_relationships_with_known_nodes(relationships, set(node_index))
         return {"nodes": nodes, "relationships": relationships}
 
     def build_triples(self, graph: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -88,10 +97,15 @@ class GraphAssembler:
         entities: list[dict[str, Any]] = []
         by_id: dict[str, dict[str, Any]] = {}
         for obj in objects:
+            compat_properties = obj.get("compat_properties")
             entity: dict[str, Any] = {
                 "type": obj.get("type"),
-                "name": obj.get("identity"),
-                "properties": dict(obj.get("properties") or {}),
+                "name": obj.get("display_name") or obj.get("identity"),
+                "properties": dict(
+                    compat_properties
+                    if isinstance(compat_properties, dict)
+                    else obj.get("properties") or {}
+                ),
                 "candidate_id": obj.get("id"),
             }
             evidence = obj.get("evidence") or []
@@ -105,14 +119,17 @@ class GraphAssembler:
             from_obj = by_id.get(relation.get("from"))
             to_obj = by_id.get(relation.get("to"))
             if from_obj is None or to_obj is None:
-                continue
+                raise GraphIntegrityError(
+                    "relation references a non-accepted entity: "
+                    f"{relation.get('from')!r} -> {relation.get('to')!r}"
+                )
             raw_relation: dict[str, Any] = {
                 "from_id": relation.get("from"),
                 "from_type": from_obj.get("type"),
-                "from_name": from_obj.get("identity"),
+                "from_name": from_obj.get("display_name") or from_obj.get("identity"),
                 "rel_type": relation.get("type"),
                 "to_type": to_obj.get("type"),
-                "to_name": to_obj.get("identity"),
+                "to_name": to_obj.get("display_name") or to_obj.get("identity"),
                 "to_id": relation.get("to"),
             }
             evidence = relation.get("evidence") or []
@@ -121,30 +138,4 @@ class GraphAssembler:
             raw_relations.append(raw_relation)
         return {"entities": entities, "relations": raw_relations}
 
-    def validate(self, graph: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-        """结构校验：uid 唯一、关系端点存在（AC-7 代理）。"""
-        issues: list[dict[str, Any]] = []
-        seen_uids: set[str] = set()
-        for index, node in enumerate(graph.get("nodes", [])):
-            uid = str(node.get("uid") or "")
-            if not uid:
-                issues.append({"code": "EMPTY_NODE_UID", "message": "node 缺少 uid", "path": f"nodes[{index}]"})
-            elif uid in seen_uids:
-                issues.append({"code": "DUPLICATE_NODE_UID", "message": f"node uid 重复: {uid}", "path": f"nodes[{index}]"})
-            else:
-                seen_uids.add(uid)
-        for index, relationship in enumerate(graph.get("relationships", [])):
-            from_uid = str(relationship.get("from_uid") or "")
-            to_uid = str(relationship.get("to_uid") or "")
-            if from_uid not in seen_uids or to_uid not in seen_uids:
-                issues.append(
-                    {
-                        "code": "DANGLING_RELATIONSHIP",
-                        "message": f"关系端点不在节点集: {from_uid} -> {to_uid}",
-                        "path": f"relationships[{index}]",
-                    }
-                )
-        return issues
-
-
-__all__ = ["GraphAssembler"]
+__all__ = ["GraphAssembler", "GraphIntegrityError"]

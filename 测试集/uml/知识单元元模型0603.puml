@@ -1,0 +1,426 @@
+@startuml 知识单元元模型
+' ==============================================
+' 知识单元元模型 (Knowledge Unit Metamodel)
+' 融合ISO 42010标准 + 维度刻度 + TOGAF三层架构
+' ==============================================
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam wrapWidth 300
+skinparam defaultTextAlignment center
+
+title <b>知识单元元模型</b>\n<b><size:12>Knowledge Unit Metamodel v4.0</size></b>\n\n<color:gray>基于ISO 42010 + 维度刻度 + TOGAF三层架构</color>
+
+' ==============================================
+' I. 知识单元核心包
+' ==============================================
+package "I. 知识单元核心包\n(Knowledge Unit Core)" <<Rectangle>> #E3F2FD {
+  
+  ' ----- 资源基类 -----
+  class 资源 <<Resource>> #lightblue {
+    <b>资源</b>
+    <size:14><b>Resource</b></size>
+    ---
+    • 资源标识 (resourceId): URI
+    • 资源类型 (resourceType): String
+    • 版本号 (version): String
+    • 状态 (status): String //草稿、待审核、已发布、已废弃、已归档
+    • 权限信息 (permissions): String //访问权限、编辑权限
+    ---
+    <i>定义：</i>
+    Resource is the base class for all manageable resources 
+    with basic attributes like id, type, version, status, and permissions.
+  }
+  
+  ' ----- 知识单元管理类 -----
+  class 知识单元管理 <<KnowledgeUnitManagement>> {
+    <b>知识单元管理</b>
+    <size:14><b>Knowledge Unit Management</b></size>
+    ---
+    • 名称 (name): String
+    • 资源标识 (resourceId): URI
+    • 资源类型 (resourceType): String //向量块、术语、规则、案例、组件等资源
+    • 版本号 (version): String
+    • 状态 (status): String //草稿、待审核、已发布、已废弃、已归档
+    • 权限信息 (permissions): String //访问权限、编辑权限
+    • 知识内容存储地址 (storageLocation): String
+    • 置信度: String
+    • 知识空间 (space): String
+    ---
+    <i>定义：</i>
+    Knowledge unit management class inherits from Resource, 
+    managing knowledge unit metadata and lifecycle.
+  }
+  
+  ' 继承关系
+  资源 <|-- 知识单元管理 : 继承
+  
+  ' ----- 知识单元逻辑属性类 -----
+  class 知识单元逻辑属性 <<KnowledgeUnitLogic>> {
+    <b>知识单元逻辑属性</b>
+    <size:14><b>Knowledge Unit Logic</b></size>
+    ---
+    • 语言 (language): String
+    • 知识内容形式 (knowledgeContentFormat): String
+    • 知识内容 (knowledgeContent): String
+    • 扩展属性 (Attributes): Attributes[] //可扩展属性，从属性资源中选取
+    • 扩展关系 (Associations): Associations[] //可扩展关系，从关系资源中选取
+    ---
+    <i>定义：</i>
+    Knowledge unit logic attributes describe the logical structure 
+    and content of knowledge units.
+  }
+  
+  ' ----- 知识单元物理属性类 -----
+  class 知识单元物理属性 <<KnowledgeUnitPhysical>> {
+    <b>知识单元物理属性</b>
+    <size:14><b>Knowledge Unit Physical</b></size>
+    ---
+    • 部署位置 (deploymentLocation): String
+    • 运行环境 (runtimeEnvironment): String
+    • 编辑环境 (editingEnvironment): String
+    • 容器配置 (containerConfig): String
+    • 依赖组件 (dependencies): String
+    • 执行参数 (executionParams): String
+    • 资源需求 (resourceRequirements): String
+    ---
+    <i>定义：</i>
+    Knowledge unit physical attributes describe the execution 
+    entity and deployment configuration.
+  }
+  
+  ' 知识单元内部关系
+  知识单元管理 "1" o--> "0..1" 知识单元逻辑属性 : 索引/定位逻辑属性
+  知识单元管理 "1" o--> "0..1" 知识单元物理属性 : 部署配置物理属性
+  
+  ' 逻辑属性与物理属性的双向关联
+  知识单元逻辑属性 "1" --> "0..1" 知识单元物理属性 : 驱动执行
+  知识单元物理属性 "1" --> "0..1" 知识单元逻辑属性 : 反馈状态/数据
+}
+
+' ==============================================
+' 目标对象（单独放在外面，不属于任何包）
+' ==============================================
+class 目标对象 <<TargetObject>> {
+  <b>目标对象</b>
+  ---
+  • 目标对象标识 (TargetObjectId): String
+  • 目标对象名称 (TargetObjectName): String
+  • 目标对象类型 (TargetObjectType): String
+  • 目标对象描述 (TargetObjectDescription): String
+  • 目标对象边界 (TargetObjectBoundary): String
+  • 接口定义 (interfaceDefinition): String
+  • 依赖关系 (dependencies): String
+  ---
+  <i>定义：</i>
+  Target object is the subject of concern.
+}
+
+' ==============================================
+' II. 认知属性包
+' ==============================================
+package "II. 认知属性包\n(Cognitive Attributes)" <<Rectangle>> #E8F5E9 {
+  
+  class 利益相关者 <<Stakeholder>> {
+    <b>利益相关者</b>
+    ---
+    • 利益相关者标识 (stakeholderId): String
+    • 名称 (name): String
+    • 角色 (role): String
+    • 组织 (organization): String
+    • 利益诉求 (interest): String
+    • 责任域 (responsibilityDomain): String
+    ---
+    <i>定义：</i>
+    Stakeholder is a role, position, individual, organization, 
+    having an interest in an entity.
+  }
+  
+  class 关注点 <<Concern>> {
+    <b>关注点</b>
+    ---
+    • 关注点标识 (concernId): String
+    • 名称 (name): String
+    • 类型 (type): String
+    • 描述 (description): String
+    • 问题列表 (problems): String
+    ---
+    <i>定义：</i>
+    Concern is a matter of importance to a stakeholder.
+  }
+  
+  class 视角 <<Viewpoint>> {
+    <b>视角</b>
+    ---
+    • 视角标识 (viewpointId): String
+    • 名称 (name): String
+    • 抽象层级 (abstractionLevel): Integer
+    • 建模思路 (modeling): String
+    • 视角描述 (description): String
+    • 目标 (objective): String
+    ---
+    <i>定义：</i>
+    Viewpoint is a way of seeing the world, framing concerns.
+  }
+  
+  class 视图 <<View>> {
+    <b>视图</b>
+    ---
+    • 视图标识 (viewId): String
+    • 名称 (name): String
+    • 生成时间 (timestamp): DateTime
+    • 版本 (version): String
+    • 视图描述 (description): String
+    ---
+    <i>定义：</i>
+    View is a representation of the system addressing selected concerns.
+  }
+  
+  class 方面 <<Aspect>> {
+    <b>方面</b>
+    ---
+    • 方面标识 (aspectId): String
+    • 名称 (name): String
+    • 类型 (type): String
+    • 描述 (description): String
+    • 特性集 (features): String
+    ---
+    <i>定义：</i>
+    Aspect is part of the character or nature of an entity.
+  }
+  
+  class 维度 <<Dimension>> {
+    <b>维度</b>
+    ---
+    • 维度标识 (dimensionId): String
+    • 维度名称 (dimensionName): String
+    • 维度类型 (dimensionType): String //时间、空间、抽象、新增（视角+方面）
+    • 维度描述 (dimensionDescription): String
+    ---
+    <i>定义：</i>
+    Dimension is an attribute that characterizes knowledge units.
+  }
+  
+  class 刻度 <<Scale>> {
+    <b>刻度</b>
+    ---
+    • 刻度标识 (scaleId): String
+    • 刻度名称 (scaleName): String
+    • 刻度类型 (scaleType): String
+    • 刻度值 (scaleValue): String
+    • 刻度描述 (scaleDescription): String
+    ---
+    <i>定义：</i>
+    Scale is a set of values assigned to a dimension.
+  }
+  
+  class 知识空间 <<KnowledgeSpace>> {
+    <b>知识空间</b>
+    ---
+    • 空间标识 (spaceId): String
+    • 空间名称 (spaceName): String
+    • 空间类型 (spaceType): String
+    • 空间描述 (spaceDescription): String
+    ---
+    <i>定义：</i>
+    Knowledge space is the contextual boundary for knowledge units.
+  }
+  
+  ' 认知属性包内部关系（基于ISO 42010）
+  关注点 "1" --> "0..*" 利益相关者 : is a matter of importance to
+  利益相关者 "1" --> "1..*" 视角 : see things from
+  视角 "1" --> "0..*" 关注点 : frames
+  视角 "1" --> "0..*" 视图 : governs
+  视图 "1" --> "0..*" 关注点 : addresses
+  方面 "1" --> "0..*" 视图 : is evidenced in
+  
+  ' 视角/方面与维度的关系
+  视角 "1" --> "1..*" 维度 : 形成
+  方面 "1" --> "1..*" 维度 : 形成
+  
+  ' 维度与刻度的关系
+  维度 "1" --> "1..*" 刻度 : 包含
+  
+  ' 知识空间与维度的关系
+  知识空间 "1" --> "0..*" 维度 : 引用维度
+  知识空间 "1" --> "0..*" 刻度 : 指定刻度
+}
+
+' ==============================================
+' III. 问题-方案属性包
+' ==============================================
+package "III. 问题-方案属性包\n(Problem-Solution)" <<Rectangle>> #FCE4EC {
+  
+  class 问题 <<Problem>> {
+    <b>问题</b>
+    ---
+    + 问题标识 (ProblemId): String //问题的唯一标识符，用于区分不同问题
+    • 问题名称 (ProblemName): String //问题的名称
+    • 问题描述 (ProblemDescription): String // 对问题的描述，帮助理解问题。
+    • 坐标系 (Coordinates): Map<DimensionID.ScaleID> // 与知识空间对应的的维度与刻度
+    • 目标对象 (TargetObject): TargetObject // 问题的对象
+    • 问题目标 (ProblemGoal): String // 问题解决的最终目标，明确描述需要达成的结果或状态
+    • 约束条件 (Constraints): String // 问题所需遵守的约束规则。
+    • 干系人 (Stakeholder): Stakeholder // 主体干系人
+    • 关注点（Concern）：Concern // 问题的关注点
+    • 问题类型 (ProblemType): problemType // 问题类型（基于5W1H扩展的问题分类）
+    • 子问题(ChildernProblem) : Problem[] // 该问题拆解出来的子问题，形同Problem本体
+    ---
+    <i>定义：</i>
+    Problem is a gap between current and desired state.
+  }
+  
+  class 方案 <<Solution>> {
+    <b>方案</b>
+    ---
+    • 方案标识 (solutionId): String
+    • 方案名称 (solutionName): String
+    • 方案描述 (solutionDescription): String
+    • 方案类别(SolutionCategory): SolutionCategory
+    • 解决方案目标(SolutionGoal): String
+    • 输入(Input)：String
+    • 输出(Output)：String
+    • 约束(Constraint)：String
+    • 资源需求 (resourceRequirements): KnowledgeResource //实现该解决方案所需要的资源集，包括知识资源、组件资源等
+    • 覆盖的维度 (coverDimensions): Map<DimensionID.ScaleID> //该解决方案所覆盖的维度与刻度
+    • 方案模板 (SolutionTemple): ActivityDiagram //方案模板是一个活动流程，包括方案步骤以及控制逻辑，方案步骤与Solution本体同形
+    • 验证规则 (valaditionRule): String //该解决方案成功解决该问题的验证规则
+    ---
+    <i>定义：</i>
+    Solution is a strategy, algorithm, or process to address a problem.
+  }
+  
+  ' 问题-方案内部关系
+  问题 "1" --> "0..*" 方案 : 需要方案
+}
+
+' ==============================================
+' IV. 跨包关系
+' ==============================================
+
+' 目标对象与利益相关者、方面的关系
+利益相关者 "1" --> "0..*" 目标对象 : has an interest in
+目标对象 "1" --> "0..*" 方面 : is part of the character or nature of
+
+' 利益相关者提出问题
+利益相关者 "1" --> "0..*" 问题 : 提出问题
+
+' 关注点关联问题
+关注点 "1" --> "0..*" 问题 : 关联问题
+
+' 视角关联方案
+视角 "1" --> "0..*" 方案 : 关联方案
+
+' 方案在视图中呈现
+方案 "1" --> "0..*" 视图 : 在视图中呈现
+
+' 知识单元作为方案所需资源
+方案 "1" --> "0..*" 知识单元管理 : 需要资源
+
+' 知识单元存放在知识空间
+知识单元管理 "0..*" --> "1" 知识空间 : 存放在
+
+' ==============================================
+' V. 说明
+' ==============================================
+
+note top of 知识单元管理
+  <b>知识单元三层架构 v4.0：</b>
+  
+  ┌─────────────────────────────┐
+  │     资源基类（Resource）      │
+  │  基础属性                   │
+  │  id、类型、版本、状态、权限   │
+  └─────────────────────────────┘
+              ↑
+         继承
+              │
+  ┌─────────────────────────────┐
+  │  知识单元管理（继承自资源）    │
+  │  元数据管理                  │
+  │  名称、创建者、审核信息       │
+  └─────────────────────────────┘
+              │
+    ┌─────────┴─────────┐
+    ↓                   ↓
+┌────────────────┐  ┌────────────────┐
+│ 知识单元逻辑属性 │  │ 知识单元物理属性 │
+│  内容和结构     │  │  部署和执行     │
+│  可索引定位     │  │  可部署配置     │
+└────────────────┘  └────────────────┘
+end note
+
+note as N1
+  <b>认知建模关系（基于ISO 42010）：</b>
+  
+  关注点 ←is a matter of importance to← 利益相关者
+       ↑                                ↑
+  addresses│frames                  see things from│
+       ↑                                ↓
+  视图 ←governs← 视角
+  
+  方面 →is evidenced in→ 视图
+  视角/方面 →形成→ 维度 →包含→ 刻度
+  知识空间 →引用维度/指定刻度
+end note
+
+note as N2
+  <b>版本状态流转：</b>
+  
+  [草稿] → [待审核] → [已发布]
+     ↑                      ↓
+     └────── [已废弃] ←────┘
+                  ↓
+             [已归档]
+end note
+
+note as N3
+  <b>问题-方案关系：</b>
+  
+  利益相关者 → 提出问题 → 问题
+       ↓                    ↓
+  关联问题              需要方案
+       ↓                    ↓
+  关注点 ←─────── 方案
+                        ↓
+              在视图中呈现 → 视图
+              ←governs← 视角
+end note
+
+note as N4
+  <b>维度形成机制：</b>
+  
+  维度由方面和视角形成：
+  • 方面形成维度：方面组织特性，特性构成维度
+  • 视角形成维度：视角定义分析角度，角度构成维度
+end note
+
+维度 .. N4
+
+enum ProblemType {
+  DESCRIPTIVE  // 描述性：What? 发生了什么/现状是什么
+  Quantitative // 量化型：How much / How many?
+  DIAGNOSTIC  // 诊断性：Why? 为什么会发生
+  PREDICTIVE  // 预测性：What if/Future? 如果…会怎样/未来会怎样
+  PRESCRIPTIVE  // 处方性：How? 应该如何做
+  EXPLANATORY  // 解释性：So what? 这意味着什么/影响是什么
+  NORMATIVE  // 规范性：Should? 是否达标/应该是什么样
+  EXPLORATORY  // 探索性：What else? 还有什么可能性
+  RETROSPECTIVE  // 溯源性：When? 何时开始/结束/关键节点
+  ATTRIBUTIONAL  // 分配性：Who/Where? 归因于谁/哪里
+  Comparative  // 比较性：Which/Compare? 对比/哪个更好/排名
+}
+
+enum SolutionCategory {
+  DataAnalysis //数据分析型解决方案
+  Classification //分类型解决方案
+  Assessment //评估型解决方案
+  Diagnosis //诊断型解决方案
+  Monitoring //监测型解决方案
+  ConfigurationDesign //配置设计型解决方案
+  Assignment //分配型解决方案
+  Planning //规划型解决方案
+  Scheduling //调度型解决方案
+}
+
+@enduml

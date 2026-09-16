@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import logging
@@ -7,6 +8,45 @@ from algorithm.ans.QA.prompt_list import entity_ranking_prompt
 
 
 LOGGER = logging.getLogger(__name__)
+
+# ── Term 语义向量索引（懒加载，可整体关闭） ──
+_term_index = None
+_term_index_tried = False
+
+
+def load_term_vector_index():
+    """加载 Term 向量索引；未配置 TERM_VECTOR_INDEX 或加载失败返回 None。"""
+    global _term_index, _term_index_tried
+    if _term_index_tried:
+        return _term_index
+    _term_index_tried = True
+    path = os.getenv("TERM_VECTOR_INDEX", "").strip()
+    if not path:
+        return None
+    try:
+        from algorithm.term_vector.index import TermVectorIndex
+
+        _term_index = TermVectorIndex.from_json(path)
+        LOGGER.info("已加载 Term 向量索引：%s（%d 条，dim=%d）",
+                    path, len(_term_index.records), _term_index.vectors.shape[1])
+    except Exception as exc:
+        LOGGER.warning("Term 向量索引加载失败，跳过向量召回：%s", exc)
+        _term_index = None
+    return _term_index
+
+
+_DECOMPOSE_PROMPT = """请把用户问题改写/拆分成一个或多个“自洽、可直接用于语义检索”的简单子问题。
+
+要求：
+1. 每个子问题尽量只针对用户问题中明确出现的一个对象/实体/指标，或一个分析意图；
+2. 只按问题里已有的内容拆分或改写，禁止补充问题外的实体、规则或背景；
+3. 保持完整名词短语，不要裁短、去掉修饰词或把短语拆碎；
+4. 问题只有一个目标时，就返回一个改写后的问题（可基本保留原句）。
+
+用户问题：{question}
+
+只输出 JSON：{{"questions": ["子问题1", "子问题2", ...]}}
+不要输出解释和 Markdown。"""
 
 
 class EntityLinker:
@@ -43,7 +83,7 @@ class EntityLinker:
 
     def _build_entity_recognition_prompt(self, question: str) -> str:
         """构建实体识别提示词"""
-        return """你是知识图谱检索的查询词提取器。请只提取问题文本中明确出现、适合用于图谱实体链接的名词短语。
+        return """你是知识图谱检索的查询词提取器。请只提取问题文本中明确出现、适合用于图谱实体链接的名词短语。保持短语完整（含其限定修饰），不要拆成更短的子串、不要去掉修饰词；宁可提取较完整的名词短语。
 
 问题："{question}"
 
@@ -357,19 +397,36 @@ class EntityLinker:
         except Exception:
             return None
 
-    def search_entities_with_full_info(self, keyword: str, limit: int = 10) -> List[Dict]:
+    def search_entities_with_full_info(
+        self, keyword: str, limit: int = 10, space_id: str = None
+    ) -> List[Dict]:
+        """实体对齐搜索：在 KnowledgeUnit 中按 name 匹配（CONTAINS），精确命中优先。
+
+        命中 name 与关键词完全相同的候选标记 exact_match=True 并置顶，
+        避免后续 LLM 统一打分时被向量候选挤低。
+
+        ``space_id`` 给出时，术语范围由该知识空间圈定（CONTAINS_UNIT 一跳），
+        不再依赖 ``resource_type`` 里写死的 'Term' 标识——术语属性改名或换场景
+        时，只要调用方指明空间就仍能取到术语节点。未给出时保持原有 Term 过滤。
         """
-        实体对齐搜索：在 KnowledgeUnit 中按 name 模糊匹配（CONTAINS 已包含精确匹配），
-        精确匹配项通过 ORDER BY 排在最前面。
-        """
-        rows = self.km_client.execute_cypher(
-            "MATCH (n:KnowledgeUnit) "
-            "WHERE n.resource_type CONTAINS $term_type AND n.name CONTAINS $keyword "
-            "RETURN n.id AS id, n.name AS name, n.content AS content "
-            "ORDER BY n.name "
-            "LIMIT $limit",
-            {"term_type": "Term", "keyword": keyword, "limit": limit},
-        )
+        if space_id:
+            statement = (
+                "MATCH (sp:KnowledgeSpace {id:$space_id})-[:CONTAINS_UNIT]->(n:KnowledgeUnit) "
+                "WHERE n.name CONTAINS $keyword "
+                "RETURN n.id AS id, n.name AS name, n.content AS content "
+                "LIMIT $limit"
+            )
+            parameters = {"space_id": space_id, "keyword": keyword, "limit": limit}
+        else:
+            statement = (
+                "MATCH (n:KnowledgeUnit) "
+                "WHERE n.resource_type CONTAINS $term_type AND n.name CONTAINS $keyword "
+                "RETURN n.id AS id, n.name AS name, n.content AS content "
+                "LIMIT $limit"
+            )
+            parameters = {"term_type": "Term", "keyword": keyword, "limit": limit}
+        rows = self.km_client.execute_cypher(statement, parameters)
+        keyword_norm = (keyword or "").strip()
         matches = []
         seen_ids = set()
         for row in rows:
@@ -377,9 +434,10 @@ class EntityLinker:
             if not qid or qid in seen_ids:
                 continue
             seen_ids.add(qid)
+            name = row.get("name", "") or ""
             node_data = {
                 "id": qid,
-                "name": row.get("name", "") or "",
+                "name": name,
                 "content": row.get("content", "") or "",
             }
             mprops = {k: v for k, v in node_data.items()
@@ -390,19 +448,27 @@ class EntityLinker:
                 "labels": ["KnowledgeUnit"],
                 "matched_properties": mprops,
                 "matched_keyword": keyword,
+                "exact_match": bool(keyword_norm) and name.strip() == keyword_norm,
             })
+        # 精确命中置顶（名称相同优先）
+        matches.sort(key=lambda m: (not m.get("exact_match"), m.get("properties", {}).get("name") or ""))
         return matches[:limit]
 
     def get_node_full_info(self, qid: str) -> Dict:
         """根据 QID（KnowledgeUnit 的 UUID）获取节点的完整信息。
 
-        完整信息 = 节点自身字段 + 关联的 KnowledgeProperty 逻辑属性节点。
+        完整信息 = 节点自身字段 + 关联的 KnowledgeProperty 逻辑属性。
+        逻辑属性直接 RETURN p 并把网关返回的行原样透传给大模型——
+        网关会把节点展开成 "p.属性" 的扁平标量列，任何提取/解析都会丢数据；
+        这里只剥掉列名上的别名前缀 "p."，值原样保留。
         """
         rows = self.km_client.execute_cypher(
             "MATCH (n:KnowledgeUnit {id:$id}) "
             "RETURN n.id AS id, n.name AS name, n.content AS content, "
-            "       n.content_type AS content_type, n.knowledge_status AS knowledge_status, "
-            "       n.logical_properties_json AS logical_properties_json "
+            "n.content_type AS content_type, n.knowledge_status AS knowledge_status, "
+            "n.resource_type AS resource_type, "
+            "n.logical_properties_json AS logical_properties_json, "
+            "labels(n) AS labels "
             "LIMIT 1",
             {"id": qid},
         )
@@ -410,18 +476,31 @@ class EntityLinker:
             return None
         row = rows[0]
         props = {k: v for k, v in row.items() if v is not None}
+
         prop_rows = self.km_client.execute_cypher(
             "MATCH (n:KnowledgeUnit {id:$id})-[:HAS_LOGICAL_PROPERTY]->(p:KnowledgeProperty) "
-            "RETURN p.id AS id, p.name AS name, p.property_type AS property_type, "
-            "       p.properties_json AS properties_json "
+            "RETURN p "
             "LIMIT 50",
             {"id": qid},
         )
-        props["logical_properties"] = prop_rows
+        cleaned_props: List[Dict[str, Any]] = []
+        for row in prop_rows:
+            entry: Dict[str, Any] = {}
+            for k, v in row.items():
+                key = k.split(".", 1)[1] if isinstance(k, str) and "." in k else k
+                if key == "properties_json":
+                    continue  # 原始 JSON 不对外暴露，只保留 id/name/property_type
+                entry[key] = v
+            cleaned_props.append(entry)
+        props["logical_properties"] = cleaned_props
+
+        node_labels = row.get("labels")
+        if not isinstance(node_labels, list):
+            node_labels = []
         return {
             "qid": qid,
-            "name": row.get("name", ""),
-            "labels": ["KnowledgeUnit"],
+            "name": props.get("name", ""),
+            "labels": node_labels or ["KnowledgeUnit"],
             "properties": props,
         }
 
@@ -508,20 +587,202 @@ class EntityLinker:
         # 解析失败，返回默认分数
         return [{**cand, "relevance_score": 0.5, "is_relevant": False, "reason": "解析失败，默认分数"} for cand in candidates]
 
-    def link_entities_with_llm_judge(self, question: str, keywords: list = None) -> Dict[str, Any]:
+    def _backfill_candidate_attributes(self, candidates: List[Dict]) -> None:
+        """按 qid 从 TermVectorIndex 回填 definition/synonyms/enriched_text。
+
+        字面(CONTAINS)召回的候选只带节点字段（name/content），而 Term 的真属性
+        （TermDefinition/Synonyms）在 KnowledgeProperty 里、build 时已解析进索引。
+        这里让所有候选都拿到『真属性』，保证进 LLM 重排时信息一致。
+        索引未加载时静默跳过，不影响原行为。
+        """
+        index = load_term_vector_index()
+        if index is None:
+            return
+        by_id: Dict[str, Dict] = {}
+        for record in index.records:
+            key = record.get("term_id") or record.get("id")
+            if key:
+                by_id[str(key)] = record
+        for candidate in candidates:
+            record = by_id.get(str(candidate.get("qid") or ""))
+            if not record:
+                continue
+            props = candidate.setdefault("properties", {})
+            if not props.get("definition") and record.get("definition"):
+                props["definition"] = record["definition"]
+            if not props.get("synonyms") and record.get("synonyms"):
+                props["synonyms"] = record["synonyms"]
+            if not props.get("content") and record.get("definition"):
+                props["content"] = record["definition"]
+            if record.get("enriched_text") and not props.get("enriched_text"):
+                props["enriched_text"] = record["enriched_text"]
+
+    @staticmethod
+    def _append_candidates(all_candidates: List[Dict], seen_qids: set, candidates: List[Dict]) -> None:
+        for cand in candidates:
+            qid = cand.get("qid")
+            if qid and qid not in seen_qids:
+                all_candidates.append(cand)
+                seen_qids.add(qid)
+
+    def search_entities_by_vector(self, keyword: str, top_k: int = 5, min_score: float = 0.0) -> List[Dict]:
+        """Term 向量语义召回（兜底）：embedding 查询短语 → 进程内余弦 top-K。
+
+        返回与 search_entities_with_full_info 同构的候选，仅用于扩宽候选池；
+        最终仍由 LLM 重排把关。索引未配置/加载失败时返回空列表，不影响原链路。
+        """
+        index = load_term_vector_index()
+        if index is None:
+            return []
+        try:
+            # 与后端 embedding 同源：自动按 env 选择本地模型或 remote 回退
+            from algorithm.NL_to_cypher.vector import batch_text_to_vectors
+
+            query_vector = batch_text_to_vectors([keyword])[0]
+        except Exception as exc:
+            LOGGER.debug("向量召回 embedding 失败，跳过（keyword=%s）：%s", keyword, exc)
+            return []
+
+        try:
+            hits = index.search(query_vector, top_k=max(top_k, 0), min_score=min_score)
+        except Exception as exc:
+            LOGGER.debug("向量召回检索失败（keyword=%s）：%s", keyword, exc)
+            return []
+
+        candidates: List[Dict] = []
+        for hit in hits:
+            qid = hit.get("term_id") or hit.get("id")
+            if not qid:
+                continue
+            name = str(hit.get("name") or "")
+            definition = str(hit.get("definition") or "")
+            content = str(hit.get("content") or "") or definition
+            props: Dict[str, Any] = {"id": qid, "name": name, "content": content}
+            if definition:
+                props["definition"] = definition
+            if hit.get("synonyms"):
+                props["synonyms"] = hit["synonyms"]
+            candidates.append({
+                "qid": qid,
+                "properties": props,
+                "labels": ["KnowledgeUnit"],
+                "matched_properties": {"name": name},
+                "matched_keyword": keyword,
+                "vector_score": hit.get("score", 0.0),
+            })
+        return candidates
+
+    # ==================== 整句向量召回：LLM 拆分子问题 ====================
+
+    def _decompose_question(self, question: str) -> List[str]:
+        """把复合问题拆成自洽的简单子问题（每句针对一个对象/意图），用于整句向量召回。
+
+        只按问题里已有的对象/意图切分与改写，禁止补充问题外实体；保持完整名词短语。
+        失败或无需拆分时回退为 [原问题]。
+        """
+        q = (question or "").strip()
+        if not q:
+            return []
+        cache_key = f"dq_{q}"
+        if cache_key in self.llm_cache:
+            return self.llm_cache[cache_key]
+
+        subs: List[str] = []
+        try:
+            response = run_llm(_DECOMPOSE_PROMPT.format(question=q), 0.2, 600,
+                               self.args.GRAPH_LLM_API_KEY, self.args.GRAPH_LLM_MODEL)
+            parsed = self._parse_question_list(response)
+            for item in parsed:
+                item = (item or "").strip()
+                if item and len(item) >= 2 and item not in subs:
+                    subs.append(item)
+        except Exception:
+            subs = []
+
+        if not subs:
+            subs = [q]
+        subs = subs[:8]
+        self.llm_cache[cache_key] = subs
+        return subs
+
+    def _parse_question_list(self, text: str) -> List[str]:
+        """从 LLM 响应提取 questions 数组；失败返回空列表。"""
+        if not text:
+            return []
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        text = re.sub(r"<think>.*", "", text, flags=re.DOTALL).strip()
+        text = re.sub(r"^```(?:json)?\n|```$", "", text).strip()
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            m = re.search(r"\{[\s\S]*\}", text)
+            if not m:
+                return []
+            try:
+                data = json.loads(m.group(0))
+            except json.JSONDecodeError:
+                return []
+        if isinstance(data, dict):
+            questions = data.get("questions") or data.get("sub_questions") or []
+            if isinstance(questions, list):
+                return [str(x) for x in questions]
+        return []
+
+    def _vector_seeds(self, question: str, keywords: list) -> List[str]:
+        """向量召回的查询源：LLM 拆分的整句子问题 + 原问题（去重）。
+
+        没有可拆分的子问题时，至少用原问题整句；连问题都没有时退回关键词。
+        """
+        q = (question or "").strip()
+        if q:
+            subs = self._decompose_question(q)
+            # 能拆成多个自洽子问题时，只对各子问题整句做向量召回（各自独立、语义聚焦）；
+            # 拆不出子问题（单目标）时才用原问题整句作查询源。
+            if len(subs) >= 2:
+                return [s for s in subs if s and s.strip()]
+            return [q]
+        return [k for k in (keywords or []) if k and str(k).strip()]
+
+    def link_entities_with_llm_judge(
+        self, question: str, keywords: list = None, space_id: str = None
+    ) -> Dict[str, Any]:
+        """把问题关键词对齐到图谱实体。
+
+        ``space_id`` 由调用方（Agent 从知识空间定位结果中选出）传入，
+        用于圈定术语范围；不给则退化为按 resource_type 里的 'Term' 过滤。
+        """
         if keywords is None:
             keywords = self.recognize_entities(question)
-        LOGGER.debug("linking %d graph keywords", len(keywords))
+        LOGGER.debug("linking %d graph keywords (space_id=%s)", len(keywords), space_id or "-")
 
         all_candidates = []
         seen_qids = set()
 
+        try:
+            vector_min_score = float(os.getenv("TERM_VECTOR_MIN_SCORE", "0.0"))
+            vector_top_k = int(os.getenv("TERM_VECTOR_TOP_K", "5"))
+        except ValueError:
+            vector_min_score, vector_top_k = 0.0, 5
+
+        # 词面召回：按关键词（name CONTAINS），保持现有逻辑；标记 recall=lexical 供回退优先使用
         for keyword in keywords:
-            candidates = self.search_entities_with_full_info(keyword, limit=5)
+            candidates = self.search_entities_with_full_info(keyword, limit=5, space_id=space_id)
             for cand in candidates:
-                if cand['qid'] not in seen_qids:
-                    all_candidates.append(cand)
-                    seen_qids.add(cand['qid'])
+                cand["recall"] = "lexical"
+            self._append_candidates(all_candidates, seen_qids, candidates)
+
+        # 向量语义召回：查询源 = LLM 拆分的整句子问题（+原问题整句），避免用拆碎的小词做向量匹配；
+        # 只扩宽候选池，最终仍由 LLM 按原问题重排校验。未配置向量索引时跳过，不白做拆分。
+        if load_term_vector_index() is not None:
+            for seed in self._vector_seeds(question, keywords):
+                vector_candidates = self.search_entities_by_vector(seed, top_k=vector_top_k, min_score=vector_min_score)
+                for cand in vector_candidates:
+                    cand["recall"] = "vector"
+                self._append_candidates(all_candidates, seen_qids, vector_candidates)
+
+        # 候选构建完统一回填『真属性』（definition/synonyms/enriched_text），
+        # 确保字面候选与向量候选进 LLM 重排时信息一致。
+        self._backfill_candidate_attributes(all_candidates)
 
         if not all_candidates:
             return {
@@ -533,12 +794,47 @@ class EntityLinker:
         ranked_candidates = self.rank_entities_by_llm(question, all_candidates)
 
         linked_entities = {}
+        degraded = False
+        exact_qids = {c.get('qid') for c in all_candidates if c.get('exact_match')}
+        # 名称精确命中置顶，并在下面保证“必留”，不被 LLM 分数或向量候选挤掉
+        if exact_qids:
+            ranked_candidates.sort(key=lambda c: 0 if c.get('qid') in exact_qids else 1)
         for cand in ranked_candidates:
-            if cand.get('relevance_score', 0) >= 0.7:
+            is_exact = cand.get('qid') in exact_qids
+            if cand.get('relevance_score', 0) >= 0.7 or is_exact:
+                if is_exact:
+                    if cand.get('relevance_score', 0) < 0.7:
+                        cand['relevance_score'] = 0.8
+                    cand['is_relevant'] = True
+                    cand['reason'] = ((cand.get('reason') or '').strip() + '；名称精确命中，强制保留').strip('；')
                 label = cand['properties'].get('name', cand['qid'])
                 linked_entities[cand['qid']] = label
 
+        # LLM 重排无结果（content 为空 / 解析失败等）时回退：
+        # 优先用字符(CONTAINS)命中（recall=lexical）——至少与关键词字面匹配，更可靠；
+        # 仅当没有词面命中时才回退向量分数。两种情况都标记 degraded。
+        if not linked_entities:
+            lexical = [c for c in all_candidates if c.get('recall') == 'lexical']
+            if lexical:
+                lexical.sort(key=lambda c: c.get('name') or '')
+                pool, source = lexical[:5], '词面(CONTAINS)'
+            else:
+                vector = [c for c in all_candidates if c.get('vector_score') is not None]
+                vector.sort(key=lambda c: float(c.get('vector_score', 0.0)), reverse=True)
+                pool, source = vector[:5], '向量分数'
+            if pool:
+                degraded = True
+                ranked_candidates = pool
+                for cand in ranked_candidates:
+                    cand['relevance_score'] = 0.8 if source.startswith('词面') else float(cand.get('vector_score', 0.0))
+                    cand['is_relevant'] = True
+                    cand['reason'] = f'LLM 重排无结果，回退{source}（降级）'
+                    qid = cand.get('qid')
+                    if qid:
+                        linked_entities[qid] = cand['properties'].get('name', qid)
+
         return {
             "linked_entities": linked_entities,
-            "all_candidates": ranked_candidates
+            "all_candidates": ranked_candidates,
+            "degraded": degraded,
         }

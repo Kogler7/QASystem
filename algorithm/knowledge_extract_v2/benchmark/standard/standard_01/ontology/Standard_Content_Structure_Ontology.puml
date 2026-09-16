@@ -7,7 +7,7 @@ hide empty methods
 package "II. 标准内容与结构包" <<Rectangle>> #E8F5E9 {
   ' 本模块可独立抽取目录、层次、条款、术语及表图公式。
   ' Standard 仅作为文档锚点，类型和关系均复用根目录 ontology.puml。
-  class "标准实体" <<Standard>> { - 文件编号 (文件编号)\n- 文件名称 (文件名称) }
+  ' Standard 由 Standard_Metadata_Ontology.puml 唯一定义。
   class "要素" <<ContentElement>> { - 要素状态 (要素状态)\n- 作用范围 (作用范围) }
   class "规范性要素" <<Normative Element>>
   class "资料性要素" <<Informative Element>>

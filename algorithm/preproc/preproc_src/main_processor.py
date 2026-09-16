@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from algorithm.runtime_profile import is_remote_only
+
 
 class DocumentProcessor:
     ENGINE_MATRIX = {
@@ -348,6 +350,32 @@ class DocumentProcessor:
                 "error": "ocr_mode 仅支持 auto、on、off",
                 "file_type": suffix.lstrip("."),
             }
+        if is_remote_only() and suffix not in {".md", ".txt"}:
+            try:
+                from external_services.models import RemoteDocumentParserClient
+
+                result = RemoteDocumentParserClient().parse(
+                    str(path),
+                    engine=model_name,
+                    force=force,
+                    language=lang,
+                    ocr_mode=normalized_ocr_mode,
+                    table_enable=table_enable,
+                    formula_enable=formula_enable,
+                    start_page_id=start_page_id,
+                    end_page_id=end_page_id,
+                )
+                result.setdefault("metadata", {})["engine_selection"] = {
+                    "mode": "remote-only",
+                    "requested_engine": model_name,
+                }
+                return {"success": True, **result}
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "error_code": "REMOTE_DOCUMENT_PARSE_FAILED",
+                    "error": str(exc),
+                }
         process_path = file_path
         process_suffix = suffix
         converted_pdf_path = None

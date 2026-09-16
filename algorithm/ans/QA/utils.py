@@ -30,7 +30,9 @@ def run_llm(
             "role": "system",
             "content": (
                 "你是知识图谱检索辅助模型。只能依据输入中的问题与图谱候选信息判断，"
-                "不得引入外部业务知识。按用户要求的格式直接输出，不输出思考过程。"
+                "不得引入外部业务知识。直接输出最终结果（用户要求的格式，通常是 JSON），"
+                "不要输出任何思考过程、解释、Markdown 或理由性文字。若你具备推理/思考能力，"
+                "也请直接给出最终 JSON，不要先输出思考内容。"
             ),
         },
         {"role": "user", "content": prompt},
@@ -47,9 +49,15 @@ def run_llm(
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
-            content = response.choices[0].message.content
+            message = response.choices[0].message
+            content = getattr(message, "content", None)
             if content and content.strip():
                 return content.strip()
+            # 推理模型（如 Qwen 系列）在 content 为空时，可能把输出放在 reasoning_content。
+            # 兜底读取并交由调用方做 <think> 剥离 + JSON 提取；仍为空才视为失败。
+            reasoning = getattr(message, "reasoning_content", None)
+            if reasoning and reasoning.strip():
+                return reasoning.strip()
             last_error = "empty response"
         except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"

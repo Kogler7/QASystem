@@ -4,15 +4,14 @@ import json
 import os
 import tempfile
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from algorithm.NL_to_cypher.vector import batch_text_to_vectors
-# 临时切换抽取算法：knowledge_extract -> knowledge_extract_v2（official benchmark 评测用）
-from algorithm.knowledge_extract_v2 import deduplicate_chunk_graphs, extract_chunks
+from algorithm.knowledge_extract_v2 import deduplicate_chunk_graphs
 from algorithm.knowledge_extract_v2.config import get_llm_config
-from algorithm.knowledge_pipeline import chunk_document_items, md_to_text, normalize_document_content
+from algorithm.knowledge_pipeline import chunk_document_items, normalize_document_content
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 
 from backend.app.responses import ErrorCode
@@ -24,6 +23,7 @@ from backend.app.schemas import (
     TextChunk,
     TextEmbeddingItem,
 )
+from backend.app.services.knowledge_extract_adapter import extract_chunks
 
 
 class CapabilityError(Exception):
@@ -40,7 +40,6 @@ class GraphExtractionBatch:
     items: list[dict[str, Any]]
     attempts: list[dict[str, Any]]
     scheduler: dict[str, Any]
-    failures: list[dict[str, Any]] = field(default_factory=list)
     graph: dict[str, Any] | None = None
     graphs: list[dict[str, Any]] | None = None
 
@@ -50,7 +49,6 @@ class GraphExtractionBatch:
             data["graph"] = self.graph
         else:
             data["graphs"] = self.graphs or []
-        data["failures"] = self.failures
         return data
 
     def pipeline_data(self) -> dict[str, Any]:
@@ -73,6 +71,20 @@ def _document_error(reason: str) -> ErrorCode:
     return ErrorCode.DOCUMENT_PARSE_FAILED
 
 
+#: Failure codes meaning "the model produced something we could not use".
+#: Knowledge Extract V2 reports these as LLM_SCHEMA_INVALID /
+#: LLM_RESPONSE_INCOMPLETE / LLM_EMPTY_RESPONSE where V1 only had
+#: LLM_JSON_PARSE_FAILED; they all map onto the same client-facing error.
+_UNUSABLE_RESPONSE_CODES = frozenset(
+    {
+        "LLM_JSON_PARSE_FAILED",
+        "LLM_SCHEMA_INVALID",
+        "LLM_RESPONSE_INCOMPLETE",
+        "LLM_EMPTY_RESPONSE",
+    }
+)
+
+
 def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCode:
     if len(failed) < total_count:
         return ErrorCode.PARTIAL_EXTRACTION_FAILED
@@ -86,7 +98,9 @@ def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCo
         return ErrorCode.LLM_TIMEOUT
     if "429" in messages or "rate limit" in messages or "限流" in messages:
         return ErrorCode.LLM_RATE_LIMITED
-    if error_codes == {"LLM_JSON_PARSE_FAILED"}:
+    if error_codes == {"LLM_TIMEOUT"}:
+        return ErrorCode.LLM_TIMEOUT
+    if error_codes and error_codes <= _UNUSABLE_RESPONSE_CODES:
         return ErrorCode.LLM_RESPONSE_INVALID
     if error_codes == {"LLM_REQUEST_FAILED"}:
         return ErrorCode.LLM_REQUEST_FAILED
@@ -238,15 +252,16 @@ class GraphExtractionService:
         items: list[GraphExtractionItem | TextChunk],
         model: str | None = None,
         base_url: str | None = None,
-        document_type: str = "auto",
         merge: bool = True,
     ) -> GraphExtractionBatch:
         results = extract_chunks(
             ontology=ontology,
-            chunks=[md_to_text(item.text) for item in items],
+            # Chunk text is passed through verbatim: Knowledge Extract V2 reads
+            # Markdown structure (numbered headings) to supplement entities, and
+            # md_to_text strips the '#' markers it depends on.
+            chunks=[item.text for item in items],
             model=model,
             base_url=base_url,
-            document_type=document_type,
         )
         for position, (source, result) in enumerate(zip(items, results)):
             result["index"] = position
@@ -254,24 +269,23 @@ class GraphExtractionService:
             ranges = getattr(source, "ranges", None)
             result["ranges"] = list(ranges) if ranges is not None else None
         failed = [item for item in results if item.get("error")]
-        failures = [
-            {
-                "position": item["index"],
-                "error_code": item.get("error_code"),
-                "info": item.get("error"),
-                "attempts": item.get("attempts", []),
-                "raw_response": item.get("raw_response", ""),
-            }
-            for item in failed
-        ]
-        if failed and len(failed) == len(results):
+        if failed:
             raise CapabilityError(
                 _extraction_error(failed, len(results)),
-                "全部文本切片知识抽取失败",
+                "部分文本切片知识抽取失败",
                 "knowledge_extract",
                 {
                     "failed_count": len(failed),
-                    "failed_items": failures,
+                    "failed_items": [
+                        {
+                            "position": item["index"],
+                            "error_code": item.get("error_code"),
+                            "info": item.get("error"),
+                            "attempts": item.get("attempts", []),
+                            "raw_response": item.get("raw_response", ""),
+                        }
+                        for item in failed
+                    ],
                 },
             )
         config = get_llm_config()
@@ -290,17 +304,13 @@ class GraphExtractionService:
                 items=results,
                 attempts=attempts,
                 scheduler=scheduler,
-                failures=failures,
-                graph=deduplicate_chunk_graphs(
-                    [item for item in results if not item.get("error")]
-                ),
+                graph=deduplicate_chunk_graphs(results),
             )
         return GraphExtractionBatch(
             items=results,
             attempts=attempts,
             scheduler=scheduler,
-            failures=failures,
-            graphs=[item["graph"] for item in results if not item.get("error")],
+            graphs=[item["graph"] for item in results],
         )
 
 

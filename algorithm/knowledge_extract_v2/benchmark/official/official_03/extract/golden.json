@@ -19,6 +19,15 @@
         "密级": "",
         "主送": "中国中车股份有限公司各一级子公司，总部各部门",
         "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 99,
+        "end_char": 126,
+        "support": "explicit"
       }
     },
     {
@@ -30,6 +39,15 @@
         "原文位置": "《关于印发《中国中车股份有限公司产品研发管理办法》的通知》正文",
         "原文内容": "《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
         "顺序号": ""
+      },
+      "evidence": {
+        "quote": "中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 154,
+        "end_char": 211,
+        "support": "explicit"
       }
     },
     {
@@ -40,6 +58,15 @@
         "主体类型": "组织",
         "组织层级": "股份公司",
         "职责": "印发《中国中车股份有限公司产品研发管理办法》的通知"
+      },
+      "evidence": {
+        "quote": "印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 101,
+        "end_char": 126,
+        "support": "explicit"
       }
     },
     {
@@ -50,6 +77,15 @@
         "主体类型": "组织",
         "组织层级": "子公司",
         "职责": "贯彻执行产品研发管理办法"
+      },
+      "evidence": {
+        "quote": "中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 13,
+        "line_end": 13,
+        "start_char": 128,
+        "end_char": 151,
+        "support": "explicit"
       }
     },
     {
@@ -60,6 +96,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "阅研产品研发管理办法，结合公司产品研发服务研发数字化建设"
+      },
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -70,6 +115,15 @@
         "主体类型": "部门",
         "组织层级": "部门",
         "职责": "阅研产品研发管理办法，融合中车产品研发管理要求"
+      },
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -80,6 +134,15 @@
         "对象描述": "经股份公司2025年第25次总裁办公会审议通过的产品研发管理制度",
         "对象名称": "中国中车股份有限公司产品研发管理办法",
         "所属领域": "产品研发"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit"
       }
     },
     {
@@ -92,6 +155,15 @@
         "动作词": "贯彻、执行",
         "预期结果": "各单位贯彻执行产品研发管理办法",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit"
       }
     },
     {
@@ -104,6 +176,15 @@
         "动作词": "服务",
         "预期结果": "融合中车产品研发管理要求，服务研发数字化建设",
         "优先级": ""
+      },
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "semantic_alignment"
       }
     },
     {
@@ -112,6 +193,15 @@
       "properties": {
         "交互类型": "通知",
         "交互描述": "中国中车股份有限公司印发《中国中车股份有限公司产品研发管理办法》的通知"
+      },
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit"
       }
     },
     {
@@ -123,6 +213,15 @@
         "约束名称": "贯彻执行要求",
         "约束类型": "流程约束",
         "校验规则": ""
+      },
+      "evidence": {
+        "quote": "《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 153,
+        "end_char": 212,
+        "support": "structural_inference"
       }
     }
   ],
@@ -132,161 +231,368 @@
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 99,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "ISSUED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车股份有限公司"
+      "to_name": "中国中车股份有限公司",
+      "evidence": {
+        "quote": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 99,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "APPLIES_TO",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 99,
+        "end_char": 151,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "CONCERNS_OBJECT",
       "to_type": "OperationalObject",
-      "to_name": "中国中车股份有限公司产品研发管理办法"
+      "to_name": "中国中车股份有限公司产品研发管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行产品研发管理办法"
+      "to_name": "贯彻执行产品研发管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "REQUIRES_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "服务研发数字化建设"
+      "to_name": "服务研发数字化建设",
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OfficialDocument",
       "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
       "rel_type": "HAS_EXCHANGE",
       "to_type": "OperationalExchange",
-      "to_name": "印发产品研发管理办法"
+      "to_name": "印发产品研发管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行产品研发管理办法",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车股份有限公司产品研发管理办法"
+      "to_name": "中国中车股份有限公司产品研发管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行产品研发管理办法",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 97,
+        "end_char": 151,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "贯彻执行产品研发管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 97,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "服务研发数字化建设",
       "rel_type": "ACTS_ON",
       "to_type": "OperationalObject",
-      "to_name": "中国中车股份有限公司产品研发管理办法"
+      "to_name": "中国中车股份有限公司产品研发管理办法",
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "服务研发数字化建设",
       "rel_type": "PERFORMED_BY",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalActivity",
       "from_name": "服务研发数字化建设",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "请技术中心,工业软件事业部阅研,结合公司产品研发,融合中车产品研发管理要求,服务研发数字化建设。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 702,
+        "end_char": 750,
+        "support": "endpoint_context"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "CONSTRAINS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行产品研发管理办法"
+      "to_name": "贯彻执行产品研发管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 97,
+        "end_char": 212,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "CONSTRAINS_AGENT",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 128,
+        "end_char": 212,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalConstraint",
       "from_name": "贯彻执行要求",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 153,
+        "end_char": 212,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "中国中车股份有限公司",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 101,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalAgent",
       "from_name": "各相关单位",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 13,
+        "line_end": 15,
+        "start_char": 128,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalObject",
       "from_name": "中国中车股份有限公司产品研发管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 97,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发产品研发管理办法",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "通知正文"
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 97,
+        "end_char": 211,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发产品研发管理办法",
       "rel_type": "sourceAgent",
       "to_type": "OperationalAgent",
-      "to_name": "中国中车股份有限公司"
+      "to_name": "中国中车股份有限公司",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发产品研发管理办法",
       "rel_type": "targetAgent",
       "to_type": "OperationalAgent",
-      "to_name": "各相关单位"
+      "to_name": "各相关单位",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 13,
+        "start_char": 97,
+        "end_char": 151,
+        "support": "explicit_endpoints"
+      }
     },
     {
       "from_type": "OperationalExchange",
       "from_name": "印发产品研发管理办法",
       "rel_type": "SUPPORTS_ACTIVITY",
       "to_type": "OperationalActivity",
-      "to_name": "贯彻执行产品研发管理办法"
+      "to_name": "贯彻执行产品研发管理办法",
+      "evidence": {
+        "quote": "# 关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "document": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 97,
+        "end_char": 126,
+        "support": "explicit_endpoints"
+      }
     }
   ]
 }

@@ -24,11 +24,17 @@ def _draw(method: str, data: dict[str, Any]) -> dict[str, Any]:
     )
     if queued is not None:
         return queued
-    return invoke_tool(
+    result = invoke_tool(
         lambda: getattr(_executor(), method)(data),
         ToolCode.VISUALIZATION_FAILED,
         "图表生成完成",
     )
+    payload = result.get("data") if isinstance(result, dict) else None
+    if isinstance(payload, dict):
+        # image_base64 体积过大、不适合进入模型上下文；图片文件路径已含在 image_path，
+        # 由展示侧按路径读取。失败分支 data 为 null，不受影响。
+        payload.pop("image_base64", None)
+    return result
 
 
 @mcp.tool(name="draw_bar_chart")

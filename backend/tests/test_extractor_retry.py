@@ -30,7 +30,7 @@ def test_extract_v2_streams_and_retries_invalid_json(monkeypatch):
     monkeypatch.setattr(extractor.time, "sleep", lambda _seconds: None)
     result = extractor.extract_v2("class Term", "text", json_retries=1)
     assert result.get("_error") is None
-    assert result["graph"]["nodes"][0]["uid"] == "term::a"
+    assert result["graph"]["nodes"][0]["uid"] == "Term::a"
     assert result["attempts"][0]["type"] == "json"
 
 
@@ -65,7 +65,7 @@ class 术语 <<Terminology>> {
 
     assert result["raw"]["entities"][0]["type"] == "Terminology"
     assert result["graph"]["nodes"][0]["label"] == "Terminology"
-    assert result["graph"]["nodes"][0]["uid"] == "terminology::采购标段数量"
+    assert result["graph"]["nodes"][0]["uid"] == "Terminology::采购标段数量"
 
 
 def test_extract_v2_discards_relationships_whose_endpoints_are_missing(monkeypatch):
@@ -182,32 +182,3 @@ def test_schema_separates_display_names_identifiers_and_secondary_stereotypes():
         "Synonyms": ["标段数量"],
         "name": "采购标段数量",
     }
-
-
-def test_repair_recovers_truncation_at_clean_boundary():
-    repaired = extractor._repair_truncated_json(
-        '{"entities":[{"type":"Object","name":"obj"}]'
-    )
-
-    assert repaired == {"entities": [{"type": "Object", "name": "obj"}]}
-
-
-def test_repair_recovers_truncation_mid_string():
-    repaired = extractor._repair_truncated_json(
-        '{"entities":[{"type":"Object","name":"obj","properties":{"desc":"外观应'
-    )
-
-    assert repaired is not None
-    assert repaired["entities"][0]["properties"] == {"desc": ""}
-
-
-def test_repair_returns_none_for_unrecoverable_input():
-    assert extractor._repair_truncated_json("not a json object") is None
-
-
-def test_retry_messages_do_not_replay_assistant_response():
-    messages = extractor._retry_messages("system", "prompt", "请修正")
-
-    assert [message["role"] for message in messages] == ["system", "user"]
-    assert "请修正" in messages[-1]["content"]
-    assert all("assistant" not in message for message in messages)

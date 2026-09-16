@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from algorithm.runtime_profile import is_remote_only
 
 MODEL_PATHS = {
     "docling": Path("/models/docling-models"),
@@ -54,6 +55,12 @@ def _url_tcp_check(name: str, value: str, default_port: int) -> dict[str, Any]:
     return _tcp_check(name, parsed.hostname, port)
 
 
+def _required_url_tcp_check(name: str, value: str, default_port: int) -> dict[str, Any]:
+    if not value:
+        return {"ok": False, "reason": "remote-only 模式必须配置外部服务 URL"}
+    return _url_tcp_check(name, value, default_port)
+
+
 def runtime_checks() -> dict[str, Any]:
     checks = {
         "docling_module": {"ok": importlib.util.find_spec("docling") is not None},
@@ -62,8 +69,15 @@ def runtime_checks() -> dict[str, Any]:
         "java": {"ok": shutil.which("java") is not None},
         "ofd_converter": {"ok": Path("/opt/qasystem/ofdrw/ofd-to-pdf.jar").is_file()},
     }
-    checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
-    checks.update({name.lower(): _optional_directory_check(name) for name in OPTIONAL_MODEL_ENV})
+    if is_remote_only():
+        checks = {
+            "local_models": {"ok": True, "skipped": True, "reason": "remote-only 模式不加载本地模型"},
+            "gpu_runtime": {"ok": True, "skipped": True, "reason": "remote-only 模式不启动 GPU 进程"},
+            **checks,
+        }
+    else:
+        checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
+        checks.update({name.lower(): _optional_directory_check(name) for name in OPTIONAL_MODEL_ENV})
     return checks
 
 
@@ -75,7 +89,7 @@ def dependency_checks() -> dict[str, Any]:
         database_port_number = None
     from external_services.application import get_application_service_url
 
-    return {
+    checks = {
         "mysql": _tcp_check("mysql", os.getenv("DATABASE_HOST", "").strip(), database_port_number),
         "knowledge_llm": _url_tcp_check(
             "knowledge_llm", os.getenv("KG_EXTRACT_LLM_BASE_URL", "").strip(), 80
@@ -84,6 +98,14 @@ def dependency_checks() -> dict[str, Any]:
             "application_service", get_application_service_url(), 80
         ),
     }
+    if is_remote_only():
+        checks["document_parse_service"] = _required_url_tcp_check(
+            "document_parse_service", os.getenv("DOCUMENT_PARSE_SERVICE_URL", "").strip(), 80
+        )
+        checks["embedding_service"] = _required_url_tcp_check(
+            "embedding_service", os.getenv("EMBEDDING_SERVICE_URL", "").strip(), 80
+        )
+    return checks
 
 
 def full_health() -> dict[str, Any]:
