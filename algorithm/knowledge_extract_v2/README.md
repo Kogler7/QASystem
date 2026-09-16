@@ -39,16 +39,12 @@ V2 只消费上游已解析、已切分的 `ExtractionChunk`，不接收完整 M
 }
 ```
 
-评测 runner 使用上游 `knowledge_pipeline` 切块，再通过 `extract_harness` 获取内部诊断信息。
 `candidate_generation.py` 与 `prompt_router.py` 共同定义单一基础 chat prompt：所有实体、关系和修复调用都使用共享 system message 与统一 user 模板，领域差异只来自自动路由解析出的 domain extension。
 
-## Benchmark 校验与评测
+## Benchmark 校验
 
 ```bash
 .venv/bin/python -m algorithm.knowledge_extract_v2.benchmark_lint
-.venv/bin/python eval_knowledge_extract_v2_simple.py --local
-.venv/bin/python eval_knowledge_extract_v2_official.py --local
-.venv/bin/python eval_knowledge_extract_v2_standard.py --local
 ```
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。
