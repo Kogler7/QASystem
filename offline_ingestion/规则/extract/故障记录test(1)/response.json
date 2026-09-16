@@ -1,0 +1,113 @@
+{
+  "code": 0,
+  "info": "知识沉淀完成",
+  "data": {
+    "name": "故障记录test(1)",
+    "summary": "未抽取到知识节点",
+    "artifacts": {
+      "markdown": {
+        "id": "file_99ef51ce8bc54523af1c53d873a0ba91",
+        "name": "故障记录test(1).md",
+        "path": "file/default/file_99ef51ce8bc54523af1c53d873a0ba91/故障记录test(1).md",
+        "url": "http://127.0.0.1:19000/knowledge-files/file/default/file_99ef51ce8bc54523af1c53d873a0ba91/%E6%95%85%E9%9A%9C%E8%AE%B0%E5%BD%95test%281%29.md?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20260916%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260916T130027Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=97f3603fad6f360381b8a291b34df7696476615abd97595787f37e53b7e8d807"
+      },
+      "vector_ids": [
+        "9cac0001-ff74-4916-858b-8d1d0c2610de"
+      ]
+    },
+    "ontology": {
+      "received": true,
+      "length": 976,
+      "sha256": "17f9b90c8cfd213e",
+      "classes": [
+        "RuleType"
+      ],
+      "property_count": 7,
+      "parse_error": null,
+      "text": "@startuml rule_ontology\n' ==== 规则 ====\nclass \"规则\" <<RuleType>> {\n  - RuleID (规则ID) //规则的唯一标识符\n  - RuleName (RuleName) //对规则语义的简要描述\n  - RuleTypeBody (RuleTypeBody) //指定规则所属类型，如ConstraintRuleType | ImplicationRuleType | CompositeRuleType\n  - RuleTemplate (RuleTemplate) //规则表达模板说明，规则模版如下：\n  - antecedent (antecedent) //规则成立所依赖的前提条件\n  - connectionSymbol(connectionSymbol) //描述前件与后件之间的语义关系\n  - consequent (consequent) //当前件成立时得到的结果或结论\n}\n' @identity RuleType: RuleID\n\nnote right of 规则\n  类定义：描述当某一故障状态、运行条件、参数异常或事件成立时，将引起另一故障现象、状态变化或结果的条件性知识规则。其基本语义形式为： IF Antecedent THEN Consequent 其中可进一步通过 ConnectionSymbol 表达前件与后件之间的语义关系，例如“导致”“引起”“造成”“触发”等。\n  规则模板示例：\n  - ConstraintRuleType： [对象] 必须或应当 满足 [约束条件]\n  - ConstraintRuleType： [对象] 的 [属性] 应当或必须 为 [允许取值或范围]\n  - ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]\n  - CompositeRuleType： 如果同时满足 [条件1] 和 [条件2]，那么 [综合结论]\n  - CompositeRuleType： 如果满足 [条件1] 或 [条件2]，那么 [综合结论]\n  - CompositeRuleType： 当先发生 [条件1]，并且随后出现 [条件2] 时，那么 [综合结论]\nend note\n@enduml"
+    },
+    "extraction": {
+      "ranges": [
+        [
+          0,
+          2946
+        ]
+      ],
+      "graph": {
+        "nodes": [],
+        "relationships": []
+      }
+    },
+    "stats": {
+      "document": {
+        "file_name": "故障记录test(1).xlsx",
+        "file_size": 10805,
+        "file_type": "xlsx",
+        "content_length": 2946,
+        "parser": {
+          "preferred_engine": "pandas",
+          "final_engine": "pandas"
+        }
+      },
+      "extraction": {
+        "chunks_extracted": 1,
+        "merge": true,
+        "nodes_extracted": 0,
+        "relationships_extracted": 0,
+        "attempts": [],
+        "scheduler": {
+          "max_concurrency": 4,
+          "qps": 0,
+          "qpm": 0
+        }
+      },
+      "chunking": {
+        "chunk_count": 1,
+        "strategy": "recursive",
+        "size": 4000,
+        "separators": null,
+        "threshold": 12000,
+        "vector_storage_enabled": true,
+        "vector_dimension": 512,
+        "vector_source": "text_chunk"
+      },
+      "storage": {
+        "enabled": true,
+        "origin": {
+          "id": "file_99ef51ce8bc54523af1c53d873a0ba91",
+          "name": "故障记录test(1).md",
+          "path": "file/default/file_99ef51ce8bc54523af1c53d873a0ba91/故障记录test(1).md",
+          "url": "http://127.0.0.1:19000/knowledge-files/file/default/file_99ef51ce8bc54523af1c53d873a0ba91/%E6%95%85%E9%9A%9C%E8%AE%B0%E5%BD%95test%281%29.md?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20260916%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260916T130027Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=97f3603fad6f360381b8a291b34df7696476615abd97595787f37e53b7e8d807"
+        },
+        "vectors": {
+          "inserted_count": 1
+        }
+      },
+      "total_time_seconds": 17.138
+    }
+  },
+  "error": null,
+  "execution": {
+    "mode": "inline",
+    "job_id": "d91482866f3b49098f9b7ac76db35a7d",
+    "status": "succeeded",
+    "stage": "completed",
+    "latest_event_id": "d91482866f3b49098f9b7ac76db35a7d:6",
+    "summary": {
+      "total_tasks": 1,
+      "completed_tasks": 1,
+      "failed_tasks": 0,
+      "retry_count": 0,
+      "queue_ms": 0,
+      "execution_ms": 17141,
+      "workers": [
+        "gateway-inline"
+      ],
+      "gpus": [],
+      "status": "succeeded"
+    },
+    "events_url": "/api/v1/jobs/d91482866f3b49098f9b7ac76db35a7d/events",
+    "executions_url": "/api/v1/jobs/d91482866f3b49098f9b7ac76db35a7d/executions",
+    "result_url": "/api/v1/jobs/d91482866f3b49098f9b7ac76db35a7d/result"
+  }
+}

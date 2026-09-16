@@ -1,0 +1,51 @@
+{
+  "backend_url": "http://127.0.0.1:8006",
+  "poll_interval_seconds": 2,
+  "poll_timeout_seconds": 3600,
+  "options": {
+    "parser": {
+      "engine": "auto",
+      "force": false,
+      "page_sharding": "auto",
+      "page_shard_size": 0,
+      "max_page_shards": 16,
+      "mineru_options": {
+        "language": "ch",
+        "ocr_mode": "auto",
+        "table_enable": true,
+        "formula_enable": true
+      },
+      "keep_page_edges": "first_page",
+      "page_edge_min_chars": 3
+    },
+    "chunking": {
+      "strategy": "recursive",
+      "size": 4000,
+      "chunk_overlap": 0,
+      "chunk_threshold": 12000,
+      "similarity": 0.6,
+      "separators": null,
+      "size_unit": "char",
+      "breakpoint_method": "percentile"
+    },
+    "extraction": {
+      "model": null,
+      "merge": true
+    },
+    "storage": {
+      "persist_graph": false,
+      "knowledge_space_id": null
+    }
+  },
+  "groups": {
+    "公文": {
+      "ontology": "公文/ontology"
+    },
+    "标准": {
+      "ontology": "标准/ontology"
+    },
+    "规则": {
+      "ontology": "规则/ontology"
+    }
+  }
+}
