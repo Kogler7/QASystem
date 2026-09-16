@@ -15,6 +15,9 @@ offline_ingestion/
   标准/
     docs/
     ontology/
+  规则/
+    docs/
+    ontology/
 ```
 
 任意含 `docs/` 的子目录视为一组（忽略 `_` / `.` 开头）。本体默认读 `<组>/ontology`；也可用 `params.yaml` 的 `groups.<组名>.ontology` 覆盖。没有本体则跳过该组。
@@ -67,7 +70,9 @@ offline_ingestion/
       "ocr_mode": "auto",
       "table_enable": true,
       "formula_enable": true
-    }
+    },
+    "keep_page_edges": "first_page",
+    "page_edge_min_chars": 3
   },
   "chunking": {
     "strategy": "recursive",
@@ -138,9 +143,9 @@ offline_ingestion/
 
 ```bash
 chmod +x offline_ingestion/run.sh
-# 把原文件放进 公文/docs 或 标准/docs
+# 把原文件放进 公文/docs、标准/docs 或 规则/docs
 ./offline_ingestion/run.sh
-./offline_ingestion/run.sh --groups 公文
+./offline_ingestion/run.sh --groups 规则
 ```
 
 ## 6. 与部署业务仍不一致、需要确认的点

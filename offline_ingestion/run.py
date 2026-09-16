@@ -42,6 +42,8 @@ DEFAULT_PARAMS: dict[str, Any] = {
                 "table_enable": True,
                 "formula_enable": True,
             },
+            "keep_page_edges": "first_page",
+            "page_edge_min_chars": 3,
         },
         "chunking": {
             "strategy": "recursive",
@@ -355,7 +357,9 @@ def ingest_file(
         log(f"{source.name} 已入队 job_id={job_id}")
         return wait_for_job(base_url, job_id, params)
     if not envelope_ok(status_code, payload):
-        raise RuntimeError(payload.get("info") or f"知识沉淀失败 HTTP {status_code}")
+        info = payload.get("info") or f"知识沉淀失败 HTTP {status_code}"
+        details = payload.get("error")
+        raise RuntimeError(json.dumps({"info": info, "error": details}, ensure_ascii=False))
     return payload
 
 
@@ -383,6 +387,9 @@ def dump_response(group_dir: Path, stem: str, envelope: dict[str, Any]) -> dict[
             "chunking": stats.get("chunking"),
         },
     )
+    stale_error = extract_dir / "error.json"
+    if stale_error.exists():
+        stale_error.unlink()
     graph_obj = graph or {}
     return {
         "nodes": len(graph_obj.get("nodes") or []) if isinstance(graph_obj, dict) else 0,
@@ -505,7 +512,22 @@ def main() -> int:
                     record.update(dumped)
                     record["status"] = "succeeded"
             except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-                record["error"] = dump_error(extract_dir, str(exc), error_code="HTTP_ORCHESTRATION_FAILED")
+                message = str(exc)
+                details: Any = None
+                if isinstance(exc, RuntimeError):
+                    try:
+                        parsed = json.loads(message)
+                    except json.JSONDecodeError:
+                        parsed = None
+                    if isinstance(parsed, dict) and "info" in parsed:
+                        message = str(parsed.get("info") or message)
+                        details = parsed.get("error")
+                record["error"] = dump_error(
+                    extract_dir,
+                    message,
+                    error_code="HTTP_ORCHESTRATION_FAILED",
+                    details=details,
+                )
             except Exception as exc:  # noqa: BLE001 - 单文件失败后继续
                 record["error"] = dump_error(extract_dir, str(exc), error_code="ORCHESTRATION_EXCEPTION")
             summary["files"].append(record)

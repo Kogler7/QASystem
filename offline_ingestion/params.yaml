@@ -17,6 +17,8 @@ options:
       ocr_mode: auto
       table_enable: true
       formula_enable: true
+    keep_page_edges: first_page
+    page_edge_min_chars: 3
   chunking:
     strategy: recursive
     size: 4000
@@ -40,3 +42,5 @@ groups:
     ontology: 公文/ontology
   标准:
     ontology: 标准/ontology
+  规则:
+    ontology: 规则/ontology
