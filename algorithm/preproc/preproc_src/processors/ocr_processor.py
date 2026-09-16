@@ -5,6 +5,16 @@ from pathlib import Path
 from typing import List, Optional, Union, Dict, Any
 from loguru import logger
 from . import BaseProcessor
+from ..page_edges import (
+    DEFAULT_MIN_CHARS,
+    extract_edge_lines,
+    lines_from_blocks,
+    merge_page_edges,
+    missing_lines,
+    normalize_keep_page_edges,
+    page_is_kept,
+)
+from ..table_json import convert_tables_to_json
 
 
 class OCRProcessor(BaseProcessor):
@@ -184,7 +194,9 @@ class OCRProcessor(BaseProcessor):
                 dump_orig_pdf=kwargs.get('dump_orig_pdf', False),
                 dump_content_list=kwargs.get('dump_content_list', False),
                 start_page_id=kwargs.get('start_page_id', 0),
-                end_page_id=kwargs.get('end_page_id', None)
+                end_page_id=kwargs.get('end_page_id', None),
+                keep_page_edges=kwargs.get('keep_page_edges'),
+                page_edge_min_chars=kwargs.get('page_edge_min_chars'),
             )
             
             # 读取生成的 Markdown 文件
@@ -248,6 +260,8 @@ class OCRProcessor(BaseProcessor):
         dump_content_list: bool = True,
         start_page_id: int = 0,
         end_page_id: Optional[int] = None,
+        keep_page_edges: Any = None,
+        page_edge_min_chars: Optional[int] = None,
     ) -> List[Path]:
         """
         :param output_dir: 输出根目录，每个文件的解析结果会放在 output_dir/文件名/ 下
@@ -340,7 +354,9 @@ class OCRProcessor(BaseProcessor):
                     f_make_md_mode=self._MakeMode.MM_MD,
                     middle_json=middle_json,
                     model_output=model_list,
-                    is_pipeline=True
+                    is_pipeline=True,
+                    keep_page_edges=keep_page_edges,
+                    page_edge_min_chars=page_edge_min_chars,
                 )
                 logger.success(f"解析完成: {pdf_file_name} -> {local_md_dir}")
 
@@ -386,7 +402,9 @@ class OCRProcessor(BaseProcessor):
                     f_make_md_mode=self._MakeMode.MM_MD,
                     middle_json=middle_json,
                     model_output=infer_result,
-                    is_pipeline=False
+                    is_pipeline=False,
+                    keep_page_edges=keep_page_edges,
+                    page_edge_min_chars=page_edge_min_chars,
                 )
                 logger.success(f"VLM解析完成: {pdf_file_name} -> {local_md_dir}")
 
@@ -412,6 +430,8 @@ class OCRProcessor(BaseProcessor):
         middle_json = kwargs["middle_json"]
         model_output = kwargs.get("model_output")
         is_pipeline = kwargs.get("is_pipeline", True)
+        keep_page_edges = kwargs.get("keep_page_edges")
+        page_edge_min_chars = kwargs.get("page_edge_min_chars")
 
         if f_draw_layout_bbox:
             self._draw_layout_bbox(pdf_info, pdf_bytes, local_md_dir, f"{pdf_file_name}_layout.pdf")
@@ -424,7 +444,27 @@ class OCRProcessor(BaseProcessor):
 
         if f_dump_md:
             make_func = self._pipeline_union_make if is_pipeline else self._vlm_union_make
-            md_content = make_func(pdf_info, f_make_md_mode, image_dir)
+            selection = normalize_keep_page_edges(keep_page_edges)
+            if selection is None:
+                md_content = make_func(pdf_info, f_make_md_mode, image_dir)
+            else:
+                md_content, injected = self._render_markdown_with_page_edges(
+                    pdf_info=pdf_info,
+                    make_func=make_func,
+                    make_mode=f_make_md_mode,
+                    image_dir=image_dir,
+                    pdf_bytes=pdf_bytes,
+                    selection=selection,
+                    min_chars=DEFAULT_MIN_CHARS if page_edge_min_chars is None else int(page_edge_min_chars),
+                )
+                if injected:
+                    logger.info(
+                        "保留页眉/页脚: {} 页补回边缘文本 {}", len(injected), injected
+                    )
+            # MinerU 以 HTML 形式输出表格，统一转成 JSON 代码块后再落盘。
+            md_content, table_count = convert_tables_to_json(md_content)
+            if table_count:
+                logger.info("表格转 JSON: {} 张", table_count)
             md_writer.write_string(f"{pdf_file_name}.md", md_content)
 
         if f_dump_content_list:
@@ -446,3 +486,55 @@ class OCRProcessor(BaseProcessor):
                 f"{pdf_file_name}_model.json",
                 json.dumps(model_output, ensure_ascii=False, indent=4)
             )
+
+    def _render_markdown_with_page_edges(
+        self,
+        *,
+        pdf_info: list,
+        make_func,
+        make_mode: str,
+        image_dir: str,
+        pdf_bytes: bytes,
+        selection: Any,
+        min_chars: int,
+    ) -> tuple[str, list[dict]]:
+        """逐页渲染 Markdown，并为选中的页补回引擎丢弃的页眉/页脚。
+
+        MinerU 的 Markdown 只渲染 ``para_blocks``，版面模型判为 ``abandon`` 的页面边缘
+        内容（``discarded_blocks``）不会出现。这里按页渲染后用 PDF 文本层取回边缘行，
+        并且只补回该页 Markdown 中缺失的行，避免与正文重复。
+        """
+        rendered: list[str] = []
+        injected: list[dict] = []
+        for index, page in enumerate(pdf_info or []):
+            page_markdown = make_func([page], make_mode, image_dir)
+            page_number = int(page.get("page_idx", index) or 0) + 1
+            if page_is_kept(selection, page_number, 1):
+                edges = extract_edge_lines(pdf_bytes, page_number, min_chars=min_chars)
+                if not edges["top"] and not edges["bottom"]:
+                    # 扫描件没有可用文本层，退回引擎自己判定的边缘块。
+                    edges = self._discarded_edge_lines(page, min_chars)
+                top = missing_lines(edges["top"], page_markdown)
+                bottom = missing_lines(edges["bottom"], page_markdown)
+                if top or bottom:
+                    page_markdown = merge_page_edges(page_markdown, top, bottom)
+                    injected.append({"page": page_number, "top": top, "bottom": bottom})
+            rendered.append(page_markdown)
+        content = "\n\n".join(text.strip() for text in rendered if text and text.strip())
+        return (content + "\n", injected) if content else ("", injected)
+
+    @staticmethod
+    def _discarded_edge_lines(page: dict, min_chars: int) -> dict:
+        """扫描件回退：按页面上下半区把 ``discarded_blocks`` 的文本行分成 top/bottom。
+
+        注意 MinerU 的 bbox 以左上角为原点、y 向下增长。
+        """
+        size = page.get("page_size") or []
+        height = float(size[1]) if len(size) == 2 and size[1] else 0.0
+        edges: Dict[str, List[str]] = {"top": [], "bottom": []}
+        for block in page.get("discarded_blocks") or []:
+            bbox = block.get("bbox") or []
+            center = (float(bbox[1]) + float(bbox[3])) / 2 if len(bbox) == 4 else 0.0
+            zone = "bottom" if height and center > height / 2 else "top"
+            edges[zone].extend(lines_from_blocks([block], min_chars))
+        return edges

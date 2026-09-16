@@ -370,7 +370,12 @@ def test_bounded_page_range_accepts_empty_processor_content(tmp_path, monkeypatc
     assert page_shard == {
         "success": True,
         "content": "",
-        "metadata": {"backend": "vlm-http-client", "empty_content": True},
+        "metadata": {
+            "backend": "vlm-http-client",
+            "empty_content": True,
+            # 页眉/页脚保留配置随解析元数据一起返回
+            "keep_page_edges": {"requested": "first_page", "page_edge_min_chars": 3},
+        },
     }
 
 

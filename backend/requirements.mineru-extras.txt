@@ -8,3 +8,7 @@ opencv-python==4.11.0.86
 opencv-python-headless==4.11.0.86
 # MinerU's supported baseline avoids newer Ultralytics' optional Polars runtime.
 ultralytics==8.3.48
+# mineru.model.mfr.unimernet (formula recognition, loaded whenever
+# formula_enable=true) imports ftfy but MinerU does not declare it; without it
+# the pipeline route fails at DocAnalysis init with "No module named 'ftfy'".
+ftfy==6.3.1
