@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-08-19T05:19:32",
+  "base_url": "http://127.0.0.1:8006/api/v1/pipelines/knowledge-ingestion",
+  "endpoint": "/api/v1/pipelines/knowledge-ingestion",
+  "benchmark": "simple",
+  "benchmark_dir": "/home/xmshi/sxm/qasystem/algorithm/knowledge_extract_v2/benchmark/simple",
+  "document_types": [
+    "docx"
+  ],
+  "options": {
+    "parser": {
+      "engine": "mineru",
+      "force": true
+    },
+    "extraction": {
+      "merge": true
+    }
+  },
+  "match_mode": "semantic",
+  "semantic_threshold": 0.8,
+  "case_results": [
+    {
+      "case": "simple",
+      "golden_entities": 27,
+      "predicted_entities": 38,
+      "golden_relations": 3,
+      "predicted_relations": 1,
+      "entity": {
+        "tp": 27.0,
+        "fp": 11.0,
+        "fn": 0.0,
+        "precision": 0.7105263157894737,
+        "recall": 1.0,
+        "f1": 0.8307692307692308
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 1.0,
+        "fn": 3.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 23.0,
+        "fp": 15.0,
+        "fn": 4.0,
+        "precision": 0.6052631578947368,
+        "recall": 0.8518518518518519,
+        "f1": 0.7076923076923076
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 38.0,
+        "fn": 27.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  ],
+  "errors": [],
+  "micro": {
+    "entity": {
+      "tp": 27.0,
+      "fp": 11.0,
+      "fn": 0.0,
+      "precision": 0.7105263157894737,
+      "recall": 1.0,
+      "f1": 0.8307692307692308
+    },
+    "relation": {
+      "tp": 0.0,
+      "fp": 1.0,
+      "fn": 3.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "entity_identity": {
+      "tp": 23.0,
+      "fp": 15.0,
+      "fn": 4.0,
+      "precision": 0.6052631578947368,
+      "recall": 0.8518518518518519,
+      "f1": 0.7076923076923076
+    },
+    "entity_full": {
+      "tp": 0.0,
+      "fp": 38.0,
+      "fn": 27.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  }
+}

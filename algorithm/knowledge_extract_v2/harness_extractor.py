@@ -69,4 +69,57 @@ def extract_harness(
     )
 
 
-__all__ = ["extract_harness"]
+def extract_harness_items(
+    ontology: str,
+    chunks: list[str],
+    *,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    document_type: str = "auto",
+    target_types: list[str] | None = None,
+    validation_mode: str = "strict",
+    use_scheduler: bool = True,
+) -> list[dict[str, Any]]:
+    """Batch-compatible harness entry point.
+
+    The harness returns one document-level extraction item.  This preserves
+    the ``extract_chunks`` item contract while changing the internal
+    algorithm from per-chunk one-shot extraction to harness extraction.
+    ``document_type`` is accepted for call compatibility; routing is resolved
+    automatically from the ontology and chunk text.
+    """
+    del document_type
+    if not chunks:
+        return []
+    extraction_chunks = [
+        ExtractionChunk(chunk_id=f"chunk-{index}", text=text or "")
+        for index, text in enumerate(chunks)
+    ]
+    result = extract_harness(
+        ontology,
+        chunks=extraction_chunks,
+        target_types=target_types,
+        validation_mode=validation_mode,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        use_scheduler=use_scheduler,
+    )
+    return [
+        {
+            "index": 0,
+            "text": "\n".join(chunks),
+            "raw": result.get("raw", {}),
+            "graph": result.get("graph") or {"nodes": [], "relationships": []},
+            "attempts": result.get("attempts", []),
+            "warnings": result.get("warnings", []),
+            "profile": result.get("profile", {}),
+            "error": result.get("_error") or result.get("error"),
+            "error_code": result.get("error_code"),
+            "raw_response": "",
+        }
+    ]
+
+
+__all__ = ["extract_harness", "extract_harness_items"]

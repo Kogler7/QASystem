@@ -1,0 +1,734 @@
+{
+  "generated_at": "2026-08-19T01:06:13",
+  "base_url": "http://127.0.0.1:8006/api/v1/pipelines/knowledge-ingestion",
+  "endpoint": "/api/v1/pipelines/knowledge-ingestion",
+  "benchmark": "official",
+  "benchmark_dir": "/home/xmshi/sxm/qasystem/algorithm/knowledge_extract_v2/benchmark/official",
+  "document_types": [
+    "pdf"
+  ],
+  "options": {
+    "parser": {
+      "engine": "mineru",
+      "force": true
+    },
+    "extraction": {
+      "merge": true
+    }
+  },
+  "match_mode": "semantic",
+  "semantic_threshold": 0.8,
+  "case_results": [
+    {
+      "case": "official_01",
+      "golden_entities": 34,
+      "predicted_entities": 280,
+      "golden_relations": 75,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 16.0,
+        "fp": 264.0,
+        "fn": 18.0,
+        "precision": 0.05714285714285714,
+        "recall": 0.47058823529411764,
+        "f1": 0.1019108280254777
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 75.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 6.0,
+        "fp": 274.0,
+        "fn": 28.0,
+        "precision": 0.02142857142857143,
+        "recall": 0.17647058823529413,
+        "f1": 0.03821656050955414
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 280.0,
+        "fn": 34.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_02",
+      "golden_entities": 23,
+      "predicted_entities": 141,
+      "golden_relations": 50,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 16.0,
+        "fp": 125.0,
+        "fn": 7.0,
+        "precision": 0.11347517730496454,
+        "recall": 0.6956521739130435,
+        "f1": 0.1951219512195122
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 50.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 11.0,
+        "fp": 130.0,
+        "fn": 12.0,
+        "precision": 0.07801418439716312,
+        "recall": 0.4782608695652174,
+        "f1": 0.13414634146341464
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 141.0,
+        "fn": 23.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_03",
+      "golden_entities": 11,
+      "predicted_entities": 37,
+      "golden_relations": 23,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 5.0,
+        "fp": 32.0,
+        "fn": 6.0,
+        "precision": 0.13513513513513514,
+        "recall": 0.45454545454545453,
+        "f1": 0.20833333333333334
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 23.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 4.0,
+        "fp": 33.0,
+        "fn": 7.0,
+        "precision": 0.10810810810810811,
+        "recall": 0.36363636363636365,
+        "f1": 0.16666666666666669
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 37.0,
+        "fn": 11.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_04",
+      "golden_entities": 18,
+      "predicted_entities": 119,
+      "golden_relations": 42,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 10.0,
+        "fp": 109.0,
+        "fn": 8.0,
+        "precision": 0.08403361344537816,
+        "recall": 0.5555555555555556,
+        "f1": 0.14598540145985403
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 42.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 7.0,
+        "fp": 112.0,
+        "fn": 11.0,
+        "precision": 0.058823529411764705,
+        "recall": 0.3888888888888889,
+        "f1": 0.1021897810218978
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 119.0,
+        "fn": 18.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_05",
+      "golden_entities": 9,
+      "predicted_entities": 107,
+      "golden_relations": 23,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 7.0,
+        "fp": 100.0,
+        "fn": 2.0,
+        "precision": 0.06542056074766354,
+        "recall": 0.7777777777777778,
+        "f1": 0.12068965517241378
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 23.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 2.0,
+        "fp": 105.0,
+        "fn": 7.0,
+        "precision": 0.018691588785046728,
+        "recall": 0.2222222222222222,
+        "f1": 0.034482758620689655
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 107.0,
+        "fn": 9.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_06",
+      "golden_entities": 11,
+      "predicted_entities": 110,
+      "golden_relations": 23,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 6.0,
+        "fp": 104.0,
+        "fn": 5.0,
+        "precision": 0.05454545454545454,
+        "recall": 0.5454545454545454,
+        "f1": 0.09917355371900825
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 23.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 4.0,
+        "fp": 106.0,
+        "fn": 7.0,
+        "precision": 0.03636363636363636,
+        "recall": 0.36363636363636365,
+        "f1": 0.06611570247933883
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 110.0,
+        "fn": 11.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_07",
+      "golden_entities": 14,
+      "predicted_entities": 15,
+      "golden_relations": 30,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 8.0,
+        "fp": 7.0,
+        "fn": 6.0,
+        "precision": 0.5333333333333333,
+        "recall": 0.5714285714285714,
+        "f1": 0.5517241379310344
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 30.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 8.0,
+        "fp": 7.0,
+        "fn": 6.0,
+        "precision": 0.5333333333333333,
+        "recall": 0.5714285714285714,
+        "f1": 0.5517241379310344
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 15.0,
+        "fn": 14.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_08",
+      "golden_entities": 15,
+      "predicted_entities": 391,
+      "golden_relations": 36,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 12.0,
+        "fp": 379.0,
+        "fn": 3.0,
+        "precision": 0.030690537084398978,
+        "recall": 0.8,
+        "f1": 0.05911330049261084
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 36.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 8.0,
+        "fp": 383.0,
+        "fn": 7.0,
+        "precision": 0.020460358056265986,
+        "recall": 0.5333333333333333,
+        "f1": 0.0394088669950739
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 391.0,
+        "fn": 15.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_09",
+      "golden_entities": 25,
+      "predicted_entities": 243,
+      "golden_relations": 55,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 21.0,
+        "fp": 222.0,
+        "fn": 4.0,
+        "precision": 0.08641975308641975,
+        "recall": 0.84,
+        "f1": 0.15671641791044774
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 55.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 18.0,
+        "fp": 225.0,
+        "fn": 7.0,
+        "precision": 0.07407407407407407,
+        "recall": 0.72,
+        "f1": 0.13432835820895522
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 243.0,
+        "fn": 25.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_10",
+      "golden_entities": 16,
+      "predicted_entities": 817,
+      "golden_relations": 40,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 10.0,
+        "fp": 807.0,
+        "fn": 6.0,
+        "precision": 0.012239902080783354,
+        "recall": 0.625,
+        "f1": 0.024009603841536616
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 40.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 8.0,
+        "fp": 809.0,
+        "fn": 8.0,
+        "precision": 0.009791921664626682,
+        "recall": 0.5,
+        "f1": 0.019207683073229287
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 817.0,
+        "fn": 16.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_11",
+      "golden_entities": 15,
+      "predicted_entities": 606,
+      "golden_relations": 32,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 9.0,
+        "fp": 597.0,
+        "fn": 6.0,
+        "precision": 0.01485148514851485,
+        "recall": 0.6,
+        "f1": 0.02898550724637681
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 32.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 7.0,
+        "fp": 599.0,
+        "fn": 8.0,
+        "precision": 0.01155115511551155,
+        "recall": 0.4666666666666667,
+        "f1": 0.02254428341384863
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 606.0,
+        "fn": 15.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_12",
+      "golden_entities": 12,
+      "predicted_entities": 520,
+      "golden_relations": 27,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 9.0,
+        "fp": 511.0,
+        "fn": 3.0,
+        "precision": 0.01730769230769231,
+        "recall": 0.75,
+        "f1": 0.03383458646616541
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 27.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 4.0,
+        "fp": 516.0,
+        "fn": 8.0,
+        "precision": 0.007692307692307693,
+        "recall": 0.3333333333333333,
+        "f1": 0.015037593984962405
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 520.0,
+        "fn": 12.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_13",
+      "golden_entities": 19,
+      "predicted_entities": 223,
+      "golden_relations": 44,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 12.0,
+        "fp": 211.0,
+        "fn": 7.0,
+        "precision": 0.053811659192825115,
+        "recall": 0.631578947368421,
+        "f1": 0.09917355371900827
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 44.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 7.0,
+        "fp": 216.0,
+        "fn": 12.0,
+        "precision": 0.03139013452914798,
+        "recall": 0.3684210526315789,
+        "f1": 0.05785123966942149
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 223.0,
+        "fn": 19.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_14",
+      "golden_entities": 16,
+      "predicted_entities": 212,
+      "golden_relations": 36,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 11.0,
+        "fp": 201.0,
+        "fn": 5.0,
+        "precision": 0.05188679245283019,
+        "recall": 0.6875,
+        "f1": 0.09649122807017543
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 36.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 7.0,
+        "fp": 205.0,
+        "fn": 9.0,
+        "precision": 0.0330188679245283,
+        "recall": 0.4375,
+        "f1": 0.06140350877192983
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 212.0,
+        "fn": 16.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_15",
+      "golden_entities": 26,
+      "predicted_entities": 273,
+      "golden_relations": 62,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 18.0,
+        "fp": 255.0,
+        "fn": 8.0,
+        "precision": 0.06593406593406594,
+        "recall": 0.6923076923076923,
+        "f1": 0.12040133779264214
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 62.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 14.0,
+        "fp": 259.0,
+        "fn": 12.0,
+        "precision": 0.05128205128205128,
+        "recall": 0.5384615384615384,
+        "f1": 0.09364548494983277
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 273.0,
+        "fn": 26.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_16",
+      "golden_entities": 18,
+      "predicted_entities": 284,
+      "golden_relations": 47,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 10.0,
+        "fp": 274.0,
+        "fn": 8.0,
+        "precision": 0.035211267605633804,
+        "recall": 0.5555555555555556,
+        "f1": 0.06622516556291391
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 47.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 6.0,
+        "fp": 278.0,
+        "fn": 12.0,
+        "precision": 0.02112676056338028,
+        "recall": 0.3333333333333333,
+        "f1": 0.03973509933774834
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 284.0,
+        "fn": 18.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "case": "official_18",
+      "golden_entities": 9,
+      "predicted_entities": 417,
+      "golden_relations": 23,
+      "predicted_relations": 0,
+      "entity": {
+        "tp": 5.0,
+        "fp": 412.0,
+        "fn": 4.0,
+        "precision": 0.011990407673860911,
+        "recall": 0.5555555555555556,
+        "f1": 0.023474178403755867
+      },
+      "relation": {
+        "tp": 0.0,
+        "fp": 0.0,
+        "fn": 23.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "entity_identity": {
+        "tp": 2.0,
+        "fp": 415.0,
+        "fn": 7.0,
+        "precision": 0.004796163069544364,
+        "recall": 0.2222222222222222,
+        "f1": 0.009389671361502348
+      },
+      "entity_full": {
+        "tp": 0.0,
+        "fp": 417.0,
+        "fn": 9.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  ],
+  "errors": [
+    {
+      "case": "official_17",
+      "error": "ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port=8006): Read timed out. (read timeout=600.0)"
+    },
+    {
+      "case": "official_19",
+      "error": "ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port=8006): Read timed out. (read timeout=600.0)"
+    },
+    {
+      "case": "official_20",
+      "error": "ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port=8006): Read timed out. (read timeout=600.0)"
+    }
+  ],
+  "micro": {
+    "entity": {
+      "tp": 185.0,
+      "fp": 4610.0,
+      "fn": 106.0,
+      "precision": 0.03858185610010428,
+      "recall": 0.6357388316151202,
+      "f1": 0.07274872198191114
+    },
+    "relation": {
+      "tp": 0.0,
+      "fp": 0.0,
+      "fn": 668.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "entity_identity": {
+      "tp": 123.0,
+      "fp": 4672.0,
+      "fn": 168.0,
+      "precision": 0.02565172054223149,
+      "recall": 0.422680412371134,
+      "f1": 0.048368069209594966
+    },
+    "entity_full": {
+      "tp": 0.0,
+      "fp": 4795.0,
+      "fn": 291.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  }
+}
