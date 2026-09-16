@@ -199,7 +199,7 @@ class DocxProcessor(BaseProcessor):
             document = result.document
             pages = sorted(document.pages.keys())
             if not pages:
-                return document.export_to_markdown(), {}
+                return self._export_markdown(result), {}
 
             # 逐页导出：docling 的 page_break_placeholder 不会为空白页插入占位符
             # （标准封面背面、目次背面常见），按占位符切分会导致页号错位。
@@ -210,7 +210,9 @@ class DocxProcessor(BaseProcessor):
             merged_lines = 0
             table_count = 0
             for index, page_no in enumerate(pages):
-                chunk = document.export_to_markdown(page_no=page_no)
+                chunk = document.export_to_markdown(
+                    page_no=page_no, escape_html=False, escape_underscores=False
+                )
                 page_lines = page_text_lines(file_path, page_no)
                 # 先合并被拆开的条款标题，再用文本层逐行对账，最后收拢编号内部空格。
                 chunk, merged = merge_split_headings(chunk, page_lines)
@@ -254,7 +256,7 @@ class DocxProcessor(BaseProcessor):
         """处理DOCX文件"""
         try:
             result = self._get_converter().convert(file_path)
-            return self._tables_to_json(result.document.export_to_markdown())
+            return self._tables_to_json(self._export_markdown(result))
         except Exception as e:
             print(f"使用docling处理DOCX失败: {e}")
             return f"处理失败：{str(e)}"
@@ -263,10 +265,17 @@ class DocxProcessor(BaseProcessor):
         """使用 Docling 原生转换器处理 PPTX 或图片。"""
         try:
             result = self._get_converter().convert(file_path)
-            return self._tables_to_json(result.document.export_to_markdown())
+            return self._tables_to_json(self._export_markdown(result))
         except Exception as e:
             print(f"使用docling处理{label}失败: {e}")
             return f"处理失败：{str(e)}"
+
+    @staticmethod
+    def _export_markdown(result) -> str:
+        # 关闭 docling 的 HTML/下划线转义：本体 DSL 文档里的 <<Sterotype>> 和
+        # DIM_TIME 型标识符会被转成 &lt;&lt;...&gt;&gt; / DIM\_TIME，下游知识抽取
+        # 无法识别；直接上传 .md 的内容本身就是未转义原文，这里保持一致。
+        return result.document.export_to_markdown(escape_html=False, escape_underscores=False)
 
     def _process_ppt(self, file_path: str) -> str:
         """旧版 PPT 先转换为 PPTX，再交给 Docling。"""
