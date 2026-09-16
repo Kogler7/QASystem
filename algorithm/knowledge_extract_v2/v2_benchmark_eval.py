@@ -686,6 +686,7 @@ def _judge_one_batch(
                 run_context={
                     "schema_name": "knowledge_extract_v2_judge",
                     "response_mode": response_mode,
+                    "prefer_chat_json_schema": True,
                 },
             )
             data = _decode_judge_response(response)

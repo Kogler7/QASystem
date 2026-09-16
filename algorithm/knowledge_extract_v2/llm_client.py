@@ -60,6 +60,11 @@ def _is_deepseek_model(model: str) -> bool:
     return model.casefold().startswith("deepseek")
 
 
+def _is_deepseek_v4_flash(model: str) -> bool:
+    """MaaS 上的 deepseek-v4-flash / -0731 在 Responses 路径上输出不稳定。"""
+    return model.casefold().startswith("deepseek-v4-flash")
+
+
 def _unsupported_parameter(exc: Exception) -> bool:
     message = str(exc).casefold()
     parameter = r"(thinking|response_format|json_schema|json_object|responses? API|client\.responses)"
@@ -357,6 +362,27 @@ class OpenAICompatibleLLM:
                 response_mode="json_object",
                 response_format={"type": "json_object"},
             )
+        if _is_deepseek_v4_flash(self.model) and (
+            bool(context.get("record_table"))
+            or bool(context.get("prefer_chat_json_schema"))
+        ):
+            # 该模型在 MaaS 的 Responses 路径上高频返回空数组/截断 JSON；
+            # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
+            try:
+                return self._chat_structured(
+                    messages,
+                    response_mode="json_schema",
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": schema_name or "extraction",
+                            "strict": True,
+                            "schema": schema,
+                        },
+                    },
+                )
+            except Exception:  # noqa: BLE001 - 兼容性回退，继续走原有链路
+                pass
         try:
             return self._responses_structured(messages, response_format=response_format)
         except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
