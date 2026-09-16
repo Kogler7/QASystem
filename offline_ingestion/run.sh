@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+
+KIT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "${KIT_DIR}/run.py" --workspace "${KIT_DIR}" "$@"

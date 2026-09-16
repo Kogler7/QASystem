@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import re
 import sys
 import types
 import unittest
@@ -22,19 +21,29 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
-ONTOLOGIES_DIR = BENCHMARK_DIR / "ontologies"
-CASES_DIR = BENCHMARK_DIR / "cases"
+FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
+ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
+CASES_DIR = FIXTURES_DIR / "cases"
+TESTS_DIR = PACKAGE_DIR / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -63,6 +72,8 @@ MODULES = _load_package_modules(
 GA = MODULES["graph_assembler"]
 GU = MODULES["graph_utils"]
 SE = MODULES["split_extractor"]
+
+from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 OBJECTS = [
@@ -118,7 +129,12 @@ class GraphAssemblerTest(unittest.TestCase):
             relationship["to_uid"],
             GU.entity_uid("SimpleRule", "R-001", None),
         )
-        self.assertEqual(self.assembler.validate(graph), [])
+        # build_graph 产出自洽：所有关系端点都在节点集内
+        node_uids = {node["uid"] for node in graph["nodes"]}
+        self.assertEqual(
+            len(GU.filter_relationships_with_known_nodes(graph["relationships"], node_uids)),
+            len(graph["relationships"]),
+        )
 
     def test_uid_stable_regardless_of_properties(self) -> None:
         objects = [
@@ -137,18 +153,23 @@ class GraphAssemblerTest(unittest.TestCase):
         self.assertEqual(triples[0]["head"], graph["relationships"][0]["from_uid"])
         self.assertEqual(triples[0]["tail"], graph["relationships"][0]["to_uid"])
 
-    def test_validate_detects_dangling_and_duplicate(self) -> None:
-        graph = {
-            "nodes": [
-                {"uid": "u1", "label": "A", "properties": {}},
-                {"uid": "u1", "label": "B", "properties": {}},
-            ],
-            "relationships": [{"from_uid": "u1", "to_uid": "missing", "type": "R"}],
-        }
-        issues = self.assembler.validate(graph)
-        codes = {issue["code"] for issue in issues}
-        self.assertIn("DUPLICATE_NODE_UID", codes)
-        self.assertIn("DANGLING_RELATIONSHIP", codes)
+    def test_dangling_relation_rejected_and_duplicate_uid_merged(self) -> None:
+        # 当前实现不再提供 validate()：悬空关系在 build_graph 时直接拒绝
+        objects = [
+            {"id": "a", "type": "SimpleRule", "identity": "R-001", "properties": {}},
+        ]
+        with self.assertRaises(GA.GraphIntegrityError):
+            self.assembler.build_graph(
+                objects,
+                [{"id": "relation-0", "type": "hasSubRule", "from": "a", "to": "missing"}],
+            )
+        # 同 identity 的对象合并为同一节点（重复 uid 去重）
+        duplicates = [
+            {"id": "a", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "A"}},
+            {"id": "b", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "B"}},
+        ]
+        graph = self.assembler.build_graph(duplicates, [])
+        self.assertEqual(len(graph["nodes"]), 1)
 
     def test_compat_raw_shape(self) -> None:
         raw = self.assembler.compat_raw(OBJECTS, RELATIONS)
@@ -171,55 +192,84 @@ class GraphAssemblerTest(unittest.TestCase):
 class IntegrationTest(unittest.TestCase):
     def test_result_contract_and_graph_consistency(self) -> None:
         case = json.loads((CASES_DIR / "06_composite_rule.json").read_text(encoding="utf-8"))
-        expected = case["expected"]
         ontology = (ONTOLOGIES_DIR / case["ontology_file"]).read_text(encoding="utf-8")
-        canonical = GU.canonical_name
+        text = case["text"]
+        # 新管线为 span-first：实体名 = 原文 mention（gold 中的 CR-001/R-001 等
+        # 编号不在原文中，属性补全也要求标识类属性逐字可定位，因此按 mention 断言）。
+        composite_mention = "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+        member_mentions = ["未经本企业充分论证和安全测试", "未经集团批准"]
+        member_rule_texts = [
+            "未经本企业充分论证和安全测试，不得部署安装各类开源智能体。",
+            "未经集团批准，不得部署安装各类开源智能体。",
+        ]
 
-        def call(prompt: str) -> str:
-            if "实体候选提议" in prompt:
-                payload = {"entities": expected["entities"]}
-            elif "关系候选提议" in prompt:
-                index = {}
-                for match in re.finditer(r"\|\s*`(entity-\d+)`\s*\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|", prompt):
-                    index[(match.group(2), canonical(match.group(3).strip()))] = match.group(1)
-                mapped = []
-                for relation in expected.get("relations", []):
-                    from_id = index.get((relation["from_type"], canonical(relation["from_name"])))
-                    to_id = index.get((relation["to_type"], canonical(relation["to_name"])))
-                    if from_id is None or to_id is None:
-                        continue
-                    mapped.append(
-                        {
-                            "from_id": from_id,
-                            "rel_type": relation["rel_type"],
-                            "to_id": to_id,
-                            "evidence": {"quote": (relation.get("evidence") or {}).get("quote") or ""},
-                        }
-                    )
-                payload = {"relations": mapped}
-            else:
-                raise AssertionError("无法识别的 prompt 段落")
-            return json.dumps(payload, ensure_ascii=False)
+        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
+            return [
+                span_item("CompositeRule", composite_mention),
+                span_item("SimpleRule", member_mentions[0]),
+                span_item("SimpleRule", member_mentions[1]),
+            ]
 
+        def property_handler(prompt: str, chunk: dict) -> dict:
+            updates = []
+            for row in parse_known_entities(prompt):
+                if row["type"] == "CompositeRule":
+                    properties = {"ruleText": composite_mention, "combinationType": "AND"}
+                else:
+                    index = member_mentions.index(row["name"].strip())
+                    properties = {
+                        "ruleText": member_rule_texts[index],
+                        "triggerCondition": member_mentions[index],
+                        "action": "不得部署安装各类开源智能体",
+                    }
+                updates.append(
+                    {
+                        "entity_id": row["id"],
+                        "properties": properties,
+                        "evidence": {"quote": composite_mention},
+                    }
+                )
+            return {"updates": updates}
+
+        def relation_handler(prompt: str, pairs: list[dict], chunk: dict) -> list[dict]:
+            return [
+                {"pair_id": pair["pair_id"], "label": pair["relation_id"], "evidence": {"quote": composite_mention}}
+                for pair in pairs
+                if pair["relation_id"] == "hassubrule"
+            ]
+
+        llm = StubLLM(
+            entity_handler=entity_handler,
+            property_handler=property_handler,
+            relation_handler=relation_handler,
+        )
         result = SE.extract_split(
             ontology,
-            text=case["text"],
-            llm=call,
-            document_type=case.get("document_type", "general"),
-            strategy="generic",
+            chunks=[SE.ExtractionChunk(chunk_id="chunk-0", text=text)],
+            llm=llm,
         )
         # 保留现有 API + 新字段
         for key in ("raw", "graph", "warnings", "attempts", "profile", "error_code"):
             self.assertIn(key, result)
         for key in ("triples", "intermediate_model", "evidence_coverage", "coverage_gaps", "mapping"):
             self.assertIn(key, result)
-        # raw 与 gold 一致
-        gold_entity_keys = {(e["type"], canonical(e["name"])) for e in expected["entities"]}
+        # raw 实体：1 CompositeRule + 2 SimpleRule，均带 hasSubRule
+        canonical = GU.canonical_name
         pred_entity_keys = {(e["type"], canonical(e["name"])) for e in result["raw"]["entities"]}
-        self.assertEqual(pred_entity_keys, gold_entity_keys)
+        self.assertEqual(
+            pred_entity_keys,
+            {
+                ("CompositeRule", canonical(composite_mention)),
+                ("SimpleRule", canonical(member_mentions[0])),
+                ("SimpleRule", canonical(member_mentions[1])),
+            },
+        )
+        pred_relation_keys = {
+            (r["from_type"], r["rel_type"], r["to_type"]) for r in result["raw"]["relations"]
+        }
+        self.assertEqual(pred_relation_keys, {("CompositeRule", "hasSubRule", "SimpleRule")})
+        self.assertEqual(len(result["raw"]["relations"]), 2)
         # graph 校验：无悬空、uid 可复算、triples 一致
-        assembler = GA.GraphAssembler()
-        self.assertEqual(assembler.validate(result["graph"]), [])
         node_uids = {node["uid"] for node in result["graph"]["nodes"]}
         for entity in result["raw"]["entities"]:
             self.assertIn(

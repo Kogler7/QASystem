@@ -2,7 +2,7 @@
 agentcode CLI — 类 Claude Code 的交互式命令行。
 
 用法:
-    agentcode                       交互式 REPL（自动加载 skillsets/ 下所有 skill）
+    agentcode                       交互式 REPL（自动加载 skills/ 下所有 skill）
     agentcode -p "查一下数据库"      单次查询
     agentcode -c /path/to/mcp.json  指定 MCP 配置文件
 """
@@ -390,7 +390,7 @@ def main() -> None:
     else:
         config.tool_policy = ToolPolicy(allow=["*"])
 
-    skill_loader = SkillLoader(skillset_dir=Path(__file__).resolve().parent / "skillsets")
+    skill_loader = SkillLoader()
     config.skills = list(config.skills) + skill_loader.discover_skills()
 
     query = args.prompt or " ".join(args.query) if args.query else ""

@@ -7,6 +7,7 @@ import logging
 import os
 import csv
 from . import BaseProcessor
+from ..table_json import render_json_block, table_from_columns_and_rows
 
 logger = logging.getLogger(__name__)
 
@@ -359,21 +360,20 @@ class ExcelProcessor(BaseProcessor):
         return schemas
 
     def _render_markdown(self, excel_data: Dict[str, Any]) -> str:
-        """把 process_excel 的结构化结果渲染成 Markdown 表格（文档管线按 Markdown 消费 content）。"""
+        """把 process_excel 的结构化结果渲染成 Markdown：每个 sheet 一个小节 + JSON 代码块。
+
+        表格统一用 JSON 表达（列名 + 记录数组），便于下游按字段抽取；
+        只有表格本身变成 JSON，小节标题仍是 Markdown。
+        """
         parts: List[str] = []
         for sheet in excel_data.get('sheets', []):
-            parts.append(f"# {sheet.get('sheet_name', '')}")
+            parts.append(f"## {sheet.get('sheet_name', '')}")
             parts.append("")
-            columns = [str(col) for col in (sheet.get('columns') or [])]
-            if columns:
-                parts.append("| " + " | ".join(columns) + " |")
-                parts.append("| " + " | ".join(["---"] * len(columns)) + " |")
-                for row in sheet.get('data') or []:
-                    cells = [
-                        str(cell).replace("|", "\\|").replace("\n", " ")
-                        for cell in row
-                    ]
-                    parts.append("| " + " | ".join(cells) + " |")
+            table = table_from_columns_and_rows(
+                sheet.get('columns') or [],
+                sheet.get('data') or [],
+            )
+            parts.append(render_json_block(table))
             parts.append("")
         return "\n".join(parts).strip()
 

@@ -24,6 +24,11 @@ class ParserConfig(StrictModel):
     page_shard_size: int = Field(default=0, ge=0, le=256)
     max_page_shards: int = Field(default=16, ge=1, le=32)
     mineru_options: MinerUOptions = Field(default_factory=MinerUOptions)
+    # 保留页眉/页脚：解析器默认把页面上下边缘的文字当版面装饰丢弃，标准封面的
+    # ICS/CCS、发布与实施日期正在其中。first_page 指本次解析范围内的首页。
+    keep_page_edges: Literal["off", "first_page", "all"] | list[int] = "first_page"
+    # 页边文本短于该长度时按水印/标志残片丢弃。
+    page_edge_min_chars: int = Field(default=3, ge=1)
 
     @model_validator(mode="after")
     def validate_force(self):

@@ -154,6 +154,7 @@ gitignore/
 frontend/frontend_venv/
 CURSOR_PROMPT_AGENTLOOP_PYTHON_LIB.md
 .omc/
+work/
 
 # 保存的模型文件
 *.pkl
@@ -169,6 +170,12 @@ CURSOR_PROMPT_AGENTLOOP_PYTHON_LIB.md
 .neo4j/
 .graph_cache/
 
+# 离线解析-切片-抽取工作区生成物（保留 docs/ 与 ontology/）
+offline_ingestion/_runs/
+offline_ingestion/**/parse/
+offline_ingestion/**/chunks/
+offline_ingestion/**/extract/
+
 # wzc
 intent/.env
 intent/embeddings/
@@ -176,6 +183,8 @@ intent/track/
 intent/models/
 intent/results_v3/
 intent/dataset
+test_docs/中车待抽取pdf/
+test_docs/抽取结果md/
 
 algorithm/knowledge_extract_v2/benchmark/
 algorithm/knowledge_extract_v2/tests/

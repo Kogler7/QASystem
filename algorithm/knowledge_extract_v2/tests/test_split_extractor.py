@@ -3,19 +3,21 @@
 运行（无需 openai / pytest）：
     python algorithm/knowledge_extract_v2/tests/test_split_extractor.py
 
-覆盖：
-- §15.1/§15.2 prompt 契约（实体 pass 禁关系、关系 pass 引用目录 id）；
+覆盖（重构后协议）：
+- prompt 契约：实体 pass 只给类型目录、禁关系；关系 pass 为候选 pair 分类；
 - §20 实体解析/去重（跨 chunk 合并属性与证据）；
-- §19 + AC-7 关系校验（端点存在、签名匹配、cardinality、拒绝悬空/越界）；
+- §19 + AC-7 关系校验（CandidatePool/RelationResolver：端点存在、签名匹配、未知类型）；
 - §25/§26/§27 O1/O2 组装与 UID 稳定性；
 - AC-2 范围纪律、失败归因（JSON/请求）、空输入；
-- benchmark gold 冒烟（实体全覆盖、证据 100%）。
+- benchmark gold 冒烟（mention 级实体全覆盖、证据 100%）。
+
+注：重构后实体名 = 原文 mention（span-first），gold 中不在原文的编号类名称
+（CR-001 等）不再可产出，相关断言按 mention 重新基线化。
 """
 from __future__ import annotations
 
 import importlib.util
 import json
-import re
 import sys
 import types
 import unittest
@@ -23,19 +25,29 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
-ONTOLOGIES_DIR = BENCHMARK_DIR / "ontologies"
-CASES_DIR = BENCHMARK_DIR / "cases"
+FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
+ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
+CASES_DIR = FIXTURES_DIR / "cases"
+TESTS_DIR = PACKAGE_DIR / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -55,11 +67,22 @@ MODULES = _load_package_modules(
         "ontology_compiler",
         "chunk_context",
         "evidence",
+        "graph_assembler",
+        "prompt_router",
+        "relation_resolver",
+        "candidate_generation",
         "split_extractor",
     ],
 )
 SE = MODULES["split_extractor"]
 CC = MODULES["chunk_context"]
+GA = MODULES["graph_assembler"]
+GU = MODULES["graph_utils"]
+PR = MODULES["prompt_router"]
+RR = MODULES["relation_resolver"]
+CG = MODULES["candidate_generation"]
+
+from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 RULE_ONTOLOGY = """@startuml rule-ontology
@@ -93,135 +116,112 @@ SimpleRule "1" --> "0..*" Object : constrainsObject
 """
 
 COMPOSITE_TEXT = "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+MEMBER_MENTIONS = ["未经本企业充分论证和安全测试", "未经集团批准"]
+MEMBER_RULE_TEXTS = [
+    "未经本企业充分论证和安全测试，不得部署安装各类开源智能体。",
+    "未经集团批准，不得部署安装各类开源智能体。",
+]
 
 
-class StubLLM:
-    """按 prompt 段落路由到 entity/relation handler 的测试桩。"""
+def composite_entity_handler(prompt: str, chunk: dict) -> list[dict]:
+    return [
+        span_item("CompositeRule", COMPOSITE_TEXT),
+        span_item("SimpleRule", MEMBER_MENTIONS[0]),
+        span_item("SimpleRule", MEMBER_MENTIONS[1]),
+    ]
 
-    def __init__(self, entity_handler=None, relation_handler=None):
-        self.entity_handler = entity_handler or (lambda prompt: {"entities": []})
-        self.relation_handler = relation_handler or (lambda prompt: {"relations": []})
-        self.calls: list[tuple[str, str]] = []
 
-    def __call__(self, prompt: str) -> str:
-        if "实体候选提议" in prompt:
-            payload = self.entity_handler(prompt)
-            self.calls.append(("entity", prompt))
-        elif "关系候选提议" in prompt:
-            payload = self.relation_handler(prompt)
-            self.calls.append(("relation", prompt))
+def composite_property_handler(prompt: str, chunk: dict) -> dict:
+    updates = []
+    for row in parse_known_entities(prompt):
+        if row["type"] == "CompositeRule":
+            properties = {"ruleText": COMPOSITE_TEXT, "combinationType": "AND"}
         else:
-            raise AssertionError("无法识别的 prompt 段落")
-        return json.dumps(payload, ensure_ascii=False)
-
-
-def catalog_ids(prompt: str) -> dict[str, dict[str, str]]:
-    """从关系 pass prompt 的目录表解析 id -> {type, name}。"""
-    entries: dict[str, dict[str, str]] = {}
-    for match in re.finditer(r"\|\s*`(entity-\d+)`\s*\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|", prompt):
-        entries[match.group(1)] = {"type": match.group(2), "name": match.group(3).strip()}
-    return entries
-
-
-def prompt_chunk_text(prompt: str) -> str:
-    """从实体 pass prompt 中提取“当前 chunk”正文，避免局部上下文干扰路由。"""
-    marker = "## 待抽取文本（当前 chunk）"
-    rest = prompt.split(marker, 1)[1]
-    return rest.split("\n## ", 1)[0].strip()
-
-
-def composite_entities() -> dict:
-    return {
-        "entities": [
-            {
-                "type": "CompositeRule",
-                "name": "CR-001",
-                "properties": {
-                    "ruleId": "CR-001",
-                    "ruleText": COMPOSITE_TEXT,
-                    "combinationType": "AND",
-                },
-                "evidence": {"quote": COMPOSITE_TEXT},
-            },
-            {
-                "type": "SimpleRule",
-                "name": "R-001",
-                "properties": {
-                    "ruleId": "R-001",
-                    "ruleText": "未经本企业充分论证和安全测试，不得部署安装各类开源智能体。",
-                    "triggerCondition": "未经本企业充分论证和安全测试",
-                    "action": "不得部署安装各类开源智能体",
-                },
-                "evidence": {"quote": "未经本企业充分论证和安全测试"},
-            },
-            {
-                "type": "SimpleRule",
-                "name": "R-002",
-                "properties": {
-                    "ruleId": "R-002",
-                    "ruleText": "未经集团批准，不得部署安装各类开源智能体。",
-                    "triggerCondition": "未经集团批准",
-                    "action": "不得部署安装各类开源智能体",
-                },
-                "evidence": {"quote": "未经集团批准"},
-            },
-        ],
-        "relations": [],
-    }
-
-
-def composite_relations(prompt: str) -> dict:
-    entries = catalog_ids(prompt)
-    composite = next(item for item in entries.values() if item["type"] == "CompositeRule")
-    simples = [item for item in entries.values() if item["type"] == "SimpleRule"]
-    composite_id = next(id_ for id_, item in entries.items() if item is composite)
-    simple_ids = [id_ for id_, item in entries.items() if item in simples]
-    return {
-        "relations": [
-            {
-                "from_id": composite_id,
-                "rel_type": "hasSubRule",
-                "to_id": simple_id,
-                "evidence": {"quote": "未经本企业充分论证和安全测试" if index == 0 else "未经集团批准"},
+            index = MEMBER_MENTIONS.index(row["name"].strip())
+            properties = {
+                "ruleText": MEMBER_RULE_TEXTS[index],
+                "triggerCondition": MEMBER_MENTIONS[index],
+                "action": "不得部署安装各类开源智能体",
             }
-            for index, simple_id in enumerate(simple_ids)
-        ]
-    }
+        updates.append(
+            {
+                "entity_id": row["id"],
+                "properties": properties,
+                "evidence": {"quote": COMPOSITE_TEXT},
+            }
+        )
+    return {"updates": updates}
+
+
+def composite_relation_handler(prompt: str, pairs: list[dict], chunk: dict) -> list[dict]:
+    return [
+        {"pair_id": pair["pair_id"], "label": pair["relation_id"], "evidence": {"quote": COMPOSITE_TEXT}}
+        for pair in pairs
+        if pair["relation_id"] == "hassubrule"
+    ]
 
 
 class PromptTest(unittest.TestCase):
     def test_entity_prompt_scope_and_features_no_relations(self) -> None:
         plan = SE.compile_plan(RULE_ONTOLOGY, target_types=["Rule"])
-        prompt = SE.build_entity_prompt(plan, COMPOSITE_TEXT, document_type="general")
-        self.assertIn("实体候选提议", prompt)
-        self.assertIn("SimpleRule", prompt)  # 父类子类展开
-        self.assertIn("ruleId", prompt)
+        chunk = CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)
+        route = PR.resolve_document_route(plan, [chunk])
+        messages = PR.build_chat_messages(task="entity", plan=plan, route=route, chunk=chunk)
+        prompt = messages[1]["content"]
+        self.assertIn("只提议实体候选，禁止输出关系", prompt)
+        self.assertIn("`SimpleRule`", prompt)  # 父类子类展开进类型目录
+        self.assertIn("`CompositeRule`", prompt)
+        self.assertIn("（实体任务不展示关系目录）", prompt)
         self.assertNotIn("hasSubRule", prompt)  # 实体 pass 不提供关系
 
     def test_relation_prompt_catalog_and_signatures(self) -> None:
         plan = SE.compile_plan(RULE_ONTOLOGY)
-        catalog = [
-            {"id": "entity-0", "type": "CompositeRule", "name": "CR-001", "properties": {"ruleId": "CR-001"}},
-            {"id": "entity-1", "type": "SimpleRule", "name": "R-001", "properties": {"ruleId": "R-001"}},
+        chunk = CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)
+        route = PR.resolve_document_route(plan, [chunk])
+        entities = [
+            {"id": "entity-0", "type": "CompositeRule", "name": "CR-001"},
+            {"id": "entity-1", "type": "SimpleRule", "name": "R-001"},
         ]
-        prompt = SE.build_relation_prompt(plan, catalog, COMPOSITE_TEXT)
+        pairs = RR.enumerate_relation_pairs(plan, entities)
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0]["relation_id"], "hassubrule")
+        messages = PR.build_chat_messages(
+            task="relation",
+            plan=plan,
+            route=route,
+            chunk=chunk,
+            known_entities=entities,
+            output_schema=CG.relation_pair_decision_schema(pairs),
+            relation_pairs=pairs,
+        )
+        prompt = messages[1]["content"]
+        self.assertIn(pairs[0]["pair_id"], prompt)
         self.assertIn("entity-0", prompt)
-        self.assertIn("hasSubRule", prompt)
-        self.assertIn("禁止输出实体", prompt)
+        self.assertIn("hassubrule", prompt)
+        self.assertIn("只分类给定 relation pair；不得创建新端点、不得输出未列出的关系", prompt)
 
 
 class TwoPassPipelineTest(unittest.TestCase):
     def test_end_to_end_composite_rule(self) -> None:
-        llm = StubLLM(entity_handler=lambda prompt: composite_entities(), relation_handler=composite_relations)
+        llm = StubLLM(
+            entity_handler=composite_entity_handler,
+            property_handler=composite_property_handler,
+            relation_handler=composite_relation_handler,
+        )
         result = SE.extract_split(
             RULE_ONTOLOGY,
-            text=COMPOSITE_TEXT,
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)],
             llm=llm,
-            document_type="general",
         )
         raw = result["raw"]
-        self.assertEqual([entity["type"] for entity in raw["entities"]], ["CompositeRule", "SimpleRule", "SimpleRule"])
-        self.assertEqual([entity["name"] for entity in raw["entities"]], ["CR-001", "R-001", "R-002"])
+        self.assertEqual(
+            [entity["type"] for entity in raw["entities"]],
+            ["CompositeRule", "SimpleRule", "SimpleRule"],
+        )
+        self.assertEqual(
+            [entity["name"] for entity in raw["entities"]],
+            [COMPOSITE_TEXT, *MEMBER_MENTIONS],
+        )
         self.assertEqual(len(raw["relations"]), 2)
         for relation in raw["relations"]:
             self.assertEqual(relation["rel_type"], "hasSubRule")
@@ -238,12 +238,12 @@ class TwoPassPipelineTest(unittest.TestCase):
         self.assertEqual(len(model["objects"]), 3)
         self.assertEqual(len(model["relations"]), 2)
         self.assertEqual(model["objects"][0]["mapping"]["status"], "accepted")
-        self.assertEqual(model["objects"][0]["identity"], "CR-001")
+        self.assertEqual(model["objects"][0]["identity"], COMPOSITE_TEXT)
         # 证据覆盖
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
         self.assertEqual(result["evidence_coverage"]["relations"]["rate"], 1.0)
-        # 两段式：实体 pass 1 次 + 关系 pass 1 次
-        self.assertEqual([call for call, _ in llm.calls], ["entity", "relation"])
+        # 三段式：实体 pass -> 属性补全 -> 关系 pass
+        self.assertEqual([task for task, _ in llm.calls], ["entity", "property", "relation"])
         # 无 schema/证据告警
         self.assertEqual(result["warnings"], [])
         self.assertIsNone(result["error_code"])
@@ -259,209 +259,219 @@ class "术语" as Terminology <<KnowledgeUnit>> {
 @enduml
 """
         chunks = [
-            CC.ExtractionChunk(chunk_id="c1", text="开展关键主数据治理，建立健全主数据识别、采集、校验机制。"),
-            CC.ExtractionChunk(chunk_id="c2", text="主数据治理也称主数据管理（MDM）。"),
+            CC.ExtractionChunk(chunk_id="c1", text="开展关键主数据治理（也称主数据管理），建立健全主数据识别、采集、校验机制。"),
+            CC.ExtractionChunk(chunk_id="c2", text="主数据治理是数据治理的核心。"),
         ]
 
-        def entity_handler(prompt: str) -> dict:
-            if "主数据管理（MDM）" in prompt_chunk_text(prompt):
-                return {
-                    "entities": [
-                        {
-                            "type": "Terminology",
-                            "name": "主数据治理",
-                            "properties": {"TermName": "主数据治理", "Synonyms": ["主数据管理"]},
-                            "evidence": {"quote": "主数据治理也称主数据管理"},
-                        }
-                    ]
-                }
-            else:
-                return {
-                    "entities": [
-                        {
-                            "type": "Terminology",
-                            "name": "主数据治理",
-                            "properties": {
-                                "TermName": "主数据治理",
-                                "TermDefinition": "对主数据的识别、采集、校验等治理活动",
-                            },
-                            "evidence": {"quote": "开展关键主数据治理"},
-                        }
-                    ]
-                }
+        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
+            if chunk.get("chunk_id") == "c2":
+                return [span_item("Terminology", "主数据治理", quote="主数据治理是数据治理的核心")]
+            return [span_item("Terminology", "主数据治理", quote="开展关键主数据治理（也称主数据管理）")]
 
-        llm = StubLLM(entity_handler=entity_handler)
-        result = SE.extract_split(
-            terminology_ontology,
-            chunks=chunks,
-            llm=llm,
-            document_type="general",
-        )
+        def property_handler(prompt: str, chunk: dict) -> dict:
+            return {
+                "updates": [
+                    {
+                        "entity_id": row["id"],
+                        "properties": {
+                            "TermName": "主数据治理",
+                            "TermDefinition": "对主数据的识别、采集、校验等治理活动",
+                            "Synonyms": ["主数据管理"],
+                        },
+                        "evidence": {"quote": "开展关键主数据治理（也称主数据管理）"},
+                    }
+                    for row in parse_known_entities(prompt)
+                ]
+            }
+
+        llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler)
+        result = SE.extract_split(terminology_ontology, chunks=chunks, llm=llm)
         entities = result["raw"]["entities"]
         self.assertEqual(len(entities), 1)
         self.assertEqual(entities[0]["candidate_id"], "entity-0")
-        self.assertEqual(entities[0]["properties"]["TermDefinition"], "对主数据的识别、采集、校验等治理活动")
-        self.assertEqual(entities[0]["properties"]["Synonyms"], ["主数据管理"])
+        properties = result["intermediate_model"]["objects"][0]["properties"]
+        self.assertEqual(properties["TermDefinition"], "对主数据的识别、采集、校验等治理活动")
+        self.assertEqual(properties["Synonyms"], ["主数据管理"])
         # 两条 evidence（不同 chunk span）都保留
         self.assertEqual(len(result["intermediate_model"]["objects"][0]["evidence"]), 2)
 
     def test_out_of_scope_entity_rejected(self) -> None:
+        # 重构后 entity pass 的 output schema enum 已限定在目标范围内，范围外类型
+        # 在结构化校验阶段就会被拒；ENTITY_OUT_OF_SCOPE 的兜底防线在 CandidatePool。
         official = (ONTOLOGIES_DIR / "official_document_ontology.puml").read_text(encoding="utf-8")
-        text = "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。"
-
-        def entity_handler(prompt: str) -> dict:
-            return {
-                "entities": [
-                    {"type": "OperationalActivity", "name": "加强网络和数据安全监测", "properties": {}, "evidence": {"quote": "加强网络和数据安全监测"}},
-                    {"type": "OperationalAgent", "name": "各企业", "properties": {}, "evidence": {"quote": "各企业"}},
-                ]
-            }
-
-        llm = StubLLM(entity_handler=entity_handler)
-        result = SE.extract_split(
-            official,
-            text=text,
-            llm=llm,
-            target_types=["OperationalActivity"],
-            document_type="official_document",
+        schema = MODULES["ontology_schema"].OntologySchema.parse(official)
+        plan = SE.compile_plan(official, target_types=["OperationalActivity"])
+        pool = SE.CandidatePool(schema, allowed_types=plan.allowed_types)
+        accepted = pool.add_entity(
+            SE.EntityCandidate(
+                candidate_id="",
+                proposed_type="OperationalActivity",
+                canonical_type="OperationalActivity",
+                name="加强网络和数据安全监测",
+                properties={},
+                evidence=[],
+                source="test",
+            )
         )
-        self.assertEqual([entity["type"] for entity in result["raw"]["entities"]], ["OperationalActivity"])
-        codes = [warning["code"] for warning in result["warnings"]]
+        self.assertIsNotNone(accepted)
+        warnings: list[dict] = []
+        rejected = pool.add_entity(
+            SE.EntityCandidate(
+                candidate_id="",
+                proposed_type="OperationalAgent",
+                canonical_type="OperationalAgent",
+                name="集团",
+                properties={},
+                evidence=[],
+                source="test",
+            ),
+            warnings=warnings,
+        )
+        self.assertIsNone(rejected)
+        codes = [warning["code"] for warning in warnings]
         self.assertIn("ENTITY_OUT_OF_SCOPE", codes)
-        self.assertNotIn("ENTITY_OUT_OF_SCOPE", [entity.get("type") for entity in result["raw"]["entities"]])
+        self.assertEqual(
+            [entity.canonical_type for entity in pool.accepted_entities()],
+            ["OperationalActivity"],
+        )
 
 
 class RelationValidationTest(unittest.TestCase):
-    def _simple_rule_scene(self) -> tuple[str, dict, dict]:
-        text = "禁止计算机等办公设备内、外网混用。未经集团批准，不得部署安装各类开源智能体。"
-        entities = {
-            "entities": [
-                {
-                    "type": "SimpleRule",
-                    "name": "R-001",
-                    "properties": {
-                        "ruleId": "R-001",
-                        "ruleText": "未经集团批准，不得部署安装各类开源智能体。",
-                        "triggerCondition": "未经集团批准",
-                        "action": "不得部署安装各类开源智能体",
-                    },
-                    "evidence": {"quote": "未经集团批准，不得部署安装各类开源智能体。"},
-                },
-                {
-                    "type": "Object",
-                    "name": "办公设备",
-                    "properties": {"objectName": "办公设备"},
-                    "evidence": {"quote": "办公设备"},
-                },
-            ],
-            "relations": [],
-        }
-        return text, entities
+    """AC-7 关系校验：重构后 relation pass 只枚举合法 pair，非法关系在
+
+    CandidatePool/RelationResolver 边界被拒绝，这里直接对池做单元测试。"""
+
+    def _pool(self) -> "SE.CandidatePool":
+        schema = MODULES["ontology_schema"].OntologySchema.parse(RULE_ONTOLOGY)
+        plan = SE.compile_plan(RULE_ONTOLOGY)
+        pool = SE.CandidatePool(schema, allowed_types=plan.allowed_types)
+        pool.add_entity(
+            SE.EntityCandidate(
+                candidate_id="",
+                proposed_type="SimpleRule",
+                canonical_type="SimpleRule",
+                name="R-001",
+                properties={"ruleId": "R-001"},
+                evidence=[],
+                source="test",
+            )
+        )
+        pool.add_entity(
+            SE.EntityCandidate(
+                candidate_id="",
+                proposed_type="Object",
+                canonical_type="Object",
+                name="办公设备",
+                properties={"objectName": "办公设备"},
+                evidence=[],
+                source="test",
+            )
+        )
+        return pool
+
+    def _relation(self, from_id: str, rel_type: str, to_id: str) -> "SE.RelationCandidate":
+        return SE.RelationCandidate(
+            candidate_id="",
+            from_candidate_id=from_id,
+            to_candidate_id=to_id,
+            proposed_relation=rel_type,
+            canonical_relation=None,
+            evidence=[],
+        )
 
     def test_unknown_endpoint_rejected(self) -> None:
-        text, entities = self._simple_rule_scene()
-        llm = StubLLM(
-            entity_handler=lambda prompt: entities,
-            relation_handler=lambda prompt: {
-                "relations": [
-                    {"from_id": "entity-99", "rel_type": "constrainsObject", "to_id": "entity-1", "evidence": {"quote": "办公设备"}}
-                ]
-            },
+        pool = self._pool()
+        warnings: list[dict] = []
+        resolved = pool.add_relation(
+            self._relation("entity-99", "constrainsObject", "entity-1"),
+            warnings=warnings,
         )
-        result = SE.extract_split(RULE_ONTOLOGY, text=text, llm=llm)
-        self.assertEqual(result["raw"]["relations"], [])
-        self.assertEqual(len(result["graph"]["relationships"]), 0)
-        codes = [warning["code"] for warning in result["warnings"]]
-        self.assertIn("UNKNOWN_RELATION_ENDPOINT_ID", codes)
+        self.assertIsNone(resolved)
+        self.assertEqual(pool.accepted_relations(), [])
+        self.assertIn("UNKNOWN_RELATION_ENDPOINT_ID", {w["code"] for w in warnings})
 
     def test_relation_type_mismatch_rejected(self) -> None:
-        text, entities = self._simple_rule_scene()
-        llm = StubLLM(
-            entity_handler=lambda prompt: entities,
-            relation_handler=lambda prompt: {
-                "relations": [
-                    {"from_id": "entity-0", "rel_type": "hasSubRule", "to_id": "entity-1", "evidence": {"quote": "未经集团批准"}}
-                ]
-            },
+        pool = self._pool()
+        warnings: list[dict] = []
+        resolved = pool.add_relation(
+            self._relation("entity-0", "hasSubRule", "entity-1"),
+            warnings=warnings,
         )
-        result = SE.extract_split(RULE_ONTOLOGY, text=text, llm=llm)
-        self.assertEqual(result["raw"]["relations"], [])
-        codes = [warning["code"] for warning in result["warnings"]]
-        self.assertIn("RELATION_ENDPOINT_TYPE_MISMATCH", codes)
+        self.assertIsNone(resolved)
+        self.assertEqual(pool.accepted_relations(), [])
+        self.assertIn("RELATION_ENDPOINT_TYPE_MISMATCH", {w["code"] for w in warnings})
 
     def test_unknown_relation_type_rejected(self) -> None:
-        text, entities = self._simple_rule_scene()
-        llm = StubLLM(
-            entity_handler=lambda prompt: entities,
-            relation_handler=lambda prompt: {
-                "relations": [
-                    {"from_id": "entity-0", "rel_type": "NOT_IN_ONTOLOGY", "to_id": "entity-1", "evidence": {"quote": "办公设备"}}
-                ]
-            },
+        pool = self._pool()
+        warnings: list[dict] = []
+        resolved = pool.add_relation(
+            self._relation("entity-0", "NOT_IN_ONTOLOGY", "entity-1"),
+            warnings=warnings,
         )
-        result = SE.extract_split(RULE_ONTOLOGY, text=text, llm=llm)
-        self.assertEqual(result["raw"]["relations"], [])
-        codes = [warning["code"] for warning in result["warnings"]]
-        self.assertIn("UNKNOWN_RELATION_TYPE", codes)
+        self.assertIsNone(resolved)
+        self.assertEqual(pool.accepted_relations(), [])
+        self.assertIn("UNKNOWN_RELATION_TYPE", {w["code"] for w in warnings})
+
+    def test_valid_relation_accepted(self) -> None:
+        pool = self._pool()
+        warnings: list[dict] = []
+        resolved = pool.add_relation(
+            self._relation("entity-0", "constrainsObject", "entity-1"),
+            warnings=warnings,
+        )
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.canonical_relation, "constrainsObject")
+        self.assertEqual(resolved.from_name, "R-001")
+        self.assertEqual(resolved.to_name, "办公设备")
 
 
 class FailureAndEdgeTest(unittest.TestCase):
     def test_json_parse_failure_recorded(self) -> None:
-        llm = StubLLM(
-            entity_handler=lambda prompt: "not json",
-            relation_handler=lambda prompt: "not json",
+        def llm(messages) -> str:
+            return "not json"
+
+        result = SE.extract_split(
+            RULE_ONTOLOGY,
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)],
+            llm=llm,
         )
-        result = SE.extract_split(RULE_ONTOLOGY, text=COMPOSITE_TEXT, llm=llm)
         self.assertEqual(result["raw"], {"entities": [], "relations": []})
-        self.assertEqual(len(result["attempts"]), 2)
+        # 实体 pass 有界重试（默认 3 次）后终止；无实体 -> 不触发关系/属性 pass
+        self.assertEqual(len(result["attempts"]), 3)
         self.assertTrue(all(attempt["type"] == "json" for attempt in result["attempts"]))
         self.assertEqual(result["error_code"], "LLM_JSON_PARSE_FAILED")
 
     def test_request_failure_recorded(self) -> None:
-        def boom(prompt: str) -> str:
+        def llm(messages) -> str:
             raise RuntimeError("network down")
 
-        llm = StubLLM(entity_handler=boom, relation_handler=lambda prompt: {"relations": []})
-        result = SE.extract_split(RULE_ONTOLOGY, text=COMPOSITE_TEXT, llm=llm)
+        result = SE.extract_split(
+            RULE_ONTOLOGY,
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)],
+            llm=llm,
+        )
         self.assertEqual(result["raw"], {"entities": [], "relations": []})
         self.assertEqual(result["attempts"][0]["type"], "request")
         self.assertEqual(result["error_code"], "LLM_REQUEST_FAILED")
 
     def test_empty_input(self) -> None:
         llm = StubLLM()
-        result = SE.extract_split(RULE_ONTOLOGY, llm=llm)
+        result = SE.extract_split(RULE_ONTOLOGY, chunks=[], llm=llm)
         codes = [warning["code"] for warning in result["warnings"]]
         self.assertIn("EMPTY_INPUT", codes)
         self.assertEqual(result["raw"], {"entities": [], "relations": []})
         self.assertEqual(result["profile"]["chunks"], 0)
 
     def test_uid_stable_regardless_of_properties(self) -> None:
-        plan = SE.compile_plan(RULE_ONTOLOGY)
-        entities = [
-            SE.EntityCandidate(
-                candidate_id="entity-0",
-                proposed_type="SimpleRule",
-                canonical_type="SimpleRule",
-                name="R-001",
-                properties={"ruleId": "R-001", "action": "A"},
-                evidence=[],
-                source="",
-            ),
-            SE.EntityCandidate(
-                candidate_id="entity-1",
-                proposed_type="SimpleRule",
-                canonical_type="SimpleRule",
-                name="R-001",
-                properties={"ruleId": "R-001", "action": "B"},
-                evidence=[],
-                source="",
-            ),
+        objects = [
+            {"id": "entity-0", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "A"}},
+            {"id": "entity-1", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "B"}},
         ]
-        graph = SE._build_graph(entities, [])
+        graph = GA.GraphAssembler().build_graph(objects, [])
         self.assertEqual(len(graph["nodes"]), 1)  # 同一 identity 合并为同一 UID
         self.assertEqual(
             graph["nodes"][0]["uid"],
-            MODULES["graph_utils"].entity_uid("SimpleRule", "R-001", None),
+            GU.entity_uid("SimpleRule", "R-001", None),
         )
 
 
@@ -469,23 +479,34 @@ class BenchmarkSmokeTest(unittest.TestCase):
     def test_ontology_class_extraction_gold(self) -> None:
         case = json.loads((CASES_DIR / "04_ontology_class_extraction.json").read_text(encoding="utf-8"))
         ontology = (ONTOLOGIES_DIR / case["ontology_file"]).read_text(encoding="utf-8")
+        text = case["text"]
+        # gold 实体名必须逐字落在原文中（span-first）；取 gold 语义对应的原文 mention
+        mentions = [
+            "开展排查",
+            "将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+            "加强网络和数据安全监测",
+            "第一时间处置，并向集团报告",
+        ]
+        for mention in mentions:
+            self.assertIn(mention, text)
 
-        def entity_handler(prompt: str) -> dict:
-            return {"entities": case["expected"]["entities"]}
+        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
+            return [span_item("OperationalActivity", mention) for mention in mentions]
 
         llm = StubLLM(entity_handler=entity_handler)
         result = SE.extract_split(
             ontology,
-            text=case["text"],
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=text)],
             llm=llm,
             target_types=case["target_types"],
             include_subclasses=case["include_subclasses"],
-            document_type=case["document_type"],
             validation_mode=case["validation_mode"],
         )
-        gold_keys = {(e["type"], e["name"]) for e in case["expected"]["entities"]}
         pred_keys = {(e["type"], e["name"]) for e in result["raw"]["entities"]}
-        self.assertEqual(pred_keys, gold_keys)
+        self.assertEqual(
+            pred_keys,
+            {("OperationalActivity", mention) for mention in mentions},
+        )
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
         codes = [warning["code"] for warning in result["warnings"]]
         self.assertNotIn("ENTITY_OUT_OF_SCOPE", codes)

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import re
 import sys
 import types
 import unittest
@@ -23,19 +22,29 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
-ONTOLOGIES_DIR = BENCHMARK_DIR / "ontologies"
-CASES_DIR = BENCHMARK_DIR / "cases"
+FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
+ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
+CASES_DIR = FIXTURES_DIR / "cases"
+TESTS_DIR = PACKAGE_DIR / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -63,9 +72,20 @@ CC = MODULES["chunk_context"]
 OC = MODULES["ontology_compiler"]
 SE = MODULES["split_extractor"]
 
+from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+
 
 RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8")
 COMPOSITE_TEXT = "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+MEMBER_MENTIONS = ["未经本企业充分论证和安全测试", "未经集团批准"]
+MEMBER_RULE_TEXTS = [
+    "未经本企业充分论证和安全测试，不得部署安装各类开源智能体。",
+    "未经集团批准，不得部署安装各类开源智能体。",
+]
+
+
+def make_manager(text: str = COMPOSITE_TEXT) -> Any:
+    return CC.ChunkContextManager([CC.ExtractionChunk(chunk_id="chunk-0", text=text)])
 
 
 def make_pool() -> tuple[Any, Any]:
@@ -140,7 +160,7 @@ class "术语" as Terminology <<KnowledgeUnit>> {
 class AssemblyTest(unittest.TestCase):
     def test_auto_membership_established(self) -> None:
         pool, plan = make_pool()
-        manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
+        manager = make_manager(COMPOSITE_TEXT)
         warnings: list[dict] = []
         handler = SE.CompositeElementHandler(plan.composite_specs)
         issues = handler.assemble(pool, plan, manager, warnings=warnings)
@@ -181,7 +201,7 @@ class AssemblyTest(unittest.TestCase):
                     source="test",
                 )
             )
-        manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
+        manager = make_manager(COMPOSITE_TEXT)
         warnings: list[dict] = []
         handler = SE.CompositeElementHandler(plan.composite_specs)
         handler.assemble(pool, plan, manager, warnings=warnings)
@@ -226,7 +246,7 @@ class AssemblyTest(unittest.TestCase):
                 evidence=[],
             )
         )
-        manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
+        manager = make_manager(COMPOSITE_TEXT)
         warnings: list[dict] = []
         handler = SE.CompositeElementHandler(plan.composite_specs)
         handler.assemble(pool, plan, manager, warnings=warnings)
@@ -234,39 +254,51 @@ class AssemblyTest(unittest.TestCase):
 
 
 class IntegrationTest(unittest.TestCase):
-    def _gold_stub(self, case: dict, relations: bool):
-        expected = case["expected"]
-        canonical = MODULES["graph_utils"].canonical_name
+    def _gold_stub(self, relations: bool) -> StubLLM:
+        """新管线 stub：实体 span + 属性补全 + pair 关系分类（label 为 canonical relation_id）。"""
 
-        def call(prompt: str) -> str:
-            if "实体候选提议" in prompt:
-                payload = {"entities": expected["entities"]}
-            elif "关系候选提议" in prompt:
-                if not relations:
-                    return json.dumps({"relations": []}, ensure_ascii=False)
-                index = {}
-                for match in re.finditer(r"\|\s*`(entity-\d+)`\s*\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|", prompt):
-                    index[(match.group(2), canonical(match.group(3).strip()))] = match.group(1)
-                mapped = []
-                for relation in expected["relations"]:
-                    from_id = index.get((relation["from_type"], canonical(relation["from_name"])))
-                    to_id = index.get((relation["to_type"], canonical(relation["to_name"])))
-                    if from_id is None or to_id is None:
-                        continue
-                    mapped.append(
-                        {
-                            "from_id": from_id,
-                            "rel_type": relation["rel_type"],
-                            "to_id": to_id,
-                            "evidence": {"quote": (relation.get("evidence") or {}).get("quote") or ""},
-                        }
-                    )
-                payload = {"relations": mapped}
-            else:
-                raise AssertionError("无法识别的 prompt 段落")
-            return json.dumps(payload, ensure_ascii=False)
+        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
+            return [
+                span_item("CompositeRule", COMPOSITE_TEXT),
+                span_item("SimpleRule", MEMBER_MENTIONS[0]),
+                span_item("SimpleRule", MEMBER_MENTIONS[1]),
+            ]
 
-        return call
+        def property_handler(prompt: str, chunk: dict) -> dict:
+            updates = []
+            for row in parse_known_entities(prompt):
+                if row["type"] == "CompositeRule":
+                    properties = {"ruleText": COMPOSITE_TEXT, "combinationType": "AND"}
+                else:
+                    index = MEMBER_MENTIONS.index(row["name"].strip())
+                    properties = {
+                        "ruleText": MEMBER_RULE_TEXTS[index],
+                        "triggerCondition": MEMBER_MENTIONS[index],
+                        "action": "不得部署安装各类开源智能体",
+                    }
+                updates.append(
+                    {
+                        "entity_id": row["id"],
+                        "properties": properties,
+                        "evidence": {"quote": COMPOSITE_TEXT},
+                    }
+                )
+            return {"updates": updates}
+
+        def relation_handler(prompt: str, pairs: list[dict], chunk: dict) -> list[dict]:
+            if not relations:
+                return []
+            return [
+                {"pair_id": pair["pair_id"], "label": pair["relation_id"], "evidence": {"quote": COMPOSITE_TEXT}}
+                for pair in pairs
+                if pair["relation_id"] == "hassubrule"
+            ]
+
+        return StubLLM(
+            entity_handler=entity_handler,
+            property_handler=property_handler,
+            relation_handler=relation_handler,
+        )
 
     def _relation_keys(self, result: dict) -> set:
         canonical = MODULES["graph_utils"].canonical_name
@@ -275,43 +307,37 @@ class IntegrationTest(unittest.TestCase):
             for r in result["raw"]["relations"]
         }
 
-    def test_composite_rule_01_auto_assembly_matches_gold(self) -> None:
-        case = json.loads((CASES_DIR / "06_composite_rule.json").read_text(encoding="utf-8"))
-        result = SE.extract_split(
-            RULE_ONTOLOGY,
-            text=case["text"],
-            llm=self._gold_stub(case, relations=False),
-            document_type=case.get("document_type", "general"),
-        )
-        expected = case["expected"]
+    def _gold_relation_keys(self) -> set:
         canonical = MODULES["graph_utils"].canonical_name
-        gold_relation_keys = {
-            (r["from_type"], canonical(r["from_name"]), r["rel_type"], r["to_type"], canonical(r["to_name"]))
-            for r in expected["relations"]
+        return {
+            ("CompositeRule", canonical(COMPOSITE_TEXT), "hasSubRule", "SimpleRule", canonical(MEMBER_MENTIONS[0])),
+            ("CompositeRule", canonical(COMPOSITE_TEXT), "hasSubRule", "SimpleRule", canonical(MEMBER_MENTIONS[1])),
         }
-        self.assertEqual(self._relation_keys(result), gold_relation_keys)
+
+    def _run_case(self, relations: bool) -> dict:
+        case = json.loads((CASES_DIR / "06_composite_rule.json").read_text(encoding="utf-8"))
+        return SE.extract_split(
+            RULE_ONTOLOGY,
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=case["text"])],
+            llm=self._gold_stub(relations),
+        )
+
+    def test_composite_rule_01_auto_assembly_matches_gold(self) -> None:
+        result = self._run_case(relations=False)
+        self.assertEqual(self._relation_keys(result), self._gold_relation_keys())
         self.assertEqual(result["profile"]["composite_auto_memberships"], 2)
         codes = {w["code"] for w in result["warnings"]}
         self.assertNotIn("INSUFFICIENT_COMPOSITE_MEMBERS", codes)
         self.assertNotIn("INVALID_COMBINATION_TYPE", codes)
 
     def test_composite_rule_01_full_gold_exact(self) -> None:
-        case = json.loads((CASES_DIR / "06_composite_rule.json").read_text(encoding="utf-8"))
-        result = SE.extract_split(
-            RULE_ONTOLOGY,
-            text=case["text"],
-            llm=self._gold_stub(case, relations=True),
-            document_type=case.get("document_type", "general"),
-        )
-        expected = case["expected"]
-        canonical = MODULES["graph_utils"].canonical_name
-        gold_relation_keys = {
-            (r["from_type"], canonical(r["from_name"]), r["rel_type"], r["to_type"], canonical(r["to_name"]))
-            for r in expected["relations"]
-        }
-        self.assertEqual(self._relation_keys(result), gold_relation_keys)
+        result = self._run_case(relations=True)
+        self.assertEqual(self._relation_keys(result), self._gold_relation_keys())
         self.assertEqual(result["profile"]["composite_auto_memberships"], 0)
-        self.assertEqual(result["raw"]["entities"][0]["properties"].get("combinationType"), "AND")
+        composite = next(
+            obj for obj in result["intermediate_model"]["objects"] if obj["type"] == "CompositeRule"
+        )
+        self.assertEqual(composite["properties"].get("combinationType"), "AND")
 
 
 if __name__ == "__main__":

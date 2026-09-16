@@ -22,19 +22,29 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
-ONTOLOGIES_DIR = BENCHMARK_DIR / "ontologies"
-CASES_DIR = BENCHMARK_DIR / "cases"
+FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
+ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
+CASES_DIR = FIXTURES_DIR / "cases"
+TESTS_DIR = PACKAGE_DIR / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -64,17 +74,28 @@ CV = MODULES["coverage"]
 OC = MODULES["ontology_compiler"]
 SE = MODULES["split_extractor"]
 
+from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+
 
 RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8")
 COMPOSITE_TEXT = "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+MEMBER_MENTIONS = ["未经本企业充分论证和安全测试", "未经集团批准"]
+MEMBER_RULE_TEXTS = [
+    "未经本企业充分论证和安全测试，不得部署安装各类开源智能体。",
+    "未经集团批准，不得部署安装各类开源智能体。",
+]
+
+
+def make_manager(text: str) -> "CC.ChunkContextManager":
+    return CC.ChunkContextManager([CC.ExtractionChunk(chunk_id="chunk-0", text=text)])
 
 
 class FeatureCoverageTest(unittest.TestCase):
     def setUp(self) -> None:
         self.plan = OC.compile_plan(RULE_ONTOLOGY)
         self.auditor = CV.CoverageAuditor()
-        self.manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
-        self.request = CC.ExtractionRequest(ontology=RULE_ONTOLOGY, text=COMPOSITE_TEXT)
+        self.manager = make_manager(COMPOSITE_TEXT)
+        self.request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)])
 
     def test_missing_features_reported_as_info(self) -> None:
         entities = [
@@ -102,7 +123,7 @@ class FeatureCoverageTest(unittest.TestCase):
                 kind=spec.kind,
                 identifier=spec.identifier,
                 datatype=spec.datatype,
-                required=(spec.identifier == "ruleId"),
+                required=(spec.identifier == "ruleText"),
                 multi_value=spec.multi_value,
                 context_inferable=spec.context_inferable,
                 lexical_patterns=spec.lexical_patterns,
@@ -130,8 +151,8 @@ class RelationCoverageTest(unittest.TestCase):
     def setUp(self) -> None:
         self.plan = OC.compile_plan(RULE_ONTOLOGY)
         self.auditor = CV.CoverageAuditor()
-        self.manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
-        self.request = CC.ExtractionRequest(ontology=RULE_ONTOLOGY, text=COMPOSITE_TEXT)
+        self.manager = make_manager(COMPOSITE_TEXT)
+        self.request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)])
 
     def test_source_min_one_relation_missing(self) -> None:
         entities = [
@@ -197,8 +218,8 @@ class EvidenceAndStructuralTest(unittest.TestCase):
         self.auditor = CV.CoverageAuditor()
 
     def test_evidence_missing(self) -> None:
-        manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
-        request = CC.ExtractionRequest(ontology=RULE_ONTOLOGY, text=COMPOSITE_TEXT)
+        manager = make_manager(COMPOSITE_TEXT)
+        request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)])
         entities = [{"type": "SimpleRule", "name": "R-001", "properties": {"ruleId": "R-001"}}]
         relations = [{"from_name": "a", "to_name": "b", "rel_type": "hasSubRule"}]
         gaps = self.auditor.audit(self.plan, manager, request, entities, relations)
@@ -214,7 +235,7 @@ class EvidenceAndStructuralTest(unittest.TestCase):
             section_title="外观",
         )
         manager = CC.ChunkContextManager([chunk])
-        request = CC.ExtractionRequest(ontology=RULE_ONTOLOGY, chunks=[chunk])
+        request = CC.ExtractionRequest(chunks=[chunk])
         gaps = self.auditor.audit(self.plan, manager, request, [], [])
         self.assertTrue(any(gap.gap_type == "structural_coverage" for gap in gaps))
         # 绑定实体后不再报告
@@ -228,8 +249,8 @@ class CompositeCoverageTest(unittest.TestCase):
     def test_composite_membership_and_combination(self) -> None:
         plan = OC.compile_plan(RULE_ONTOLOGY)
         auditor = CV.CoverageAuditor()
-        manager = CC.ChunkContextManager.from_text(COMPOSITE_TEXT)
-        request = CC.ExtractionRequest(ontology=RULE_ONTOLOGY, text=COMPOSITE_TEXT)
+        manager = make_manager(COMPOSITE_TEXT)
+        request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)])
         entities = [
             {
                 "type": "CompositeRule",
@@ -248,27 +269,45 @@ class CompositeCoverageTest(unittest.TestCase):
 class IntegrationTest(unittest.TestCase):
     def test_composite_rule_01_generic_coverage(self) -> None:
         case = json.loads((CASES_DIR / "06_composite_rule.json").read_text(encoding="utf-8"))
-        expected = case["expected"]
 
-        def call(prompt: str) -> str:
-            if "实体候选提议" in prompt:
-                payload = {"entities": expected["entities"]}
-            elif "关系候选提议" in prompt:
-                payload = {"relations": []}
-            else:
-                raise AssertionError("无法识别的 prompt 段落")
-            return json.dumps(payload, ensure_ascii=False)
+        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
+            return [
+                span_item("CompositeRule", COMPOSITE_TEXT),
+                span_item("SimpleRule", MEMBER_MENTIONS[0]),
+                span_item("SimpleRule", MEMBER_MENTIONS[1]),
+            ]
 
+        def property_handler(prompt: str, chunk: dict) -> dict:
+            updates = []
+            for row in parse_known_entities(prompt):
+                if row["type"] == "CompositeRule":
+                    properties = {"ruleText": COMPOSITE_TEXT, "combinationType": "AND"}
+                else:
+                    index = MEMBER_MENTIONS.index(row["name"].strip())
+                    properties = {
+                        "ruleText": MEMBER_RULE_TEXTS[index],
+                        "triggerCondition": MEMBER_MENTIONS[index],
+                        "action": "不得部署安装各类开源智能体",
+                    }
+                updates.append(
+                    {
+                        "entity_id": row["id"],
+                        "properties": properties,
+                        "evidence": {"quote": COMPOSITE_TEXT},
+                    }
+                )
+            return {"updates": updates}
+
+        llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler)
         result = SE.extract_split(
             RULE_ONTOLOGY,
-            text=case["text"],
-            llm=call,
-            document_type=case.get("document_type", "general"),
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=case["text"])],
+            llm=llm,
         )
         gap_types = {gap["gap_type"] for gap in result["coverage_gaps"]}
-        # 自动组装补全成员 -> 无复合 gap；SimpleRule 无 constrainsObject -> 关系覆盖 gap
+        # 自动组装补全成员 -> 无复合 gap；hasSubRule 双端基数 min=1 均被自动成员关系覆盖
         self.assertNotIn("composite_membership", gap_types)
-        self.assertIn("relation_coverage", gap_types)
+        self.assertNotIn("relation_coverage", gap_types)
         # gold 实体都带证据 -> 无 evidence_missing
         self.assertNotIn("evidence_missing", gap_types)
 

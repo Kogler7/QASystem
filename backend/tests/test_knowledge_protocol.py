@@ -236,12 +236,35 @@ def test_v1_confidence_reports_unavailable_capability(protocol_module):
     assert "message" not in body
 
 
-def test_precipitation_requires_ontology(protocol_module):
+def test_precipitation_without_ontology_uses_unstructured_summary(protocol_module):
     response = TestClient(protocol_module.app).post(
         "/api/knowledge/precipitation",
         files={"file": ("sample.csv", b"name\nvalue\n", "text/csv")},
     )
-    assert response.status_code == 422
+    body = response.json()
+    assert response.status_code == 200
+    assert body["code"] == 0
+    assert body["error"] is None
+    assert "Deprecated" in body["info"]
+    assert body["data"]["summary"] == "共生成 1 个切片及摘要。"
+    assert body["data"]["ontology"]["received"] is False
+    assert body["data"]["extraction"]["mode"] == "unstructured"
+    assert body["data"]["extraction"]["chunks"] == [
+        {
+            "index": 0,
+            "text": "# 测试文档\n测试内容",
+            "range": [0, len("# 测试文档\n测试内容")],
+            "summary": "摘要",
+        }
+    ]
+    assert body["data"]["stats"]["extraction"]["mode"] == "unstructured"
+    assert body["data"]["stats"]["extraction"]["chunks_summarized"] == 1
+    assert body["data"]["stats"]["extraction"]["attempts"] == []
+    assert body["data"]["stats"]["extraction"]["scheduler"] == {
+        "max_concurrency": 4,
+        "qps": 0.0,
+        "qpm": 0,
+    }
 
 
 def test_deprecated_pipeline_uses_v1_fields_and_response_shape(protocol_module):

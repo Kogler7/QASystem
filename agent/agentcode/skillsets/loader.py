@@ -36,7 +36,7 @@ class SkillLoader:
     ) -> None:
         self._resource_resolver = resource_resolver
         if skillset_dir is None:
-            skillset_dir = Path(__file__).resolve().parent
+            skillset_dir = Path(__file__).resolve().parents[2] / "skills"
         self._skillset_dir = Path(skillset_dir)
         self._path_by_id: dict[str, str] = {}
 
