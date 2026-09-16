@@ -170,6 +170,12 @@ work/
 .neo4j/
 .graph_cache/
 
+# 离线解析-切片-抽取工作区生成物（保留 docs/ 与 ontology/）
+offline_ingestion/_runs/
+offline_ingestion/**/parse/
+offline_ingestion/**/chunks/
+offline_ingestion/**/extract/
+
 # wzc
 intent/.env
 intent/embeddings/
