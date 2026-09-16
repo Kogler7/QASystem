@@ -9,6 +9,17 @@ from pathlib import Path
 from typing import Any, Optional
 
 from algorithm.runtime_profile import is_remote_only
+from algorithm.preproc.preproc_src.page_edges import (
+    DEFAULT_MIN_CHARS as DEFAULT_PAGE_EDGE_MIN_CHARS,
+    normalize_keep_page_edges,
+)
+
+# 显示面积占比低于该值的图片按水印/角标等装饰处理，不计入 PDF 版面复杂度。
+# 典型情况：标准文本每页带一个 15pt 的角标（约占页面 0.04%），旧逻辑按 pypdf 的
+# 图片对象数统计会把纯文本 PDF 误判成"扫描或复杂版面"。
+DECORATIVE_IMAGE_MAX_AREA_RATIO = 0.03
+# 保留页眉/页脚时默认打开到解析范围的首页（封面），与文档解析行为规范一致。
+DEFAULT_KEEP_PAGE_EDGES = "first_page"
 
 
 class DocumentProcessor:
@@ -86,6 +97,41 @@ class DocumentProcessor:
             self._processors["ofd_converter"] = OFDConverter()
         return self._processors["ofd_converter"]
 
+    @staticmethod
+    def _content_image_count(file_path: str, max_pages: int) -> Optional[int]:
+        """统计"内容图片"数：忽略水印、角标这类显示面积很小的装饰图。
+
+        返回 None 表示无法判定（缺少 pypdfium2 或读取失败），调用方退回 pypdf 的对象计数。
+        """
+        try:
+            import pypdfium2 as pdfium
+        except ModuleNotFoundError:
+            return None
+        pdf = None
+        try:
+            pdf = pdfium.PdfDocument(file_path)
+            total = 0
+            for index in range(min(max_pages, len(pdf))):
+                page = pdf[index]
+                width, height = page.get_size()
+                page_area = float(width) * float(height)
+                if page_area <= 0:
+                    continue
+                for obj in page.get_objects(filter=(pdfium.raw.FPDF_PAGEOBJ_IMAGE,)):
+                    left, bottom, right, top = obj.get_pos()
+                    area = abs(float(right) - float(left)) * abs(float(top) - float(bottom))
+                    if area / page_area >= DECORATIVE_IMAGE_MAX_AREA_RATIO:
+                        total += 1
+            return total
+        except Exception:
+            return None
+        finally:
+            if pdf is not None:
+                try:
+                    pdf.close()
+                except Exception:
+                    pass
+
     def _profile_pdf(self, file_path: str) -> dict[str, Any]:
         profile = {
             "kind": "complex_or_scanned",
@@ -100,14 +146,16 @@ class DocumentProcessor:
             reader = PdfReader(file_path)
             pages = reader.pages[: min(5, len(reader.pages))]
             text_characters = 0
-            images = 0
+            raw_images = 0
             for page in pages:
                 text_characters += len((page.extract_text() or "").strip())
                 try:
-                    images += len(page.images)
+                    raw_images += len(page.images)
                 except Exception:
                     pass
             checked = len(pages)
+            content_images = self._content_image_count(file_path, checked)
+            images = raw_images if content_images is None else content_images
             average_text = text_characters / max(checked, 1)
             average_images = images / max(checked, 1)
             is_text_pdf = average_text >= 200 and average_images <= 1.5
@@ -117,10 +165,12 @@ class DocumentProcessor:
                     "pages_checked": checked,
                     "text_characters": text_characters,
                     "images": images,
+                    "raw_images": raw_images,
+                    "decorative_images_ignored": max(raw_images - images, 0),
                     "reason": (
-                        "检测到稳定文本层且图片较少"
+                        "检测到稳定文本层且内容图片较少"
                         if is_text_pdf
-                        else "文本层不足、图片较多或版面较复杂"
+                        else "文本层不足、内容图片较多或版面较复杂"
                     ),
                 }
             )
@@ -246,6 +296,8 @@ class DocumentProcessor:
         start_page_id: int = 0,
         end_page_id: Optional[int] = None,
         allow_empty_content: bool = False,
+        keep_page_edges: Any = DEFAULT_KEEP_PAGE_EDGES,
+        page_edge_min_chars: int = DEFAULT_PAGE_EDGE_MIN_CHARS,
     ) -> dict[str, Any]:
         process_path = file_path
         temp_pdf_path = None
@@ -298,6 +350,17 @@ class DocumentProcessor:
                         kwargs["server_url"] = server_url
                     kwargs["max_concurrency"] = int(os.getenv("MINERU_VLM_MAX_CONCURRENCY", "16"))
                     kwargs["http_timeout"] = int(os.getenv("MINERU_VLM_HTTP_TIMEOUT_SECONDS", "600"))
+            elif engine == "docling":
+                # Docling 支持 0 基闭区间换算出的 1 基 page_range，并可按页补回页眉/页脚。
+                kwargs = {
+                    "start_page_id": start_page_id,
+                    "end_page_id": end_page_id,
+                    "keep_page_edges": keep_page_edges,
+                    "page_edge_min_chars": page_edge_min_chars,
+                }
+            if engine in {"mineru", "vlm"}:
+                kwargs["keep_page_edges"] = keep_page_edges
+                kwargs["page_edge_min_chars"] = page_edge_min_chars
             result = self._processor(engine).process(process_path, **kwargs)
             metadata = result.get("metadata") or {}
             if engine == "mineru":
@@ -306,6 +369,11 @@ class DocumentProcessor:
                     "ocr_mode": ocr_mode,
                     "table_enable": table_enable,
                     "formula_enable": formula_enable,
+                }
+            if engine in {"mineru", "vlm", "docling"}:
+                metadata["keep_page_edges"] = {
+                    "requested": keep_page_edges,
+                    "page_edge_min_chars": page_edge_min_chars,
                 }
             content = result.get("content")
             if metadata.get("error"):
@@ -337,6 +405,8 @@ class DocumentProcessor:
         end_page_id: Optional[int] = None,
         selected_engine: Optional[str] = None,
         engine_selection: Optional[dict[str, Any]] = None,
+        keep_page_edges: Any = DEFAULT_KEEP_PAGE_EDGES,
+        page_edge_min_chars: int = DEFAULT_PAGE_EDGE_MIN_CHARS,
     ) -> dict[str, Any]:
         path = Path(file_path)
         if not path.exists():
@@ -348,6 +418,22 @@ class DocumentProcessor:
                 "success": False,
                 "error_code": "INVALID_OCR_MODE",
                 "error": "ocr_mode 仅支持 auto、on、off",
+                "file_type": suffix.lstrip("."),
+            }
+        try:
+            normalize_keep_page_edges(keep_page_edges)
+        except ValueError as exc:
+            return {
+                "success": False,
+                "error_code": "INVALID_KEEP_PAGE_EDGES",
+                "error": str(exc),
+                "file_type": suffix.lstrip("."),
+            }
+        if page_edge_min_chars is None or int(page_edge_min_chars) < 1:
+            return {
+                "success": False,
+                "error_code": "INVALID_PAGE_EDGE_MIN_CHARS",
+                "error": "page_edge_min_chars 必须是不小于 1 的整数",
                 "file_type": suffix.lstrip("."),
             }
         if is_remote_only() and suffix not in {".md", ".txt"}:
@@ -424,6 +510,8 @@ class DocumentProcessor:
             start_page_id=start_page_id,
             end_page_id=end_page_id,
             allow_empty_content=end_page_id is not None,
+            keep_page_edges=keep_page_edges,
+            page_edge_min_chars=page_edge_min_chars,
         )
         fallback_from = None
         fallback = selection.get("fallback_engine")
@@ -439,6 +527,8 @@ class DocumentProcessor:
                 start_page_id=start_page_id,
                 end_page_id=end_page_id,
                 allow_empty_content=end_page_id is not None,
+                keep_page_edges=keep_page_edges,
+                page_edge_min_chars=page_edge_min_chars,
             )
 
         base_metadata = {
