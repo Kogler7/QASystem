@@ -205,9 +205,17 @@ def test_repair_returns_none_for_unrecoverable_input():
     assert extractor._repair_truncated_json("not a json object") is None
 
 
-def test_retry_messages_do_not_replay_assistant_response():
-    messages = extractor._retry_messages("system", "prompt", "请修正")
+def test_retry_messages_replay_assistant_response():
+    messages = extractor._retry_messages("system", "prompt", "原始响应", "请修正")
 
-    assert [message["role"] for message in messages] == ["system", "user"]
+    assert [message["role"] for message in messages] == ["system", "user", "assistant", "user"]
+    assert messages[0]["content"] == "system"
+    assert messages[1]["content"] == "prompt"
+    assert messages[2]["content"] == "原始响应"
     assert "请修正" in messages[-1]["content"]
-    assert all("assistant" not in message for message in messages)
+
+
+def test_retry_messages_truncate_long_raw_response():
+    messages = extractor._retry_messages("system", "prompt", "x" * 20000, "请修正")
+
+    assert len(messages[2]["content"]) == 12000

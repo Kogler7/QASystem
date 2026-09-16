@@ -22,19 +22,29 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
-ONTOLOGIES_DIR = BENCHMARK_DIR / "ontologies"
-CASES_DIR = BENCHMARK_DIR / "cases"
+FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
+ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
+CASES_DIR = FIXTURES_DIR / "cases"
+TESTS_DIR = PACKAGE_DIR / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -62,6 +72,9 @@ MODULES = _load_package_modules(
 MS = MODULES["mapping_scorer"]
 OC = MODULES["ontology_compiler"]
 SE = MODULES["split_extractor"]
+CC = MODULES["chunk_context"]
+
+from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8")
@@ -281,36 +294,42 @@ class RelationScoreTest(unittest.TestCase):
 
 
 class IntegrationTest(unittest.TestCase):
-    def _rule_stub(self, entities: dict):
-        def call(prompt: str) -> str:
-            if "实体候选提议" in prompt:
-                payload = entities
-            elif "关系候选提议" in prompt:
-                payload = {"relations": []}
-            else:
-                raise AssertionError("无法识别的 prompt 段落")
-            return json.dumps(payload, ensure_ascii=False)
+    TEXT = "未经集团批准，不得部署安装各类开源智能体。"
 
-        return call
+    def _extract(self, properties: dict | None, **kwargs):
+        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
+            return [span_item("SimpleRule", self.TEXT)]
+
+        def property_handler(prompt: str, chunk: dict) -> dict:
+            if not properties:
+                return {"updates": []}
+            return {
+                "updates": [
+                    {
+                        "entity_id": row["id"],
+                        "properties": dict(properties),
+                        "evidence": {"quote": self.TEXT},
+                    }
+                    for row in parse_known_entities(prompt)
+                ]
+            }
+
+        llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler)
+        return SE.extract_split(
+            RULE_ONTOLOGY,
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=self.TEXT)],
+            llm=llm,
+            **kwargs,
+        )
 
     def test_annotate_mode_does_not_change_raw(self) -> None:
-        text = "未经集团批准，不得部署安装各类开源智能体。"
-        entities = {
-            "entities": [
-                {
-                    "type": "SimpleRule",
-                    "name": "R-001",
-                    "properties": {
-                        "ruleId": "R-001",
-                        "ruleText": "未经集团批准，不得部署安装各类开源智能体。",
-                        "triggerCondition": "未经集团批准",
-                        "action": "不得部署安装各类开源智能体",
-                    },
-                    "evidence": {"quote": "未经集团批准，不得部署安装各类开源智能体。"},
-                }
-            ]
-        }
-        result = SE.extract_split(RULE_ONTOLOGY, text=text, llm=self._rule_stub(entities))
+        result = self._extract(
+            {
+                "ruleText": self.TEXT,
+                "triggerCondition": "未经集团批准",
+                "action": "不得部署安装各类开源智能体",
+            }
+        )
         self.assertEqual(len(result["raw"]["entities"]), 1)
         self.assertGreaterEqual(result["mapping"]["entities"][0]["score"], 0.0)
         self.assertEqual(result["profile"]["mapping_mode"], "annotate")
@@ -320,23 +339,8 @@ class IntegrationTest(unittest.TestCase):
         )
 
     def test_enforce_mode_filters_rejected(self) -> None:
-        text = "未经集团批准，不得部署安装各类开源智能体。"
-        entities = {
-            "entities": [
-                {
-                    "type": "SimpleRule",
-                    "name": "R-001",
-                    "properties": {"ruleId": "R-001"},
-                    "evidence": {"quote": "未经集团批准，不得部署安装各类开源智能体。"},
-                }
-            ]
-        }
-        result = SE.extract_split(
-            RULE_ONTOLOGY,
-            text=text,
-            llm=self._rule_stub(entities),
-            apply_mapping_threshold=True,
-        )
+        # 属性补全为空 -> attribute 覆盖 0 -> 映射分数低于阈值 -> enforce 模式过滤
+        result = self._extract(None, apply_mapping_threshold=True)
         self.assertEqual(result["raw"]["entities"], [])
         self.assertGreaterEqual(result["mapping"]["rejected"], 1)
         codes = {w["code"] for w in result["warnings"]}

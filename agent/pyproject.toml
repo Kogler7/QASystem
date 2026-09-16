@@ -43,5 +43,3 @@ package-dir = {"" = "."}
 where = ["."]
 include = ["agentcode*"]
 
-[tool.setuptools.package-data]
-agentcode = ["skillsets/**/*.md"]

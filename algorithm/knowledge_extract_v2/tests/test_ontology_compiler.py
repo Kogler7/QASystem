@@ -19,20 +19,27 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
-ONTOLOGIES_DIR = BENCHMARK_DIR / "ontologies"
-CASES_DIR = BENCHMARK_DIR / "cases"
+FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
+ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
+CASES_DIR = FIXTURES_DIR / "cases"
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
     """绕过包 __init__（避免 openai 依赖）加载子模块，与 benchmark/eval.py 同模式。"""
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -137,6 +144,17 @@ def case_target_types(case_id: str) -> list[str]:
     return json.loads(payload).get("target_types") or []
 
 
+def relations_in_scope(plan) -> tuple:
+    """当前 ExtractionPlan 不再提供 relations_in_scope()；按 expanded_types 过滤签名。"""
+    expanded = plan.target_scope.expanded_types
+    return tuple(
+        spec
+        for specs in plan.relation_specs.values()
+        for spec in specs
+        if spec.source in expanded and spec.target in expanded
+    )
+
+
 class CompileBasicsTest(unittest.TestCase):
     def test_rule_ontology_hierarchy_properties_identity(self) -> None:
         plan = COMPILER.compile_plan(RULE_ONTOLOGY)
@@ -199,7 +217,7 @@ class TargetScopeTest(unittest.TestCase):
         self.assertTrue(plan.allows("OperationalActivity"))
         self.assertFalse(plan.allows("OperationalAgent"))
         self.assertEqual(
-            {spec.signature for spec in plan.relations_in_scope()},
+            {spec.signature for spec in relations_in_scope(plan)},
             {"OperationalActivity -[PRECEDES]-> OperationalActivity"},
         )
 
@@ -224,7 +242,7 @@ class TargetScopeTest(unittest.TestCase):
             plan.target_scope.expanded_types,
             frozenset({"OperationalActivity", "OperationalConstraint"}),
         )
-        in_scope = plan.relations_in_scope()
+        in_scope = relations_in_scope(plan)
         self.assertEqual(
             {spec.signature for spec in in_scope},
             {

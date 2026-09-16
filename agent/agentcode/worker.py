@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from pathlib import Path
 
 from . import task_store
 from .adapter import (
@@ -268,7 +267,7 @@ def _build_config(
     """从请求数据构建 SessionConfig。
 
     skill_loader 与 discovered_refs 通常由 _run_worker_process 预创建并传入，
-    避免每个请求重复扫描 skillset 目录。未传入时走旧兼容路径。
+    避免每个请求重复扫描 skills 目录。未传入时走旧兼容路径。
     """
     config: SessionConfig = build_config_from_mcp_json(mcp_path)
     config.session_id = data.get("session_id", "")
@@ -285,8 +284,7 @@ def _build_config(
     elif skill_loader is not None:
         config.skills = list(config.skills) + skill_loader.discover_skills()
     else:
-        skillset_dir = Path(__file__).resolve().parent / "skillsets"
-        skill_loader = SkillLoader(skillset_dir=skillset_dir)
+        skill_loader = SkillLoader()
         config.skills = list(config.skills) + skill_loader.discover_skills()
 
     skill_ids = data.get("skill_ids", [])

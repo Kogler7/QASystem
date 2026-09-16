@@ -91,7 +91,7 @@ def _start_workers() -> None:
     """FastAPI 启动时回调（在本进程内只执行一次）。
 
     1. 创建 ToolManagerPool × _WORKER_POOL_SIZE 个连接
-    2. 预扫描 skillsets/ 目录加载所有 Skill
+    2. 预扫描 skills/ 目录加载所有 Skill
     3. 拉起 _WORKER_CONCURRENCY 个工作线程，共享上面的连接池
 
     线程数 vs 连接数:
@@ -115,8 +115,7 @@ def _start_workers() -> None:
     logger.info("API worker: pool %d/%d 就绪", _worker_pool.stats()["total"], _WORKER_POOL_SIZE)
 
     # ── 预加载 Skills ──
-    skillset_dir = Path(__file__).resolve().parent / "skillsets"
-    skill_loader = SkillLoader(skillset_dir=skillset_dir)
+    skill_loader = SkillLoader()
     discovered_refs = skill_loader.discover_skills()
     logger.info("API worker: 发现 %d 个 skill", len(discovered_refs))
 

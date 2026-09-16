@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from agentcode.tools.mcp_tools.mcp_loader import load_mcp_servers
+
+
+@pytest.fixture(autouse=True)
+def _clear_mcp_url_override(monkeypatch) -> None:
+    # .env 或宿主机环境里的 AGENT_MCP_URL 会覆盖单 server 配置的 url，测试必须与环境无关
+    monkeypatch.delenv("AGENT_MCP_URL", raising=False)
 
 
 def test_stdio_config_preserves_command_args_and_env(tmp_path) -> None:

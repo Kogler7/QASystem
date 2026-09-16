@@ -4,7 +4,8 @@
     python algorithm/knowledge_extract_v2/tests/test_chunk_evidence.py
 
 覆盖：
-- §5 输入契约：text-only 包装单 chunk、chunks 优先、text+chunks 主输入；
+- §5 输入契约：ExtractionRequest 只携带 chunks 与 target_types（text/ontology
+  已在重构中移出请求对象）；
 - §6 ChunkContextManager：索引、邻接、同结构上下文、有界拼接、span 定位；
 - §14.3 Evidence：模型、from_dict/to_dict、evidence_type 校验；
 - §16 L1/L2 验证与 AC-4 覆盖统计。
@@ -22,13 +23,20 @@ PACKAGE_DIR = Path(__file__).resolve().parents[1]
 
 
 def _load_package_modules(package_name: str, directory: Path, stems: list[str]) -> dict[str, types.ModuleType]:
-    parent = types.ModuleType(package_name)
-    parent.__path__ = [str(directory)]
-    parent.__package__ = package_name
-    sys.modules[package_name] = parent
+    # pytest 全量运行时多个测试文件共享 sys.modules：已加载的模块直接复用，
+    # 避免同名模块被重复 exec 出多个类对象（isinstance/类型一致性污染）。
+    parent = sys.modules.get(package_name)
+    if parent is None:
+        parent = types.ModuleType(package_name)
+        parent.__path__ = [str(directory)]
+        parent.__package__ = package_name
+        sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
         module_name = f"{package_name}.{stem}"
+        if module_name in sys.modules:
+            loaded[stem] = sys.modules[module_name]
+            continue
         spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
@@ -72,26 +80,26 @@ def make_chunks() -> list[CC.ExtractionChunk]:
 
 
 class ExtractionRequestTest(unittest.TestCase):
-    def test_text_only_wraps_single_chunk(self) -> None:
-        request = CC.ExtractionRequest(ontology="o", text="正文内容")
-        chunks = request.extraction_chunks()
-        self.assertEqual(len(chunks), 1)
-        self.assertEqual(chunks[0].chunk_id, "chunk-0")
-        self.assertEqual(chunks[0].text, "正文内容")
-
-    def test_chunks_preferred_over_text(self) -> None:
+    def test_single_chunk_request(self) -> None:
         request = CC.ExtractionRequest(
-            ontology="o",
-            text="全局上下文",
-            chunks=make_chunks(),
+            chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text="正文内容")]
         )
-        chunks = request.extraction_chunks()
-        self.assertEqual([chunk.chunk_id for chunk in chunks], ["c1", "c2", "c3"])
-        self.assertEqual(request.text, "全局上下文")
+        self.assertEqual(len(request.chunks), 1)
+        self.assertEqual(request.chunks[0].chunk_id, "chunk-0")
+        self.assertEqual(request.chunks[0].text, "正文内容")
+        self.assertIsNone(request.target_types)
+
+    def test_request_carries_chunks_and_target_types(self) -> None:
+        request = CC.ExtractionRequest(
+            chunks=make_chunks(),
+            target_types=["OperationalActivity"],
+        )
+        self.assertEqual([chunk.chunk_id for chunk in request.chunks], ["c1", "c2", "c3"])
+        self.assertEqual(request.target_types, ["OperationalActivity"])
 
     def test_empty_request(self) -> None:
-        request = CC.ExtractionRequest(ontology="o")
-        self.assertEqual(request.extraction_chunks(), [])
+        request = CC.ExtractionRequest(chunks=[])
+        self.assertEqual(request.chunks, [])
 
     def test_chunk_roundtrip_dict(self) -> None:
         chunk = make_chunks()[0]
