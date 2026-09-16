@@ -5,12 +5,34 @@ from docling.document_converter import PdfFormatOption
 from docling.document_converter import DocumentConverter
 import os
 import shutil
+import sys
 import tempfile
 import subprocess
 from typing import Optional, Dict, Any
 from . import BaseProcessor
+from ..page_edges import (
+    DEFAULT_MIN_CHARS,
+    extract_edge_lines,
+    merge_page_edges,
+    missing_lines,
+    normalize_keep_page_edges,
+    page_is_kept,
+)
+from ..table_json import convert_tables_to_json
+from ..text_layer import (
+    merge_split_headings,
+    page_text_lines,
+    reconcile_markdown,
+    tighten_number_artifacts,
+)
 
 DOCLING_MODELS_PATH = "/models/docling-models"
+
+
+def get_docling_models_path() -> str:
+    """Docling 离线模型目录：默认容器挂载点，可用 DOCLING_MODELS_PATH 覆盖。"""
+    return os.getenv("DOCLING_MODELS_PATH") or DOCLING_MODELS_PATH
+
 
 class DocxProcessor(BaseProcessor):
     def __init__(self, libreoffice_path: str = None):
@@ -38,11 +60,12 @@ class DocxProcessor(BaseProcessor):
     def _get_pdf_converter(self) -> DocumentConverter:
         if self.pdf_converter is None:
             self._ensure_docling_artifacts()
+            models_path = get_docling_models_path()
             self.pdf_converter = DocumentConverter(
                 allowed_formats=[InputFormat.PDF],
                 format_options={
                     InputFormat.PDF: PdfFormatOption(
-                        pipeline_options=PdfPipelineOptions(artifacts_path=DOCLING_MODELS_PATH)
+                        pipeline_options=PdfPipelineOptions(artifacts_path=models_path)
                     )
                 },
             )
@@ -50,12 +73,14 @@ class DocxProcessor(BaseProcessor):
 
     @staticmethod
     def _ensure_docling_artifacts() -> None:
-        if not os.path.isdir(DOCLING_MODELS_PATH):
+        models_path = get_docling_models_path()
+        if not os.path.isdir(models_path):
             raise RuntimeError(
-                f"Docling 离线模型目录不存在：{DOCLING_MODELS_PATH}；"
-                "请在交付包的 models 目录中包含 docling-models"
+                f"Docling 离线模型目录不存在：{models_path}；"
+                "请在交付包的 models 目录中包含 docling-models，"
+                "或用 DOCLING_MODELS_PATH 指向真实目录"
             )
-        docling_settings.artifacts_path = DOCLING_MODELS_PATH
+        docling_settings.artifacts_path = models_path
 
     def _detect_office_app(self) -> Optional[str]:
         """检测系统中的LibreOffice应用"""
@@ -110,7 +135,14 @@ class DocxProcessor(BaseProcessor):
 
         if ext == '.pdf':
             metadata['file_type'] = 'pdf'
-            content = self._process_pdf(file_path)
+            content, pdf_metadata = self._process_pdf(
+                file_path,
+                start_page_id=kwargs.get('start_page_id') or 0,
+                end_page_id=kwargs.get('end_page_id'),
+                keep_page_edges=kwargs.get('keep_page_edges'),
+                page_edge_min_chars=kwargs.get('page_edge_min_chars'),
+            )
+            metadata.update(pdf_metadata)
         elif ext == '.docx':
             content = self._process_docx(file_path)
         elif ext == '.doc':
@@ -136,20 +168,95 @@ class DocxProcessor(BaseProcessor):
             'metadata': metadata
         }
 
-    def _process_pdf(self, file_path: str) -> str:
-        """使用 Docling 处理 PDF 文件"""
+    def _process_pdf(
+        self,
+        file_path: str,
+        *,
+        start_page_id: int = 0,
+        end_page_id: Optional[int] = None,
+        keep_page_edges: Any = None,
+        page_edge_min_chars: Optional[int] = None,
+    ) -> tuple[str, Dict[str, Any]]:
+        """使用 Docling 处理 PDF 文件。
+
+        ``start_page_id`` / ``end_page_id`` 为 0 基闭区间页码（``None`` 表示到末页），
+        内部换算为 Docling 的 1 基 ``page_range``。
+
+        ``keep_page_edges`` 打开时，Docling 判为 FURNITURE（页眉/页脚）而默认不导出的
+        内容，会按页从 PDF 文本层补回 Markdown，详见 ``preproc_src/page_edges.py``。
+        """
+        selection = normalize_keep_page_edges(keep_page_edges)
+        min_chars = DEFAULT_MIN_CHARS if page_edge_min_chars is None else int(page_edge_min_chars)
+
+        first_page = start_page_id + 1
+        last_page = (end_page_id + 1) if end_page_id is not None else sys.maxsize
+        page_range = (first_page, last_page) if (start_page_id or end_page_id is not None) else None
+
         try:
-            result = self._get_pdf_converter().convert(file_path)
-            return self._export_markdown(result)
+            # docling 不接受显式 page_range=None，未限定范围时保持默认调用方式。
+            convert_kwargs: Dict[str, Any] = {"page_range": page_range} if page_range else {}
+            result = self._get_pdf_converter().convert(file_path, **convert_kwargs)
+            document = result.document
+            pages = sorted(document.pages.keys())
+            if not pages:
+                return self._export_markdown(result), {}
+
+            # 逐页导出：docling 的 page_break_placeholder 不会为空白页插入占位符
+            # （标准封面背面、目次背面常见），按占位符切分会导致页号错位。
+            # 逐页导出与整篇导出的内容等价，但页号始终与 document.pages 对齐。
+            injected: list[dict] = []
+            rendered: list[str] = []
+            reconciled_lines = 0
+            merged_lines = 0
+            table_count = 0
+            for index, page_no in enumerate(pages):
+                chunk = document.export_to_markdown(
+                    page_no=page_no, escape_html=False, escape_underscores=False
+                )
+                page_lines = page_text_lines(file_path, page_no)
+                # 先合并被拆开的条款标题，再用文本层逐行对账，最后收拢编号内部空格。
+                chunk, merged = merge_split_headings(chunk, page_lines)
+                chunk, replaced = reconcile_markdown(chunk, page_lines)
+                chunk = tighten_number_artifacts(chunk)
+                chunk, converted = convert_tables_to_json(chunk)
+                merged_lines += merged
+                reconciled_lines += replaced
+                table_count += converted
+                if selection is not None and page_is_kept(selection, index + 1, 1):
+                    edges = extract_edge_lines(file_path, page_no, min_chars=min_chars)
+                    top = missing_lines(edges["top"], chunk)
+                    bottom = missing_lines(edges["bottom"], chunk)
+                    if top or bottom:
+                        chunk = merge_page_edges(chunk, top, bottom)
+                        injected.append({"page": page_no, "top": top, "bottom": bottom})
+                rendered.append(chunk)
+            content = "\n\n".join(text.strip() for text in rendered if text.strip())
+            metadata: Dict[str, Any] = {
+                "text_layer_reconcile": {
+                    "pages": len(pages),
+                    "replaced_lines": reconciled_lines,
+                    "merged_heading_lines": merged_lines,
+                },
+                # 关闭时也记录，便于从元数据确认页边内容是有意不补回的。
+                "page_edges": {"mode": str(keep_page_edges), "injected": injected},
+                "tables_json": {"count": table_count},
+            }
+            return (content + "\n" if content else ""), metadata
         except Exception as e:
             print(f"使用docling处理PDF失败: {e}")
-            return f"处理失败：{str(e)}"
+            return f"处理失败：{str(e)}", {}
+
+    @staticmethod
+    def _tables_to_json(markdown: str) -> str:
+        """把导出 Markdown 里的表格统一替换成 JSON 代码块，其余结构保持不变。"""
+        converted, _ = convert_tables_to_json(markdown)
+        return converted
 
     def _process_docx(self, file_path: str) -> str:
         """处理DOCX文件"""
         try:
             result = self._get_converter().convert(file_path)
-            return self._export_markdown(result)
+            return self._tables_to_json(self._export_markdown(result))
         except Exception as e:
             print(f"使用docling处理DOCX失败: {e}")
             return f"处理失败：{str(e)}"
@@ -158,7 +265,7 @@ class DocxProcessor(BaseProcessor):
         """使用 Docling 原生转换器处理 PPTX 或图片。"""
         try:
             result = self._get_converter().convert(file_path)
-            return self._export_markdown(result)
+            return self._tables_to_json(self._export_markdown(result))
         except Exception as e:
             print(f"使用docling处理{label}失败: {e}")
             return f"处理失败：{str(e)}"

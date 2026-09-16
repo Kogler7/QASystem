@@ -154,6 +154,7 @@ gitignore/
 frontend/frontend_venv/
 CURSOR_PROMPT_AGENTLOOP_PYTHON_LIB.md
 .omc/
+work/
 
 # 保存的模型文件
 *.pkl
@@ -176,3 +177,5 @@ intent/track/
 intent/models/
 intent/results_v3/
 intent/dataset
+test_docs/中车待抽取pdf/
+test_docs/抽取结果md/

@@ -192,6 +192,8 @@ class DocumentParsingService:
                     end_page_id=page_range[1] if page_range else None,
                     selected_engine=(execution_plan or {}).get("engine"),
                     engine_selection=(execution_plan or {}).get("selection"),
+                    keep_page_edges=config.keep_page_edges,
+                    page_edge_min_chars=config.page_edge_min_chars,
                 )
             if not result.get("success"):
                 reason = str(result.get("error") or "未知原因")
