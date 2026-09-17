@@ -17,9 +17,13 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from ._logging import get_step_logger
 from .graph_utils import canonical_name, coerce_non_empty_name
 from .ontology_schema import OntologyClass, OntologyProperty, OntologySchema
 from .composite import CompositeSpec, discover_composite_specs
+
+
+logger = get_step_logger(__name__)
 
 
 _ENUM_KEYWORDS = ("枚举", "enum")
@@ -817,7 +821,14 @@ def compile_plan(
     unknown_content_policy: str = "ignore",
 ) -> ExtractionPlan:
     """§37 Step 2 便捷入口：编译本体并解析目标范围。"""
-    return OntologyCompiler(
+    logger.info(
+        "[步骤][本体编译] 输入: 本体=%d字符 target_types=%s include_subclasses=%s mode=%s",
+        len(ontology or ""),
+        list(target_types) if target_types is not None else "全部",
+        include_subclasses,
+        mode,
+    )
+    plan = OntologyCompiler(
         mode=mode,
         unknown_content_policy=unknown_content_policy,
     ).compile(
@@ -826,3 +837,11 @@ def compile_plan(
         include_subclasses=include_subclasses,
         ontology_id=ontology_id,
     )
+    logger.info(
+        "[步骤][本体编译] 输出: types=%d %s 关系族=%d schema_warnings=%d",
+        len(plan.allowed_types),
+        sorted(plan.allowed_types),
+        len(getattr(plan, "relation_specs", {}) or {}),
+        len(plan.schema_warnings),
+    )
+    return plan

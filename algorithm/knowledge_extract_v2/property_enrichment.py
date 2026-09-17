@@ -12,11 +12,16 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any
 
-from .candidate_generation import generate_structured
+from ._logging import get_step_logger
+from .candidate_generation import generate_structured, verify_items_with_llm
 from .chunk_context import ChunkContextManager, ExtractionChunk
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan, PropertySpec
-from .prompt_router import DocumentRoute, build_chat_messages
+from .prompt_router import DocumentRoute, _looks_like_record_table, build_chat_messages
+
+
+logger = get_step_logger(__name__)
+from .semantic_evidence import semantic_support
 
 _EMPTY = (None, [])
 _LITERAL_PROPERTY = re.compile(
@@ -186,15 +191,73 @@ def _valid_update(
         return False
     # 允许字符串属性显式置为空字符串，用于表示“原文无值/缺失”，不删除属性。
     if value == "":
-        return bool(quote and chunk.text)
-    # 不再强制字面属性逐字：证据 quote 已定位到当前 chunk，属性值可以是对该
-    # quote 的忠实归纳（含编号/名称等）。
-    return bool(quote and chunk.text)
+        return True
+    # 是否逐字定位不再决定丢弃：调用方先做语义比对，不一致时交由大模型核验。
+    return True
 
 
 def _batches(values: list[Any], size: int) -> Iterable[list[Any]]:
     for index in range(0, len(values), max(1, size)):
         yield values[index : index + max(1, size)]
+
+
+_JSON_UNESCAPES = {'"': '"', "\\": "\\", "/": "/", "n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f"}
+
+
+def _unescape_json_like(value: str) -> str:
+    """把模型输出里字面存在的 JSON 转义序列还原（\" -> "、\n -> 换行 等）。"""
+    if "\\" not in value:
+        return value
+    out: list[str] = []
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char == "\\" and index + 1 < len(value):
+            nxt = value[index + 1]
+            if nxt in _JSON_UNESCAPES:
+                out.append(_JSON_UNESCAPES[nxt])
+                index += 2
+                continue
+            if nxt == "u" and index + 5 < len(value):
+                try:
+                    out.append(chr(int(value[index + 2 : index + 6], 16)))
+                    index += 6
+                    continue
+                except ValueError:
+                    pass
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def _locate_record_table_quote(manager: Any, chunk_id: str, quote: str) -> str | None:
+    """记录表 chunk 的证据兜底：模型常把 JSON 对象包成数组并转义。
+
+    仅在原样定位失败时调用；返回可以在 chunk 内逐字定位的最长候选片段。
+    """
+    normalized = _unescape_json_like(quote).strip()
+    candidates: list[str] = []
+    if normalized:
+        candidates.append(normalized)
+    stripped = normalized.strip().strip(",")
+    if stripped.startswith("["):
+        candidates.append(stripped[1:].strip().strip(","))
+    if stripped.endswith("]"):
+        candidates.append(stripped[:-1].strip().strip(","))
+    obj_start = stripped.find("{")
+    if obj_start > 0:
+        candidates.append(stripped[obj_start:].strip().strip(","))
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if manager.find_span(chunk_id, candidate) is not None:
+            return candidate
+        # 记录之间可能有轻微格式差异，退化为最长可逐字定位前缀。
+        for length in range(len(candidate), 23, -8):
+            prefix = candidate[:length]
+            if manager.find_span(chunk_id, prefix) is not None:
+                return prefix
+    return None
 
 
 def enrich_entity_properties(
@@ -237,7 +300,7 @@ def enrich_entity_properties(
         grouped[anchor].append(entity)
         allowed_by_id[str(entity.candidate_id)] = declared
 
-    applied = rejected = calls = 0
+    applied = rejected = calls = verifications = 0
     for chunk_id in manager.chunk_ids:
         candidates = grouped.get(chunk_id, [])
         if not candidates:
@@ -294,6 +357,8 @@ def enrich_entity_properties(
                 continue
             entities_by_id = {str(entity.candidate_id): entity for entity in batch}
             seen_ids: set[str] = set()
+            planned: list[dict[str, Any]] = []
+            pending: list[dict[str, Any]] = []
             for update_index, update in enumerate(parsed.get("updates") or []):
                 entity_id = str(update.get("entity_id") or "")
                 entity = entities_by_id.get(entity_id)
@@ -304,10 +369,107 @@ def enrich_entity_properties(
                     continue
                 seen_ids.add(entity_id)
                 quote = str((update.get("evidence") or {}).get("quote") or "")
-                if manager.find_span(chunk_id, quote) is None:
-                    rejected += 1
-                    _warn(warnings, "PROPERTY_EVIDENCE_INVALID", "属性证据无法在当前 chunk 逐字定位", path, quote)
-                    continue
+                evidence_mode = ""
+                if quote and manager.find_span(chunk_id, quote) is not None:
+                    evidence_mode = "exact"
+                else:
+                    if quote and _looks_like_record_table(chunk):
+                        normalized_quote = _locate_record_table_quote(manager, chunk_id, quote)
+                        if normalized_quote is not None:
+                            quote = normalized_quote
+                            evidence_mode = "normalized"
+                    if not evidence_mode:
+                        semantic_values = [
+                            str(value)
+                            for value in dict(update.get("properties") or {}).values()
+                        ]
+                        semantic_values.append(str(getattr(entity, "name", "") or ""))
+                        if quote:
+                            semantic_values.append(quote)
+                        if semantic_support(chunk.text, semantic_values):
+                            evidence_mode = "semantic"
+                    if not evidence_mode:
+                        pending.append({
+                            "item_id": f"{chunk_id}:batch-{batch_index}:update[{update_index}]",
+                            "path": path,
+                            "entity": entity,
+                            "entity_id": entity_id,
+                            "update": update,
+                            "quote": quote,
+                        })
+                        continue
+                planned.append({
+                    "path": path,
+                    "entity": entity,
+                    "entity_id": entity_id,
+                    "update": update,
+                    "quote": quote,
+                    "mode": evidence_mode,
+                })
+
+            if pending:
+                verdicts = verify_items_with_llm(
+                    llm,
+                    chunk=chunk,
+                    items=[
+                        {
+                            "item_id": item["item_id"],
+                            "kind": "property",
+                            "entity_type": str(getattr(item["entity"], "type", "") or ""),
+                            "entity": str(getattr(item["entity"], "name", "") or ""),
+                            "properties": dict(item["update"].get("properties") or {}),
+                            "evidence_quote": item["quote"],
+                        }
+                        for item in pending
+                    ],
+                    pass_name="evidence_verification",
+                    chunk_id=f"{chunk_id}:batch-{batch_index}",
+                    use_scheduler=use_scheduler,
+                    attempts=attempts,
+                    max_attempts=min(2, max(1, max_attempts)),
+                    retry_base_seconds=retry_base_seconds,
+                    call_metrics=call_metrics,
+                    record_table=_looks_like_record_table(chunk),
+                )
+                verifications += 1
+                for item in pending:
+                    verdict = verdicts.get(item["item_id"], "uncertain")
+                    if verdict == "no":
+                        rejected += 1
+                        _warn(
+                            warnings,
+                            "PROPERTY_EVIDENCE_REJECTED",
+                            "语义比对不一致且大模型核验判定不属于原文，已拒绝",
+                            item["path"],
+                            item["quote"][:200],
+                        )
+                        continue
+                    code = "PROPERTY_EVIDENCE_LLM_VERIFIED" if verdict == "yes" else "PROPERTY_EVIDENCE_UNVERIFIED"
+                    message = (
+                        "语义比对不一致，大模型核验确认属于原文"
+                        if verdict == "yes"
+                        else "语义比对不一致，大模型核验不确定，保留并标记"
+                    )
+                    _warn(warnings, code, message, item["path"], item["quote"][:200])
+                    planned.append({
+                        "path": item["path"],
+                        "entity": item["entity"],
+                        "entity_id": item["entity_id"],
+                        "update": item["update"],
+                        "quote": item["quote"],
+                        "mode": f"llm_{verdict}",
+                    })
+
+            for item in planned:
+                entity = item["entity"]
+                entity_id = item["entity_id"]
+                update = item["update"]
+                path = item["path"]
+                quote = item["quote"]
+                if item["mode"] == "normalized":
+                    _warn(warnings, "PROPERTY_EVIDENCE_NORMALIZED", "属性证据经 JSON 记录表归一化后定位", path, quote[:200])
+                elif item["mode"] == "semantic":
+                    _warn(warnings, "PROPERTY_EVIDENCE_SEMANTIC", "属性证据未逐字定位，语义比对通过", path, quote[:200])
                 accepted_values: dict[str, Any] = {}
                 for prop_id, value in dict(update.get("properties") or {}).items():
                     prop = batch_allowed[entity_id].get(prop_id)
@@ -322,16 +484,28 @@ def enrich_entity_properties(
                         _warn(
                             warnings,
                             "PROPERTY_UPDATE_UNSUPPORTED",
-                            "属性未声明、已有值或缺少足够字面/语义证据，已拒绝",
+                            "属性未声明或已有值，已拒绝",
                             f"{path}.properties.{prop_id}",
                             value,
                         )
+                        continue
+                    if value == "" and _looks_like_record_table(chunk):
+                        # 记录表里归纳出的规则没有唯一标识时，不输出空属性占位。
                         continue
                     accepted_values[prop_id] = value
                 if accepted_values:
                     entity.properties.update(accepted_values)
                     applied += len(accepted_values)
-    return {"calls": calls, "applied": applied, "rejected": rejected}
+    summary = {"calls": calls, "applied": applied, "rejected": rejected, "verifications": verifications}
+    logger.info(
+        "[步骤][属性补全] 输出: 实体=%d 批次调用=%d 应用=%d 拒绝=%d 语义核验=%d",
+        len(pool.accepted_entities()),
+        calls,
+        applied,
+        rejected,
+        verifications,
+    )
+    return summary
 
 
 __all__ = ["enrich_entity_properties"]

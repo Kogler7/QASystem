@@ -3,13 +3,13 @@ import openpyxl
 from typing import Dict, List, Any, Tuple
 import numpy as np
 from datetime import datetime, date
-import logging
 import os
 import csv
 from . import BaseProcessor
 from ..table_json import render_json_block, table_from_columns_and_rows
+from algorithm.logging_setup import get_step_logger, preview
 
-logger = logging.getLogger(__name__)
+logger = get_step_logger(__name__)
 
 
 class ExcelProcessor(BaseProcessor):
@@ -390,12 +390,27 @@ class ExcelProcessor(BaseProcessor):
         result = self.process_excel(file_path)
         if 'error' in result:
             metadata['error'] = result['error']
+            logger.info(
+                "[步骤][解析][Excel] 输出: file=%s success=False error=%s",
+                os.path.basename(file_path),
+                result['error'],
+            )
             return {
                 'content': '',
                 'metadata': metadata
             }
 
+        sheets = result.get('sheets') or []
+        markdown = self._render_markdown(result)
+        logger.info(
+            "[步骤][解析][Excel] 输入: file=%s 输出: 工作表=%d 行数=%s markdown=%d字符 预览=%s",
+            os.path.basename(file_path),
+            len(sheets),
+            preview([len(sheet.get('data') or []) for sheet in sheets], 60),
+            len(markdown),
+            preview(markdown, 80),
+        )
         return {
-            'content': self._render_markdown(result),
+            'content': markdown,
             'metadata': metadata
         }

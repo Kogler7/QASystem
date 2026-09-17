@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from algorithm.knowledge_pipeline import generate_understanding, store_vectors, upload_file
+from algorithm.logging_setup import ensure_logging
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 from external_services.application import get_application_service_url
 
@@ -27,11 +28,29 @@ from backend.app.services.algorithm_capabilities import (
     GraphExtractionService,
 )
 
-logger = logging.getLogger(__name__)
+#: 本模块日志一定可见：不依赖 root 是否已有 handler（worker/子进程里 root 通常
+#: 既无 handler、级别也是 WARNING，模块级 INFO 会被 lastResort 直接丢弃）。
+logger = ensure_logging(logging.getLogger(__name__))
+
 
 #: 抽取结果快照目录：每次运行落盘一份 JSON、失败时同目录写 *_error.log，供后续比对。
 #: 本地是 backend/data/，容器内挂载在可写的 backend-data 卷（/app/backend/data）。
 EXTRACTION_SNAPSHOT_DIR = Path(__file__).resolve().parents[2] / "data" / "extraction_snapshots"
+
+#: 最近一次运行的阶段产物目录：流水线失败时把报错现场也写进同一个目录（见 _save_error_log）。
+_LAST_RUN_DIR: Path | None = None
+
+#: 日志里最多展开的本体行数；完整原文始终原样写进运行目录的 00-ontology.puml。
+ONTOLOGY_LOG_LINES = 200
+
+
+def _ontology_log_text(text: str, limit: int = ONTOLOGY_LOG_LINES) -> str:
+    """日志用的本体文本：最多前 limit 行，超出部分只报行数并指向产物文件。"""
+    lines = str(text or "").splitlines()
+    if len(lines) <= limit:
+        return str(text or "")
+    head = "\n".join(lines[:limit])
+    return f"{head}\n…（共 {len(lines)} 行，日志只展开前 {limit} 行；完整原文见运行目录 00-ontology.puml）"
 
 
 @dataclass(slots=True)
@@ -95,39 +114,71 @@ def _ontology_digest(ontology: str) -> dict[str, Any]:
     return info
 
 
+def _ontology_catalog(ontology: str) -> dict[str, Any]:
+    """本体在抽取器眼里的样子：类 / 属性 / identity / 关系。
+
+    前端传进来的 PlantUML 原文和抽取器实际编译出来的结构经常不是一回事
+    （别名、stereotype 会决定 type id，``名称 (标识)`` 的第二段才是属性 identifier），
+    所以抽取前把解析视图一并记录下来。
+    """
+    text = ontology or ""
+    catalog: dict[str, Any] = {
+        "received": bool(text.strip()),
+        "characters": len(text),
+        "classes": [],
+        "relations": [],
+        "parse_error": None,
+    }
+    if not text.strip():
+        return catalog
+    try:
+        from algorithm.knowledge_extract_v2.ontology_schema import OntologySchema
+
+        schema = OntologySchema.parse(text)
+        for item in schema.classes:
+            catalog["classes"].append(
+                {
+                    "type": item.identifier,
+                    "display_name": item.display_name,
+                    "stereotypes": list(item.stereotypes),
+                    "identity": list(schema.identity_properties_for(item.identifier)),
+                    "properties": [
+                        {
+                            "identifier": prop.identifier,
+                            "display_name": prop.display_name,
+                            "data_type": prop.data_type,
+                        }
+                        for prop in item.properties
+                    ],
+                }
+            )
+        catalog["relations"] = [
+            {"identifier": rel.identifier, "source": rel.source, "target": rel.target}
+            for rel in schema.relations
+        ]
+    except Exception as exc:  # noqa: BLE001 - 解析失败本身就是要看的信息
+        catalog["parse_error"] = f"{type(exc).__name__}: {exc}"
+    return catalog
+
+
 def _snapshot_prefix(label: str) -> str:
     safe = re.sub(r'[\\/:*?"<>|\s]+', "_", label)[:80] or "upload"
     return f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}_{safe}"
 
 
-def _save_extraction_snapshot(
-    label: str,
-    mode: str,
-    extraction: dict[str, Any],
-    stats: dict[str, Any],
-    ontology: str,
-) -> None:
-    """把本次提取后的结果原样落盘，供不同运行之间比对。"""
+def _save_stage_artifact(label: str, stage: str, content: str) -> None:
+    """把解析全文 / 切片文本另存一份时间戳文件（兼容旧的使用习惯）。
+
+    文件名形如 ``<时间戳>_<文件名>_parsed.md`` / ``..._chunks.json``；
+    同一次运行的这三份产物另外还落在 ``<run_id>_<文件名>/`` 目录里。
+    抽取及其之后的阶段不落盘。
+    """
     try:
         EXTRACTION_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-        path = EXTRACTION_SNAPSHOT_DIR / f"{_snapshot_prefix(label)}.json"
-        path.write_text(
-            json.dumps(
-                {
-                    "saved_at": datetime.now().isoformat(timespec="seconds"),
-                    "file": label,
-                    "mode": mode,
-                    "ontology": _ontology_digest(ontology),
-                    "extraction": extraction,
-                    "stats": stats,
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-    except Exception as exc:  # noqa: BLE001 - 快照写不进去不应让整条流水线失败
-        logger.error("抽取结果快照写入失败: %s", exc)
+        path = EXTRACTION_SNAPSHOT_DIR / f"{_snapshot_prefix(label)}_{stage}"
+        path.write_text(content, encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 - 落盘失败不应让流水线失败
+        logger.error("阶段产物写入失败: %s", exc)
 
 
 def _save_error_log(label: str, exc: Exception) -> None:
@@ -147,7 +198,11 @@ def _save_error_log(label: str, exc: Exception) -> None:
                 f"details: {json.dumps(exc.details, ensure_ascii=False, default=str) if exc.details is not None else None}",
             ]
         lines += [f"error: {type(exc).__name__}: {exc}", "", "traceback:", traceback.format_exc()]
-        path.write_text("\n".join(lines), encoding="utf-8")
+        payload = "\n".join(lines)
+        path.write_text(payload, encoding="utf-8")
+        if _LAST_RUN_DIR is not None:
+            # 同一次运行的目录里也留一份，便于"整个流程"在一个目录里看全。
+            (_LAST_RUN_DIR / "run-error.log").write_text(payload, encoding="utf-8")
     except Exception as write_exc:  # noqa: BLE001 - 写日志失败不能吞掉原始异常
         logger.error("报错日志写入失败: %s", write_exc)
 
@@ -173,6 +228,82 @@ def _log_pipeline_failure(method):
 
     return wrapper
 
+
+def _summarize_warnings(warnings: Any, *, limit: int = 30) -> dict[str, Any]:
+    """把抽取告警按 code 归类，便于一眼看出"没提议实体"还是"提议了被打掉"。"""
+    rows = [item for item in (warnings or []) if isinstance(item, dict)]
+    counter: dict[str, int] = {}
+    for row in rows:
+        code = str(row.get("code") or "UNKNOWN")
+        counter[code] = counter.get(code, 0) + 1
+    return {
+        "total": len(rows),
+        "by_code": dict(sorted(counter.items(), key=lambda item: (-item[1], item[0]))),
+        "details": rows[:limit],
+    }
+
+
+class StageRecorder:
+    """把知识沉淀"抽取之前"的每一步输出落成独立文档，并在日志里回执。
+
+    每次运行建一个目录 ``<run_id>_<文件名>/``，只放三份文档：
+    ``00-ontology.puml``（前端本体）、``01-parse.md``（解析输出）、
+    ``02-chunking.json``（切片输出）。抽取及其之后的阶段不再产生任何
+    日志与产物文件，结果只通过接口响应返回。
+
+    所有落盘都吞掉异常：阶段产物写不进去不能让整条流水线失败。
+    """
+
+    def __init__(self, label: str, *, directory: Path | None = None) -> None:
+        global _LAST_RUN_DIR
+        safe = re.sub(r'[\\/:*?"<>|\s]+', "_", str(label or ""))[:60].strip("_")
+        self.label = safe or "upload"
+        self.run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        self.directory = (directory or EXTRACTION_SNAPSHOT_DIR) / f"{self.run_id}_{self.label}"
+        _LAST_RUN_DIR = self.directory
+        self.started = datetime.now()
+        self._last = self.started
+        self._available = self._prepare()
+
+    def _prepare(self) -> bool:
+        try:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            return True
+        except Exception as exc:  # noqa: BLE001 - 产物目录创建失败不应中断流程
+            logger.error("[知识沉淀] 阶段产物目录创建失败: %s", exc)
+            return False
+
+    def write(
+        self,
+        stage: str,
+        filename: str,
+        content: str,
+        *,
+        title: str = "",
+        summary: str = "",
+    ) -> str | None:
+        """写一份步骤输出文档并打日志；返回落盘路径，未落盘时返回 None。"""
+        now = datetime.now()
+        elapsed = (now - self._last).total_seconds()
+        self._last = now
+        written: str | None = None
+        path = self.directory / filename
+        if self._available:
+            try:
+                path.write_text(content, encoding="utf-8")
+                written = str(path)
+            except Exception as exc:  # noqa: BLE001 - 单步落盘失败不影响流程
+                logger.error("[知识沉淀] 步骤产物写入失败 stage=%s: %s", stage, exc)
+        logger.info(
+            "[知识沉淀] 步骤 %s 输出文档: %s（%d 字符, 耗时 %.2fs）→ %s%s",
+            stage,
+            filename,
+            len(content),
+            elapsed,
+            written or "未落盘",
+            f"｜{summary}" if summary else "",
+        )
+        return written
 
 class KnowledgePrecipitationService:
     def __init__(
@@ -226,6 +357,7 @@ class KnowledgePrecipitationService:
         origin: dict[str, Any] | None,
         started: datetime,
         stats: dict[str, Any],
+        recorder: StageRecorder | None = None,
     ) -> dict[str, Any]:
         threshold = options.chunking.chunk_threshold
         if len(markdown) <= threshold:
@@ -237,10 +369,60 @@ class KnowledgePrecipitationService:
         else:
             chunked = self.chunking.chunk(markdown, options.chunking)
             chunks = chunked["items"]
+        logger.info(
+            "[知识沉淀] 切片完成: count=%d 总字符=%d threshold=%d",
+            len(chunks),
+            sum(len(item["text"]) for item in chunks),
+            threshold,
+        )
+        _save_stage_artifact(
+            upload_stem,
+            "chunks.json",
+            json.dumps(chunks, ensure_ascii=False, indent=2, default=str),
+        )
+        if recorder is not None:
+            recorder.write(
+                "02-chunking",
+                "02-chunking.json",
+                json.dumps(chunks, ensure_ascii=False, indent=2, default=str),
+                title="切片输出",
+                summary=(
+                    f"count={len(chunks)} 总字符={sum(len(item['text']) for item in chunks)}"
+                    f" threshold={threshold}"
+                ),
+            )
 
         # 兼容两种抽取模式：传元模型走本体图谱抽取；不传元模型走非结构化摘要（切片+概要，不产图谱）
         has_ontology = bool((ontology or "").strip())
         if has_ontology:
+            # 抽取前先把"前端传进来的本体长什么样"完整记下来：原文 + 抽取器的解析视图。
+            ontology_catalog = _ontology_catalog(ontology)
+            logger.info(
+                "[知识沉淀] 抽取输入本体（前端原样传入）: %d字符 sha256=%s",
+                len(ontology),
+                hashlib.sha256(ontology.encode("utf-8")).hexdigest()[:16],
+            )
+            logger.info(
+                "[知识沉淀] 抽取输入本体原文（日志最多 %d 行）:\n%s",
+                ONTOLOGY_LOG_LINES,
+                _ontology_log_text(ontology),
+            )
+            logger.info(
+                "[知识沉淀] 本体解析视图（type / identity / 属性）:\n%s",
+                _ontology_log_text(
+                    json.dumps(ontology_catalog["classes"], ensure_ascii=False, indent=2)
+                ),
+            )
+            logger.info(
+                "[知识沉淀] 本体解析视图（关系）: %s",
+                _ontology_log_text(
+                    json.dumps(ontology_catalog["relations"], ensure_ascii=False)
+                ),
+            )
+            if ontology_catalog["parse_error"]:
+                logger.error(
+                    "[知识沉淀] 本体解析失败: %s", ontology_catalog["parse_error"]
+                )
             extracted_batch = self.extraction.extract(
                 ontology=ontology,
                 items=[
@@ -272,6 +454,36 @@ class KnowledgePrecipitationService:
                 "attempts": extracted_batch.attempts,
                 "scheduler": extracted_batch.scheduler,
             }
+            logger.info(
+                "[知识沉淀] 抽取完成: model=%s nodes=%d relationships=%d merge=%s attempts=%d",
+                options.extraction.model or "env默认",
+                node_count,
+                relationship_count,
+                options.extraction.merge,
+                len(extracted_batch.attempts),
+            )
+            # 图谱全文与 attempts 全量不再打日志：抽取结果通过接口响应的
+            # data.extraction / data.stats.extraction 返回，算法层另有 [步骤][LLM] 明细。
+
+            # 抽取诊断：warnings 按 code 归类 + profile 计数。这两项此前既不在日志也不在
+            # 快照里，导致"0 节点"无法区分"模型没提议实体"还是"提议了被校验打掉"。
+            diagnostics = extracted_items[0] if extracted_items else {}
+            extracted_warnings = list(diagnostics.get("warnings") or [])
+            extracted_profile = dict(diagnostics.get("profile") or {})
+            warning_summary = _summarize_warnings(extracted_warnings)
+            logger.info(
+                "[知识沉淀] 抽取诊断: warnings=%d by_code=%s",
+                warning_summary["total"],
+                json.dumps(warning_summary["by_code"], ensure_ascii=False),
+            )
+            logger.info(
+                "[知识沉淀] 抽取诊断 profile: %s",
+                json.dumps(extracted_profile, ensure_ascii=False, default=str),
+            )
+            stats["extraction"]["warnings"] = warning_summary
+            stats["extraction"]["profile"] = extracted_profile
+            # 抽取结果不再落盘 03-extraction.json：图谱与诊断直接进入接口响应的
+            # data.extraction / data.stats.extraction，需要时从调用方取。
 
             if options.storage.persist_graph:
                 raise PipelineError(
@@ -289,6 +501,12 @@ class KnowledgePrecipitationService:
                 [item["text"] for item in chunks],
                 model=options.extraction.model,
             )
+            logger.info(
+                "[知识沉淀] 摘要完成: chunks=%d model=%s",
+                len(summaries),
+                options.extraction.model or "env默认",
+            )
+            # 逐片摘要不打日志：完整内容通过响应返回，不再落盘。
             scheduler_cfg = _get_llm_config()
             final_graph = None
             final_graphs = None
@@ -325,15 +543,8 @@ class KnowledgePrecipitationService:
                     "qpm": scheduler_cfg["qpm"],
                 },
             }
+            # 摘要结果同样不再落盘 03-extraction 产物。
 
-        # 提取后立刻落盘快照：下游（向量化/图谱存储）失败也不丢本次抽取结果
-        _save_extraction_snapshot(
-            upload_stem,
-            "ontology" if has_ontology else "unstructured",
-            extracted_result,
-            stats,
-            ontology,
-        )
 
         vector_ids = None
         vector_dimension = None
@@ -341,6 +552,7 @@ class KnowledgePrecipitationService:
             embedded = self.embeddings.texts(
                 [TextEmbeddingItem(text=item["text"]) for item in chunks]
             )
+            # 抽取之后不再产生任何日志与产物文件（向量化结果只在本次响应里返回）。
             vector_items = [
                 {"text": chunk["text"], "vector": embedded_item["vector"]}
                 for chunk, embedded_item in zip(chunks, embedded["items"])
@@ -417,15 +629,51 @@ class KnowledgePrecipitationService:
         file_name = Path(request.file_name or "upload.bin").name
         stem = Path(file_name).stem
         suffix = Path(file_name).suffix.lower()
+        # 本次运行的阶段产物目录：解析/切片/抽取/向量/存储/摘要 每步一份输出文档。
+        recorder = StageRecorder(stem)
         stats: dict[str, Any] = {
             "document": {"file_name": file_name, "file_size": len(request.content), "file_type": suffix.lstrip(".")},
             "extraction": {},
             "chunking": {},
             "storage": {"enabled": bool(get_application_service_url())},
         }
+        logger.info(
+            "[知识沉淀] 开始处理: file=%s bytes=%d ontology=%s model=%s",
+            file_name,
+            len(request.content),
+            f"{len(request.ontology or '')}字符" if (request.ontology or "").strip() else "未提供",
+            request.options.extraction.model or "env默认",
+        )
+        # 本体原文只在抽取阶段打一次（见 _run_pipeline），这里不再重复。
+        logger.info("[知识沉淀] 本次运行阶段产物目录: %s", recorder.directory)
+        if (request.ontology or "").strip():
+            # 本体是本次抽取的输入，作为第 0 步产物原样留档。
+            recorder.write(
+                "00-ontology",
+                "00-ontology.puml",
+                request.ontology,
+                title="前端传入的本体（抽取输入原文）",
+                summary=f"{len(request.ontology)}字符 sha256={hashlib.sha256(request.ontology.encode('utf-8')).hexdigest()[:16]}",
+            )
         try:
             parsed = self.parsing.parse(file_name, request.content, request.options.parser)
             markdown = parsed["markdown"]
+            logger.info(
+                "[知识沉淀] 解析完成: file=%s parser=%s markdown=%d字符 sha256=%s",
+                file_name,
+                parsed["parser"],
+                len(markdown),
+                hashlib.sha256(markdown.encode("utf-8")).hexdigest()[:16],
+            )
+            # 解析全文不打日志：完整内容见运行目录 01-parse.md。
+            _save_stage_artifact(stem, "parsed.md", markdown)
+            recorder.write(
+                "01-parse",
+                "01-parse.md",
+                markdown,
+                title="解析输出（切片阶段的输入）",
+                summary=f"parser={parsed['parser']} {len(markdown)}字符",
+            )
             stats["document"].update(
                 {"content_length": parsed["content_length"], "parser": parsed["parser"]}
             )
@@ -434,9 +682,11 @@ class KnowledgePrecipitationService:
             )
             if origin is not None:
                 stats["storage"]["origin"] = origin
+                # 落盘细节已由算法层 [步骤][存储] 原文上传输出 打印，此处不再重复。
 
             return self._run_pipeline(
                 markdown, stem, request.ontology, request.options, origin, started, stats,
+                recorder=recorder,
             )
         except CapabilityError as exc:
             partial = None
@@ -483,8 +733,35 @@ class KnowledgePrecipitationService:
                 "parser": parsed["parser"],
             })
 
+        # 本体原文只在抽取阶段打一次（见 _run_pipeline），这里不再重复。
         combined_markdown = "\n".join(combined_parts)
+        logger.info(
+            "[知识沉淀] 批量解析完成: files=%d combined=%d字符 sha256=%s",
+            len(request.files),
+            len(combined_markdown),
+            hashlib.sha256(combined_markdown.encode("utf-8")).hexdigest()[:16],
+        )
+        # 批量合并全文不打日志：完整内容见运行目录 01-parse.md。
+        # 注意：combined_stem 必须先赋值再使用（此前先调用后赋值会在批量入口直接 NameError）。
         combined_stem = Path(request.files[0].file_name).stem + f"_等{len(request.files)}个文件"
+        recorder = StageRecorder(combined_stem)
+        logger.info("[知识沉淀] 本次运行阶段产物目录: %s", recorder.directory)
+        if (request.ontology or "").strip():
+            recorder.write(
+                "00-ontology",
+                "00-ontology.puml",
+                request.ontology,
+                title="前端传入的本体（抽取输入原文）",
+                summary=f"{len(request.ontology)}字符 sha256={hashlib.sha256(request.ontology.encode('utf-8')).hexdigest()[:16]}",
+            )
+        _save_stage_artifact(combined_stem, "parsed.md", combined_markdown)
+        recorder.write(
+            "01-parse",
+            "01-parse.md",
+            combined_markdown,
+            title="批量解析输出（切片阶段的输入）",
+            summary=f"files={len(request.files)} 合并后 {len(combined_markdown)}字符",
+        )
         stats: dict[str, Any] = {
             "documents": file_stats,
             "extraction": {},
@@ -508,9 +785,11 @@ class KnowledgePrecipitationService:
         )
         if origin is not None:
             stats["storage"]["origin"] = origin
+            # 落盘细节已由算法层 [步骤][存储] 原文上传输出 打印，此处不再重复。
 
         result = self._run_pipeline(
             combined_markdown, combined_stem, request.ontology, request.options, origin, started, stats,
+            recorder=recorder,
         )
         # Augment summary with file count
         fc = len(request.files)

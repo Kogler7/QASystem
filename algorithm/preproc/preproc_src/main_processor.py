@@ -8,11 +8,54 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+import functools
+import time
+
+from algorithm.logging_setup import get_step_logger, preview
 from algorithm.runtime_profile import is_remote_only
 from algorithm.preproc.preproc_src.page_edges import (
     DEFAULT_MIN_CHARS as DEFAULT_PAGE_EDGE_MIN_CHARS,
     normalize_keep_page_edges,
 )
+
+
+logger = get_step_logger(__name__)
+
+
+def _log_parse_io(method):
+    """给解析入口加统一的输入/输出日志：谁在解析、用了什么配置、产出多少字符。"""
+
+    @functools.wraps(method)
+    def wrapper(self, file_path, *args, **kwargs):
+        started = time.monotonic()
+        path = Path(file_path)
+        size = path.stat().st_size if path.exists() else -1
+        logger.info(
+            "[步骤][解析] 输入: file=%s size=%d engine=%s ocr=%s table=%s formula=%s page=%s-%s",
+            path.name,
+            size,
+            kwargs.get("model_name") or "auto",
+            kwargs.get("ocr_mode") or "auto",
+            kwargs.get("table_enable"),
+            kwargs.get("formula_enable"),
+            kwargs.get("start_page_id"),
+            kwargs.get("end_page_id"),
+        )
+        result = method(self, file_path, *args, **kwargs)
+        payload = result if isinstance(result, dict) else {}
+        content = payload.get("content")
+        metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        logger.info(
+            "[步骤][解析] 输出: success=%s engine=%s markdown=%d字符 耗时=%.2fs 预览=%s",
+            payload.get("success", "error" not in payload),
+            metadata.get("model_used") or metadata.get("engine") or "unknown",
+            len(content) if isinstance(content, str) else 0,
+            time.monotonic() - started,
+            preview(content, 60) if isinstance(content, str) else str(payload.get("error") or ""),
+        )
+        return result
+
+    return wrapper
 
 # 显示面积占比低于该值的图片按水印/角标等装饰处理，不计入 PDF 版面复杂度。
 # 典型情况：标准文本每页带一个 15pt 的角标（约占页面 0.04%），旧逻辑按 pypdf 的
@@ -392,6 +435,7 @@ class DocumentProcessor:
             if temp_pdf_path:
                 shutil.rmtree(os.path.dirname(temp_pdf_path), ignore_errors=True)
 
+    @_log_parse_io
     def process_file(
         self,
         file_path: str,

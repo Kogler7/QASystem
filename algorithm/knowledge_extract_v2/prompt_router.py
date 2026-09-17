@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
 from .chunk_context import ExtractionChunk
+from .structured_text import is_structured_payload
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
 
@@ -350,7 +351,7 @@ def resolve_document_route(plan: ExtractionPlan, chunks: list[ExtractionChunk]) 
     )
 
 
-def _catalog_text(plan: ExtractionPlan) -> str:
+def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> str:
     lines: list[str] = []
     for type_id in sorted(plan.allowed_types):
         spec = plan.class_specs.get(type_id)
@@ -361,7 +362,11 @@ def _catalog_text(plan: ExtractionPlan) -> str:
             line += f"；identity: {', '.join(spec.identity_properties)}"
         lines.append(line)
         for prop in spec.properties:
-            lines.append(f"  - `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type})")
+            suffix = ""
+            if include_comments:
+                comment = " ".join((prop.comment or "").split())
+                suffix = f" // {comment[:200]}" if comment else ""
+            lines.append(f"  - `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type}){suffix}")
     return "\n".join(lines) if lines else "（无本体类目录）"
 
 
@@ -437,6 +442,47 @@ _OFFICIAL_FORM_RULES = """
 - 表单提供的公文标题/文号等元数据可作为对应 OfficialDocument 的属性/证据；没有可靠标题 mention 时也可以只输出上述 operational 实体。"""
 
 
+_RECORD_TABLE_PROPERTY_RULES = """
+### 当前 chunk 是结构化记录表，属性补全必须遵守以下特殊约束
+- 同一规则/对象可能对应记录表中的多条记录（例如按分类字段归并）：语义属性必须综合该实体对应的全部记录进行归纳，不得只取第一条，也不得把多条记录逐条罗列成同义拼接。
+- 语义属性不得直接复制实体名；同一实体的不同属性必须各自给出与其语义匹配的内容，不得多个属性输出完全相同的值。
+- 条件类属性（identifier/display_name 含 antecedent、前件、前提、条件）：归纳规则成立所依赖的前提。
+- 结果类属性（identifier/display_name 含 consequent、后件、结论、结果）：归纳前提成立时得到的结果。
+- 连接类属性（identifier/display_name 含 connection、连接、符号）：给出前件到后件的连接词，如「则」「导致」「引起」。
+- 模板类属性（identifier/display_name/注释含 template、模板、模版、表达式）：按「若<前提>，则<结果>」形式给出规则模板。
+- 正文/描述类属性（identifier/display_name/注释含 body、正文、描述、说明、内容）：给出对规则语义的完整陈述（包含前提与结果），不得只写规则名或规则类型。
+- 标识类属性（identifier/display_name/注释含 id、identifier、编号、唯一标识）：只有规则唯一对应单条记录标识时才填写；由多条记录归纳得到的规则不填该属性。
+- 名称类属性（identifier/display_name 含 name、名称、title）：直接使用实体名或原文中的规范短名，不得扩写成长句。
+- 语义/模板/前件/后件属性必须包含原文的关键限定（对象、地点、数值、处置等），做完整归纳；不得过度简化成几个词。
+- 规则模板按「若<前件>，则<后件>。」形式输出，直接拼接 antecedent 与 consequent 的文本，不要使用尖括号或额外符号。
+- 前件取规则的前提/触发条件，后件取由它引出的结果、诊断原因或处置结论；原文以「现象，原因是 X」表述时，前件=现象、后件=X；原文以「X 导致 Y」表述时，前件=X、后件=Y。
+- 必须为 known entities 中列出的每个 missing property 输出更新；确实无法确定的语义属性也要按原文做忠实归纳，不得直接复制实体名。"""
+
+
+_RECORD_TABLE_ENTITY_RULES = """
+### 当前 chunk 是结构化记录表（JSON/表格形式的键值记录列表），必须执行以下特殊约束
+- 结构化记录/表格不是「没有实体」的理由：应按记录行归纳出 ontology 允许的实体（如规则、事件、对象、条款），不得因为「内容都是字段标签和标量值」就直接输出空数组。
+- 若记录表有分类/类型/类别字段（如「故障详细分类」「类别」「类型」），实体 mention 直接使用该字段的值本身（如「RTU」「对标不准」），不要添加「故障」「规则」等后缀，也不要改写成描述性名称。
+- 同一语义的规则/对象（同一分类或同一规则下的多条记录）只输出一个实体；按 ontology 的 identity/名称语义归并，不要为同一条规则的每条原始记录重复创建实体。
+- 抽全优先：只要 current chunk 中存在可承载 ontology 类型的业务对象，必须逐条或按语义归纳给出候选；只有整个 chunk 与 ontology 完全无关时，才允许输出空数组。"""
+
+
+def _looks_like_record_table(chunk: ExtractionChunk) -> bool:
+    """识别 JSON 记录表 chunk。
+
+    两种形态都算（判定细节见 structured_text）：
+
+    * 整段就是 JSON——benchmark 数据集的 docs/*.md；批量路径的 "## 文件:" 头
+      同样会被剥掉；
+    * Markdown 外壳 + json 代码块——解析层按行为规范 §10 产出的真实形态
+      （Excel 的 "## sheet 名 + 表格 JSON"，docx/OCR 原地替换的表格 JSON），
+      此时要求 JSON 主体在 chunk 里占绝对多数，避免误判正文夹带 JSON 的文档。
+
+    历史实现只认第一种，导致前端上传 xlsx 永远命中不了记录表策略。
+    """
+    return is_structured_payload(chunk.text or "")
+
+
 def _looks_like_official_form(chunk: ExtractionChunk) -> bool:
     """识别公文收文处理单/表单 chunk，抑制审批流转记录造成的实体爆炸。"""
     text_head = (chunk.text or "")[:600]
@@ -492,6 +538,15 @@ def build_chat_messages(
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
         top_level = "按本轮 schema 输出 JSON object"
 
+    record_table = _looks_like_record_table(chunk)
+    if record_table:
+        output_constraint = (
+            "- 只输出 JSON object。不要用空数组敷衍：结构化记录/表格中每一行或每一条可归纳对象都应输出；"
+            '只有确认 current chunk 中不存在任何符合 ontology 的对象时，才允许输出 {"entities": []}。'
+        )
+    else:
+        output_constraint = f"- 只输出 JSON object；没有结果时输出 {top_level}。"
+
     issue_text = (
         json.dumps(repair_issues, ensure_ascii=False, sort_keys=True, default=str)
         if repair_issues
@@ -513,10 +568,12 @@ def build_chat_messages(
 - start_char/end_char 是 chunk-relative、左闭右开区间；mention 无法逐字定位时填 0，系统会按 evidence.quote 兜底。
 - 数值、单位、标量属性值、字段标签和修饰词不是独立实体；同一 type + 完全相同 mention 每个 chunk 只输出一次。
 - 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。"""
+        if record_table:
+            entity_rules += _RECORD_TABLE_ENTITY_RULES
         if _looks_like_official_form(chunk):
             entity_rules += _OFFICIAL_FORM_RULES
     else:
-        ontology_section = _catalog_text(plan)
+        ontology_section = _catalog_text(plan, include_comments=record_table)
         feature_section = _feature_text(plan)
         relation_section = _signature_text(plan)
         known_section = _known_entities_text(known_entities)
@@ -535,6 +592,8 @@ def build_chat_messages(
 - 不要用 null 代替字符串属性；空字符串 "" 是允许的空值表达。
 - 同一个实体的 updates 中，一个属性只能出现一次；如果属性已有值，不要重复输出。
 - evidence.quote 必须是 current chunk.text 中逐字连续、足以支撑本次全部属性更新的原文。"""
+        if record_table:
+            entity_rules += _RECORD_TABLE_PROPERTY_RULES
 
     if task == "relation" and relation_pairs is not None:
         ontology_section = "候选 relation pair（只能选择这些 pair 的 relation_id 或 NONE）\n" + "\n".join(
@@ -585,7 +644,7 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
 {json.dumps(output_schema or {}, ensure_ascii=False, sort_keys=True, default=str)}
 
 ## output constraints
-- 只输出 JSON object；没有结果时输出 {top_level}。
+{output_constraint}
 - evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。
  - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。
 {entity_rules}"""

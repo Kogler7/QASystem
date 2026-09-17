@@ -15,6 +15,7 @@ from typing import Any, Iterable, Optional
 
 from openai import OpenAI
 
+from ._logging import ensure_logging
 from .config import get_llm_config
 from .graph_utils import (
     build_node_properties,
@@ -26,7 +27,8 @@ from .graph_utils import (
 from .ontology_schema import OntologySchema
 from .scheduler import get_llm_scheduler
 
-logger = logging.getLogger(__name__)
+#: 子进程/独立脚本里 root 通常没有 handler，这里保证本模块的 INFO 日志可见。
+logger = ensure_logging(logging.getLogger(__name__))
 
 
 GENERIC_INSTRUCTION = """## 通用抽取规则
@@ -350,13 +352,6 @@ def _thinking_rejected(exc: Exception) -> bool:
             "invalid type",
             "deserialize",
             "extra_forbidden",
-            # SGLang 等后端用 pydantic 枚举校验拒绝，报 literal_error
-            # 而不是 unsupported parameter，同样要触发降级。
-            "literal_error",
-            "invalid value",
-            "input should be",
-            "should be one of",
-            "must be one of",
         )
     )
 
