@@ -563,30 +563,42 @@ class KnowledgePrecipitationService:
                 options.storage.knowledge_space_id,
                 origin["id"],
             )
+            # 存储入库是"抽取结果展示之后"的独立步骤：这里失败不再抛错作废整篇，
+            # 否则前端连抽取结果都看不到（异常虽带 extraction，但任务已判失败）。
+            # 失败原因记入 stats 与日志，前端可按需重试入库。
+            vector_ids = None
+            inserted_count = None
+            vector_dimension = embedded["dimension"]
             if not vector_result.get("success"):
-                raise PipelineError(
-                    ErrorCode.VECTOR_STORE_FAILED,
-                    "向量存储失败",
-                    "vector_storage",
-                    vector_result,
-                    {"artifacts": {"markdown": origin}, "extraction": extracted_result},
-                )
-            vector_ids = vector_result.get("ids")
-            inserted_count = vector_result.get("inserted_count")
-            if not isinstance(vector_ids, list) or inserted_count != len(vector_items) or len(vector_ids) != len(vector_items):
-                raise PipelineError(
-                    ErrorCode.VECTOR_ID_COUNT_MISMATCH,
-                    "向量存储返回的 ids 数量与输入不一致",
-                    "vector_storage",
-                    {
+                logger.error("[知识沉淀] 向量存储失败，已降级返回抽取结果: %s", vector_result)
+                stats["storage"]["vector_error"] = {
+                    "code": "VECTOR_STORE_FAILED",
+                    "detail": vector_result,
+                }
+            else:
+                vector_ids = vector_result.get("ids")
+                inserted_count = vector_result.get("inserted_count")
+                if (
+                    not isinstance(vector_ids, list)
+                    or inserted_count != len(vector_items)
+                    or len(vector_ids) != len(vector_items)
+                ):
+                    logger.error(
+                        "[知识沉淀] 向量存储返回 ids 数量不一致，已降级: input=%d inserted=%s ids=%s",
+                        len(vector_items),
+                        inserted_count,
+                        len(vector_ids) if isinstance(vector_ids, list) else None,
+                    )
+                    stats["storage"]["vector_error"] = {
+                        "code": "VECTOR_ID_COUNT_MISMATCH",
                         "input_count": len(vector_items),
                         "inserted_count": inserted_count,
                         "id_count": len(vector_ids) if isinstance(vector_ids, list) else None,
-                    },
-                    {"artifacts": {"markdown": origin}, "extraction": extracted_result},
-                )
-            vector_dimension = embedded["dimension"]
-            stats["storage"]["vectors"] = {"inserted_count": inserted_count}
+                    }
+                    vector_ids = None
+                    inserted_count = None
+                else:
+                    stats["storage"]["vectors"] = {"inserted_count": inserted_count}
 
         stats["chunking"] = {
             "chunk_count": chunked["count"],
