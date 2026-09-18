@@ -1,0 +1,36 @@
+@startuml
+title 干系人—关注点本体模型
+
+top to bottom direction
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty methods
+
+package "干系人与关注点" <<Rectangle>> #E0F2F1 {
+class "干系人" <<stakeholder>> {
+  - 干系人标识 (干系人标识) //干系人唯一标识
+  - 干系人名称 (干系人名称) //干系人名称
+  - 干系人所关联角色 (干系人所关联角色) //干系人所关联角色
+  - 干系人所在组织 (干系人所在组织) //干系人所在组织
+  - 干系人利益诉求 (干系人利益诉求) //干系人利益诉求
+  - 干系人责任域 (干系人责任域) //干系人责任域
+}
+
+note right of "干系人"
+  类定义：Stakeholder is a role, position, individual, organization, having an interest in an entity.
+end note
+
+class "关注点" <<Concern>> {
+  - 关注点标识 (关注点标识) //关注点标识
+  - 关注点名称 (关注点名称) //关注点名称
+  - 关注点类型 (关注点类型) //关注点类型
+  - 关注点描述 (关注点描述) //关注点描述
+}
+
+note right of "关注点"
+  类定义：Concern is a matter of importance to a stakeholder.
+end note
+
+"关注点" "1" --> "1" "干系人" : is_a_matter_of_importance_to <<is_a_matter_of_importance_to>>
+}
+@enduml

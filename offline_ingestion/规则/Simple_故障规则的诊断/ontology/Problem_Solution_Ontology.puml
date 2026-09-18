@@ -1,0 +1,49 @@
+@startuml
+title 问题—方案本体模型
+
+top to bottom direction
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty methods
+
+package "问题与方案" <<Rectangle>> #F3E5F5 {
+class "问题类" <<Problem>> {
+  - 问题标识 (问题标识) //问题的唯一标识符，用于区分不同问题
+  - 问题名称 (问题名称) //问题的名称
+  - 问题描述 (问题描述) //用户对于问题的自然语言描述
+  - 问题坐标系 (坐标系) //问题所涉及的[维度,刻度]的集合
+  - 问题目标对象 (目标对象) //问题所涉及的目标对象
+  - 问题目标 (问题目标) //问题解决的最终目标，明确描述需要达成的结果或状态
+  - 问题约束条件 (约束条件) //问题所需遵守的约束规则
+  - 问题干系人 (干系人) //问题相关的干系人
+  - 问题关注点 (关注点) //问题相关干系人的关注点
+  - 问题类型 (问题类型) //DESCRIPTIVE、QUANTITATIVE、DIAGNOSTIC、PREDICTIVE、PRESCRIPTIVE、EXPLANATORY、NORMATIVE、EXPLORATORY、RETROSPECTIVE、ATTRIBUTIONAL、COMPARATIVE
+  - 子问题 (子问题) //该问题拆解出来的子问题，形同问题类本体
+}
+
+note right of "问题类"
+  类定义：Problem is a gap between current and desired state.
+end note
+
+class "方案类" <<Solution>> {
+  - 方案标识 (方案标识) //方案的唯一标识符，用于区分不同方案
+  - 方案名称 (方案名称) //方案的名称
+  - 方案描述 (方案描述) //方案描述
+  - 方案类别 (方案类别) //DataAnalysis、Classification、Assessment、Diagnosis、Monitoring、ConfigurationDesign、Assignment、Planning、Scheduling
+  - 解决方案目标 (解决方案目标) //解决方案目标
+  - 输入 (输入) //输入
+  - 输出 (输出) //输出
+  - 方案约束 (方案约束) //方案约束
+  - 方案资源需求 (方案资源需求) //实现该解决方案所需要的资源集，包括知识资源、组件资源等
+  - 方案覆盖的维度 (方案覆盖的维度) //该解决方案所覆盖的维度与刻度
+  - 方案模板 (方案模板) //方案模板是一个活动流程，包括方案步骤以及控制逻辑，方案步骤与方案类本体同形
+  - 方案验证规则 (方案验证规则) //该解决方案成功解决该问题的验证规则
+}
+
+note right of "方案类"
+  类定义：Solution is a strategy, algorithm, or process to address a problem.
+end note
+
+"问题类" "1" --> "1" "方案类" : NEED_SOLUTION <<NEED_SOLUTION>>
+}
+@enduml
