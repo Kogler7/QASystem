@@ -628,18 +628,6 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
 ## ontology relation signatures
 {relation_section}
 
-## known entities
-{known_section}
-
-## current chunk
-{_chunk_text(chunk)}
-
-## local context
-{context_section}
-
-## repair issues
-{issue_text}
-
 ## output schema
 {json.dumps(output_schema or {}, ensure_ascii=False, sort_keys=True, default=str)}
 
@@ -647,7 +635,19 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
 {output_constraint}
 - evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。
  - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。
-{entity_rules}"""
+{entity_rules}
+
+## known entities
+{known_section}
+
+## local context
+{context_section}
+
+## current chunk
+{_chunk_text(chunk)}
+
+## repair issues
+{issue_text}"""
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": user},

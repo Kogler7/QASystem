@@ -130,17 +130,71 @@ def _schema(entities: list[Any], allowed: dict[str, dict[str, PropertySpec]]) ->
     }
 
 
+_CATALOG_VALUE_MAX = 40
+_CATALOG_MAX_PROPERTIES = 3
+_CATALOG_TEXTLIKE_HINTS = (
+    "body", "template", "antecedent", "consequent", "quote", "original",
+    "text", "content", "正文", "模板", "前件", "后件", "内容", "原文", "摘要", "描述",
+)
+
+
+def _identity_properties(entity: Any) -> dict[str, Any]:
+    """目录里只保留"身份型"短标量。
+
+    entity.properties 里是上游 pass 让模型归纳出的长文本（规则正文、模板、
+    前件后件、单元标题…），它们对"补哪些属性"毫无帮助，却会把单次 prompt
+    从几千字符撑到两万以上（实测 property prompt 26k、单次调用 66 秒）。
+    这里只留短标量，模型补值时靠 missing_properties 与 current chunk。
+    """
+    picked: dict[str, Any] = {}
+    for key, value in dict(getattr(entity, "properties", None) or {}).items():
+        if not isinstance(value, (str, int, float, bool)):
+            continue
+        text = str(value)
+        if len(text) > _CATALOG_VALUE_MAX:
+            continue
+        if any(hint in f"{key}{text}" for hint in _CATALOG_TEXTLIKE_HINTS):
+            continue
+        picked[key] = value
+        if len(picked) >= _CATALOG_MAX_PROPERTIES:
+            break
+    return picked
+
+
+_NEIGHBOR_TEXT_MAX = 800
+_NEIGHBOR_TOTAL_MAX = 2000
+
+
+def _truncated_neighbor_context(neighbors: Iterable[Any]) -> list[dict[str, Any]]:
+    """邻接片只作补值参考：截断文本，避免把整篇文档拼进单次 prompt。
+
+    属性值通常落在实体所属片（current chunk）内并已原文提供；邻接片保留片首
+    若干字符足以提供上下文，完整拼接会让 prompt 膨胀数倍、单次调用显著变慢。
+    """
+    rows: list[dict[str, Any]] = []
+    budget = _NEIGHBOR_TOTAL_MAX
+    for item in neighbors:
+        payload = item.to_dict()
+        text = str(payload.get("text") or "")
+        if len(text) > _NEIGHBOR_TEXT_MAX:
+            payload["text"] = f"{text[:_NEIGHBOR_TEXT_MAX]}…（共{len(text)}字符，已截断）"
+        if budget <= 0:
+            break
+        budget -= len(str(payload.get("text") or ""))
+        rows.append(payload)
+    return rows
+
+
 def _catalog_row(entity: Any, allowed: dict[str, PropertySpec]) -> dict[str, Any]:
     return {
         "id": entity.candidate_id,
         "type": entity.canonical_type,
         "name": entity.name,
-        "properties": dict(entity.properties),
+        "properties": _identity_properties(entity),
         "missing_properties": {
             prop_id: {
                 "display_name": prop.display_name,
                 "data_type": prop.data_type,
-                "comment": prop.comment,
             }
             for prop_id, prop in allowed.items()
         },
@@ -317,7 +371,7 @@ def enrich_entity_properties(
             if item.chunk_id != chunk_id
         ]
         local_context = json.dumps(
-            [item.to_dict() for item in neighbors],
+            _truncated_neighbor_context(neighbors),
             ensure_ascii=False,
             sort_keys=True,
             default=str,

@@ -33,6 +33,76 @@ GLOBAL_RELATION_CATALOG_THRESHOLD = 80
 MAX_LOCAL_RELATION_CATALOG = 160
 RELATION_PAIR_BATCH_SIZE = 40
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
+# 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
+# 同时按字符封顶，防止"行少但单元格极长"的表格把单次 prompt 撑爆。
+TABLE_ROWS_PER_PART = 20
+TABLE_CHARS_PER_PART = 6000
+
+
+def _structured_row_segments(chunk: ExtractionChunk) -> list[tuple[int, ExtractionChunk]]:
+    """把超长表格切片按行拆成多个自洽子表，返回 (偏移, 子片)（偏移恒为 0）。
+
+    分片规则：先到 TABLE_ROWS_PER_PART 行、或 TABLE_CHARS_PER_PART 字符即封片。
+    子表自带 columns 与完整围栏，是合法 JSON；子表文本由原始单元格值重新序列化，
+    引文仍可在原文中逐字定位。返回空表示"不是可拆的结构化表格"，上层回落原逻辑。
+    """
+    text = chunk.text or ""
+    fence = chr(96) * 3
+    open_at = text.find(fence)
+    if open_at < 0:
+        return []
+    body_start = text.find("\n", open_at)
+    close_at = text.rfind(fence)
+    if body_start < 0 or close_at <= body_start:
+        return []
+    try:
+        payload = json.loads(text[body_start + 1:close_at])
+    except Exception:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or len(rows) <= TABLE_ROWS_PER_PART:
+        return []
+    prefix = text[:body_start + 1]
+    suffix = text[close_at:]
+    windows: list[list[Any]] = []
+    window: list[Any] = []
+    size = 0
+    for row in rows:
+        row_size = len(json.dumps(row, ensure_ascii=False, default=str))
+        if window and (len(window) >= TABLE_ROWS_PER_PART or size + row_size > TABLE_CHARS_PER_PART):
+            windows.append(window)
+            window = []
+            size = 0
+        window.append(row)
+        size += row_size
+    if window:
+        windows.append(window)
+    if len(windows) < 2:
+        return []
+    parts: list[tuple[int, ExtractionChunk]] = []
+    for window in windows:
+        rebuilt = prefix + json.dumps({**payload, "rows": window}, ensure_ascii=False, indent=1) + "\n" + suffix
+        parts.append((
+            0,
+            ExtractionChunk(
+                chunk_id=chunk.chunk_id,
+                text=rebuilt,
+                document_id=chunk.document_id,
+                section_id=chunk.section_id,
+                section_title=chunk.section_title,
+                clause_number=chunk.clause_number,
+                page_no=chunk.page_no,
+                start_offset=chunk.start_offset,
+                end_offset=chunk.end_offset,
+                parent_chunk_id=chunk.parent_chunk_id,
+                previous_chunk_id=chunk.previous_chunk_id,
+                next_chunk_id=chunk.next_chunk_id,
+                metadata=dict(chunk.metadata),
+            ),
+        ))
+    return parts
 
 
 def _append_warning(
@@ -887,6 +957,26 @@ def entity_pass(
         local_attempts: list[dict[str, Any]] = []
         local_warnings: list[dict[str, Any]] = []
         local_call_metrics: list[dict[str, Any]] = []
+        # 表格切片按行拆子表：几十/几百/几千行的 Excel 若整块送进单次调用，
+        # 要么被输出上限截断、要么 prompt 过大超时，最终整片判失败、整篇报错。
+        # 拆成自洽子表后每片只裁决 TABLE_ROWS_PER_PART 行，单次调用恒有界；
+        # 子表行数不超过上限，因此递归在下一层自然终止。
+        row_parts = _structured_row_segments(chunk)
+        if row_parts:
+            merged_entities: list[dict[str, Any]] = []
+            for _, part in row_parts:
+                _, part_entities, part_attempts, part_warnings, part_metrics = run(part)
+                local_attempts.extend(part_attempts)
+                local_warnings.extend(part_warnings)
+                local_call_metrics.extend(part_metrics)
+                merged_entities.extend(part_entities)
+            _append_warning(
+                local_warnings,
+                "ENTITY_TABLE_SPLIT_BY_ROWS",
+                f"表格切片按行拆为 {len(row_parts)} 个子表",
+                chunk.chunk_id,
+            )
+            return chunk.chunk_id, merged_entities, local_attempts, local_warnings, local_call_metrics
         neighbors = [
             item
             for item in manager.local_context(

@@ -46,6 +46,62 @@ def parse_chunk_characters(raw: str | list[str] | None) -> list[str]:
     return separators
 
 
+_FENCE_CHAR = chr(96)
+_FENCE_MARKS = (_FENCE_CHAR * 3, "~~~")
+
+
+def _fenced_spans(text: str) -> list[tuple[int, int]]:
+    """扫描围栏符配对，返回每个围栏块的 [start, end) 字符区间。"""
+    spans: list[tuple[int, int]] = []
+    open_at: int | None = None
+    position = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith(_FENCE_MARKS):
+            if open_at is None:
+                open_at = position
+            else:
+                spans.append((open_at, position + len(line)))
+                open_at = None
+        position += len(line)
+    return spans
+
+
+def _heading_start(text: str, fence_start: int) -> int:
+    """把紧邻表格上方的 Markdown 标题并进表格片，避免标题与表格分家。"""
+    head_lines = text[:fence_start].splitlines(keepends=True)
+    index = len(head_lines) - 1
+    back = 0
+    while index >= 0 and not head_lines[index].strip():
+        back += len(head_lines[index])
+        index -= 1
+    if index >= 0 and head_lines[index].lstrip().startswith("#"):
+        return fence_start - back - len(head_lines[index])
+    return fence_start
+
+
+def _table_aware_segments(content: str) -> list[tuple[bool, str]] | None:
+    """把每个围栏代码块（含紧邻标题）隔离成独立片段：表格整块不切。
+
+    按字符切会在表格中间下刀，JSON 变成非法片段、围栏只剩一半、工作表标题与
+    表格分家，抽取必然失败（几十行 Excel 抽不出来就是此因）。超长表格改由
+    抽取层按行拆成多个自洽子表消化。返回 None 表示没有围栏块，走原逻辑。
+    """
+    spans = _fenced_spans(content)
+    if not spans:
+        return None
+    segments: list[tuple[bool, str]] = []
+    cursor = 0
+    for start, end in spans:
+        head = _heading_start(content, start)
+        if head > cursor:
+            segments.append((False, content[cursor:head]))
+        segments.append((True, content[head:end]))
+        cursor = end
+    if cursor < len(content):
+        segments.append((False, content[cursor:]))
+    return [(is_table, segment) for is_table, segment in segments if segment.strip()]
+
+
 def chunk_document(
     content: str,
     chunk_type: int = 0,
@@ -66,6 +122,33 @@ def chunk_document(
         raise ValueError("chunk_overlap 必须小于 chunk_size")
     if not content:
         return []
+    segments = _table_aware_segments(content)
+    if segments is not None:
+        merged: list[str] = []
+        for is_table, segment in segments:
+            if is_table:
+                merged.append(segment)
+                continue
+            merged.extend(
+                chunk_document(
+                    segment,
+                    chunk_type=chunk_type,
+                    chunk_size=chunk_size,
+                    chunk_characters=chunk_characters,
+                    similarity=similarity,
+                    chunk_overlap=chunk_overlap,
+                    model_path=model_path,
+                    breakpoint_method=breakpoint_method,
+                )
+            )
+        logger.info(
+            "[步骤][切片] 表格感知切分: 片段=%d 切片=%d 单片字符=%s",
+            len(segments),
+            len(merged),
+            preview([len(item) for item in merged], 80),
+        )
+        return merged or [content]
+
     logger.info(
         "[步骤][切片] 输入: %d字符 算法=%s size=%d overlap=%d 分隔符=%s",
         len(content),
