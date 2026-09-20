@@ -31,7 +31,10 @@ from .structured_output import validate_json_schema
 
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
 MAX_LOCAL_RELATION_CATALOG = 160
-RELATION_PAIR_BATCH_SIZE = 40
+# 批大小受输出上限约束：每条 pair 决策（pair_id+label+evidence.quote）约 60~90
+# token，默认 max_tokens=16384 最多容纳约 150~250 条。超限会导致响应 JSON 截断、
+# generate_structured 解析失败后整批丢弃（批越大丢得越多），故取 150。
+RELATION_PAIR_BATCH_SIZE = 200
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
 # 同时按字符封顶，防止"行少但单元格极长"的表格把单次 prompt 撑爆。

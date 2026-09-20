@@ -404,14 +404,22 @@ def _signature_text(plan: ExtractionPlan) -> str:
     return "\n".join(lines) if lines else "（无关系签名）"
 
 
-def _known_entities_text(known_entities: list[dict[str, Any]] | None) -> str:
+def _known_entities_text(
+    known_entities: list[dict[str, Any]] | None,
+    *,
+    task: str = "",
+) -> str:
     if not known_entities:
         return "（无）"
+    # repair 只把实体目录当端点参照用：截断到前 25 个，且不展示
+    # missing_properties（属性补全另有专 pass），避免撑爆 repair prompt。
+    repair = task == "repair"
+    entries = known_entities[:25] if repair else known_entities
     lines = [
         "| id | type | name | properties | missing_properties |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for entry in known_entities:
+    for entry in entries:
         properties = ", ".join(
             f"{key}={value}" for key, value in dict(entry.get("properties") or {}).items()
         )
@@ -421,14 +429,30 @@ def _known_entities_text(known_entities: list[dict[str, Any]] | None) -> str:
             else str(key)
             for key, value in dict(entry.get("missing_properties") or {}).items()
         )
-        lines.append(
-            f"| `{entry.get('id', '')}` | `{entry.get('type', '')}` | {entry.get('name', '')} | "
-            f"{properties or '-'} | {missing or '-'} |"
-        )
+        if repair:
+            lines.append(
+                f"| `{entry.get('id', '')}` | `{entry.get('type', '')}` | {entry.get('name', '')} | "
+                f"{properties or '-'} |"
+            )
+        else:
+            lines.append(
+                f"| `{entry.get('id', '')}` | `{entry.get('type', '')}` | {entry.get('name', '')} | "
+                f"{properties or '-'} | {missing or '-'} |"
+            )
+    if repair and len(known_entities) > len(entries):
+        lines.append(f"（共 {len(known_entities)} 个实体，repair 仅展示前 {len(entries)} 个）")
     return "\n".join(lines)
 
 
-def _chunk_text(chunk: ExtractionChunk) -> str:
+def _chunk_text(chunk: ExtractionChunk, *, task: str = "") -> str:
+    if task == "repair":
+        # repair 的上下文 chunk 只需要原文证据，全量 metadata JSON 体积大且无用。
+        return json.dumps(
+            {"chunk_id": chunk.chunk_id, "text": (chunk.text or "")[:8000]},
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
     return json.dumps(chunk.to_dict(), ensure_ascii=False, sort_keys=True, default=str)
 
 _OFFICIAL_FORM_RULES = """
@@ -576,7 +600,7 @@ def build_chat_messages(
         ontology_section = _catalog_text(plan, include_comments=record_table)
         feature_section = _feature_text(plan)
         relation_section = _signature_text(plan)
-        known_section = _known_entities_text(known_entities)
+        known_section = _known_entities_text(known_entities, task=task)
         context_section = local_context or "（无）"
         entity_rules = ""
 
@@ -644,7 +668,7 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
 {context_section}
 
 ## current chunk
-{_chunk_text(chunk)}
+{_chunk_text(chunk, task=task)}
 
 ## repair issues
 {issue_text}"""

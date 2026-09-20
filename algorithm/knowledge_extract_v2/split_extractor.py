@@ -132,7 +132,7 @@ def _repair_context_chunks(
     *,
     entities: list[dict[str, Any]],
     relations: list[dict[str, Any]],
-    max_chunks: int = 6,
+    max_chunks: int = 3,
 ) -> list[ExtractionChunk]:
     """Resolve verifier issues to evidence chunks without guessing document prefixes."""
     known_ids = set(manager.chunk_ids)
@@ -670,6 +670,7 @@ def extract_split(
         same_section=same_section,
         max_attempts=max_attempts,
         retry_base_seconds=retry_base_seconds,
+        max_workers=max_workers,
     )
 
     logger.info(
@@ -807,7 +808,8 @@ def extract_split(
                 f"repair[{payload['round']}]",
             )
             return {"entities": [], "relations": []}
-        repair_text = "\n\n".join(chunk.text for chunk in referenced_chunks)
+        # repair 只需要证据定位用的原文，过长的上下文会撑爆 repair prompt。
+        repair_text = "\n\n".join(chunk.text for chunk in referenced_chunks)[:15000]
         repair_chunk = ExtractionChunk(
             chunk_id=f"repair-{payload['round']}",
             text=repair_text,

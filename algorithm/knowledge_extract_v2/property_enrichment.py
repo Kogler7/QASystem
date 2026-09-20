@@ -10,6 +10,7 @@ import json
 import re
 from collections import defaultdict
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ._logging import get_step_logger
@@ -330,7 +331,8 @@ def enrich_entity_properties(
     same_section: bool = True,
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
-    batch_size: int = 12,
+    batch_size: int = 24,
+    max_workers: int = 1,
 ) -> dict[str, int]:
     """Fill properties without changing the resolved entity/relation universe."""
     grouped: dict[str, list[Any]] = defaultdict(list)
@@ -354,7 +356,197 @@ def enrich_entity_properties(
         grouped[anchor].append(entity)
         allowed_by_id[str(entity.candidate_id)] = declared
 
-    applied = rejected = calls = verifications = 0
+    def _run_batch(
+        chunk: ExtractionChunk,
+        chunk_id: str,
+        batch_index: int,
+        batch: list[Any],
+        local_context: str,
+    ) -> tuple[int, int, int, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]] | None]:
+        """单个属性补全批次：LLM 补全 + 证据核验 + 应用。
+
+        批次间实体互不重叠（按 anchor 唯一分组），可安全并发；
+        返回 (applied, rejected, verifications, 本地 warnings/attempts/call_metrics)。
+        """
+        batch_allowed = {
+            str(entity.candidate_id): allowed_by_id[str(entity.candidate_id)]
+            for entity in batch
+        }
+        local_warnings: list[dict[str, Any]] = []
+        local_attempts: list[dict[str, Any]] = []
+        local_call_metrics: list[dict[str, Any]] | None = [] if call_metrics is not None else None
+        output_schema = _schema(batch, batch_allowed)
+        messages = build_chat_messages(
+            task="property",
+            plan=plan,
+            route=route,
+            chunk=chunk,
+            local_context=local_context,
+            known_entities=[
+                _catalog_row(entity, batch_allowed[str(entity.candidate_id)])
+                for entity in batch
+            ],
+            output_schema=output_schema,
+        )
+        parsed = generate_structured(
+            llm,
+            messages,
+            output_schema,
+            use_scheduler=use_scheduler,
+            attempts=local_attempts,
+            pass_name="property",
+            chunk_id=f"{chunk_id}:batch-{batch_index}",
+            max_attempts=max_attempts,
+            retry_base_seconds=retry_base_seconds,
+            call_metrics=local_call_metrics,
+        )
+        batch_applied = batch_rejected = batch_verifications = 0
+        if parsed is None:
+            return 0, 0, 0, local_warnings, local_attempts, local_call_metrics
+        entities_by_id = {str(entity.candidate_id): entity for entity in batch}
+        seen_ids: set[str] = set()
+        planned: list[dict[str, Any]] = []
+        pending: list[dict[str, Any]] = []
+        for update_index, update in enumerate(parsed.get("updates") or []):
+            entity_id = str(update.get("entity_id") or "")
+            entity = entities_by_id.get(entity_id)
+            path = f"property.{chunk_id}.batch-{batch_index}.updates[{update_index}]"
+            if entity is None or entity_id in seen_ids:
+                batch_rejected += 1
+                _warn(local_warnings, "PROPERTY_UPDATE_ENTITY_INVALID", "属性更新实体不在固定批次中或重复", path, entity_id)
+                continue
+            seen_ids.add(entity_id)
+            quote = str((update.get("evidence") or {}).get("quote") or "")
+            evidence_mode = ""
+            if quote and manager.find_span(chunk_id, quote) is not None:
+                evidence_mode = "exact"
+            else:
+                if quote and _looks_like_record_table(chunk):
+                    normalized_quote = _locate_record_table_quote(manager, chunk_id, quote)
+                    if normalized_quote is not None:
+                        quote = normalized_quote
+                        evidence_mode = "normalized"
+                if not evidence_mode:
+                    semantic_values = [
+                        str(value)
+                        for value in dict(update.get("properties") or {}).values()
+                    ]
+                    semantic_values.append(str(getattr(entity, "name", "") or ""))
+                    if quote:
+                        semantic_values.append(quote)
+                    if semantic_support(chunk.text, semantic_values):
+                        evidence_mode = "semantic"
+                if not evidence_mode:
+                    pending.append({
+                        "item_id": f"{chunk_id}:batch-{batch_index}:update[{update_index}]",
+                        "path": path,
+                        "entity": entity,
+                        "entity_id": entity_id,
+                        "update": update,
+                        "quote": quote,
+                    })
+                    continue
+            planned.append({
+                "path": path,
+                "entity": entity,
+                "entity_id": entity_id,
+                "update": update,
+                "quote": quote,
+                "mode": evidence_mode,
+            })
+
+        if pending:
+            verdicts = verify_items_with_llm(
+                llm,
+                chunk=chunk,
+                items=[
+                    {
+                        "item_id": item["item_id"],
+                        "kind": "property",
+                        "entity_type": str(getattr(item["entity"], "type", "") or ""),
+                        "entity": str(getattr(item["entity"], "name", "") or ""),
+                        "properties": dict(item["update"].get("properties") or {}),
+                        "evidence_quote": item["quote"],
+                    }
+                    for item in pending
+                ],
+                pass_name="evidence_verification",
+                chunk_id=f"{chunk_id}:batch-{batch_index}",
+                use_scheduler=use_scheduler,
+                attempts=local_attempts,
+                max_attempts=min(2, max(1, max_attempts)),
+                retry_base_seconds=retry_base_seconds,
+                call_metrics=local_call_metrics,
+                record_table=_looks_like_record_table(chunk),
+            )
+            batch_verifications += 1
+            for item in pending:
+                verdict = verdicts.get(item["item_id"], "uncertain")
+                if verdict == "no":
+                    batch_rejected += 1
+                    _warn(
+                        local_warnings,
+                        "PROPERTY_EVIDENCE_REJECTED",
+                        "语义比对不一致且大模型核验判定不属于原文，已拒绝",
+                        item["path"],
+                        item["quote"][:200],
+                    )
+                    continue
+                code = "PROPERTY_EVIDENCE_LLM_VERIFIED" if verdict == "yes" else "PROPERTY_EVIDENCE_UNVERIFIED"
+                message = (
+                    "语义比对不一致，大模型核验确认属于原文"
+                    if verdict == "yes"
+                    else "语义比对不一致，大模型核验不确定，保留并标记"
+                )
+                _warn(local_warnings, code, message, item["path"], item["quote"][:200])
+                planned.append({
+                    "path": item["path"],
+                    "entity": item["entity"],
+                    "entity_id": item["entity_id"],
+                    "update": item["update"],
+                    "quote": item["quote"],
+                    "mode": f"llm_{verdict}",
+                })
+
+        for item in planned:
+            entity = item["entity"]
+            entity_id = item["entity_id"]
+            update = item["update"]
+            path = item["path"]
+            quote = item["quote"]
+            if item["mode"] == "normalized":
+                _warn(local_warnings, "PROPERTY_EVIDENCE_NORMALIZED", "属性证据经 JSON 记录表归一化后定位", path, quote[:200])
+            elif item["mode"] == "semantic":
+                _warn(local_warnings, "PROPERTY_EVIDENCE_SEMANTIC", "属性证据未逐字定位，语义比对通过", path, quote[:200])
+            accepted_values: dict[str, Any] = {}
+            for prop_id, value in dict(update.get("properties") or {}).items():
+                prop = batch_allowed[entity_id].get(prop_id)
+                if prop is None or not _valid_update(
+                    entity=entity,
+                    prop=prop,
+                    value=value,
+                    quote=quote,
+                    chunk=chunk,
+                ):
+                    batch_rejected += 1
+                    _warn(
+                        local_warnings,
+                        "PROPERTY_UPDATE_UNSUPPORTED",
+                        "属性未声明或已有值，已拒绝",
+                        f"{path}.properties.{prop_id}",
+                        value,
+                    )
+                    continue
+                if value == "" and _looks_like_record_table(chunk):
+                    # 记录表里归纳出的规则没有唯一标识时，不输出空属性占位。
+                    continue
+                accepted_values[prop_id] = value
+            if accepted_values:
+                entity.properties.update(accepted_values)
+                batch_applied += len(accepted_values)
+        return batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics
+
+    jobs: list[tuple[ExtractionChunk, str, int, list[Any], str]] = []
     for chunk_id in manager.chunk_ids:
         candidates = grouped.get(chunk_id, [])
         if not candidates:
@@ -377,179 +569,26 @@ def enrich_entity_properties(
             default=str,
         )
         for batch_index, batch in enumerate(_batches(candidates, batch_size), start=1):
-            batch_allowed = {
-                str(entity.candidate_id): allowed_by_id[str(entity.candidate_id)]
-                for entity in batch
-            }
-            output_schema = _schema(batch, batch_allowed)
-            messages = build_chat_messages(
-                task="property",
-                plan=plan,
-                route=route,
-                chunk=chunk,
-                local_context=local_context,
-                known_entities=[
-                    _catalog_row(entity, batch_allowed[str(entity.candidate_id)])
-                    for entity in batch
-                ],
-                output_schema=output_schema,
-            )
-            parsed = generate_structured(
-                llm,
-                messages,
-                output_schema,
-                use_scheduler=use_scheduler,
-                attempts=attempts,
-                pass_name="property",
-                chunk_id=f"{chunk_id}:batch-{batch_index}",
-                max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds,
-                call_metrics=call_metrics,
-            )
-            calls += 1
-            if parsed is None:
-                continue
-            entities_by_id = {str(entity.candidate_id): entity for entity in batch}
-            seen_ids: set[str] = set()
-            planned: list[dict[str, Any]] = []
-            pending: list[dict[str, Any]] = []
-            for update_index, update in enumerate(parsed.get("updates") or []):
-                entity_id = str(update.get("entity_id") or "")
-                entity = entities_by_id.get(entity_id)
-                path = f"property.{chunk_id}.batch-{batch_index}.updates[{update_index}]"
-                if entity is None or entity_id in seen_ids:
-                    rejected += 1
-                    _warn(warnings, "PROPERTY_UPDATE_ENTITY_INVALID", "属性更新实体不在固定批次中或重复", path, entity_id)
-                    continue
-                seen_ids.add(entity_id)
-                quote = str((update.get("evidence") or {}).get("quote") or "")
-                evidence_mode = ""
-                if quote and manager.find_span(chunk_id, quote) is not None:
-                    evidence_mode = "exact"
-                else:
-                    if quote and _looks_like_record_table(chunk):
-                        normalized_quote = _locate_record_table_quote(manager, chunk_id, quote)
-                        if normalized_quote is not None:
-                            quote = normalized_quote
-                            evidence_mode = "normalized"
-                    if not evidence_mode:
-                        semantic_values = [
-                            str(value)
-                            for value in dict(update.get("properties") or {}).values()
-                        ]
-                        semantic_values.append(str(getattr(entity, "name", "") or ""))
-                        if quote:
-                            semantic_values.append(quote)
-                        if semantic_support(chunk.text, semantic_values):
-                            evidence_mode = "semantic"
-                    if not evidence_mode:
-                        pending.append({
-                            "item_id": f"{chunk_id}:batch-{batch_index}:update[{update_index}]",
-                            "path": path,
-                            "entity": entity,
-                            "entity_id": entity_id,
-                            "update": update,
-                            "quote": quote,
-                        })
-                        continue
-                planned.append({
-                    "path": path,
-                    "entity": entity,
-                    "entity_id": entity_id,
-                    "update": update,
-                    "quote": quote,
-                    "mode": evidence_mode,
-                })
+            jobs.append((chunk, chunk_id, batch_index, batch, local_context))
 
-            if pending:
-                verdicts = verify_items_with_llm(
-                    llm,
-                    chunk=chunk,
-                    items=[
-                        {
-                            "item_id": item["item_id"],
-                            "kind": "property",
-                            "entity_type": str(getattr(item["entity"], "type", "") or ""),
-                            "entity": str(getattr(item["entity"], "name", "") or ""),
-                            "properties": dict(item["update"].get("properties") or {}),
-                            "evidence_quote": item["quote"],
-                        }
-                        for item in pending
-                    ],
-                    pass_name="evidence_verification",
-                    chunk_id=f"{chunk_id}:batch-{batch_index}",
-                    use_scheduler=use_scheduler,
-                    attempts=attempts,
-                    max_attempts=min(2, max(1, max_attempts)),
-                    retry_base_seconds=retry_base_seconds,
-                    call_metrics=call_metrics,
-                    record_table=_looks_like_record_table(chunk),
-                )
-                verifications += 1
-                for item in pending:
-                    verdict = verdicts.get(item["item_id"], "uncertain")
-                    if verdict == "no":
-                        rejected += 1
-                        _warn(
-                            warnings,
-                            "PROPERTY_EVIDENCE_REJECTED",
-                            "语义比对不一致且大模型核验判定不属于原文，已拒绝",
-                            item["path"],
-                            item["quote"][:200],
-                        )
-                        continue
-                    code = "PROPERTY_EVIDENCE_LLM_VERIFIED" if verdict == "yes" else "PROPERTY_EVIDENCE_UNVERIFIED"
-                    message = (
-                        "语义比对不一致，大模型核验确认属于原文"
-                        if verdict == "yes"
-                        else "语义比对不一致，大模型核验不确定，保留并标记"
-                    )
-                    _warn(warnings, code, message, item["path"], item["quote"][:200])
-                    planned.append({
-                        "path": item["path"],
-                        "entity": item["entity"],
-                        "entity_id": item["entity_id"],
-                        "update": item["update"],
-                        "quote": item["quote"],
-                        "mode": f"llm_{verdict}",
-                    })
+    # 批次间互不依赖，整体并发执行；max_workers=1 时退化为原有串行行为。
+    worker_count = max(1, max_workers)
+    if worker_count == 1 or len(jobs) <= 1:
+        job_results = [_run_batch(*job) for job in jobs]
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ke-property") as executor:
+            job_results = list(executor.map(lambda job: _run_batch(*job), jobs))
 
-            for item in planned:
-                entity = item["entity"]
-                entity_id = item["entity_id"]
-                update = item["update"]
-                path = item["path"]
-                quote = item["quote"]
-                if item["mode"] == "normalized":
-                    _warn(warnings, "PROPERTY_EVIDENCE_NORMALIZED", "属性证据经 JSON 记录表归一化后定位", path, quote[:200])
-                elif item["mode"] == "semantic":
-                    _warn(warnings, "PROPERTY_EVIDENCE_SEMANTIC", "属性证据未逐字定位，语义比对通过", path, quote[:200])
-                accepted_values: dict[str, Any] = {}
-                for prop_id, value in dict(update.get("properties") or {}).items():
-                    prop = batch_allowed[entity_id].get(prop_id)
-                    if prop is None or not _valid_update(
-                        entity=entity,
-                        prop=prop,
-                        value=value,
-                        quote=quote,
-                        chunk=chunk,
-                    ):
-                        rejected += 1
-                        _warn(
-                            warnings,
-                            "PROPERTY_UPDATE_UNSUPPORTED",
-                            "属性未声明或已有值，已拒绝",
-                            f"{path}.properties.{prop_id}",
-                            value,
-                        )
-                        continue
-                    if value == "" and _looks_like_record_table(chunk):
-                        # 记录表里归纳出的规则没有唯一标识时，不输出空属性占位。
-                        continue
-                    accepted_values[prop_id] = value
-                if accepted_values:
-                    entity.properties.update(accepted_values)
-                    applied += len(accepted_values)
+    applied = rejected = calls = verifications = 0
+    for batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics in job_results:
+        applied += batch_applied
+        rejected += batch_rejected
+        calls += 1
+        verifications += batch_verifications
+        warnings.extend(local_warnings)
+        attempts.extend(local_attempts)
+        if local_call_metrics is not None:
+            call_metrics.extend(local_call_metrics)
     summary = {"calls": calls, "applied": applied, "rejected": rejected, "verifications": verifications}
     logger.info(
         "[步骤][属性补全] 输出: 实体=%d 批次调用=%d 应用=%d 拒绝=%d 语义核验=%d",
