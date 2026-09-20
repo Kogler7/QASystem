@@ -13,6 +13,7 @@ inject_layer: developer
 **业务类型识别**：
 - **干系人**：用 `get_stakeholders` 工具获取（内部按 Stakeholder 本体的固定 uid 查询），**不需要手动查 MetaClass uid**；
 - **问题类 / 方案类**：**不靠 resource_type 识别**（它们的 resource_type 不是 Problem/Solution），沿 `KNOWLEDGE_RELATION` 关系导航找到（图里干系人→问题类→方案类全部是 KNOWLEDGE_RELATION）。
+- **用逻辑属性字段名分辨节点类型**：链路探索返回的候选会同时带问题类、关注点等多种节点，先看节点 `logical_properties` 里的业务字段名分流——含 `问题描述`/`问题目标`/`问题目标对象`/`问题约束条件` 字段的是**问题类**；含 `关注点名称`/`关注点描述`/`关注点标识`/`关注点类型` 字段的是**关注点**（不是问题类，别混同）；其他节点同理按各自字段特征分辨，再结合 content 与用户问题匹配。
 
 **关键导航关系**：
 - 干系人 → 问题类：沿 `KNOWLEDGE_RELATION` 关系导航

@@ -303,8 +303,14 @@ class IntegrationTest(unittest.TestCase):
             return [span_item(type_id, name) for type_id, name in verbatim if name in text]
 
         llm = StubLLM(entity_handler=entity_handler)
-        result = SE.extract_split(STANDARD_ONTOLOGY, chunks=chunks, llm=llm)
-        self.assertIsNone(result["error_code"])
+        result = SE.extract_split(
+            STANDARD_ONTOLOGY,
+            chunks=chunks,
+            llm=llm,
+            identity_admission="observe",
+        )
+        self.assertEqual(result["error_code"], "REPAIR_INCOMPLETE")
+        self.assertFalse(result["repair"]["coverage_complete"])
         canonical = MODULES["graph_utils"].canonical_name
         pred_keys = {(e["type"], canonical(e["name"])) for e in result["raw"]["entities"]}
         emitted = {(type_id, canonical(name)) for type_id, name in verbatim}

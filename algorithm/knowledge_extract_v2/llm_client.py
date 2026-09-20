@@ -7,9 +7,14 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlparse
 
+from ._logging import get_step_logger
 from .config import get_llm_config
 from .prompt_router import ChatMessages
+
+
+logger = get_step_logger(__name__)
 
 
 # DeepSeek's Responses strict-schema implementation intentionally supports a
@@ -76,6 +81,24 @@ def _unsupported_parameter(exc: Exception) -> bool:
         re.search(rf"{parameter}[^.;\n]{{0,120}}{unsupported}", message)
         or re.search(rf"{unsupported}[^.;\n]{{0,120}}{parameter}", message)
     )
+
+
+def _thinking_unsupported(exc: Exception) -> bool:
+    """Only classify an error as a thinking-toggle capability mismatch."""
+    message = str(exc).casefold()
+    unsupported = (
+        r"(unsupported|unknown|unrecognized|not[- ]supported|"
+        r"unavailable|extra[- ]input|extra input|extra inputs|not permitted)"
+    )
+    return bool(
+        re.search(rf"thinking[^.;\n]{{0,120}}{unsupported}", message)
+        or re.search(rf"{unsupported}[^.;\n]{{0,120}}thinking", message)
+    )
+
+
+def _is_official_deepseek_endpoint(base_url: str) -> bool:
+    host = (urlparse(base_url or "").hostname or "").casefold().rstrip(".")
+    return host == "api.deepseek.com"
 
 
 def _field(value: Any, name: str, default: Any = None) -> Any:
@@ -191,11 +214,13 @@ class OpenAICompatibleLLM:
         model: str,
         max_tokens: int,
         disable_thinking: bool,
+        base_url: str = "",
     ) -> None:
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.disable_thinking = disable_thinking
+        self.base_url = base_url
 
     def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None) -> Any:
         kwargs: dict[str, Any] = {
@@ -206,9 +231,18 @@ class OpenAICompatibleLLM:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        logger.info(
+            "[步骤][LLM-Client] 请求: model=%s messages=%d prompt=%d字符 max_tokens=%s response_format=%s thinking=%s",
+            self.model,
+            len(messages),
+            sum(len(str(item.get("content") or "")) for item in messages),
+            self.max_tokens,
+            (response_format or {}).get("type") if isinstance(response_format, dict) else None,
+            "disabled" if self.disable_thinking else "default",
+        )
         try:
             if self.disable_thinking:
-                return self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     **kwargs,
                     # OpenAI-compatible SDKs forward provider-specific fields
                     # through ``extra_body``.  DeepSeek V4 documents the
@@ -217,11 +251,20 @@ class OpenAICompatibleLLM:
                     extra_body={"thinking": {"type": "disabled"}},
                 )
             else:
-                return self.client.chat.completions.create(**kwargs)
+                response = self.client.chat.completions.create(**kwargs)
         except Exception as exc:  # noqa: BLE001 - compatible providers vary
-            if not self.disable_thinking or not _unsupported_parameter(exc):
+            if not self.disable_thinking or not _thinking_unsupported(exc):
                 raise
-            return self.client.chat.completions.create(**kwargs)
+            logger.info("[步骤][LLM-Client] thinking 参数不被支持，改用默认思考模式重试")
+            response = self.client.chat.completions.create(**kwargs)
+        logger.info(
+            "[步骤][LLM-Client] 响应: id=%s finish_reason=%s usage=%s 文本=%d字符",
+            _field(response, "id"),
+            self._chat_finish_reason(response),
+            _usage_dict(_field(response, "usage")),
+            len(self._chat_text(response) or ""),
+        )
+        return response
 
     @staticmethod
     def _chat_text(response: Any) -> str:
@@ -278,9 +321,14 @@ class OpenAICompatibleLLM:
             "max_output_tokens": self.max_tokens,
             "text": {"format": response_format},
         }
-        # disable_thinking=True 时直接省略 reasoning 字段即可关闭思考：
-        # 部分 OpenAI 兼容的 Responses 实现会拒绝 reasoning 参数，
-        # 不下发它比先下发再回退更稳妥。
+        if (
+            self.disable_thinking
+            and _is_official_deepseek_endpoint(self.base_url)
+            and _is_deepseek_model(self.model)
+        ):
+            # DeepSeek Responses 默认开启 thinking；官方 API requires an
+            # explicit effort=none to disable it.
+            kwargs["reasoning"] = {"effort": "none"}
         return create(**kwargs)
 
     def _chat_structured(
@@ -362,9 +410,13 @@ class OpenAICompatibleLLM:
                 response_mode="json_object",
                 response_format={"type": "json_object"},
             )
-        if _is_deepseek_v4_flash(self.model) and (
-            bool(context.get("record_table"))
-            or bool(context.get("prefer_chat_json_schema"))
+        if (
+            _is_deepseek_v4_flash(self.model)
+            and not _is_official_deepseek_endpoint(self.base_url)
+            and (
+                bool(context.get("record_table"))
+                or bool(context.get("prefer_chat_json_schema"))
+            )
         ):
             # 该模型在 MaaS 的 Responses 路径上高频返回空数组/截断 JSON；
             # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
@@ -413,8 +465,9 @@ def create_llm_client(
     from openai import OpenAI  # lazy import：仅 live 调用时才需要
 
     config = get_llm_config()
+    effective_base_url = base_url or config["base_url"]
     client = OpenAI(
-        base_url=base_url or config["base_url"],
+        base_url=effective_base_url,
         api_key=api_key or config["api_key"] or "not-needed",
         timeout=max(
             1.0,
@@ -435,6 +488,7 @@ def create_llm_client(
         disable_thinking=(
             config["disable_thinking"] if disable_thinking is None else disable_thinking
         ),
+        base_url=effective_base_url,
     )
 
 

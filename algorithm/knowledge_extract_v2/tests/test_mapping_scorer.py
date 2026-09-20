@@ -18,6 +18,7 @@ import json
 import sys
 import types
 import unittest
+from itertools import permutations
 from pathlib import Path
 
 
@@ -108,6 +109,208 @@ class ConfigTest(unittest.TestCase):
     def test_invalid_thresholds_rejected(self) -> None:
         with self.assertRaises(ValueError):
             MS.MappingScorer(accepted_threshold=0.7, low_confidence_threshold=0.85)
+
+    def test_invalid_weights_rejected(self) -> None:
+        for weights in (
+            {"attribute": -1.0, "relation": 2.0},
+            {"attribute": float("nan")},
+            {"attribute": 1.0, "unknown": 1.0},
+        ):
+            with self.subTest(weights=weights), self.assertRaises(ValueError):
+                MS.MappingScorer(weights=weights)
+
+    def test_confidence_keeps_mapping_score_and_explains_signals(self) -> None:
+        payload = MS.mapping_confidence_payload(
+            0.8,
+            "low_confidence",
+            evidences=[
+                {
+                    "span_id": "chunk-0:0:4",
+                    "source_block_ids": ["chunk-0"],
+                    "quote": "示例文本",
+                    "start_char": 0,
+                    "end_char": 4,
+                    "evidence_type": "explicit",
+                }
+            ],
+            canonical_mapping_valid=True,
+        )
+
+        self.assertEqual(payload["mapping_score"], 0.8)
+        self.assertLessEqual(payload["confidence"], payload["mapping_score"])
+        self.assertEqual(payload["confidence_status"], "needs_review")
+        self.assertEqual(payload["confidence_details"]["source"], "multi_signal")
+        self.assertEqual(
+            set(payload["confidence_details"]["signals"]),
+            {"mapping", "evidence", "canonical_mapping"},
+        )
+        self.assertFalse(payload["confidence_details"]["calibrated"])
+
+    def test_missing_evidence_and_invalid_schema_apply_gates(self) -> None:
+        missing_evidence = MS.mapping_confidence_payload(
+            0.99,
+            "accepted",
+            evidences=[],
+            canonical_mapping_valid=True,
+        )
+        self.assertLess(missing_evidence["confidence"], 0.85)
+        self.assertEqual(missing_evidence["confidence_status"], "needs_review")
+        self.assertIn("missing_evidence", missing_evidence["confidence_details"]["gates"])
+
+        invalid_schema = MS.mapping_confidence_payload(
+            0.99,
+            "accepted",
+            evidences=[],
+            canonical_mapping_valid=False,
+        )
+        self.assertEqual(invalid_schema["confidence"], 0.0)
+        self.assertEqual(invalid_schema["confidence_status"], "rejected")
+        self.assertIn(
+            "canonical_mapping_missing",
+            invalid_schema["confidence_details"]["gates"],
+        )
+
+    def test_relation_can_exclude_correlated_numeric_signals_but_keep_gates(self) -> None:
+        payload = MS.mapping_confidence_payload(
+            0.82,
+            "low_confidence",
+            evidences=[
+                {
+                    "span_id": "chunk-0:0:4",
+                    "source_block_ids": ["chunk-0"],
+                    "quote": "示例文本",
+                    "start_char": 0,
+                    "end_char": 4,
+                }
+            ],
+            canonical_mapping_valid=True,
+            aggregate_evidence=False,
+            aggregate_canonical_mapping=False,
+        )
+
+        self.assertEqual(payload["confidence"], 0.82)
+        self.assertEqual(set(payload["confidence_details"]["signals"]), {"mapping"})
+        self.assertEqual(payload["confidence_status"], "needs_review")
+        self.assertIn("mapping_low_confidence", payload["confidence_details"]["gates"])
+
+    def test_equal_confidence_merge_has_deterministic_detail_tie_break(self) -> None:
+        first = {
+            "confidence": 0.8,
+            "confidence_details": {"method": "z", "status": "accepted"},
+        }
+        second = {
+            "confidence": 0.8,
+            "confidence_details": {"method": "a", "status": "accepted"},
+        }
+
+        forward = MS.merge_confidence_payload(first, second)
+        reverse = MS.merge_confidence_payload(second, first)
+
+        self.assertEqual(forward, reverse)
+        self.assertEqual(forward["confidence_details"]["method"], "a")
+
+    def test_three_way_equal_confidence_merge_is_order_independent(self) -> None:
+        observations = [
+            {
+                "confidence": 0.8,
+                "confidence_details": {"method": method, "status": "accepted"},
+            }
+            for method in ("c", "a", "b")
+        ]
+        results = []
+        for ordered in permutations(observations):
+            merged = ordered[0]
+            for observation in ordered[1:]:
+                merged = MS.merge_confidence_payload(merged, observation)
+            results.append(merged)
+
+        self.assertTrue(all(result == results[0] for result in results))
+        self.assertEqual(results[0]["confidence_details"]["method"], "a")
+        self.assertEqual(results[0]["confidence_details"]["source_scores"], [0.8, 0.8, 0.8])
+        self.assertEqual(results[0]["confidence_details"]["observation_count"], 3)
+
+    def test_merge_preserves_strongest_status_and_union_of_gates(self) -> None:
+        passed = {
+            "confidence": 0.8,
+            "confidence_status": "accepted",
+            "gate_status": "passed",
+            "confidence_details": {"method": "z", "gates": []},
+        }
+        blocked = {
+            "confidence": 0.9,
+            "confidence_status": "rejected",
+            "gate_status": "blocked",
+            "confidence_details": {
+                "method": "a",
+                "gates": ["schema_invalid", "final_verification_failed"],
+            },
+        }
+
+        forward = MS.merge_confidence_payload(passed, blocked)
+        reverse = MS.merge_confidence_payload(blocked, passed)
+
+        self.assertEqual(forward, reverse)
+        self.assertEqual(forward["confidence"], 0.8)
+        self.assertEqual(forward["confidence_status"], "rejected")
+        self.assertEqual(forward["gate_status"], "blocked")
+        self.assertEqual(
+            forward["confidence_details"]["gates"],
+            ["final_verification_failed", "schema_invalid"],
+        )
+
+    def test_merge_status_precedence_is_monotonic_across_repeated_merges(self) -> None:
+        observations = [
+            {
+                "confidence": 0.95,
+                "confidence_status": "accepted",
+                "gate_status": "passed",
+                "confidence_details": {"gates": []},
+            },
+            {
+                "confidence": 0.9,
+                "confidence_status": "needs_review",
+                "gate_status": "review",
+                "confidence_details": {"gates": ["missing_evidence"]},
+            },
+            {
+                "confidence": 0.85,
+                "confidence_status": "rejected",
+                "gate_status": "blocked",
+                "confidence_details": {"gates": ["schema_invalid"]},
+            },
+        ]
+        results = []
+        for ordered in permutations(observations):
+            merged = ordered[0]
+            for observation in ordered[1:]:
+                merged = MS.merge_confidence_payload(merged, observation)
+            results.append(merged)
+
+        self.assertTrue(all(result == results[0] for result in results))
+        self.assertEqual(results[0]["confidence_status"], "rejected")
+        self.assertEqual(results[0]["gate_status"], "blocked")
+        self.assertEqual(
+            results[0]["confidence_details"]["gates"],
+            ["missing_evidence", "schema_invalid"],
+        )
+
+    def test_equal_confidence_uses_lower_mapping_score_independent_of_order(self) -> None:
+        lower_mapping = {
+            "mapping_score": 0.7,
+            "confidence": 0.7,
+            "confidence_details": {"method": "same"},
+        }
+        higher_mapping = {
+            "mapping_score": 0.9,
+            "confidence": 0.7,
+            "confidence_details": {"method": "same"},
+        }
+
+        forward = MS.merge_confidence_payload(lower_mapping, higher_mapping)
+        reverse = MS.merge_confidence_payload(higher_mapping, lower_mapping)
+
+        self.assertEqual(forward, reverse)
+        self.assertEqual(forward["mapping_score"], 0.7)
 
 
 class EntityScoreTest(unittest.TestCase):
@@ -319,6 +522,7 @@ class IntegrationTest(unittest.TestCase):
             RULE_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=self.TEXT)],
             llm=llm,
+            identity_admission="observe",
             **kwargs,
         )
 
@@ -332,6 +536,25 @@ class IntegrationTest(unittest.TestCase):
         )
         self.assertEqual(len(result["raw"]["entities"]), 1)
         self.assertGreaterEqual(result["mapping"]["entities"][0]["score"], 0.0)
+        entity = result["raw"]["entities"][0]
+        self.assertEqual(entity["mapping_score"], result["mapping"]["entities"][0]["score"])
+        self.assertEqual(entity["confidence_status"], "rejected")
+        self.assertEqual(entity["confidence_details"]["source"], "multi_signal")
+        self.assertEqual(
+            entity["confidence_details"]["method"],
+            "mapping_bounded_multi_signal_v3",
+        )
+        self.assertFalse(entity["confidence_details"]["calibrated"])
+        self.assertEqual(
+            set(entity["confidence_details"]["signals"]),
+            {"mapping", "evidence", "canonical_mapping"},
+        )
+        self.assertEqual(
+            result["mapping"]["accepted"]
+            + result["mapping"]["low_confidence"]
+            + result["mapping"]["rejected"],
+            len(result["mapping"]["entities"]) + len(result["mapping"]["relations"]),
+        )
         self.assertEqual(result["profile"]["mapping_mode"], "annotate")
         self.assertEqual(
             result["intermediate_model"]["objects"][0]["mapping"]["status"],

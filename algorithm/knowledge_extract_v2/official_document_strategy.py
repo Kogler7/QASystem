@@ -159,6 +159,16 @@ def _make_unit(
 
 def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
     """按 golden 口径切分：通知正文 / 条 / 段落 / 附件说明。"""
+    numbered_units = _document_units(text)
+    if numbered_units:
+        return [
+            {
+                **unit,
+                "name": unit["unit_id"],
+                "unit_location": f"《{title}》第{unit['unit_order']}条" if title else "",
+            }
+            for unit in numbered_units
+        ]
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if title:
         normalized = re.sub(r"\s+", "", title)

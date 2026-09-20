@@ -319,7 +319,12 @@ def _attach_full_properties(units: list[dict[str, Any]]) -> None:
         except Exception as exc:
             LOGGER.warning("补齐候选 %s 完整属性失败：%s", unit.get("id"), exc)
             info = None
-        unit["properties"] = (info or {}).get("properties") or {}
+        props = (info or {}).get("properties") or {}
+        # 列表型工具的单元顶层已带 id/name/content/labels，properties 里再放一份纯属重复；
+        # logical_properties_json 是 logical_properties 的原始 JSON 串，也只留解析版。
+        for redundant in ("id", "name", "content", "labels", "logical_properties_json"):
+            props.pop(redundant, None)
+        unit["properties"] = props
 
 
 def _list_neighbor_units(

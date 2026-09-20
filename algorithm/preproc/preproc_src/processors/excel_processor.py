@@ -3,13 +3,13 @@ import openpyxl
 from typing import Dict, List, Any, Tuple
 import numpy as np
 from datetime import datetime, date
-import logging
 import os
 import csv
 from . import BaseProcessor
 from ..table_json import render_json_block, table_from_columns_and_rows
+from algorithm.logging_setup import get_step_logger, preview
 
-logger = logging.getLogger(__name__)
+logger = get_step_logger(__name__)
 
 
 class ExcelProcessor(BaseProcessor):
@@ -42,18 +42,6 @@ class ExcelProcessor(BaseProcessor):
             ]
         }
         """
-        # 获取文件扩展名
-        _, file_ext = os.path.splitext(file_path)
-        file_ext = file_ext.lower()
-
-        # 根据文件类型选择处理方法
-        if file_ext == '.csv':
-            return self._process_csv(file_path)
-        elif file_ext in ['.xlsx', '.xls']:
-            return self._process_excel_file(file_path)
-        else:
-            logger.error(f"不支持的文件格式: {file_ext}")
-            return {'error': f'不支持的文件格式: {file_ext}'}
         # 获取文件扩展名
         _, file_ext = os.path.splitext(file_path)
         file_ext = file_ext.lower()
@@ -102,6 +90,16 @@ class ExcelProcessor(BaseProcessor):
 
         except Exception as e:
             logger.error(f"使用pandas处理Excel失败: {e}")
+            if os.path.splitext(file_path)[1].lower() == '.xls':
+                reason = str(e).strip() or type(e).__name__
+                return {
+                    'error': (
+                        "旧式 .xls 文件解析失败；xlrd 兼容依赖缺失、文件损坏或受保护"
+                        f"均可能导致此错误（原始原因：{reason}）。"
+                        "请将文件另存为 .xlsx 或 .csv 后重试。"
+                    ),
+                    'file_name': os.path.basename(file_path),
+                }
             return self._fallback_excel_process(file_path)
 
     def _process_csv(self, file_path: str) -> Dict[str, Any]:
@@ -133,7 +131,13 @@ class ExcelProcessor(BaseProcessor):
                     try:
                         read_kwargs = {
                             'encoding': encoding,
-                            'on_bad_lines': 'skip'
+                            'on_bad_lines': 'skip',
+                            # CSV has no schema from which pandas can safely infer
+                            # numeric values.  Inference turns identifiers such as
+                            # 00123 into 123 and converts literal/empty cells to
+                            # NaN; keep the lexical value for extraction.
+                            'dtype': str,
+                            'keep_default_na': False,
                         }
                         if delimiter is None:
                             read_kwargs.update({'sep': None, 'engine': 'python'})
@@ -163,7 +167,9 @@ class ExcelProcessor(BaseProcessor):
                     engine='python',
                     encoding='utf-8',
                     encoding_errors='replace',
-                    on_bad_lines='skip'
+                    on_bad_lines='skip',
+                    dtype=str,
+                    keep_default_na=False,
                 )
 
             df = best_df
@@ -390,12 +396,42 @@ class ExcelProcessor(BaseProcessor):
         result = self.process_excel(file_path)
         if 'error' in result:
             metadata['error'] = result['error']
+            logger.info(
+                "[步骤][解析][Excel] 输出: file=%s success=False error=%s",
+                os.path.basename(file_path),
+                result['error'],
+            )
             return {
                 'content': '',
                 'metadata': metadata
             }
 
+        sheets = result.get('sheets') or []
+        metadata['sheets'] = [
+            {
+                'sheet_name': str(sheet.get('sheet_name') or ''),
+                'row_count': int((sheet.get('metadata') or {}).get('row_count') or 0),
+                'column_count': int((sheet.get('metadata') or {}).get('col_count') or 0),
+                'columns': [str(column) for column in (sheet.get('columns') or [])],
+            }
+            for sheet in sheets
+        ]
+        metadata['table_semantics'] = {
+            'header_row': 1,
+            'first_data_row': 2,
+            'formulas': 'cached_values_only',
+            'merged_cells': 'top_left_value_only',
+        }
+        markdown = self._render_markdown(result)
+        logger.info(
+            "[步骤][解析][Excel] 输入: file=%s 输出: 工作表=%d 行数=%s markdown=%d字符 预览=%s",
+            os.path.basename(file_path),
+            len(sheets),
+            preview([len(sheet.get('data') or []) for sheet in sheets], 60),
+            len(markdown),
+            preview(markdown, 80),
+        )
         return {
-            'content': self._render_markdown(result),
+            'content': markdown,
             'metadata': metadata
         }

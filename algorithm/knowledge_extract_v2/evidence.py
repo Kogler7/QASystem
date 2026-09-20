@@ -55,7 +55,7 @@ class Evidence:
         return cls(
             span_id=coerce_non_empty_name(payload.get("span_id")) or "",
             source_block_ids=payload.get("source_block_ids") or [],
-            quote=coerce_non_empty_name(payload.get("quote")) or "",
+            quote=payload["quote"] if isinstance(payload.get("quote"), str) else coerce_non_empty_name(payload.get("quote")),
             start_char=payload.get("start_char"),
             end_char=payload.get("end_char"),
             evidence_type=payload.get("evidence_type") or "explicit",
@@ -180,7 +180,12 @@ def verify_evidence(
     raw: dict[str, Any],
     chunks: ChunkContextManager | Iterable[ExtractionChunk],
 ) -> list[EvidenceVerdict]:
-    """§16 L1/L2 验证：span/source_block 存在 + quote 可在原文定位。"""
+    """§16 L1/L2 验证：source、span、offset 与 quote 必须相互一致。
+
+    ``span_id`` 使用 ``<chunk_id>:<start>:<end>``。chunk id 本身允许包含
+    冒号，因此从右侧拆分。多 ``source_block_ids`` 不再只检查第一项；span
+    指向的 block 只要存在于声明集合中且精确切片匹配即可通过。
+    """
     manager = _as_manager(chunks)
     verdicts: list[EvidenceVerdict] = []
 
@@ -192,9 +197,18 @@ def verify_evidence(
         if isinstance(relation, dict):
             items.append(("relations", index, relation))
 
+    expanded_items: list[tuple[str, dict[str, Any], Any]] = []
     for section, index, item in items:
-        ref = f"{section}[{index}]"
-        evidence = item.get("evidence")
+        evidences = item.get("evidences")
+        if isinstance(evidences, list) and evidences:
+            expanded_items.extend(
+                (f"{section}[{index}].evidences[{evidence_index}]", item, evidence)
+                for evidence_index, evidence in enumerate(evidences)
+            )
+        else:
+            expanded_items.append((f"{section}[{index}]", item, item.get("evidence")))
+
+    for ref, item, evidence in expanded_items:
         if isinstance(evidence, Evidence):
             payload = evidence.to_dict()
         elif isinstance(evidence, dict):
@@ -206,34 +220,59 @@ def verify_evidence(
             continue
 
         span_id = coerce_non_empty_name(payload.get("span_id"))
-        quote = coerce_non_empty_name(payload.get("quote"))
+        quote = payload.get("quote")
+        if not isinstance(quote, str):
+            quote = coerce_non_empty_name(quote)
         block_ids = [coerce_non_empty_name(bid) for bid in (payload.get("source_block_ids") or [])]
 
-        if not quote:
+        if not quote.strip():
             verdicts.append(EvidenceVerdict(ref, span_id, "L1", "fail", "evidence 缺少 quote"))
             continue
         if not block_ids:
             verdicts.append(EvidenceVerdict(ref, span_id, "L1", "fail", "evidence 缺少 source_block_ids"))
             continue
-        if not manager.has_chunk(block_ids[0]):
+        existing_block_ids = [block_id for block_id in block_ids if manager.has_chunk(block_id)]
+        if not existing_block_ids:
             verdicts.append(
                 EvidenceVerdict(
                     ref,
                     span_id,
                     "L1",
                     "fail",
-                    f"source_block 不存在: {block_ids[0]!r}",
+                    f"source_block 均不存在: {block_ids!r}",
                 )
             )
             continue
-
-        located = any(
-            manager.has_chunk(block_id) and manager.find_span(block_id, quote) is not None
-            for block_id in block_ids
-        )
-        if located:
+        if not span_id:
+            verdicts.append(EvidenceVerdict(ref, span_id, "L1", "fail", "evidence 缺少 span_id"))
+            continue
+        try:
+            span_block_id, raw_start, raw_end = span_id.rsplit(":", 2)
+            span_start = int(raw_start)
+            span_end = int(raw_end)
+        except (TypeError, ValueError):
+            verdicts.append(EvidenceVerdict(ref, span_id, "L1", "fail", "span_id 格式无效"))
+            continue
+        start_char = payload.get("start_char")
+        end_char = payload.get("end_char")
+        if not isinstance(start_char, int) or not isinstance(end_char, int):
+            verdicts.append(EvidenceVerdict(ref, span_id, "L1", "fail", "evidence 缺少整数 offset"))
+            continue
+        if (span_start, span_end) != (start_char, end_char):
+            verdicts.append(EvidenceVerdict(ref, span_id, "L2", "fail", "span_id 与 offset 不一致"))
+            continue
+        if span_block_id not in block_ids or not manager.has_chunk(span_block_id):
             verdicts.append(
-                EvidenceVerdict(ref, span_id, "L2", "ok", "quote 可在 source_block 中定位")
+                EvidenceVerdict(ref, span_id, "L1", "fail", "span_id 指向的 block 未在 source_block_ids 中")
+            )
+            continue
+        chunk = manager.get_chunk(span_block_id)
+        if not (0 <= start_char <= end_char <= len(chunk.text)):
+            verdicts.append(EvidenceVerdict(ref, span_id, "L2", "fail", "evidence offset 越界"))
+            continue
+        if chunk.text[start_char:end_char] == quote:
+            verdicts.append(
+                EvidenceVerdict(ref, span_id, "L2", "ok", "quote 与 source_block 精确 span 一致")
             )
         else:
             verdicts.append(
@@ -242,7 +281,7 @@ def verify_evidence(
                     span_id,
                     "L2",
                     "fail",
-                    "quote 无法在 source_block 中定位（L2 Literal Match 失败）",
+                    "quote 与声明 span 不一致（L2 Literal Match 失败）",
                 )
             )
     return verdicts
@@ -258,7 +297,15 @@ def evidence_coverage(raw: dict[str, Any]) -> dict[str, Any]:
         hits = sum(
             1
             for item in items
-            if coerce_non_empty_name((item.get("evidence") or {}).get("quote"))
+            if any(
+                coerce_non_empty_name(evidence.get("quote"))
+                for evidence in (
+                    item.get("evidences")
+                    if isinstance(item.get("evidences"), list) and item.get("evidences")
+                    else [item.get("evidence") or {}]
+                )
+                if isinstance(evidence, dict)
+            )
         )
         return total, hits
 

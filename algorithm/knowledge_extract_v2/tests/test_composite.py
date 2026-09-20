@@ -320,6 +320,7 @@ class IntegrationTest(unittest.TestCase):
             RULE_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=case["text"])],
             llm=self._gold_stub(relations),
+            identity_admission="observe",
         )
 
     def test_composite_rule_01_auto_assembly_matches_gold(self) -> None:

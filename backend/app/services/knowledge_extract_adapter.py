@@ -24,12 +24,21 @@ Two deliberate choices worth knowing about:
 """
 from __future__ import annotations
 
+import json
 import logging
+import re
+from copy import deepcopy
 from typing import Any, Callable, Iterable, Sequence
 
 logger = logging.getLogger(__name__)
 
 CHUNK_ID_PREFIX = "chunk-"
+_JSON_FENCE = re.compile(
+    r"(?ims)^[ \t]*```[ \t]*json[ \t]*\r?\n(?P<body>.*?)^[ \t]*```[ \t]*$"
+)
+_HEADING = re.compile(r"(?m)^\s{0,3}#{1,6}\s+(?P<title>.+?)\s*$")
+_BATCH_FILE_HEADING = re.compile(r"^文件\s*[:：]\s*(?P<name>.+?)\s*$")
+_SPREADSHEET_TYPES = frozenset({"csv", "excel", "xls", "xlsx"})
 
 #: V2 only raises these as terminal failures for the runs we care about; a
 #: terminal ``repair_*`` or ``verification`` attempt is not attributed to a
@@ -53,13 +62,145 @@ def _empty_graph() -> dict[str, list[dict[str, Any]]]:
     return {"nodes": [], "relationships": []}
 
 
+def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep aggregate verification visible across the per-chunk adapter."""
+    profile = result.get("profile") or {}
+    verification = result.get("verification") or {}
+    status = str(
+        result.get("status")
+        or ("failed" if result.get("error_code") else "succeeded")
+    )
+    # A graph that failed terminal verification may still be useful for
+    # diagnostics/manual review, but it must never be treated as publishable.
+    # Keep the decision in the public quality contract so every adapter path
+    # applies the same gate.
+    graph_publishable = verification.get("valid") is not False and status not in {
+        "failed",
+    }
+    return {
+        "status": status,
+        "error_code": result.get("error_code") or None,
+        "verification": deepcopy(verification) if isinstance(verification, dict) else {},
+        "graph_publishable": graph_publishable,
+        "repair_stop_reason": (
+            profile.get("repair_stop_reason") if isinstance(profile, dict) else None
+        ),
+    }
+
+
 def _chunk_id(position: int) -> str:
     return f"{CHUNK_ID_PREFIX}{position:04d}"
+
+
+def _table_payload(value: Any) -> tuple[list[str], list[Any]] | None:
+    if not isinstance(value, dict) or not isinstance(value.get("rows"), list):
+        return None
+    columns = value.get("columns")
+    if not isinstance(columns, list):
+        columns = []
+    return [str(item) for item in columns], list(value["rows"])
+
+
+def _nearest_heading(text: str, offset: int) -> str | None:
+    headings = [match.group("title").strip() for match in _HEADING.finditer(text, 0, offset)]
+    for title in reversed(headings):
+        if not re.match(r"^文件\s*[:：]", title):
+            return title
+    return None
+
+
+def _nearest_source_file(text: str, offset: int) -> str | None:
+    headings = [match.group("title").strip() for match in _HEADING.finditer(text, 0, offset)]
+    for title in reversed(headings):
+        matched = _BATCH_FILE_HEADING.match(title)
+        if matched:
+            return matched.group("name").strip()
+    return None
+
+
+def _infer_table_metadata(text: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    """Infer compact table provenance without changing the caller's text.
+
+    Spreadsheet-specific row numbers are only emitted when the trusted caller
+    identifies the source as Excel/CSV.  Other JSON tables still get generic
+    table counts and columns, avoiding the false claim that every heading is a
+    worksheet name.
+    """
+    tables: list[dict[str, Any]] = []
+    for index, match in enumerate(_JSON_FENCE.finditer(text or "")):
+        try:
+            parsed = json.loads(match.group("body"))
+        except (TypeError, ValueError):
+            continue
+        table = _table_payload(parsed)
+        if table is None:
+            continue
+        columns, rows = table
+        tables.append(
+            {
+                "table_index": index,
+                "title": _nearest_heading(text, match.start()),
+                "source_file": _nearest_source_file(text, match.start()),
+                "columns": columns,
+                "row_count": len(rows),
+            }
+        )
+
+    if not tables:
+        try:
+            parsed = json.loads((text or "").strip())
+        except (TypeError, ValueError):
+            parsed = None
+        table = _table_payload(parsed)
+        if table is not None:
+            columns, rows = table
+            tables.append(
+                {
+                    "table_index": 0,
+                    "title": None,
+                    "source_file": None,
+                    "columns": columns,
+                    "row_count": len(rows),
+                }
+            )
+
+    if not tables:
+        return metadata
+
+    source_type = str(metadata.get("source_type") or metadata.get("file_type") or "")
+    source_type = source_type.lower().lstrip(".")
+    if source_type == "batch":
+        source_type = str(metadata.get("source_file_type") or "").lower().lstrip(".")
+    spreadsheet = source_type in _SPREADSHEET_TYPES
+    for table in tables:
+        table_source_type = str(table.get("source_file") or "").rsplit(".", 1)[-1].lower()
+        table_is_spreadsheet = spreadsheet or table_source_type in _SPREADSHEET_TYPES
+        if table_is_spreadsheet:
+            table["sheet_name"] = table.pop("title", None)
+            if table["row_count"]:
+                table["source_row_start"] = 2
+                table["source_row_end"] = 1 + int(table["row_count"])
+        elif table.get("title") is None:
+            table.pop("title", None)
+        if table.get("source_file") is None:
+            table.pop("source_file", None)
+    metadata.setdefault("content_kind", "record_table")
+    metadata["table_count"] = len(tables)
+    metadata["tables"] = tables
+    if len(tables) == 1 and tables[0].get("sheet_name"):
+        if tables[0].get("source_file"):
+            metadata.setdefault("source_file", tables[0]["source_file"])
+        metadata.setdefault("sheet_name", tables[0]["sheet_name"])
+        if tables[0].get("source_row_start") is not None:
+            metadata.setdefault("source_row_start", tables[0]["source_row_start"])
+            metadata.setdefault("source_row_end", tables[0]["source_row_end"])
+    return metadata
 
 
 def build_chunks(
     texts: Sequence[str],
     ranges: Sequence[Sequence[int] | None] | None = None,
+    metadata: Sequence[dict[str, Any] | None] | None = None,
 ) -> list[Any]:
     """Wrap plain chunk texts as the ``ExtractionChunk`` objects V2 requires.
 
@@ -71,12 +212,18 @@ def build_chunks(
     chunks = []
     for position, text in enumerate(texts):
         span = ranges[position] if ranges is not None and position < len(ranges) else None
+        supplied = metadata[position] if metadata is not None and position < len(metadata) else None
+        chunk_metadata = _infer_table_metadata(text or "", deepcopy(supplied or {}))
+        document_id = chunk_metadata.get("document_id") or chunk_metadata.get("source_file")
         chunks.append(
             ExtractionChunk(
                 chunk_id=_chunk_id(position),
                 text=text or "",
+                document_id=str(document_id) if document_id else None,
+                section_title=str(chunk_metadata.get("sheet_name")) if chunk_metadata.get("sheet_name") else None,
                 start_offset=span[0] if span else None,
                 end_offset=span[1] if span else None,
+                metadata=chunk_metadata,
             )
         )
     return chunks
@@ -92,6 +239,7 @@ def run_aggregate(
     target_types: Iterable[str] | None = None,
     max_workers: int | None = None,
     ranges: Sequence[Sequence[int] | None] | None = None,
+    metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run the V2 pipeline once over every chunk and return its raw result."""
@@ -101,7 +249,7 @@ def run_aggregate(
         runner = extract_harness
     return runner(
         ontology=ontology,
-        chunks=build_chunks(texts, ranges),
+        chunks=build_chunks(texts, ranges, metadata),
         target_types=list(target_types) if target_types is not None else None,
         validation_mode="permissive",
         best_effort=True,
@@ -248,10 +396,14 @@ def project_items(
     *,
     texts: Sequence[str],
     ranges: Sequence[Sequence[int] | None] | None = None,
+    metadata: Sequence[dict[str, Any] | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Project the document-level V2 result back onto one item per chunk."""
     total = len(texts)
     positions = {_chunk_id(position): position for position in range(total)}
+    for child, parent in (result.get("profile", {}).get("chunk_source_ids") or {}).items():
+        if parent in positions:
+            positions[child] = positions[parent]
 
     graph = result.get("graph") or {}
     node_by_uid = {
@@ -273,16 +425,23 @@ def project_items(
         if not buckets:
             node_positions[uid] = {0}
 
-    # Graph relationships are deduplicated triples and carry no back-reference
-    # to the intermediate relation, so they are bucketed by their endpoints.
-    # Both endpoints contribute, which keeps every projected subgraph closed:
-    # it never references a node it does not contain.
+    # Prefer the relationship's own evidence for attribution.  Legacy graphs
+    # without relationship provenance retain endpoint-based projection, marked
+    # explicitly below as inferred.  Endpoint nodes are added later as closure
+    # context, without rewriting their evidence-derived source positions.
     relationship_buckets: list[set[int]] = []
+    relationship_sources: list[set[int]] = []
     for relationship in relationships:
-        buckets = node_positions.get(str(relationship.get("from_uid") or ""), set()) | node_positions.get(
-            str(relationship.get("to_uid") or ""), set()
-        )
-        relationship_buckets.append(buckets or {0})
+        evidence = relationship.get("evidences")
+        if not isinstance(evidence, list):
+            singular = relationship.get("evidence")
+            evidence = [singular] if isinstance(singular, dict) else []
+        source_buckets = _positions_from_evidence(evidence, positions)
+        inferred_buckets = node_positions.get(
+            str(relationship.get("from_uid") or ""), set()
+        ) | node_positions.get(str(relationship.get("to_uid") or ""), set())
+        relationship_sources.append(source_buckets)
+        relationship_buckets.append(source_buckets or inferred_buckets or {0})
 
     failures, _, error_code = _failure_plan(result, positions, total)
     attempts = _compressed_attempts(result.get("attempts"))
@@ -302,18 +461,44 @@ def project_items(
     warnings = result.get("warnings") or []
     profile = result.get("profile") or {}
     raw = result.get("raw") or {}
+    quality = _quality_summary(result)
 
     items: list[dict[str, Any]] = []
     for position in range(total):
+        projected_relationships: list[dict[str, Any]] = []
+        for relationship, buckets, sources in zip(
+            relationships,
+            relationship_buckets,
+            relationship_sources,
+        ):
+            if position not in buckets:
+                continue
+            projected = deepcopy(relationship)
+            projected["chunk_indices"] = sorted(sources)
+            projected["provenance_status"] = (
+                "evidence" if sources else "inferred_from_endpoints"
+            )
+            projected_relationships.append(projected)
+        required_uids = {
+            str(endpoint)
+            for relationship in projected_relationships
+            for endpoint in (relationship.get("from_uid"), relationship.get("to_uid"))
+            if endpoint
+        }
+        projected_nodes: list[dict[str, Any]] = []
+        for uid, node in node_by_uid.items():
+            if position not in node_positions.get(uid, set()) and uid not in required_uids:
+                continue
+            projected = deepcopy(node)
+            # Closure copies must not rewrite provenance when the per-chunk
+            # graphs are merged again.  Preserve the evidence-derived source
+            # positions explicitly instead of treating projection presence as
+            # a new source observation.
+            projected["chunk_indices"] = sorted(node_positions.get(uid) or {0})
+            projected_nodes.append(projected)
         graph_for_chunk = {
-            "nodes": [
-                node for uid, node in node_by_uid.items() if position in node_positions.get(uid, set())
-            ],
-            "relationships": [
-                relationship
-                for relationship, buckets in zip(relationships, relationship_buckets)
-                if position in buckets
-            ],
+            "nodes": projected_nodes,
+            "relationships": projected_relationships,
         }
         failed = position in failures
         items.append(
@@ -321,11 +506,16 @@ def project_items(
                 "index": position,
                 "text": texts[position],
                 "ranges": list(ranges[position]) if ranges is not None and position < len(ranges) and ranges[position] else None,
+                "metadata": _infer_table_metadata(
+                    texts[position],
+                    deepcopy(metadata[position] or {}) if metadata is not None and position < len(metadata) else {},
+                ),
                 "raw": raw,
                 "graph": graph_for_chunk,
                 "attempts": attempts_by_position[position] + document_attempts,
                 "warnings": warnings,
                 "profile": profile,
+                "quality": deepcopy(quality),
                 "error": (result.get("_error") or "知识抽取失败") if failed else None,
                 "error_code": error_code if failed else None,
                 # V2 does not retain raw provider responses.
@@ -353,6 +543,7 @@ def extract_chunks(
     target_types: Iterable[str] | None = None,
     max_workers: int | None = None,
     ranges: Sequence[Sequence[int] | None] | None = None,
+    metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """V2-backed replacement for V1's ``extract_chunks``.
@@ -371,27 +562,42 @@ def extract_chunks(
             target_types=target_types,
             max_workers=max_workers,
             ranges=ranges,
+            metadata=metadata,
             runner=runner,
         )
     except Exception as exc:  # noqa: BLE001 - mirror V1's per-call error containment
         logger.warning("knowledge extract v2 call failed: %s", exc)
+        # V2 的结构化错误（如 ONTOLOGY_EMPTY）带 error_code，原样透传避免被泛化。
+        error_code = str(getattr(exc, "error_code", "") or "EXTRACTION_EXCEPTION")
+        message = str(exc).strip() or "知识抽取调用异常"
         return [
             {
                 "index": position,
                 "text": text,
                 "ranges": list(ranges[position]) if ranges is not None and position < len(ranges) and ranges[position] else None,
+                "metadata": _infer_table_metadata(
+                    text,
+                    deepcopy(metadata[position] or {}) if metadata is not None and position < len(metadata) else {},
+                ),
                 "raw": {},
                 "graph": _empty_graph(),
-                "attempts": [{"attempt": 1, "type": "exception", "message": str(exc)}],
+                "attempts": [{"attempt": 1, "type": "exception", "message": message}],
                 "warnings": [],
                 "profile": {},
-                "error": "知识抽取调用异常",
-                "error_code": "EXTRACTION_EXCEPTION",
+                "quality": {
+                    "status": "failed",
+                    "error_code": error_code,
+                    "verification": {},
+                    "graph_publishable": False,
+                    "repair_stop_reason": None,
+                },
+                "error": message,
+                "error_code": error_code,
                 "raw_response": "",
             }
             for position, text in enumerate(chunks)
         ]
-    return project_items(result, texts=chunks, ranges=ranges)
+    return project_items(result, texts=chunks, ranges=ranges, metadata=metadata)
 
 
 def run_single_document(
@@ -416,6 +622,7 @@ def run_single_document(
         api_key=api_key,
     )
     status = str(result.get("status") or "")
+    quality = _quality_summary(result)
     if status != "succeeded" or result.get("error_code"):
         return {
             "_error": result.get("_error") or "知识抽取失败",
@@ -423,6 +630,8 @@ def run_single_document(
             "status": status,
             "attempts": _compressed_attempts(result.get("attempts")),
             "warnings": result.get("warnings") or [],
+            "quality": quality,
+            "verification": deepcopy(quality["verification"]),
         }
     return {
         "raw": result.get("raw") or {},
@@ -431,6 +640,8 @@ def run_single_document(
         "attempts": _compressed_attempts(result.get("attempts")),
         "profile": result.get("profile") or {},
         "status": status,
+        "quality": quality,
+        "verification": deepcopy(quality["verification"]),
     }
 
 

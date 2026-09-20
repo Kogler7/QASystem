@@ -105,6 +105,7 @@ def assemble_numbered_hierarchy_relations(
             if pool.schema.is_assignable(child.canonical_type or "", signature.target)
             for parent in entities
             if parent.candidate_id != child.candidate_id
+            and _same_source_scope(parent, child, manager)
             and pool.schema.is_assignable(parent.canonical_type or "", signature.source)
             and numbered_identifier(parent) == expected_parent
         }
@@ -214,6 +215,8 @@ def assemble_document_relations(
         for target in entities.values():
             if target.source != "standard_semantics":
                 continue
+            if not _same_source_scope(primary, target, manager):
+                continue
             if not any(
                 pool.schema.is_assignable(primary.canonical_type or "", signature.source)
                 and pool.schema.is_assignable(target.canonical_type or "", signature.target)
@@ -236,9 +239,20 @@ def assemble_document_relations(
             )
         counts[relation_id] = len(pool.accepted_relations()) - before
 
-    # Cover metadata has a single unambiguous owner: the document anchor.
-    # Link every accepted, ontology-compatible metadata value to that anchor;
-    # entity selection has already rejected unscoped organizations/categories.
+    # Cover metadata has a single unambiguous owner: the document anchor.  It
+    # must also precede the first structural/body unit; type compatibility alone
+    # is not proof that a body mention is document metadata.
+    structural_positions = [
+        position
+        for entity in entities.values()
+        if (
+            entity.source == "markdown_structure"
+            or canonical_name(entity.canonical_type or "") == "documentunit"
+        )
+        if (position := _valid_position(entity, manager)) is not None
+        and _same_source_scope(primary, entity, manager)
+    ]
+    header_boundary = min(structural_positions) if structural_positions else None
     for relation_id in ("classifiedUnder", "issuedBy", "proposedBy", "administeredBy"):
         before = len(pool.accepted_relations())
         signatures = tuple(pool.schema.resolve_relation(relation_id))
@@ -246,6 +260,15 @@ def assemble_document_relations(
             if target.candidate_id == primary.candidate_id:
                 continue
             if target.source in {"document_anchor", "normative_reference"}:
+                continue
+            if not _same_source_scope(primary, target, manager):
+                continue
+            target_position = _valid_position(target, manager)
+            if (
+                target_position is None
+                or header_boundary is None
+                or target_position > header_boundary
+            ):
                 continue
             if not any(
                 pool.schema.is_assignable(primary.canonical_type or "", signature.source)
@@ -284,6 +307,63 @@ def _position(entity: Any, manager: Any) -> tuple[int, int]:
     return min(positions) if positions else (10**9, 10**9)
 
 
+def _source_scopes(entity: Any, manager: Any) -> frozenset[tuple[str, str]]:
+    """Return provenance scopes as ``(document_id, source_file)`` pairs.
+
+    ``document_id`` is the primary boundary.  ``source_file`` additionally
+    separates batch uploads where every chunk shares one batch-level document
+    ID.  Empty components remain unknown rather than becoming global matches.
+    """
+    scopes: set[tuple[str, str]] = set()
+    for evidence in getattr(entity, "evidence", ()) or ():
+        for block_id in getattr(evidence, "source_block_ids", ()) or ():
+            try:
+                chunk = manager.get_chunk(str(block_id))
+            except KeyError:
+                continue
+            scopes.add(
+                (
+                    str(chunk.document_id or "").strip(),
+                    str((chunk.metadata or {}).get("source_file") or "").strip(),
+                )
+            )
+    return frozenset(scopes)
+
+
+def _source_block_ids(entity: Any) -> frozenset[str]:
+    return frozenset(
+        str(block_id)
+        for evidence in (getattr(entity, "evidence", ()) or ())
+        for block_id in (getattr(evidence, "source_block_ids", ()) or ())
+        if block_id
+    )
+
+
+def _same_source_scope(left: Any, right: Any, manager: Any) -> bool:
+    """Require a proven common scope, shared block, or a single-chunk input."""
+    left_scopes = _source_scopes(left, manager)
+    right_scopes = _source_scopes(right, manager)
+    if not left_scopes or not right_scopes:
+        return bool(_source_block_ids(left) & _source_block_ids(right)) or len(manager) == 1
+    for left_doc, left_file in left_scopes:
+        for right_doc, right_file in right_scopes:
+            if left_doc and right_doc:
+                if left_doc != right_doc:
+                    continue
+                if left_file and right_file:
+                    if left_file == right_file:
+                        return True
+                    continue
+                return True
+            if left_file and right_file:
+                if left_file == right_file:
+                    return True
+                continue
+            if _source_block_ids(left) & _source_block_ids(right):
+                return True
+    return len(manager) == 1
+
+
 def _valid_position(entity: Any, manager: Any) -> tuple[int, int] | None:
     position = _position(entity, manager)
     return None if position[0] == 10**9 else position
@@ -313,7 +393,7 @@ def _nearest_document_unit(
     if entity_position is None or entity_position[0] != chunk_index:
         return None
     preceding = [unit for position, unit in eligible if position <= entity_position]
-    return preceding[-1] if preceding else eligible[0][1]
+    return preceding[-1] if preceding else None
 
 
 def _match_key(value: Any) -> str:
@@ -380,24 +460,29 @@ def assemble_document_unit_relations(
                 entity for entity in entities
                 if pool.schema.is_assignable(entity.canonical_type or "", signature.source)
             ]
-            for source in sources:
-                for unit in units:
-                    if source.candidate_id == unit.candidate_id:
-                        continue
-                    evidence = _structural_evidence(unit, manager)
-                    if evidence is None:
-                        continue
-                    pool.add_relation(
-                        RelationCandidate(
-                            candidate_id="",
-                            from_candidate_id=source.candidate_id,
-                            to_candidate_id=unit.candidate_id,
-                            proposed_relation="HAS_PART",
-                            canonical_relation=None,
-                            evidence=[evidence],
-                        ),
-                        warnings=warnings,
-                    )
+            for unit in units:
+                compatible = [
+                    source
+                    for source in sources
+                    if source.candidate_id != unit.candidate_id
+                    and _same_source_scope(source, unit, manager)
+                ]
+                if len(compatible) != 1:
+                    continue
+                evidence = _structural_evidence(unit, manager)
+                if evidence is None:
+                    continue
+                pool.add_relation(
+                    RelationCandidate(
+                        candidate_id="",
+                        from_candidate_id=compatible[0].candidate_id,
+                        to_candidate_id=unit.candidate_id,
+                        proposed_relation="HAS_PART",
+                        canonical_relation=None,
+                        evidence=[evidence],
+                    ),
+                    warnings=warnings,
+                )
         counts["HAS_PART"] = len(pool.accepted_relations()) - before
 
     evidenced_by = tuple(pool.schema.resolve_relation("EVIDENCED_BY"))
@@ -424,24 +509,34 @@ def assemble_document_unit_relations(
                 # Attachment-owned facts keep their owner even when they are
                 # mentioned in the main body (e.g. "详见附件").  Everything else
                 # belongs to the nearest preceding non-attachment unit.
-                entity_key = _match_key(getattr(entity, "name", ""))
-                unit = None
-                if entity_key:
-                    unit = next(
-                        (
-                            candidate
-                            for candidate in attachment_units
-                            if entity_key in attachment_text[candidate.candidate_id]
-                        ),
-                        None,
-                    )
-                if unit is None:
-                    position = _valid_position(entity, manager)
-                    if position is None:
-                        continue
-                    unit = _nearest_document_unit(
-                        entity, other_units or units, manager, position[0]
-                    )
+                scoped_units = [
+                    candidate
+                    for candidate in units
+                    if _same_source_scope(entity, candidate, manager)
+                ]
+                position = _valid_position(entity, manager)
+                if position is None:
+                    continue
+                unit = _nearest_document_unit(entity, scoped_units, manager, position[0])
+                if unit is None or not _is_attachment_unit(unit):
+                    entity_key = _match_key(getattr(entity, "name", ""))
+                    attachment_matches = [
+                        candidate
+                        for candidate in attachment_units
+                        if _same_source_scope(entity, candidate, manager)
+                        and entity_key
+                        and entity_key in attachment_text[candidate.candidate_id]
+                    ]
+                    if len(attachment_matches) == 1:
+                        unit = attachment_matches[0]
+                    else:
+                        unit = _nearest_document_unit(
+                            entity,
+                            [candidate for candidate in scoped_units if not _is_attachment_unit(candidate)]
+                            or scoped_units,
+                            manager,
+                            position[0],
+                        )
                 if unit is None or unit.candidate_id == entity.candidate_id:
                     continue
                 evidence = _structural_evidence(entity, manager)
@@ -483,6 +578,8 @@ def assemble_standard_semantic_relations(
     }
 
     def add(source: Any, target: Any, relation_id: str) -> None:
+        if not _same_source_scope(source, target, manager):
+            return
         evidence = _structural_evidence(target, manager)
         if evidence is None:
             return
@@ -517,15 +614,29 @@ def assemble_standard_semantic_relations(
         clause_number = numbered_identifier(clause)
         owner: Any | None = None
         if str(clause.name).startswith("附录"):
-            owner = next((entity for entity in content if str(entity.name).startswith("附录")), None)
+            matches = [
+                entity for entity in content
+                if str(entity.name).startswith("附录")
+                and _same_source_scope(entity, clause, manager)
+            ]
+            owner = matches[0] if len(matches) == 1 else None
         elif str(clause.name).startswith("参考文献"):
-            owner = next((entity for entity in content if entity.name == "参考文献"), None)
+            matches = [
+                entity for entity in content
+                if entity.name == "参考文献"
+                and _same_source_scope(entity, clause, manager)
+            ]
+            owner = matches[0] if len(matches) == 1 else None
         elif clause_number:
             if len(clause_number) == 2 and not str(clause.name).endswith("要求"):
                 owner_number = clause_number[:1]
             else:
                 owner_number = clause_number
-            matches = [entity for entity in structural if numbered_identifier(entity) == owner_number]
+            matches = [
+                entity for entity in structural
+                if numbered_identifier(entity) == owner_number
+                and _same_source_scope(entity, clause, manager)
+            ]
             owner = matches[0] if len(matches) == 1 else None
         if owner is not None:
             add(owner, clause, "hasClause")
@@ -533,10 +644,13 @@ def assemble_standard_semantic_relations(
 
     terminology = [entity for entity in entities if entity.source == "terminology_definition"]
     before = len(pool.accepted_relations())
-    terms_owner = next((entity for entity in content if entity.name == "术语和定义"), None)
-    symbols_owner = next((entity for entity in content if entity.name == "符号"), None)
     for term in terminology:
-        owner = symbols_owner if re.fullmatch(r"[A-Za-z]+\d+", str(term.name)) else terms_owner
+        owner_name = "符号" if re.fullmatch(r"[A-Za-z]+\d+", str(term.name)) else "术语和定义"
+        matches = [
+            entity for entity in content
+            if entity.name == owner_name and _same_source_scope(entity, term, manager)
+        ]
+        owner = matches[0] if len(matches) == 1 else None
         if owner is not None:
             add(owner, term, "defines")
     counts["defines"] = len(pool.accepted_relations()) - before
@@ -556,18 +670,32 @@ def assemble_standard_semantic_relations(
         form_type = canonical_name(form.canonical_type)
         owner = None
         if form_type == "annex":
-            owner = next((clause for clause in clauses if str(clause.name).startswith("附录")), None)
+            matches = [
+                clause for clause in clauses
+                if str(clause.name).startswith("附录")
+                and _same_source_scope(clause, form, manager)
+            ]
+            owner = matches[0] if len(matches) == 1 else None
         elif form_type == "reference":
-            owner = next((clause for clause in clauses if str(clause.name).startswith("参考文献")), None)
+            matches = [
+                clause for clause in clauses
+                if str(clause.name).startswith("参考文献")
+                and _same_source_scope(clause, form, manager)
+            ]
+            owner = matches[0] if len(matches) == 1 else None
         elif form_type in {"equation", "table"}:
             form_position = _position(form, manager)
-            preceding = [entity for position, entity in structural_positions if position <= form_position]
+            preceding = [
+                entity for position, entity in structural_positions
+                if position <= form_position and _same_source_scope(entity, form, manager)
+            ]
             nearest_number = numbered_identifier(preceding[-1]) if preceding else None
             if nearest_number:
                 matches = [
                     (number, clause)
                     for number, clause in numbered_clauses
-                    if nearest_number == number or nearest_number[: len(number)] == number
+                    if (nearest_number == number or nearest_number[: len(number)] == number)
+                    and _same_source_scope(clause, form, manager)
                 ]
                 if matches:
                     owner = max(matches, key=lambda item: len(item[0]))[1]
@@ -623,7 +751,6 @@ def assemble_standard_semantic_relations(
                 ),
                 warnings=warnings,
             )
-            break
     counts["usesTerm"] = len(pool.accepted_relations()) - before
     return counts
 
@@ -647,6 +774,8 @@ def assemble_standard_technical_relations(
     }
 
     def add(source: Any, target: Any, relation_id: str, evidence: Evidence | None = None) -> None:
+        if not _same_source_scope(source, target, manager):
+            return
         bound = evidence or _structural_evidence(target, manager)
         if bound is None:
             return
@@ -695,7 +824,7 @@ def assemble_standard_technical_relations(
         if entity.source == "technical_semantics"
         and canonical_name(entity.canonical_type) == "actionclass"
     ]
-    action_by_number: dict[tuple[str, ...], Any] = {}
+    actions_by_number: dict[tuple[str, ...], list[Any]] = {}
     for action in actions:
         match = next(
             (
@@ -707,7 +836,7 @@ def assemble_standard_technical_relations(
             None,
         )
         if match:
-            action_by_number[tuple(match.group(1).split("."))] = action
+            actions_by_number.setdefault(tuple(match.group(1).split(".")), []).append(action)
 
     before_references = len(pool.accepted_relations())
     for clause in clauses:
@@ -715,47 +844,59 @@ def assemble_standard_technical_relations(
         if clause_scope is None:
             continue
         block_id, text, start, end = clause_scope
-        match = re.search(r"按\s*(?P<number>\d+(?:\.\d+)+)\s*(?:检验|试验)", text[start:end])
+        matches = list(
+            re.finditer(r"按\s*(?P<number>\d+(?:\.\d+)+)\s*(?:检验|试验)", text[start:end])
+        )
         search_offset = start
-        if match is None:
-            current_index = manager.index_of(block_id)
-            next_id = (
-                manager.chunk_ids[current_index + 1]
-                if current_index is not None and current_index + 1 < len(manager.chunk_ids)
-                else None
+        if not matches:
+            context = manager.local_context(
+                block_id,
+                previous=0,
+                next=1,
+                same_section=False,
             )
+            next_id = context[1].chunk_id if len(context) > 1 else None
             if next_id is not None:
                 next_text = manager.get_chunk(next_id).text or ""
                 next_heading = re.search(r"(?m)^#{1,3}\s+", next_text)
                 prefix_end = next_heading.start() if next_heading else len(next_text)
-                next_match = re.search(
+                matches = list(re.finditer(
                     r"按\s*(?P<number>\d+(?:\.\d+)+)\s*(?:检验|试验)",
                     next_text[:prefix_end],
-                )
-                if next_match is not None:
+                ))
+                if matches:
                     block_id, text, start, end = next_id, next_text, 0, prefix_end
-                    match = next_match
                     search_offset = 0
-        if match is None:
+        if not matches:
             continue
-        number = tuple(match.group("number").split("."))
-        if len(number) > 3:
-            number = number[:3]
-        target = next((entity for entity in structural if numbered_identifier(entity) == number), None)
-        mention_start = search_offset + match.start("number")
-        relation_evidence = Evidence(
-            span_id=f"{block_id}:{mention_start}:{mention_start + len(match.group('number'))}",
-            source_block_ids=[block_id],
-            quote=match.group("number"),
-            start_char=mention_start,
-            end_char=mention_start + len(match.group("number")),
-            evidence_type="explicit",
-        )
-        if target is not None:
-            add(clause, target, "referencesClause", relation_evidence)
-        action = action_by_number.get(number)
-        if action is not None:
-            add(clause, action, "describesAction", relation_evidence)
+        for match in matches:
+            number = tuple(match.group("number").split("."))
+            if len(number) > 3:
+                number = number[:3]
+            targets = [
+                entity for entity in structural
+                if numbered_identifier(entity) == number
+                and _same_source_scope(entity, clause, manager)
+            ]
+            target = targets[0] if len(targets) == 1 else None
+            mention_start = search_offset + match.start("number")
+            relation_evidence = Evidence(
+                span_id=f"{block_id}:{mention_start}:{mention_start + len(match.group('number'))}",
+                source_block_ids=[block_id],
+                quote=match.group("number"),
+                start_char=mention_start,
+                end_char=mention_start + len(match.group("number")),
+                evidence_type="explicit",
+            )
+            if target is not None:
+                add(clause, target, "referencesClause", relation_evidence)
+            actions = [
+                action for action in actions_by_number.get(number, [])
+                if _same_source_scope(action, clause, manager)
+            ]
+            action = actions[0] if len(actions) == 1 else None
+            if action is not None:
+                add(clause, action, "describesAction", relation_evidence)
     new_reference_relations = pool.accepted_relations()[before_references:]
     counts["referencesClause"] = sum(
         canonical_name(relation.canonical_relation) == "referencesclause"
@@ -797,40 +938,39 @@ def assemble_standard_technical_relations(
         for clause in clauses
         if (resolved := scope(clause)) is not None
     }
-    subject_rank: list[tuple[int, int, str, Any]] = []
-    for subject in subjects:
-        mentions = sum(
-            str(subject.name) in text[start:end]
-            for _, text, start, end in clause_scopes.values()
-        )
-        subject_rank.append((-mentions, len(str(subject.name)), canonical_name(subject.name), subject))
-    subject_rank.sort(key=lambda item: item[:3])
-    base_subject = subject_rank[0][3] if subject_rank and subject_rank[0][0] < 0 else None
     before = len(pool.accepted_relations())
-    if base_subject is not None:
-        for prop in properties:
-            add(base_subject, prop, "hasCharacteristic")
+    for prop in properties:
+        clause = first_clause_by_property.get(prop.candidate_id)
+        clause_scope = clause_scopes.get(clause.candidate_id) if clause is not None else None
+        if clause_scope is None:
+            continue
+        _, text, start, end = clause_scope
+        mentioned_subjects = [
+            subject for subject in subjects if str(subject.name) in text[start:end]
+        ]
+        if len(mentioned_subjects) == 1:
+            add(mentioned_subjects[0], prop, "hasCharacteristic")
     counts["hasCharacteristic"] = len(pool.accepted_relations()) - before
 
     before = len(pool.accepted_relations())
-    if base_subject is not None:
-        for clause in clauses:
-            # A generated identity property is not structural evidence that an
-            # annex/bibliography clause is a numbered requirement clause.
-            if _NUMBERED_PREFIX.match(str(clause.name)) is None:
-                continue
-            clause_scope = clause_scopes.get(clause.candidate_id)
-            if clause_scope is None:
-                continue
-            _, text, start, end = clause_scope
-            body = text[start:end]
-            if str(base_subject.name) not in body:
-                continue
-            # Direct qualitative predicates establish the involved object.
-            # Pure numeric comparisons describe a characteristic constraint
-            # and are not enough by themselves to add another object edge.
-            if re.search(r"(?:应无|应正确|应清晰|应符合|应满足)", body):
-                add(clause, base_subject, "involvesObject")
+    for clause in clauses:
+        # A generated identity property is not structural evidence that an
+        # annex/bibliography clause is a numbered requirement clause.
+        if _NUMBERED_PREFIX.match(str(clause.name)) is None:
+            continue
+        clause_scope = clause_scopes.get(clause.candidate_id)
+        if clause_scope is None:
+            continue
+        _, text, start, end = clause_scope
+        body = text[start:end]
+        mentioned_subjects = [subject for subject in subjects if str(subject.name) in body]
+        if len(mentioned_subjects) != 1:
+            continue
+        # Direct qualitative predicates establish the involved object.
+        # Pure numeric comparisons describe a characteristic constraint
+        # and are not enough by themselves to add another object edge.
+        if re.search(r"(?:应无|应正确|应清晰|应符合|应满足)", body):
+            add(clause, mentioned_subjects[0], "involvesObject")
     counts["involvesObject"] = len(pool.accepted_relations()) - before
 
     resources = [
@@ -849,7 +989,6 @@ def assemble_standard_technical_relations(
             if str(resource.name) not in text[start:end]:
                 continue
             add(clause, resource, "referencesExternalResource")
-            break
     counts["referencesExternalResource"] = len(pool.accepted_relations()) - before
 
     constraints = [
