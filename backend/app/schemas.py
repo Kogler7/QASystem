@@ -16,7 +16,7 @@ class MinerUOptions(StrictModel):
 
 class ParserConfig(StrictModel):
     engine: Literal[
-        "auto", "text", "docling", "vlm", "mineru", "pandas",
+        "auto", "text", "docling", "vlm", "mineru", "mineru4", "pandas",
         "beautifulsoup", "excel", "bs4", "html",
     ] = "auto"
     force: bool = False

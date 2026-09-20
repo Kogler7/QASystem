@@ -67,20 +67,20 @@ DEFAULT_KEEP_PAGE_EDGES = "first_page"
 
 class DocumentProcessor:
     ENGINE_MATRIX = {
-        ".pdf": ("docling", "vlm", "mineru"),
-        ".ofd": ("docling", "vlm", "mineru"),
-        ".docx": ("docling", "vlm", "mineru"),
-        ".doc": ("docling", "vlm", "mineru"),
-        ".pptx": ("docling", "vlm", "mineru"),
-        ".ppt": ("docling", "vlm", "mineru"),
-        ".png": ("vlm", "mineru", "docling"),
-        ".jpg": ("vlm", "mineru", "docling"),
-        ".jpeg": ("vlm", "mineru", "docling"),
+        ".pdf": ("docling", "vlm", "mineru", "mineru4"),
+        ".ofd": ("docling", "vlm", "mineru", "mineru4"),
+        ".docx": ("docling", "vlm", "mineru", "mineru4"),
+        ".doc": ("docling", "vlm", "mineru", "mineru4"),
+        ".pptx": ("docling", "vlm", "mineru", "mineru4"),
+        ".ppt": ("docling", "vlm", "mineru", "mineru4"),
+        ".png": ("vlm", "mineru", "mineru4", "docling"),
+        ".jpg": ("vlm", "mineru", "mineru4", "docling"),
+        ".jpeg": ("vlm", "mineru", "mineru4", "docling"),
         ".md": ("text",),
         ".txt": ("text",),
-        ".xlsx": ("pandas",),
-        ".xls": ("pandas",),
-        ".csv": ("pandas",),
+        ".xlsx": ("pandas", "mineru4"),
+        ".xls": ("pandas", "mineru4"),
+        ".csv": ("pandas", "mineru4"),
         ".html": ("beautifulsoup",),
         ".htm": ("beautifulsoup",),
     }
@@ -113,13 +113,24 @@ class DocumentProcessor:
 
             processor = DocxProcessor(libreoffice_path=self.libreoffice_path)
         elif engine in {"mineru", "vlm"}:
-            from .processors.ocr_processor import OCRProcessor
+            # MinerU 2.x 已退役：环境里装的是 4.x 时，这两个引擎名复用 4.x 适配层，
+            # 入参/返回/输出格式与其它引擎一致，只是底层引擎升级（元数据 engine 仍是请求名）。
+            from .processors.mineru4_processor import Mineru4Processor, mineru_major_version
 
-            processor = OCRProcessor(
-                config_path=self.mineru_config_path,
-                model_source=self.mineru_model_source,
-                required_mode="pipeline" if engine == "mineru" else "vlm",
-            )
+            if (mineru_major_version() or 0) >= 4:
+                processor = Mineru4Processor(engine_name=engine)
+            else:
+                from .processors.ocr_processor import OCRProcessor
+
+                processor = OCRProcessor(
+                    config_path=self.mineru_config_path,
+                    model_source=self.mineru_model_source,
+                    required_mode="pipeline" if engine == "mineru" else "vlm",
+                )
+        elif engine == "mineru4":
+            from .processors.mineru4_processor import Mineru4Processor
+
+            processor = Mineru4Processor(engine_name="mineru4")
         elif engine == "pandas":
             from .processors.excel_processor import ExcelProcessor
 
@@ -141,10 +152,30 @@ class DocumentProcessor:
         return self._processors["ofd_converter"]
 
     @staticmethod
-    def _content_image_count(file_path: str, max_pages: int) -> Optional[int]:
+    def _displayed_rect(obj: Any) -> Optional[tuple[float, float, float, float]]:
+        """取图片对象在页面上的显示矩形。
+
+        pypdfium2 4.x 用 ``get_pos()``，5.x 改名为 ``get_bounds()``；两者都取不到时返回 None，
+        由调用方决定是否放弃统计（不能当成"没有图片"）。
+        """
+        for name in ("get_pos", "get_bounds"):
+            getter = getattr(obj, name, None)
+            if not callable(getter):
+                continue
+            try:
+                rect = getter()
+            except Exception:
+                continue
+            if rect is not None and len(rect) == 4:
+                return (float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3]))
+        return None
+
+    @classmethod
+    def _content_image_count(cls, file_path: str, max_pages: int) -> Optional[int]:
         """统计"内容图片"数：忽略水印、角标这类显示面积很小的装饰图。
 
-        返回 None 表示无法判定（缺少 pypdfium2 或读取失败），调用方退回 pypdf 的对象计数。
+        返回 None 表示无法判定（缺少 pypdfium2、接口不兼容或读取失败），调用方退回 pypdf 的
+        对象计数——宁可判成复杂版面，也不能把扫描件误判成文本型。
         """
         try:
             import pypdfium2 as pdfium
@@ -161,8 +192,12 @@ class DocumentProcessor:
                 if page_area <= 0:
                     continue
                 for obj in page.get_objects(filter=(pdfium.raw.FPDF_PAGEOBJ_IMAGE,)):
-                    left, bottom, right, top = obj.get_pos()
-                    area = abs(float(right) - float(left)) * abs(float(top) - float(bottom))
+                    rect = cls._displayed_rect(obj)
+                    if rect is None:
+                        # 有图片但量不出显示尺寸：放弃统计，交回 pypdf 计数
+                        return None
+                    left, bottom, right, top = rect
+                    area = abs(right - left) * abs(top - bottom)
                     if area / page_area >= DECORATIVE_IMAGE_MAX_AREA_RATIO:
                         total += 1
             return total
@@ -210,6 +245,9 @@ class DocumentProcessor:
                     "images": images,
                     "raw_images": raw_images,
                     "decorative_images_ignored": max(raw_images - images, 0),
+                    "content_image_source": (
+                        "pypdfium2" if content_images is not None else "pypdf_fallback"
+                    ),
                     "reason": (
                         "检测到稳定文本层且内容图片较少"
                         if is_text_pdf
@@ -358,6 +396,8 @@ class DocumentProcessor:
                         continue
                 return {"success": False, "error": "文本文件编码无法识别"}
 
+            # MinerU 4.x 原生支持 doc/docx/ppt/pptx 与图片，不需要先转 PDF；
+            # 只有 2.x 的 mineru/vlm 路线仍依赖 LibreOffice 转换。
             if suffix in {".doc", ".docx", ".ppt", ".pptx", ".png", ".jpg", ".jpeg"} and engine in {"mineru", "vlm"}:
                 docling = self._processor("docling")
                 temp_pdf_path = docling.convert_to_pdf(file_path)
@@ -401,7 +441,18 @@ class DocumentProcessor:
                     "keep_page_edges": keep_page_edges,
                     "page_edge_min_chars": page_edge_min_chars,
                 }
-            if engine in {"mineru", "vlm"}:
+            if engine == "mineru4":
+                kwargs = {
+                    "lang": lang,
+                    "ocr_mode": ocr_mode,
+                    "table_enable": table_enable,
+                    "formula_enable": formula_enable,
+                    "start_page_id": start_page_id,
+                    "end_page_id": end_page_id,
+                    "keep_page_edges": keep_page_edges,
+                    "page_edge_min_chars": page_edge_min_chars,
+                }
+            if engine in {"mineru", "vlm", "mineru4"}:
                 kwargs["keep_page_edges"] = keep_page_edges
                 kwargs["page_edge_min_chars"] = page_edge_min_chars
             result = self._processor(engine).process(process_path, **kwargs)
@@ -413,7 +464,7 @@ class DocumentProcessor:
                     "table_enable": table_enable,
                     "formula_enable": formula_enable,
                 }
-            if engine in {"mineru", "vlm", "docling"}:
+            if engine in {"mineru", "vlm", "docling", "mineru4"}:
                 metadata["keep_page_edges"] = {
                     "requested": keep_page_edges,
                     "page_edge_min_chars": page_edge_min_chars,
@@ -509,31 +560,54 @@ class DocumentProcessor:
         process_path = file_path
         process_suffix = suffix
         converted_pdf_path = None
+        ofd_native_engine: Optional[str] = None
         try:
             if suffix == ".ofd":
                 converter = self._ofd_converter()
                 converted_pdf_path = converter.convert_to_pdf(file_path)
                 if not converted_pdf_path:
-                    error = converter.last_conversion_error or "OFD 转换为 PDF 失败"
-                    return {
-                        "success": False,
-                        "error_code": "DOCUMENT_CONVERT_FAILED",
-                        "error": error,
-                        "file_type": suffix.lstrip("."),
-                    }
-                process_path = converted_pdf_path
-                process_suffix = ".pdf"
+                    # OFD 转 PDF 失败时，若环境里有 MinerU 4.x，直接用它原生的 OFD 解析
+                    # （4.0 支持 ofd，走 flash 档）；否则保持原有转换失败错误。
+                    from .processors.mineru4_processor import mineru_major_version
+
+                    if (mineru_major_version() or 0) >= 4 and "mineru4" in self.ENGINE_MATRIX.get(".ofd", ()):
+                        ofd_native_engine = "mineru4"
+                        process_path = file_path
+                        process_suffix = ".ofd"
+                        logger.warning(
+                            "OFD 转换为 PDF 失败（{}），改用 MinerU 4.x 原生 OFD 解析",
+                            converter.last_conversion_error,
+                        )
+                    else:
+                        error = converter.last_conversion_error or "OFD 转换为 PDF 失败"
+                        return {
+                            "success": False,
+                            "error_code": "DOCUMENT_CONVERT_FAILED",
+                            "error": error,
+                            "file_type": suffix.lstrip("."),
+                        }
+                else:
+                    process_path = converted_pdf_path
+                    process_suffix = ".pdf"
             if selected_engine:
                 allowed = self.ENGINE_MATRIX.get(process_suffix) or ()
                 if selected_engine not in allowed:
                     raise ValueError(f"文件类型 {process_suffix} 不支持执行计划引擎: {selected_engine}")
                 engine = selected_engine
                 selection = dict(engine_selection or {})
+            elif ofd_native_engine:
+                engine = ofd_native_engine
+                selection = {
+                    "mode": "auto",
+                    "allowed_engines": list(self.ENGINE_MATRIX.get(".ofd", ())),
+                    "preferred_engine": ofd_native_engine,
+                    "request_role": "ofd_conversion_fallback",
+                }
             else:
                 engine, selection = self.select_engine(process_path, model_name, force=force)
             if suffix == ".ofd":
                 selection["source_file_type"] = ".ofd"
-                selection["converted_file_type"] = ".pdf"
+                selection["converted_file_type"] = ".pdf" if converted_pdf_path else ".ofd"
         except ValueError as exc:
             if converted_pdf_path:
                 shutil.rmtree(os.path.dirname(converted_pdf_path), ignore_errors=True)
