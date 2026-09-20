@@ -77,26 +77,118 @@ class ExtractionRequest:
     target_types: list[str] | None = None
 
 
+def _append_chunk_warning(
+    warnings: list[dict[str, Any]] | None,
+    code: str,
+    message: str,
+    path: str,
+    value: Any = None,
+) -> None:
+    if warnings is None:
+        return
+    row: dict[str, Any] = {"code": code, "message": message, "path": path}
+    if value is not None:
+        row["value"] = value
+    warnings.append(row)
+
+
+def validate_chunk_contract(
+    chunks: Iterable[ExtractionChunk],
+    *,
+    warnings: list[dict[str, Any]] | None = None,
+) -> dict[str, int]:
+    """Validate intake invariants without rejecting otherwise compatible input.
+
+    The upstream splitter remains the authority for boundaries.  V2 therefore
+    reports malformed offsets/links as structured warnings and keeps processing;
+    only impossible scalar values are left to the normal type conversion path.
+    """
+    rows = list(chunks)
+    counts: dict[str, int] = {}
+    def warn(code: str, message: str, path: str, value: Any = None) -> None:
+        counts[code] = counts.get(code, 0) + 1
+        _append_chunk_warning(warnings, code, message, path, value)
+
+    ids = {str(chunk.chunk_id): index for index, chunk in enumerate(rows)}
+    previous_start: int | None = None
+    previous_doc = ""
+    for index, chunk in enumerate(rows):
+        path = f"chunks[{index}]"
+        start, end = chunk.start_offset, chunk.end_offset
+        if start is not None and (not isinstance(start, int) or isinstance(start, bool) or start < 0):
+            warn("INVALID_CHUNK_OFFSET", "start_offset 必须是非负整数", f"{path}.start_offset", start)
+        if end is not None and (not isinstance(end, int) or isinstance(end, bool) or end < 0):
+            warn("INVALID_CHUNK_OFFSET", "end_offset 必须是非负整数", f"{path}.end_offset", end)
+        if isinstance(start, int) and isinstance(end, int) and end < start:
+            warn("INVALID_CHUNK_SPAN", "end_offset 不能小于 start_offset", path, {"start": start, "end": end})
+        document = (chunk.document_id or "").strip()
+        if previous_start is not None and isinstance(start, int) and start < previous_start and document == previous_doc:
+            warn("CHUNK_OFFSET_REGRESSION", "同一文档 chunk 的 start_offset 发生回退", f"{path}.start_offset", start)
+        if isinstance(start, int):
+            previous_start = start
+        previous_doc = document
+        for field_name in ("previous_chunk_id", "next_chunk_id", "parent_chunk_id"):
+            ref = getattr(chunk, field_name)
+            if not ref:
+                continue
+            if ref == chunk.chunk_id:
+                warn("CHUNK_SELF_REFERENCE", f"{field_name} 不能引用自身", f"{path}.{field_name}", ref)
+            elif ref not in ids:
+                warn("CHUNK_REFERENCE_MISSING", f"{field_name} 引用了不存在的 chunk", f"{path}.{field_name}", ref)
+            elif document and (rows[ids[ref]].document_id or "").strip() and document != (rows[ids[ref]].document_id or "").strip():
+                warn("CHUNK_CROSS_DOCUMENT_REFERENCE", f"{field_name} 不能跨 document 引用", f"{path}.{field_name}", ref)
+    return counts
+
+
 class ChunkContextManager:
     """§6：chunk 索引、局部上下文与 evidence 定位。"""
 
-    def __init__(self, chunks: Iterable[ExtractionChunk]):
+    def __init__(
+        self,
+        chunks: Iterable[ExtractionChunk],
+        *,
+        warnings: list[dict[str, Any]] | None = None,
+    ):
         self._chunks: dict[str, ExtractionChunk] = {}
         self._order: list[str] = []
         self._positions: dict[str, int] = {}
         for chunk in chunks:
             chunk_id = (chunk.chunk_id or "").strip()
             if not chunk_id:
-                raise ValueError("chunk_id 不能为空")
+                raise ValueError(f"chunk_id 不能为空（位置 {len(self._order)}）")
             if chunk_id in self._chunks:
-                raise ValueError(f"chunk_id 重复: {chunk_id!r}")
+                # 上游重复提交同一 id 时重命名保留内容，不让整批失败。
+                suffix = 2
+                while f"{chunk_id}#dup{suffix}" in self._chunks:
+                    suffix += 1
+                renamed = f"{chunk_id}#dup{suffix}"
+                _append_chunk_warning(
+                    warnings,
+                    "DUPLICATE_CHUNK_ID",
+                    f"chunk_id 重复，已重命名保留: {chunk_id!r} -> {renamed!r}",
+                    f"chunks[{len(self._order)}].chunk_id",
+                    {"chunk_id": chunk_id, "renamed_to": renamed},
+                )
+                # Never mutate caller-owned objects; normalization owns these rows.
+                chunk.chunk_id = renamed
+                chunk_id = renamed
             self._chunks[chunk_id] = chunk
             self._positions[chunk_id] = len(self._order)
             self._order.append(chunk_id)
+        self._scannable = [
+            chunk_id
+            for chunk_id in self._order
+            if (self._chunks[chunk_id].text or "").strip()
+        ]
 
     @property
     def chunk_ids(self) -> list[str]:
         return list(self._order)
+
+    @property
+    def scannable_chunk_ids(self) -> list[str]:
+        """文本非空的 chunk；空白 chunk 只作为位置与证据锚点保留。"""
+        return list(self._scannable)
 
     def __len__(self) -> int:
         return len(self._order)
@@ -116,19 +208,38 @@ class ChunkContextManager:
     def index_of(self, chunk_id: str) -> int | None:
         return self._positions.get(chunk_id)
 
+    def _same_document(self, left: ExtractionChunk, right: ExtractionChunk) -> bool:
+        left_doc = (left.document_id or "").strip()
+        right_doc = (right.document_id or "").strip()
+        if not left_doc or not right_doc:
+            return True
+        return left_doc == right_doc
+
     def _previous_id(self, chunk_id: str) -> str | None:
         chunk = self.get_chunk(chunk_id)
         if chunk.previous_chunk_id:
-            return chunk.previous_chunk_id if self.has_chunk(chunk.previous_chunk_id) else None
-        index = self.index_of(chunk_id)
-        return self._order[index - 1] if index is not None and index > 0 else None
+            candidate = chunk.previous_chunk_id if self.has_chunk(chunk.previous_chunk_id) else None
+        else:
+            index = self.index_of(chunk_id)
+            candidate = self._order[index - 1] if index is not None and index > 0 else None
+        if candidate is None or not self._same_document(chunk, self.get_chunk(candidate)):
+            return None
+        return candidate
 
     def _next_id(self, chunk_id: str) -> str | None:
         chunk = self.get_chunk(chunk_id)
         if chunk.next_chunk_id:
-            return chunk.next_chunk_id if self.has_chunk(chunk.next_chunk_id) else None
-        index = self.index_of(chunk_id)
-        return self._order[index + 1] if index is not None and index + 1 < len(self._order) else None
+            candidate = chunk.next_chunk_id if self.has_chunk(chunk.next_chunk_id) else None
+        else:
+            index = self.index_of(chunk_id)
+            candidate = (
+                self._order[index + 1]
+                if index is not None and index + 1 < len(self._order)
+                else None
+            )
+        if candidate is None or not self._same_document(chunk, self.get_chunk(candidate)):
+            return None
+        return candidate
 
     def local_context(
         self,
@@ -207,3 +318,6 @@ class ChunkContextManager:
         if start >= end:
             return ""
         return text[start:end]
+
+
+__all__ = ["ExtractionChunk", "ExtractionRequest", "ChunkContextManager", "validate_chunk_contract"]

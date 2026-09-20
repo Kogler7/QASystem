@@ -209,6 +209,88 @@ def chunk_document_items(
     breakpoint_method: str = "percentile",
 ) -> list[dict[str, Any]]:
     """Return ordered chunks with source character ranges."""
+    # Table-aware splitting is performed on source segments first.  This keeps
+    # offsets correct even when adjacent segments contain identical text.
+    if chunk_size <= 0:
+        raise ValueError("chunk_size 必须大于 0")
+    if not 0 <= similarity <= 1:
+        raise ValueError("similarity 必须在 0 到 1 之间")
+    if chunk_overlap < 0:
+        raise ValueError("chunk_overlap 不能为负数")
+    if chunk_overlap >= chunk_size:
+        raise ValueError("chunk_overlap 必须小于 chunk_size")
+    if not content:
+        return []
+
+    table_segments = _table_aware_segments(content) if chunk_type in (0, 1, 2, 3) else None
+    if table_segments is not None:
+        items: list[dict[str, Any]] = []
+        source_cursor = 0
+        for is_table, segment in table_segments:
+            start = content.find(segment, source_cursor)
+            if start < 0:
+                start = source_cursor
+            source_cursor = start + len(segment)
+            if is_table:
+                segment_items = [{"text": segment, "range": [0, len(segment)]}]
+            else:
+                segment_items = chunk_document_items(
+                    segment,
+                    chunk_type=chunk_type,
+                    chunk_size=chunk_size,
+                    chunk_characters=chunk_characters,
+                    similarity=similarity,
+                    chunk_overlap=chunk_overlap,
+                    model_path=model_path,
+                    breakpoint_method=breakpoint_method,
+                )
+            for item in segment_items:
+                items.append({
+                    "text": item["text"],
+                    "range": [start + item["range"][0], start + item["range"][1]],
+                })
+        return items
+
+    # Text splitters carry exact source ranges in Document metadata.  Do
+    # not rediscover offsets with ``str.find``: repeated text plus overlap makes
+    # that ambiguous.
+    if chunk_type in (0, 1, 2, 3):
+        source_documents = [Document(page_content=content, metadata={})]
+        if chunk_type == 1:
+            documents = split_by_characters(
+                source_documents,
+                chunk_size=chunk_size,
+                separators=chunk_characters or DEFAULT_SEPARATORS,
+                chunk_overlap=chunk_overlap,
+            )
+        elif chunk_type in (0, 2):
+            documents = split_recursively(
+                source_documents,
+                chunk_size=chunk_size,
+                separators=chunk_characters if chunk_type == 2 else None,
+                chunk_overlap=chunk_overlap,
+            )
+        else:
+            documents = split_by_markdown(
+                source_documents,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+        ranged = [
+            {
+                "text": document.page_content,
+                "range": list(document.metadata["__source_range"]),
+            }
+            for document in documents
+            if document.page_content
+        ]
+        if ranged:
+            for item in ranged:
+                start, end = item["range"]
+                if content[start:end] != item["text"]:
+                    raise ValueError("无法定位切片在原始 Markdown 中的字符偏移")
+            return ranged
+
     chunks = chunk_document(
         content,
         chunk_type=chunk_type,

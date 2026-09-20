@@ -1,10 +1,146 @@
 from __future__ import annotations
 
+import json
 import re
 
 from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownTextSplitter, RecursiveCharacterTextSplitter
 
+
+# ======================== JSON 保护核心函数 ========================
+
+def _is_protectable_json(data: object) -> bool:
+    """只有对象、或「含对象的数组」值得保护。
+
+    标量数组（`[1]`、`["参考文献"]`）多是正文里的文献角标或列举，保护它们会把
+    `[1] 标准号…` 撕成 `"[1]"` + 正文两片，确定性参考文献抽取也会因此失效。
+    口径与结构化文本判定（structured_text._is_record_payload）保持一致。
+    """
+    if isinstance(data, dict):
+        return True
+    return isinstance(data, list) and any(isinstance(item, dict) for item in data)
+
+
+def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
+    """提取文本中所有完整、合法的 JSON 块（对象 {...} 和含对象的数组 [...]）。
+
+    使用括号匹配 + json.loads 双重验证，避免把代码中的花括号误判为 JSON；
+    标量数组不算 JSON 块。
+    返回 list of (start_pos, end_pos, json_text)。
+    """
+    blocks: list[tuple[int, int, str]] = []
+    i = 0
+    while i < len(text):
+        while i < len(text) and text[i] in ' \t\n\r':
+            i += 1
+        if i >= len(text):
+            break
+
+        ch = text[i]
+        if ch not in ('{', '['):
+            i += 1
+            continue
+
+        open_ch = ch
+        close_ch = '}' if ch == '{' else ']'
+        depth = 0
+        in_string = False
+        escape = False
+        j = i
+
+        while j < len(text):
+            c = text[j]
+            if escape:
+                escape = False
+            elif c == '\\' and in_string:
+                escape = True
+            elif c == '"':
+                in_string = not in_string
+            elif not in_string:
+                if c == open_ch:
+                    depth += 1
+                elif c == close_ch:
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[i:j + 1]
+                        try:
+                            data = json.loads(candidate)
+                        except json.JSONDecodeError:
+                            i += 1
+                            break
+                        if _is_protectable_json(data):
+                            blocks.append((i, j + 1, candidate))
+                            i = j + 1
+                        else:
+                            # 标量数组不保护：跳过开头字符继续向后扫描
+                            i += 1
+                        break
+            j += 1
+        else:
+            i += 1
+
+    return blocks
+
+
+#: 围栏行：```json 开行 / ``` 闭行。围栏必须和 JSON 同属一个片段，否则会被切成
+#: 孤立的 "```json" / "```" 小片（白占一次 LLM 调用，且没有任何信息量）。
+_FENCE_OPENER = re.compile(r"`{3,}\s*(?:json)?", re.IGNORECASE)
+_FENCE_CLOSER = re.compile(r"`{3,}\s*")
+
+
+def _absorb_fence_lines(text: str, start: int, end: int) -> tuple[int, int]:
+    """把紧贴 JSON 两侧的围栏行并入 (start, end)；裸 JSON 边界原样返回。"""
+    head = start
+    while head > 0 and text[head - 1] in " \t\r\n":
+        head -= 1
+    line_start = text.rfind("\n", 0, head) + 1
+    opener = text[line_start:head]
+    if opener and _FENCE_OPENER.fullmatch(opener):
+        start = line_start
+
+    tail = end
+    while tail < len(text) and text[tail] in " \t\r\n":
+        tail += 1
+    line_end = text.find("\n", tail)
+    if line_end == -1:
+        line_end = len(text)
+    closer = text[tail:line_end]
+    if closer and _FENCE_CLOSER.fullmatch(closer):
+        end = line_end
+
+    return start, end
+
+
+def _split_text_with_json_protection(text: str) -> list[tuple[str, bool]]:
+    """将文本按 JSON 块边界拆分为 (片段, is_json) 列表。
+
+    JSON 块连同紧贴的 ```json / ``` 围栏作为独立片段且 is_json=True，
+    非 JSON 部分 is_json=False。
+    """
+    json_blocks = _extract_json_blocks(text)
+    if not json_blocks:
+        return [(text, False)]
+
+    result: list[tuple[str, bool]] = []
+    last_end = 0
+    for start, end, _json_text in json_blocks:
+        start, end = _absorb_fence_lines(text, start, end)
+        if start > last_end:
+            non_json = text[last_end:start]
+            if non_json:
+                result.append((non_json, False))
+        result.append((text[start:end], True))
+        last_end = end
+
+    if last_end < len(text):
+        remaining = text[last_end:]
+        if remaining:
+            result.append((remaining, False))
+
+    return result if result else [(text, False)]
+
+
+# ======================== 工具函数 ========================
 
 def _cosine_similarity(a, b) -> float:
     """Cosine similarity between two numpy vectors."""
@@ -22,238 +158,6 @@ def _cosine_similarity(a, b) -> float:
     return float(np.dot(a, b) / (a_norm * b_norm))
 
 
-def split_by_characters(
-    documents: list[Document],
-    chunk_size: int = 500,
-    separators: list[str] | None = None,
-    chunk_overlap: int = 0,
-) -> list[Document]:
-    """Split documents through every configured separator, then pack chunks."""
-    active_separators = [separator for separator in (separators or ["\n"]) if separator]
-    if not active_separators:
-        active_separators = ["\n"]
-
-    fragments: list[Document] = []
-    for document in documents:
-        texts = [document.page_content]
-        for separator in active_separators:
-            next_texts: list[str] = []
-            for text in texts:
-                parts = text.split(separator)
-                next_texts.extend(
-                    part + (separator if index < len(parts) - 1 else "")
-                    for index, part in enumerate(parts)
-                    if part or index < len(parts) - 1
-                )
-            texts = next_texts
-        fragments.extend(
-            Document(page_content=text, metadata=dict(document.metadata))
-            for text in texts
-            if text
-        )
-
-    if chunk_overlap > 0:
-        return _pack_with_overlap(fragments, chunk_size, chunk_overlap)
-
-    chunks: list[Document] = []
-    for fragment in fragments:
-        if len(fragment.page_content) <= chunk_size:
-            if chunks and len(chunks[-1].page_content) + len(fragment.page_content) <= chunk_size:
-                chunks[-1].page_content += fragment.page_content
-            else:
-                chunks.append(fragment)
-            continue
-        chunks.extend(
-            Document(
-                page_content=fragment.page_content[start:start + chunk_size],
-                metadata=dict(fragment.metadata),
-            )
-            for start in range(0, len(fragment.page_content), chunk_size)
-        )
-    return chunks
-
-
-def _pack_with_overlap(
-    fragments: list[Document],
-    chunk_size: int,
-    chunk_overlap: int,
-) -> list[Document]:
-    if not fragments:
-        return []
-
-    chunks: list[Document] = []
-    # 以 fragment 为粒度累积，避免切断句子
-    buf_frags: list[str] = []
-    buf_len = 0
-    meta = dict(fragments[0].metadata)
-
-    def flush(force: bool = False) -> None:
-        nonlocal buf_frags, buf_len
-        if not buf_frags:
-            return
-        text = "".join(buf_frags)
-        if len(text) <= chunk_size or force:
-            if text.strip():
-                chunks.append(Document(page_content=text, metadata=dict(meta)))
-            buf_frags, buf_len = [], 0
-
-    for frag in fragments:
-        content = frag.page_content
-        if not content:
-            continue
-        # 若加入后超长：先输出当前缓冲，再把当前 frag 作为新缓冲起点
-        if buf_len + len(content) > chunk_size and buf_frags:
-            flush(force=True)
-        buf_frags.append(content)
-        buf_len += len(content)
-
-    flush(force=True)
-
-    # 应用 overlap：在相邻块之间复制尾部若干【完整 fragment】
-    if chunk_overlap <= 0 or len(chunks) < 2:
-        return chunks
-
-    overlapped: list[Document] = [chunks[0]]
-    for k in range(1, len(chunks)):
-        prev_text = overlapped[-1].page_content
-        tail = _tail_with_boundary(prev_text, chunk_overlap)
-        if tail and tail != prev_text:
-            new_text = tail + chunks[k].page_content
-            if len(new_text) > chunk_size + chunk_overlap:
-                # 截断 tail 使总长度不超过 chunk_size + chunk_overlap
-                allowed_tail_len = max(0, (chunk_size + chunk_overlap) - len(chunks[k].page_content))
-                tail = tail[-allowed_tail_len:] if allowed_tail_len > 0 else ""
-                new_text = tail + chunks[k].page_content
-            overlapped.append(Document(page_content=new_text, metadata=dict(chunks[k].metadata)))
-        else:
-            overlapped.append(chunks[k])
-    return overlapped
-
-
-def split_recursively(
-    documents: list[Document],
-    chunk_size: int = 500,
-    separators: list[str] | None = None,
-    chunk_overlap: int = 0,
-) -> list[Document]:
-    splitter = RecursiveCharacterTextSplitter(
-        separators=separators or ["\n\n", "\n", "。", "！", "？", ".", "!", "?", " ", ""],
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-    )
-    return splitter.split_documents(documents)
-
-
-def split_by_markdown(
-    documents: list[Document],
-    chunk_size: int = 500,
-    chunk_overlap: int = 0,
-) -> list[Document]:
-    splitter = MarkdownTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    return splitter.split_documents(documents)
-
-
-def split_semantically(
-    documents: list[Document],
-    chunk_size: int = 500,
-    similarity: float = 0.6,
-    chunk_overlap: int = 0,
-    model_path: str | None = None,
-    breakpoint_method: str = "percentile",
-    min_segments_per_chunk: int = 2, 
-) -> list[Document]:
-    """Split text by semantic boundaries using Max-Min chunking + breakpoint detection.
-
-    Pipeline:
-    1. Pre-split by Markdown headers (#, ##, ...) for structure awareness.
-    2. Within each section, split into sentence-level segments.
-    3. Batch-encode all segments with SentenceTransformer.
-    4. Merge tiny (<20 char) segments into neighbors.
-    5. Detect semantic breakpoints (valleys in consecutive similarity).
-    6. Group segments using the Max-Min algorithm.
-    7. Apply character-level overlap if configured.
-
-    *similarity* serves as *tau* (initial threshold) in Max-Min.
-    *breakpoint_method* controls how hard semantic boundaries are detected:
-    ``"percentile"`` (default), ``"stddev"``, or ``"none"``.
-    """
-    import numpy as np
-
-    from algorithm.NL_to_cypher.vector import _load_model, _model_path
-
-    resolved_path = _model_path(model_path)
-    model = _load_model(resolved_path)
-
-    # Derive min_similarity from tau (lower bound for MaxSim).
-    # Keeps chunks from collapsing when MinSim drops below a reasonable floor.
-    min_similarity = max(0.3, similarity - 0.15)
-
-    result: list[Document] = []
-    for document in documents:
-        text = document.page_content
-        if not text.strip():
-            continue
-
-        # Step 1: Pre-split by Markdown headers for structure awareness
-        sections = _split_by_markdown_headers(text)
-
-        # Step 2-3: Split each section into segments + collect for batch encoding
-        all_segments: list[str] = []
-        section_spans: list[tuple[int, int]] = []
-        for section in sections:
-            segs = _split_into_segments(section, list(_SENTENCE_SEPARATORS))
-            if not segs:
-                continue
-            start = len(all_segments)
-            all_segments.extend(segs)
-            section_spans.append((start, len(all_segments)))
-
-        if not all_segments:
-            continue
-
-        # Batch-encode all segments (single model call for efficiency)
-        all_embeddings = model.encode(all_segments, convert_to_numpy=True)
-
-        # Step 4-6: Process each section independently
-        for start, end in section_spans:
-            section_segs = all_segments[start:end]
-            section_embs = all_embeddings[start:end]
-
-            # Merge tiny segments
-            merged_segs, merged_embs = _merge_tiny_segments(section_segs, section_embs)
-            if len(merged_segs) == 0:
-                continue
-
-            # Detect breakpoints (valleys in consecutive similarity)
-            bps = _detect_breakpoints(merged_segs, merged_embs, method=breakpoint_method)
-
-            # Max-Min grouping
-            chunks = _group_segments_maxmin(
-                merged_segs,
-                merged_embs,
-                chunk_size,
-                tau=similarity,
-                min_similarity=min_similarity,
-                breakpoints=bps,
-                min_segments=min_segments_per_chunk, 
-            )
-            chunks = _merge_short_chunks(
-                chunks, chunk_size, min_fill_ratio=0.5
-            )
-
-            for chunk_text in chunks:
-                result.append(Document(page_content=chunk_text, metadata=dict(document.metadata)))
-
-    result_texts = [d.page_content for d in result]
-    result_texts = _merge_short_chunks(result_texts, chunk_size, min_fill_ratio=0.5)
-    result = [Document(page_content=t, metadata=dict(result[i].metadata))
-              for i, t in enumerate(result_texts)]
-    if chunk_overlap > 0 and len(result) > 1:
-        result = _apply_overlap_to_chunks(result, chunk_size, chunk_overlap)
-
-    return result
-
-
 _SENTENCE_SEPARATORS: list[str] = [
     "\n\n",
     "。",
@@ -268,44 +172,33 @@ _SENTENCE_SEPARATORS: list[str] = [
 
 _HEADER_PATTERN = re.compile(r"^(#{1,6}\s)", re.MULTILINE)
 
+
 def _merge_short_chunks(
     chunks: list[str],
     chunk_size: int,
     min_fill_ratio: float = 0.5,
 ) -> list[str]:
-    """合并过短的 chunk 到相邻 chunk 中。
-    
-    如果 chunk 长度 < chunk_size * min_fill_ratio，
-    尝试合并到前一个（优先）或后一个 chunk，只要不超 chunk_size。
-    """
+    """合并过短的 chunk 到相邻 chunk 中。"""
     if not chunks:
         return chunks
-    
+
     min_len = int(chunk_size * min_fill_ratio)
     result: list[str] = []
-    
+
     for chunk in chunks:
         if len(chunk) >= min_len:
-            # 够长，直接保留
             result.append(chunk)
         else:
-            # 太短了，尝试合并
             if result and len(result[-1]) + len(chunk) <= chunk_size:
-                # 合并到前一个
                 result[-1] += chunk
             else:
                 result.append(chunk)
-    
+
     return result
 
 
 def _split_into_segments(text: str, separators: list[str] | None = None) -> list[str]:
-    """Split text into atomic segments at sentence / paragraph boundaries.
-
-    Returns cleaned segments with separators merged into preceding content.
-    Short segments (< *min_segment_len*) are kept separate and will be
-    merged back by the caller based on semantic similarity.
-    """
+    """Split text into atomic segments at sentence / paragraph boundaries."""
     if separators is None:
         separators = list(_SENTENCE_SEPARATORS)
 
@@ -341,6 +234,7 @@ def _split_into_segments(text: str, separators: list[str] | None = None) -> list
             current = seg
     if current:
         merged.append(current)
+
     cleaned = [m for m in merged if m and m.strip()]
     if not cleaned and text.strip():
         return [text.strip()]
@@ -349,13 +243,7 @@ def _split_into_segments(text: str, separators: list[str] | None = None) -> list
 
 
 def _split_by_markdown_headers(text: str) -> list[str]:
-    """Split text at Markdown header boundaries for structure-aware chunking.
-
-    Headers (#, ##, ###, etc.) indicate section boundaries. Each section
-    (including its header line) is returned as an independent unit that
-    will be semantically chunked separately, preventing chunks from
-    spanning across unrelated sections.
-    """
+    """Split text at Markdown header boundaries for structure-aware chunking."""
     if not text.strip():
         return [text]
 
@@ -378,6 +266,7 @@ def _split_by_markdown_headers(text: str) -> list[str]:
         prefix = text[: matches[0].start()].strip()
         if prefix:
             sections.insert(0, prefix)
+
     if len(sections) >= 2:
         def _is_title_only(s):
             body = "\n".join(s.splitlines()[1:]).strip()
@@ -394,12 +283,7 @@ def _merge_tiny_segments(
     embeddings: "numpy.ndarray",
     min_segment_len: int = 20,
 ) -> tuple[list[str], "numpy.ndarray"]:
-    """Merge tiny segments into neighboring content segments.
-
-    Segments shorter than *min_segment_len* (YAML frontmatter, delimiters,
-    empty markers) are merged into adjacent content so they don't produce
-    low-quality singleton embeddings that distort the grouping step.
-    """
+    """Merge tiny segments into neighboring content segments."""
     import numpy as np
 
     merged_segs: list[str] = []
@@ -442,16 +326,7 @@ def _detect_breakpoints(
     method: str = "percentile",
     percentile: float = 15.0,
 ) -> set[int]:
-    """Detect semantic breakpoints between consecutive segments.
-
-    Computes cosine similarity between consecutive segments and identifies
-    valleys (sharp drops) as natural semantic boundaries. These breakpoints
-    act as hard boundaries that the Max-Min grouper will not cross.
-
-    *method='percentile'*: similarities below the given percentile are breakpoints.
-    *method='stddev'*: similarities below (mean - 1.5 * std) are breakpoints.
-    *method='none'*: no breakpoint detection.
-    """
+    """Detect semantic breakpoints between consecutive segments."""
     import numpy as np
 
     if len(segments) < 2 or method == "none":
@@ -483,20 +358,7 @@ def _group_segments_maxmin(
     breakpoints: set[int] | None = None,
     min_segments: int = 1,
 ) -> list[str]:
-    """Group segments into chunks using the Max-Min semantic chunking algorithm.
-
-    Unlike centroid-based grouping, this uses pairwise similarity comparisons
-    to eliminate centroid drift and produce semantically tighter chunks.
-
-    Algorithm (Bhat et al., 2025):
-    1. When the current chunk has only 1 segment s₀:
-       merge sᵢ if cosine(s₀, sᵢ) >= *tau*.
-    2. When the chunk has ≥2 segments:
-       - MinSim = minimum pairwise cosine similarity within the chunk
-       - MaxSim = maximum cosine similarity between sᵢ and any segment in the chunk
-       - Merge if MaxSim >= MinSim AND MaxSim >= *min_similarity*.
-    3. *breakpoints* are hard boundaries that always force a new chunk.
-    """
+    """Group segments into chunks using the Max-Min semantic chunking algorithm."""
     import numpy as np
 
     breakpoints = breakpoints or set()
@@ -514,7 +376,6 @@ def _group_segments_maxmin(
         emb = embeddings[i]
         current_len = sum(len(s) for s in chunk_segs)
 
-        # Hard breakpoint → force new chunk
         if i in breakpoints:
             chunks.append("".join(chunk_segs))
             chunk_segs = [seg]
@@ -522,13 +383,9 @@ def _group_segments_maxmin(
             chunk_minsim = 1.0
             continue
 
-        # Compute all pairwise similarities between new segment and chunk once.
-        # We need both MaxSim (for the decision rule) and the individual values
-        # (for updating MinSim). A single pass avoids redundant norm calls.
         pairwise_sims = [_cosine_similarity(emb, e) for e in chunk_embs]
         max_sim = max(pairwise_sims) if pairwise_sims else 0.0
 
-        # Size overflow → close current chunk, start new one
         if current_len + len(seg) > chunk_size:
             chunks.append("".join(chunk_segs))
             chunk_segs = [seg]
@@ -536,11 +393,7 @@ def _group_segments_maxmin(
             chunk_minsim = 1.0
             continue
 
-        # Max-Min decision rule
         if len(chunk_segs) == 1:
-            # First merge: use tau as the initial threshold.
-            # max_sim == the only pairwise similarity in a 2-element set,
-            # which is the correct MinSim after merging.
             if max_sim >= tau and max_sim >= min_similarity:
                 chunk_segs.append(seg)
                 chunk_embs.append(emb)
@@ -552,14 +405,12 @@ def _group_segments_maxmin(
                 chunk_minsim = 1.0
         else:
             if max_sim >= chunk_minsim and max_sim >= min_similarity:
-                # Update MinSim: check if any new pair is weaker than current minimum
                 for sim in pairwise_sims:
                     if sim < chunk_minsim:
                         chunk_minsim = sim
                 chunk_segs.append(seg)
                 chunk_embs.append(emb)
             elif len(chunk_segs) < min_segments and current_len + len(seg) <= chunk_size:
-                #新增：凑不够最少段数时强制并入，防碎片化
                 for sim in pairwise_sims:
                     if sim < chunk_minsim:
                         chunk_minsim = sim
@@ -574,27 +425,28 @@ def _group_segments_maxmin(
     if chunk_segs:
         chunks.append("".join(chunk_segs))
 
-    # Final pass: split any oversized chunks by character fallback
     result: list[str] = []
     for chunk_text in chunks:
         if len(chunk_text) <= chunk_size:
             result.append(chunk_text)
         else:
             for start in range(0, len(chunk_text), chunk_size):
-                result.append(chunk_text[start : start + chunk_size])
+                result.append(chunk_text[start: start + chunk_size])
     return result
+
 
 def _tail_with_boundary(text: str, max_len: int) -> str:
     """从文本末尾截取最多 max_len 字符，对齐到句子/段落边界。"""
     if len(text) <= max_len:
         return text
     tail = text[-max_len:]
-    # 尝试从第一个句子分隔符开始（避免截断半句）
     for sep in ["。", "！", "？", ". ", "! ", "? ", "\n\n", "\n"]:
         idx = tail.find(sep)
         if idx != -1:
             return tail[idx + len(sep):]
     return tail
+
+
 def _apply_overlap_to_chunks(
     chunks: list[Document],
     chunk_size: int,
@@ -619,18 +471,9 @@ def _apply_overlap_to_chunks(
             start += step
     return result
 
-def _build_heading_tree(text: str) -> dict:
-    """解析 Markdown 文本中的标题层级，构建文档树。
 
-    返回根节点 dict，结构：
-    {
-        "level": 0,
-        "title": "",
-        "content": "第一个标题前的文本",
-        "children": [子节点...]
-    }
-    每个子节点包含 level(1-6), title, content(含标题行及下属文本), children。
-    """
+def _build_heading_tree(text: str) -> dict:
+    """解析 Markdown 文本中的标题层级，构建文档树。"""
     lines = text.splitlines(keepends=True)
     root = {"level": 0, "title": "", "content": "", "children": []}
     stack = [root]
@@ -639,7 +482,6 @@ def _build_heading_tree(text: str) -> dict:
     for line in lines:
         heading_match = re.match(r"^(#{1,6})\s+(.*)", line)
         if heading_match:
-            # 将之前累积的内容挂到当前栈顶节点
             if current_content_lines:
                 stack[-1]["content"] += "".join(current_content_lines)
                 current_content_lines = []
@@ -648,10 +490,9 @@ def _build_heading_tree(text: str) -> dict:
             new_node = {
                 "level": level,
                 "title": title,
-                "content": line,  # 标题行本身作为节点内容的开头
+                "content": line,
                 "children": [],
             }
-            # 弹出栈中层级 >= 当前层级的节点，找到父节点
             while len(stack) > 1 and stack[-1]["level"] >= level:
                 stack.pop()
             stack[-1]["children"].append(new_node)
@@ -659,34 +500,452 @@ def _build_heading_tree(text: str) -> dict:
         else:
             current_content_lines.append(line)
 
-    # 剩余内容挂到最后一个栈顶节点
     if current_content_lines:
         stack[-1]["content"] += "".join(current_content_lines)
 
     return root
 
 
+# ======================== 切片方法（全部集成 JSON 保护） ========================
+
+def split_by_characters(
+    documents: list[Document],
+    chunk_size: int = 500,
+    separators: list[str] | None = None,
+    chunk_overlap: int = 0,
+) -> list[Document]:
+    """Split documents through every configured separator, then pack chunks.
+    JSON 块受保护，不会从中间断开，可以独占一个超长切片。"""
+    if chunk_size <= 0 or not 0 <= chunk_overlap < chunk_size:
+        raise ValueError("chunk_size 必须大于 0，且 0 <= chunk_overlap < chunk_size")
+    plain_limit = chunk_size - chunk_overlap
+    active_separators = [separator for separator in (separators or ["\n"]) if separator]
+    if not active_separators:
+        active_separators = ["\n"]
+
+    fragments: list[Document] = []
+    for document_index, document in enumerate(documents):
+        text = document.page_content
+        protected = _split_text_with_json_protection(text)
+        source_cursor = 0
+
+        for part_text, is_json in protected:
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            part_end = part_start + len(part_text)
+            source_cursor = part_end
+            if is_json:
+                # JSON 块直接作为完整 fragment
+                fragments.append(Document(
+                    page_content=part_text,
+                    metadata={
+                        **dict(document.metadata),
+                        "_is_json": True,
+                        "__source_range": [part_start, part_end],
+                        "__document_index": document_index,
+                    },
+                ))
+            else:
+                # 非 JSON 走原有 separator 拆分
+                texts = [part_text]
+                for separator in active_separators:
+                    next_texts: list[str] = []
+                    for t in texts:
+                        parts = t.split(separator)
+                        next_texts.extend(
+                            p + (separator if idx < len(parts) - 1 else "")
+                            for idx, p in enumerate(parts)
+                            if p or idx < len(parts) - 1
+                        )
+                    texts = next_texts
+                part_cursor = 0
+                for t in texts:
+                    t_start = part_text.find(t, part_cursor)
+                    if t_start < 0:
+                        t_start = part_cursor
+                    part_cursor = t_start + len(t)
+                    for start in range(0, len(t), plain_limit):
+                        fragments.append(Document(
+                            page_content=t[start:start + plain_limit],
+                            metadata={
+                                **dict(document.metadata),
+                                "_is_json": False,
+                                "__source_range": [
+                                    part_start + t_start + start,
+                                    part_start + t_start + min(start + plain_limit, len(t)),
+                                ],
+                                "__document_index": document_index,
+                            },
+                        ))
+
+    if chunk_overlap > 0:
+        return _pack_with_overlap(fragments, chunk_size, chunk_overlap)
+
+    # 打包：JSON 块不拆分
+    chunks: list[Document] = []
+    buf_texts: list[str] = []
+    buf_ranges: list[list[int]] = []
+    buf_len = 0
+    active_document: int | None = None
+    buf_metadata: dict = {}
+
+    for fragment in fragments:
+        frag_text = fragment.page_content
+        is_json = fragment.metadata.get("_is_json", False)
+        frag_len = len(frag_text)
+
+        document_index = fragment.metadata.get("__document_index")
+        if buf_texts and document_index != active_document:
+            metadata = dict(buf_metadata)
+            if buf_ranges:
+                metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+            chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
+            buf_texts, buf_ranges, buf_len = [], [], 0
+        active_document = document_index
+
+        if is_json and frag_len > chunk_size:
+            if buf_texts:
+                metadata = dict(buf_metadata)
+                if buf_ranges:
+                    metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+                chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
+                buf_texts, buf_ranges = [], []
+                buf_len = 0
+            chunks.append(Document(page_content=frag_text, metadata=dict(fragment.metadata)))
+            continue
+
+        if buf_len + frag_len > chunk_size and buf_texts:
+            metadata = dict(buf_metadata)
+            if buf_ranges:
+                metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+            chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
+            buf_texts = [frag_text]
+            buf_metadata = dict(fragment.metadata)
+            buf_ranges = [list(fragment.metadata["__source_range"])] if fragment.metadata.get("__source_range") else []
+            buf_len = frag_len
+        else:
+            if not buf_texts:
+                buf_metadata = dict(fragment.metadata)
+            buf_texts.append(frag_text)
+            if fragment.metadata.get("__source_range"):
+                buf_ranges.append(list(fragment.metadata["__source_range"]))
+            buf_len += frag_len
+
+    if buf_texts:
+        metadata = dict(buf_metadata)
+        if buf_ranges:
+            metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+        chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
+
+    for c in chunks:
+        c.metadata.pop("_is_json", None)
+        c.metadata.pop("__document_index", None)
+
+    return chunks
+
+
+def _pack_with_overlap(
+    fragments: list[Document],
+    chunk_size: int,
+    chunk_overlap: int,
+) -> list[Document]:
+    if not fragments:
+        return []
+
+    chunks: list[Document] = []
+    buf_frags: list[str] = []
+    buf_ranges: list[list[int]] = []
+    buf_len = 0
+    active_document: int | None = None
+    buf_metadata: dict = {}
+
+    def flush(force: bool = False) -> None:
+        nonlocal buf_frags, buf_ranges, buf_len, buf_metadata
+        if not buf_frags:
+            return
+        text = "".join(buf_frags)
+        if len(text) <= chunk_size or force:
+            if text.strip():
+                metadata = dict(buf_metadata)
+                if buf_ranges:
+                    metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+                metadata.pop("_is_json", None)
+                chunks.append(Document(page_content=text, metadata=metadata))
+            buf_frags, buf_ranges, buf_len, buf_metadata = [], [], 0, {}
+
+    for frag in fragments:
+        content = frag.page_content
+        is_json = frag.metadata.get("_is_json", False)
+        if not content:
+            continue
+
+        document_index = frag.metadata.get("__document_index")
+        if buf_frags and document_index != active_document:
+            flush(force=True)
+        active_document = document_index
+
+        if is_json and len(content) > chunk_size:
+            flush(force=True)
+            chunks.append(Document(
+                page_content=content,
+                metadata={k: v for k, v in dict(frag.metadata).items() if k != "_is_json"},
+            ))
+            continue
+
+        if buf_len + len(content) > chunk_size - chunk_overlap and buf_frags:
+            flush(force=True)
+        if not buf_frags:
+            buf_metadata = dict(frag.metadata)
+        buf_frags.append(content)
+        if frag.metadata.get("__source_range"):
+            buf_ranges.append(list(frag.metadata["__source_range"]))
+        buf_len += len(content)
+
+    flush(force=True)
+
+    if chunk_overlap <= 0 or len(chunks) < 2:
+        for chunk in chunks:
+            chunk.metadata.pop("__document_index", None)
+        return chunks
+
+    overlapped: list[Document] = [chunks[0]]
+    for k in range(1, len(chunks)):
+        prev_text = overlapped[-1].page_content
+        tail = _tail_with_boundary(prev_text, chunk_overlap)
+        previous_range = overlapped[-1].metadata.get("__source_range")
+        # A boundary-aligned tail may intentionally omit trailing whitespace
+        # from the previous source span.  It is then not a contiguous source
+        # suffix; drop the overlap rather than inventing a range containing
+        # characters absent from the emitted chunk.
+        if (
+            tail
+            and previous_range
+            and chunks[k].metadata.get("__source_range")
+            and chunks[k].metadata["__source_range"][0] != previous_range[1]
+            and len(prev_text) == previous_range[1] - previous_range[0]
+        ):
+            tail = ""
+        if tail and tail != prev_text:
+            new_text = tail + chunks[k].page_content
+            if len(new_text) > chunk_size:
+                allowed_tail_len = max(0, chunk_size - len(chunks[k].page_content))
+                tail = tail[-allowed_tail_len:] if allowed_tail_len > 0 else ""
+                new_text = tail + chunks[k].page_content
+            metadata = dict(chunks[k].metadata)
+            current_range = metadata.get("__source_range")
+            if current_range and previous_range:
+                metadata["__source_range"] = [
+                    max(previous_range[1] - len(tail), previous_range[0]),
+                    current_range[1],
+                ]
+            elif current_range:
+                metadata["__source_range"] = list(current_range)
+            overlapped.append(Document(page_content=new_text, metadata=metadata))
+        else:
+            overlapped.append(chunks[k])
+
+    for chunk in overlapped:
+        chunk.metadata.pop("__document_index", None)
+    return overlapped
+
+
+def split_recursively(
+    documents: list[Document],
+    chunk_size: int = 500,
+    separators: list[str] | None = None,
+    chunk_overlap: int = 0,
+) -> list[Document]:
+    """递归切片 + JSON 保护。"""
+    result: list[Document] = []
+
+    for document_index, document in enumerate(documents):
+        text = document.page_content
+        protected = _split_text_with_json_protection(text)
+        source_cursor = 0
+
+        for part_text, is_json in protected:
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            source_cursor = part_start + len(part_text)
+            if is_json:
+                result.append(Document(
+                    page_content=part_text,
+                    metadata={
+                        **dict(document.metadata),
+                        "__source_range": [part_start, source_cursor],
+                        "__document_index": document_index,
+                    },
+                ))
+            else:
+                splitter = RecursiveCharacterTextSplitter(
+                    separators=separators or ["\n\n", "\n", "。", "！", "？", ".", "!", "?", " ", ""],
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    add_start_index=True,
+                )
+                for chunk in splitter.split_documents([Document(page_content=part_text, metadata=dict(document.metadata))]):
+                    local_start = int(chunk.metadata.pop("start_index", -1))
+                    if local_start < 0:
+                        raise ValueError("切片器未返回有效 start_index")
+                    result.append(Document(
+                        page_content=chunk.page_content,
+                        metadata={
+                            **dict(chunk.metadata),
+                            "__source_range": [
+                                part_start + local_start,
+                                part_start + local_start + len(chunk.page_content),
+                            ],
+                            "__document_index": document_index,
+                        },
+                    ))
+
+    return result
+
+
+def split_by_markdown(
+    documents: list[Document],
+    chunk_size: int = 500,
+    chunk_overlap: int = 0,
+) -> list[Document]:
+    """Markdown 切片 + JSON 保护。"""
+    result: list[Document] = []
+
+    for document_index, document in enumerate(documents):
+        text = document.page_content
+        protected = _split_text_with_json_protection(text)
+        source_cursor = 0
+
+        for part_text, is_json in protected:
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            source_cursor = part_start + len(part_text)
+            if is_json:
+                result.append(Document(
+                    page_content=part_text,
+                    metadata={
+                        **dict(document.metadata),
+                        "__source_range": [part_start, source_cursor],
+                        "__document_index": document_index,
+                    },
+                ))
+            else:
+                splitter = MarkdownTextSplitter(
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    add_start_index=True,
+                )
+                for chunk in splitter.split_documents([Document(page_content=part_text, metadata=dict(document.metadata))]):
+                    local_start = int(chunk.metadata.pop("start_index", -1))
+                    if local_start < 0:
+                        raise ValueError("切片器未返回有效 start_index")
+                    result.append(Document(
+                        page_content=chunk.page_content,
+                        metadata={
+                            **dict(chunk.metadata),
+                            "__source_range": [
+                                part_start + local_start,
+                                part_start + local_start + len(chunk.page_content),
+                            ],
+                            "__document_index": document_index,
+                        },
+                    ))
+
+    return result
+
+
+def split_semantically(
+    documents: list[Document],
+    chunk_size: int = 500,
+    similarity: float = 0.6,
+    chunk_overlap: int = 0,
+    model_path: str | None = None,
+    breakpoint_method: str = "percentile",
+    min_segments_per_chunk: int = 2,
+) -> list[Document]:
+    """语义切片 + JSON 保护。"""
+    import numpy as np
+
+    try:
+        from algorithm.NL_to_cypher.vector import _load_model, _model_path
+        resolved_path = _model_path(model_path)
+        model = _load_model(resolved_path)
+        has_model = True
+    except Exception:
+        has_model = False
+        model = None
+
+    min_similarity = max(0.3, similarity - 0.15) if has_model else 0.0
+
+    result: list[Document] = []
+    for document in documents:
+        text = document.page_content
+        if not text.strip():
+            continue
+
+        protected = _split_text_with_json_protection(text)
+
+        for part_text, is_json in protected:
+            if is_json:
+                result.append(Document(page_content=part_text, metadata=dict(document.metadata)))
+                continue
+
+            if not has_model or not part_text.strip():
+                if len(part_text) <= chunk_size:
+                    result.append(Document(page_content=part_text, metadata=dict(document.metadata)))
+                else:
+                    for start in range(0, len(part_text), chunk_size):
+                        result.append(Document(
+                            page_content=part_text[start:start + chunk_size],
+                            metadata=dict(document.metadata),
+                        ))
+                continue
+
+            sections = _split_by_markdown_headers(part_text)
+            all_segments: list[str] = []
+            section_spans: list[tuple[int, int]] = []
+            for section in sections:
+                segs = _split_into_segments(section, list(_SENTENCE_SEPARATORS))
+                if not segs:
+                    continue
+                start = len(all_segments)
+                all_segments.extend(segs)
+                section_spans.append((start, len(all_segments)))
+
+            if not all_segments:
+                continue
+
+            all_embeddings = model.encode(all_segments, convert_to_numpy=True)
+
+            for start, end in section_spans:
+                section_segs = all_segments[start:end]
+                section_embs = all_embeddings[start:end]
+                merged_segs, merged_embs = _merge_tiny_segments(section_segs, section_embs)
+                if len(merged_segs) == 0:
+                    continue
+                bps = _detect_breakpoints(merged_segs, merged_embs, method=breakpoint_method)
+                chunks = _group_segments_maxmin(
+                    merged_segs, merged_embs, chunk_size,
+                    tau=similarity, min_similarity=min_similarity,
+                    breakpoints=bps, min_segments=min_segments_per_chunk,
+                )
+                chunks = _merge_short_chunks(chunks, chunk_size, min_fill_ratio=0.5)
+                for chunk_text in chunks:
+                    result.append(Document(page_content=chunk_text, metadata=dict(document.metadata)))
+
+    if chunk_overlap > 0 and len(result) > 1:
+        result = _apply_overlap_to_chunks(result, chunk_size, chunk_overlap)
+
+    return result
+
+
 def split_by_tree(
     documents: list[Document],
     chunk_size: int = 12000,
 ) -> list[Document]:
-    """树状切分：按 Markdown 标题层级构建文档树，以标题节点为最小单元打包。
-
-    - 不在段落/标题节点中断开（最小不可拆单位是标题节点及其下属内容）。
-    - 累积内容接近 chunk_size 时切分，允许最后一块少于阈值，
-      若单个节点超阈值则单独成块（不拆分）。
-    - 每个输出 chunk 前添加段落位置标记（面包屑路径）。
-
-    标记格式示例：
-        [文档位置: 文章标题 > 一级标题 > 二级标题]
-
-    Args:
-        documents: 输入的 Document 列表。
-        chunk_size: 每个 chunk 的目标最大字符数，默认 12000。
-
-    Returns:
-        list[Document]: 带位置标记的树状切分结果。
-    """
+    """树状切片 + JSON 保护。"""
     results: list[Document] = []
 
     for doc in documents:
@@ -694,7 +953,6 @@ def split_by_tree(
         if not text.strip():
             continue
 
-        # 确定文章标题：优先 metadata，其次第一个 # 标题，最后兜底
         doc_title = (
             doc.metadata.get("title")
             or doc.metadata.get("source")
@@ -707,18 +965,14 @@ def split_by_tree(
             else:
                 doc_title = "未命名文档"
 
-        # 构建文档树
-        tree = _build_heading_tree(text)
+        protected = _split_text_with_json_protection(text)
 
-        # 收集待输出的块：(路径列表, 内容文本)
         chunks_to_flush: list[tuple[list[str], str]] = []
-
         current_path: list[str] = [doc_title]
         current_parts: list[str] = []
         current_len: int = 0
 
         def _flush() -> None:
-            """将当前累积的内容作为一个 chunk 记录。"""
             nonlocal current_parts, current_len
             if current_parts:
                 combined = "".join(current_parts)
@@ -727,57 +981,53 @@ def split_by_tree(
                 current_parts = []
                 current_len = 0
 
-        def _traverse(node: dict, path: list[str]) -> None:
-            nonlocal current_len
-            node_text = node["content"]
+        for part_text, is_json in protected:
+            if is_json:
+                if current_parts:
+                    _flush()
+                marker = f"[文档位置: {' > '.join(current_path)}]"
+                marked_content = f"{marker}\n\n{part_text}"
+                results.append(Document(page_content=marked_content, metadata=dict(doc.metadata)))
+                continue
 
-            # 如果加入当前节点会超阈值，且已有累积，先 flush
-            if current_len + len(node_text) > chunk_size and current_parts:
-                _flush()
+            tree = _build_heading_tree(part_text)
+            if tree["content"].strip():
+                if current_len + len(tree["content"]) > chunk_size and current_parts:
+                    _flush()
+                current_parts.append(tree["content"])
+                current_len += len(tree["content"])
 
-            # 加入当前节点内容
-            current_parts.append(node_text)
-            current_len += len(node_text)
+            def _traverse(node: dict, path: list[str]) -> None:
+                nonlocal current_len
+                node_text = node["content"]
+                if current_len + len(node_text) > chunk_size and current_parts:
+                    _flush()
+                current_parts.append(node_text)
+                current_len += len(node_text)
+                for child in node["children"]:
+                    if current_len + len(child["content"]) > chunk_size and current_parts:
+                        _flush()
+                    _traverse(child, path + [child["title"]])
 
-            # 遍历子节点
-            for child in node["children"]:
-                child_path = path + [child["title"]]
-                # 如果子节点加入会超且当前有内容，先 flush 再进入子树
+            for child in tree["children"]:
                 if current_len + len(child["content"]) > chunk_size and current_parts:
                     _flush()
-                _traverse(child, child_path)
+                _traverse(child, [doc_title, child["title"]])
 
-        # 处理根节点前置内容（第一个标题之前的文本）
-        if tree["content"].strip():
-            current_parts.append(tree["content"])
-            current_len += len(tree["content"])
-
-        # 遍历所有顶级标题节点
-        for child in tree["children"]:
-            if current_len + len(child["content"]) > chunk_size and current_parts:
-                _flush()
-            _traverse(child, [doc_title, child["title"]])
-
-        # 剩余内容 flush
         _flush()
 
-        # 生成带位置标记的 Document
         for path, content in chunks_to_flush:
             if len(path) > 1:
                 marker = f"[文档位置: {' > '.join(path)}]"
             else:
                 marker = f"[文档位置: {path[0]}]"
             marked_content = f"{marker}\n\n{content}"
-            results.append(
-                Document(
-                    page_content=marked_content,
-                    metadata=dict(doc.metadata),
-                )
-            )
+            results.append(Document(page_content=marked_content, metadata=dict(doc.metadata)))
 
     return results
 
-# ======================== 以下为新增的 main 测试函数 ========================
+
+# ======================== 测试文档生成 ========================
 
 def _generate_test_document() -> str:
     """生成一篇约3000字的交通领域测试文档（Markdown格式）。"""
@@ -811,21 +1061,7 @@ def _generate_test_document() -> str:
 
 ### 2.2 智能信号控制系统
 
-传统固定配时信号控制已无法适应动态变化的交通流。自适应信号控制系统（如SCATS、SCOOT的升级版本）通过地磁检测器、视频AI分析等手段实时感知路口各方向车流量，动态调整绿灯时长和相位差。
-
-最新的AI信号优化方案引入深度强化学习算法，将每个路口视为一个智能体，通过多智能体协同学习实现区域路网信号配时的全局最优。试点数据显示，AI信号优化可使路口平均排队长度缩短22%，通行效率提升15%以上。
-
-### 2.3 车路协同与自动驾驶
-
-车路协同（V2X）技术通过"车-车-路-云"的全方位连接，弥补单车智能在感知盲区、超视距等方面的不足。路侧单元（RSU）部署激光雷达和高清摄像头，将感知结果通过5G网络实时广播给周边车辆。自动驾驶车辆在接收到路侧感知信息后，可提前做出减速、变道等决策。
-
-目前，国内已有超过20个城市开展了车路协同示范项目建设。北京亦庄、上海嘉定、长沙湘江新区等区域已实现特定路段L4级自动驾驶公交和Robotaxi的常态化运营。
-
-### 2.4 交通数字孪生
-
-数字孪生技术通过构建与物理世界1:1映射的虚拟交通系统，支持交通方案的在线仿真与预评估。孪生模型集成路网几何数据、实时交通流数据、气象数据、事件数据等多维信息，可模拟不同管控策略下的交通运行状态。
-
-应用场景包括：新开通道路的信号配时预优化、大型活动交通组织方案仿真评估、交通事故应急响应推演等。某特大城市在亚运会期间利用数字孪生平台对开闭幕式散场交通进行预演，提前发现3处瓶颈节点并优化疏导方案，实际散场时间较预期缩短40%。
+传统固定配时信号控制已无法适应动态变化的交通流。自适应信号控制系统通过地磁检测器、视频AI分析等手段实时感知路口各方向车流量，动态调整绿灯时长和相位差。最新的AI信号优化方案引入深度强化学习算法，使路口平均排队长度缩短22%，通行效率提升15%以上。
 
 ## 三、数据治理与隐私保护
 
@@ -835,31 +1071,17 @@ def _generate_test_document() -> str:
 
 ### 3.2 个人隐私保护
 
-交通轨迹数据具有高度敏感性，能够精准还原个人的出行规律、常驻地点、社交关系等隐私信息。在数据采集、传输、存储、使用全生命周期中，必须落实脱敏处理、访问控制、审计追溯等安全措施。差分隐私、联邦学习等隐私计算技术正在逐步应用于交通数据开放共享场景。
+交通轨迹数据具有高度敏感性，能够精准还原个人的出行规律、常驻地点、社交关系等隐私信息。差分隐私、联邦学习等隐私计算技术正在逐步应用于交通数据开放共享场景。
 
-## 四、典型应用案例
+## 四、未来发展趋势
 
-### 4.1 某超大城市交通大脑项目
+### 4.1 MaaS出行即服务
 
-该项目构建了覆盖全市域的交通感知、分析、决策、控制闭环系统。接入2.8万路视频监控、1.5万个地磁检测器、5000余套电子警察设备。系统上线一年后，全市工作日高峰拥堵指数下降11.3%，平均车速提升9.7%，交通事故发现时间从平均5分钟缩短至30秒以内。
+MaaS理念将多种交通方式整合到统一平台，用户只需输入起终点，系统自动规划包含地铁、公交、共享单车、网约车等组合的最优出行方案，并提供一站式支付服务。
 
-### 4.2 智慧高速公路建设
+### 4.2 交通与能源融合
 
-以某省智慧高速示范路段为例，全长120公里，全线部署毫米波雷达、气象站、可变信息标志等设备。实现恶劣天气自动预警、异常停车自动检测、分车道动态限速等功能。运营数据显示，示范路段事故率同比下降35%，通行效率提升18%。
-
-## 五、未来发展趋势
-
-### 5.1 MaaS出行即服务
-
-MaaS（Mobility as a Service）理念将多种交通方式整合到统一平台，用户只需输入起终点，系统自动规划包含地铁、公交、共享单车、网约车等组合的最优出行方案，并提供一站式支付服务。欧洲赫尔辛基的Whim应用和国内高德、百度等平台的"门到门"规划功能已初具MaaS雏形。
-
-### 5.2 低空交通与城市空中出行
-
-随着eVTOL（电动垂直起降飞行器）技术的成熟，城市空中出行（UAM）正从概念走向现实。预计2030年前后，部分城市将开通空中出租车航线，用于商务通勤和紧急医疗转运。低空空域管理、起降场规划、空中交通管制等配套体系正在加速布局。
-
-### 5.3 交通与能源融合
-
-新能源汽车的普及使交通系统从单纯的能源消耗者转变为移动储能单元。车网互动（V2G）技术允许电动汽车在电网负荷低谷时充电、高峰时向电网放电，参与电力调峰。交通与能源系统的深度融合将推动城市向"零碳交通"目标迈进。
+新能源汽车的普及使交通系统从单纯的能源消耗者转变为移动储能单元。车网互动（V2G）技术允许电动汽车在电网负荷低谷时充电、高峰时向电网放电，参与电力调峰。
 
 ## 结语
 
@@ -867,17 +1089,107 @@ MaaS（Mobility as a Service）理念将多种交通方式整合到统一平台�
 """
 
 
+def _generate_json_test_document() -> str:
+    """生成包含 JSON 结构的测试文档，用于验证 JSON 保护功能。"""
+    return """# API 接口文档与配置说明
+
+## 概述
+
+本文档包含交通数据平台的接口定义和配置示例。
+
+## 用户信息接口
+
+获取用户基本信息，请求示例：
+{
+"method": "GET",
+"path": "/api/v1/users/info",
+"headers": {
+"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxx",
+"Content-Type": "application/json"
+},
+"query_params": {
+"user_id": "U12345678",
+"fields": ["name", "email", "role", "department"]
+},
+"timeout_ms": 5000,
+"retry_count": 3
+}
+上述接口返回的用户数据格式如下：
+{
+"code": 0,
+"message": "success",
+"data": {
+"user_id": "U12345678",
+"name": "张三",
+"email": "zhangsan@traffic-platform.com",
+"role": "admin",
+"department": "交通规划部",
+"permissions": ["read:traffic", "write:traffic", "admin:users"],
+"created_at": "2023-06-15T08:30:00Z",
+"last_login": "2024-01-20T14:22:00Z",
+"preferences": {
+"language": "zh-CN",
+"timezone": "Asia/Shanghai",
+"dashboard_layout": "compact"
+}
+},
+"request_id": "req_abc_789"
+}
+## 交通信号配置
+路口信号配时参数以 JSON 数组形式下发：
+[
+{
+"intersection_id": "ITS-001",
+"name": "中关村大街-知春路",
+"phases": [
+{"phase": 1, "direction": "南北直行", "green": 45, "yellow": 3, "red": 52},
+{"phase": 2, "direction": "南北左转", "green": 25, "yellow": 3, "red": 72},
+{"phase": 3, "direction": "东西直行", "green": 40, "yellow": 3, "red": 57},
+{"phase": 4, "direction": "东西左转", "green": 20, "yellow": 3, "red": 77}
+],
+"cycle_length": 120,
+"offset": 15,
+"coordinate_system": "absolute",
+"last_updated": "2024-03-01T06:00:00Z"
+},
+{
+"intersection_id": "ITS-002",
+"name": "学院路-清华东路",
+"phases": [
+{"phase": 1, "direction": "南北直行", "green": 50, "yellow": 3, "red": 47},
+{"phase": 2, "direction": "南北左转", "green": 30, "yellow": 3, "red": 67},
+{"phase": 3, "direction": "东西直行", "green": 35, "yellow": 3, "red": 62},
+{"phase": 4, "direction": "东西左转", "green": 25, "yellow": 3, "red": 72}
+],
+"cycle_length": 120,
+"offset": 30,
+"coordinate_system": "absolute",
+"last_updated": "2024-03-01T06:00:00Z"
+}
+]
+## 总结
+
+以上配置和接口定义构成了交通数据平台的核心交互规范。在实际部署中，所有 JSON 配置需通过配置中心统一管理，支持热更新和版本回滚。
+"""
+
+
+# ======================== main 测试入口 ========================
+
 def main():
-    """测试入口：用交通领域文档逐一验证所有切片方法。"""
+    """测试入口：逐一验证所有切片方法，包含普通文档和 JSON 文档。"""
     import sys
     import os
 
     print("=" * 80)
-    print("  文档切片方法综合测试报告")
+    print("  文档切片方法综合测试报告（含 JSON 保护验证）")
     print("  chunk_size = 500")
     print("=" * 80)
 
-    # 准备测试文档
+    # ==================== 测试一：普通交通文档 ====================
+    print("\n" + "=" * 80)
+    print("  测试一：普通交通文档（无 JSON）")
+    print("=" * 80)
+
     test_text = _generate_test_document()
     print(f"\n📄 测试文档信息:")
     print(f"   字符数: {len(test_text)}")
@@ -891,76 +1203,40 @@ def main():
     )
     documents = [doc]
 
-    # ---------- 1. split_by_characters ----------
+    # split_by_characters
     print(f"\n{'='*80}")
-    print("  方法一: split_by_characters (无 overlap)")
+    print("  方法一: split_by_characters")
     print(f"{'='*80}")
     chunks1 = split_by_characters(documents, chunk_size=500)
     for i, c in enumerate(chunks1):
         print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-    print(f"  → 共 {len(chunks1)} 块, 平均 {sum(len(c.page_content) for c in chunks1)//max(len(chunks1),1)} 字符")
+    print(f"  → 共 {len(chunks1)} 块")
 
-    print(f"\n  方法一-b: split_by_characters (overlap=50)")
-    chunks1b = split_by_characters(documents, chunk_size=500, chunk_overlap=50)
-    for i, c in enumerate(chunks1b):
-        print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-    print(f"  → 共 {len(chunks1b)} 块")
-
-    # ---------- 2. split_recursively ----------
+    # split_recursively
     print(f"\n{'='*80}")
-    print("  方法二: split_recursively (无 overlap)")
+    print("  方法二: split_recursively")
     print(f"{'='*80}")
     chunks2 = split_recursively(documents, chunk_size=500)
     for i, c in enumerate(chunks2):
         print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-    print(f"  → 共 {len(chunks2)} 块, 平均 {sum(len(c.page_content) for c in chunks2)//max(len(chunks2),1)} 字符")
+    print(f"  → 共 {len(chunks2)} 块")
 
-    print(f"\n  方法二-b: split_recursively (overlap=50)")
-    chunks2b = split_recursively(documents, chunk_size=500, chunk_overlap=50)
-    for i, c in enumerate(chunks2b):
-        print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-    print(f"  → 共 {len(chunks2b)} 块")
-
-    # ---------- 3. split_by_markdown ----------
+    # split_by_markdown
     print(f"\n{'='*80}")
-    print("  方法三: split_by_markdown (无 overlap)")
+    print("  方法三: split_by_markdown")
     print(f"{'='*80}")
     chunks3 = split_by_markdown(documents, chunk_size=500)
     for i, c in enumerate(chunks3):
         print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-    print(f"  → 共 {len(chunks3)} 块, 平均 {sum(len(c.page_content) for c in chunks3)//max(len(chunks3),1)} 字符")
+    print(f"  → 共 {len(chunks3)} 块")
 
-    print(f"\n  方法三-b: split_by_markdown (overlap=50)")
-    chunks3b = split_by_markdown(documents, chunk_size=500, chunk_overlap=50)
-    for i, c in enumerate(chunks3b):
-        print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-    print(f"  → 共 {len(chunks3b)} 块")
-
-    # ---------- 4. split_semantically (真实模型) ----------
+    # split_by_tree
     print(f"\n{'='*80}")
-    print("  方法四: split_semantically (语义切分, bge-small-zh-v1.5)")
+    print("  方法四: split_by_tree")
     print(f"{'='*80}")
-    try:
-        chunks4 = split_semantically(
-            documents, 
-            chunk_size=500,
-            #model_path="/home/swang/project/models/bge-small-zh-v1.5",
-        )
-        for i, c in enumerate(chunks4):
-            print(f"  Chunk {i+1}: {len(c.page_content)} 字符 | 前50字: {c.page_content[:50]}...")
-        print(f"  → 共 {len(chunks4)} 块")
-    except Exception as e:
-        print(f"  ❌ 语义切分失败: {e}")
-        chunks4 = []
-
-    # ---------- 5. split_by_tree ----------
-    print(f"\n{'='*80}")
-    print("  方法五: split_by_tree (树状切分, chunk_size=500)")
-    print(f"{'='*80}")
-    chunks5 = split_by_tree(documents, chunk_size=500)
-    for i, c in enumerate(chunks5):
+    chunks4 = split_by_tree(documents, chunk_size=500)
+    for i, c in enumerate(chunks4):
         content = c.page_content
-        # 提取标记
         marker_end = content.find("\n\n")
         if marker_end > 0:
             marker = content[:marker_end]
@@ -970,21 +1246,91 @@ def main():
             rest = content
         print(f"  Chunk {i+1}: {len(content)} 字符 | {marker}")
         print(f"    内容前60字: {rest[:60]}...")
-    print(f"  → 共 {len(chunks5)} 块, 平均 {sum(len(c.page_content) for c in chunks5)//max(len(chunks5),1)} 字符")
+    print(f"  → 共 {len(chunks4)} 块")
 
-    # ---------- 汇总 ----------
+    # ==================== 测试二：包含 JSON 的文档 ====================
+    print("\n" + "=" * 80)
+    print("  测试二：包含 JSON 结构的文档（验证 JSON 保护）")
+    print("=" * 80)
+
+    json_text = _generate_json_test_document()
+    print(f"\n📄 JSON 测试文档信息:")
+    print(f"   字符数: {len(json_text)}")
+    print(f"   JSON 块数: {len(_extract_json_blocks(json_text))}")
+
+    json_doc = Document(
+        page_content=json_text,
+        metadata={"title": "API 接口文档与配置说明", "source": "test_json_doc.md"},
+    )
+    json_documents = [json_doc]
+
+    # split_by_characters (JSON)
+    print(f"\n{'='*80}")
+    print("  [JSON] split_by_characters")
+    print(f"{'='*80}")
+    jchunks1 = split_by_characters(json_documents, chunk_size=500)
+    for i, c in enumerate(jchunks1):
+        # 检查是否包含完整 JSON
+        is_valid = _check_json_integrity(c.page_content)
+        status = "✅" if is_valid else "❌ JSON被截断"
+        print(f"  Chunk {i+1}: {len(c.page_content)} 字符 {status} | 前50字: {c.page_content[:50]}...")
+    print(f"  → 共 {len(jchunks1)} 块")
+
+    # split_recursively (JSON)
+    print(f"\n{'='*80}")
+    print("  [JSON] split_recursively")
+    print(f"{'='*80}")
+    jchunks2 = split_recursively(json_documents, chunk_size=500)
+    for i, c in enumerate(jchunks2):
+        is_valid = _check_json_integrity(c.page_content)
+        status = "✅" if is_valid else "❌ JSON被截断"
+        print(f"  Chunk {i+1}: {len(c.page_content)} 字符 {status} | 前50字: {c.page_content[:50]}...")
+    print(f"  → 共 {len(jchunks2)} 块")
+
+    # split_by_markdown (JSON)
+    print(f"\n{'='*80}")
+    print("  [JSON] split_by_markdown")
+    print(f"{'='*80}")
+    jchunks3 = split_by_markdown(json_documents, chunk_size=500)
+    for i, c in enumerate(jchunks3):
+        is_valid = _check_json_integrity(c.page_content)
+        status = "✅" if is_valid else "❌ JSON被截断"
+        print(f"  Chunk {i+1}: {len(c.page_content)} 字符 {status} | 前50字: {c.page_content[:50]}...")
+    print(f"  → 共 {len(jchunks3)} 块")
+
+    # split_by_tree (JSON)
+    print(f"\n{'='*80}")
+    print("  [JSON] split_by_tree")
+    print(f"{'='*80}")
+    jchunks4 = split_by_tree(json_documents, chunk_size=500)
+    for i, c in enumerate(jchunks4):
+        content = c.page_content
+        is_valid = _check_json_integrity(content)
+        status = "✅" if is_valid else "❌ JSON被截断"
+        marker_end = content.find("\n\n")
+        if marker_end > 0:
+            marker = content[:marker_end]
+            rest = content[marker_end+2:]
+        else:
+            marker = "(无标记)"
+            rest = content
+        print(f"  Chunk {i+1}: {len(content)} 字符 {status} | {marker}")
+        print(f"    内容前60字: {rest[:60]}...")
+    print(f"  → 共 {len(jchunks4)} 块")
+
+    # ==================== 汇总 ====================
     print(f"\n{'='*80}")
     print("  汇总对比")
     print(f"{'='*80}")
     methods = [
-        ("split_by_characters (无overlap)", chunks1),
-        ("split_by_characters (overlap=50)", chunks1b),
-        ("split_recursively (无overlap)", chunks2),
-        ("split_recursively (overlap=50)", chunks2b),
-        ("split_by_markdown (无overlap)", chunks3),
-        ("split_by_markdown (overlap=50)", chunks3b),
-        ("split_semantically (fake model)", chunks4),
-        ("split_by_tree", chunks5),
+        ("split_by_characters (普通)", chunks1),
+        ("split_recursively (普通)", chunks2),
+        ("split_by_markdown (普通)", chunks3),
+        ("split_by_tree (普通)", chunks4),
+        ("split_by_characters (JSON)", jchunks1),
+        ("split_recursively (JSON)", jchunks2),
+        ("split_by_markdown (JSON)", jchunks3),
+        ("split_by_tree (JSON)", jchunks4),
     ]
     print(f"  {'方法':<35} {'块数':>6} {'平均长度':>10} {'最大块':>8} {'最小块':>8}")
     print(f"  {'-'*35} {'-'*6} {'-'*10} {'-'*8} {'-'*8}")
@@ -998,9 +1344,70 @@ def main():
         else:
             print(f"  {name:<35} {'0':>6}")
 
+    # JSON 完整性汇总
+    print(f"\n{'='*80}")
+    print("  JSON 完整性验证汇总")
+    print(f"{'='*80}")
+    all_json_chunks = [
+        ("split_by_characters", jchunks1),
+        ("split_recursively", jchunks2),
+        ("split_by_markdown", jchunks3),
+        ("split_by_tree", jchunks4),
+    ]
+    for method_name, chunks in all_json_chunks:
+        violations = 0
+        for c in chunks:
+            if not _check_json_integrity(c.page_content):
+                violations += 1
+        if violations == 0:
+            print(f"  ✅ {method_name:<30} 所有 chunk JSON 完整")
+        else:
+            print(f"  ❌ {method_name:<30} {violations} 个 chunk 存在 JSON 截断")
+
     print(f"\n{'='*80}")
     print("  测试完成!")
     print(f"{'='*80}")
+
+
+def _check_json_integrity(text: str) -> bool:
+    """检查文本中的 JSON 块是否完整（没有被截断）。
+
+    返回 True 表示所有 JSON 块都完整，False 表示存在截断。
+    """
+    # 找到文本中所有 { 和 [ 开头的 JSON 块
+    json_blocks = _extract_json_blocks(text)
+    if not json_blocks:
+        # 没有 JSON，自然不存在截断
+        return True
+
+    # 检查文本中是否有未闭合的 { 或 [
+    stack = []
+    in_string = False
+    escape = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if escape:
+            escape = False
+        elif ch == '\\' and in_string:
+            escape = True
+        elif ch == '"':
+            in_string = not in_string
+        elif not in_string:
+            if ch == '{' or ch == '[':
+                stack.append(ch)
+            elif ch == '}':
+                if not stack or stack[-1] != '{':
+                    return False
+                stack.pop()
+            elif ch == ']':
+                if not stack or stack[-1] != '[':
+                    return False
+                stack.pop()
+        i += 1
+
+    # 如果栈非空，说明有未闭合的 JSON
+    return len(stack) == 0
 
 
 if __name__ == "__main__":

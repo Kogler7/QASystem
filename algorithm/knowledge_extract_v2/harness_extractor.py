@@ -6,6 +6,7 @@ from typing import Any, Callable, Iterable
 from .chunk_context import ExtractionChunk
 from .config import get_llm_config
 from .llm_client import create_llm_client
+from .run_state import ExtractionValidationError
 from .split_extractor import extract_split
 
 
@@ -27,6 +28,7 @@ def extract_harness(
     best_effort: bool = False,
     repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
+    identity_admission: str | None = None,
     max_repair_rounds: int = 2,
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
@@ -34,7 +36,11 @@ def extract_harness(
     """Run the two-pass pipeline over caller-provided chunks."""
     ontology = (ontology or "").strip()
     if not ontology:
-        raise ValueError("本体定义不能为空")
+        raise ExtractionValidationError(
+            "本体定义不能为空",
+            stage="ontology_compile",
+            error_code="ONTOLOGY_EMPTY",
+        )
     if validation_mode.casefold() not in {"strict", "permissive"}:
         raise ValueError("validation_mode 仅支持 strict 或 permissive")
 
@@ -63,6 +69,7 @@ def extract_harness(
         best_effort=best_effort,
         repairer=repairer,
         entity_adjudicator=entity_adjudicator,
+        identity_admission=identity_admission or config.get("identity_admission", "quarantine"),
         max_repair_rounds=max_repair_rounds,
         max_attempts=max_attempts,
         retry_base_seconds=retry_base_seconds,

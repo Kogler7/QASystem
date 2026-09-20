@@ -225,9 +225,11 @@ class IntegrationTest(unittest.TestCase):
             OFFICIAL_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=text)],
             llm=llm,
+            identity_admission="observe",
         )
         self.assertEqual(result["profile"]["document_route"]["kind"], "official_document")
-        self.assertIsNone(result["error_code"])
+        self.assertEqual(result["error_code"], "REPAIR_INCOMPLETE")
+        self.assertFalse(result["repair"]["coverage_complete"])
         canonical = MODULES["graph_utils"].canonical_name
         pred_keys = {(e["type"], canonical(e["name"])) for e in result["raw"]["entities"]}
         emitted = {(type_id, canonical(name)) for type_id, name in verbatim}

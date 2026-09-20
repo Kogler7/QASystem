@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .candidate_models import EntityCandidate, RelationCandidate
-from .graph_utils import canonical_name, coerce_non_empty_name
+from .graph_utils import canonical_name, canonical_relation_name, coerce_non_empty_name
 from .relation_resolver import RelationResolver
 
 _COREFERENCE_NAMES = {
@@ -76,11 +76,24 @@ class EntityResolver:
     def identity_value(self, candidate: Any) -> tuple[str, str, str]:
         """Return the first ontology-declared identity value, falling back to display name."""
         type_id = str(candidate.canonical_type or candidate.proposed_type)
+        if getattr(candidate, "source", "") == "official_attachment" and getattr(candidate, "source_identity", ""):
+            return type_id, "__source_file__", candidate.source_identity
         for property_id in self.schema.identity_properties_for(type_id):
             value = candidate.properties.get(property_id)
             if canonical_name(value):
                 return type_id, property_id, coerce_non_empty_name(value)
         return type_id, "name", coerce_non_empty_name(candidate.name)
+
+    def stable_identity_value(self, candidate: Any) -> tuple[str, str, str] | None:
+        """Return ontology-declared identity only; never fall back to display name."""
+        type_id = str(candidate.canonical_type or candidate.proposed_type)
+        if getattr(candidate, "source", "") == "official_attachment" and getattr(candidate, "source_identity", ""):
+            return type_id, "__source_file__", candidate.source_identity
+        for property_id in self.schema.identity_properties_for(type_id):
+            value = candidate.properties.get(property_id)
+            if canonical_name(value):
+                return type_id, property_id, coerce_non_empty_name(value)
+        return None
 
     def decide(
         self,
@@ -93,6 +106,8 @@ class EntityResolver:
         exact = self._exact.get(key)
         if exact is not None:
             return ResolutionDecision(exact, "exact_identity", key)
+        if getattr(candidate, "source", "") == "official_attachment":
+            return ResolutionDecision(None, "source_file_identity", key)
 
         alias_matches: set[str] = set()
         for alias in self.aliases(candidate):
@@ -159,6 +174,8 @@ class EntityResolver:
     ) -> bool:
         if incoming[0] != existing[0]:
             return False
+        if "__source_file__" in {incoming[1], existing[1]}:
+            return incoming == existing
         if incoming[1] == existing[1] != "name" and incoming[2] != existing[2]:
             return False
         return True
@@ -278,6 +295,10 @@ class CandidatePool:
         allowed_types: Iterable[str] | None = None,
         manager: Any | None = None,
         adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
+        ontology_namespace: str = "ontology",
+        identity_admission: str = "quarantine",
+        entity_admission: Callable[[EntityCandidate], bool] | None = None,
+        relation_admission: Callable[[RelationCandidate], bool] | None = None,
     ):
         self.schema = schema
         self.allowed_types = set(allowed_types or ()) or {
@@ -287,6 +308,14 @@ class CandidatePool:
         self._entity_by_id: dict[str, EntityCandidate] = {}
         self._entity_index: dict[tuple[str, str], EntityCandidate] = {}
         self._next_entity_id = 0
+        self.ontology_namespace = ontology_namespace or "ontology"
+        if identity_admission not in {"observe", "quarantine"}:
+            raise ValueError("identity_admission 仅支持 observe 或 quarantine")
+        self.identity_admission = identity_admission
+        self._identity_finalized = False
+        self._entity_admission = entity_admission
+        self._relation_admission = relation_admission
+        self._id_remap: dict[str, str] = {}
         self._resolver = EntityResolver(schema, manager, adjudicator)
         self._relation_resolver = RelationResolver(schema, self._entity_by_id)
 
@@ -327,12 +356,22 @@ class CandidatePool:
             return None
 
         candidate.canonical_type = ontology_class.identifier
+        if self._entity_admission is not None and not self._entity_admission(candidate):
+            _append_warning(warnings, "OFFICIAL_ENTITY_ROLE_REJECTED", "实体来源不符合公文表单、正文、附件角色约束", "entities", candidate.name)
+            return None
         name_key = (ontology_class.identifier, canonical_name(candidate.name))
-        decision = self._resolver.decide(
-            candidate,
-            self._entity_by_id,
-            warnings=warnings,
-        )
+        stable_identity = self._resolver.stable_identity_value(candidate)
+        if stable_identity is not None:
+            decision = self._resolver.decide(candidate, self._entity_by_id, warnings=warnings)
+        else:
+            # Mention-level candidates must remain independent until property
+            # enrichment freezes ontology identities.  Otherwise two equal
+            # mentions that later receive different IDs can no longer split.
+            decision = ResolutionDecision(
+                None,
+                "provisional_mention",
+                self._resolver.identity_key(candidate),
+            )
         existing = (
             self._entity_by_id.get(decision.merge_into_id)
             if decision.merge_into_id is not None
@@ -340,6 +379,11 @@ class CandidatePool:
         )
         if existing is None:
             candidate.candidate_id = f"entity-{self._next_entity_id}"
+            candidate.lifecycle = "PROVISIONAL"
+            candidate.mention_aliases = list(dict.fromkeys([*candidate.mention_aliases, candidate.name]))
+            candidate.source_candidate_ids = list(
+                dict.fromkeys([*candidate.source_candidate_ids, candidate.candidate_id])
+            )
             _, candidate.identity_property, candidate.identity_value = self._resolver.identity_value(
                 candidate
             )
@@ -371,6 +415,206 @@ class CandidatePool:
         self._resolver.register(existing)
         self._resolver.register_merged_aliases(candidate, existing)
         return existing
+
+    def finalize_identities(
+        self,
+        *,
+        warnings: list[dict[str, Any]] | None = None,
+    ) -> dict[str, int]:
+        """Freeze ontology-declared identities after property enrichment."""
+        identified = unresolved = quarantined = 0
+        for entity in self._entities:
+            stable = self._resolver.stable_identity_value(entity)
+            if stable is None:
+                declared_identity = self.schema.identity_properties_for(
+                    entity.canonical_type or entity.proposed_type
+                )
+                # A rule mention is still useful extraction output when its
+                # optional RuleID was not present in the source. Keep it under
+                # its generated candidate ID and make the missing identity
+                # explicit; never invent a RuleID from the mention text.
+                identity_type = entity.canonical_type or entity.proposed_type
+                identity_property = (
+                    self.schema.resolve_property(identity_type, declared_identity[0])
+                    if len(declared_identity) == 1
+                    else None
+                )
+                identity_symbols = (
+                    [declared_identity[0], identity_property.identifier, identity_property.display_name]
+                    if identity_property is not None
+                    else list(declared_identity)
+                )
+                rule_id_only = (
+                    len(declared_identity) == 1
+                    and any(
+                        canonical_relation_name(symbol) == "ruleid"
+                        for symbol in identity_symbols
+                    )
+                )
+                should_quarantine = (
+                    bool(declared_identity)
+                    and not rule_id_only
+                    and self.identity_admission == "quarantine"
+                )
+                entity.lifecycle = "QUARANTINED" if should_quarantine else "UNRESOLVED"
+                if should_quarantine:
+                    entity.mapping_status = "rejected"
+                    quarantined += 1
+                    if "ENTITY_IDENTITY_QUARANTINED" not in entity.warnings:
+                        entity.warnings.append("ENTITY_IDENTITY_QUARANTINED")
+                        _append_warning(
+                            warnings,
+                            "ENTITY_IDENTITY_QUARANTINED",
+                            f"实体 {entity.name!r} 缺少本体声明的稳定身份属性，已进入隔离区",
+                            f"entities.{entity.candidate_id}",
+                            {"identity_properties": list(declared_identity)},
+                        )
+                elif rule_id_only:
+                    if "RULE_ID_MISSING" not in entity.warnings:
+                        entity.warnings.append("RULE_ID_MISSING")
+                    _append_warning(
+                        warnings,
+                        "RULE_ID_MISSING",
+                        f"规则实体 {entity.name!r} 缺少 RuleID，保留为未解析实体并使用临时候选 ID",
+                        f"entities.{entity.candidate_id}",
+                        {"identity_properties": list(declared_identity)},
+                    )
+                entity.resolution_trace.append({
+                    "stage": "identity_finalization",
+                    "status": "quarantined" if should_quarantine else "unresolved",
+                    "reason": "missing_ontology_identity",
+                    "identity_properties": list(declared_identity),
+                })
+                if not should_quarantine:
+                    unresolved += 1
+                continue
+            _, property_id, value = stable
+            if "ENTITY_IDENTITY_QUARANTINED" in entity.warnings:
+                entity.warnings = [
+                    code for code in entity.warnings if code != "ENTITY_IDENTITY_QUARANTINED"
+                ]
+                if not entity.warnings:
+                    entity.mapping_status = "accepted"
+                entity.resolution_trace.append({
+                    "stage": "identity_finalization",
+                    "status": "recovered_from_quarantine",
+                    "property": property_id,
+                    "value": value,
+                })
+            entity.identity_property = property_id
+            entity.identity_value = value
+            entity.lifecycle = "IDENTIFIED"
+            entity.resolution_trace.append({
+                "stage": "identity_finalization",
+                "status": "identified",
+                "property": property_id,
+                "value": value,
+            })
+            identified += 1
+        self._identity_finalized = True
+        return {
+            "identified": identified,
+            "unresolved": unresolved,
+            "quarantined": quarantined,
+        }
+
+    def resolve_global(
+        self,
+        *,
+        warnings: list[dict[str, Any]] | None = None,
+    ) -> dict[str, str]:
+        """Merge entities by frozen namespace/type/property/value and rebuild indexes."""
+        if not self._identity_finalized:
+            self.finalize_identities(warnings=warnings)
+        resolved: list[EntityCandidate] = []
+        by_stable_key: dict[tuple[str, str, str, str], EntityCandidate] = {}
+        by_provisional_key: dict[tuple[str, str], EntityCandidate] = {}
+        remap: dict[str, str] = {}
+        for entity in self._entities:
+            old_id = entity.candidate_id
+            stable = self._resolver.stable_identity_value(entity)
+            if stable is None:
+                provisional_key = (
+                    entity.canonical_type or entity.proposed_type,
+                    canonical_name(entity.name),
+                )
+                existing = by_provisional_key.get(provisional_key)
+                if existing is None:
+                    by_provisional_key[provisional_key] = entity
+                    resolved.append(entity)
+                    remap[old_id] = old_id
+                    continue
+                merge_candidate(existing, entity)
+                existing.resolution_method = "provisional_same_mention"
+                if "provisional_same_mention" not in existing.resolution_methods:
+                    existing.resolution_methods.append("provisional_same_mention")
+                existing.resolution_trace.append({
+                    "stage": "global_resolution",
+                    "status": "provisional_merged",
+                    "source_candidate_id": old_id,
+                    "key": provisional_key,
+                })
+                remap[old_id] = existing.candidate_id
+                continue
+            type_id, property_id, value = stable
+            key = (self.ontology_namespace, type_id, property_id, canonical_name(value))
+            existing = by_stable_key.get(key)
+            if existing is None:
+                entity.lifecycle = "RESOLVED"
+                entity.resolution_method = "stable_identity"
+                if "stable_identity" not in entity.resolution_methods:
+                    entity.resolution_methods.append("stable_identity")
+                entity.resolution_trace.append({"stage": "global_resolution", "status": "resolved", "key": key})
+                by_stable_key[key] = entity
+                resolved.append(entity)
+                remap[old_id] = old_id
+                continue
+            merge_candidate(existing, entity)
+            existing.lifecycle = "RESOLVED"
+            existing.resolution_trace.append({
+                "stage": "global_resolution",
+                "status": "merged",
+                "source_candidate_id": old_id,
+                "key": key,
+            })
+            remap[old_id] = existing.candidate_id
+            _append_warning(
+                warnings,
+                "ENTITY_STABLE_IDENTITY_MERGED",
+                f"实体 {old_id} 已按 stable identity 合并到 {existing.candidate_id}",
+                f"entities.{old_id}",
+                {"resolved_id": existing.candidate_id, "key": key},
+            )
+
+        self._entities = resolved
+        self._entity_by_id.clear()
+        self._entity_index.clear()
+        self._resolver = EntityResolver(self.schema, self._resolver.manager, self._resolver.adjudicator)
+        for entity in self._entities:
+            self._entity_by_id[entity.candidate_id] = entity
+            aliases = [entity.name, *entity.mention_aliases]
+            for alias in aliases:
+                self._entity_index[(entity.canonical_type or entity.proposed_type, canonical_name(alias))] = entity
+            self._resolver.register(entity)
+        self._relation_resolver.remap_endpoints(remap, warnings=warnings)
+        self._id_remap = remap
+        return dict(remap)
+
+    @property
+    def id_remap(self) -> dict[str, str]:
+        return dict(self._id_remap)
+
+    def resolve_candidate_id(self, candidate_id: str) -> str:
+        """Resolve an ID emitted before the latest global identity pass."""
+        current = candidate_id
+        seen: set[str] = set()
+        while current in self._id_remap and current not in seen:
+            seen.add(current)
+            resolved = self._id_remap[current]
+            if resolved == current:
+                break
+            current = resolved
+        return current
 
     def find_entity(self, type_id: str, name: str) -> EntityCandidate | None:
         ontology_class = self.schema.resolve_class(type_id)
@@ -404,6 +648,7 @@ class CandidatePool:
                 ),
             }
             for entity in self.accepted_entities()
+            if entity.source != "official_attachment"
         ]
 
     def add_relation(
@@ -412,6 +657,9 @@ class CandidatePool:
         *,
         warnings: list[dict[str, Any]] | None = None,
     ) -> RelationCandidate | None:
+        if self._relation_admission is not None and not self._relation_admission(candidate):
+            _append_warning(warnings, "OFFICIAL_RELATION_ROLE_REJECTED", "表单和附件内容不用于生成知识关系", "relations", candidate.proposed_relation)
+            return None
         return self._relation_resolver.add(candidate, warnings=warnings)
 
     def accepted_relations(self) -> list[RelationCandidate]:
@@ -421,8 +669,19 @@ class CandidatePool:
         """Return all resolved relation candidates, including rejections."""
         return self._relation_resolver.candidates()
 
+    def recompute_relation_cardinality(
+        self,
+        *,
+        warnings: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self._relation_resolver.recompute_cardinality(warnings=warnings)
+
     def unresolved_relation_rejections(self) -> list[dict[str, Any]]:
         return self._relation_resolver.unresolved_rejections()
+
+    @property
+    def relation_endpoint_remap_count(self) -> int:
+        return self._relation_resolver.endpoint_remap_count
 
 
 def merge_candidate(existing: Any, incoming: Any) -> None:
@@ -447,6 +706,27 @@ def merge_candidate(existing: Any, incoming: Any) -> None:
         evidence_key = (evidence.span_id, evidence.quote)
         if not any((item.span_id, item.quote) == evidence_key for item in existing.evidence):
             existing.evidence.append(evidence)
+    existing.mention_aliases = list(
+        dict.fromkeys([
+            *getattr(existing, "mention_aliases", []),
+            existing.name,
+            *getattr(incoming, "mention_aliases", []),
+            incoming.name,
+        ])
+    )
+    existing.source_candidate_ids = list(
+        item for item in dict.fromkeys([
+            *getattr(existing, "source_candidate_ids", []),
+            existing.candidate_id,
+            *getattr(incoming, "source_candidate_ids", []),
+            incoming.candidate_id,
+        ]) if item
+    )
+    for property_id, evidences in getattr(incoming, "property_evidence", {}).items():
+        target = existing.property_evidence.setdefault(property_id, [])
+        for evidence in evidences:
+            if not any((item.span_id, item.quote) == (evidence.span_id, evidence.quote) for item in target):
+                target.append(evidence)
     existing.warnings.extend(incoming.warnings)
 
 

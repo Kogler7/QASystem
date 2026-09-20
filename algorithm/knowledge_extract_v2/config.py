@@ -20,6 +20,9 @@ KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
 KG_EXTRACT_REQUEST_TIMEOUT = float(_env("KG_EXTRACT_LLM_TIMEOUT_SECONDS", default="300"))
 # 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启
 KG_EXTRACT_DISABLE_THINKING = _env("KG_EXTRACT_LLM_DISABLE_THINKING", default="1") != "0"
+KG_EXTRACT_IDENTITY_ADMISSION = _env(
+    "KG_EXTRACT_IDENTITY_ADMISSION", default="quarantine"
+).casefold()
 
 
 def get_llm_config() -> dict:
@@ -33,4 +36,9 @@ def get_llm_config() -> dict:
         "qpm": max(0, KG_EXTRACT_QPM),
         "request_timeout": max(1.0, KG_EXTRACT_REQUEST_TIMEOUT),
         "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
+        "identity_admission": (
+            KG_EXTRACT_IDENTITY_ADMISSION
+            if KG_EXTRACT_IDENTITY_ADMISSION in {"observe", "quarantine"}
+            else "quarantine"
+        ),
     }

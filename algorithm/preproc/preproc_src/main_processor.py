@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import zipfile
 import xml.etree.ElementTree as ET
@@ -105,6 +106,15 @@ class DocumentProcessor:
         self.libreoffice_path = libreoffice_path or os.getenv("LIBREOFFICE_PATH") or os.getenv("SOFFICE_PATH")
         self._processors: dict[str, Any] = {}
 
+    @staticmethod
+    def _has_meaningful_content(content: Any) -> bool:
+        """Return false for parser output containing only image placeholders."""
+        if not isinstance(content, str):
+            return False
+        text = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
+        text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+        return bool(text.strip())
+
     def _processor(self, engine: str):
         if engine in self._processors:
             return self._processors[engine]
@@ -161,12 +171,22 @@ class DocumentProcessor:
                 if page_area <= 0:
                     continue
                 for obj in page.get_objects(filter=(pdfium.raw.FPDF_PAGEOBJ_IMAGE,)):
-                    left, bottom, right, top = obj.get_pos()
+                    # pypdfium2 5.x removed the old get_pos() wrapper in favour
+                    # of get_bounds().  Keep the old call as a compatibility
+                    # fallback for the older versions used by some workers.
+                    get_bounds = getattr(obj, "get_bounds", None)
+                    if callable(get_bounds):
+                        left, bottom, right, top = get_bounds()
+                    else:
+                        left, bottom, right, top = obj.get_pos()
                     area = abs(float(right) - float(left)) * abs(float(top) - float(bottom))
                     if area / page_area >= DECORATIVE_IMAGE_MAX_AREA_RATIO:
                         total += 1
             return total
-        except Exception:
+        except Exception as exc:
+            # Keep the fallback observable without logging the input path or
+            # PDF contents, which may contain sensitive document metadata.
+            logger.warning("PDF content-image profiling unavailable: %s", type(exc).__name__)
             return None
         finally:
             if pdf is not None:
@@ -220,6 +240,40 @@ class DocumentProcessor:
         except Exception as exc:
             profile["profile_error"] = str(exc)
         return profile
+
+    def _local_pipeline_available(self) -> bool:
+        """Return whether the configured local MinerU pipeline model is usable.
+
+        Auto PDF routing must not select the HTTP VLM backend when no endpoint
+        exists on the worker.  This check is deliberately configuration-only;
+        importing MinerU here would initialize heavyweight model code during
+        every engine selection.
+        """
+        if (self.mineru_model_source or "local").lower() != "local":
+            return False
+        override = os.getenv("MINERU_MODEL_PIPELINE_PATH", "").strip()
+        if override:
+            return Path(override).is_dir()
+        config_path = self.mineru_config_path
+        if not config_path:
+            return False
+        try:
+            import json
+
+            config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+            models_dir = config.get("models-dir")
+            pipeline_path = models_dir.get("pipeline") if isinstance(models_dir, dict) else None
+            return bool(pipeline_path and Path(str(pipeline_path)).is_dir())
+        except (OSError, TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _vlm_server_url() -> str:
+        """Read both the application and native MinerU endpoint variables."""
+        return (
+            os.getenv("MINERU_VLM_SERVER_URL", "").strip()
+            or os.getenv("MINERU_VL_SERVER", "").strip()
+        )
 
     def _profile_docx(self, file_path: str) -> dict[str, Any]:
         profile = {"kind": "text", "reason": "常规 Word 文档"}
@@ -293,8 +347,23 @@ class DocumentProcessor:
         if suffix == ".pdf":
             profile = self._profile_pdf(file_path)
             engine = "docling" if profile["kind"] == "text" else "vlm"
+            # The default VLM route is an HTTP client.  When it has no endpoint
+            # configured, use the mounted local pipeline instead of selecting a
+            # backend that is guaranteed to fail.  Explicit force=true remains
+            # strict because it returns before this auto-selection branch.
+            if (
+                profile["kind"] != "text"
+                and not self._vlm_server_url()
+                and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
+                and self._local_pipeline_available()
+            ):
+                engine = "mineru"
+                selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地MinerU pipeline"
             selection["preferred_engine"] = engine
             selection["pdf_profile"] = profile
+            if engine == "docling" and self._local_pipeline_available():
+                selection["fallback_engine"] = "mineru"
+                selection["fallback_reason"] = "Docling未生成有效文本时使用本地MinerU pipeline"
             if requested_engine:
                 selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
                 selection["request_matched_selection"] = requested_engine == engine
@@ -304,6 +373,20 @@ class DocumentProcessor:
         if suffix == ".docx":
             profile = self._profile_docx(file_path)
             preferred_engine = "vlm" if profile["kind"] == "complex" else "docling"
+            if (
+                profile["kind"] == "complex"
+                and not self._vlm_server_url()
+                and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
+                and self._local_pipeline_available()
+                and not requested_engine
+            ):
+                # Complex Word files are converted to PDF before MinerU/VLM
+                # processing.  Auto selection must not choose the HTTP VLM
+                # client when no endpoint exists; use the mounted local
+                # pipeline just as the scanned-PDF route does.  A forced VLM
+                # request has already returned above and remains strict.
+                preferred_engine = "mineru"
+                selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地MinerU pipeline"
             selection["preferred_engine"] = preferred_engine
             if profile["kind"] == "complex" and requested_engine:
                 engine = requested_engine
@@ -319,6 +402,18 @@ class DocumentProcessor:
                 selection["request_matched_selection"] = requested_engine == engine
             return engine, selection
         engine = allowed[0]
+        if (
+            engine == "vlm"
+            and not requested_engine
+            and not self._vlm_server_url()
+            and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
+            and self._local_pipeline_available()
+            and "mineru" in allowed
+        ):
+            # Image and presentation routes also default to VLM.  Keep auto
+            # parsing usable on workers that only mount the local pipeline.
+            engine = "mineru"
+            selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地MinerU pipeline"
         selection["preferred_engine"] = engine
         if requested_engine:
             selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
@@ -388,7 +483,7 @@ class DocumentProcessor:
                     "end_page_id": end_page_id,
                 }
                 if engine == "vlm":
-                    server_url = os.getenv("MINERU_VLM_SERVER_URL", "").strip()
+                    server_url = self._vlm_server_url()
                     if server_url:
                         kwargs["server_url"] = server_url
                     kwargs["max_concurrency"] = int(os.getenv("MINERU_VLM_MAX_CONCURRENCY", "16"))
@@ -421,8 +516,12 @@ class DocumentProcessor:
             content = result.get("content")
             if metadata.get("error"):
                 return {"success": False, "error": str(metadata["error"]), "metadata": metadata}
-            if content is None or not str(content).strip():
-                if allow_empty_content:
+            if not self._has_meaningful_content(content):
+                # A bounded shard may legitimately contain no output, but an
+                # image placeholder is evidence that parsing produced a page
+                # artifact and must remain a failure for fallback handling.
+                truly_empty = content is None or (isinstance(content, str) and not content.strip())
+                if allow_empty_content and truly_empty:
                     metadata["empty_content"] = True
                     return {"success": True, "content": "", "metadata": metadata}
                 return {"success": False, "error": f"{engine} 未生成有效内容", "metadata": metadata}

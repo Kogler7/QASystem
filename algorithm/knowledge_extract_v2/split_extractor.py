@@ -19,6 +19,7 @@ LLM 通过标准 chat messages 调用，本模块不依赖 openai；live 环境�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -29,11 +30,7 @@ from functools import lru_cache
 from typing import Any
 
 from .candidate_generation import (
-    _normalize_span_entities,
     relation_catalog_for_context,
-)
-from .candidate_generation import (
-    bind_entity_evidence as _bind_entity_evidence,
 )
 from .candidate_generation import (
     bind_relation_evidence as _bind_relation_evidence,
@@ -50,11 +47,23 @@ from .candidate_generation import (
 from .candidate_generation import (
     relation_pass as _relation_pass,
 )
+from .candidate_generation import (
+    verify_relation_claims as _verify_relation_claims,
+)
 from .candidate_models import EntityCandidate, RelationCandidate
 from .candidate_selector import CandidateSelector
-from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
+from .chunk_context import (
+    ChunkContextManager,
+    ExtractionChunk,
+    ExtractionRequest,
+    validate_chunk_contract,
+)
+from .chunk_metadata import enrich_chunk_metadata
 from .composite import CompositeElementHandler
 from .coverage import CoverageAuditor
+from .table_semantics import analyze_table_semantics
+from .official_document_scope import annotate_official_roles, entity_in_official_scope, relation_in_official_scope, split_embedded_attachments
+from .official_attachments import add_official_attachment_entities
 from .document_entities import enrich_document_entities
 from .entity_resolver import CandidatePool
 from .evidence import Evidence, evidence_coverage, locate_quote, verify_evidence
@@ -67,12 +76,17 @@ from .hierarchy import (
     assemble_standard_semantic_relations,
     assemble_standard_technical_relations,
 )
-from .mapping_scorer import MappingScorer
-from .ontology_compiler import ExtractionPlan, compile_plan
+from .mapping_scorer import CONFIDENCE_METHOD, MappingScorer, mapping_confidence_payload
+from .ontology_compiler import ONTOLOGY_COMPILER_VERSION, ExtractionPlan, compile_plan
 from .ontology_schema import OntologySchema
 from .orchestrator import TargetedRepairOrchestrator
-from .prompt_router import DocumentRoute, build_chat_messages, resolve_document_route
-from .property_enrichment import enrich_entity_properties
+from .prompt_router import (
+    DocumentRoute,
+    build_chat_messages,
+    resolve_chunk_routes,
+    resolve_document_route,
+)
+from .property_enrichment import enrich_entity_identities, enrich_entity_properties
 from .run_state import ExtractionRun, ExtractionValidationError
 from .standard_semantics import enrich_standard_semantics
 from .structure_entities import add_structural_heading_entities
@@ -93,14 +107,14 @@ def _warning_codes(warnings: Iterable[dict[str, Any]]) -> dict[str, int]:
 
 
 @lru_cache(maxsize=32)
-def _compile_runtime(
+def _compile_runtime_cached(
     ontology: str,
     target_types: tuple[str, ...] | None,
     include_subclasses: bool,
     mode: str,
     unknown_content_policy: str,
 ) -> tuple[ExtractionPlan, OntologySchema]:
-    """Reuse immutable ontology artifacts across repeated harness runs."""
+    """Compile once per stable input; callers receive isolated copies below."""
     plan = compile_plan(
         ontology,
         target_types=target_types,
@@ -109,6 +123,25 @@ def _compile_runtime(
         unknown_content_policy=unknown_content_policy,
     )
     return plan, OntologySchema.parse(ontology or "")
+
+
+def _compile_runtime(
+    ontology: str,
+    target_types: tuple[str, ...] | None,
+    include_subclasses: bool,
+    mode: str,
+    unknown_content_policy: str,
+) -> tuple[ExtractionPlan, OntologySchema]:
+    """Return request-owned artifacts so cached mutable mappings cannot leak."""
+    return deepcopy(
+        _compile_runtime_cached(
+            ontology,
+            target_types,
+            include_subclasses,
+            mode,
+            unknown_content_policy,
+        )
+    )
 
 
 def _append_warning(
@@ -251,7 +284,21 @@ def build_intermediate_model(
             "from": relation.from_candidate_id,
             "to": relation.to_candidate_id,
             "evidence": [evidence.to_dict() for evidence in relation.evidence],
-            "mapping": {"score": relation.mapping_score, "status": relation.mapping_status},
+            "mapping": {
+                "score": relation.mapping_score,
+                "status": relation.mapping_status,
+                "admission_status": relation.mapping_status,
+                "score_status": relation.mapping_score_status or relation.mapping_status,
+            },
+            **mapping_confidence_payload(
+                relation.mapping_score,
+                relation.mapping_score_status or relation.mapping_status,
+                evidences=relation.evidence,
+                canonical_mapping_valid=bool(relation.canonical_relation),
+                warnings=relation.warnings,
+                aggregate_evidence=False,
+                aggregate_canonical_mapping=False,
+            ),
         }
         for relation in accepted_relations
     ]
@@ -267,6 +314,33 @@ def build_intermediate_model(
         "coverage_gaps": [],
         "warnings": [],
     }
+
+
+def _apply_global_confidence_gate(
+    collections: Iterable[list[dict[str, Any]]],
+    *,
+    gate: str,
+) -> None:
+    """Conservatively prevent fact promotion after a global hard failure."""
+    for items in collections:
+        for item in items:
+            if item.get("confidence") is None:
+                continue
+            details = dict(item.get("confidence_details") or {})
+            gates = list(details.get("gates") or [])
+            if gate not in gates:
+                gates.append(gate)
+            confidence = min(float(item["confidence"]), 0.8499)
+            current_status = str(item.get("confidence_status") or details.get("status") or "")
+            status = "rejected" if current_status == "rejected" or confidence < 0.70 else "needs_review"
+            details["gates"] = gates
+            details["status"] = status
+            item["confidence"] = round(confidence, 4)
+            item["confidence_status"] = status
+            item["gate_status"] = (
+                "blocked" if item.get("gate_status") == "blocked" else "review"
+            )
+            item["confidence_details"] = details
 
 
 def _pool_fact_keys(pool: CandidatePool) -> set[str]:
@@ -292,53 +366,74 @@ def _pool_fact_keys(pool: CandidatePool) -> set[str]:
     return keys
 
 
+def _frozen_entity_fingerprint(pool: CandidatePool, plan: ExtractionPlan) -> str:
+    """Hash the entity universe and every identity-bearing field."""
+    rows: list[dict[str, Any]] = []
+    for entity in pool.entity_candidates():
+        type_id = str(entity.canonical_type or entity.proposed_type or "")
+        spec = plan.class_specs.get(type_id)
+        identity_properties = tuple(spec.identity_properties) if spec is not None else ()
+        rows.append({
+            "entity_id": str(entity.candidate_id),
+            "type": type_id,
+            "name": str(entity.name),
+            "identity_property": str(entity.identity_property or ""),
+            "identity_value": entity.identity_value,
+            "identity_properties": {
+                property_id: entity.properties.get(property_id)
+                for property_id in identity_properties
+            },
+        })
+    rows.sort(key=lambda row: row["entity_id"])
+    payload = json.dumps(rows, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _assert_frozen_entity_fingerprint(
+    pool: CandidatePool,
+    plan: ExtractionPlan,
+    expected: str,
+    *,
+    stage: str,
+) -> None:
+    actual = _frozen_entity_fingerprint(pool, plan)
+    if actual == expected:
+        return
+    raise ExtractionValidationError(
+        "实体集合、类型或身份在冻结边界后发生变化",
+        stage=stage,
+        error_code="FROZEN_ENTITY_UNIVERSE_MUTATED",
+        details={"expected_fingerprint": expected, "actual_fingerprint": actual},
+    )
+
+
 def _apply_repair_proposal(
     pool: CandidatePool,
     proposal: dict[str, Any] | None,
     manager: ChunkContextManager,
     warnings: list[dict[str, Any]],
+    *,
+    allowed_chunk_ids: Iterable[str] | None = None,
 ) -> int:
     before = _pool_fact_keys(pool)
     payload = proposal if isinstance(proposal, dict) else {}
-    entities = _bind_entity_evidence(payload.get("entities") or [], manager)
-    for index, entity in enumerate(entities):
-        bound_evidence = Evidence.from_dict(entity.get("evidence"))
-        if (
-            bound_evidence is None
-            or not bound_evidence.span_id
-            or not bound_evidence.source_block_ids
-            or locate_quote(
-                manager,
-                bound_evidence.quote,
-                chunk_ids=bound_evidence.source_block_ids,
-            )
-            is None
-        ):
-            _append_warning(
-                warnings,
-                "REPAIR_ENTITY_EVIDENCE_INVALID",
-                "修复候选实体无法绑定到原始 chunk，已丢弃",
-                f"repair.entities[{index}].evidence",
-                (entity.get("evidence") or {}).get("quote"),
-            )
-            continue
-        pool.add_entity(
-            EntityCandidate(
-                candidate_id="",
-                proposed_type=str(entity.get("type") or ""),
-                canonical_type=entity.get("type"),
-                name=str(entity.get("name") or ""),
-                properties=dict(entity.get("properties") or {}),
-                evidence=[bound_evidence],
-                source="repair",
-            ),
-            warnings=warnings,
+    for index, entity in enumerate(payload.get("entities") or []):
+        _append_warning(
+            warnings,
+            "REPAIR_ENTITY_REJECTED_FROZEN",
+            "实体宇宙已冻结，repair 不得新增实体或改变实体身份",
+            f"repair.entities[{index}]",
+            entity,
         )
 
     for index, relation in enumerate(payload.get("relations") or []):
         if not isinstance(relation, dict):
             continue
-        evidence = _bind_relation_evidence(relation, manager)
+        evidence = _bind_relation_evidence(
+            relation,
+            manager,
+            chunk_ids=allowed_chunk_ids,
+        )
         if evidence is None:
             _append_warning(
                 warnings,
@@ -350,6 +445,10 @@ def _apply_repair_proposal(
             continue
         from_id = str(relation.get("from_id") or "")
         to_id = str(relation.get("to_id") or "")
+        if from_id:
+            from_id = pool.resolve_candidate_id(from_id)
+        if to_id:
+            to_id = pool.resolve_candidate_id(to_id)
         if not from_id:
             entity = pool.find_entity(
                 str(relation.get("from_type") or ""),
@@ -370,10 +469,46 @@ def _apply_repair_proposal(
             canonical_relation=None,
             evidence=[evidence],
         )
-        resolved = pool.add_relation(candidate, warnings=warnings)
-        if resolved is not None:
-            resolved.evidence = [evidence]
+        pool.add_relation(candidate, warnings=warnings)
     return len(_pool_fact_keys(pool) - before)
+
+
+_TERMINAL_SCHEMA_CODES = frozenset({"ONTOLOGY_EMPTY", "TARGET_SCOPE_EMPTY"})
+
+
+def _normalize_chunks(
+    chunks: Iterable[Any],
+    warnings: list[dict[str, Any]],
+) -> list[ExtractionChunk]:
+    """宽容接收上游 chunks：ExtractionChunk 直通，字段 dict 按契约转换。"""
+    resolved: list[ExtractionChunk] = []
+    for index, item in enumerate(chunks):
+        if isinstance(item, ExtractionChunk):
+            # V2 may enrich metadata and disambiguate ids.  Work on a deep copy
+            # so retry/routing cannot mutate the upstream splitter's objects.
+            resolved.append(deepcopy(item))
+            continue
+        if isinstance(item, dict):
+            payload = dict(item)
+            if not str(payload.get("chunk_id") or "").strip():
+                generated = f"chunk-{index:04d}"
+                payload["chunk_id"] = generated
+                _append_warning(
+                    warnings,
+                    "CHUNK_ID_GENERATED",
+                    f"chunks[{index}] 缺少 chunk_id，已生成 {generated!r}",
+                    f"chunks[{index}].chunk_id",
+                )
+            if payload.get("text") is None:
+                raise TypeError(f"chunks[{index}] 缺少 text 字段")
+            payload["text"] = str(payload.get("text"))
+            try:
+                resolved.append(ExtractionChunk.from_dict(payload))
+            except TypeError as exc:
+                raise TypeError(f"chunks[{index}] 无法转换为 ExtractionChunk: {exc}") from exc
+            continue
+        raise TypeError(f"chunks[{index}] 必须是 ExtractionChunk 或字段 dict")
+    return resolved
 
 
 def _empty_result(
@@ -384,11 +519,37 @@ def _empty_result(
     attempts: list[dict[str, Any]],
     run_id: str,
     run: ExtractionRun,
+    chunk_count: int = 0,
+    failure_code: str = "",
+    failure_message: str = "",
+    stop_reason: str = "empty_input",
+    profile_extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     run.absorb_attempts(attempts)
-    run.finish(accepted_entities=0, accepted_relations=0, stop_reason="empty_input")
+    run.finish(
+        accepted_entities=0,
+        accepted_relations=0,
+        stop_reason=stop_reason,
+        failure_code=failure_code,
+        failure_message=failure_message,
+    )
     empty = {"nodes": [], "relationships": []}
-    return {
+    verification_valid = not bool(failure_code)
+    verification_issues = (
+        []
+        if verification_valid
+        else [
+            {
+                "code": failure_code,
+                "message": failure_message or stop_reason,
+                "path": "ontology",
+                "severity": "error",
+                "repair_type": None,
+                "context": {},
+            }
+        ]
+    )
+    result = {
         "raw": {"entities": [], "relations": []},
         "graph": empty,
         "triples": [],
@@ -418,15 +579,18 @@ def _empty_result(
         "profile": {
             "document_route": route.to_dict(),
             "pipeline": "two_pass",
-            "chunks": 0,
+            "chunks": chunk_count,
             "repair_rounds": [],
-            "repair_stop_reason": "empty_input",
+            "repair_stop_reason": stop_reason,
+            **(profile_extra or {}),
         },
         "verification": {
-            "valid": True,
-            "hard_issue_count": 0,
+            "valid": verification_valid,
+            "coverage_complete": True,
+            "hard_issue_count": 0 if verification_valid else 1,
             "repairable_issue_count": 0,
-            "issues": [],
+            "unresolved_repairable_count": 0,
+            "issues": verification_issues,
             "coverage_gaps": [],
         },
         "status": run.status.value,
@@ -434,10 +598,18 @@ def _empty_result(
             **run.to_trace(),
             "calls": [],
             "repair_rounds": [],
-            "verification": {"valid": True, "hard_issue_count": 0},
+            "verification": {
+                "valid": verification_valid,
+                "coverage_complete": True,
+                "hard_issue_count": 0 if verification_valid else 1,
+                "unresolved_repairable_count": 0,
+            },
         },
         "error_code": run.error_code,
     }
+    if run.error:
+        result["_error"] = run.error
+    return result
 
 
 def extract_split(
@@ -463,6 +635,7 @@ def extract_split(
     best_effort: bool = False,
     repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
+    identity_admission: str = "quarantine",
     max_repair_rounds: int = 2,
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
@@ -475,12 +648,16 @@ def extract_split(
     """
     if isinstance(chunks, (str, bytes, dict)):
         raise TypeError("chunks 必须是 ExtractionChunk 序列，不能是完整文本或单个字典")
-    resolved_chunks = list(chunks)
-    if any(not isinstance(chunk, ExtractionChunk) for chunk in resolved_chunks):
-        raise TypeError("extract_split 只接收 ExtractionChunk 序列")
     resolved_validation_mode = (validation_mode or "strict").casefold()
     if resolved_validation_mode not in {"strict", "permissive"}:
         raise ValueError("validation_mode 仅支持 strict 或 permissive")
+    if identity_admission not in {"observe", "quarantine"}:
+        raise ValueError("identity_admission 仅支持 observe 或 quarantine")
+
+    chunk_warnings: list[dict[str, Any]] = []
+    resolved_chunks = _normalize_chunks(chunks, chunk_warnings)
+    metadata_counts = enrich_chunk_metadata(resolved_chunks)
+    validate_chunk_contract(resolved_chunks, warnings=chunk_warnings)
 
     resolved_target_types = tuple(target_types) if target_types is not None else None
     plan, schema = _compile_runtime(
@@ -491,17 +668,27 @@ def extract_split(
         unknown_content_policy,
     )
     compile_errors = [warning for warning in plan.schema_warnings if warning.severity == "error"]
+    terminal_warning = next(
+        (warning for warning in plan.schema_warnings if warning.code in _TERMINAL_SCHEMA_CODES),
+        None,
+    )
     if resolved_validation_mode == "strict" and compile_errors:
         raise ExtractionValidationError(
             "ontology strict validation failed",
             stage="ontology_compile",
             details={"warnings": [warning.to_dict() for warning in compile_errors]},
+            error_code=terminal_warning.code if terminal_warning is not None else "",
         )
     started = time.monotonic()
+    resolved_chunks = split_embedded_attachments(plan, resolved_chunks, resolve_chunk_routes(plan, resolved_chunks))
+    chunk_source_ids = {chunk.chunk_id: chunk.metadata["source_chunk_id"] for chunk in resolved_chunks if chunk.metadata.get("source_chunk_id")}
+    scannable = [chunk for chunk in resolved_chunks if (chunk.text or "").strip()]
+    skipped_ids = [chunk.chunk_id for chunk in resolved_chunks if not (chunk.text or "").strip()]
     logger.info(
-        "[步骤][抽取] 输入: 本体=%d字符 chunks=%d target_types=%s model=%s 校验模式=%s include_subclasses=%s",
+        "[步骤][抽取] 输入: 本体=%d字符 chunks=%d 可扫描=%d target_types=%s model=%s 校验模式=%s include_subclasses=%s",
         len(ontology or ""),
         len(resolved_chunks),
+        len(scannable),
         list(resolved_target_types) if resolved_target_types is not None else "全部",
         model or "env默认",
         resolved_validation_mode,
@@ -514,26 +701,51 @@ def extract_split(
         len(plan.schema_warnings),
     )
     request = ExtractionRequest(
-        chunks=resolved_chunks,
+        chunks=scannable,
         target_types=list(resolved_target_types) if resolved_target_types is not None else None,
     )
-    extraction_chunks = list(request.chunks)
-    manager = ChunkContextManager(extraction_chunks)
-    route = resolve_document_route(plan, extraction_chunks)
+    manager = ChunkContextManager(resolved_chunks, warnings=chunk_warnings)
+    # Include normalization-time contract events such as generated/duplicate
+    # ids, not only the offset/reference validator's findings.
+    contract_counts = _warning_codes(chunk_warnings)
+    # 重名 chunk 在 manager 构造时可能被改名，扫描集合与路由映射需在其后建立。
+    scannable_ids = {chunk.chunk_id for chunk in scannable}
+    route_map = resolve_chunk_routes(plan, resolved_chunks)
+    route = resolve_document_route(plan, resolved_chunks)
+    official_roles = annotate_official_roles(plan, resolved_chunks, route_map)
+    extraction_chunks = [chunk for chunk in scannable if official_roles.get(chunk.chunk_id) != "attachment"]
+    extraction_manager = ChunkContextManager(extraction_chunks)
+    body_manager = ChunkContextManager([chunk for chunk in extraction_chunks if official_roles.get(chunk.chunk_id) != "form"])
+    request.chunks = extraction_chunks
+    scannable_ids = {chunk.chunk_id for chunk in extraction_chunks}
+    chunk_routes = {chunk.chunk_id: route_map[chunk.chunk_id].kind for chunk in resolved_chunks}
+    table_semantics = {
+        chunk.chunk_id: decision.to_dict()
+        for chunk in resolved_chunks
+        if "source.not_table" not in (decision := analyze_table_semantics(plan, chunk)).reasons
+    }
     logger.info(
-        "[步骤][抽取] 文档路由输出: kind=%s source=%s reasons=%s",
+        "[步骤][抽取] 文档路由输出: kind=%s labels=%s source=%s 分段=%d reasons=%s",
         route.kind,
+        ",".join(route.labels) or "-",
         route.source,
+        len({id(item) for item in route_map.values()}),
         ",".join(route.reasons) or "-",
     )
+    logger.info(
+        "[步骤][抽取] 逐chunk路由输出: %s",
+        preview(" ".join(f"{chunk_id}={kind}" for chunk_id, kind in chunk_routes.items()), 400)
+        or "-",
+    )
     warnings: list[dict[str, Any]] = [warning.to_dict() for warning in plan.schema_warnings]
+    warnings.extend(chunk_warnings)
     attempts: list[dict[str, Any]] = []
     call_metrics: list[dict[str, Any]] = []
     resolved_run_id = run_id or f"ke-{int(time.time())}-{uuid.uuid4().hex[:6]}"
     run = ExtractionRun.create(
         run_id=resolved_run_id,
         ontology=ontology,
-        markdown="\n".join(chunk.text for chunk in extraction_chunks),
+        markdown="\n".join(chunk.text for chunk in resolved_chunks),
         model=model,
         prompt_version="knowledge-extract-v2-two-pass-v1",
         best_effort=best_effort,
@@ -547,7 +759,21 @@ def extract_split(
             kind=str(metadata.get("block_kind") or "chunk"),
         )
 
-    if not extraction_chunks:
+    profile_extra = {
+        "chunk_source_ids": chunk_source_ids,
+        "official_document_roles": official_roles,
+        "table_semantics": table_semantics,
+        "ontology_compiler_version": ONTOLOGY_COMPILER_VERSION,
+        "metadata_enrichment": metadata_counts,
+        "chunk_contract": contract_counts,
+        "scannable_chunks": len(scannable),
+        "skipped_chunks": len(skipped_ids),
+        "chunk_routes": chunk_routes,
+        "chunk_route_details": {
+            chunk_id: route_map[chunk_id].to_dict() for chunk_id in chunk_routes
+        },
+    }
+    if not resolved_chunks:
         _append_warning(warnings, "EMPTY_INPUT", "请求没有 chunks", "chunks")
         return _empty_result(
             plan,
@@ -556,6 +782,35 @@ def extract_split(
             attempts=attempts,
             run_id=resolved_run_id,
             run=run,
+            profile_extra=profile_extra,
+        )
+    if not scannable:
+        _append_warning(warnings, "EMPTY_INPUT", "所有 chunk 文本均为空白，没有可扫描内容", "chunks")
+        return _empty_result(
+            plan,
+            route=route,
+            warnings=warnings,
+            attempts=attempts,
+            run_id=resolved_run_id,
+            run=run,
+            chunk_count=len(resolved_chunks),
+            stop_reason="empty_input",
+            profile_extra=profile_extra,
+        )
+    if terminal_warning is not None:
+        # permissive 模式：本体为空或目标类型全部无法解析时，不再调用 LLM，结构化失败。
+        return _empty_result(
+            plan,
+            route=route,
+            warnings=warnings,
+            attempts=attempts,
+            run_id=resolved_run_id,
+            run=run,
+            chunk_count=len(resolved_chunks),
+            failure_code=terminal_warning.code,
+            failure_message=terminal_warning.message,
+            stop_reason="ontology_compile_failed",
+            profile_extra=profile_extra,
         )
 
     pool = CandidatePool(
@@ -563,6 +818,10 @@ def extract_split(
         allowed_types=plan.allowed_types,
         manager=manager,
         adjudicator=entity_adjudicator,
+        ontology_namespace=plan.ontology_id,
+        identity_admission=identity_admission,
+        entity_admission=lambda candidate: entity_in_official_scope(plan, manager, candidate),
+        relation_admission=lambda candidate: relation_in_official_scope(plan, manager, candidate),
     )
     known_entities = pool.entity_catalog()
 
@@ -570,10 +829,11 @@ def extract_split(
     entity_results = _entity_pass(
         plan,
         schema,
-        manager,
+        extraction_manager,
         request,
         llm,
         route=route,
+        route_map=route_map,
         max_workers=max_workers,
         use_scheduler=use_scheduler,
         attempts=attempts,
@@ -614,7 +874,7 @@ def extract_split(
     # define the complete document-entity set before semantic relations.
     document_entities = enrich_document_entities(
         pool,
-        manager,
+        body_manager,
         plan,
         warnings=warnings,
     )
@@ -623,13 +883,15 @@ def extract_split(
     # evidence, and must be present before relation candidates are proposed.
     structural_headings = add_structural_heading_entities(
         pool,
-        manager,
+        body_manager,
         allowed_types=plan.allowed_types,
         warnings=warnings,
     )
+    # 标准补全不再跟随单一 kind：只要文档任一段带 standard 标签（含本体先验），
+    # 即便整篇聚合 kind 被公文标签抢占，也照常执行；内部按 entity.source 门控。
     standard_semantics = (
-        enrich_standard_semantics(pool, manager, plan, warnings=warnings)
-        if route.kind == "standard"
+        enrich_standard_semantics(pool, body_manager, plan, warnings=warnings)
+        if "standard" in route.labels
         else {}
     )
     logger.info(
@@ -639,6 +901,7 @@ def extract_split(
         preview(standard_semantics, 120),
         pool.entity_candidate_count,
     )
+    attachment_count = add_official_attachment_entities(plan, pool, manager, warnings=warnings) if "attachment" in official_roles.values() else 0
     selector = CandidateSelector(plan, manager, warnings)
     selector.pre_relation(pool.entity_candidates())
     logger.info(
@@ -652,15 +915,16 @@ def extract_split(
         preview(_warning_codes(warnings), 200),
     )
 
-    # Closed-world property pass: entity identities/types are frozen here.
-    # The model can only fill missing ontology-declared properties on the
-    # accepted candidate-id enum and must cite the current source chunk.
-    property_enrichment = enrich_entity_properties(
+    # Identity admission is a separate, bounded pass.  It can fill only the
+    # ontology-declared identity fields of already proposed candidates; it has
+    # no schema surface for creating entities, changing types, or relations.
+    identity_enrichment = enrich_entity_identities(
         pool,
-        manager,
+        extraction_manager,
         plan,
         llm,
         route=route,
+        route_map=route_map,
         attempts=attempts,
         warnings=warnings,
         call_metrics=call_metrics,
@@ -673,18 +937,59 @@ def extract_split(
     )
 
     logger.info(
-        "[步骤][抽取] 属性补全输出: %s",
+        "[步骤][抽取] 身份补全输出: %s",
+        preview(identity_enrichment, 240),
+    )
+
+    identity_finalization = pool.finalize_identities(warnings=warnings)
+    identity_remap = pool.resolve_global(warnings=warnings)
+    frozen_entity_fingerprint = _frozen_entity_fingerprint(pool, plan)
+    logger.info(
+        "[步骤][抽取] 全局实体解析输出: identity=%s remap=%s 池内=%d",
+        preview(identity_finalization, 160),
+        preview(identity_remap, 240),
+        pool.entity_candidate_count,
+    )
+
+    # Closed-world property pass starts only after identity finalization and
+    # global resolution.  Identity properties are excluded from its schema.
+    property_enrichment = enrich_entity_properties(
+        pool,
+        extraction_manager,
+        plan,
+        llm,
+        route=route,
+        route_map=route_map,
+        attempts=attempts,
+        warnings=warnings,
+        call_metrics=call_metrics,
+        use_scheduler=use_scheduler,
+        local_previous=local_previous,
+        local_next=local_next,
+        same_section=same_section,
+        max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds,
+    )
+    logger.info(
+        "[步骤][抽取] 闭世属性补全输出: %s",
         preview(property_enrichment, 240),
+    )
+    _assert_frozen_entity_fingerprint(
+        pool,
+        plan,
+        frozen_entity_fingerprint,
+        stage="property_enrichment",
     )
 
     # Pass 2：关系候选（LLM，基于 accepted/resolved 实体目录）
     relation_results = _relation_pass(
         plan,
-        manager,
+        extraction_manager,
         request,
         llm,
         pool,
         route=route,
+        route_map=route_map,
         max_workers=max_workers,
         use_scheduler=use_scheduler,
         attempts=attempts,
@@ -704,14 +1009,13 @@ def extract_split(
                 to_candidate_id=str(raw_relation.get("to_id") or ""),
                 proposed_relation=str(raw_relation.get("rel_type") or ""),
                 canonical_relation=None,
-                evidence=[],
+                evidence=(
+                    [evidence]
+                    if (evidence := _bind_relation_evidence(raw_relation, manager)) is not None
+                    else []
+                ),
             )
-            resolved = pool.add_relation(candidate, warnings=warnings)
-            if resolved is None:
-                continue
-            evidence = _bind_relation_evidence(raw_relation, manager)
-            if evidence is not None:
-                resolved.evidence = [evidence]
+            pool.add_relation(candidate, warnings=warnings)
 
     logger.info(
         "[步骤][抽取] Pass2 关系候选输出: pairs=%d 池内关系=%d accepted=%d",
@@ -722,41 +1026,36 @@ def extract_split(
 
     document_relations = assemble_document_relations(
         pool,
-        manager,
+        body_manager,
         document_entities,
         warnings=warnings,
     )
     numbered_hierarchy_relations = assemble_numbered_hierarchy_relations(
         pool,
-        manager,
+        body_manager,
         warnings=warnings,
     )
     # HAS_PART / EVIDENCED_BY are determined by the document-unit span, so they
     # are assembled here instead of being enumerated for the relation classifier.
     document_unit_relations = assemble_document_unit_relations(
         pool,
-        manager,
+        body_manager,
         warnings=warnings,
     )
-    standard_semantic_relations = (
-        assemble_standard_semantic_relations(
-            pool,
-            manager,
-            document_entities,
-            warnings=warnings,
-        )
-        if route.kind == "standard"
-        else {}
+    # 同标准补全：无条件调用，内部只处理 standard 来源实体，无数据时自然 no-op。
+    standard_semantic_relations = assemble_standard_semantic_relations(
+        pool,
+        body_manager,
+        document_entities,
+        warnings=warnings,
     )
-    standard_technical_relations = (
-        assemble_standard_technical_relations(pool, manager, warnings=warnings)
-        if route.kind == "standard"
-        else {}
+    standard_technical_relations = assemble_standard_technical_relations(
+        pool, body_manager, warnings=warnings
     )
 
     # §21/AC-6：复合元素确定性组装与校验（补建 hasSubRule 成员关系）
     composite_handler = CompositeElementHandler.from_plan(plan)
-    composite_issues = composite_handler.assemble(pool, plan, manager, warnings=warnings)
+    composite_issues = composite_handler.assemble(pool, plan, body_manager, warnings=warnings)
     selector.post_relation(pool.entity_candidates(), pool.relation_candidates())
     logger.info(
         "[步骤][抽取] 关系后处理输出: 复合组装问题=%d 文档关系=%s 层级关系=%d accepted_entities=%d accepted_relations=%d warnings=%s",
@@ -774,7 +1073,7 @@ def extract_split(
 
     def verify_pool(current_pool: CandidatePool):
         model = build_intermediate_model(current_pool, plan, run_id=resolved_run_id)
-        current_raw = GraphAssembler().compat_raw(model["objects"], model["relations"])
+        current_raw = GraphAssembler().canonical_raw(model["objects"], model["relations"])
         return verifier.verify(
             plan,
             schema,
@@ -783,22 +1082,20 @@ def extract_split(
             current_raw["entities"],
             current_raw["relations"],
             rejected_warnings=current_pool.unresolved_relation_rejections(),
+            # Identity and properties are frozen here.  Only an evidence-backed
+            # relation between existing endpoints can still be added safely.
+            repairable_types={"required_relation"},
         )
+
+    active_repair_chunk_ids: tuple[str, ...] = ()
 
     def builtin_repair(payload: dict[str, Any]) -> dict[str, Any]:
         issue_rows = payload["issues"]
-        entity_repairs = {
-            "required_property",
-            "dangling_relation_endpoint",
-            "uncovered_block",
-        }
-        needs_entity_pass = any(row.get("repair_type") in entity_repairs for row in issue_rows)
-        referenced_chunks = _repair_context_chunks(
-            issue_rows,
-            manager,
-            entities=payload.get("entities") or [],
-            relations=payload.get("relations") or [],
-        )
+        referenced_chunks = [
+            body_manager.get_chunk(chunk_id)
+            for chunk_id in payload.get("repair_chunk_ids") or []
+            if body_manager.has_chunk(chunk_id)
+        ]
         if not referenced_chunks:
             _append_warning(
                 warnings,
@@ -818,42 +1115,6 @@ def extract_split(
             referenced_chunks[0],
             referenced_chunks[1:],
         )
-
-        if needs_entity_pass:
-            output_schema = _output_schema_for_types(
-                plan,
-                "entity_candidates",
-                plan.relevant_types(repair_text),
-            )
-            messages = build_chat_messages(
-                task="repair",
-                plan=plan,
-                route=route,
-                chunk=repair_chunk,
-                known_entities=repair_catalog,
-                output_schema=output_schema,
-                repair_issues=issue_rows,
-            )
-            parsed = _generate_structured(
-                llm,
-                messages,
-                output_schema,
-                use_scheduler=use_scheduler,
-                attempts=attempts,
-                pass_name="repair_entity",
-                chunk_id=f"repair-{payload['round']}",
-                max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds,
-                call_metrics=call_metrics,
-            )
-            normalized_entities = _normalize_span_entities(
-                parsed or {},
-                chunk=repair_chunk,
-                schema=schema,
-                target_types=request.target_types,
-                warnings=warnings,
-            )
-            return {"entities": normalized_entities, "relations": []}
 
         if not repair_catalog:
             _append_warning(
@@ -894,18 +1155,72 @@ def extract_split(
     resolved_repairer = repairer or builtin_repair
 
     def request_repair(current_pool: CandidatePool, issues, round_number: int):
+        nonlocal active_repair_chunk_ids
         model = build_intermediate_model(current_pool, plan, run_id=resolved_run_id)
-        current_raw = GraphAssembler().compat_raw(model["objects"], model["relations"])
-        return resolved_repairer(
-            {
-                "round": round_number,
-                "issues": [issue.to_dict() for issue in issues],
-                "entities": current_pool.entity_catalog(),
-                "relations": current_raw["relations"],
-                "chunks": [chunk.to_dict() for chunk in manager],
-                "schemas": deepcopy(plan.output_schemas),
-            }
+        current_raw = GraphAssembler().canonical_raw(model["objects"], model["relations"])
+        issue_rows = [issue.to_dict() for issue in issues]
+        active_repair_chunk_ids = tuple(
+            chunk.chunk_id
+            for chunk in _repair_context_chunks(
+                issue_rows,
+                body_manager,
+                entities=current_pool.entity_catalog(),
+                relations=current_raw["relations"],
+            )
         )
+        repair_payload = {
+            "round": round_number,
+            "issues": issue_rows,
+            "entities": current_pool.entity_catalog(),
+            "relations": current_raw["relations"],
+            "chunks": [chunk.to_dict() for chunk in body_manager],
+            "repair_chunk_ids": list(active_repair_chunk_ids),
+            "schemas": deepcopy(plan.output_schemas),
+        }
+        proposal = resolved_repairer(repair_payload)
+        if not isinstance(proposal, dict) or not proposal.get("relations"):
+            return proposal
+
+        relations_by_chunk: dict[str, list[dict[str, Any]]] = {}
+        unbound_relations: list[dict[str, Any]] = []
+        for relation in proposal.get("relations") or []:
+            if not isinstance(relation, dict):
+                continue
+            bound = _bind_relation_evidence(
+                relation,
+                manager,
+                chunk_ids=active_repair_chunk_ids,
+            )
+            if bound is None or not bound.source_block_ids:
+                unbound_relations.append(relation)
+                continue
+            normalized = dict(relation)
+            normalized["evidence"] = bound.to_dict()
+            relations_by_chunk.setdefault(bound.source_block_ids[0], []).append(normalized)
+
+        verified_relations: list[dict[str, Any]] = []
+        entity_catalog = current_pool.entity_catalog()
+        for evidence_chunk_id, chunk_relations in relations_by_chunk.items():
+            verified_relations.extend(_verify_relation_claims(
+                llm,
+                chunk=manager.get_chunk(evidence_chunk_id),
+                relations=chunk_relations,
+                entity_catalog=entity_catalog,
+                use_scheduler=use_scheduler,
+                attempts=attempts,
+                warnings=warnings,
+                pass_name="repair_relation_evidence_verification",
+                chunk_id=evidence_chunk_id,
+                max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds,
+                call_metrics=call_metrics,
+            ))
+        return {
+            **proposal,
+            # Invalid/unbound evidence remains here only so the existing apply
+            # path records its explicit REPAIR_RELATION_EVIDENCE_INVALID warning.
+            "relations": [*verified_relations, *unbound_relations],
+        }
 
     repair_result = TargetedRepairOrchestrator(max_rounds=max_repair_rounds).run(
         pool,
@@ -913,16 +1228,43 @@ def extract_split(
         repair=request_repair,
         apply=lambda current_pool, proposal: (
             current_pool,
-            _apply_repair_proposal(current_pool, proposal, manager, warnings),
+            _apply_repair_proposal(
+                current_pool,
+                proposal,
+                manager,
+                warnings,
+                allowed_chunk_ids=active_repair_chunk_ids,
+            ),
         ),
     )
     repair_rounds = [item.to_dict() for item in repair_result.rounds]
     repair_stop_reason = repair_result.stop_reason
+    repair_summary = repair_result.to_dict()
+
+    _assert_frozen_entity_fingerprint(
+        pool,
+        plan,
+        frozen_entity_fingerprint,
+        stage="repair",
+    )
+    repair_identity_finalization = {
+        "identified": 0,
+        "unresolved": 0,
+        "quarantined": 0,
+        "frozen": True,
+    }
+    repair_identity_remap: dict[str, str] = {}
 
     # Repair proposals pass through the same acceptance boundary.  This also
     # cascades any repaired relation whose endpoint was previously rejected.
     selector.pre_relation(pool.entity_candidates())
     selector.post_relation(pool.entity_candidates(), pool.relation_candidates())
+    _assert_frozen_entity_fingerprint(
+        pool,
+        plan,
+        frozen_entity_fingerprint,
+        stage="post_repair_selection",
+    )
 
     # §17-§19：Mapping Scorer（默认注释模式；apply_mapping_threshold 开启后按阈值过滤）
     scorer = MappingScorer(
@@ -931,15 +1273,26 @@ def extract_split(
         low_confidence_threshold=mapping_low_confidence_threshold,
     )
     all_entities = pool.accepted_entities()
-    all_relations = pool.accepted_relations()
+    all_relations = (
+        pool.relation_candidates() if apply_mapping_threshold else pool.accepted_relations()
+    )
     entity_scores = [
         (entity, scorer.score_entity(entity, plan, all_relations)) for entity in all_entities
     ]
     relation_scores = [
-        (relation, scorer.score_relation(relation, plan)) for relation in all_relations
+        (
+            relation,
+            scorer.score_relation(
+                relation,
+                plan,
+                include_cardinality=not apply_mapping_threshold,
+            ),
+        )
+        for relation in all_relations
     ]
     for entity, score in entity_scores:
         entity.mapping_score = score.score
+        entity.mapping_score_status = score.status
         if apply_mapping_threshold:
             entity.mapping_status = score.status
             if score.status == "rejected":
@@ -958,15 +1311,24 @@ def extract_split(
                 )
     for relation, score in relation_scores:
         relation.mapping_score = score.score
+        relation.mapping_score_status = score.status
         if apply_mapping_threshold:
             relation.mapping_status = score.status
             if score.status == "rejected":
+                if "MAPPING_REJECTED" not in relation.warnings:
+                    relation.warnings.append("MAPPING_REJECTED")
                 _append_warning(
                     warnings,
                     "MAPPING_REJECTED",
                     f"关系 {relation.canonical_relation} 映射分数 {score.score} 低于阈值",
                     f"relations.{relation.candidate_id}",
                 )
+            elif score.status == "low_confidence":
+                if "MAPPING_LOW_CONFIDENCE" not in relation.warnings:
+                    relation.warnings.append("MAPPING_LOW_CONFIDENCE")
+
+    if apply_mapping_threshold:
+        pool.recompute_relation_cardinality(warnings=warnings)
 
     accepted_entities = pool.accepted_entities()
     accepted_entity_ids = {entity.candidate_id for entity in accepted_entities}
@@ -1002,6 +1364,9 @@ def extract_split(
             if entity_scores
             else None
         ),
+        "accepted": sum(
+            1 for _, score in [*entity_scores, *relation_scores] if score.status == "accepted"
+        ),
         "low_confidence": sum(
             1 for _, score in [*entity_scores, *relation_scores] if score.status == "low_confidence"
         ),
@@ -1011,12 +1376,27 @@ def extract_split(
         "weights": scorer.weights,
         "accepted_threshold": scorer.accepted_threshold,
         "low_confidence_threshold": scorer.low_confidence_threshold,
+        "confidence_contract": {
+            "type": "heuristic_score",
+            "source": "multi_signal",
+            "method": CONFIDENCE_METHOD,
+            "calibrated": False,
+            "signals": ["mapping", "evidence", "canonical_mapping"],
+            "decision_gates": [
+                "missing_evidence",
+                "schema_invalid",
+                "cardinality_exceeded",
+            ],
+            "interpretation": "explainable_quality_score_not_probability",
+        },
     }
-
     # O1 中间对象模型 -> O2 graph / triples + compat raw（§25-§28）
     intermediate_model = build_intermediate_model(pool, plan, run_id=resolved_run_id)
     assembler = GraphAssembler()
     raw = assembler.compat_raw(intermediate_model["objects"], intermediate_model["relations"])
+    canonical = assembler.canonical_raw(
+        intermediate_model["objects"], intermediate_model["relations"]
+    )
     graph = assembler.build_graph(intermediate_model["objects"], intermediate_model["relations"])
     triples = assembler.build_triples(graph)
     # §23 / AC-8：通用 Coverage Auditor（只发现 gap）
@@ -1024,13 +1404,13 @@ def extract_split(
         plan,
         manager,
         request,
-        raw["entities"],
-        raw["relations"],
+        canonical["entities"],
+        canonical["relations"],
     )
     intermediate_model["coverage_gaps"] = [gap.to_dict() for gap in coverage_gaps]
 
     # Evidence 验证（L1/L2）与覆盖（AC-4）
-    verdicts = verify_evidence(raw, manager)
+    verdicts = verify_evidence(canonical, manager)
     for verdict in verdicts:
         if verdict.status == "fail":
             _append_warning(
@@ -1039,16 +1419,64 @@ def extract_split(
                 verdict.message,
                 verdict.ref,
             )
-    coverage = evidence_coverage(raw)
+    coverage = evidence_coverage(canonical)
+    warning_counts = _warning_codes(warnings)
+    all_entity_candidates = pool.entity_candidates()
+    rejected_entity_count = sum(
+        1 for entity in all_entity_candidates if entity.mapping_status != "accepted"
+    )
+    evidence_rejection_count = sum(
+        warning_counts.get(code, 0)
+        for code in ("ENTITY_EVIDENCE_REJECTED", "EVIDENCE_L1_FAIL", "EVIDENCE_L2_FAIL")
+    )
+    candidate_denominator = len(all_entity_candidates) + warning_counts.get(
+        "ENTITY_EVIDENCE_REJECTED", 0
+    )
+    merge_count = sum(
+        1 for old_id, new_id in identity_remap.items() if old_id != new_id
+    ) + sum(
+        1 for old_id, new_id in repair_identity_remap.items() if old_id != new_id
+    )
+    resolution_quality = {
+        "candidate_rejection_rate": (
+            (rejected_entity_count + warning_counts.get("ENTITY_EVIDENCE_REJECTED", 0))
+            / candidate_denominator
+            if candidate_denominator
+            else 0.0
+        ),
+        "evidence_rejection_count": evidence_rejection_count,
+        "identified_count": sum(
+            1 for entity in all_entity_candidates if entity.lifecycle in {"IDENTIFIED", "RESOLVED"}
+        ),
+        "unresolved_count": sum(
+            1 for entity in all_entity_candidates if entity.lifecycle == "UNRESOLVED"
+        ),
+        "quarantined_count": sum(
+            1 for entity in all_entity_candidates if entity.lifecycle == "QUARANTINED"
+        ),
+        "entity_merge_count": merge_count,
+        "entity_merge_rate": (
+            merge_count / (len(all_entity_candidates) + merge_count)
+            if all_entity_candidates or merge_count
+            else 0.0
+        ),
+        "property_conflict_count": sum(
+            len(entity.property_conflicts) for entity in all_entity_candidates
+        ),
+        "relation_endpoint_remap_count": pool.relation_endpoint_remap_count,
+        "identity_admission": identity_admission,
+    }
 
     verification_report = ExtractionVerifier().verify(
         plan,
         schema,
         manager,
         request,
-        raw["entities"],
-        raw["relations"],
+        canonical["entities"],
+        canonical["relations"],
         rejected_warnings=pool.unresolved_relation_rejections(),
+        # Terminal verification is observational; no repair pass follows it.
+        repairable_types=(),
     )
     logger.info(
         "[步骤][抽取] 校验输出: valid=%s hard_issues=%d repairable_issues=%d L1/L2覆盖=%s",
@@ -1057,7 +1485,7 @@ def extract_split(
         len(verification_report.repairable_issues),
         preview(coverage, 120),
     )
-    if resolved_validation_mode == "strict" and verification_report.hard_issues:
+    if verification_report.hard_issues:
         attempts.append(
             {
                 "attempt": 1,
@@ -1071,6 +1499,18 @@ def extract_split(
                 "terminal": True,
             }
         )
+        _apply_global_confidence_gate(
+            (
+                raw.get("entities", []),
+                raw.get("relations", []),
+                graph.get("nodes", []),
+                graph.get("relationships", []),
+                triples,
+                intermediate_model.get("objects", []),
+                intermediate_model.get("relations", []),
+            ),
+            gate="final_verification_failed",
+        )
 
     terminal_failures = {
         (str(attempt.get("pass") or ""), str(attempt.get("chunk") or ""))
@@ -1078,6 +1518,8 @@ def extract_split(
         if attempt.get("terminal") is True
     }
     for chunk in manager:
+        if chunk.chunk_id not in scannable_ids:
+            continue
         run.mark_chunk_scan(
             chunk.chunk_id,
             "entity",
@@ -1086,14 +1528,27 @@ def extract_split(
         run.mark_chunk_scan(
             chunk.chunk_id,
             "relation",
-            completed=("relation", chunk.chunk_id) not in terminal_failures,
+            completed=(
+                ("relation", chunk.chunk_id) not in terminal_failures
+                and ("relation_evidence_verification", chunk.chunk_id) not in terminal_failures
+            ),
         )
 
     run.absorb_attempts(attempts)
+    repair_failure_code = ""
+    repair_failure_message = ""
+    if repair_result.report.repairable_issues:
+        repair_failure_code = "REPAIR_INCOMPLETE"
+        repair_failure_message = (
+            f"targeted repair stopped at {repair_stop_reason}; "
+            f"{len(repair_result.report.repairable_issues)} repairable issue(s) remain"
+        )
     run.finish(
         accepted_entities=len(accepted_entities),
         accepted_relations=len(accepted_relations),
         stop_reason=repair_stop_reason,
+        failure_code=repair_failure_code,
+        failure_message=repair_failure_message,
     )
     run_trace = run.to_trace()
     run_trace["calls"] = sorted(
@@ -1105,10 +1560,13 @@ def extract_split(
         ),
     )
     run_trace["repair_rounds"] = repair_rounds
+    run_trace["repair"] = repair_summary
     run_trace["verification"] = {
         "valid": verification_report.valid,
+        "coverage_complete": verification_report.coverage_complete,
         "hard_issue_count": len(verification_report.hard_issues),
         "repairable_issue_count": len(verification_report.repairable_issues),
+        "unresolved_repairable_count": verification_report.unresolved_repairable_count,
     }
     logger.info(
         "[步骤][抽取] 映射评分输出: accepted=%s low_confidence=%s rejected=%s",
@@ -1138,11 +1596,25 @@ def extract_split(
         "evidence_coverage": coverage,
         "coverage_gaps": [gap.to_dict() for gap in coverage_gaps],
         "verification": verification_report.to_dict(),
+        "repair": repair_summary,
         "mapping": mapping_summary,
         "profile": {
             "document_route": route.to_dict(),
             "pipeline": "two_pass",
-            "chunks": len(extraction_chunks),
+            "chunks": len(resolved_chunks),
+            "scannable_chunks": len(scannable),
+            "skipped_chunks": len(skipped_ids),
+            "metadata_enrichment": metadata_counts,
+            "chunk_contract": contract_counts,
+            "chunk_routes": chunk_routes,
+            "official_document_roles": official_roles,
+            "chunk_source_ids": chunk_source_ids,
+            "attachments_stored": attachment_count,
+            "table_semantics": table_semantics,
+            "chunk_route_details": {
+                chunk_id: route_map[chunk_id].to_dict() for chunk_id in chunk_routes
+            },
+            "ontology_compiler_version": ONTOLOGY_COMPILER_VERSION,
             "entity_candidates": pool.entity_candidate_count,
             "relation_candidates": pool.relation_candidate_count,
             "accepted_entities": len(accepted_entities),
@@ -1150,7 +1622,22 @@ def extract_split(
             "numbered_hierarchy_relations": numbered_hierarchy_relations,
             "document_entities": document_entities,
             "standard_semantics": standard_semantics,
+            "identity_enrichment": identity_enrichment,
             "property_enrichment": property_enrichment,
+            "identity_resolution": {
+                **identity_finalization,
+                "merged": sum(1 for old_id, new_id in identity_remap.items() if old_id != new_id),
+                "id_remap": identity_remap,
+                "frozen_entity_fingerprint": frozen_entity_fingerprint,
+                "repair": {
+                    **repair_identity_finalization,
+                    "merged": sum(
+                        1 for old_id, new_id in repair_identity_remap.items() if old_id != new_id
+                    ),
+                    "id_remap": repair_identity_remap,
+                },
+            },
+            "resolution_quality": resolution_quality,
             "document_relations": document_relations,
             "standard_semantic_relations": standard_semantic_relations,
             "standard_technical_relations": standard_technical_relations,
@@ -1172,6 +1659,7 @@ def extract_split(
             },
             "repair_rounds": repair_rounds,
             "repair_stop_reason": repair_stop_reason,
+            "repair": repair_summary,
             "llm_calls": len(call_metrics),
         },
         "status": run.status.value,

@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from .graph_utils import canonical_name
-from .structured_text import is_structured_payload
+from .structured_text import has_json_table_payload, is_structured_payload
 
 _NUMBERED_HEADING = re.compile(
     r"^\s{0,3}(?:#{1,6}\s+)?(?P<number>\d+(?:\.\d+)*)[.)]?\s+\S"
@@ -28,7 +28,15 @@ _MATH_ATOM = re.compile(
 _SEPARATOR = re.compile(r"[,，、;；|]\s*|\n(?!\s*\n)")
 _TABLE_ROW = re.compile(r"^\s*\|.+\|\s*$")
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)|<(?:img|svg)\b", re.IGNORECASE)
-_TABLE = re.compile(r"<table\b|^\s*\|.+\|\s*$", re.IGNORECASE | re.MULTILINE)
+#: 表结构支撑。§10 之后解析层把表格统一输出为 json 代码块，切片还会把围栏
+#: 留在表题所在片段里，因此围栏开头也算表结构；.md/.txt 原文直读时是 <table> 或管道表格。
+_TABLE = re.compile(
+    r"<table\b"
+    r"|```\s*json\b"
+    r"|^\s*\{\s*\"(?:columns|rows)\""
+    r"|^\s*\|.+\|\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 _EQUATION = re.compile(r"\$\$[\s\S]*?\$\$|\\begin\{(?:equation|align)\}|[^\n]{1,160}=[^\n]{1,160}")
 _ANNEX = re.compile(r"^\s{0,3}(?:#{1,6}\s+)?附录\s*[A-Za-z0-9一二三四五六七八九十]", re.MULTILINE)
 _REFERENCE = re.compile(r"^\s*\[\d+\]\s+\S", re.MULTILINE)
@@ -196,6 +204,37 @@ def _following_paragraph(candidate: Any, manager: Any, limit: int = 4000) -> str
         if next_end < 0:
             next_end = len(text)
         values.append(text[cursor : min(next_end, cursor + limit)])
+    return "\n".join(values)
+
+
+def _adjacent_chunk_text(candidate: Any, manager: Any, limit: int = 1200) -> str:
+    """证据 chunk 之后的相邻 chunk 文本（同一文档，不跨段，各取前 ``limit`` 字符）。
+
+    表题与其表格数据常被 500-700 字符的切片分到相邻两片：表题片自身没有表格
+    结构，结构支撑必须能看到下一片（与 standard_semantics 的表定位同口径）。
+    """
+    if manager is None or not hasattr(manager, "local_context"):
+        return ""
+    values: list[str] = []
+    seen: set[str] = set()
+    for evidence in _evidence(candidate):
+        for block_id in getattr(evidence, "source_block_ids", None) or ():
+            block_id = str(block_id)
+            if not block_id or block_id in seen:
+                continue
+            seen.add(block_id)
+            try:
+                neighbours = manager.local_context(
+                    block_id, previous=0, next=1, same_section=False
+                )
+            except (KeyError, AttributeError):
+                continue
+            for chunk in neighbours:
+                if str(getattr(chunk, "chunk_id", "")) == block_id:
+                    continue
+                text = str(getattr(chunk, "text", "") or "")
+                if text:
+                    values.append(text[:limit])
     return "\n".join(values)
 
 
@@ -623,9 +662,15 @@ class CandidateSelector:
                 if any(token in type_identifiers for token in ("figure", "diagram", "image")) or type_display == "图":
                     structural_support = bool(_IMAGE.search(window))
                 elif "table" in type_identifiers or type_display == "表":
+                    following = _following_paragraph(candidate, self.manager)
+                    adjacent = _adjacent_chunk_text(candidate, self.manager)
                     structural_support = bool(
                         _TABLE.search(window)
-                        or _TABLE.search(_following_paragraph(candidate, self.manager))
+                        or _TABLE.search(following)
+                        or _TABLE.search(adjacent)
+                        or has_json_table_payload(window)
+                        or has_json_table_payload(following)
+                        or has_json_table_payload(adjacent)
                     )
                 elif any(token in type_identifiers for token in ("equation", "formula", "math")) or type_display == "数学公式":
                     structural_support = bool(_EQUATION.search(window)) and not _math_atom(

@@ -30,7 +30,7 @@ def test_extract_v2_streams_and_retries_invalid_json(monkeypatch):
     monkeypatch.setattr(extractor.time, "sleep", lambda _seconds: None)
     result = extractor.extract_v2("class Term", "text", json_retries=1)
     assert result.get("_error") is None
-    assert result["graph"]["nodes"][0]["uid"] == "Term::a"
+    assert result["graph"]["nodes"][0]["uid"] == "term::a"
     assert result["attempts"][0]["type"] == "json"
 
 
@@ -65,7 +65,7 @@ class 术语 <<Terminology>> {
 
     assert result["raw"]["entities"][0]["type"] == "Terminology"
     assert result["graph"]["nodes"][0]["label"] == "Terminology"
-    assert result["graph"]["nodes"][0]["uid"] == "Terminology::采购标段数量"
+    assert result["graph"]["nodes"][0]["uid"] == "terminology::采购标段数量"
 
 
 def test_extract_v2_discards_relationships_whose_endpoints_are_missing(monkeypatch):

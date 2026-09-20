@@ -157,6 +157,57 @@ def test_excel_engine_outputs_json_per_sheet(tmp_path):
         }
     ]
     assert result["content"].startswith("## ")
+    assert result["metadata"]["sheets"] == [
+        {
+            "sheet_name": "sample",
+            "row_count": 2,
+            "column_count": 2,
+            "columns": ["术语", "定义"],
+        }
+    ]
+    assert result["metadata"]["table_semantics"]["first_data_row"] == 2
+
+
+def test_csv_preserves_identifier_lexemes_and_empty_values(tmp_path):
+    from algorithm.preproc.preproc_src.processors.excel_processor import ExcelProcessor
+
+    path = tmp_path / "lexical.csv"
+    path.write_text(
+        "编号,数量,备注\n00123,9007199254740993,\n00456,NA,nan\n",
+        encoding="utf-8",
+    )
+
+    result = ExcelProcessor().process(str(path))
+    blocks = _json_blocks(result["content"])
+
+    assert blocks[0]["rows"] == [
+        {"编号": "00123", "数量": "9007199254740993", "备注": ""},
+        {"编号": "00456", "数量": "NA", "备注": "nan"},
+    ]
+
+
+def test_legacy_xls_failure_is_explicit_and_does_not_use_openpyxl(monkeypatch, tmp_path):
+    from algorithm.preproc.preproc_src.processors import excel_processor
+
+    path = tmp_path / "legacy.xls"
+    path.write_bytes(b"not-a-real-workbook")
+    processor = excel_processor.ExcelProcessor()
+    monkeypatch.setattr(
+        excel_processor.pd,
+        "ExcelFile",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ImportError("Missing xlrd")),
+    )
+    monkeypatch.setattr(
+        processor,
+        "_fallback_excel_process",
+        lambda *_args, **_kwargs: pytest.fail(".xls must not be passed to openpyxl"),
+    )
+
+    result = processor.process(str(path))
+
+    assert result["content"] == ""
+    assert "xlrd" in result["metadata"]["error"]
+    assert ".xlsx" in result["metadata"]["error"]
 
 
 def test_mineru_path_converts_html_tables(monkeypatch, tmp_path):

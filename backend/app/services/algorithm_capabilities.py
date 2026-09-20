@@ -45,20 +45,41 @@ class GraphExtractionBatch:
     scheduler: dict[str, Any]
     graph: dict[str, Any] | None = None
     graphs: list[dict[str, Any]] | None = None
+    quality: dict[str, Any] | None = None
+    isolated_graph: dict[str, Any] | None = None
+    isolated_graphs: list[dict[str, Any]] | None = None
 
     def graph_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {}
+        publishable = bool((self.quality or {}).get("graph_publishable", True))
         if self.graph is not None:
-            data["graph"] = self.graph
+            data["graph"] = self.graph if publishable else {"nodes": [], "relationships": []}
+            quarantined_graph = self.isolated_graph if self.isolated_graph is not None else self.graph
+            if not publishable and quarantined_graph is not None:
+                data["isolated_graph"] = quarantined_graph
+            elif self.isolated_graph is not None:
+                data["isolated_graph"] = self.isolated_graph
         else:
-            data["graphs"] = self.graphs or []
+            data["graphs"] = (self.graphs or []) if publishable else []
+            quarantined_graphs = self.isolated_graphs if self.isolated_graphs is not None else self.graphs
+            if not publishable and quarantined_graphs is not None:
+                data["isolated_graphs"] = quarantined_graphs
+            elif self.isolated_graphs is not None:
+                data["isolated_graphs"] = self.isolated_graphs
+        data["graph_publishable"] = publishable
+        if self.quality is not None:
+            data["quality"] = self.quality
         return data
 
     def pipeline_data(self) -> dict[str, Any]:
-        return {
+        data = {
             "ranges": [item.get("ranges") for item in self.items],
+            "metadata": [item.get("metadata") or {} for item in self.items],
             **self.graph_data(),
         }
+        if self.quality is not None:
+            data["quality"] = self.quality
+        return data
 
 
 def _document_error(reason: str) -> ErrorCode:
@@ -86,6 +107,10 @@ _UNUSABLE_RESPONSE_CODES = frozenset(
         "LLM_EMPTY_RESPONSE",
     }
 )
+
+#: V2 terminal codes meaning "the ontology cannot support extraction" --
+#: empty ontology, zero class declarations, or requested types not in it.
+_ONTOLOGY_FAILURE_CODES = frozenset({"ONTOLOGY_EMPTY", "TARGET_SCOPE_EMPTY"})
 
 
 def _strict_chunk_failures() -> bool:
@@ -117,6 +142,8 @@ def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCo
         return ErrorCode.LLM_RESPONSE_INVALID
     if error_codes == {"LLM_REQUEST_FAILED"}:
         return ErrorCode.LLM_REQUEST_FAILED
+    if error_codes and error_codes <= _ONTOLOGY_FAILURE_CODES:
+        return ErrorCode.ONTOLOGY_INVALID
     return ErrorCode.GRAPH_EXTRACTION_FAILED
 
 
@@ -145,6 +172,10 @@ class DocumentParsingService:
             }
         if metadata.get("encoding"):
             summary["encoding"] = metadata["encoding"]
+        if metadata.get("sheets"):
+            summary["sheets"] = metadata["sheets"]
+        if metadata.get("table_semantics"):
+            summary["table_semantics"] = metadata["table_semantics"]
         return summary
 
     def resolve_engine_plan(self, file_name: str, content: bytes, config: ParserConfig) -> dict[str, Any] | None:
@@ -269,6 +300,14 @@ class GraphExtractionService:
         base_url: str | None = None,
         merge: bool = True,
     ) -> GraphExtractionBatch:
+        chunk_metadata: list[dict[str, Any]] = []
+        for item in items:
+            metadata = dict(getattr(item, "metadata", {}) or {})
+            if isinstance(item, GraphExtractionItem):
+                # API callers may attach provenance for round-tripping, but it
+                # must not become a trusted document-routing signal.
+                metadata["signal_source"] = "external"
+            chunk_metadata.append(metadata)
         results = extract_chunks(
             ontology=ontology,
             # Chunk text is passed through verbatim: Knowledge Extract V2 reads
@@ -277,12 +316,17 @@ class GraphExtractionService:
             chunks=[item.text for item in items],
             model=model,
             base_url=base_url,
+            ranges=[getattr(item, "ranges", None) for item in items],
+            metadata=chunk_metadata,
         )
         for position, (source, result) in enumerate(zip(items, results)):
             result["index"] = position
             result["text"] = source.text
             ranges = getattr(source, "ranges", None)
             result["ranges"] = list(ranges) if ranges is not None else None
+            result_metadata = dict(result.get("metadata") or {})
+            result_metadata.update(chunk_metadata[position])
+            result["metadata"] = result_metadata
         failed = [item for item in results if item.get("error")]
         if failed:
             failed_items = [
@@ -295,10 +339,11 @@ class GraphExtractionService:
                 }
                 for item in failed
             ]
-            if _strict_chunk_failures():
+            all_failed = len(failed) == len(results)
+            if all_failed or _strict_chunk_failures():
                 raise CapabilityError(
                     _extraction_error(failed, len(results)),
-                    "部分文本切片知识抽取失败",
+                    "全部文本切片知识抽取失败" if all_failed else "部分文本切片知识抽取失败",
                     "knowledge_extract",
                     {"failed_count": len(failed), "failed_items": failed_items},
                 )
@@ -319,18 +364,45 @@ class GraphExtractionService:
             "qps": config["qps"],
             "qpm": config["qpm"],
         }
+        quality = dict(results[0].get("quality") or {}) if results else {
+            "status": "succeeded",
+            "error_code": None,
+            "verification": {},
+            "graph_publishable": True,
+            "repair_stop_reason": None,
+        }
+        if failed:
+            quality["status"] = "partial"
+            quality["error_code"] = _extraction_error(failed, len(results)).name
+            quality["failed_chunk_count"] = len(failed)
         if merge:
+            merged_graph = deduplicate_chunk_graphs(results)
+            graph_publishable = bool(quality.get("graph_publishable", True))
             return GraphExtractionBatch(
                 items=results,
                 attempts=attempts,
                 scheduler=scheduler,
-                graph=deduplicate_chunk_graphs(results),
+                graph=(
+                    merged_graph
+                    if graph_publishable
+                    else {"nodes": [], "relationships": []}
+                ),
+                quality=quality,
+                isolated_graph=None if graph_publishable else merged_graph,
             )
+        graph_publishable = bool(quality.get("graph_publishable", True))
+        extracted_graphs = [item["graph"] for item in results]
         return GraphExtractionBatch(
             items=results,
             attempts=attempts,
             scheduler=scheduler,
-            graphs=[item["graph"] for item in results],
+            graphs=(
+                extracted_graphs
+                if graph_publishable
+                else [{"nodes": [], "relationships": []} for _ in extracted_graphs]
+            ),
+            quality=quality,
+            isolated_graphs=None if graph_publishable else extracted_graphs,
         )
 
 

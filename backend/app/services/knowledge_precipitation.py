@@ -358,17 +358,47 @@ class KnowledgePrecipitationService:
         started: datetime,
         stats: dict[str, Any],
         recorder: StageRecorder | None = None,
+        source_metadata: dict[str, Any] | None = None,
+        document_segments: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         threshold = options.chunking.chunk_threshold
-        if len(markdown) <= threshold:
-            chunked: dict[str, Any] = {
-                "count":1,
-                "items": [{"text": markdown,"range": [0, len(markdown)]}]
+        if document_segments:
+            # Batch input is one artifact for storage, but remains a sequence of
+            # independent documents for extraction.  Chunk each segment before
+            # combining it so a threshold bypass cannot create a cross-file
+            # chunk (and so all ranges remain offsets into combined markdown).
+            chunks = []
+            for segment in document_segments:
+                text = str(segment["text"])
+                base = int(segment["start"])
+                if len(text) <= threshold:
+                    segment_items = [{"text": text, "range": [0, len(text)]}]
+                else:
+                    segment_items = self.chunking.chunk(text, options.chunking)["items"]
+                segment_metadata = dict(segment.get("metadata") or {})
+                for item in segment_items:
+                    local_start, local_end = item["range"]
+                    item = dict(item)
+                    item["range"] = [base + local_start, base + local_end]
+                    item["metadata"] = {
+                        **segment_metadata,
+                        **dict(item.get("metadata") or {}),
+                    }
+                    chunks.append(item)
+            chunked = {"count": len(chunks), "items": chunks}
+        elif len(markdown) <= threshold:
+            chunked = {
+                "count": 1,
+                "items": [{"text": markdown, "range": [0, len(markdown)]}],
             }
             chunks = chunked["items"]
         else:
             chunked = self.chunking.chunk(markdown, options.chunking)
             chunks = chunked["items"]
+        for item in chunks:
+            item_metadata = dict(source_metadata or {})
+            item_metadata.update(dict(item.get("metadata") or {}))
+            item["metadata"] = item_metadata
         logger.info(
             "[知识沉淀] 切片完成: count=%d 总字符=%d threshold=%d",
             len(chunks),
@@ -426,7 +456,11 @@ class KnowledgePrecipitationService:
             extracted_batch = self.extraction.extract(
                 ontology=ontology,
                 items=[
-                    TextChunk(text=item["text"], ranges=item["range"])
+                    TextChunk(
+                        text=item["text"],
+                        ranges=item["range"],
+                        metadata=item.get("metadata") or {},
+                    )
                     for item in chunks
                 ],
                 model=options.extraction.model,
@@ -453,6 +487,7 @@ class KnowledgePrecipitationService:
                 "relationships_extracted": relationship_count,
                 "attempts": extracted_batch.attempts,
                 "scheduler": extracted_batch.scheduler,
+                "quality": extracted_batch.quality or {},
             }
             logger.info(
                 "[知识沉淀] 抽取完成: model=%s nodes=%d relationships=%d merge=%s attempts=%d",
@@ -519,6 +554,7 @@ class KnowledgePrecipitationService:
                         "index": item["index"],
                         "text": item["text"],
                         "range": chunks[item["index"]]["range"],
+                        "metadata": chunks[item["index"]].get("metadata") or {},
                         "summary": item["summary"],
                     }
                     for item in summaries
@@ -699,6 +735,13 @@ class KnowledgePrecipitationService:
             return self._run_pipeline(
                 markdown, stem, request.ontology, request.options, origin, started, stats,
                 recorder=recorder,
+                source_metadata={
+                    "document_id": file_name,
+                    "source_file": file_name,
+                    "source_type": parsed["file_type"],
+                    "signal_source": "parser",
+                    "source_sheets": (parsed.get("parser") or {}).get("sheets") or [],
+                },
             )
         except CapabilityError as exc:
             partial = None
@@ -712,34 +755,36 @@ class KnowledgePrecipitationService:
             raise PipelineError(ErrorCode.INVALID_REQUEST, "至少需要上传一个文件", "validation")
 
         started = datetime.now()
-        file_parsed: list[tuple[str, dict[str, Any]]] = []
+        file_parsed: list[tuple[int, str, dict[str, Any]]] = []
 
         max_workers = min(len(request.files), os.cpu_count() or 4)
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             future_to_file = {
-                pool.submit(self.parsing.parse, f.file_name, f.content, request.options.parser): f
-                for f in request.files
+                pool.submit(self.parsing.parse, f.file_name, f.content, request.options.parser): (index, f)
+                for index, f in enumerate(request.files)
             }
             for future in as_completed(future_to_file):
-                f = future_to_file[future]
+                index, f = future_to_file[future]
                 try:
                     parsed = future.result()
                 except CapabilityError as exc:
                     raise PipelineError(
                         exc.code, f"文件 {f.file_name} 解析失败: {exc.info}", exc.stage, exc.details
                     ) from exc
-                file_parsed.append((f.file_name, parsed))
+                file_parsed.append((index, f.file_name, parsed))
 
-        file_parsed.sort(key=lambda x: x[0])
+        # Keep the historical filename ordering for distinct names, but make
+        # repeated names stable according to the request order.
+        file_parsed.sort(key=lambda x: (x[1], x[0]))
 
-        name_to_size = {f.file_name: len(f.content) for f in request.files}
+        size_by_index = {index: len(file.content) for index, file in enumerate(request.files)}
         combined_parts: list[str] = []
         file_stats: list[dict[str, Any]] = []
-        for file_name, parsed in file_parsed:
+        for input_index, file_name, parsed in file_parsed:
             combined_parts.append(f"\n## 文件: {file_name}\n\n{parsed['markdown']}")
             file_stats.append({
                 "file_name": file_name,
-                "file_size": name_to_size.get(file_name, 0),
+                "file_size": size_by_index.get(input_index, 0),
                 "file_type": Path(file_name).suffix.lower().lstrip("."),
                 "content_length": parsed["content_length"],
                 "parser": parsed["parser"],
@@ -747,6 +792,36 @@ class KnowledgePrecipitationService:
 
         # 本体原文只在抽取阶段打一次（见 _run_pipeline），这里不再重复。
         combined_markdown = "\n".join(combined_parts)
+        # Resolve offsets after joining, rather than reconstructing them from
+        # parser lengths: the synthetic batch header and join newlines are part
+        # of the public combined Markdown/range contract.
+        document_segments: list[dict[str, Any]] = []
+        cursor = 0
+        for (input_index, file_name, parsed), part in zip(file_parsed, combined_parts):
+            start = combined_markdown.find(part, cursor)
+            if start < 0:  # defensive; parts were used to build this string
+                raise PipelineError(ErrorCode.INVALID_REQUEST, "批量文档边界定位失败", "chunking")
+            end = start + len(part)
+            cursor = end
+            # The request index is part of the internal ID so duplicate names,
+            # and names that already contain a ``#2`` suffix, cannot collide.
+            document_id = f"batch-{input_index + 1}:{file_name}"
+            source_type = Path(file_name).suffix.lower().lstrip(".")
+            document_segments.append(
+                {
+                    "text": part,
+                    "start": start,
+                    "end": end,
+                    "metadata": {
+                        "document_id": document_id,
+                        "source_file": file_name,
+                        "source_type": "batch",
+                        "source_file_type": source_type,
+                        "signal_source": "parser",
+                        "source_sheets": (parsed.get("parser") or {}).get("sheets") or [],
+                    },
+                }
+            )
         logger.info(
             "[知识沉淀] 批量解析完成: files=%d combined=%d字符 sha256=%s",
             len(request.files),
@@ -802,6 +877,12 @@ class KnowledgePrecipitationService:
         result = self._run_pipeline(
             combined_markdown, combined_stem, request.ontology, request.options, origin, started, stats,
             recorder=recorder,
+            source_metadata={
+                "source_type": "batch",
+                "signal_source": "parser",
+                "source_files": [item["file_name"] for item in file_stats],
+            },
+            document_segments=document_segments,
         )
         # Augment summary with file count
         fc = len(request.files)

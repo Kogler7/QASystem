@@ -130,7 +130,45 @@ def test_v1_graph_extraction_preserves_input_order(protocol_module):
     assert "ranges" not in body["data"]
 
 
-def test_v1_graph_extraction_rejects_chunk_ranges(protocol_module):
+def test_v1_all_failed_extraction_returns_error_and_failed_execution(protocol_module, monkeypatch, tmp_path):
+    from backend.app.execution import api
+    from backend.app.execution.artifacts import ArtifactStore
+    from backend.app.execution.hub import ExecutionEventHub
+    from backend.app.execution.manager import ExecutionManager
+    from backend.app.execution.store import MemoryExecutionStore
+    from backend.app.services import algorithm_capabilities
+
+    store = MemoryExecutionStore()
+    manager = ExecutionManager(store=store, hub=ExecutionEventHub(store), artifacts=ArtifactStore(tmp_path))
+    monkeypatch.setattr(api, "get_execution_manager", lambda: manager)
+    monkeypatch.delenv("KG_EXTRACT_STRICT_CHUNK_FAILURES", raising=False)
+    monkeypatch.setattr(algorithm_capabilities, "extract_chunks", lambda **_kwargs: [{
+        "index": 0, "error": "request failed", "error_code": "LLM_REQUEST_FAILED", "attempts": [],
+        "graph": {"nodes": [], "relationships": []},
+    }])
+
+    response = TestClient(protocol_module.app).post(
+        "/api/v1/graphs/extract", json={"ontology": "class Term", "items": [{"text": "A"}]},
+    )
+    body = response.json()
+    assert response.status_code == 502
+    assert body["code"] == 4001
+    assert body["error"]["type"] == "LLM_REQUEST_FAILED"
+    assert body["execution"]["status"] == "failed"
+    assert store.get_job(body["execution"]["job_id"])["status"] == "failed"
+
+
+def test_v1_graph_extraction_forwards_chunk_ranges(protocol_module, monkeypatch):
+    from backend.app.services import algorithm_capabilities
+
+    captured = {}
+    original = algorithm_capabilities.extract_chunks
+
+    def extract_with_capture(**kwargs):
+        captured.update(kwargs)
+        return original(**kwargs)
+
+    monkeypatch.setattr(algorithm_capabilities, "extract_chunks", extract_with_capture)
     response = TestClient(protocol_module.app).post(
         "/api/v1/graphs/extract",
         json={
@@ -138,7 +176,8 @@ def test_v1_graph_extraction_rejects_chunk_ranges(protocol_module):
             "items": [{"text": "A", "ranges": [0, 1]}],
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert captured["ranges"] == [[0, 1]]
 
 
 def test_v1_graph_embeddings_use_stable_serialization(protocol_module):
@@ -255,6 +294,10 @@ def test_precipitation_without_ontology_uses_unstructured_summary(protocol_modul
             "text": "# 测试文档\n测试内容",
             "range": [0, len("# 测试文档\n测试内容")],
             "summary": "摘要",
+            "metadata": {
+                "document_id": "sample.csv", "source_file": "sample.csv", "source_type": "csv",
+                "signal_source": "parser", "source_sheets": [],
+            },
         }
     ]
     assert body["data"]["stats"]["extraction"]["mode"] == "unstructured"
@@ -420,7 +463,7 @@ def test_pipeline_reports_file_service_failure(protocol_module, monkeypatch):
     assert body["error"]["type"] == "FILE_SERVICE_FAILED"
 
 
-def test_pipeline_reports_vector_store_failure_with_extraction_partial_data(protocol_module, monkeypatch):
+def test_pipeline_preserves_extraction_and_reports_vector_store_failure(protocol_module, monkeypatch):
     from backend.app.services import knowledge_precipitation as pipeline_module
 
     monkeypatch.setenv("FILE_SERVICE_URL", "https://files.example")
@@ -435,14 +478,16 @@ def test_pipeline_reports_vector_store_failure_with_extraction_partial_data(prot
         data={"ontology": "class Term"},
     )
     body = response.json()
-    assert response.status_code == 502
-    assert body["code"] == 7001
-    assert body["error"]["type"] == "VECTOR_STORE_FAILED"
+    assert response.status_code == 200
+    assert body["code"] == 0
+    assert body["error"] is None
+    assert body["data"]["stats"]["storage"]["vector_error"]["code"] == "VECTOR_STORE_FAILED"
+    assert body["data"]["artifacts"]["vector_ids"] is None
     assert body["data"]["artifacts"]["markdown"]["id"] == "id-sample.md"
     assert body["data"]["extraction"]["graph"] == {"nodes": [], "relationships": []}
 
 
-def test_pipeline_rejects_vector_id_count_mismatch(protocol_module, monkeypatch):
+def test_pipeline_reports_vector_id_count_mismatch_without_publishing_invalid_ids(protocol_module, monkeypatch):
     from backend.app.services import knowledge_precipitation as pipeline_module
 
     monkeypatch.setenv("FILE_SERVICE_URL", "https://files.example")
@@ -457,10 +502,11 @@ def test_pipeline_rejects_vector_id_count_mismatch(protocol_module, monkeypatch)
         data={"ontology": "class Term"},
     )
     body = response.json()
-    assert response.status_code == 502
-    assert body["code"] == 7002
-    assert body["error"]["type"] == "VECTOR_ID_COUNT_MISMATCH"
-    assert body["error"]["retryable"] is False
+    assert response.status_code == 200
+    assert body["code"] == 0
+    assert body["error"] is None
+    assert body["data"]["stats"]["storage"]["vector_error"]["code"] == "VECTOR_ID_COUNT_MISMATCH"
+    assert body["data"]["artifacts"]["vector_ids"] is None
 
 
 def test_deprecated_pipeline_accepts_v1_structured_options(protocol_module):
