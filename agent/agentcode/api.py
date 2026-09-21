@@ -41,13 +41,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import task_store
 from .adapter import _default_mcp_path
-from .models import SessionConfig, StreamEvent, StreamFirstEvent
+from .identity import caller_identity, identity_matches
+from .models import HistoryMessage, SessionConfig, StreamEvent, StreamFirstEvent
 from .pool import ToolManagerPool
 from .skillsets.loader import SkillLoader
 from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
@@ -110,7 +111,7 @@ def _start_workers() -> None:
 
     # ── 创建 ToolManager 连接池 ──
     base_config: SessionConfig = build_config_from_mcp_json(mcp_path)
-    _worker_pool = ToolManagerPool(size=_WORKER_POOL_SIZE, config=base_config)
+    _worker_pool = ToolManagerPool(size=_WORKER_POOL_SIZE, config=base_config, include_shell=False)
     _worker_pool.start()
     logger.info("API worker: pool %d/%d 就绪", _worker_pool.stats()["total"], _WORKER_POOL_SIZE)
 
@@ -176,6 +177,17 @@ class QueryRequest(BaseModel):
     max_turns: int = Field(default=50, ge=1, le=500)
     max_tool_calls: int = Field(default=70, ge=0, le=2000)
     max_time_s: int = Field(default=1200, ge=1, le=86_400)
+    history: list[HistoryMessage] = Field(default_factory=list, max_length=40)
+
+
+_SENSITIVE_REQUEST_KEYS = {"authorization", "headers", "cookie", "cookies"}
+_USER_CONTEXT_HEADERS = {
+    "authorization",
+    "x-user-id",
+    "x-user-name",
+    "x-tenant-id",
+    "x-user-roles",
+}
 
 
 def _request_data(req: QueryRequest) -> dict[str, Any]:
@@ -187,7 +199,57 @@ def _request_data(req: QueryRequest) -> dict[str, Any]:
                 400,
                 "per-request mcp_config_path is unsupported; configure AGENT_MCP_CONFIG at service startup",
             )
-    return req.model_dump(exclude={"mcp_config_path"})
+    data = req.model_dump(exclude={"mcp_config_path"})
+    return {key: value for key, value in data.items() if key.lower() not in _SENSITIVE_REQUEST_KEYS}
+
+
+def _user_headers(request: Request) -> dict[str, str]:
+    return {
+        key.lower(): value
+        for key, value in request.headers.items()
+        if key.lower() in _USER_CONTEXT_HEADERS and value
+    }
+
+
+def _enqueue_query(req: QueryRequest, request: Request) -> tuple[str, int]:
+    task_id = uuid.uuid4().hex
+    request_data = _request_data(req)
+    headers = _user_headers(request)
+    auth_id = None
+    if headers:
+        auth_id = task_store.save_auth_context(task_id, headers)
+        request_data["auth_context_id"] = auth_id
+    try:
+        position = task_store.enqueue(
+            task_id, request_data, owner=caller_identity(headers)
+        )
+    except Exception:
+        if auth_id:
+            task_store.delete_auth_context(auth_id)
+        raise
+    from .stream_broker import get_broker
+    get_broker().create_task(task_id)
+    return task_id, position
+
+
+def _sse_event(event: dict[str, Any]) -> str:
+    event_id = event.pop("_event_id", None)
+    event_type = event.get("type", "")
+    if event_type == "heartbeat":
+        return str(StreamFirstEvent(type="heartbeat"))
+    event_data = {k: v for k, v in event.items() if k != "type"}
+    return str(StreamEvent(type=event_type, data=event_data, event_id=event_id))
+
+
+def _require_task_access(task_id: str, request: Request) -> dict[str, Any]:
+    info = task_store.get(task_id)
+    if info is None:
+        raise HTTPException(404, f"task not found: {task_id}")
+    owner = task_store.get_owner(task_id)
+    incoming = caller_identity(_user_headers(request))
+    if not identity_matches(owner, incoming):
+        raise HTTPException(404, f"task not found: {task_id}")
+    return info
 
 class TaskResponse(BaseModel):
     task_id: str
@@ -229,27 +291,24 @@ async def health():
     }
 
 @app.post("/v1/query")
-async def query(req: QueryRequest):
+async def query(req: QueryRequest, request: Request):
     """提交异步任务：入队后立刻返回 task_id，不等待 Agent 执行完成。
 
     返回 202 Accepted + task_id，客户端后续轮询 GET /v1/task/{task_id}。
     """
-    task_id = uuid.uuid4().hex
-    request_data = _request_data(req)
     try:
-        position = task_store.enqueue(task_id, request_data)
+        task_id, position = _enqueue_query(req, request)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(503, f"task_store unavailable: {exc}")
-    # 预建 StreamBroker 队列，确保 Worker 的 publish 不丢消息
-    from .stream_broker import get_broker
-    get_broker().create_task(task_id)
     return JSONResponse(
         status_code=202,
         content={"task_id": task_id, "status": "queued", "queue_position": position},
     )
 
 @app.post("/v1/query/wait")
-async def query_wait(req: QueryRequest, stream: bool = False):
+async def query_wait(req: QueryRequest, request: Request, stream: bool = False):
     """提交任务并等待结果。
 
     默认行为（stream=false）：入队后每 2 秒轮询，完成/失败后一次性返回完整 JSON。
@@ -257,28 +316,21 @@ async def query_wait(req: QueryRequest, stream: bool = False):
 
     查询参数: ?stream=true  开启 SSE 流式
     """
-    task_id = uuid.uuid4().hex
-    request_data = _request_data(req)
     try:
-        position = task_store.enqueue(task_id, request_data)
+        task_id, position = _enqueue_query(req, request)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(503, f"task_store unavailable: {exc}")
 
-    # ── SSE 流式模式 ──
     if stream:
         from .stream_broker import get_broker
         broker = get_broker()
-        broker.create_task(task_id)
 
         async def _generator():
             yield str(StreamFirstEvent(type="status", task_id=task_id, status="queued", queue_position=position))
             async for event in broker.subscribe(task_id):
-                if event.get("type") == "heartbeat":
-                    yield str(StreamFirstEvent(type="heartbeat"))
-                else:
-                    event_type = event["type"]
-                    event_data = {k: v for k, v in event.items() if k != "type"}
-                    yield str(StreamEvent(type=event_type, data=event_data))
+                yield _sse_event(event)
 
         return StreamingResponse(
             _generator(),
@@ -286,7 +338,6 @@ async def query_wait(req: QueryRequest, stream: bool = False):
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
 
-    # ── 阻塞轮询模式 ──
     import time as _time
     deadline = _time.time() + req.max_time_s + 120
     while _time.time() < deadline:
@@ -300,21 +351,15 @@ async def query_wait(req: QueryRequest, stream: bool = False):
     raise HTTPException(504, f"task timed out after {req.max_time_s + 120}s")
 
 @app.get("/v1/task/{task_id}")
-async def get_task(task_id: str):
-    """查询任务当前状态和结果。
-
-    状态：queued → running → completed / failed
-    完成后 result 字段包含 payload + spent。
-    """
-    info = task_store.get(task_id)
-    if info is None:
-        raise HTTPException(404, f"task not found: {task_id}")
-    return info
+async def get_task(task_id: str, request: Request):
+    """查询任务当前状态和结果。"""
+    return _require_task_access(task_id, request)
 
 
 @app.post("/v1/task/{task_id}/cancel")
-async def cancel_task(task_id: str):
+async def cancel_task(task_id: str, request: Request):
     """Request cooperative cancellation for a queued or running task."""
+    _require_task_access(task_id, request)
     info = task_store.cancel(task_id)
     if info is None:
         raise HTTPException(404, f"task not found: {task_id}")
@@ -325,39 +370,24 @@ async def cancel_task(task_id: str):
     return info
 
 @app.get("/v1/task/{task_id}/stream")
-async def stream_task(task_id: str):
+async def stream_task(task_id: str, request: Request, cursor: str | None = None):
     """SSE 流式订阅任务事件 —— LLM token、工具调用、状态变更实时推送。
 
-    事件类型:
-        token       — LLM 逐 token 输出
-        tool_calls  — LLM 决定调用工具（含工具名+参数）
-        tool_result — 工具执行结果
-        status      — 任务状态变更 (queued/running/completed/failed)
-        error       — 执行错误
-
-    任务完成后连接自动关闭。
+    可用 ``cursor`` 查询参数或 ``Last-Event-ID`` 从头之后续传。
     """
-    # 先检查任务是否存在
-    info = task_store.get(task_id)
-    if info is None:
-        raise HTTPException(404, f"task not found: {task_id}")
+    info = _require_task_access(task_id, request)
+    last_event_id = cursor or request.headers.get("last-event-id")
 
     async def _generator():
-        # 首条：task_store 快照
-        yield str(StreamFirstEvent(type="status", **info))
-
-        if info["status"] in ("completed", "failed", "cancelled"):
-            return
+        if not last_event_id:
+            yield str(StreamFirstEvent(type="status", **info))
+            if info["status"] in ("completed", "failed", "cancelled"):
+                return
 
         from .stream_broker import get_broker
         broker = get_broker()
-        async for event in broker.subscribe(task_id):
-            if event.get("type") == "heartbeat":
-                yield str(StreamFirstEvent(type="heartbeat"))
-            else:
-                event_type = event["type"]
-                event_data = {k: v for k, v in event.items() if k != "type"}
-                yield str(StreamEvent(type=event_type, data=event_data))
+        async for event in broker.subscribe(task_id, last_event_id or "0"):
+            yield _sse_event(event)
 
     return StreamingResponse(
         _generator(),

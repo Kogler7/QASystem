@@ -41,6 +41,11 @@ class BudgetConfig(BaseModel):
     repeat_action_threshold: int = Field(default=10, ge=0, le=10_000)
 
 
+class HistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=20_000)
+
+
 class DeliveryConfig(BaseModel):
     output_schema_id: str
     json_schema: dict[str, Any]
@@ -86,10 +91,12 @@ class StreamEvent(BaseModel):
 
     type: str
     data: dict[str, Any] = Field(default_factory=dict)
+    event_id: str | None = None
 
     def __str__(self) -> str:
         payload = {"type": self.type, **self.data}
-        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        prefix = f"id: {self.event_id}\n" if self.event_id else ""
+        return f"{prefix}data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 class StreamFirstEvent(BaseModel):

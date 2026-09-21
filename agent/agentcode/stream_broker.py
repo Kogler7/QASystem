@@ -33,24 +33,26 @@ class StreamBroker:
 
         task_store.publish_event(task_id, event)
 
-    async def subscribe(self, task_id: str) -> AsyncIterator[dict]:
+    async def subscribe(self, task_id: str, cursor: str = "0") -> AsyncIterator[dict]:
         """Read persisted events in order and emit periodic heartbeats."""
         from . import task_store
 
-        cursor = "0"
         last_heartbeat = time.monotonic()
         while True:
-            events, cursor = await asyncio.to_thread(
+            rows, cursor = await asyncio.to_thread(
                 task_store.get_events, task_id, cursor
             )
-            if events:
-                for event in events:
+            if rows:
+                for event_id, event in rows:
                     event_type = event.get("type", "")
-                    yield event
+                    yield {**event, "_event_id": event_id}
                     if event_type in ("done", "error"):
                         return
                 last_heartbeat = time.monotonic()
                 continue
+            info = task_store.get(task_id)
+            if info and info.get("status") in ("completed", "failed", "cancelled"):
+                return
             if time.monotonic() - last_heartbeat >= 15:
                 yield {"type": "heartbeat"}
                 last_heartbeat = time.monotonic()

@@ -22,6 +22,7 @@ from .adapter import (
     _mcp_tools_to_openai,
     _default_mcp_path,
 )
+from .delivery import answer_v1_delivery
 from .models import BudgetConfig, SessionConfig, SkillRef, ToolPolicy
 from .pool import ToolManagerPool
 from .runtime import AgentRuntime
@@ -278,6 +279,7 @@ def _build_config(
         max_tool_calls=data.get("max_tool_calls", 70),
         max_time_s=data.get("max_time_s", 1200),
     )
+    config.delivery = answer_v1_delivery()
 
     if skill_loader is not None and discovered_refs is not None:
         config.skills = list(config.skills) + discovered_refs
@@ -348,28 +350,52 @@ def _process_one(
                 config, sk_loader = _build_config(
                     request_data, mcp_path, skill_loader, discovered_refs,
                 )
+                user_headers = task_store.load_auth_context(
+                    request_data.get("auth_context_id"), task_id
+                )
 
                 def _on_tool_results(results, elapsed_ms):
                     for r in results:
+                        name = r.get("name", "")
+                        content = r.get("content", "") if not r.get("is_error") else None
                         broker.publish(task_id, {
                             "type": "tool_result",
-                            "name": r.get("name", ""),
+                            "name": name,
                             "is_error": r.get("is_error", False),
-                            "content": r.get("content", "") if not r.get("is_error") else None,
+                            "content": content,
                             "error": r.get("error") if r.get("is_error") else None,
                         })
+                        if (
+                            not r.get("is_error")
+                            and "problem-resolve-path-display" in name
+                            and content
+                        ):
+                            try:
+                                import json as json_mod
+                                path_payload = json_mod.loads(content) if isinstance(content, str) else content
+                            except (TypeError, ValueError):
+                                path_payload = content
+                            broker.publish(task_id, {
+                                "type": "solution_path",
+                                "path": path_payload,
+                            })
 
+                history = request_data.get("history") or []
                 with pool.borrow(timeout=120.0) as tm:
-                    runtime = AgentRuntime(
-                        llm_backend=llm,
-                        tool_manager=tm,
-                        trace_sink=TaskEventTraceSink(task_id),
-                        skill_loader=sk_loader,
-                        on_tool_results=_on_tool_results,
-                    )
-                    result = runtime.run_session(
-                        config, request_data["user_message"], cancel_token=cancel_token
-                    )
+                    with tm.bind_user_headers(user_headers):
+                        runtime = AgentRuntime(
+                            llm_backend=llm,
+                            tool_manager=tm,
+                            trace_sink=TaskEventTraceSink(task_id),
+                            skill_loader=sk_loader,
+                            on_tool_results=_on_tool_results,
+                        )
+                        result = runtime.run_session(
+                            config,
+                            request_data["user_message"],
+                            cancel_token=cancel_token,
+                            history=history,
+                        )
 
                 if result.status == "ok":
                     task_store.update(task_id, "completed", result={
@@ -412,6 +438,9 @@ def _process_one(
                 lease_stop.set()
                 lease_thread.join(timeout=1)
                 broker.publish(task_id, {"type": "done"})
+                info = task_store.get(task_id)
+                if info and info.get("status") in ("completed", "failed", "cancelled"):
+                    task_store.delete_auth_context(request_data.get("auth_context_id"))
 
     finally:
         llm.close()

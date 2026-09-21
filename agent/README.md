@@ -8,11 +8,11 @@ AgentCode 是 QASystem 仓库内的单智能体运行时和后台 Agent 服务�
 
 | 文档 | 适用场景 |
 | --- | --- |
-| [架构设计](docs/架构设计.md) | 理解组件关系、任务状态机、可靠队列、跨进程 SSE 和取消语义 |
-| [开发扩展指南](docs/开发扩展指南.md) | 接入模型、MCP、Skill，修改 Agent loop 或编写测试 |
-| [部署运维指南](docs/部署运维指南.md) | Compose 部署、环境变量、容量规划、监控和故障排查 |
-| [流式接口说明](流式接口说明.md) | 面向调用方的 HTTP、任务状态和 SSE 事件协议 |
-| [接口参考](接口参考.md) | 启动参数、请求字段、响应结构和调用示例 |
+| [接口参考](接口参考.md) | 调用方：HTTP、SSE、`answer-v1` 终稿和错误码 |
+| [架构设计](docs/架构设计.md) | 运行时：任务状态机、队列、SSE 游标、取消和隔离 |
+| [部署运维指南](docs/部署运维指南.md) | Compose、环境变量、容量和排障 |
+| [开发扩展指南](docs/开发扩展指南.md) | 改代码：模型、MCP、Skill、测试 |
+| [图谱求解方法](../docs/智能体知识图谱驱动求解架构.md) | Agent / Skill / 图谱 / MCP 职责（不是 HTTP 协议） |
 
 ## 能力边界
 
@@ -24,7 +24,7 @@ AgentCode 当前负责：
 - 内置 Shell 工具；
 - Skill 发现、按需加载和提示词注入；
 - 工具白名单、轮次/工具次数/墙钟时间预算；
-- JSON Schema 终稿校验；
+- JSON Schema 终稿校验。HTTP 问答固定 `answer-v1`；
 - Redis 或内存任务队列；
 - 后台 Worker、任务取消、任务租约和崩溃恢复；
 - Redis Stream/内存事件日志与 SSE；
@@ -33,7 +33,9 @@ AgentCode 当前负责：
 当前不负责：
 
 - 业务数据库、知识图谱和文档处理的具体实现，这些由 QASystem MCP Server 提供；
-- 跨请求的对话历史持久化。`session_id` 当前用于关联和追踪，不会自动恢复历史消息；
+- 跨请求的对话历史持久化。`session_id` 当前用于关联和追踪，不会自动恢复历史消息；调用方可在请求中传入 `history`；
+- HTTP API 默认不注册 Shell 工具；CLI 仍可使用；
+- 跨用户会话产品。当前并发是不同用户/子公司打到同一套后台的独立任务并行，不共享上下文，但共享队列和 Worker；
 - 独立 Worker CLI。当前 Worker 由 FastAPI lifespan 在每个 API 进程中启动；
 - 通用编码 Agent 所需的结构化文件编辑、Git、持久终端和审批工作流。
 
@@ -51,20 +53,21 @@ docker compose up -d
 
 Compose 会启动：
 
-- `backend`：QASystem HTTP 和 MCP Server，容器内端口 `8000`；
-- `agent`：AgentCode API，默认宿主机端口 `9180`；
-- `redis`：任务、租约和事件流存储。
+- `backend`：QASystem HTTP 和 MCP Server，容器内端口 `8000`，宿主机默认 `8006`；
+- `agent`：AgentCode API，容器内端口 `9180`，Compose 不映射到宿主机，对外经 Backend `/agent` 反代；
+- `redis`：任务、租约、鉴权上下文和事件流存储。
 
 检查服务：
 
 ```bash
-curl http://127.0.0.1:9180/health
+curl http://127.0.0.1:8006/health
+curl http://127.0.0.1:8006/agent/health
 ```
 
 提交任务：
 
 ```bash
-curl -X POST http://127.0.0.1:9180/v1/query \
+curl -X POST http://127.0.0.1:8006/agent/v1/query \
   -H "Content-Type: application/json" \
   -d '{"user_message":"查询知识图谱中的采购指标定义"}'
 ```
@@ -82,14 +85,14 @@ curl -X POST http://127.0.0.1:9180/v1/query \
 查询和取消：
 
 ```bash
-curl http://127.0.0.1:9180/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47
-curl -X POST http://127.0.0.1:9180/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47/cancel
+curl http://127.0.0.1:8006/agent/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47
+curl -X POST http://127.0.0.1:8006/agent/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47/cancel
 ```
 
 订阅流式事件：
 
 ```bash
-curl -N http://127.0.0.1:9180/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47/stream
+curl -N http://127.0.0.1:8006/agent/v1/task/6a97f5f4c4f94db5aeedecbc4c992a47/stream
 ```
 
 ### 本地开发启动

@@ -37,6 +37,7 @@ def test_skills_use_atomic_graph_tools_without_removed_planning_tools():
         "get_plan_from_intent",
     ):
         assert removed_tool not in combined
+    assert "problem-resolve-path-display" in combined
 
 
 def test_skills_require_graph_sourced_business_knowledge_and_solutions():
@@ -51,3 +52,7 @@ def test_skills_require_graph_sourced_business_knowledge_and_solutions():
     assert "禁止自行创造一个替代方案" in problem
     assert "不得自行设计一个业务方案" in execute
     assert "禁止自行设计业务方案冒充图谱方案" in execute
+    assert "answer-v1" in problem
+    assert '"conclusion"' in problem
+    assert '"confidence"' in problem
+    assert "【结论】" in problem and "不要写【结论】" in problem

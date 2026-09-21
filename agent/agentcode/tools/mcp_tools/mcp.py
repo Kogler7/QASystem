@@ -51,10 +51,11 @@ async def connect_single_server(
             - ``"streamable_http"`` / ``"http"`` — 需要 ``url``，可选 ``headers``。
 
     Returns:
-        ``(name, stack, session)`` 三元组：
+        ``(name, stack, session, http_client)``：
         - *stack* — ``AsyncExitStack`` 实例，持有所有传输层上下文。
         - *session* — 已调用 ``initialize()`` 的 ``ClientSession``。
-        连接失败时返回 ``(name, None, None)``。
+        - *http_client* — streamable HTTP 使用的 ``httpx.AsyncClient``，其它传输为 ``None``。
+        连接失败时返回 ``(name, None, None, None)``。
     """
     from contextlib import AsyncExitStack
 
@@ -64,6 +65,7 @@ async def connect_single_server(
     await stack.__aenter__()
 
     try:
+        http_client = None
         transport = (cfg.get("transport") or "streamable_http").strip().lower()
 
         if transport == "stdio":
@@ -136,17 +138,44 @@ async def connect_single_server(
                 "MCP server '%s': unknown transport '%s'", name, transport
             )
             await stack.aclose()
-            return name, None, None
+            return name, None, None, None
 
         session = await stack.enter_async_context(ClientSession(read, write))
         await session.initialize()
         logger.info("MCP server '%s' connected via %s", name, transport)
-        return name, stack, session
+        return name, stack, session, http_client
 
     except Exception:
         logger.exception("MCP server '%s': connection failed", name)
         await stack.aclose()
-        return name, None, None
+        return name, None, None, None
+
+
+def _unpack_connection(item: Any) -> tuple[str, Any, Any, Any]:
+    if not isinstance(item, tuple) or len(item) < 3:
+        name = item[0] if isinstance(item, tuple) and item else "unknown"
+        return str(name), None, None, None
+    name, stack, session = item[0], item[1], item[2]
+    http_client = item[3] if len(item) > 3 else None
+    return name, stack, session, http_client
+
+
+_USER_HEADER_MAP = {
+    "authorization": "Authorization",
+    "x-user-id": "X-User-Id",
+    "x-user-name": "X-User-Name",
+    "x-tenant-id": "X-Tenant-Id",
+    "x-user-roles": "X-User-Roles",
+}
+
+
+def _canonical_user_headers(headers: dict[str, str]) -> dict[str, str]:
+    canonical: dict[str, str] = {}
+    for key, value in headers.items():
+        name = _USER_HEADER_MAP.get(key.lower())
+        if name and value:
+            canonical[name] = value
+    return canonical
 
 
 class MCPToolWrapper:
@@ -169,8 +198,16 @@ class MCPToolWrapper:
         self._sessions: dict[str, Any] = {}
         self._tool_schemas: dict[str, dict] = {}
         self._tool_handlers: dict[str, Any] = {}
+        self._http_clients: list[Any] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._loop_thread: threading.Thread | None = None
+        self._user_header_names = (
+            "Authorization",
+            "X-User-Id",
+            "X-User-Name",
+            "X-Tenant-Id",
+            "X-User-Roles",
+        )
 
     def connect_all(self, servers: list[Any]) -> None:
         """并行连接所有配置的 MCP 服务器。
@@ -226,13 +263,15 @@ class MCPToolWrapper:
                 name, exc = item
                 logger.error("MCP server '%s': connection failed (%s): %s", name, type(exc).__name__, exc)
                 continue
-            name, stack, session = item
+            name, stack, session, http_client = _unpack_connection(item)
             if stack is None or session is None:
                 logger.error("MCP server '%s': connection failed", name)
                 continue
 
             self._stacks[name] = stack
             self._sessions[name] = session
+            if http_client is not None:
+                self._http_clients.append(http_client)
 
             tools = loop.run_until_complete(session.list_tools())
 
@@ -254,6 +293,20 @@ class MCPToolWrapper:
             name="agentcode-mcp-loop",
         )
         self._loop_thread.start()
+
+    def apply_user_headers(self, headers: dict[str, str] | None) -> None:
+        """Bind or clear per-task user context headers on pooled HTTP clients.
+
+        ToolManager is borrowed exclusively for one Agent, so updating the
+        shared httpx client is safe for the duration of that task. Header
+        names follow ``external_services.application.USER_CONTEXT_HEADERS``.
+        """
+        canonical = _canonical_user_headers(headers or {})
+        for client in self._http_clients:
+            for name in self._user_header_names:
+                client.headers.pop(name, None)
+            if canonical:
+                client.headers.update(canonical)
 
     def _convert_schema(self, tool_name: str, mcp_tool: Any) -> dict:
         """将 MCP SDK 返回的 Tool 对象转换为 agent 内部使用的工具描述格式。
@@ -393,6 +446,7 @@ class MCPToolWrapper:
         finally:
             self._stacks.clear()
             self._sessions.clear()
+            self._http_clients.clear()
             self._tool_schemas.clear()
             self._tool_handlers.clear()
             if self._loop:

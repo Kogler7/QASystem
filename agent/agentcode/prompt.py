@@ -6,6 +6,9 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+from .delivery import schema_prompt_text
+from .models import DeliveryConfig
+
 _CST = timezone(timedelta(hours=8))
 
 
@@ -51,7 +54,7 @@ def build_safety_constraints() -> str:
 - Never execute destructive SQL (DROP, TRUNCATE, ALTER TABLE DROP) unless explicitly required and confirmed.
 
 ## Delivery Compliance
-- Your final answer must conform to the delivery schema specified in this session.
+- When this session includes a Delivery Contract, the final assistant message must be JSON that validates against that schema. Do not answer in Markdown headings such as 【结论】.
 - If the schema is not satisfied, you will be prompted to retry. Learn from schema validation errors.
 - Respect the tool execution mode (sequential or parallel) as configured for this session."""
 
@@ -156,32 +159,19 @@ def build_domain_knowledge(skill_loader: Any, skills: list[Any]) -> str:
                   "explore alternative graph paths.")
     lines.append("")
 
-    # ── skill 内容注入 ──
+    # ── skill 元数据：正文按需通过 Skill 工具加载，不预注入 ──
     if skill_loader and skills:
         metadata_text = skill_loader.build_metadata_text(skills)
         if metadata_text:
-            lines.append("## Available Skills")
-            lines.append("")
-            lines.append("You have a `Skill` tool that loads step-by-step instructions "
-                          "for specific task types. When a relevant Skill exists, "
-                          "call it BEFORE using other tools.")
-            lines.append("")
             lines.append(metadata_text)
             lines.append("")
-
-        skill_layers = skill_loader.resolve(skills)
-        all_skill_content: list[str] = []
-        all_skill_content.extend(skill_layers.get("system", []))
-        all_skill_content.extend(skill_layers.get("developer", []))
-        all_skill_content.extend(skill_layers.get("task", []))
-        if all_skill_content:
-            lines.append("## Skill Instructions")
+            lines.append(
+                "Skill bodies are not inlined in this prompt. When a Skill applies, "
+                "call the `Skill` tool with its id and follow the returned instructions "
+                "before using other tools."
+            )
             lines.append("")
-            for content in all_skill_content:
-                lines.append(content)
-                lines.append("")
     elif skills:
-        # 没有 skill_loader 但有 skills 列表时，仅打印 metadata
         lines.append("## Available Skills")
         lines.append("")
         for s in skills:
@@ -189,8 +179,32 @@ def build_domain_knowledge(skill_loader: Any, skills: list[Any]) -> str:
             desc = getattr(s, 'description', '')
             lines.append(f"- **{name}**: {desc}")
         lines.append("")
+        lines.append(
+            "Call the `Skill` tool to load full instructions before following a Skill."
+        )
+        lines.append("")
 
     return "\n".join(lines)
+
+
+# ============================================================================
+# 模块 4b: 终稿 JSON 契约
+# ============================================================================
+def build_delivery_contract(delivery: DeliveryConfig | None) -> str:
+    if delivery is None:
+        return ""
+    return f"""# Delivery Contract
+
+When you are ready to finish (no further tool calls), the assistant message MUST be a single JSON object that validates against the schema below.
+
+- Output only that JSON object. A ```json fence is allowed; no other prose.
+- `confidence` must be exactly `high`, `medium`, or `low` (not 高/中/低).
+- If the evidence gate fails, still return this JSON: `confidence` is `low`, `gaps` is non-empty, and `evidence` / `charts` / `solution_path` may be empty arrays.
+- `charts[].path` is the path returned by `draw_*` tools. Use `[]` when there is no chart.
+- `solution_path` is the template step list already shown via `problem-resolve-path-display`. Use `[]` when that tool was not called.
+
+{schema_prompt_text(delivery)}
+"""
 
 
 # ============================================================================
@@ -215,15 +229,17 @@ def build_system_prompt(
     tool_manager: Any,
     skill_loader: Any,
     skills: list[Any],
+    delivery: DeliveryConfig | None = None,
 ) -> str:
     """整合各模块提示词，返回完整的系统提示词。
 
-    按 Claude Code 风格组装：基础行为规范 → 安全约束 → 工具使用 → 领域知识 → 任务管理 → 环境上下文。
+    按 Claude Code 风格组装：基础行为规范 → 安全约束 → 工具使用 → 领域知识 → 交付契约 → 环境上下文。
 
     Args:
         tool_manager: ToolManager 实例，用于获取工具列表和描述。
         skill_loader: SkillLoader 实例，用于解析和加载 skill 内容。
         skills: SkillRef 列表，当前会话启用的 skills。
+        delivery: 可选终稿 JSON Schema；HTTP Worker 固定为 answer-v1。
 
     Returns:
         完整的系统提示词字符串。
@@ -233,6 +249,7 @@ def build_system_prompt(
         build_safety_constraints(),
         build_tool_usage(tool_manager),
         build_domain_knowledge(skill_loader, skills),
+        build_delivery_contract(delivery),
         build_environment(),
     ]
-    return "\n\n".join(modules)
+    return "\n\n".join(module for module in modules if module)

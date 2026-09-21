@@ -43,11 +43,12 @@ class ToolManagerPool:
             runtime.run_session(...)
     """
 
-    def __init__(self, size: int, config: SessionConfig):
+    def __init__(self, size: int, config: SessionConfig, include_shell: bool = False):
         if size < 1:
             raise ValueError("pool size must be >= 1")
         self._size = size
         self._config = config
+        self._include_shell = include_shell
         self._slots: list[_Slot] = []
         self._cond = threading.Condition()
         self._closed = False
@@ -57,7 +58,7 @@ class ToolManagerPool:
 
         def _init_one(idx: int) -> tuple[int, ToolManager | None]:
             try:
-                return idx, ToolManager(config=self._config)
+                return idx, ToolManager(config=self._config, include_shell=self._include_shell)
             except Exception as e:
                 logger.error("ToolManagerPool[%d]: 创建失败: %s", idx, e)
                 return idx, None
@@ -105,6 +106,10 @@ class ToolManagerPool:
             slot.error_count += 1
             raise
         finally:
+            try:
+                slot.tm.bind_user_headers({})
+            except Exception:
+                pass
             with self._cond:
                 slot.in_use = False
                 self._cond.notify_all()
