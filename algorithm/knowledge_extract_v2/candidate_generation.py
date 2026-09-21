@@ -17,6 +17,8 @@ from typing import Any
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import canonical_name
+from .jev_client import partition_relation_pairs
+from .llm_client import thinking_enabled_for
 from .ontology_compiler import ExtractionPlan
 from .ontology_schema import OntologySchema
 from .prompt_router import ChatMessages, DocumentRoute, build_chat_messages
@@ -27,7 +29,9 @@ from .structured_output import validate_json_schema
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
 MAX_LOCAL_RELATION_CATALOG = 160
 RELATION_PAIR_BATCH_SIZE = 40
+THINKING_RELATION_PAIR_BATCH_SIZE = 8
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
+MAX_THINKING_LENGTH_TOKENS = 65536
 
 
 def _append_warning(
@@ -333,6 +337,8 @@ def _response_metadata(response: Any) -> dict[str, Any]:
                 "incomplete_details": trace.get("incomplete_details") or {},
                 "usage": trace.get("usage"),
                 "usage_unavailable": bool(trace.get("usage_unavailable", trace.get("usage") is None)),
+                "thinking": trace.get("thinking"),
+                "max_tokens": trace.get("max_tokens"),
             }
     usage = getattr(response, "usage", None)
     status = getattr(response, "status", None)
@@ -345,6 +351,8 @@ def _response_metadata(response: Any) -> dict[str, Any]:
         "incomplete_details": getattr(response, "incomplete_details", {}) or {},
         "usage": usage,
         "usage_unavailable": usage is None,
+        "thinking": getattr(response, "thinking", None),
+        "max_tokens": getattr(response, "max_tokens", None),
     }
 
 
@@ -366,6 +374,13 @@ def _pre_parse_response_error(response: Any) -> tuple[str, str] | None:
     return None
 
 
+def relation_pair_batch_size(llm: Any) -> int:
+    """Use a smaller pair batch when the relation pass spends a thinking budget."""
+    if thinking_enabled_for(llm, "relation"):
+        return THINKING_RELATION_PAIR_BATCH_SIZE
+    return RELATION_PAIR_BATCH_SIZE
+
+
 def _invoke_generation(
     llm: Any,
     schema: dict[str, Any],
@@ -375,20 +390,20 @@ def _invoke_generation(
     chunk_id: str,
     attempt_number: int,
     response_mode: str,
+    run_overrides: dict[str, Any] | None = None,
 ) -> Any:
     structured = getattr(llm, "generate_structured", None)
     if callable(structured):
-        return structured(
-            schema,
-            messages,
-            {
-                "schema_name": f"{pass_name}_candidates",
-                "pass_name": pass_name,
-                "chunk_id": chunk_id,
-                "attempt": attempt_number,
-                "response_mode": response_mode,
-            },
-        )
+        context = {
+            "schema_name": f"{pass_name}_candidates",
+            "pass_name": pass_name,
+            "chunk_id": chunk_id,
+            "attempt": attempt_number,
+            "response_mode": response_mode,
+        }
+        if run_overrides:
+            context.update(run_overrides)
+        return structured(schema, messages, context)
     return llm(messages)
 
 
@@ -412,6 +427,8 @@ def generate_structured(
     collection_name = _array_collection_name(schema)
     recovered_items: list[dict[str, Any]] = []
     largest_invalid_response = 0
+    run_overrides: dict[str, Any] = {}
+    length_retry_stage = ""
     for attempt_number in range(1, resolved_max_attempts + 1):
         started = time.monotonic()
         error_type = ""
@@ -429,6 +446,7 @@ def generate_structured(
                         chunk_id=chunk_id,
                         attempt_number=attempt_number,
                         response_mode=response_mode,
+                        run_overrides=run_overrides or None,
                     )
             else:
                 response = _invoke_generation(
@@ -439,6 +457,7 @@ def generate_structured(
                     chunk_id=chunk_id,
                     attempt_number=attempt_number,
                     response_mode=response_mode,
+                    run_overrides=run_overrides or None,
                 )
             pre_parse_error = _pre_parse_response_error(response)
             if pre_parse_error is not None:
@@ -527,6 +546,9 @@ def generate_structured(
                 "elapsed_seconds": round(time.monotonic() - started, 6),
                 "retryable": retryable,
                 "terminal": False,
+                "thinking": response_metadata.get("thinking"),
+                "max_tokens": response_metadata.get("max_tokens"),
+                "length_retry": length_retry_stage or None,
             }
         )
         _record_call(
@@ -544,6 +566,27 @@ def generate_structured(
         if not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
+        if error_type == "incomplete" and thinking_enabled_for(
+            llm,
+            pass_name,
+            disable_thinking=run_overrides.get("disable_thinking"),
+        ):
+            thinking_max = int(getattr(llm, "thinking_max_tokens", 0) or 32768)
+            default_max = int(getattr(llm, "max_tokens", 0) or 16384)
+            if length_retry_stage != "budget_bump":
+                length_retry_stage = "budget_bump"
+                run_overrides = {
+                    "max_tokens": min(max(thinking_max * 2, thinking_max), MAX_THINKING_LENGTH_TOKENS),
+                }
+            elif length_retry_stage != "disable_thinking":
+                length_retry_stage = "disable_thinking"
+                run_overrides = {
+                    "disable_thinking": True,
+                    "max_tokens": default_max,
+                }
+            else:
+                attempts[-1]["terminal"] = True
+                break
         if error_type in {"json", "schema"}:
             response_size = len(_response_text(response))
             recovery_instruction = ""
@@ -720,6 +763,61 @@ def bind_entity_evidence(
         chunk_ids=chunk_ids,
     )
     return bound.get("entities", [])
+
+
+def _deterministic_relation_quote(
+    pair: dict[str, Any],
+    pool: Any,
+    manager: ChunkContextManager,
+    chunk_id: str,
+) -> Evidence | None:
+    """Ground a Jev-accepted pair to a literal window covering both endpoints."""
+    accepted = getattr(pool, "accepted_entities", None)
+    entities = {entity.candidate_id: entity for entity in (accepted() if callable(accepted) else [])}
+    spans: list[tuple[int, int]] = []
+    for candidate_id, name in (
+        (pair.get("source_id"), pair.get("source_name")),
+        (pair.get("target_id"), pair.get("target_name")),
+    ):
+        entity = entities.get(str(candidate_id or ""))
+        for evidence in getattr(entity, "evidence", ()) or ():
+            if chunk_id not in (getattr(evidence, "source_block_ids", None) or []):
+                continue
+            start = getattr(evidence, "start_char", None)
+            end = getattr(evidence, "end_char", None)
+            if start is not None and end is not None and int(end) > int(start):
+                spans.append((int(start), int(end)))
+                continue
+            quote = str(getattr(evidence, "quote", "") or "")
+            located = locate_quote(manager, quote, chunk_ids=(chunk_id,)) if quote else None
+            if (
+                located is not None
+                and located.start_char is not None
+                and located.end_char is not None
+            ):
+                spans.append((int(located.start_char), int(located.end_char)))
+        if name:
+            found = manager.find_span(chunk_id, str(name))
+            if found is not None:
+                spans.append(found)
+    if not spans:
+        return None
+    quote = manager.evidence_text(
+        chunk_id,
+        min(item[0] for item in spans),
+        max(item[1] for item in spans),
+    )
+    if not quote.strip():
+        return None
+    return locate_quote(manager, quote, chunk_ids=(chunk_id,))
+
+
+def _llm_relation_pairs(pairs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop Jev diagnostic keys before the LLM pair schema sees the batch."""
+    cleaned: list[dict[str, Any]] = []
+    for pair in pairs:
+        cleaned.append({key: value for key, value in pair.items() if key != "judgment"})
+    return cleaned
 
 
 def bind_relation_evidence(
@@ -985,8 +1083,49 @@ def relation_pass(
         if not pairs:
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
         all_relations: list[dict[str, Any]] = []
-        for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE):
-            pair_batch = pairs[offset : offset + RELATION_PAIR_BATCH_SIZE]
+        accepted_pairs, rejected_pairs, gray_pairs = partition_relation_pairs(
+            pairs,
+            chunk_text=chunk.text,
+        )
+        for pair in rejected_pairs:
+            _append_warning(
+                local_warnings,
+                "JEV_RELATION_REJECTED",
+                "Jev 高置信判定当前 chunk 不支持该关系",
+                f"{chunk.chunk_id}.pairs.{pair.get('pair_id')}",
+                pair.get("judgment"),
+            )
+        llm_pairs: list[dict[str, Any]] = []
+        for pair in accepted_pairs:
+            evidence = _deterministic_relation_quote(pair, pool, manager, chunk.chunk_id)
+            if evidence is None:
+                llm_pairs.append(pair)
+                _append_warning(
+                    local_warnings,
+                    "JEV_RELATION_EVIDENCE_FALLBACK",
+                    "Jev 判定成立但无法确定性锚定 quote，回退 LLM",
+                    f"{chunk.chunk_id}.pairs.{pair.get('pair_id')}",
+                    pair.get("judgment"),
+                )
+                continue
+            _append_warning(
+                local_warnings,
+                "JEV_RELATION_ACCEPTED",
+                "Jev 高置信接受关系并由端点 span 锚定证据",
+                f"{chunk.chunk_id}.pairs.{pair.get('pair_id')}",
+                pair.get("judgment"),
+            )
+            all_relations.append({
+                "from_id": pair["source_id"],
+                "to_id": pair["target_id"],
+                "rel_type": pair["relation_id"],
+                "evidence": evidence.to_dict(),
+                "judgment": pair.get("judgment"),
+            })
+        llm_pairs.extend(gray_pairs)
+        pair_batch_size = relation_pair_batch_size(llm)
+        for offset in range(0, len(llm_pairs), pair_batch_size):
+            pair_batch = _llm_relation_pairs(llm_pairs[offset : offset + pair_batch_size])
             output_schema = relation_pair_decision_schema(pair_batch)
             messages = build_chat_messages(
                 task="relation",
@@ -1005,7 +1144,7 @@ def relation_pass(
                 use_scheduler=use_scheduler,
                 attempts=local_attempts,
                 pass_name="relation",
-                chunk_id=f"{chunk.chunk_id}.batch-{offset // RELATION_PAIR_BATCH_SIZE}",
+                chunk_id=f"{chunk.chunk_id}.batch-{offset // pair_batch_size}",
                 max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=local_call_metrics,
@@ -1041,6 +1180,7 @@ def relation_pass(
                 all_relations.append({
                     "from_id": pair["source_id"], "to_id": pair["target_id"],
                     "rel_type": label, "evidence": evidence.to_dict(),
+                    "judgment": {"source": "llm_thinking" if thinking_enabled_for(llm, "relation") else "llm"},
                 })
         return chunk.chunk_id, all_relations, local_attempts, local_warnings, local_call_metrics
 
@@ -1109,6 +1249,7 @@ __all__ = [
     "generate_structured",
     "output_schema_for_types",
     "relation_catalog_for_context",
+    "relation_pair_batch_size",
     "relation_pair_decision_schema",
     "relation_pass",
 ]

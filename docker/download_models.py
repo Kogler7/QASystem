@@ -13,6 +13,7 @@ MINERU_VLM_DIR = MODELS_DIR / "mineru" / "vlm"
 EMBEDDING_MODELS = {
     "bge_small_zh": ("BAAI/bge-small-zh-v1.5", MODELS_DIR / "bge-small-zh-v1.5"),
 }
+JEV_MODEL = ("com-kotobalabs/open-jev-deberta-v3-large", MODELS_DIR / "open-jev-deberta-v3-large")
 
 MINERU_REPOSITORIES = {
     "huggingface": {
@@ -47,6 +48,14 @@ def _download_embedding_models() -> None:
         snapshot_download(repo_id=repository, local_dir=destination)
 
 
+def _download_jev_model() -> None:
+    from huggingface_hub import snapshot_download
+
+    repository, destination = JEV_MODEL
+    destination.mkdir(parents=True, exist_ok=True)
+    snapshot_download(repo_id=repository, local_dir=destination)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", choices=tuple(MINERU_REPOSITORIES), default="modelscope")
@@ -54,6 +63,11 @@ def main() -> None:
     parser.add_argument("--skip-mineru-pipeline", action="store_true")
     parser.add_argument("--skip-mineru-vlm", action="store_true")
     parser.add_argument("--skip-embedding", action="store_true")
+    parser.add_argument(
+        "--jev",
+        action="store_true",
+        help="Download the local Jev-shaped classifier into /models/open-jev-deberta-v3-large",
+    )
     args = parser.parse_args()
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,6 +81,8 @@ def main() -> None:
         _download_mineru(args.source, "vlm", MINERU_VLM_DIR)
     if not args.skip_embedding:
         _download_embedding_models()
+    if args.jev:
+        _download_jev_model()
 
     expected = {
         "Docling": DOCLING_DIR,
@@ -80,6 +96,9 @@ def main() -> None:
         "MinerU VLM": args.skip_mineru_vlm,
         "BGE-small-zh": args.skip_embedding,
     }
+    if args.jev:
+        expected["Jev"] = JEV_MODEL[1]
+        skipped["Jev"] = False
     for name, path in expected.items():
         if not skipped[name] and not any(path.iterdir()):
             raise RuntimeError(f"{name} model download produced no files: {path}")
