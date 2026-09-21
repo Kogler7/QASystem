@@ -175,12 +175,33 @@ python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw�
 
 ### 看结果
 
-每次运行写入 `_runs/<时间戳>/`：
+每次运行写入 `_runs/<时间戳>/`，不会覆盖 `extract/golden.json`。目录已 gitignore。
 
-- `summary.json`：各 case 后台抽取模块（以及可选沉淀 / 插件）的状态与 P/R/F1/Acc
-- `<类型>/<case>/`：`document.md`、`chunks.json`、`backend_extract.json`、`scores.json`；加 `--system` 才有 `backend_system_*.json`
+```text
+_runs/<YYYYMMDD-HHMMSS>/
+  params.yaml                 # 本次拷贝的评测参数
+  params.resolved.json        # 解析后的地址 / 阶段 / 评分口径
+  summary.json                # 整次运行总览：状态、P/R/F1、耗时
+  <类型>/<case>/
+    parse_<文件名>.json       # 后台解析接口回包
+    document.md               # 拼好的 Markdown
+    chunks.json               # 切片回包
+    backend_extract.json      # 后台抽取回包（预测图在 data 里）
+    scores.json               # 该 case 状态、分数、各步耗时
+    backend_system_<文件>.json  # 仅 --system：沉淀流水线回包
+    plugin_extract.json       # 仅插件阶段：MCP 抽图结果
+    plugin_error.json         # 仅插件失败时
+```
 
-终端默认打印后台抽取总览；加 `--system` / `--stage plugin|all` 时再打印对应行。
+| 文件 | 看什么 |
+| --- | --- |
+| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时 |
+| `scores.json` | 单案明细。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长） |
+| `document.md` | 解析结果，便于对照原文 |
+| `chunks.json` | 实际送进抽取的切片 |
+| `backend_extract.json` | 生产接口原样回包，排抽取失败或图结构时用 |
+
+终端默认只打后台抽取：P/R/F1/Acc 与 标准/抽出/对上/多抽/漏抽（实体、关系分行）。未跑的插件、沉淀不出现在总览里；加 `--system` 或 `--stage plugin|all` 才打印对应块。case 日志同样按步输出耗时和抽取计数。
 
 ### 加 case
 

@@ -83,6 +83,23 @@ def log(message: str) -> None:
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
 
+def elapsed_seconds(started: float) -> float:
+    return round(time.perf_counter() - started, 3)
+
+
+def format_duration(seconds: float | None) -> str:
+    if seconds is None:
+        return "-"
+    value = max(0.0, float(seconds))
+    if value < 60:
+        return f"{value:.1f}s"
+    minutes, rest = divmod(value, 60)
+    if minutes < 60:
+        return f"{int(minutes)}m{rest:04.1f}s"
+    hours, rest_m = divmod(int(minutes), 60)
+    return f"{hours}h{rest_m}m{rest:.0f}s"
+
+
 def load_env_file(path: Path) -> None:
     if not path.is_file():
         return
@@ -1416,28 +1433,52 @@ def plugin_extract(
     return {"rpc": rpc_result, "tool": tool, "graph": graph}
 
 
-def format_metrics_line(metrics: dict[str, Any] | None) -> str:
+def _metric_side_lines(label: str, block: dict[str, Any] | None) -> list[str]:
+    item = block or {}
+    return [
+        (
+            f"{label}  P={float(item.get('precision') or 0):.3f}  "
+            f"R={float(item.get('recall') or 0):.3f}  "
+            f"F1={float(item.get('f1') or 0):.3f}  "
+            f"Acc={float(item.get('accuracy') or 0):.3f}"
+        ),
+        (
+            f"     标准={int(item.get('golden') or 0)}  抽出={int(item.get('predicted') or 0)}  "
+            f"对上={int(item.get('tp') or 0)}  多抽={int(item.get('fp') or 0)}  漏抽={int(item.get('fn') or 0)}"
+        ),
+    ]
+
+
+def iter_metrics_lines(metrics: dict[str, Any] | None, *, indent: str = "") -> list[str]:
     if not metrics:
-        return "未评分"
-    ent = metrics.get("entities") or {}
-    rel = metrics.get("relations") or {}
-    mode = metrics.get("match_mode") or ""
-    prefix = f"{mode} " if mode else ""
-    line = (
-        f"{prefix}实体 P={ent.get('precision', 0):.3f} R={ent.get('recall', 0):.3f} "
-        f"F1={ent.get('f1', 0):.3f} Acc={ent.get('accuracy', 0):.3f} "
-        f"关系 P={rel.get('precision', 0):.3f} R={rel.get('recall', 0):.3f} "
-        f"F1={rel.get('f1', 0):.3f} Acc={rel.get('accuracy', 0):.3f}"
-    )
-    identity = metrics.get("identity")
-    if isinstance(identity, dict) and identity.get("entities"):
-        ident_ent = identity.get("entities") or {}
-        ident_rel = identity.get("relations") or {}
-        line += (
-            f" | identity 实体 F1={ident_ent.get('f1', 0):.3f} "
-            f"关系 F1={ident_rel.get('f1', 0):.3f}"
+        return [f"{indent}未评分"]
+    lines = [
+        f"{indent}{line}"
+        for line in (
+            *_metric_side_lines("实体", metrics.get("entities")),
+            *_metric_side_lines("关系", metrics.get("relations")),
         )
-    return line
+    ]
+    identity = metrics.get("identity")
+    if isinstance(identity, dict) and (identity.get("entities") or identity.get("relations")):
+        lines.append(f"{indent}identity 对照")
+        lines.extend(
+            f"{indent}{line}"
+            for line in (
+                *_metric_side_lines("实体", identity.get("entities")),
+                *_metric_side_lines("关系", identity.get("relations")),
+            )
+        )
+    return lines
+
+
+def emit_metrics(header: str, metrics: dict[str, Any] | None) -> None:
+    log(header)
+    if not metrics:
+        print("  未评分", flush=True)
+        return
+    for line in iter_metrics_lines(metrics, indent="  "):
+        print(line, flush=True)
 
 
 def run_backend_case(
@@ -1462,6 +1503,7 @@ def run_backend_case(
     }
     markdown_parts: list[str] = []
     parse_failures: list[dict[str, Any]] = []
+    parse_started = time.perf_counter()
     for source in sources:
         try:
             envelope = parse_document(base_url, source, options, params)
@@ -1476,6 +1518,7 @@ def run_backend_case(
             failed["file"] = source.name
             parse_failures.append(failed)
             log(f"模块 parse 失败 {source.name}: {failed['message']}")
+    parse_elapsed = elapsed_seconds(parse_started)
     markdown = "\n\n".join(markdown_parts)
     items: list[dict[str, Any]] = []
     if markdown.strip():
@@ -1486,7 +1529,9 @@ def run_backend_case(
             "parsed": len(markdown_parts),
             "content_length": len(markdown),
             "failed_files": parse_failures,
+            "elapsed_seconds": parse_elapsed,
         }
+        log(f"模块 parse {result['modules']['parse']['status']} {format_duration(parse_elapsed)}")
     else:
         result["modules"]["parse"] = {
             "status": "failed",
@@ -1494,11 +1539,14 @@ def run_backend_case(
             "parsed": 0,
             "message": "docs/ 全部解析失败或结果为空",
             "failed_files": parse_failures,
+            "elapsed_seconds": parse_elapsed,
         }
         result["modules"]["chunk"] = {"status": "skipped", "message": "解析无可用 Markdown"}
         result["modules"]["extract"] = {"status": "skipped", "message": "解析无可用 Markdown"}
+        log(f"模块 parse 失败 {format_duration(parse_elapsed)}")
 
     if markdown.strip():
+        chunk_started = time.perf_counter()
         try:
             file_name = sources[0].with_suffix(".md").name if sources else "document.md"
             envelope = chunk_document(base_url, markdown, file_name, options, params)
@@ -1510,31 +1558,48 @@ def run_backend_case(
             result["modules"]["chunk"] = {
                 "status": "succeeded",
                 "chunk_count": data.get("count") if data.get("count") is not None else len(items),
+                "elapsed_seconds": elapsed_seconds(chunk_started),
             }
+            log(f"模块 chunk succeeded {format_duration(result['modules']['chunk']['elapsed_seconds'])}")
         except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
             result["modules"]["chunk"] = fail_payload(exc)
-            log(f"模块 chunk 失败: {result['modules']['chunk']['message']}")
+            result["modules"]["chunk"]["elapsed_seconds"] = elapsed_seconds(chunk_started)
+            log(f"模块 chunk 失败 {format_duration(result['modules']['chunk']['elapsed_seconds'])}: {result['modules']['chunk']['message']}")
             items = [{"text": markdown, "range": [0, len(markdown)]}]
 
+        extract_started = time.perf_counter()
         try:
             envelope = extract_graphs(base_url, ontology, items, options, params)
+            extract_elapsed = elapsed_seconds(extract_started)
             write_json(out_dir / "backend_extract.json", envelope)
             graph = extract_graph_from_envelope(envelope)
+            score_started = time.perf_counter()
             metrics = maybe_score(golden, graph, score_ctx)
             result["modules"]["extract"] = {
                 "status": "succeeded",
                 "nodes": len(graph.get("nodes") or []),
                 "relationships": len(graph.get("relationships") or []),
                 "metrics": metrics,
+                "elapsed_seconds": extract_elapsed,
+                "score_elapsed_seconds": elapsed_seconds(score_started),
             }
-            log(f"模块 extract {format_metrics_line(metrics)}")
+            emit_metrics(
+                f"模块 extract {format_duration(extract_elapsed)} "
+                f"评分 {format_duration(result['modules']['extract']['score_elapsed_seconds'])}",
+                metrics,
+            )
         except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
             result["modules"]["extract"] = fail_payload(exc)
-            log(f"模块 extract 失败: {result['modules']['extract']['message']}")
+            result["modules"]["extract"]["elapsed_seconds"] = elapsed_seconds(extract_started)
+            log(
+                f"模块 extract 失败 {format_duration(result['modules']['extract']['elapsed_seconds'])}: "
+                f"{result['modules']['extract']['message']}"
+            )
 
     if run_system:
         graphs: list[dict[str, Any]] = []
         ingest_failures: list[dict[str, Any]] = []
+        system_started = time.perf_counter()
         for source in sources:
             try:
                 envelope = ingest_file(base_url, source, ontology, options, params)
@@ -1545,9 +1610,11 @@ def run_backend_case(
                 failed["file"] = source.name
                 ingest_failures.append(failed)
                 log(f"系统 knowledge-ingestion 失败 {source.name}: {failed['message']}")
+        system_elapsed = elapsed_seconds(system_started)
         if graphs:
             graph = merge_graphs(graphs) if len(graphs) > 1 else graphs[0]
             write_json(out_dir / "backend_system_graph.json", graph)
+            score_started = time.perf_counter()
             metrics = maybe_score(golden, graph, score_ctx)
             result["system"] = {
                 "status": "partial" if ingest_failures else "succeeded",
@@ -1557,14 +1624,21 @@ def run_backend_case(
                 "files": len(sources),
                 "ingested": len(graphs),
                 "failed_files": ingest_failures,
+                "elapsed_seconds": system_elapsed,
+                "score_elapsed_seconds": elapsed_seconds(score_started),
             }
-            log(f"系统 knowledge-ingestion {format_metrics_line(metrics)}")
+            emit_metrics(
+                f"沉淀 knowledge-ingestion {format_duration(system_elapsed)} "
+                f"评分 {format_duration(result['system']['score_elapsed_seconds'])}",
+                metrics,
+            )
         else:
             result["system"] = {
                 "status": "failed",
                 "message": "全部文件知识沉淀失败",
                 "files": len(sources),
                 "failed_files": ingest_failures,
+                "elapsed_seconds": system_elapsed,
             }
     result["markdown"] = markdown
     result["chunk_items"] = []
@@ -1583,24 +1657,34 @@ def run_plugin_case(
     out_dir: Path,
     score_ctx: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     try:
         payload = plugin_extract(
             mcp_url, ontology, markdown, options, params, base_url=base_url
         )
         write_json(out_dir / "plugin_extract.json", payload)
         graph = payload.get("graph") or {"nodes": [], "relationships": []}
+        extract_elapsed = elapsed_seconds(started)
+        score_started = time.perf_counter()
         metrics = maybe_score(golden, graph, score_ctx)
-        log(f"插件 {MCP_TOOL_NAME} {format_metrics_line(metrics)}")
+        score_elapsed = elapsed_seconds(score_started)
+        emit_metrics(
+            f"插件 {MCP_TOOL_NAME} {format_duration(extract_elapsed)} 评分 {format_duration(score_elapsed)}",
+            metrics,
+        )
         return {
             "status": "succeeded",
             "nodes": len(graph.get("nodes") or []),
             "relationships": len(graph.get("relationships") or []),
             "metrics": metrics,
+            "elapsed_seconds": extract_elapsed,
+            "score_elapsed_seconds": score_elapsed,
         }
     except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
         failed = fail_payload(exc)
+        failed["elapsed_seconds"] = elapsed_seconds(started)
         write_json(out_dir / "plugin_error.json", failed)
-        log(f"插件抽取失败: {failed['message']}")
+        log(f"插件抽取失败 {format_duration(failed['elapsed_seconds'])}: {failed['message']}")
         return failed
 
 
@@ -1756,7 +1840,7 @@ def main() -> int:
             if args.match_mode == "llm":
                 log(str(exc))
                 return 1
-            log(f"{exc} 未配置 judge，改用 identity。需要 LLM-judge 时加 --match-mode llm 并设置 KG_EXTRACT_LLM_BASE_URL。")
+            log("未配置 LLM-judge，改用 identity。强制 judge 时加 --match-mode llm 并设置 KG_EXTRACT_LLM_BASE_URL。")
             match_mode = "identity"
             score_ctx["match_mode"] = match_mode
     run_backend = args.stage in {"all", "backend"}
@@ -1775,8 +1859,10 @@ def main() -> int:
             else:
                 labels.extend(f"{group}/{name}" for name in sorted(cases))
         log(f"目标: {', '.join(labels)}")
-    log(f"阶段: {' → '.join(name for name, flag in (('后台', run_backend), ('插件', run_plugin)) if flag)}")
-    log("沉淀: knowledge-ingestion" if args.system else "沉淀: 跳过（停在抽取评分；需要时加 --system）")
+    if run_plugin:
+        log(f"阶段: {'后台 → 插件' if run_backend else '插件'}")
+    if args.system:
+        log("沉淀: knowledge-ingestion")
     if match_mode == "llm":
         judge = score_ctx["judge_client"]
         log(f"评分: LLM-judge model={judge.model} base_url={judge.base_url}")
@@ -1784,6 +1870,7 @@ def main() -> int:
         log("评分: identity（type+name 精确匹配）")
 
     started = datetime.now()
+    run_started = time.perf_counter()
     run_id = started.strftime("%Y%m%d-%H%M%S")
     run_dir = workspace / "_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -1858,6 +1945,7 @@ def main() -> int:
                 "plugin": None,
                 "error": None,
             }
+            case_started = time.perf_counter()
             log(f"开始 {type_dir.name}/{case_dir.name} files={len(sources)} golden={'yes' if golden else golden_reason}")
             if golden and match_mode == "llm":
                 gold_ent, gold_rel = normalize_graph(golden)
@@ -1868,6 +1956,7 @@ def main() -> int:
                     )
             if not sources:
                 record["error"] = "docs/ 中没有原文件"
+                record["elapsed_seconds"] = elapsed_seconds(case_started)
                 summary["cases"].append(record)
                 summary["failed"] += 1
                 continue
@@ -1875,6 +1964,7 @@ def main() -> int:
                 ontology = read_ontology(resolve_ontology_path(workspace, type_dir, case_dir, group_cfg))
             except Exception as exc:  # noqa: BLE001 - 单个 case 失败后继续
                 record["error"] = str(exc)
+                record["elapsed_seconds"] = elapsed_seconds(case_started)
                 summary["cases"].append(record)
                 summary["failed"] += 1
                 log(f"读取本体失败: {exc}")
@@ -1940,13 +2030,17 @@ def main() -> int:
                 summary["unscored"] += 1
             failed = stage_failed(record.get("backend")) or stage_failed(record.get("plugin")) or bool(record.get("error"))
             record["status"] = "failed" if failed else "succeeded"
+            record["elapsed_seconds"] = elapsed_seconds(case_started)
             if failed:
                 summary["failed"] += 1
             else:
                 summary["succeeded"] += 1
             write_json(out_dir / "scores.json", record)
             summary["cases"].append(record)
-            log(f"完成 {type_dir.name}/{case_dir.name}: status={record['status']}")
+            log(
+                f"完成 {type_dir.name}/{case_dir.name}: status={record['status']} "
+                f"{format_duration(record['elapsed_seconds'])}"
+            )
 
     if not found_cases:
         log("未发现任何 case（需要 <类型>/<case>/docs 与同级 extract/golden.json）")
@@ -1956,25 +2050,31 @@ def main() -> int:
     if match_mode == "llm":
         summary["overall_identity"] = {key: finalize_metrics(value) for key, value in running_identity.items()}
     summary["finished_at"] = datetime.now().isoformat()
+    summary["elapsed_seconds"] = elapsed_seconds(run_started)
     write_json(run_dir / "summary.json", summary)
 
     print("\n---------- 评测总览 ----------")
-    print(f"评分口径: {match_mode}（精确率 P / 召回率 R / F1 / 准确率 Acc）")
-    overview = [
-        ("backend_extract", "后台模块 graphs/extract"),
-        ("plugin_extract", f"插件 {MCP_TOOL_NAME}"),
-    ]
+    print(
+        f"{match_mode}  {format_duration(summary['elapsed_seconds'])}  "
+        f"成功 {summary['succeeded']}  失败 {summary['failed']}  未评分 {summary['unscored']}"
+    )
+    overview: list[tuple[str, str]] = []
+    if run_backend:
+        overview.append(("backend_extract", "后台抽取"))
     if args.system:
-        overview.insert(0, ("backend_system", "后台系统 knowledge-ingestion"))
+        overview.append(("backend_system", "沉淀 knowledge-ingestion"))
+    if run_plugin:
+        overview.append(("plugin_extract", f"插件 {MCP_TOOL_NAME}"))
     for key, title in overview:
-        print(f"{title}: {format_metrics_line(summary['overall'][key])}")
+        print(f"\n{title}")
+        for line in iter_metrics_lines(summary["overall"][key], indent="  "):
+            print(line)
         identity_overall = (summary.get("overall_identity") or {}).get(key)
         if identity_overall:
-            print(f"  identity 对照: {format_metrics_line(identity_overall)}")
-    print(
-        f"cases succeeded={summary['succeeded']} failed={summary['failed']} "
-        f"unscored={summary['unscored']} → {run_dir / 'summary.json'}"
-    )
+            print("  identity 对照")
+            for line in iter_metrics_lines(identity_overall, indent="  "):
+                print(line)
+    print(f"\n{run_dir / 'summary.json'}")
 
     if summary["failed"]:
         return 2
