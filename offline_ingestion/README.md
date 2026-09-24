@@ -1,163 +1,217 @@
-# 知识沉淀 HTTP 编排脚本
+# 知识沉淀评测
 
-本目录只编排、只调已有 Backend 接口、只落盘响应。不含解析/切片/抽取实现，不 `import algorithm` / `backend`。
+改完解析、切片、抽取或沉淀流水线后，在仓库根目录对指定 case 跑一次脚本。默认只测后台 HTTP，不 `import algorithm` / `backend`。
 
-部署机上 Backend 已在跑时，拷走本目录即可跑。默认地址 `http://127.0.0.1:8006`。
+默认连 `http://127.0.0.1:8006`。机器上 Backend 已在跑时，拷走本目录即可评测。
 
-## 1. 目录
+抽取走 **Knowledge Extract V2**（`algorithm.knowledge_extract_v2`）：后台 `/api/v1/graphs/extract` 和沉淀流水线经 adapter 调 `extract_harness`；插件 MCP 工具名为 `kg_extract_v2`，同样进 V2。本脚本不直接 import 算法包，测的是线上这条链路。
+
+## 做了什么
+
+**评测集。** 按文档类型放 case，每个 case 有原文件和标准答案：
 
 ```text
 offline_ingestion/
-  run.py / run.sh / params.yaml / README.md
-  公文/
-    docs/        # 原文件，可任意增删
-    ontology/    # 该组权威本体（后端请求必填字段 ontology）
-  标准/
-    docs/
-    ontology/
-  规则/
-    docs/
-    ontology/
+  run.sh / run.py / params.yaml
+  <类型>/
+    ontology/                 # 该类型共用本体
+    <case>/
+      docs/                   # 原文件（pdf / docx / xlsx / png …）
+      extract/golden.json     # 抽取标准答案
+      ontology/               # 可选；有则覆盖类型级本体
 ```
 
-任意含 `docs/` 的子目录视为一组（忽略 `_` / `.` 开头）。本体默认读 `<组>/ontology`；也可用 `params.yaml` 的 `groups.<组名>.ontology` 覆盖。没有本体则跳过该组。
+当前正式集：公文 1 个、标准 6 个、规则 2 个（其中 `故障记录test(1)` 的 golden 为空，只跑通不评分）。`中车RAG验证数据集/` 是造 golden 的源材料，评测扫描会跳过。
 
-当前 `ontology/` 中的 PlantUML 来自仓库验证数据集，**作为该组请求发给后端的权威 schema**。后端不会自己读这些文件，必须由调用方放进 `ontology` 字段。可替换、可改路径。
+**系统流程。** 默认后台拆开打：解析 → 切片 → V2 抽取，对照 `golden.json` 打 P / R / F1 / Acc。整条沉淀 `POST /api/v1/pipelines/knowledge-ingestion` 默认不跑，需要时加 `--system`。插件走 MCP `kg_extract_v2`。
 
-## 2. 参数从哪里来
+**模块评测。** 后台按接口拆开打：
 
-| 用到的值                  | 来源                                                                        | 说明                                                                                                              |
-| ------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Backend 地址              | 环境变量`QASYSTEM_BACKEND_URL`，否则 `params.yaml` 的 `backend_url`   | 默认`http://127.0.0.1:8006`（容器内端口是 8000）                                                                |
-| 原文件                    | `<组>/docs/`                                                              | 对应接口字段`file`；每文件单独一次请求                                                                          |
-| 本体                      | `<组>/ontology/` 或 `groups.<组名>.ontology`                            | 对应接口字段`ontology`（PlantUML 文本）。目录内全部 `.puml`/`.uml` 按文件名排序后拼成 **一个** 字符串 |
-| 流水线配置                | `params.yaml` 的 `options`                                              | 对应接口字段`options`（JSON 字符串），结构即生产 `PipelineOptions`                                            |
-| LLM 地址 / Key / 默认模型 | **服务端** `.env`：`KG_EXTRACT_LLM_*`                             | 脚本传不了`base_url`。`options.extraction.model` 只能覆盖模型名                                               |
-| 向量/文件服务             | **服务端** `APPLICATION_SERVICE_URL`（`FILE_SERVICE_URL` 仅回退） | 配了才会上传 Markdown、写向量；脚本只传`storage.knowledge_space_id`                                             |
-| 鉴权                      | 环境变量`AUTHORIZATION`                                                   | 只放 HTTP 头。无空格时脚本会加`Bearer ` 前缀。不写入 payload、日志、落盘 JSON                                   |
-| 任务轮询                  | `poll_interval_seconds` / `poll_timeout_seconds`                        | **仅编排层**，后端没有这两个字段                                                                            |
+| 模块 | 调用 | 怎么算过 |
+| --- | --- | --- |
+| 解析 | `POST /api/v1/documents/parse` | 接口成功且 Markdown 非空 |
+| 切片 | `POST /api/v1/documents/chunk` | 接口成功且切片非空 |
+| 抽取 | `POST /api/v1/graphs/extract`（V2） | 对照 golden 打分 |
 
-`options` 缺项时 `run.py` 会按与 [`backend/app/schemas.py`](../backend/app/schemas.py) 相同的默认值补全后再发给后端。协议文档里的 `chunking.size: 500` 是示例，代码默认是 `4000`。
+插件侧没有独立的 parse / chunk 工具：插件阶段复用后台解析出的 Markdown；若只跑 `--stage plugin`，会先调一次解析接口再调 MCP。
 
-## 3. 脚本实际调用的接口
+**打分。** 默认 LLM-judge（语义一对一匹配，允许同义、别名、格式差），summary 里附 identity（type+name 精确集合）对照。judge 失败则该 case 降级 identity。需要纯精确匹配时加 `--match-mode identity`。空 golden 仍会跑并落盘预测，但不计入分数。
 
-每个原文件走一遍下面这条链。不调用 parse / chunk / extract 分步接口。
+预测只写 `_runs/<时间戳>/`，不会覆盖 `extract/golden.json`。
 
-### 3.1 `POST /api/v1/pipelines/knowledge-ingestion`
+## 如何使用
 
-后端顺序：解析 Markdown → 切片 → 分片抽取 →（可选）向量存储。`persist_graph=true` 时后端直接返回未开通，不会写库。
+### 准备
 
-**脚本发出的输入（multipart）**
+1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
+2. 默认 LLM-judge 需要 `KG_EXTRACT_LLM_BASE_URL`（可选 `KG_EXTRACT_LLM_MODEL` / `KG_EXTRACT_LLM_API_KEY`）。未配 base_url 时自动改 identity，不会假装用大模型评过。显式 `--match-mode llm` 且未配地址则退出。
+3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
-| 字段         | 必填 | 本脚本填什么                                          |
-| ------------ | :--: | ----------------------------------------------------- |
-| `file`     |  是  | `<组>/docs/` 里的一个原文件（不用 `files=` 批量） |
-| `ontology` |  是  | 该组权威本体全文                                      |
-| `options`  |  否  | `params.yaml` 的 `options` JSON                   |
+地址也可用 `QASYSTEM_BACKEND_URL` / `QASYSTEM_MCP_URL`，或改 `params.yaml`。流水线选项在 `params.yaml` 的 `options`，与生产 `PipelineOptions` 对齐。不要把密钥写进 YAML。
 
-`options` 完整结构：
+### 命令
 
-```json
-{
-  "parser": {
-    "engine": "auto",
-    "force": false,
-    "page_sharding": "auto",
-    "page_shard_size": 0,
-    "max_page_shards": 16,
-    "mineru_options": {
-      "language": "ch",
-      "ocr_mode": "auto",
-      "table_enable": true,
-      "formula_enable": true
-    },
-    "keep_page_edges": "first_page",
-    "page_edge_min_chars": 3
-  },
-  "chunking": {
-    "strategy": "recursive",
-    "size": 4000,
-    "separators": null,
-    "similarity": 0.6,
-    "chunk_overlap": 0,
-    "size_unit": "char",
-    "breakpoint_method": "percentile",
-    "chunk_threshold": 12000
-  },
-  "extraction": { "model": null, "merge": true },
-  "storage": { "persist_graph": false, "knowledge_space_id": null }
-}
-```
-
-默认不带 `Prefer`（同步等结果）。大文件可能仍返回 `202`。
-
-**后端输出（成功 envelope）**
-
-| 路径                       | 含义                                            | 脚本是否落盘                       |
-| -------------------------- | ----------------------------------------------- | ---------------------------------- |
-| `data.name`              | 文件名去扩展名                                  | 在`response.json` 里             |
-| `data.summary`           | 抽取摘要句                                      | 同上                               |
-| `data.artifacts`         | 配了文件服务才有 Markdown/向量 id，否则`null` | 同上；**没有 Markdown 正文** |
-| `data.extraction.ranges` | 各切片在 Markdown 中的字符区间                  | `chunks/<stem>/ranges.json`      |
-| `data.extraction.graph`  | `merge=true` 时的合并图                       | `extract/<stem>/graph.json`      |
-| `data.extraction.graphs` | `merge=false` 时的分片图                      | 写入`graph.json` 的 `graphs`   |
-| `data.stats.document`    | 解析元数据（无 markdown 字段）                  | `parse/<stem>/parser.json`       |
-| `data.stats.chunking`    | 切片统计（无切片正文）                          | `ranges.json` 内                 |
-| `data.stats.extraction`  | 抽取统计 / attempts / scheduler                 | 仅`response.json`                |
-| `execution`              | 队列任务信息                                    | 仅`response.json`                |
-
-完整响应另存 `extract/<stem>/response.json`。失败另存 `error.json`。
-
-### 3.2 仅当沉淀接口返回 202 时
-
-| 方法 | 路径                             | 输入                                                                      | 输出                                                                                   |
-| ---- | -------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| GET  | `/api/v1/jobs/{job_id}`        | 路径参数`job_id`（来自 202 的 `data.job_id` 或 `execution.job_id`） | `data.status`：`queued` / `running` / `succeeded` / `failed` / `cancelled` |
-| GET  | `/api/v1/jobs/{job_id}/result` | 同上                                                                      | 成功后返回与 3.1 相同的业务 envelope；未完成时 HTTP 409                                |
-
-轮询间隔/超时见第 2 节。
-
-## 4. 后端内部会用到、但本脚本不直接调用的接口
-
-沉淀接口复用这些能力。下面便于对照「若改成三步调用能多拿到什么」。
-
-### 4.1 `POST /api/v1/documents/parse`
-
-输入：`file` + `options`（即沉淀里的 `options.parser`）。
-输出：`data.markdown`、`data.parser`、`data.content_length`。
-沉淀成功响应 **不包含** `markdown` 正文。
-
-### 4.2 `POST /api/v1/documents/chunk`
-
-输入：`markdown` + `options`（即沉淀里的 `options.chunking`）。
-输出：`data.items[]`，每项 `text` + `range`。
-沉淀成功响应只有 `ranges`，**没有** `text`。
-
-### 4.3 `POST /api/v1/graphs/extract`
-
-输入：`ontology` + `items[].text` + `options`（`model` / `merge`）。
-输出：`data.graph` 或 `data.graphs`。
-与沉淀的 `data.extraction` 规则相同。LLM Base URL 不能由请求覆盖。
-
-## 5. 怎么跑
+先给脚本执行权限（只需一次）：
 
 ```bash
 chmod +x offline_ingestion/run.sh
-# 把原文件放进 公文/docs、标准/docs 或 规则/docs
-./offline_ingestion/run.sh
-./offline_ingestion/run.sh --groups 规则
 ```
 
-## 6. 与部署业务仍不一致、需要确认的点
+`run.sh` 会把工作区指到本目录，再转调 `run.py`。后面所有参数都原样传给 `run.py`。
 
-脚本没有再实现算法，但编排选择和后端「一次请求」的语义仍有差别：
+---
 
-1. **每文件一次 `file=`，不用 `files=`**后端批量会把多文件 Markdown 拼成一份再抽一张图。脚本是一文件一张图。是否要改成按组 `files=` 一次提交？
-2. **一组多个 `.puml` 会拼成一个 `ontology` 字符串**后端只收一个字符串，不会自己读目录。标准组当前三份模块本体是拼起来上传的。是否应改为每组只放一个权威文件？
-3. **空本体**后端允许 `ontology=""` 走非结构化摘要。脚本把本体当必填，缺文件就跳过该组。是否保持必填？
-4. **本地没有 Markdown / 切片正文**这是聚合接口的响应边界，不是脚本丢了。若验收需要这两类中间产物，要改调 4.1 / 4.2，或改后端沉淀响应。
-5. **向量化和 Markdown 上传**由服务器是否配置 `APPLICATION_SERVICE_URL` 决定，脚本不能关，只能把 `persist_graph` 保持 `false`。部署环境若配了文件服务，跑脚本也会走存储。是否接受？
-6. **`AUTHORIZATION` 自动加 `Bearer `**
-   若网关要的是别的头格式，需要改脚本或改为原样转发。
+**按路径评测（推荐）**
 
-协议原文：[`docs/算法接口协议.md`](../docs/算法接口协议.md)。
+```bash
+./offline_ingestion/run.sh 公文/关于开展OpenClaw开源智能体安全风险排查工作的通知
+```
+
+在仓库根目录也可以：
+
+```bash
+python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw开源智能体安全风险排查工作的通知
+```
+
+脚本从路径推出类型和 case。默认 `--stage backend`：**解析 / 切片 / 抽取并对抽取结果评分**，不跑沉淀、不调 MCP。传类型目录则跑该类型全部 case：
+
+```bash
+./offline_ingestion/run.sh 规则
+```
+
+---
+
+**全量评测（只测后台）**
+
+```bash
+./offline_ingestion/run.sh
+```
+
+扫公文 / 标准 / 规则下全部 case，默认只跑后台。抽取对照 golden：配了 judge 走 LLM-judge，否则 identity。
+
+---
+
+**后台 + 插件**
+
+```bash
+./offline_ingestion/run.sh --stage all
+```
+
+每个 case 先跑后台，再跑插件 `kg_extract_v2`。MCP 会话在多 worker 下可能失败，插件回归时再加此项。
+
+---
+
+**额外跑沉淀流水线**
+
+```bash
+./offline_ingestion/run.sh 公文/某case --system
+```
+
+会再打 `POST /api/v1/pipelines/knowledge-ingestion`（内部再走一遍解析→切片→抽取）。默认评测不需要这一步。
+
+---
+
+**只测插件**
+
+```bash
+./offline_ingestion/run.sh --stage plugin
+```
+
+只调 MCP `kg_extract_v2`。插件没有 parse/chunk，脚本会先用后台解析接口把 `docs/` 转成 Markdown，再交给插件。适合只改了 MCP 工具封装、抽取算法本身已在后台测过时用。
+
+---
+
+**只扫描评测集（不调服务）**
+
+```bash
+./offline_ingestion/run.sh --dry-run
+```
+
+列出将要跑的类型、case、原文件数、golden 规模和本体路径。拷到部署机后先跑这一步，确认目录被识别，且不需要 Backend / judge。
+
+---
+
+**按类型筛选**
+
+```bash
+./offline_ingestion/run.sh 公文
+./offline_ingestion/run.sh --groups 公文,标准
+```
+
+路径与 `--groups/--cases` 不要混用。`--groups` 仍支持逗号分隔多类型。
+
+---
+
+**按 case 筛选**
+
+```bash
+./offline_ingestion/run.sh 规则/Simple_故障规则的诊断
+./offline_ingestion/run.sh --groups 规则 --cases Simple_故障规则的诊断
+```
+
+---
+
+**精确匹配打分**
+
+```bash
+./offline_ingestion/run.sh --match-mode identity
+```
+
+不用 LLM-judge，实体按 type+name、关系按五元组做集合精确匹配。未配 `KG_EXTRACT_LLM_BASE_URL` 时即使 `params.yaml` 写了 `llm` 也会自动改 identity；显式 `--match-mode llm` 才会因缺地址退出。
+
+---
+
+**质量门禁**
+
+```bash
+./offline_ingestion/run.sh --min-f1 0.5
+```
+
+在接口都成功的前提下，检查已评分 case 的实体 F1（后台系统、后台抽取、插件三者取最低）。低于 `0.5` 则退出码 3。适合 CI 或发版前卡住明显回退；阈值按集子自己定。
+
+---
+
+退出码：`0` 全部成功，`1` 配置/发现失败，`2` 有 case 失败，`3` 质量门禁未过。
+
+### 看结果
+
+每次运行写入 `_runs/<时间戳>/`，不会覆盖 `extract/golden.json`。目录已 gitignore。
+
+```text
+_runs/<YYYYMMDD-HHMMSS>/
+  params.yaml                 # 本次拷贝的评测参数
+  params.resolved.json        # 解析后的地址 / 阶段 / 评分口径
+  summary.json                # 整次运行总览：状态、P/R/F1、耗时
+  <类型>/<case>/
+    parse_<文件名>.json       # 后台解析接口回包
+    document.md               # 拼好的 Markdown
+    chunks.json               # 切片回包
+    backend_extract.json      # 后台抽取回包（预测图在 data 里）
+    scores.json               # 该 case 状态、分数、各步耗时
+    backend_system_<文件>.json  # 仅 --system：沉淀流水线回包
+    plugin_extract.json       # 仅插件阶段：MCP 抽图结果
+    plugin_error.json         # 仅插件失败时
+```
+
+| 文件 | 看什么 |
+| --- | --- |
+| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时 |
+| `scores.json` | 单案明细。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长） |
+| `document.md` | 解析结果，便于对照原文 |
+| `chunks.json` | 实际送进抽取的切片 |
+| `backend_extract.json` | 生产接口原样回包，排抽取失败或图结构时用 |
+
+终端默认只打后台抽取：P/R/F1/Acc 与 标准/抽出/对上/多抽/漏抽（实体、关系分行）。未跑的插件、沉淀不出现在总览里；加 `--system` 或 `--stage plugin|all` 才打印对应块。case 日志同样按步输出耗时和抽取计数。
+
+### 加 case
+
+在对应类型下新建 `<case>/docs/` 和 `<case>/extract/golden.json`。`golden.json` 用 `entities` / `relations`，或生产接口同款 `nodes` / `relationships`。确认真空图可写 `"score_empty": true`。
+
+## 使用注意
+
+- 标准类 golden 很大（数百实体/关系）。默认 LLM-judge 会多次调模型，耗时长；想先看字面匹配用 `--match-mode identity`。
+- `规则/故障记录test(1)` 未标注，只跑通不评分。
+- 公文 case 含多附件：单个文件解析失败不再拖死整案，会记 `failed_files`，其余文件继续。加 `--system` 时沉淀同样按文件继续。
+- parse / chunk 只验接口成功和输出非空，没有独立 golden；质量分只打在图抽取上。
+- 插件没有 parse/chunk 工具，抽取的是整篇 Markdown，和后台「先切片再抽取」路径不完全相同。
+- `中车RAG验证数据集/` 是造集源，不是评测入口。拷目录做评测时可以不带它。

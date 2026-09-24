@@ -206,3 +206,6 @@ eval_api.md
 
 # 本地备份（不提交）
 algorithm/knowledge_extract_v2/backups/
+
+# 离线入库运行产物
+offline_ingestion/_runs/

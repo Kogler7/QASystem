@@ -3,12 +3,14 @@ from __future__ import annotations
 import fnmatch
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import Any
 
 from ...errors import ErrorCode
 from .mcp import MCPToolWrapper
 from ...models import SessionConfig
-from ..base_tools import ShellTool
+from ..base_tools.path_display import PathDisplayTool
+from ..base_tools.shell_tool import ShellTool
 from ...cancellation import CancellationToken
 
 logger = logging.getLogger(__name__)
@@ -30,21 +32,25 @@ class ToolManager:
         _handlers: ``{tool_name: callable}`` 工具执行闭包。
     """
 
-    def __init__(self, config: SessionConfig) -> None:
+    def __init__(self, config: SessionConfig, include_shell: bool = True) -> None:
         """初始化工具管理器，连接所有 MCP 服务器并注册工具。
 
         Args:
             config: 会话配置，包含 ``mcp_servers`` 列表。
+            include_shell: HTTP API 连接池应关闭 Shell；CLI 可按需打开。
         """
         self._config = config
         self._mcp_wrapper = MCPToolWrapper()
-        self._shell_tool = ShellTool()
+        self._shell_tool = ShellTool() if include_shell else None
+        self._path_display = PathDisplayTool()
         self._tool_map: dict[str, tuple[str, str]] = {}
         self._handlers: dict[str, Any] = {}
 
         self._mcp_wrapper.connect_all(config.mcp_servers)
         self._register_mcp_tools()
-        self._register_base_tools()
+        self._register_display_tools()
+        if include_shell:
+            self._register_base_tools()
 
     def _register_mcp_tools(self) -> None:
         """将 MCPToolWrapper 已注册的工具导入本地 handler 字典和反向索引。
@@ -58,12 +64,19 @@ class ToolManager:
             if len(parts) == 2:
                 self._tool_map[tool_name] = (parts[0], parts[1])
 
+    def _register_display_tools(self) -> None:
+        for tool_name, schema in self._path_display.get_tool_definitions().items():
+            self._handlers[tool_name] = self._path_display.get_tool_handlers()[tool_name]
+            self._tool_map[tool_name] = ("base", tool_name)
+
     def _register_base_tools(self) -> None:
         """将内置基础工具（如命令行执行）注册到 handler 字典和反向索引。
 
         与 _register_mcp_tools 采用相同的数据结构，确保 base tools
         和 MCP tools 能够被 ToolManager 统一调度。
         """
+        if self._shell_tool is None:
+            return
         for tool_name, schema in self._shell_tool.get_tool_definitions().items():
             self._handlers[tool_name] = self._shell_tool.get_tool_handlers()[tool_name]
             parts = tool_name.split("__", 1)
@@ -76,7 +89,19 @@ class ToolManager:
         Returns:
             工具描述列表，每个元素包含 ``name``、``description``、``input_schema`` 字段。
         """
-        return self._mcp_wrapper.get_tool_schemas() + self._shell_tool.get_tool_schemas()
+        schemas = self._mcp_wrapper.get_tool_schemas() + self._path_display.get_tool_schemas()
+        if self._shell_tool is not None:
+            schemas = schemas + self._shell_tool.get_tool_schemas()
+        return schemas
+
+    @contextmanager
+    def bind_user_headers(self, headers: dict[str, str] | None):
+        """Apply caller identity headers to MCP HTTP for this borrowed connection."""
+        self._mcp_wrapper.apply_user_headers(headers or {})
+        try:
+            yield
+        finally:
+            self._mcp_wrapper.apply_user_headers({})
 
     @staticmethod
     def is_tool_allowed(tool_name: str, allowlist: list[str]) -> bool:

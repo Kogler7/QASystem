@@ -34,3 +34,18 @@ def test_http_config_preserves_headers(tmp_path) -> None:
     }}}), encoding="utf-8")
     server = load_mcp_servers(path)[0]
     assert server.headers == {"Authorization": "Bearer test"}
+
+
+def test_http_worker_binds_answer_v1_delivery(tmp_path, monkeypatch) -> None:
+    from agentcode.delivery import ANSWER_V1_ID, ANSWER_V1_SCHEMA
+    from agentcode.worker import _build_config
+
+    monkeypatch.delenv("AGENT_MCP_URL", raising=False)
+    path = tmp_path / "mcp.json"
+    path.write_text(json.dumps({"mcpServers": {"remote": {
+        "transport": "streamable_http", "url": "http://example/mcp",
+    }}}), encoding="utf-8")
+    config, _loader = _build_config({"user_message": "hello", "session_id": "s", "trace_id": "t"}, str(path))
+    assert config.delivery is not None
+    assert config.delivery.output_schema_id == ANSWER_V1_ID
+    assert config.delivery.json_schema == ANSWER_V1_SCHEMA

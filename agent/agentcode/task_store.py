@@ -63,11 +63,12 @@ class _MemoryQueue:
     def __init__(self, maxsize: int = 10000):
         self._tasks: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._queue: list[str] = []
+        self._auth: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
         self._maxsize = maxsize
         self._not_empty = threading.Condition(self._lock)
 
-    def enqueue(self, task_id: str, data: dict[str, Any]) -> int:
+    def enqueue(self, task_id: str, data: dict[str, Any], owner: dict[str, str] | None = None) -> int:
         with self._lock:
             if len(self._tasks) >= self._maxsize:
                 raise RuntimeError("task_store: 内存队列已满")
@@ -77,6 +78,7 @@ class _MemoryQueue:
                 "created_at": now,
                 "updated_at": now,
                 "request": data,
+                "owner": dict(owner or {}),
                 "result": None,
                 "cancel_requested": False,
                 "claimed_at": None,
@@ -147,6 +149,13 @@ class _MemoryQueue:
                 "cancel_requested": bool(task.get("cancel_requested")),
             }
 
+    def get_owner(self, task_id: str) -> dict[str, str]:
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None:
+                return {}
+            return dict(task.get("owner") or {})
+
     def queue_length(self) -> int:
         with self._lock:
             return len(self._queue)
@@ -203,16 +212,37 @@ class _MemoryQueue:
                 del events[: len(events) - _EVENT_MAXLEN]
             return str(seq)
 
-    def get_events(self, task_id: str, cursor: str = "0") -> tuple[list[dict[str, Any]], str]:
+    def get_events(self, task_id: str, cursor: str = "0") -> tuple[list[tuple[str, dict[str, Any]]], str]:
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
                 return [], cursor
-            after = int(cursor or "0")
+            after = _memory_cursor(cursor)
             selected = [(seq, event) for seq, event in task["events"] if seq > after]
             if not selected:
                 return [], cursor
-            return [event for _, event in selected], str(selected[-1][0])
+            return [(str(seq), event) for seq, event in selected], str(selected[-1][0])
+
+    def save_auth_context(self, task_id: str, headers: dict[str, str]) -> str:
+        auth_id = uuid.uuid4().hex
+        with self._lock:
+            self._auth[auth_id] = {"task_id": task_id, "headers": dict(headers)}
+        return auth_id
+
+    def load_auth_context(self, auth_context_id: str | None, task_id: str) -> dict[str, str]:
+        if not auth_context_id:
+            return {}
+        with self._lock:
+            context = self._auth.get(auth_context_id) or {}
+            if context.get("task_id") != task_id:
+                return {}
+            return dict(context.get("headers") or {})
+
+    def delete_auth_context(self, auth_context_id: str | None) -> None:
+        if not auth_context_id:
+            return
+        with self._lock:
+            self._auth.pop(auth_context_id, None)
 
 
 class _RedisQueue:
@@ -227,7 +257,7 @@ class _RedisQueue:
     def _hash_key(self, task_id: str) -> str:
         return f"{self._hash_prefix}{task_id}"
 
-    def enqueue(self, task_id: str, data: dict[str, Any]) -> int:
+    def enqueue(self, task_id: str, data: dict[str, Any], owner: dict[str, str] | None = None) -> int:
         now = _now_iso()
         pipe = self._client.pipeline()
         pipe.hset(self._hash_key(task_id), mapping={
@@ -235,6 +265,7 @@ class _RedisQueue:
             "created_at": now,
             "updated_at": now,
             "request": json.dumps(data, ensure_ascii=False),
+            "owner": json.dumps(owner or {}, ensure_ascii=False),
             "cancel_requested": "0",
             "queued_at": str(time.time()),
         })
@@ -303,6 +334,16 @@ class _RedisQueue:
             "queue_position": 0,
             "cancel_requested": raw.get("cancel_requested") == "1",
         }
+
+    def get_owner(self, task_id: str) -> dict[str, str]:
+        raw = self._client.hget(self._hash_key(task_id), "owner")
+        if not raw:
+            return {}
+        try:
+            owner = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return owner if isinstance(owner, dict) else {}
 
     def queue_length(self) -> int:
         return self._client.llen(self._list_key)
@@ -374,18 +415,45 @@ class _RedisQueue:
         self._client.expire(event_key, _TASK_TTL)
         return event_id
 
-    def get_events(self, task_id: str, cursor: str = "0-0") -> tuple[list[dict[str, Any]], str]:
+    def get_events(self, task_id: str, cursor: str = "0-0") -> tuple[list[tuple[str, dict[str, Any]]], str]:
         event_key = f"{self._hash_key(task_id)}:events"
         rows = self._client.xread({event_key: cursor or "0-0"}, count=200)
         if not rows:
             return [], cursor
-        events: list[dict[str, Any]] = []
+        events: list[tuple[str, dict[str, Any]]] = []
         next_cursor = cursor
         for _, entries in rows:
             for event_id, fields in entries:
                 next_cursor = event_id
-                events.append(json.loads(fields["data"]))
+                events.append((event_id, json.loads(fields["data"])))
         return events, next_cursor
+
+    def _auth_key(self, auth_id: str) -> str:
+        return f"{_KEY_PREFIX}:auth:{auth_id}"
+
+    def save_auth_context(self, task_id: str, headers: dict[str, str]) -> str:
+        auth_id = uuid.uuid4().hex
+        self._client.set(
+            self._auth_key(auth_id),
+            json.dumps({"task_id": task_id, "headers": headers}, ensure_ascii=False),
+            ex=_TASK_TTL,
+        )
+        return auth_id
+
+    def load_auth_context(self, auth_context_id: str | None, task_id: str) -> dict[str, str]:
+        if not auth_context_id:
+            return {}
+        raw = self._client.get(self._auth_key(auth_context_id))
+        if not raw:
+            return {}
+        context = json.loads(raw)
+        if context.get("task_id") != task_id:
+            return {}
+        return dict(context.get("headers") or {})
+
+    def delete_auth_context(self, auth_context_id: str | None) -> None:
+        if auth_context_id:
+            self._client.delete(self._auth_key(auth_context_id))
 
 
 _QUEUE: _MemoryQueue | _RedisQueue | None = None
@@ -408,9 +476,9 @@ def _ensure_queue() -> _MemoryQueue | _RedisQueue:
     return _QUEUE
 
 
-def enqueue(task_id: str, data: dict[str, Any]) -> int:
+def enqueue(task_id: str, data: dict[str, Any], owner: dict[str, str] | None = None) -> int:
     """入队一个任务，返回当前队列长度。"""
-    return _ensure_queue().enqueue(task_id, data)
+    return _ensure_queue().enqueue(task_id, data, owner=owner)
 
 
 def dequeue(timeout: float = 5.0) -> tuple[str, dict[str, Any]] | None:
@@ -426,6 +494,10 @@ def update(task_id: str, status: str, result: Any = None, error: str | None = No
 def get(task_id: str) -> dict[str, Any] | None:
     """查询任务详情。"""
     return _ensure_queue().get(task_id)
+
+
+def get_owner(task_id: str) -> dict[str, str]:
+    return _ensure_queue().get_owner(task_id)
 
 
 def queue_length() -> int:
@@ -453,5 +525,26 @@ def publish_event(task_id: str, event: dict[str, Any]) -> str:
     return _ensure_queue().publish_event(task_id, event)
 
 
-def get_events(task_id: str, cursor: str = "0") -> tuple[list[dict[str, Any]], str]:
+def get_events(task_id: str, cursor: str = "0") -> tuple[list[tuple[str, dict[str, Any]]], str]:
     return _ensure_queue().get_events(task_id, cursor)
+
+
+def save_auth_context(task_id: str, headers: dict[str, str]) -> str:
+    return _ensure_queue().save_auth_context(task_id, headers)
+
+
+def load_auth_context(auth_context_id: str | None, task_id: str) -> dict[str, str]:
+    return _ensure_queue().load_auth_context(auth_context_id, task_id)
+
+
+def delete_auth_context(auth_context_id: str | None) -> None:
+    _ensure_queue().delete_auth_context(auth_context_id)
+
+
+def _memory_cursor(cursor: str) -> int:
+    if not cursor or cursor in {"0", "0-0"}:
+        return 0
+    try:
+        return int(cursor)
+    except ValueError:
+        return 0

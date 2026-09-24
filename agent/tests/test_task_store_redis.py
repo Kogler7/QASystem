@@ -28,7 +28,7 @@ def test_redis_claim_complete_and_event_replay(store) -> None:
 
     event_id = store.publish_event("t1", {"type": "token", "text": "a"})
     events, cursor = store.get_events("t1")
-    assert events == [{"type": "token", "text": "a"}]
+    assert events == [(event_id, {"type": "token", "text": "a"})]
     assert cursor == event_id
     assert store.get_events("t1", cursor)[0] == []
 
@@ -49,7 +49,7 @@ def test_redis_events_are_visible_across_store_instances(store) -> None:
     store.enqueue("t1", {"user_message": "x"})
     store.publish_event("t1", {"type": "status", "status": "running"})
     events, _ = other.get_events("t1")
-    assert events == [{"type": "status", "status": "running"}]
+    assert events == [(events[0][0], {"type": "status", "status": "running"})]
 
 
 def test_redis_stale_claim_is_requeued(store) -> None:

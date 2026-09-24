@@ -15,9 +15,9 @@ from .tools.mcp_tools.tool_manager import ToolManager
 from .models import AgentState, FinalResult, SessionConfig
 from .skillsets.loader import SkillLoader
 from .trace import JsonlTraceSink, TraceSink
-from .tools.base_tools.memory_tool import MemoryCompactor
 from .prompt import build_system_prompt
 from .cancellation import AgentCancelled, CancellationToken
+from .delivery import ANSWER_V1_ID, normalize_answer_payload
 
 
 class AgentRuntime:
@@ -35,6 +35,7 @@ class AgentRuntime:
         self.skill_loader = skill_loader or SkillLoader()
         self.on_tool_results = on_tool_results
         try:
+            from .tools.base_tools.memory_tool import MemoryCompactor
             self._compactor = MemoryCompactor()
             self._compactor_threshold = int(os.environ.get("COMPACT_TOKEN_THRESHOLD", 100000))
         except Exception:
@@ -46,13 +47,14 @@ class AgentRuntime:
         config: SessionConfig,
         user_message: str,
         cancel_token: CancellationToken | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> FinalResult:
         state = AgentState(
             session_id=config.session_id,
             trace_id=config.trace_id,
             started_at=time.time(),
             status="running",
-            messages=self._build_initial_messages(config, user_message),
+            messages=self._build_initial_messages(config, user_message, history),
         )
         cancel_token = cancel_token or CancellationToken()
         cancel_token.set_deadline(time.monotonic() + config.budget.max_time_s)
@@ -190,7 +192,9 @@ class AgentRuntime:
                             "type": "text",
                             "text": (
                                 "Delivery schema not satisfied. "
-                                f"Please return JSON that matches schema. reason={schema_error}"
+                                "Return only a JSON object matching "
+                                f"{config.delivery.output_schema_id}. "
+                                f"reason={schema_error}"
                             ),
                         }
                     ],
@@ -367,6 +371,8 @@ class AgentRuntime:
         payload = self._extract_payload(assistant_message)
         if config.delivery is None:
             return payload, None
+        if config.delivery.output_schema_id == ANSWER_V1_ID:
+            payload = normalize_answer_payload(payload)
         try:
             validate(payload, config.delivery.json_schema)
             return payload, None
@@ -406,15 +412,30 @@ class AgentRuntime:
             }
         )
 
-    def _build_initial_messages(self, config: SessionConfig, user_message: str) -> list[dict[str, Any]]:
+    def _build_initial_messages(
+        self,
+        config: SessionConfig,
+        user_message: str,
+        history: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = []
         system_text = build_system_prompt(
             tool_manager=self.tool_manager,
             skill_loader=self.skill_loader,
             skills=config.skills,
+            delivery=config.delivery,
         )
         if system_text:
             messages.append({"role": "system", "content": [{"type": "text", "text": system_text}]})
+        for item in history or []:
+            role = item.get("role")
+            content = item.get("content")
+            if role not in {"user", "assistant"} or not isinstance(content, str) or not content.strip():
+                continue
+            messages.append({
+                "role": role,
+                "content": [{"type": "text", "text": content.strip()}],
+            })
         messages.append({"role": "user", "content": [{"type": "text", "text": user_message}]})
         return messages
 

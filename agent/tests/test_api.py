@@ -135,3 +135,57 @@ class TestPool:
         monkeypatch.setenv("AGENT_API_WORKERS", "2")
         with pytest.raises(RuntimeError, match="Redis is required"):
             api._start_workers()
+
+
+class TestAuthAndHistory:
+    def test_authorization_is_not_copied_into_task_payload(self, monkeypatch) -> None:
+        import agentcode.task_store as store
+
+        captured: dict = {}
+        original = store.enqueue
+
+        def wrapped(task_id, data, owner=None):
+            captured["data"] = dict(data)
+            captured["owner"] = dict(owner or {})
+            return original(task_id, data, owner=owner)
+
+        monkeypatch.setattr(store, "enqueue", wrapped)
+        monkeypatch.setattr(store, "delete_auth_context", lambda *_args, **_kwargs: None)
+        resp = client.post(
+            "/v1/query",
+            json={"user_message": "hello"},
+            headers={"Authorization": "Bearer secret-token", "X-Tenant-Id": "tenant-a"},
+        )
+        assert resp.status_code == 202
+        payload = json.dumps(captured["data"])
+        assert "secret-token" not in payload
+        assert "Bearer" not in payload
+        assert "secret-token" not in json.dumps(captured.get("owner") or {})
+        auth_id = captured["data"].get("auth_context_id")
+        assert auth_id
+        loaded = store.load_auth_context(auth_id, resp.json()["task_id"])
+        assert loaded["authorization"] == "Bearer secret-token"
+        assert loaded["x-tenant-id"] == "tenant-a"
+
+    def test_history_is_accepted(self) -> None:
+        resp = client.post("/v1/query", json={
+            "user_message": "再看一眼",
+            "history": [
+                {"role": "user", "content": "上一问"},
+                {"role": "assistant", "content": "上一答"},
+            ],
+        })
+        assert resp.status_code == 202
+
+    def test_other_tenant_cannot_read_or_cancel_task(self) -> None:
+        created = client.post(
+            "/v1/query",
+            json={"user_message": "隔离查询"},
+            headers={"Authorization": "Bearer token-a", "X-Tenant-Id": "tenant-a"},
+        )
+        task_id = created.json()["task_id"]
+        other = {"Authorization": "Bearer token-b", "X-Tenant-Id": "tenant-b"}
+        assert client.get(f"/v1/task/{task_id}", headers=other).status_code == 404
+        assert client.post(f"/v1/task/{task_id}/cancel", headers=other).status_code == 404
+        same = {"Authorization": "Bearer token-a", "X-Tenant-Id": "tenant-a"}
+        assert client.get(f"/v1/task/{task_id}", headers=same).status_code == 200

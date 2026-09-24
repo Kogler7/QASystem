@@ -58,3 +58,44 @@ class TestToolManagerBaseTools:
         assert ToolManager.is_tool_allowed("base__execute_command", ["base__*"]) is True
         assert ToolManager.is_tool_allowed("base__execute_command", ["other__*"]) is False
         assert ToolManager.is_tool_allowed("base__execute_command", []) is True
+
+    def test_http_pool_registers_path_display_without_shell(self) -> None:
+        tm = ToolManager(_make_config(), include_shell=False)
+        names = [t["name"] for t in tm.list_tools()]
+        assert "problem-resolve-path-display" in names
+        assert "base__execute_command" not in names
+
+    def test_path_display_echoes_solution_path(self) -> None:
+        tm = ToolManager(_make_config(), include_shell=False)
+        result = tm.call_tool(
+            "problem-resolve-path-display",
+            {
+                "question": "指标趋势",
+                "solution_path": ["步骤1 查询", "步骤2 汇总"],
+                "reasoning_summary": "按方案执行",
+            },
+            timeout_s=5,
+            retries=0,
+        )
+        assert result["ok"] is True
+        import json
+        payload = json.loads(result["content"])
+        assert payload["question"] == "指标趋势"
+        assert payload["solution_path"] == ["步骤1 查询", "步骤2 汇总"]
+
+    def test_apply_user_headers_updates_and_clears_http_client(self) -> None:
+        from agentcode.tools.mcp_tools.mcp import MCPToolWrapper
+
+        class DummyClient:
+            def __init__(self) -> None:
+                self.headers: dict[str, str] = {"Content-Type": "application/json"}
+
+        wrapper = MCPToolWrapper()
+        client = DummyClient()
+        wrapper._http_clients = [client]
+        wrapper.apply_user_headers({"authorization": "Bearer abc", "x-user-id": "u1"})
+        assert client.headers["Authorization"] == "Bearer abc"
+        assert client.headers["X-User-Id"] == "u1"
+        wrapper.apply_user_headers({})
+        assert "Authorization" not in client.headers
+        assert client.headers["Content-Type"] == "application/json"
