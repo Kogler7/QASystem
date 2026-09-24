@@ -44,6 +44,8 @@ BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 - 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。
 - 数值、单位、标量属性值、字段标签和修饰词不是独立实体。
 - 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。
+- 输出预算：单次调用最多输出 60 个实体；候选很多时优先覆盖不同标题/条款，不要重复同一事实。
+- evidence.quote 只给最短可逐字定位的片段（建议不超过 80 字），不要整段复制正文；同一候选/同一证据不得重复输出。
 
 [关系提取规则]
 - 只提取原文明确表达的关系。
@@ -91,7 +93,16 @@ STANDARD_PROMPT_EXTENSION = """STANDARD_PROMPT_EXTENSION v2
 - 标准整体对象使用 StandardizationObject（例如“电动汽车用动力蓄电池单体”）；不要在条款中为同一对象的简称/别名另建 Subject of Standardization。
 - 若文本中的“电池单体”“锂离子电池单体”“金属氢化物镍电池单体”等只是同一标准化对象在不同条款中的表达，应复用已有 StandardizationObject，不要创建冗余对象实体。
 - Clause、Subclause、Section、Annex 等结构实体只按实际标题层级创建，不要同时用多个结构类型重复表达同一个标题。
-- 不要因为条款中出现了多个约束数值，就把同一条要求拆成多个互相独立的 Constrain；先合并为同一特性的约束，再在属性中记录最大值/最小值/单位。"""
+- 不要因为条款中出现了多个约束数值，就把同一条要求拆成多个互相独立的 Constrain；先合并为同一特性的约束，再在属性中记录最大值/最小值/单位。
+- property 是事实：对对象、能力、状态或测量结果的客观陈述，回答是什么、值多少。
+- constraint 是规则：要求、限定、条件或允许范围，回答应当/必须/不得超过/不得低于/适用什么条件。
+- 规则句归 Constrain，事实句归 Property；同一特性可分别以事实和规则出现，不要合并或改名。
+- Property 字段：name(<=8字)、type(描述型/能力型/约束型)、value、quote。
+- Constrain 字段：name(<=20字)、type(时间/权限/安全/流程/质量/合规约束)、min、max、range、unit、property、quote。
+- quote 必须逐字来自正文；同一名称只输出一次；无依据不输出。
+- Property 的 name 只写特性名词本身（<=8字），不要带 要求/条件/方法/步骤/单位/计算/试验/计量 等词尾。
+- Constraint 只收规范性要求（应/不应/不得/不超过/不低于/范围/条件）；试验方法、操作步骤、单位、公式、计算过程不要输出。
+- 同一条款内同一特性或同一规则先合并再输出，只给一条，不要按条件/测试项目拆成多条。"""
 
 
 _DOMAIN_ORDER: tuple[RouteKind, RouteKind] = ("official_document", "standard")
@@ -519,12 +530,15 @@ def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> st
         line = f"- `{spec.display_name}` -> type `{type_id}`"
         if spec.identity_properties:
             line += f"；identity: {', '.join(spec.identity_properties)}"
+        class_comment = " ".join((getattr(spec, "comment", "") or "").split())
+        if class_comment:
+            line += f" // {class_comment[:500]}"
         lines.append(line)
         for prop in spec.properties:
             suffix = ""
             if include_comments:
                 comment = " ".join((prop.comment or "").split())
-                suffix = f" // {comment[:200]}" if comment else ""
+                suffix = f" // {comment[:500]}" if comment else ""
             lines.append(f"  - `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type}){suffix}")
     return "\n".join(lines) if lines else "（无本体类目录）"
 
@@ -535,7 +549,11 @@ def _type_catalog_text(plan: ExtractionPlan, type_ids: Iterable[str] | None = No
     for type_id in sorted(plan.allowed_types if type_ids is None else type_ids):
         spec = plan.class_specs.get(type_id)
         if spec is not None:
-            lines.append(f"- `{spec.display_name}` -> type `{type_id}`")
+            line = f"- `{spec.display_name}` -> type `{type_id}`"
+            class_comment = " ".join((getattr(spec, "comment", "") or "").split())
+            if class_comment:
+                line += f" // {class_comment[:500]}"
+            lines.append(line)
     return "\n".join(lines) if lines else "（无本体类目录）"
 
 
@@ -552,14 +570,20 @@ def _feature_text(plan: ExtractionPlan) -> str:
 
 
 def _signature_text(plan: ExtractionPlan) -> str:
-    lines = sorted(
-        {
-            f"`{spec.source}` -[`{spec.relation_id}`]-> `{spec.target}`"
-            for specs in plan.relation_specs.values()
-            for spec in specs
-            if spec.source in plan.allowed_types and spec.target in plan.allowed_types
-        }
-    )
+    seen: set[str] = set()
+    lines: list[str] = []
+    for specs in plan.relation_specs.values():
+        for spec in specs:
+            if spec.source not in plan.allowed_types or spec.target not in plan.allowed_types:
+                continue
+            text = f"`{spec.source}` -[`{spec.relation_id}`]-> `{spec.target}`"
+            comment = " ".join((getattr(spec, "comment", "") or "").split())
+            if comment:
+                text += f" // {comment[:500]}"
+            if text not in seen:
+                seen.add(text)
+                lines.append(text)
+    lines.sort()
     return "\n".join(lines) if lines else "（无关系签名）"
 
 
@@ -676,10 +700,13 @@ def build_chat_messages(
     output_schema: dict[str, Any] | None = None,
     repair_issues: list[dict[str, Any]] | None = None,
     relation_pairs: list[dict[str, Any]] | None = None,
+    structure_hint: str = "",
 ) -> ChatMessages:
     system = BASE_SYSTEM_PROMPT
     if route.prompt_extension:
         system = f"{system}\n\n{route.prompt_extension}"
+    if structure_hint:
+        system = f"{system}\n\n{structure_hint}"
 
     span_entity_task = task == "entity" or (
         isinstance(output_schema, dict)
@@ -765,7 +792,7 @@ def build_chat_messages(
         if _looks_like_official_form(chunk):
             entity_rules += _OFFICIAL_FORM_RULES
     else:
-        ontology_section = _catalog_text(plan, include_comments=record_table)
+        ontology_section = _catalog_text(plan, include_comments=record_table or task in {"property", "identity"})
         feature_section = _feature_text(plan)
         relation_section = _signature_text(plan)
         known_section = _known_entities_text(known_entities)
@@ -811,7 +838,7 @@ def build_chat_messages(
             for pair in relation_pairs
         )
         feature_section = "（关系 pair 分类不展示属性目录）"
-        relation_section = "（关系 pair 分类不开放关系目录）"
+        relation_section = _signature_text(plan)
         known_section = "（关系端点已由候选 pair 固定）"
         context_section = local_context or "（无）"
         entity_rules = """

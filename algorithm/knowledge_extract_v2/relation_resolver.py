@@ -17,6 +17,7 @@ DETERMINISTIC_RELATION_IDS = frozenset(
         # rather than from language understanding; the pipeline assembles them
         # directly in ``hierarchy`` instead of asking the relation classifier.
         "haspart",
+        "hasnote",
         "evidencedby",
         "hassubclause",
         "hasstructuralelement",

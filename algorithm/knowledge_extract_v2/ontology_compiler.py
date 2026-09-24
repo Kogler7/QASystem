@@ -84,6 +84,7 @@ class ClassSpec:
     properties: tuple[PropertySpec, ...] = ()
     identity_properties: tuple[str, ...] = ()
     is_abstract: bool = False
+    comment: str = ""
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,7 @@ class RelationSpec:
     source_cardinality: str = ""
     target_cardinality: str = ""
     display_label: str = ""
+    comment: str = ""
 
     @property
     def signature(self) -> str:
@@ -678,6 +680,7 @@ def _compile_class_specs(
             properties=own_properties + tuple(inherited_properties),
             identity_properties=schema.identity_properties_for(identifier),
             is_abstract=ontology_class.is_abstract,
+            comment=getattr(ontology_class, "comment", ""),
         )
     return specs
 
@@ -692,6 +695,7 @@ def _compile_relation_specs(schema: OntologySchema) -> dict[str, tuple[RelationS
             source_cardinality=relation.source_cardinality,
             target_cardinality=relation.target_cardinality,
             display_label=relation.identifier,
+            comment=getattr(relation, "comment", ""),
         )
         specs.setdefault(canonical_name(relation.identifier), []).append(spec)
     return {key: tuple(value) for key, value in specs.items()}

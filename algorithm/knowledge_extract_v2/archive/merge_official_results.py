@@ -144,7 +144,9 @@ def main() -> int:
     merged_summary["merge_note"] = "official per_case/predictions replaced from source"
 
     # 4. 备份原 summary，再写回同一个 summary 文件
-    backup_path = target_summary_path.with_suffix(target_summary_path.suffix + ".bak")
+    backup_dir = target_summary_path.parent / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_dir / f"{target_summary_path.name}.bak-{datetime.now():%Y%m%d-%H%M%S}"
     shutil.copy2(target_summary_path, backup_path)
     target_summary_path.write_text(
         json.dumps(merged_summary, ensure_ascii=False, indent=2),

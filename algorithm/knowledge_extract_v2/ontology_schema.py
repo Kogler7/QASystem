@@ -15,7 +15,7 @@ conversion, and batch merging agree on the same identifiers.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import json
 import re
 from typing import Any, Iterable
@@ -158,6 +158,7 @@ class OntologyClass:
     properties: list[OntologyProperty] = field(default_factory=list)
     identity_properties: tuple[str, ...] = ()
     is_abstract: bool = False
+    comment: str = ""
 
     @property
     def identifier(self) -> str:
@@ -191,6 +192,7 @@ class OntologyRelation:
     target: str
     source_cardinality: str = ""
     target_cardinality: str = ""
+    comment: str = ""
 
 
 @dataclass
@@ -264,13 +266,17 @@ class OntologySchema:
 
             prop = _parse_property_line(line)
             if prop is None:
+                text = line.strip()
+                if text and not text.startswith("'"):
+                    current.comment = (current.comment + " " + text).strip()
                 continue
             current.properties.append(prop)
 
         provisional = cls(classes)
         parents: dict[str, list[str]] = {}
         relations: list[OntologyRelation] = []
-        for line in source.splitlines():
+        relation_line_numbers: list[int] = []
+        for line_number, line in enumerate(source.splitlines(), start=1):
             stripped = line.strip()
             if not stripped or stripped.startswith("'"):
                 continue
@@ -341,6 +347,11 @@ class OntologySchema:
                 )
                 continue
             relation_name = _clean_relation_identifier(relation_match.group("label").split("//", 1)[0].strip().strip('"'))
+            if relation_name.casefold().replace("_", "").replace(":", "") == "rdfssubclassof":
+                parent_ids = parents.setdefault(source_class.identifier, [])
+                if target_class.identifier not in parent_ids:
+                    parent_ids.append(target_class.identifier)
+                continue
             if not relation_name:
                 continue
             reverse = relation_match.group("arrow").startswith("<")
@@ -360,6 +371,27 @@ class OntologySchema:
                     target_cardinality=target_cardinality,
                 )
             )
+            relation_line_numbers.append(line_number)
+
+        # Frontend payload: class definition notes and relation semantic notes.
+        for note in re.finditer(r"(?ms)^note right of\s+(?P<target>[^\n]+?)\s*\n(?P<body>.*?)^end note\s*$", source):
+            target = _unquote(note.group("target").strip())
+            klass = provisional.resolve_class(target)
+            if klass is None:
+                continue
+            text = " ".join(part.strip() for part in note.group("body").splitlines() if part.strip())
+            if text:
+                klass.comment = (klass.comment + " " + text).strip()
+        for note in re.finditer(r"(?ms)^note on link\s*\n(?P<body>.*?)^end note\s*$", source):
+            line_no = source[: note.start()].count("\n") + 1
+            text = " ".join(part.strip() for part in note.group("body").splitlines() if part.strip())
+            if not text:
+                continue
+            candidates = [(rel_line, idx) for idx, rel_line in enumerate(relation_line_numbers) if rel_line < line_no]
+            if not candidates:
+                continue
+            _, idx = max(candidates)
+            relations[idx] = replace(relations[idx], comment=text)
 
         # Identity resolution must happen after inheritance is known so that
         # inherited attributes are valid identity fields as well.

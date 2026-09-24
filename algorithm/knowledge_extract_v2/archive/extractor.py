@@ -15,17 +15,17 @@ from typing import Any, Iterable, Optional
 
 from openai import OpenAI
 
-from ._logging import ensure_logging
-from .config import get_llm_config
-from .graph_utils import (
+from .._logging import ensure_logging
+from ..config import get_llm_config
+from ..graph_utils import (
     build_node_properties,
     coerce_non_empty_name,
     entity_uid,
     filter_relationships_with_known_nodes,
     merge_node_properties,
 )
-from .ontology_schema import OntologySchema
-from .scheduler import get_llm_scheduler
+from ..ontology_schema import OntologySchema
+from ..scheduler import get_llm_scheduler
 
 #: 子进程/独立脚本里 root 通常没有 handler，这里保证本模块的 INFO 日志可见。
 logger = ensure_logging(logging.getLogger(__name__))

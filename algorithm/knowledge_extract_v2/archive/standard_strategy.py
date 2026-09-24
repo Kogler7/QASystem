@@ -17,10 +17,10 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 
-from .chunk_context import ChunkContextManager, ExtractionRequest
-from .coverage import CoverageGap
-from .graph_utils import canonical_name
-from .ontology_compiler import ExtractionPlan
+from ..chunk_context import ChunkContextManager, ExtractionRequest
+from ..coverage import CoverageGap
+from ..graph_utils import canonical_name
+from ..ontology_compiler import ExtractionPlan
 
 
 _STANDARD_NUMBER = re.compile(

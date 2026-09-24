@@ -14,10 +14,10 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from .graph_utils import canonical_name
+from ..graph_utils import canonical_name
 from .markdown_quality import lint_heading_hierarchy, lint_markdown
-from .ontology_compiler import compile_plan
-from .ontology_schema import OntologySchema
+from ..ontology_compiler import compile_plan
+from ..ontology_schema import OntologySchema
 
 
 ONTOLOGY_SUFFIXES = {".puml", ".uml", ".plantuml"}
@@ -666,7 +666,7 @@ def lint_benchmark(
 
 
 def _default_root() -> Path:
-    return Path(__file__).resolve().parent / "benchmark"
+    return Path(__file__).resolve().parent.parent / "benchmark"
 
 
 def main(argv: list[str] | None = None) -> int:

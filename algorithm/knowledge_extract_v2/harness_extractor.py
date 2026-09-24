@@ -29,7 +29,7 @@ def extract_harness(
     repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
     identity_admission: str | None = None,
-    max_repair_rounds: int = 2,
+    max_repair_rounds: int = 0,
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
 ) -> dict[str, Any]:

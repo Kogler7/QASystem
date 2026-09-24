@@ -563,7 +563,7 @@ class CandidateSelector:
         for candidate in items:
             if getattr(candidate, "mapping_status", "accepted") != "accepted":
                 continue
-            if getattr(candidate, "source", "") == "markdown_structure" or any(
+            if getattr(candidate, "source", "") in {"markdown_structure", "standard_semantics", "technical_semantics"} or any(
                 getattr(evidence, "evidence_type", "") == "structural"
                 for evidence in _evidence(candidate)
             ):

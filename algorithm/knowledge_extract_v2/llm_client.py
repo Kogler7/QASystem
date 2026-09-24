@@ -410,16 +410,10 @@ class OpenAICompatibleLLM:
                 response_mode="json_object",
                 response_format={"type": "json_object"},
             )
-        if (
-            _is_deepseek_v4_flash(self.model)
-            and not _is_official_deepseek_endpoint(self.base_url)
-            and (
-                bool(context.get("record_table"))
-                or bool(context.get("prefer_chat_json_schema"))
-            )
-        ):
-            # 该模型在 MaaS 的 Responses 路径上高频返回空数组/截断 JSON；
+        if _is_deepseek_v4_flash(self.model) and not _is_official_deepseek_endpoint(self.base_url):
+            # 该模型在 MaaS 的 Responses 路径上会超时/返回空数组/截断 JSON；
             # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
+            # 对所有 pass（实体/属性/关系/修复/核验）统一生效。
             try:
                 return self._chat_structured(
                     messages,
