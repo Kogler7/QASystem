@@ -167,7 +167,7 @@ _ENTITY_SYSTEM = """你是知识抽取评测员。下面给出若干候选配对
 判断规则：
 1. predicted 的 type 与 golden 指向同一个本体类型即可，字符串可以不同（如 Section/Clause 这种层级/别名差异由你判断是否同一语义）。
 2. name 指向同一实体即可，允许同义表达、别名、规范名、标点/空格/全半角差异。
-3. properties：两侧都出现的属性，键和值应一致（允许日期格式、全半角、数值精度差异）；golden 没有的属性不判错。
+3. properties：只看 golden 中出现的非空属性。请你判断 predicted 的属性值与 golden 的相似度是否达到 0.7：达到 0.7 即算一致（允许同义改写、句式/语序变化、修饰词增减、日期/全半角/数值精度差异）；predicted 缺失该属性、值为空，或相似度明显低于 0.7 才判不匹配。predicted 多出的属性不判错。
 4. 每个 pair_id 独立判断，只输出 {"verdicts":[{"pair_id":"...","matched":true/false}]}，不要输出解释。"""
 
 _RELATION_SYSTEM = """你是知识抽取评测员。下面给出若干候选配对，每对包含 golden 和 predicted 两个关系。
@@ -201,7 +201,12 @@ class FixedJudge:
     def _verify_batch(self, pairs: list[dict[str, Any]], kind: str) -> dict[str, bool]:
         valid_ids = {str(item["pair_id"]) for item in pairs}
         system = _ENTITY_SYSTEM if kind == "entity" else _RELATION_SYSTEM
-        user = json.dumps({"pairs": pairs}, ensure_ascii=False)
+        # 只把业务字段发给判分模型，避免把本地提示字段（相似度/类型/属性等价）当作答案暗示。
+        payload = [
+            {key: item[key] for key in ("pair_id", "golden", "predicted") if key in item}
+            for item in pairs
+        ]
+        user = json.dumps({"pairs": payload}, ensure_ascii=False)
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -315,14 +320,8 @@ class FixedJudge:
         stats = {"pairs_total": len(candidates), "auto": 0, "llm_pairs": 0, "llm_accept": 0, "llm_reject": 0, "llm_fallback": 0}
         for (i, j), score in candidates.items():
             gitem, pitem = golden[i], predicted[j]
-            gn, pn = _norm_name(gitem.get("name")), _norm_name(pitem.get("name"))
             gt, pt = _norm_type(gitem.get("type")), _norm_type(pitem.get("type"))
-            if gn and gn == pn and gt == pt:
-                auto.append((i, j, 1.0, "exact_name_type"))
-                continue
-            if gt == pt and score >= _NEAR_NAME_AUTO:
-                auto.append((i, j, 0.95, "near_name_same_type"))
-                continue
+            # 属性相似度由大模型判断（>=0.7 即算一致），因此候选配对不做本地自动判定。
             pending.append({
                 "pair_id": f"E-{i}-{j}",
                 "golden": _simple_entities([gitem])[0],
@@ -477,16 +476,27 @@ class FixedJudge:
         auto: list[tuple[int, int, float, str]] = []
         pending: list[dict[str, Any]] = []
         stats = {"pairs_total": 0, "auto": 0, "llm_pairs": 0, "llm_accept": 0, "llm_reject": 0, "llm_fallback": 0}
+        def _relation_endpoint_keys(relation: dict[str, Any], side: str) -> set[tuple[str, str]]:
+            name = _norm_name(relation.get(f"{side}_name"))
+            if not name:
+                return set()
+            return {(name, _norm_type(relation.get(f"{side}_type")))}
+
         for gi, grel in enumerate(golden):
             gfrom = self._endpoint_indices(grel, "from", g_typed, g_named)
             gto = self._endpoint_indices(grel, "to", g_typed, g_named)
             mapped_from = {entity_mapping[i] for i in gfrom if i in entity_mapping}
             mapped_to = {entity_mapping[i] for i in gto if i in entity_mapping}
-            if not mapped_from or not mapped_to:
+            g_from_keys = _relation_endpoint_keys(grel, "from")
+            g_to_keys = _relation_endpoint_keys(grel, "to")
+            if not g_from_keys or not g_to_keys:
                 continue
             for pj, prel in enumerate(predicted):
                 pfrom, pto = pred_endpoints[pj]
-                if not (mapped_from & pfrom) or not (mapped_to & pto):
+                # 端点匹配：实体映射下标一致，或关系端点自身的 name/type 归一化后一致。
+                from_ok = bool(mapped_from & pfrom) or bool(g_from_keys & _relation_endpoint_keys(prel, "from"))
+                to_ok = bool(mapped_to & pto) or bool(g_to_keys & _relation_endpoint_keys(prel, "to"))
+                if not from_ok or not to_ok:
                     continue
                 score = _rel_similarity(grel, prel)
                 stats["pairs_total"] += 1

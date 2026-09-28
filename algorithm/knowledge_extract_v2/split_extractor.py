@@ -62,6 +62,12 @@ from .chunk_metadata import enrich_chunk_metadata
 from .composite import CompositeElementHandler
 from .coverage import CoverageAuditor
 from .table_semantics import analyze_table_semantics
+from .official_structure import (
+    add_official_form_agents,
+    add_official_structure_entities,
+    build_official_form_agents,
+    build_official_structure_entities,
+)
 from .official_document_scope import annotate_official_roles, entity_in_official_scope, relation_in_official_scope, split_embedded_attachments
 from .official_attachments import add_official_attachment_entities
 from .document_entities import enrich_document_entities
@@ -237,6 +243,48 @@ def _compat_properties(entity: EntityCandidate, plan: ExtractionPlan) -> dict[st
         labels.get(canonical_name(key), key): value
         for key, value in entity.properties.items()
     }
+
+
+def _empty_property_value(prop: Any) -> Any:
+    """本体声明但原文未提供的属性占位值：多值属性用 []，单值属性用 ""。"""
+    data_type = re.sub(r"\s+", "", str(getattr(prop, "data_type", "") or "")).casefold()
+    if (
+        bool(getattr(prop, "multi_value", False))
+        or data_type.endswith("[]")
+        or "list<" in data_type
+        or "array<" in data_type
+    ):
+        return []
+    return ""
+
+
+def _complete_ontology_properties(
+    entities: Iterable[dict[str, Any]], plan: ExtractionPlan
+) -> list[dict[str, Any]]:
+    """输出契约：实体 properties 覆盖本体声明的全部字段，原文缺失的用空值占位。"""
+    completed: list[dict[str, Any]] = []
+    for entity in entities:
+        if not isinstance(entity, dict):
+            completed.append(entity)
+            continue
+        item = dict(entity)
+        spec = plan.class_specs.get(str(entity.get("type") or ""))
+        properties = dict(entity.get("properties") or {})
+        if spec is not None:
+            labels = {
+                canonical_name(prop.identifier): str(prop.display_name or prop.identifier)
+                for prop in spec.properties
+            }
+            filled: dict[str, Any] = {
+                str(prop.display_name or prop.identifier): _empty_property_value(prop)
+                for prop in spec.properties
+            }
+            for key, value in properties.items():
+                filled[labels.get(canonical_name(key), key)] = value
+            properties = filled
+        item["properties"] = properties
+        completed.append(item)
+    return completed
 
 
 def build_intermediate_model(
@@ -920,6 +968,36 @@ def extract_split(
         plan,
         warnings=warnings,
     )
+
+    # 确定性补充：公文表单中的职责主体（来文单位/拟办意见/领导批示）直接入池。
+    official_form_agents = (
+        build_official_form_agents(plan, extraction_manager)
+        if "official_document" in route.labels
+        else []
+    )
+    official_form_added = (
+        add_official_form_agents(pool, plan, official_form_agents, warnings=warnings)
+        if official_form_agents
+        else {"entities": 0}
+    )
+    if official_form_agents:
+        logger.info("[步骤][抽取] 表单确定性主体入池: candidates=%d added=%d",
+                    len(official_form_agents), official_form_added.get("entities", 0))
+
+    # 确定性补充：公文元数据（文件标题/来文字号/来文单位）与结构单元（通知正文/条/附件说明）。
+    official_structure_entities = (
+        build_official_structure_entities(plan, extraction_manager)
+        if "official_document" in route.labels
+        else []
+    )
+    official_structure_added = (
+        add_official_structure_entities(pool, plan, official_structure_entities, warnings=warnings)
+        if official_structure_entities
+        else {"entities": 0}
+    )
+    if official_structure_entities:
+        logger.info("[步骤][抽取] 公文结构确定性入池: candidates=%d added=%d",
+                    len(official_structure_entities), official_structure_added.get("entities", 0))
 
     # Deterministic supplement: numbered Markdown headings are structural
     # evidence, and must be present before relation candidates are proposed.
@@ -2143,6 +2221,8 @@ def extract_split(
         repair_stop_reason,
         time.monotonic() - started,
     )
+    # 输出契约：实体 properties 必须覆盖本体声明的全部字段，缺失值用空值占位。
+    raw["entities"] = _complete_ontology_properties(raw.get("entities") or [], plan)
     result = {
         "raw": raw,
         "graph": graph,

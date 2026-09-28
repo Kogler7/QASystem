@@ -360,6 +360,36 @@ def _math_atom(value: str) -> bool:
     return bool(_MATH_ATOM.fullmatch(normalized))
 
 
+def _downgrade(
+    candidate: Any,
+    code: str,
+    reason: str,
+    sink: list[dict[str, Any]] | None,
+) -> None:
+    """记录问题但不拒绝：命中护栏时降级保留（低置信标记，实体仍进入后续流程）。"""
+    if getattr(candidate, "mapping_status", "accepted") == "rejected":
+        return
+    candidate_warnings = getattr(candidate, "warnings", None)
+    if isinstance(candidate_warnings, list) and code not in candidate_warnings:
+        candidate_warnings.append(code)
+    if getattr(candidate, "mapping_score_status", None) in (None, "accepted"):
+        candidate.mapping_score_status = "low_confidence"
+    if sink is not None:
+        candidate_id = str(getattr(candidate, "candidate_id", "") or "")
+        sink.append(
+            {
+                "code": code,
+                "message": reason,
+                "path": f"entities.{candidate_id}" if candidate_id else "entities",
+                "value": {
+                    "type": _type(candidate),
+                    "name": getattr(candidate, "name", ""),
+                    "downgraded": True,
+                },
+            }
+        )
+
+
 class CandidateSelector:
     """Apply cheap pre-relation and support-aware post-relation rejection."""
 
@@ -563,7 +593,10 @@ class CandidateSelector:
         for candidate in items:
             if getattr(candidate, "mapping_status", "accepted") != "accepted":
                 continue
-            if getattr(candidate, "source", "") in {"markdown_structure", "standard_semantics", "technical_semantics"} or any(
+            if getattr(candidate, "source", "") in {
+                "markdown_structure", "standard_semantics", "technical_semantics",
+                "official_form_structure", "official_structure",
+            } or any(
                 getattr(evidence, "evidence_type", "") == "structural"
                 for evidence in _evidence(candidate)
             ):
@@ -592,10 +625,10 @@ class CandidateSelector:
             if len(distinct_names) < 5 or separators < len(unique) - 1:
                 continue
             for candidate in unique:
-                _warn(
+                _downgrade(
                     candidate,
                     "CANDIDATE_DENSE_ENUMERATION",
-                    "同一原文段落中的高密度同类枚举缺少独立实体结构",
+                    "同一原文段落中的高密度同类枚举缺少独立实体结构，已降级保留",
                     self.warnings,
                 )
 
