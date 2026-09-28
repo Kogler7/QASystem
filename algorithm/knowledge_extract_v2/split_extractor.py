@@ -82,7 +82,9 @@ from .ontology_schema import OntologySchema
 from .orchestrator import TargetedRepairOrchestrator
 from .prompt_router import (
     DocumentRoute,
+    PROMPT_VERSIONS,
     build_chat_messages,
+    disabled_document_route,
     resolve_chunk_routes,
     resolve_document_route,
 )
@@ -636,6 +638,7 @@ def extract_split(
     mapping_low_confidence_threshold: float = 0.70,
     apply_mapping_threshold: bool = False,
     best_effort: bool = False,
+    use_router: bool = True,
     repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
     identity_admission: str = "quarantine",
@@ -683,7 +686,10 @@ def extract_split(
             error_code=terminal_warning.code if terminal_warning is not None else "",
         )
     started = time.monotonic()
-    resolved_chunks = split_embedded_attachments(plan, resolved_chunks, resolve_chunk_routes(plan, resolved_chunks))
+    if use_router:
+        resolved_chunks = split_embedded_attachments(
+            plan, resolved_chunks, resolve_chunk_routes(plan, resolved_chunks)
+        )
     chunk_source_ids = {chunk.chunk_id: chunk.metadata["source_chunk_id"] for chunk in resolved_chunks if chunk.metadata.get("source_chunk_id")}
     scannable = [chunk for chunk in resolved_chunks if (chunk.text or "").strip()]
     skipped_ids = [chunk.chunk_id for chunk in resolved_chunks if not (chunk.text or "").strip()]
@@ -713,9 +719,15 @@ def extract_split(
     contract_counts = _warning_codes(chunk_warnings)
     # 重名 chunk 在 manager 构造时可能被改名，扫描集合与路由映射需在其后建立。
     scannable_ids = {chunk.chunk_id for chunk in scannable}
-    route_map = resolve_chunk_routes(plan, resolved_chunks)
-    route = resolve_document_route(plan, resolved_chunks)
-    official_roles = annotate_official_roles(plan, resolved_chunks, route_map)
+    if use_router:
+        route_map = resolve_chunk_routes(plan, resolved_chunks)
+        route = resolve_document_route(plan, resolved_chunks)
+        official_roles = annotate_official_roles(plan, resolved_chunks, route_map)
+    else:
+        # 路由关闭：不识别文档类型，所有 chunk 统一走通用算法与通用 prompt。
+        route = disabled_document_route()
+        route_map = {chunk.chunk_id: route for chunk in resolved_chunks}
+        official_roles = {}
     extraction_chunks = [chunk for chunk in scannable if official_roles.get(chunk.chunk_id) != "attachment"]
     extraction_manager = ChunkContextManager(extraction_chunks)
     body_manager = ChunkContextManager([chunk for chunk in extraction_chunks if official_roles.get(chunk.chunk_id) != "form"])
@@ -765,6 +777,8 @@ def extract_split(
     profile_extra = {
         "chunk_source_ids": chunk_source_ids,
         "official_document_roles": official_roles,
+        "router_enabled": use_router,
+        "prompt_versions": dict(PROMPT_VERSIONS),
         "table_semantics": table_semantics,
         "ontology_compiler_version": ONTOLOGY_COMPILER_VERSION,
         "metadata_enrichment": metadata_counts,
@@ -823,8 +837,16 @@ def extract_split(
         adjudicator=entity_adjudicator,
         ontology_namespace=plan.ontology_id,
         identity_admission=identity_admission,
-        entity_admission=lambda candidate: entity_in_official_scope(plan, manager, candidate),
-        relation_admission=lambda candidate: relation_in_official_scope(plan, manager, candidate),
+        entity_admission=(
+            (lambda candidate: entity_in_official_scope(plan, manager, candidate))
+            if use_router
+            else None
+        ),
+        relation_admission=(
+            (lambda candidate: relation_in_official_scope(plan, manager, candidate))
+            if use_router
+            else None
+        ),
     )
     known_entities = pool.entity_catalog()
 
@@ -2135,6 +2157,8 @@ def extract_split(
         "mapping": mapping_summary,
         "profile": {
             "document_route": route.to_dict(),
+            "router_enabled": use_router,
+            "prompt_versions": dict(PROMPT_VERSIONS),
             "pipeline": "two_pass",
             "chunks": len(resolved_chunks),
             "scannable_chunks": len(scannable),

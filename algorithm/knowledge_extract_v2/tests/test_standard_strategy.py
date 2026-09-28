@@ -290,6 +290,26 @@ class IntegrationTest(unittest.TestCase):
         for key in ("graph", "triples", "intermediate_model", "coverage_gaps", "mapping"):
             self.assertIn(key, result)
 
+    def test_extract_split_router_disabled_uses_generic(self) -> None:
+        result = SE.extract_split(
+            STANDARD_ONTOLOGY,
+            chunks=[
+                CC.ExtractionChunk(
+                    chunk_id="chunk-0",
+                    text=STANDARD_TEXT + "\n电池单体按6.2.1检验，外观应无变形及裂纹。",
+                )
+            ],
+            llm=StubLLM(),
+            use_router=False,
+        )
+        route = result["profile"]["document_route"]
+        self.assertEqual(route["kind"], "generic")
+        self.assertEqual(route["labels"], [])
+        self.assertEqual(route["reasons"], ["router.disabled"])
+        self.assertIs(result["profile"]["router_enabled"], False)
+        self.assertIsNone(result["error_code"])
+        self.assertEqual(result["raw"], {"entities": [], "relations": []})
+
     def test_standard_01_verbatim_gold_entities(self) -> None:
         # gold 中编号/名称逐字落在原文的实体（span-first 只能产出这些；
         # 确定性结构关系组装依赖封面/规范性引用结构，此处不覆盖）。

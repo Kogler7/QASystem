@@ -27,7 +27,25 @@ class ChatMessage(TypedDict):
 ChatMessages = list[ChatMessage]
 
 
-BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
+GENERIC_STRUCTURE_RULES = """[通用归类与粒度规则]
+- 使用最具体的类型；不要用父类/抽象类型重复表达同一实体。
+- 同一现实对象只保留一个实体：全称、简称、别名、编号不拆成多个；同一对象的不同表达应复用同一实体。
+- 结构实体只按实际标题层级创建；一个标题只用一个最合适的结构类型；段落、列表、条目类内容优先抽为结构单元，不要拆成零散活动。
+- 行为/工作事项以“一个动宾事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合为一个；原文中并列出现的多个动宾事项必须分别抽取，不得只取其一或强行合并。
+- 字段缺失保持缺失，不要用模板标题、编号或其他字段填充；不要把普通名词都抽成业务对象，只有作为管理/治理/建设/约束/交换/引用对象出现的才抽取。
+"""
+
+
+GENERIC_SEMANTIC_RULES = """[通用语义归类规则]
+- 属性类实体是事实：对对象、能力、状态或测量结果的客观陈述，回答是什么、值多少；约束类实体是规则：要求、限定、条件或允许范围，回答应当/必须/不得超过/不得低于/适用什么条件。
+- 规则句归约束，事实句归属性；同一特性可分别以事实和规则出现，不要合并或改名。
+- 义务/禁止性表述（应/不应/不得/严禁/禁止/未经……不得）优先归约束类实体，不要把其中的动作短语拆成独立活动；试验方法、操作步骤、单位、公式、计算过程不作为约束。
+- 同一范围内同一特性或同一规则的多个数值先合并为一条，再用属性记录最大值/最小值/范围/单位，不要按条件或测试项拆成多条。
+- 实体/属性名只写名词短语本身，不要带“要求/条件/方法/步骤/单位/计算/试验/计量”等结构词尾。
+"""
+
+
+_BASE_SYSTEM_PROMPT_HEAD = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v5
 你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。
 只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。
 
@@ -36,8 +54,10 @@ BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 - mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。
 - evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。
 - 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。
+"""
 
-[实体提取规则]
+
+_BASE_SYSTEM_PROMPT_TAIL = """[实体提取规则]
 - 优先提取显式命名的实体。
 - 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。
 - 同类型实体的 mention 长度应合理（避免截断或过度包含）。
@@ -62,47 +82,55 @@ BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 - 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。
 """
 
-OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v6
+
+BASE_SYSTEM_PROMPT = (
+    _BASE_SYSTEM_PROMPT_HEAD
+    + "\n"
+    + GENERIC_STRUCTURE_RULES
+    + "\n"
+    + GENERIC_SEMANTIC_RULES
+    + "\n"
+    + _BASE_SYSTEM_PROMPT_TAIL
+)
+
+OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v7
 领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。
-这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
 公文抽取精度规则：
 - 表单仅用于抽取一个 OfficialDocument（公文管理单元），mention 优先使用文件标题，缺失时可使用明确的收文号或来文字号；正文仅抽取结构单元和其他业务内容，不从正文新增公文管理单元。
 - 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit，而不是拆成多个 OperationalActivity。
 - 正文中提到的材料、反馈表、报告等信息对象可按本体抽取；附件文件由系统保存为 OperationalInformation 容器，信息类型为附件，附件内容不参与知识抽取。
 - 发布通知、报送反馈、安全事件报告等明确传递/报送行为应抽取为 OperationalExchange。
-- OperationalActivity 以“动宾工作事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合成一个活动；但原文中并列出现的多个动宾事项必须分别抽取，不得只取其中一个或强行合并。
-  · 例如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“高等级网络系统部署管控”“其他网络系统风险防范”“安全监测与事件处置”“报送排查反馈表”各为一个活动。
-  · 又如“……按照任务分工进行分解落实、健全项目管理机制、加强资源投入、确保按计划完成项目实施、打造人工智能高质量数据集建设标杆示范”这类并列动宾，应各自抽为一个活动。
-  · 不要把“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”这类同一动宾事项的状语/结果短语再拆成独立活动。
-- 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不应把其中的动作短语拆成 OperationalActivity。
-- 不要把风险描述中的“病毒”“内部系统”“邮箱”等普通名词都抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。
+- 公文中的动宾事项示例：“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“报送排查反馈表”各为一个活动；不要把“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”这类同一动宾事项的状语/结果短语拆成独立活动。
+- 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不要把这些要求中的动作短语拆成 OperationalActivity。
+- 风险描述中的“病毒”“内部系统”“邮箱”等普通名词不要抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。
 
 公文表单/收文处理单规则：
 - “收文处理单”“表单”“领导批示”不是文件标题。文件标题字段缺失时保持缺失，不用模板标题、编号或其他文件标题填充。
 - 收文处理单、表单、审批单只提供公文管理单元属性。拟办意见、领导批示、收文号、来文单位、收文日期、主送、抄送等均保留为 OfficialDocument 的本体属性。
 - 表单中即使出现明确的职责、任务、约束或报送行为，也不拆成 OperationalAgent / OperationalActivity / OperationalConstraint / OperationalExchange；不抽取 DocumentUnit。"""
 
-STANDARD_PROMPT_EXTENSION = """STANDARD_PROMPT_EXTENSION v2
+STANDARD_PROMPT_EXTENSION = """STANDARD_PROMPT_EXTENSION v3
 领域表达提示：若文本是标准/规范，重点识别标准号、标准标题、章条编号、要求/试验/检验条款、引用标准、约束指标和适用对象。
-这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
 标准抽取精度规则：
-- 机构角色优先使用最具体的类型：发布机构 Publishing Organization、提出机构 Proposing Organization、归口部门 CompetentDepartment、起草单位 Drafting Organization、组织实施单位 Implementing Organization 等；不要额外创建父类 Organization 来表达同一个机构。
 - 一个标准只保留一个 Standard 实体，不要将标准编号、标题或简称拆成多个 Standard。
-- 标准整体对象使用 StandardizationObject（例如“电动汽车用动力蓄电池单体”）；不要在条款中为同一对象的简称/别名另建 Subject of Standardization。
-- 若文本中的“电池单体”“锂离子电池单体”“金属氢化物镍电池单体”等只是同一标准化对象在不同条款中的表达，应复用已有 StandardizationObject，不要创建冗余对象实体。
-- Clause、Subclause、Section、Annex 等结构实体只按实际标题层级创建，不要同时用多个结构类型重复表达同一个标题。
-- 不要因为条款中出现了多个约束数值，就把同一条要求拆成多个互相独立的 Constrain；先合并为同一特性的约束，再在属性中记录最大值/最小值/单位。
-- property 是事实：对对象、能力、状态或测量结果的客观陈述，回答是什么、值多少。
-- constraint 是规则：要求、限定、条件或允许范围，回答应当/必须/不得超过/不得低于/适用什么条件。
-- 规则句归 Constrain，事实句归 Property；同一特性可分别以事实和规则出现，不要合并或改名。
+- 标准整体对象使用 StandardizationObject（例如“电动汽车用动力蓄电池单体”）；不要为同一对象另建 Subject of Standardization。
+- 机构角色优先使用最具体的类型：发布机构 Publishing Organization、提出机构 Proposing Organization、归口部门 CompetentDepartment、起草单位 Drafting Organization、组织实施单位 Implementing Organization 等。
+- Clause、Subclause、Section、Annex 等结构实体按实际标题层级选择最匹配的一类创建，不要用多个结构类型重复表达同一个标题。
 - Property 字段：name(<=8字)、type(描述型/能力型/约束型)、value、quote。
 - Constrain 字段：name(<=20字)、type(时间/权限/安全/流程/质量/合规约束)、min、max、range、unit、property、quote。
 - quote 必须逐字来自正文；同一名称只输出一次；无依据不输出。
-- Property 的 name 只写特性名词本身（<=8字），不要带 要求/条件/方法/步骤/单位/计算/试验/计量 等词尾。
-- Constraint 只收规范性要求（应/不应/不得/不超过/不低于/范围/条件）；试验方法、操作步骤、单位、公式、计算过程不要输出。
-- 同一条款内同一特性或同一规则先合并再输出，只给一条，不要按条件/测试项目拆成多条。"""
+- 正文中的「引用」指注释（Note）或第 2 章「规范性引用文件」（ReferencedDocuments）；不要把「引用」与文末「参考文献」混为一类。
+- 条款正文中的「注：…」抽取为「引用」（Reference / InformationForm），由所属条款通过 hasRepresentationForm 关联；不要抽成 Additional Information 或 Note。
+- 标准文末的「参考文献」是文档中名为「参考文献」的独立章节（信息性要素），不是附录；其条目使用 Reference，容器使用 InformationUnit 参考文献；不要与第 2 章规范性引用文件混为一类。"""
+
+
+PROMPT_VERSIONS = {
+    "base": "v5",
+    "official_document": "v7",
+    "standard": "v3",
+}
 
 
 _DOMAIN_ORDER: tuple[RouteKind, RouteKind] = ("official_document", "standard")
@@ -521,6 +549,21 @@ def resolve_document_route(
     )
 
 
+ROUTER_DISABLED_REASON = "router.disabled"
+
+
+def disabled_document_route() -> DocumentRoute:
+    """路由关闭时的占位路由：不识别文档类型，只用通用算法与通用 prompt。"""
+    return DocumentRoute(
+        kind="generic",
+        source="fallback",
+        labels=(),
+        reasons=(ROUTER_DISABLED_REASON,),
+        decision="disabled",
+        router_version=ROUTER_VERSION,
+    )
+
+
 def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> str:
     lines: list[str] = []
     for type_id in sorted(plan.allowed_types):
@@ -783,7 +826,6 @@ def build_chat_messages(
 - 每项只能包含 type、mention、start_char、end_char、evidence.quote；禁止 name、properties 或其他键。
 - mention 可以是 current chunk.text 中逐字连续的原文片段，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。
 - start_char/end_char 是 chunk-relative、左闭右开区间；mention 无法逐字定位时填 0，系统会按 evidence.quote 兜底。
-- 数值、单位、标量属性值、字段标签和修饰词不是独立实体；同一 type + 完全相同 mention 每个 chunk 只输出一次。
 - 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。"""
         if has_table:
             entity_rules += _RECORD_TABLE_ENTITY_RULES + rule_scope
@@ -905,4 +947,8 @@ __all__ = [
     "build_chat_messages",
     "resolve_chunk_routes",
     "resolve_document_route",
+    "disabled_document_route",
+    "GENERIC_STRUCTURE_RULES",
+    "GENERIC_SEMANTIC_RULES",
+    "PROMPT_VERSIONS",
 ]

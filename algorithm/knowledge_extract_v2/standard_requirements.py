@@ -7,7 +7,7 @@ from ._logging import get_step_logger
 from .candidate_models import EntityCandidate
 from .evidence import Evidence
 from .graph_utils import canonical_name
-from .prompt_router import STANDARD_PROMPT_EXTENSION
+from .prompt_router import GENERIC_SEMANTIC_RULES, STANDARD_PROMPT_EXTENSION
 
 logger = get_step_logger(__name__)
 
@@ -16,7 +16,9 @@ CTYPES = {"时间约束", "权限约束", "安全约束", "流程约束", "质�
 BLOCK = {"适用范围", "电池类型", "范围", "电性能要求", "充电方法"}
 
 SYSTEM = (
-    STANDARD_PROMPT_EXTENSION
+    GENERIC_SEMANTIC_RULES
+    + "\n\n"
+    + STANDARD_PROMPT_EXTENSION
     + "\n\n任务：对给定条款正文输出 items 数组，元素为 property 或 constraint，字段按上规则；只输出 JSON object，顶层键为 items。"
 )
 SCHEMA = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {

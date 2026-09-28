@@ -707,6 +707,31 @@ def align_standard_graph(
                 table_linked = True
                 break
 
+    # ---- clause notes as Reference (引用) ---------------------------------
+    note_line = re.compile(r"(?m)^\s*注\s*[：:]\s*(.+?)\s*$")
+    section_clause_by_prefix: dict[str, str] = {}
+    for section_head in sections:
+        section_clause = _head_clause_name(section_head, str(section_head["number"]))
+        if graph.has("Clause", section_clause):
+            section_clause_by_prefix[str(section_head["number"])] = section_clause
+    for head, kind, owner in head_meta:
+        body = head["body"]
+        if not body:
+            continue
+        key = head["number"] or norm(head["text"])
+        clause_name = _head_clause_name(head, key)
+        if not graph.has("Clause", clause_name):
+            prefix = str(head["number"]).split(".")[0] if head["number"] else ""
+            clause_name = section_clause_by_prefix.get(prefix, "")
+        if not clause_name:
+            continue
+        for match in note_line.finditer(body):
+            note_text = clean(match.group(1))
+            if not note_text:
+                continue
+            note_name = "注：" + note_text
+            graph.add_entity("Reference", note_name, {"内容描述": note_text})
+            graph.add_rel("Clause", clause_name, "hasRepresentationForm", "Reference", note_name)
     # ---- requirement clause semantic links ------------------------------
     test_prefixes: set[str] = set()
     for head in sections:

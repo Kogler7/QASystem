@@ -383,6 +383,7 @@ def call_extract(
     max_tokens: int | None,
     max_workers: int | None,
     best_effort: bool = False,
+    use_router: bool = True,
     max_attempts: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """调用 knowledge_extract_v2 抽取一个 case，返回 (entities, relations)。"""
@@ -405,6 +406,7 @@ def call_extract(
         "api_key": api_key,
         "max_tokens": max_tokens,
         "max_workers": max_workers,
+        "use_router": use_router,
     }
     if best_effort:
         extract_kwargs["best_effort"] = True
@@ -975,6 +977,13 @@ def parse_args() -> argparse.Namespace:
         help="允许部分 chunk 抽取失败时返回已有结果（默认开启；可用 --no-best-effort 关闭）",
     )
     parser.add_argument(
+        "--use-router",
+        "--router",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="是否启用文档类型路由（--no-use-router / --no-router 关闭后只用通用算法与通用 prompt；默认启用）",
+    )
+    parser.add_argument(
         "--max-workers",
         type=int,
         default=None,
@@ -1174,6 +1183,7 @@ def main() -> int:
                     max_tokens=args.max_tokens,
                     max_workers=args.max_workers,
                     best_effort=args.best_effort,
+                    use_router=args.use_router,
                     max_attempts=args.max_attempts,
                 )
                 print(
@@ -1270,6 +1280,7 @@ def main() -> int:
         "max_attempts": args.max_attempts,
         "max_workers": args.max_workers,
         "best_effort": args.best_effort,
+        "use_router": args.use_router,
         "output_dir": str(output_dir),
         "overall": aggregate_metrics(per_case),
         "datasets": {},
