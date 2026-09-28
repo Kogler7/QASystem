@@ -50,10 +50,4 @@ eval:
   judge_batch_size: 20
 
 # 每个类型共用一份本体；也可在 <类型>/<case>/ontology 下放 case 级本体。
-groups:
-  公文:
-    ontology: 公文/ontology
-  标准:
-    ontology: 标准/ontology
-  规则:
-    ontology: 规则/ontology
+groups: {}
