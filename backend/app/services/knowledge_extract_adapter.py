@@ -1,18 +1,25 @@
-"""Adapter exposing Knowledge Extract V2 through the V1 batch contract.
+"""Adapter exposing the configured Knowledge Extract version through the V1 batch contract.
 
 ``GraphExtractionService`` and the MCP extraction tool were written against
 ``algorithm.knowledge_extract`` (V1), whose batch entry point takes one plain
-string per chunk and returns one result item per chunk.  V2 is an aggregate
-pipeline: it consumes ``ExtractionChunk`` objects, runs one pass over the whole
-document, and returns a single merged graph.
+string per chunk and returns one result item per chunk.  V2/V3 are aggregate
+pipelines: they consume ``ExtractionChunk`` objects, run one pass over the whole
+document, and return a single merged result.
 
-This module bridges the two without touching V2.  It runs V2 once, then
-projects the document-level result back onto the individual chunks using each
-entity's evidence anchor, so the caller keeps seeing one item per chunk and
-``deduplicate_chunk_graphs`` can still rebuild the merged graph (and its
-``chunk_indices``) exactly as before.
+This module bridges the two without touching the versioned packages.  The
+environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
+``algorithm.knowledge_extract_version``) selects the concrete algorithm:
 
-Two deliberate choices worth knowing about:
+* ``v2`` (default): run ``extract_harness`` once, then project the
+  document-level result back onto the individual chunks using each entity's
+  evidence anchor, so the caller keeps seeing one item per chunk and
+  ``deduplicate_chunk_graphs`` can still rebuild the merged graph (and its
+  ``chunk_indices``) exactly as before.
+* ``v3``: run ``extract_detailed`` with the V2-configured LLM client, reshape
+  its flat ``entities``/``relations`` result into the V2 aggregate contract
+  (``_v3_to_aggregate``), then share the same projection.
+
+Two deliberate choices worth knowing about for the V2 path:
 
 * ``validation_mode="permissive"``.  In strict mode V2 turns *any* verification
   hard issue (a single unlocatable evidence quote, one duplicate entity) into a
@@ -28,7 +35,10 @@ import json
 import logging
 import re
 from copy import deepcopy
+from types import SimpleNamespace
 from typing import Any, Callable, Iterable, Sequence
+
+from algorithm.knowledge_extract_version import V3, get_extract_version
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +87,7 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
     graph_publishable = verification.get("valid") is not False and status not in {
         "failed",
     }
-    return {
+    summary = {
         "status": status,
         "error_code": result.get("error_code") or None,
         "verification": deepcopy(verification) if isinstance(verification, dict) else {},
@@ -86,6 +96,10 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
             profile.get("repair_stop_reason") if isinstance(profile, dict) else None
         ),
     }
+    # 评测侧需要知道本次结果出自哪版算法；由 run_aggregate 盖戳。
+    if result.get("extract_version"):
+        summary["extract_version"] = result["extract_version"]
+    return summary
 
 
 def _chunk_id(position: int) -> str:
@@ -229,6 +243,169 @@ def build_chunks(
     return chunks
 
 
+def _v3_source_block_ids(refs: Any) -> list[str]:
+    """Collect the chunk ids a V3 ``source_refs`` list points at, in order."""
+    ids: list[str] = []
+    for ref in refs or ():
+        if not isinstance(ref, dict):
+            continue
+        chunk_id = str(ref.get("chunk_id") or "")
+        if chunk_id and chunk_id not in ids:
+            ids.append(chunk_id)
+    return ids
+
+
+#: V3 reports success/incomplete/failed; the adapter contract is the V2
+#: succeeded/partial/failed vocabulary.
+_V3_STATUS_MAP = {"success": "succeeded", "incomplete": "partial", "failed": "failed"}
+
+
+def _v3_to_aggregate(result: dict[str, Any]) -> dict[str, Any]:
+    """Reshape V3's flat fact list into the V2 aggregate ``project_items`` expects.
+
+    V3 entities/relations locate their evidence through ``source_refs[].chunk_id``
+    (the ids ``build_chunks`` assigned), which maps onto V2's
+    ``evidence[].source_block_ids`` so chunk projection, failure attribution and
+    ``deduplicate_chunk_graphs`` keep working unchanged.  Diagnostics become
+    non-terminal attempts: they are reported for observability but never mark a
+    chunk failed -- V3's document-level ``status`` already carries that verdict.
+    """
+    entities = [item for item in (result.get("entities") or []) if isinstance(item, dict)]
+    relations = [item for item in (result.get("relations") or []) if isinstance(item, dict)]
+
+    nodes: list[dict[str, Any]] = []
+    objects: list[dict[str, Any]] = []
+    for entity in entities:
+        name = str(entity.get("name") or "")
+        entity_type = str(entity.get("type") or "")
+        uid = _uid_for(entity_type, name)
+        properties = entity.get("properties")
+        nodes.append(
+            {
+                "uid": uid,
+                "label": entity_type,
+                "properties": {"name": name, **(properties if isinstance(properties, dict) else {})},
+            }
+        )
+        objects.append(
+            {
+                "id": uid,
+                "type": entity_type,
+                "identity": name,
+                "evidence": [{"source_block_ids": _v3_source_block_ids(entity.get("source_refs"))}],
+            }
+        )
+
+    relationships: list[dict[str, Any]] = []
+    for relation in relations:
+        rel_type = str(relation.get("rel_type") or "")
+        if not rel_type:
+            continue
+        evidences: list[dict[str, Any]] = []
+        for ref in relation.get("source_refs") or ():
+            if not isinstance(ref, dict):
+                continue
+            chunk_id = str(ref.get("chunk_id") or "")
+            if not chunk_id:
+                continue
+            entry: dict[str, Any] = {"source_block_ids": [chunk_id]}
+            if ref.get("quote"):
+                entry["quote"] = ref["quote"]
+            evidences.append(entry)
+        relationships.append(
+            {
+                "from_uid": _uid_for(relation.get("from_type"), relation.get("from_name")),
+                "to_uid": _uid_for(relation.get("to_type"), relation.get("to_name")),
+                "type": rel_type,
+                "evidences": evidences,
+            }
+        )
+
+    attempts: list[dict[str, Any]] = []
+    for diagnostic in result.get("diagnostics") or ():
+        if not isinstance(diagnostic, dict):
+            continue
+        attempts.append(
+            {
+                "attempt": 1,
+                "type": str(diagnostic.get("code") or "diagnostic").lower(),
+                "pass": None,
+                "chunk": diagnostic.get("chunk_id") or diagnostic.get("observation_id"),
+                "message": diagnostic.get("message") or diagnostic.get("code"),
+                "response_status": None,
+            }
+        )
+
+    status = _V3_STATUS_MAP.get(str(result.get("status") or ""))
+    if status is None:
+        status = "partial" if (entities or relations) else "failed"
+    return {
+        "status": status,
+        "error_code": None,
+        "graph": {"nodes": nodes, "relationships": relationships},
+        "intermediate_model": {"objects": objects, "relations": []},
+        # raw keeps V3's five-field relations, which is exactly what
+        # ``deduplicate_chunk_graphs`` reads when recovering cross-chunk edges.
+        "raw": {"entities": entities, "relations": relations},
+        "attempts": attempts,
+        "warnings": [],
+        "profile": {"chunk_source_ids": {}, "extract_stats": result.get("stats") or {}},
+    }
+
+
+class _V3ClientBridge:
+    """Give V3 the ``client(messages) -> StructuredLLMResponse`` callable it expects.
+
+    Built on V2's configured client so both versions run against the same
+    ``KG_EXTRACT_LLM_*`` endpoint (and so V3's ``ProviderConfig`` HTTPS-only
+    validation, which would reject the internal HTTP LLM, is not involved).
+    """
+
+    def __init__(self, llm: Any):
+        self._llm = llm
+        # V3's harness reads ``client.config.max_tokens`` as output-token reserve.
+        self.config = SimpleNamespace(max_tokens=getattr(llm, "max_tokens", 16384))
+
+    def __call__(self, messages: list[dict[str, str]]) -> Any:
+        return self._llm.generate_structured(
+            {},
+            messages,
+            {"response_mode": "json_object", "schema_name": "kg_extract_v3"},
+        )
+
+
+def _run_v3_aggregate(
+    *,
+    ontology: str,
+    chunks: Iterable[Any],
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    max_workers: int | None = None,
+    **_ignored: Any,
+) -> dict[str, Any]:
+    """Run V3's ``extract_detailed`` once over every chunk, V2-contract shaped."""
+    from algorithm.knowledge_extract_v2.llm_client import create_llm_client
+    from algorithm.knowledge_extract_v3 import extract_detailed
+
+    llm = create_llm_client(base_url=base_url or "", api_key=api_key or "", model=model or "")
+    result = extract_detailed(
+        list(chunks),
+        ontology,
+        llm=_V3ClientBridge(llm),
+        max_workers=max(1, int(max_workers or 4)),
+    )
+    return _v3_to_aggregate(result)
+
+
+def _default_runner(version: str) -> Callable[..., dict[str, Any]]:
+    if version == V3:
+        return _run_v3_aggregate
+    from algorithm.knowledge_extract_v2 import extract_harness
+
+    return extract_harness
+
+
 def run_aggregate(
     ontology: str,
     texts: Sequence[str],
@@ -242,12 +419,11 @@ def run_aggregate(
     metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Run the V2 pipeline once over every chunk and return its raw result."""
+    """Run the configured extraction version once over every chunk and return its raw result."""
+    version = get_extract_version()
     if runner is None:
-        from algorithm.knowledge_extract_v2 import extract_harness
-
-        runner = extract_harness
-    return runner(
+        runner = _default_runner(version)
+    result = runner(
         ontology=ontology,
         chunks=build_chunks(texts, ranges, metadata),
         target_types=list(target_types) if target_types is not None else None,
@@ -258,6 +434,9 @@ def run_aggregate(
         api_key=api_key,
         max_workers=max_workers,
     )
+    # 盖戳供 _quality_summary 透传，评测侧据此区分结果出自哪版算法。
+    result["extract_version"] = version
+    return result
 
 
 def _uid_for(type_id: Any, identity: Any) -> str:
@@ -523,7 +702,8 @@ def project_items(
             }
         )
     logger.info(
-        "knowledge extract v2 run: status=%s error_code=%s chunks=%d failed_chunks=%d nodes=%d",
+        "knowledge extract %s run: status=%s error_code=%s chunks=%d failed_chunks=%d nodes=%d",
+        result.get("extract_version") or "v2",
         result.get("status"),
         result.get("error_code"),
         total,
@@ -546,12 +726,15 @@ def extract_chunks(
     metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """V2-backed replacement for V1's ``extract_chunks``.
+    """Version-switched replacement for V1's ``extract_chunks``.
 
     Keeps V1's guarantees: one item per input chunk, and never raises.
+    A misconfigured ``KG_EXTRACT_ALGO_VERSION`` is the one exception: it is a
+    configuration error, so it propagates instead of becoming per-chunk failures.
     """
     if not chunks:
         return []
+    version = get_extract_version()
     try:
         result = run_aggregate(
             ontology,
@@ -566,7 +749,7 @@ def extract_chunks(
             runner=runner,
         )
     except Exception as exc:  # noqa: BLE001 - mirror V1's per-call error containment
-        logger.warning("knowledge extract v2 call failed: %s", exc)
+        logger.warning("knowledge extract %s call failed: %s", version, exc)
         # V2 的结构化错误（如 ONTOLOGY_EMPTY）带 error_code，原样透传避免被泛化。
         error_code = str(getattr(exc, "error_code", "") or "EXTRACTION_EXCEPTION")
         message = str(exc).strip() or "知识抽取调用异常"
@@ -590,6 +773,7 @@ def extract_chunks(
                     "verification": {},
                     "graph_publishable": False,
                     "repair_stop_reason": None,
+                    "extract_version": version,
                 },
                 "error": message,
                 "error_code": error_code,
@@ -608,7 +792,7 @@ def run_single_document(
     base_url: str | None = None,
     api_key: str | None = None,
 ) -> dict[str, Any]:
-    """Run V2 over one text and return a compact result for the MCP tool.
+    """Run the configured extraction version over one text for the MCP tool.
 
     Success returns the ``raw`` / ``graph`` / ``warnings`` / ``attempts`` /
     ``profile`` keys V1 exposed.  Failure returns ``_error`` so

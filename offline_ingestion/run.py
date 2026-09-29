@@ -6,6 +6,12 @@
   <类型>/<case>/extract/golden.json
 类型级本体在 <类型>/ontology/，也可用 params.yaml 覆盖。
 
+后台评测按模式归一化成三类（--mode，可组合）：
+  extract       仅知识抽取：经 --from-run 复用上次运行的 chunks.json，只调抽取接口；
+                切片固定不变，适合对照 KG_EXTRACT_ALGO_VERSION 不同版本的算法效果
+  chunk-extract 切片+抽取：解析（或复用 document.md）→ 切片 → 抽取并评分（默认）
+  pipeline      全流程知识沉淀：POST /api/v1/pipelines/knowledge-ingestion 并评分
+
 本目录只调已有 HTTP / MCP，不 import algorithm / backend。
 """
 from __future__ import annotations
@@ -264,6 +270,21 @@ def resolve_path(workspace: Path, raw: str) -> Path:
     if not path.is_absolute():
         path = (workspace / path).resolve()
     return path
+
+
+def resolve_reuse_dir(workspace: Path, raw: str) -> Path:
+    """--from-run：接受 _runs 下的时间戳目录名或任意路径。"""
+    path = Path(raw).expanduser()
+    candidates = (
+        [path]
+        if path.is_absolute()
+        else [Path.cwd() / path, workspace / "_runs" / raw, workspace / path]
+    )
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved.is_dir():
+            return resolved
+    raise FileNotFoundError(f"--from-run 目录不存在: {raw}")
 
 
 def read_ontology(path: Path) -> str:
@@ -1481,26 +1502,14 @@ def emit_metrics(header: str, metrics: dict[str, Any] | None) -> None:
         print(line, flush=True)
 
 
-def run_backend_case(
-    *,
+def _parse_sources(
     base_url: str,
-    ontology: str,
     sources: list[Path],
     options: dict[str, Any],
     params: dict[str, Any],
-    golden: dict[str, Any] | None,
     out_dir: Path,
-    score_ctx: dict[str, Any] | None = None,
-    run_system: bool = False,
-) -> dict[str, Any]:
-    result: dict[str, Any] = {
-        "system": {"status": "skipped", "message": "默认不跑 knowledge-ingestion；需要时加 --system"},
-        "modules": {
-            "parse": {"status": "failed"},
-            "chunk": {"status": "failed"},
-            "extract": {"status": "failed"},
-        },
-    }
+) -> tuple[str, dict[str, Any]]:
+    """模块 parse：docs/ 原文件 → 拼接 Markdown。"""
     markdown_parts: list[str] = []
     parse_failures: list[dict[str, Any]] = []
     parse_started = time.perf_counter()
@@ -1520,10 +1529,9 @@ def run_backend_case(
             log(f"模块 parse 失败 {source.name}: {failed['message']}")
     parse_elapsed = elapsed_seconds(parse_started)
     markdown = "\n\n".join(markdown_parts)
-    items: list[dict[str, Any]] = []
     if markdown.strip():
         write_text(out_dir / "document.md", markdown)
-        result["modules"]["parse"] = {
+        block = {
             "status": "partial" if parse_failures else "succeeded",
             "files": len(sources),
             "parsed": len(markdown_parts),
@@ -1531,9 +1539,9 @@ def run_backend_case(
             "failed_files": parse_failures,
             "elapsed_seconds": parse_elapsed,
         }
-        log(f"模块 parse {result['modules']['parse']['status']} {format_duration(parse_elapsed)}")
+        log(f"模块 parse {block['status']} {format_duration(parse_elapsed)}")
     else:
-        result["modules"]["parse"] = {
+        block = {
             "status": "failed",
             "files": len(sources),
             "parsed": 0,
@@ -1541,107 +1549,251 @@ def run_backend_case(
             "failed_files": parse_failures,
             "elapsed_seconds": parse_elapsed,
         }
-        result["modules"]["chunk"] = {"status": "skipped", "message": "解析无可用 Markdown"}
-        result["modules"]["extract"] = {"status": "skipped", "message": "解析无可用 Markdown"}
         log(f"模块 parse 失败 {format_duration(parse_elapsed)}")
+    return markdown, block
 
-    if markdown.strip():
-        chunk_started = time.perf_counter()
+
+def _chunk_markdown(
+    base_url: str,
+    markdown: str,
+    file_name: str,
+    options: dict[str, Any],
+    params: dict[str, Any],
+    out_dir: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """模块 chunk：Markdown → 切片。切片失败时按整篇兜底，抽取照常跑。"""
+    chunk_started = time.perf_counter()
+    try:
+        envelope = chunk_document(base_url, markdown, file_name, options, params)
+        write_json(out_dir / "chunks.json", envelope)
+        data = envelope.get("data") or {}
+        items = list(data.get("items") or [])
+        if not items:
+            raise RuntimeError("切片结果为空")
+        block = {
+            "status": "succeeded",
+            "chunk_count": data.get("count") if data.get("count") is not None else len(items),
+            "elapsed_seconds": elapsed_seconds(chunk_started),
+        }
+        log(f"模块 chunk succeeded {format_duration(block['elapsed_seconds'])}")
+        return items, block
+    except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        block = fail_payload(exc)
+        block["elapsed_seconds"] = elapsed_seconds(chunk_started)
+        log(f"模块 chunk 失败 {format_duration(block['elapsed_seconds'])}: {block['message']}")
+        return [{"text": markdown, "range": [0, len(markdown)]}], block
+
+
+def extract_version_from(envelope: dict[str, Any]) -> str | None:
+    """服务端在 quality 里盖戳本次抽取用的算法版本（KG_EXTRACT_ALGO_VERSION）。"""
+    for layer in _payload_layers(envelope):
+        quality = layer.get("quality") if isinstance(layer, dict) else None
+        if isinstance(quality, dict) and quality.get("extract_version"):
+            return str(quality["extract_version"])
+    return None
+
+
+def _extract_items(
+    base_url: str,
+    ontology: str,
+    items: list[dict[str, Any]],
+    options: dict[str, Any],
+    params: dict[str, Any],
+    golden: dict[str, Any] | None,
+    out_dir: Path,
+    score_ctx: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """模块 extract：切片 → 图谱 → 对照 golden 评分。"""
+    extract_started = time.perf_counter()
+    try:
+        envelope = extract_graphs(base_url, ontology, items, options, params)
+        extract_elapsed = elapsed_seconds(extract_started)
+        write_json(out_dir / "backend_extract.json", envelope)
+        graph = extract_graph_from_envelope(envelope)
+        score_started = time.perf_counter()
+        metrics = maybe_score(golden, graph, score_ctx)
+        block: dict[str, Any] = {
+            "status": "succeeded",
+            "nodes": len(graph.get("nodes") or []),
+            "relationships": len(graph.get("relationships") or []),
+            "metrics": metrics,
+            "elapsed_seconds": extract_elapsed,
+            "score_elapsed_seconds": elapsed_seconds(score_started),
+        }
+        version = extract_version_from(envelope)
+        if version:
+            block["extract_version"] = version
+        emit_metrics(
+            f"模块 extract {format_duration(extract_elapsed)} "
+            f"评分 {format_duration(block['score_elapsed_seconds'])}",
+            metrics,
+        )
+        return block
+    except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        block = fail_payload(exc)
+        block["elapsed_seconds"] = elapsed_seconds(extract_started)
+        log(f"模块 extract 失败 {format_duration(block['elapsed_seconds'])}: {block['message']}")
+        return block
+
+
+def _run_system(
+    base_url: str,
+    sources: list[Path],
+    ontology: str,
+    options: dict[str, Any],
+    params: dict[str, Any],
+    golden: dict[str, Any] | None,
+    out_dir: Path,
+    score_ctx: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """模式 pipeline：POST knowledge-ingestion 整条沉淀（内部解析→切片→抽取）。"""
+    graphs: list[dict[str, Any]] = []
+    ingest_failures: list[dict[str, Any]] = []
+    version: str | None = None
+    system_started = time.perf_counter()
+    for source in sources:
         try:
-            file_name = sources[0].with_suffix(".md").name if sources else "document.md"
-            envelope = chunk_document(base_url, markdown, file_name, options, params)
-            write_json(out_dir / "chunks.json", envelope)
-            data = envelope.get("data") or {}
-            items = list(data.get("items") or [])
-            if not items:
-                raise RuntimeError("切片结果为空")
-            result["modules"]["chunk"] = {
-                "status": "succeeded",
-                "chunk_count": data.get("count") if data.get("count") is not None else len(items),
-                "elapsed_seconds": elapsed_seconds(chunk_started),
-            }
-            log(f"模块 chunk succeeded {format_duration(result['modules']['chunk']['elapsed_seconds'])}")
+            envelope = ingest_file(base_url, source, ontology, options, params)
+            write_json(out_dir / f"backend_system_{source.stem}.json", envelope)
+            graphs.append(extract_graph_from_envelope(envelope))
+            version = version or extract_version_from(envelope)
         except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-            result["modules"]["chunk"] = fail_payload(exc)
-            result["modules"]["chunk"]["elapsed_seconds"] = elapsed_seconds(chunk_started)
-            log(f"模块 chunk 失败 {format_duration(result['modules']['chunk']['elapsed_seconds'])}: {result['modules']['chunk']['message']}")
-            items = [{"text": markdown, "range": [0, len(markdown)]}]
+            failed = fail_payload(exc)
+            failed["file"] = source.name
+            ingest_failures.append(failed)
+            log(f"系统 knowledge-ingestion 失败 {source.name}: {failed['message']}")
+    system_elapsed = elapsed_seconds(system_started)
+    if not graphs:
+        return {
+            "status": "failed",
+            "message": "全部文件知识沉淀失败",
+            "files": len(sources),
+            "failed_files": ingest_failures,
+            "elapsed_seconds": system_elapsed,
+        }
+    graph = merge_graphs(graphs) if len(graphs) > 1 else graphs[0]
+    write_json(out_dir / "backend_system_graph.json", graph)
+    score_started = time.perf_counter()
+    metrics = maybe_score(golden, graph, score_ctx)
+    block: dict[str, Any] = {
+        "status": "partial" if ingest_failures else "succeeded",
+        "nodes": len(graph.get("nodes") or []),
+        "relationships": len(graph.get("relationships") or []),
+        "metrics": metrics,
+        "files": len(sources),
+        "ingested": len(graphs),
+        "failed_files": ingest_failures,
+        "elapsed_seconds": system_elapsed,
+        "score_elapsed_seconds": elapsed_seconds(score_started),
+    }
+    if version:
+        block["extract_version"] = version
+    emit_metrics(
+        f"沉淀 knowledge-ingestion {format_duration(system_elapsed)} "
+        f"评分 {format_duration(block['score_elapsed_seconds'])}",
+        metrics,
+    )
+    return block
 
-        extract_started = time.perf_counter()
-        try:
-            envelope = extract_graphs(base_url, ontology, items, options, params)
-            extract_elapsed = elapsed_seconds(extract_started)
-            write_json(out_dir / "backend_extract.json", envelope)
-            graph = extract_graph_from_envelope(envelope)
-            score_started = time.perf_counter()
-            metrics = maybe_score(golden, graph, score_ctx)
-            result["modules"]["extract"] = {
-                "status": "succeeded",
-                "nodes": len(graph.get("nodes") or []),
-                "relationships": len(graph.get("relationships") or []),
-                "metrics": metrics,
-                "elapsed_seconds": extract_elapsed,
-                "score_elapsed_seconds": elapsed_seconds(score_started),
-            }
-            emit_metrics(
-                f"模块 extract {format_duration(extract_elapsed)} "
-                f"评分 {format_duration(result['modules']['extract']['score_elapsed_seconds'])}",
-                metrics,
-            )
-        except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-            result["modules"]["extract"] = fail_payload(exc)
-            result["modules"]["extract"]["elapsed_seconds"] = elapsed_seconds(extract_started)
-            log(
-                f"模块 extract 失败 {format_duration(result['modules']['extract']['elapsed_seconds'])}: "
-                f"{result['modules']['extract']['message']}"
-            )
 
-    if run_system:
-        graphs: list[dict[str, Any]] = []
-        ingest_failures: list[dict[str, Any]] = []
-        system_started = time.perf_counter()
-        for source in sources:
-            try:
-                envelope = ingest_file(base_url, source, ontology, options, params)
-                write_json(out_dir / f"backend_system_{source.stem}.json", envelope)
-                graphs.append(extract_graph_from_envelope(envelope))
-            except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-                failed = fail_payload(exc)
-                failed["file"] = source.name
-                ingest_failures.append(failed)
-                log(f"系统 knowledge-ingestion 失败 {source.name}: {failed['message']}")
-        system_elapsed = elapsed_seconds(system_started)
-        if graphs:
-            graph = merge_graphs(graphs) if len(graphs) > 1 else graphs[0]
-            write_json(out_dir / "backend_system_graph.json", graph)
-            score_started = time.perf_counter()
-            metrics = maybe_score(golden, graph, score_ctx)
-            result["system"] = {
-                "status": "partial" if ingest_failures else "succeeded",
-                "nodes": len(graph.get("nodes") or []),
-                "relationships": len(graph.get("relationships") or []),
-                "metrics": metrics,
-                "files": len(sources),
-                "ingested": len(graphs),
-                "failed_files": ingest_failures,
-                "elapsed_seconds": system_elapsed,
-                "score_elapsed_seconds": elapsed_seconds(score_started),
-            }
-            emit_metrics(
-                f"沉淀 knowledge-ingestion {format_duration(system_elapsed)} "
-                f"评分 {format_duration(result['system']['score_elapsed_seconds'])}",
-                metrics,
+def _reused_chunks(case_reuse_dir: Path) -> tuple[list[dict[str, Any]] | None, Path]:
+    path = case_reuse_dir / "chunks.json"
+    if not path.is_file():
+        return None, path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None, path
+    items = (payload.get("data") or {}).get("items")
+    return (list(items) if isinstance(items, list) and items else None), path
+
+
+def run_backend_case(
+    *,
+    base_url: str,
+    ontology: str,
+    sources: list[Path],
+    options: dict[str, Any],
+    params: dict[str, Any],
+    golden: dict[str, Any] | None,
+    out_dir: Path,
+    score_ctx: dict[str, Any] | None = None,
+    modes: list[str] | None = None,
+    reuse_dir: Path | None = None,
+) -> dict[str, Any]:
+    """后台评测。modes 取值：extract（仅抽取，复用切片）、chunk-extract（切片+抽取）、pipeline（整条沉淀）。
+
+    ``reuse_dir`` 指向上次运行的 case 目录（``_runs/<ts>/<类型>/<case>``）：
+    extract 模式从中读 chunks.json，chunk-extract 模式从中读 document.md。
+    """
+    modes = modes or ["chunk-extract"]
+    result: dict[str, Any] = {
+        "system": {"status": "skipped", "message": "未选择 pipeline 模式；需要时加 --mode pipeline"},
+        "modules": {},
+    }
+    markdown = ""
+
+    if "extract" in modes or "chunk-extract" in modes:
+        items: list[dict[str, Any]] = []
+        if "extract" in modes:
+            # 仅知识抽取：切片固定复用上次运行，保证不同算法版本喂入完全相同
+            result["modules"]["parse"] = {"status": "skipped", "message": "extract 模式只复用切片"}
+            reused: list[dict[str, Any]] | None = None
+            chunks_path: Path | None = None
+            if reuse_dir is not None:
+                reused, chunks_path = _reused_chunks(reuse_dir)
+            if reused:
+                items = [{"text": str(item.get("text") or "")} for item in reused]
+                result["modules"]["chunk"] = {
+                    "status": "reused",
+                    "chunk_count": len(items),
+                    "source": str(chunks_path),
+                }
+                log(f"模块 chunk 复用 {chunks_path}（{len(items)} 片）")
+            else:
+                result["modules"]["chunk"] = {"status": "skipped", "message": "无切片可复用"}
+                hint = (
+                    f"缺少可复用的切片: {chunks_path}"
+                    if chunks_path is not None
+                    else "extract 模式需要 --from-run 指定上次运行"
+                )
+                result["modules"]["extract"] = {
+                    "status": "failed",
+                    "message": f"{hint}；先跑 --mode chunk-extract 生成切片",
+                }
+                log(result["modules"]["extract"]["message"])
+        else:
+            md_path = (reuse_dir or Path("__no_reuse__")) / "document.md"
+            if reuse_dir is not None and md_path.is_file():
+                markdown = md_path.read_text(encoding="utf-8")
+                write_text(out_dir / "document.md", markdown)
+                result["modules"]["parse"] = {
+                    "status": "reused",
+                    "source": str(md_path),
+                    "content_length": len(markdown),
+                }
+                log(f"模块 parse 复用 {md_path}")
+            else:
+                markdown, result["modules"]["parse"] = _parse_sources(base_url, sources, options, params, out_dir)
+            if markdown.strip():
+                file_name = sources[0].with_suffix(".md").name if sources else "document.md"
+                items, result["modules"]["chunk"] = _chunk_markdown(
+                    base_url, markdown, file_name, options, params, out_dir
+                )
+            else:
+                result["modules"]["chunk"] = {"status": "skipped", "message": "解析无可用 Markdown"}
+                result["modules"]["extract"] = {"status": "skipped", "message": "解析无可用 Markdown"}
+        if items:
+            result["modules"]["extract"] = _extract_items(
+                base_url, ontology, items, options, params, golden, out_dir, score_ctx
             )
         else:
-            result["system"] = {
-                "status": "failed",
-                "message": "全部文件知识沉淀失败",
-                "files": len(sources),
-                "failed_files": ingest_failures,
-                "elapsed_seconds": system_elapsed,
-            }
+            result["modules"].setdefault("extract", {"status": "skipped", "message": "无可用切片"})
+
+    if "pipeline" in modes:
+        result["system"] = _run_system(base_url, sources, ontology, options, params, golden, out_dir, score_ctx)
+
     result["markdown"] = markdown
-    result["chunk_items"] = []
     return result
 
 
@@ -1672,7 +1824,7 @@ def run_plugin_case(
             f"插件 {MCP_TOOL_NAME} {format_duration(extract_elapsed)} 评分 {format_duration(score_elapsed)}",
             metrics,
         )
-        return {
+        block: dict[str, Any] = {
             "status": "succeeded",
             "nodes": len(graph.get("nodes") or []),
             "relationships": len(graph.get("relationships") or []),
@@ -1680,6 +1832,10 @@ def run_plugin_case(
             "elapsed_seconds": extract_elapsed,
             "score_elapsed_seconds": score_elapsed,
         }
+        version = extract_version_from(payload.get("tool") or {})
+        if version:
+            block["extract_version"] = version
+        return block
     except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
         failed = fail_payload(exc)
         failed["elapsed_seconds"] = elapsed_seconds(started)
@@ -1690,7 +1846,7 @@ def run_plugin_case(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="知识沉淀评测：默认只测后台解析/切片/抽取。可直接传 case/类型目录。",
+        description="知识沉淀评测：默认只测后台切片+抽取（chunk-extract）。可直接传 case/类型目录。",
         epilog="示例: python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw开源智能体安全风险排查工作的通知",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1708,12 +1864,28 @@ def parse_args() -> argparse.Namespace:
         "--stage",
         choices=("all", "backend", "plugin"),
         default="backend",
-        help="backend=只测后台解析/切片/抽取（默认）；all=后台后再跑插件；plugin=只测插件",
+        help="backend=只测后台（默认）；all=后台后再跑插件；plugin=只测插件",
+    )
+    parser.add_argument(
+        "--mode",
+        nargs="+",
+        choices=("extract", "chunk-extract", "pipeline"),
+        default=None,
+        metavar="模式",
+        help="后台评测模式，可组合：extract=仅知识抽取（经 --from-run 复用切片）；"
+        "chunk-extract=切片+抽取（默认）；pipeline=全流程知识沉淀 knowledge-ingestion",
+    )
+    parser.add_argument(
+        "--from-run",
+        default=None,
+        metavar="运行目录",
+        help="复用上次运行的中间产物（_runs/<时间戳> 或路径）：extract 模式从中读 chunks.json；"
+        "chunk-extract 模式有 document.md 则跳过解析",
     )
     parser.add_argument(
         "--system",
         action="store_true",
-        help="额外跑 POST /api/v1/pipelines/knowledge-ingestion 整条沉淀；默认不跑",
+        help="兼容参数：等价于在 --mode 里追加 pipeline",
     )
     parser.add_argument(
         "--match-mode",
@@ -1736,9 +1908,13 @@ def stage_failed(block: dict[str, Any] | None) -> bool:
     if block.get("status") == "failed":
         return True
     modules = block.get("modules")
-    if isinstance(modules, dict):
-        return any(item.get("status") == "failed" for item in modules.values() if isinstance(item, dict))
-    return False
+    if isinstance(modules, dict) and any(
+        item.get("status") == "failed" for item in modules.values() if isinstance(item, dict)
+    ):
+        return True
+    # pipeline 可以脱离模块步骤单跑（--mode pipeline），整条沉淀失败即案件失败
+    system = block.get("system")
+    return isinstance(system, dict) and system.get("status") == "failed"
 
 
 def dry_run_inventory(
@@ -1845,6 +2021,19 @@ def main() -> int:
             score_ctx["match_mode"] = match_mode
     run_backend = args.stage in {"all", "backend"}
     run_plugin = args.stage in {"all", "plugin"}
+    modes = [str(item) for item in (args.mode or [])]
+    if args.system and "pipeline" not in modes:
+        # --system 是 --mode pipeline 的兼容写法
+        modes.append("pipeline")
+    if not modes:
+        modes = ["chunk-extract"]
+    reuse_run_dir: Path | None = None
+    if args.from_run:
+        try:
+            reuse_run_dir = resolve_reuse_dir(workspace, str(args.from_run))
+        except FileNotFoundError as exc:
+            log(str(exc))
+            return 1
 
     log(f"工作区: {workspace}")
     log(f"参数文件: {params_path}")
@@ -1861,8 +2050,10 @@ def main() -> int:
         log(f"目标: {', '.join(labels)}")
     if run_plugin:
         log(f"阶段: {'后台 → 插件' if run_backend else '插件'}")
-    if args.system:
-        log("沉淀: knowledge-ingestion")
+    if run_backend:
+        log(f"模式: {', '.join(modes)}")
+    if reuse_run_dir is not None:
+        log(f"复用: {reuse_run_dir}")
     if match_mode == "llm":
         judge = score_ctx["judge_client"]
         log(f"评分: LLM-judge model={judge.model} base_url={judge.base_url}")
@@ -1878,9 +2069,11 @@ def main() -> int:
     snapshot["backend_url"] = base_url
     snapshot["mcp_url"] = mcp_url
     snapshot["stage"] = args.stage
+    snapshot["modes"] = modes
+    snapshot["from_run"] = str(reuse_run_dir) if reuse_run_dir is not None else None
     snapshot["match_mode"] = match_mode
     snapshot["targets"] = list(args.targets)
-    snapshot["system"] = bool(args.system)
+    snapshot["system"] = "pipeline" in modes
     if match_mode == "llm":
         snapshot.setdefault("eval", {})
         snapshot["eval"] = dict(eval_cfg)
@@ -1897,6 +2090,7 @@ def main() -> int:
         "backend_url": base_url,
         "mcp_url": mcp_url,
         "stage": args.stage,
+        "modes": modes,
         "match_mode": match_mode,
         "groups": [],
         "cases": [],
@@ -1921,6 +2115,7 @@ def main() -> int:
     }
 
     found_cases = False
+    extract_versions: set[str] = set()
     for type_dir in types:
         cases = discover_cases(
             type_dir,
@@ -1981,10 +2176,10 @@ def main() -> int:
                     golden=golden,
                     out_dir=out_dir,
                     score_ctx=score_ctx,
-                    run_system=bool(args.system),
+                    modes=modes,
+                    reuse_dir=(reuse_run_dir / type_dir.name / case_dir.name) if reuse_run_dir is not None else None,
                 )
                 markdown = str(backend.pop("markdown", "") or "")
-                backend.pop("chunk_items", None)
                 record["backend"] = backend
                 add_metrics(running["backend_system"], (backend.get("system") or {}).get("metrics"))
                 add_metrics(running["backend_extract"], ((backend.get("modules") or {}).get("extract") or {}).get("metrics"))
@@ -2025,6 +2220,15 @@ def main() -> int:
                         running_identity["plugin_extract"],
                         ((record["plugin"] or {}).get("metrics") or {}).get("identity"),
                     )
+            for block in (
+                (record.get("backend") or {}).get("system"),
+                ((record.get("backend") or {}).get("modules") or {}).get("extract"),
+                record.get("plugin"),
+            ):
+                version = (block or {}).get("extract_version") if isinstance(block, dict) else None
+                if version:
+                    record["extract_version"] = str(version)
+                    extract_versions.add(str(version))
             if golden is None:
                 record["unscored_reason"] = golden_reason
                 summary["unscored"] += 1
@@ -2049,6 +2253,7 @@ def main() -> int:
     summary["overall"] = {key: finalize_metrics(value) for key, value in running.items()}
     if match_mode == "llm":
         summary["overall_identity"] = {key: finalize_metrics(value) for key, value in running_identity.items()}
+    summary["extract_versions"] = sorted(extract_versions)
     summary["finished_at"] = datetime.now().isoformat()
     summary["elapsed_seconds"] = elapsed_seconds(run_started)
     write_json(run_dir / "summary.json", summary)
@@ -2058,10 +2263,13 @@ def main() -> int:
         f"{match_mode}  {format_duration(summary['elapsed_seconds'])}  "
         f"成功 {summary['succeeded']}  失败 {summary['failed']}  未评分 {summary['unscored']}"
     )
-    overview: list[tuple[str, str]] = []
     if run_backend:
+        version_note = f"  抽取版本: {', '.join(summary['extract_versions'])}" if summary["extract_versions"] else ""
+        print(f"模式: {', '.join(modes)}{version_note}")
+    overview: list[tuple[str, str]] = []
+    if run_backend and ("extract" in modes or "chunk-extract" in modes):
         overview.append(("backend_extract", "后台抽取"))
-    if args.system:
+    if run_backend and "pipeline" in modes:
         overview.append(("backend_system", "沉淀 knowledge-ingestion"))
     if run_plugin:
         overview.append(("plugin_extract", f"插件 {MCP_TOOL_NAME}"))

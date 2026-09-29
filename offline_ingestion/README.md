@@ -4,7 +4,7 @@
 
 默认连 `http://127.0.0.1:8006`。机器上 Backend 已在跑时，拷走本目录即可评测。
 
-抽取走 **Knowledge Extract V2**（`algorithm.knowledge_extract_v2`）：后台 `/api/v1/graphs/extract` 和沉淀流水线经 adapter 调 `extract_harness`；插件 MCP 工具名为 `kg_extract_v2`，同样进 V2。本脚本不直接 import 算法包，测的是线上这条链路。
+抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`v2` 默认 / `v3`）：后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；切换版本只需改 Backend 环境并重启，再跑同一套评测即可对比。
 
 ## 做了什么
 
@@ -23,15 +23,17 @@ offline_ingestion/
 
 当前正式集：公文 1 个、标准 6 个、规则 2 个（其中 `故障记录test(1)` 的 golden 为空，只跑通不评分）。`中车RAG验证数据集/` 是造 golden 的源材料，评测扫描会跳过。
 
-**系统流程。** 默认后台拆开打：解析 → 切片 → V2 抽取，对照 `golden.json` 打 P / R / F1 / Acc。整条沉淀 `POST /api/v1/pipelines/knowledge-ingestion` 默认不跑，需要时加 `--system`。插件走 MCP `kg_extract_v2`。
+**评测模式。** 后台评测归一化成三类（`--mode`，可组合）：
 
-**模块评测。** 后台按接口拆开打：
+| 模式 | 含义 | 调用 | 输入 |
+| --- | --- | --- | --- |
+| `extract` | 仅知识抽取 | `POST /api/v1/graphs/extract` | `--from-run` 复用的切片（chunks.json） |
+| `chunk-extract`（默认） | 切片+抽取 | `POST /api/v1/documents/chunk` + extract | docs/ 现解析，或 `--from-run` 复用 document.md |
+| `pipeline` | 全流程知识沉淀 | `POST /api/v1/pipelines/knowledge-ingestion` | docs/ 原文件 |
 
-| 模块 | 调用 | 怎么算过 |
-| --- | --- | --- |
-| 解析 | `POST /api/v1/documents/parse` | 接口成功且 Markdown 非空 |
-| 切片 | `POST /api/v1/documents/chunk` | 接口成功且切片非空 |
-| 抽取 | `POST /api/v1/graphs/extract`（V2） | 对照 golden 打分 |
+`extract` 模式只重跑抽取这一步，切片固定不变——这是对比抽取算法版本（v2/v3）的推荐方式：先跑一次 `chunk-extract` 冻结切片，切换 Backend 的 `KG_EXTRACT_ALGO_VERSION` 后再 `--mode extract --from-run <上次运行>`，两次喂入完全相同。插件走 MCP `kg_extract_v2`，同样受版本开关控制。
+
+**模块通过标准。** 解析 / 切片只验接口成功且输出非空；抽取对照 `golden.json` 打 P / R / F1 / Acc。复用的中间产物在 scores.json 里记 `status: reused` 与来源路径。
 
 插件侧没有独立的 parse / chunk 工具：插件阶段复用后台解析出的 Markdown；若只跑 `--stage plugin`，会先调一次解析接口再调 MCP。
 
@@ -73,11 +75,26 @@ chmod +x offline_ingestion/run.sh
 python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw开源智能体安全风险排查工作的通知
 ```
 
-脚本从路径推出类型和 case。默认 `--stage backend`：**解析 / 切片 / 抽取并对抽取结果评分**，不跑沉淀、不调 MCP。传类型目录则跑该类型全部 case：
+脚本从路径推出类型和 case。默认 `--stage backend` + `--mode chunk-extract`：**解析 / 切片 / 抽取并对抽取结果评分**，不跑沉淀、不调 MCP。传类型目录则跑该类型全部 case：
 
 ```bash
 ./offline_ingestion/run.sh 规则
 ```
+
+---
+
+**对比抽取算法版本（v2/v3）**
+
+```bash
+# 1. Backend 用当前版本（默认 v2），先冻结切片
+./offline_ingestion/run.sh 标准 --mode chunk-extract
+#    记下运行目录 _runs/<时间戳>
+
+# 2. 改 Backend 环境 KG_EXTRACT_ALGO_VERSION=v3 并重启，然后只重跑抽取：
+./offline_ingestion/run.sh 标准 --mode extract --from-run <时间戳>
+```
+
+两次喂入的切片完全相同，分数差只来自算法版本。每次运行的 `summary.json` 会记录服务端回报的 `extract_versions`。
 
 ---
 
@@ -101,13 +118,13 @@ python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw�
 
 ---
 
-**额外跑沉淀流水线**
+**全流程知识沉淀**
 
 ```bash
-./offline_ingestion/run.sh 公文/某case --system
+./offline_ingestion/run.sh 公文/某case --mode pipeline
 ```
 
-会再打 `POST /api/v1/pipelines/knowledge-ingestion`（内部再走一遍解析→切片→抽取）。默认评测不需要这一步。
+打 `POST /api/v1/pipelines/knowledge-ingestion`（内部走完整 解析→切片→抽取）并对结果评分。也可与模块模式组合：`--mode chunk-extract pipeline`；旧参数 `--system` 等价于追加 pipeline。
 
 ---
 
@@ -180,8 +197,8 @@ python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw�
 ```text
 _runs/<YYYYMMDD-HHMMSS>/
   params.yaml                 # 本次拷贝的评测参数
-  params.resolved.json        # 解析后的地址 / 阶段 / 评分口径
-  summary.json                # 整次运行总览：状态、P/R/F1、耗时
+  params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
+  summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
   <类型>/<case>/
     parse_<文件名>.json       # 后台解析接口回包
     document.md               # 拼好的 Markdown
@@ -211,7 +228,7 @@ _runs/<YYYYMMDD-HHMMSS>/
 
 - 标准类 golden 很大（数百实体/关系）。默认 LLM-judge 会多次调模型，耗时长；想先看字面匹配用 `--match-mode identity`。
 - `规则/故障记录test(1)` 未标注，只跑通不评分。
-- 公文 case 含多附件：单个文件解析失败不再拖死整案，会记 `failed_files`，其余文件继续。加 `--system` 时沉淀同样按文件继续。
+- 公文 case 含多附件：单个文件解析失败不再拖死整案，会记 `failed_files`，其余文件继续。`--mode pipeline` 时沉淀同样按文件继续。
 - parse / chunk 只验接口成功和输出非空，没有独立 golden；质量分只打在图抽取上。
 - 插件没有 parse/chunk 工具，抽取的是整篇 Markdown，和后台「先切片再抽取」路径不完全相同。
 - `中车RAG验证数据集/` 是造集源，不是评测入口。拷目录做评测时可以不带它。

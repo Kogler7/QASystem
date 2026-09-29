@@ -37,7 +37,7 @@ def _extract(ontology, text, model, base_url):
 
 
 def _extract_with_ontology(ontology, text, model, base_url):
-    """按元模型抽取实体/关系图（Knowledge Extract V2）。"""
+    """按元模型抽取实体/关系图（版本由 KG_EXTRACT_ALGO_VERSION 决定）。"""
     from backend.app.services.knowledge_extract_adapter import run_single_document
 
     return run_single_document(ontology, text, model=model, base_url=base_url)
