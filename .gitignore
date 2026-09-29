@@ -66,7 +66,6 @@ backend/data/documents/
 backend/data/preproc_output/
 backend/data/preproc_upload/
 backend/data/extraction_snapshots/
-backend/processed/
 backend/processed_files/
 backend/temp_files/
 backend/chroma_db/
@@ -192,14 +191,12 @@ algorithm/knowledge_extract/v2/algorithm_docs
 # 本地编辑器与运行时产物（勿提交）
 .claude/settings.local.json
 backend/data/execution/
-tmp/
 eval/_runs/
 test_data/eval/_runs/
 algorithm/knowledge_extract/v2/eval_results
 agent/image_result/
 agent/log/
 ofd_converter/target/
-/processed/
 
 # Agent工作流相关
 AGENT.md

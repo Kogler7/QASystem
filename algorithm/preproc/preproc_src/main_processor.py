@@ -93,7 +93,7 @@ class DocumentProcessor:
         mineru_model_source: str = "local",
         libreoffice_path: Optional[str] = None,
     ):
-        self.output_dir = Path(output_dir or Path.cwd() / "processed")
+        self.output_dir = Path(output_dir or Path.cwd() / "tmp" / "processed")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         preproc_root = Path(__file__).resolve().parent.parent
         default_mineru = preproc_root / "mineru.json"

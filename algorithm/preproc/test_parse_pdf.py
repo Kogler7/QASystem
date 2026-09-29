@@ -70,7 +70,7 @@ def main() -> int:
         print("[提示] 该页未生成有效内容（可能是空白页，engine 元信息已记录）")
 
     # 直接写入最终 md 文件
-    md_path = Path(args.out_dir or PROJECT_ROOT / "processed")
+    md_path = Path(args.out_dir or PROJECT_ROOT / "tmp" / "processed")
     md_path = md_path / f"{pdf_path.stem}_p{args.page}.md"
     md_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.write_text(content, encoding="utf-8")
