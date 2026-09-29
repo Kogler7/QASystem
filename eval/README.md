@@ -2,7 +2,7 @@
 
 改完解析、切片、抽取或沉淀流水线后，在仓库根目录对指定 case 跑一次脚本。默认只测后台 HTTP，不 `import algorithm` / `backend`。
 
-默认连 `http://127.0.0.1:8006`。机器上 Backend 已在跑时，拷走本目录即可评测。
+默认连 `http://127.0.0.1:8006`。Backend 已在跑时，在仓库根目录执行即可；评测数据在 `test_data/eval/`，不要只拷 `eval/` 目录。
 
 抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2` 或 `v3`，再跑同一套评测即可对比。
 
@@ -24,7 +24,18 @@ test_data/eval/
       ontology/               # 可选；有则覆盖类型级本体
 ```
 
-当前正式集：公文 1 个、标准 6 个、规则 2 个（其中 `故障记录test(1)` 的 golden 为空，只跑通不评分）。`中车RAG验证数据集/` 是造 golden 的源材料，评测扫描会跳过。
+当前正式集在 `test_data/eval/`，类型目录是英文名：
+
+| 类型目录 | 含义 | case | 说明 |
+| --- | --- | --- | --- |
+| `official` | 公文 | 10（`official_01` … `official_10`） | 多数含通知 PDF + `表单.pdf` 两个附件 |
+| `standard` | 标准 | 4（`standard_01` … `standard_04`） | golden 很大（数百实体/关系），LLM-judge 很慢 |
+| `rule` | 规则 | 1（`故障记录test`） | 有 golden，会评分 |
+| `simple` | 简单规则/术语 | 1（`Simple_故障规则的诊断`） |  |
+
+不再使用中文类型目录名（`公文`/`标准`/`规则`）。`中车RAG验证数据集/` 若出现会被扫描跳过。
+
+参数文件默认是 [`eval/params.yaml`](params.yaml)。若 `test_data/eval/params.yaml` 存在则覆盖它。`run.sh` 只转调 `run.py`，工作区默认仍是 `test_data/eval`。
 
 **评测模式。** 后台评测归一化成三类（`--mode`，可组合）：
 
@@ -44,6 +55,8 @@ test_data/eval/
 
 预测只写 `tmp/eval/runs/<时间戳>/`，不会覆盖 `test_data/eval/<类型>/<case>/extract/golden.json`。
 
+批量跑多个 case / 多附件时，单个文件或单个 case 失败不会停下后面的任务：该单元最多重试 3 次，仍失败则跳过并记入 `failed_files` / `skipped_after_retries`，已成功的解析、切片、抽取产物下一轮直接复用。Ctrl+C 会先把当前进度写入 `summary.json`（带 `interrupted`）再退出。
+
 ## 如何使用
 
 ### 准备
@@ -62,26 +75,36 @@ test_data/eval/
 chmod +x eval/run.sh
 ```
 
-`run.sh` 会把工作区指到本目录，再转调 `run.py`。后面所有参数都原样传给 `run.py`。
+`run.sh` 只把参数原样传给同目录的 `run.py`。工作区默认 `test_data/eval`，参数默认 `eval/params.yaml`。建议在仓库根目录执行。
+
+---
+
+**先扫一遍评测集（不调服务）**
+
+```bash
+./eval/run.sh --dry-run
+```
+
+确认能认出 `official` / `standard` / `rule` / `simple` 共 16 个 case。拷到部署机后先跑这一步。
 
 ---
 
 **按路径评测（推荐）**
 
 ```bash
-./eval/run.sh test_data/eval/公文/关于开展OpenClaw开源智能体安全风险排查工作的通知
+./eval/run.sh test_data/eval/official/official_01
 ```
 
 在仓库根目录也可以：
 
 ```bash
-python3 eval/run.py test_data/eval/test_data/eval/公文/关于开展OpenClaw开源智能体安全风险排查工作的通知
+python3 eval/run.py test_data/eval/official/official_01
 ```
 
-脚本从路径推出类型和 case。默认 `--stage backend` + `--mode chunk-extract`：**解析 / 切片 / 抽取并对抽取结果评分**，不跑沉淀、不调 MCP。传类型目录则跑该类型全部 case：
+默认 `--stage backend` + `--mode chunk-extract`：**解析 / 切片 / 抽取并对抽取结果评分**，不跑沉淀、不调 MCP。传类型目录则跑该类型全部 case：
 
 ```bash
-./eval/run.sh test_data/eval/规则
+./eval/run.sh test_data/eval/rule
 ```
 
 ---
@@ -92,31 +115,31 @@ python3 eval/run.py test_data/eval/test_data/eval/公文/关于开展OpenClaw开
 
 ```bash
 # 1. 固定 Backend 环境为 v2，先冻结切片
-KG_EXTRACT_ALGO_VERSION=v2 ./eval/run.sh test_data/eval/标准 --mode chunk-extract
+KG_EXTRACT_ALGO_VERSION=v2 ./eval/run.sh test_data/eval/standard --mode chunk-extract --match-mode identity
 #    记下运行目录 tmp/eval/runs/<时间戳>
 
 # 2. 改 Backend 环境为 v3，然后只重跑抽取（喂入完全相同的切片）：
-KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/标准 --mode extract --from-run <时间戳>
+KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract --from-run <时间戳> --match-mode identity
 ```
 
-两次切片完全相同，分数差只来自算法版本。每次运行的 `summary.json` 会记录服务端回报的 `extract_versions`。
+两次切片完全相同，分数差只来自算法版本。每次运行的 `summary.json` 会记录服务端回报的 `extract_versions`。标准类 golden 很大，对比版本时建议先 `--match-mode identity`。
 
 ---
 
 **全量评测（只测后台）**
 
 ```bash
-./test_data/eval/run.sh
+./eval/run.sh
 ```
 
-扫公文 / 标准 / 规则下全部 case，默认只跑后台。抽取对照 golden：配了 judge 走 LLM-judge，否则 identity。
+扫 `official` / `standard` / `rule` / `simple` 下全部 case，默认只跑后台。抽取对照 golden：配了 judge 走 LLM-judge，否则 identity。正式开测建议先 `--match-mode identity` 跑通链路，再开 LLM-judge。
 
 ---
 
 **后台 + 插件**
 
 ```bash
-./eval/run.sh test_data/eval/--stage all
+./eval/run.sh --stage all
 ```
 
 每个 case 先跑后台，再跑插件 `kg_extract_v2`。MCP 会话在多 worker 下可能失败，插件回归时再加此项。
@@ -126,7 +149,7 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/标准 --mode extract --
 **全流程知识沉淀**
 
 ```bash
-./eval/run.sh test_data/eval/公文/某case --mode pipeline
+./eval/run.sh test_data/eval/official/official_01 --mode pipeline
 ```
 
 打 `POST /api/v1/pipelines/knowledge-ingestion`（内部走完整 解析→切片→抽取）并对结果评分。也可与模块模式组合：`--mode chunk-extract pipeline`；旧参数 `--system` 等价于追加 pipeline。
@@ -136,39 +159,29 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/标准 --mode extract --
 **只测插件**
 
 ```bash
-./eval/run.sh test_data/eval/--stage plugin
+./eval/run.sh --stage plugin
 ```
 
 只调 MCP `kg_extract_v2`。插件没有 parse/chunk，脚本会先用后台解析接口把 `docs/` 转成 Markdown，再交给插件。适合只改了 MCP 工具封装、抽取算法本身已在后台测过时用。
 
 ---
 
-**只扫描评测集（不调服务）**
-
-```bash
-./eval/run.sh test_data/eval/--dry-run
-```
-
-列出将要跑的类型、case、原文件数、golden 规模和本体路径。拷到部署机后先跑这一步，确认目录被识别，且不需要 Backend / judge。
-
----
-
 **按类型筛选**
 
 ```bash
-./eval/run.sh test_data/eval/公文
-./eval/run.sh test_data/eval/--groups 公文,标准
+./eval/run.sh test_data/eval/official
+./eval/run.sh --groups official,standard
 ```
 
-路径与 `--groups/--cases` 不要混用。`--groups` 仍支持逗号分隔多类型。
+路径与 `--groups/--cases` 不要混用。`--groups` 用目录名：`official,standard,rule,simple`。
 
 ---
 
 **按 case 筛选**
 
 ```bash
-./eval/run.sh test_data/eval/规则/Simple_故障规则的诊断
-./eval/run.sh test_data/eval/--groups 规则 --cases Simple_故障规则的诊断
+./eval/run.sh test_data/eval/simple/Simple_故障规则的诊断
+./eval/run.sh --groups simple --cases Simple_故障规则的诊断
 ```
 
 ---
@@ -176,7 +189,7 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/标准 --mode extract --
 **精确匹配打分**
 
 ```bash
-./eval/run.sh test_data/eval/--match-mode identity
+./eval/run.sh --match-mode identity
 ```
 
 不用 LLM-judge，实体按 type+name、关系按五元组做集合精确匹配。未配 `KG_EXTRACT_LLM_BASE_URL` 时即使 `params.yaml` 写了 `llm` 也会自动改 identity；显式 `--match-mode llm` 才会因缺地址退出。
@@ -186,21 +199,21 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/标准 --mode extract --
 **质量门禁**
 
 ```bash
-./eval/run.sh test_data/eval/--min-f1 0.5
+./eval/run.sh --match-mode identity --min-f1 0.5
 ```
 
 在接口都成功的前提下，检查已评分 case 的实体 F1（后台系统、后台抽取、插件三者取最低）。低于 `0.5` 则退出码 3。适合 CI 或发版前卡住明显回退；阈值按集子自己定。
 
 ---
 
-退出码：`0` 全部成功，`1` 配置/发现失败，`2` 有 case 失败，`3` 质量门禁未过。
+退出码：`0` 全部成功，`1` 配置/发现失败，`2` 有 case 失败（含重试后跳过），`3` 质量门禁未过。
 
 ### 看结果
 
-每次运行写入 `_runs/<时间戳>/`，不会覆盖 `extract/golden.json`。目录已 gitignore。
+每次运行写入 `tmp/eval/runs/<时间戳>/`，不会覆盖 `extract/golden.json`。目录已 gitignore。
 
 ```text
-_runs/<YYYYMMDD-HHMMSS>/
+tmp/eval/runs/<YYYYMMDD-HHMMSS>/
   params.yaml                 # 本次拷贝的评测参数
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
@@ -218,8 +231,8 @@ _runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时 |
-| `scores.json` | 单案明细。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
+| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时。每跑完一个 case 就会更新，中途可看。`skipped` 是重试 3 次后仍失败并跳过的 case 数 |
+| `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
 | `match_details.json` | 每个已评分块（`backend_extract` / `backend_system` / `plugin_extract`）的逐条明细：`entities` / `relations` 各自的 `matched`（golden+predicted 对照）、`missing`（漏抽）、`extra`（多抽）。LLM-judge 时另有 `judge_batches`（每批评分的预测区间、耗时、成功的 `response_mode`、失败尝试）和 `identity`（精确匹配口径的对上/漏抽/多抽清单） |
 | `document.md` | 解析结果，便于对照原文 |
 | `chunks.json` | 实际送进抽取的切片 |
@@ -233,9 +246,10 @@ _runs/<YYYYMMDD-HHMMSS>/
 
 ## 使用注意
 
-- 标准类 golden 很大（数百实体/关系）。默认 LLM-judge 会多次调模型，耗时长；想先看字面匹配用 `--match-mode identity`。
-- `规则/故障记录test(1)` 未标注，只跑通不评分。
-- 公文 case 含多附件：单个文件解析失败不再拖死整案，会记 `failed_files`，其余文件继续；逐文件耗时与产出在 `per_file`。`--mode pipeline` 时沉淀同样按文件继续。
+- `standard` 的 golden 很大（数百实体/关系）。默认 LLM-judge 会多次调模型，耗时长；正式开测或对比版本先 `--match-mode identity`。
+- `rule/故障记录test` 有 6 个实体、0 条关系，会评分（不是空 golden）。
+- 公文 `official_*` 多数含多附件：单个文件解析失败会立刻重试，最多 3 次，仍失败则跳过该文件并记 `failed_files`，其余文件继续；逐文件耗时、尝试次数与产出在 `per_file`。`--mode pipeline` 时沉淀同样按文件重试后跳过。
+- 扫类型目录时，单个 case 的切片/抽取/打分抛错或失败同样最多重试 3 次，然后跳过进入下一个 case，不会把整批停掉。无 docs、本体缺失这类配置错误不重试。
 - parse / chunk 只验接口成功和输出非空，没有独立 golden；质量分只打在图抽取上。
 - 插件没有 parse/chunk 工具，抽取的是整篇 Markdown，和后台「先切片再抽取」路径不完全相同。
 - `中车RAG验证数据集/` 是造集源，不是评测入口。拷目录做评测时可以不带它。
