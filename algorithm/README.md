@@ -115,7 +115,7 @@
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
 
 Backend `graph.extract` 与 MCP `kg_extract_v2` 通过
-`backend/app/services/knowledge_extract_adapter.py` 调用上述 shim。
+`algorithm/knowledge_extract/adapter.py` 调用上述 shim。
 调用方只需指定 `KG_EXTRACT_ALGO_VERSION`：
 
 - `latest`（默认）：运行当前最新版本（v3），结果投影回 V1 逐 chunk 契约；

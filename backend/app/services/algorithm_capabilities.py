@@ -26,7 +26,7 @@ from backend.app.schemas import (
     TextChunk,
     TextEmbeddingItem,
 )
-from backend.app.services.knowledge_extract_adapter import extract_chunks
+from algorithm.knowledge_extract.adapter import extract_chunks
 
 
 class CapabilityError(Exception):

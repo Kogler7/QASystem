@@ -11,7 +11,6 @@ from typing import Any, Iterable
 
 from ..v2.graph_utils import entity_uid
 from ..v2.llm_client import create_llm_client
-from . import extract_detailed
 
 
 def _v3_source_block_ids(refs: Any) -> list[str]:
@@ -149,6 +148,9 @@ def extract_aggregate(
     **_: Any,
 ) -> dict[str, Any]:
     """Run V3's ``extract_detailed`` once over ``chunks``, V2-contract shaped."""
+    # Import locally so callers/tests can monkeypatch ``algorithm.knowledge_extract.v3.extract_detailed``.
+    from . import extract_detailed
+
     llm = create_llm_client(base_url=base_url or "", api_key=api_key or "", model=model or "")
     result = extract_detailed(
         list(chunks),

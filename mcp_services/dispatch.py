@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from . import execution_bridge
 from .result import ToolCode, tool_error, tool_success
 
 
@@ -33,9 +34,7 @@ def maybe_submit(
     if mode == "inline":
         return None
     try:
-        from backend.app.execution.manager import ExecutionUnavailable, get_execution_manager
-
-        manager = get_execution_manager()
+        manager = execution_bridge.get_execution_manager()
         if not manager.is_async:
             return None
         submission = manager.submit(
@@ -75,7 +74,7 @@ def maybe_submit(
             },
             "任务已提交",
         )
-    except ExecutionUnavailable as exc:
+    except execution_bridge.ExecutionUnavailable as exc:
         return tool_error(ToolCode.EXECUTION_UNAVAILABLE, "执行队列不可用", str(exc))
     except Exception as exc:
         return tool_error(

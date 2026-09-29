@@ -219,7 +219,7 @@ def _real_chunks(markdown: str, chunk_size: int = 4000) -> list:
     """镜像生产路径：上游解析 Markdown -> knowledge_pipeline 递归切片 -> V2 ExtractionChunk。
 
     ChunkOptions 默认（backend/app/schemas.py）：recursive(size=4000, overlap=0)，
-    即将切到 500-700；knowledge_extract_adapter.build_chunks 只带 range 偏移、
+    即将切到 500-700；algorithm.knowledge_extract.adapter.build_chunks 只带 range 偏移、
     不设 document_id（表单识别因此不能依赖文件名）。
     """
     try:

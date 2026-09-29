@@ -14,6 +14,17 @@ from .health import full_health
 
 configure_runtime_environment()
 
+from mcp_services.execution_bridge import register_execution_manager
+
+
+def _execution_manager_factory():
+    from backend.app.execution.manager import get_execution_manager
+
+    return get_execution_manager()
+
+
+register_execution_manager(_execution_manager_factory)
+
 from .routers.confidence import router as confidence_router
 from .routers.algorithm_capabilities import router as capabilities_router
 from .routers.knowledge_precipitation import router as knowledge_router
