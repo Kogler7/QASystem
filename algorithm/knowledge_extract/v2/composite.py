@@ -96,64 +96,14 @@ def _member_supported_by(composite_text: str, member: Any) -> bool:
     )
 
 
-def _source_block_ids(entity: Any) -> tuple[str, ...]:
-    return tuple(dict.fromkeys(
-        str(block_id)
-        for evidence in (getattr(entity, "evidence", ()) or ())
-        for block_id in (getattr(evidence, "source_block_ids", ()) or ())
-        if block_id
-    ))
-
-
-def _same_known_document(left: Any, right: Any, manager: ChunkContextManager) -> bool:
-    def scopes(entity: Any) -> set[tuple[str, str]]:
-        resolved: set[tuple[str, str]] = set()
-        for block_id in _source_block_ids(entity):
-            try:
-                chunk = manager.get_chunk(block_id)
-            except KeyError:
-                continue
-            resolved.add((
-                str(chunk.document_id or "").strip(),
-                str((chunk.metadata or {}).get("source_file") or "").strip(),
-            ))
-        return resolved
-
-    left_scopes = scopes(left)
-    right_scopes = scopes(right)
-    for left_doc, left_file in left_scopes:
-        for right_doc, right_file in right_scopes:
-            if left_doc and right_doc:
-                if left_doc != right_doc:
-                    continue
-                if left_file and right_file:
-                    if left_file == right_file:
-                        return True
-                    continue
-                return True
-            if left_file and right_file:
-                if left_file == right_file:
-                    return True
-                continue
-    shared_blocks = set(_source_block_ids(left)) & set(_source_block_ids(right))
-    return bool(shared_blocks) or len(manager) == 1
-
-
 def _bind_membership_evidence(member: Any, composite: Any, manager: ChunkContextManager) -> Any | None:
-    member_blocks = _source_block_ids(member)
-    composite_blocks = _source_block_ids(composite)
-    allowed_blocks = member_blocks or composite_blocks
-    if not allowed_blocks and len(manager) == 1:
-        allowed_blocks = tuple(manager.chunk_ids)
-    if not allowed_blocks:
-        return None
     for candidate_text in (
         (member.properties or {}).get("ruleText"),
         (member.properties or {}).get("triggerCondition"),
         (composite.properties or {}).get("ruleText"),
     ):
         if candidate_text:
-            located = locate_quote(manager, candidate_text, chunk_ids=allowed_blocks)
+            located = locate_quote(manager, candidate_text)
             if located is not None:
                 return located
     return None
@@ -202,28 +152,7 @@ class CompositeElementHandler:
                 for member_id, member in members.items():
                     if (composite.candidate_id, member_id) in existing:
                         continue
-                    if not _same_known_document(composite, member, manager):
-                        continue
                     if not _member_supported_by(composite_text, member):
-                        continue
-                    evidence = _bind_membership_evidence(member, composite, manager)
-                    if evidence is None:
-                        if warnings is not None:
-                            warnings.append(
-                                {
-                                    "code": "COMPOSITE_MEMBERSHIP_EVIDENCE_NOT_FOUND",
-                                    "message": (
-                                        f"复合元素 {composite.name} 与成员 {member.name} "
-                                        "缺少可定位的同域证据，已跳过自动关系"
-                                    ),
-                                    "path": f"composite.{spec.composite_type}",
-                                    "value": {
-                                        "from_id": composite.candidate_id,
-                                        "to_id": member_id,
-                                        "rel_type": spec.membership_relation,
-                                    },
-                                }
-                            )
                         continue
                     candidate = RelationCandidate(
                         candidate_id="",
@@ -231,11 +160,14 @@ class CompositeElementHandler:
                         to_candidate_id=member_id,
                         proposed_relation=spec.membership_relation,
                         canonical_relation=None,
-                        evidence=[evidence],
+                        evidence=[],
                     )
                     resolved = pool.add_relation(candidate, warnings=warnings)
                     if resolved is None:
                         continue
+                    evidence = _bind_membership_evidence(member, composite, manager)
+                    if evidence is not None:
+                        resolved.evidence = [evidence]
                     issues.append(
                         {
                             "code": "AUTO_MEMBERSHIP_ESTABLISHED",

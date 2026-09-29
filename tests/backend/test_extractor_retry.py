@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from algorithm.knowledge_extract import extractor
-from algorithm.knowledge_extract.ontology_schema import OntologySchema
+from algorithm.knowledge_extract.v1 import extractor
+from algorithm.knowledge_extract.v1.ontology_schema import OntologySchema
 
 
 def _stream(text):
@@ -101,15 +101,20 @@ def test_extract_v2_keeps_non_empty_entity_name_when_properties_name_is_empty(mo
     assert result["graph"]["nodes"][0]["properties"]["name"] == "A"
 
 
-def test_build_extraction_prompt_requires_creating_missing_nodes_before_relations():
+def test_build_extraction_prompt_uses_v3_base_prompt_and_keeps_output_contract():
     prompt = extractor.build_extraction_prompt("class Term", "A relates to B")
 
-    assert "先补建该实体，再输出 relation" in prompt
-    assert "禁止输出引用不存在实体的 relation" in prompt
-    assert "输出 relations 之前，先检查 `entities` 是否已经包含两端实体" in prompt
-    assert "正确示例" in prompt
-    assert "错误示例" in prompt
-    assert "不要输出悬空 relation" in prompt
+    # 通用规则改为引用 v3 的 BASE_SYSTEM_PROMPT（v5）
+    assert "KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v5" in prompt
+    assert "[核心原则]" in prompt
+    assert "[关系提取规则]" in prompt
+    assert "关系必须符合 ontology 声明的签名" in prompt
+    assert "避免推测性关系，不得虚构端点" in prompt
+    # V1 的文档画像 / 本体 / JSON 输出结构保持不变
+    assert "## 文档画像" in prompt
+    assert "## 本体定义（唯一 schema）" in prompt
+    assert "JSON 输出结构" in prompt
+    assert '"entities"' in prompt and '"relations"' in prompt
 
 
 def test_schema_normalizes_relationship_endpoint_types():

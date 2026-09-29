@@ -24,19 +24,10 @@ class RunStatus(str, Enum):
 class ExtractionError(RuntimeError):
     error_code = "EXTRACTION_FAILED"
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        stage: str = "",
-        details: dict[str, Any] | None = None,
-        error_code: str = "",
-    ):
+    def __init__(self, message: str, *, stage: str = "", details: dict[str, Any] | None = None):
         super().__init__(message)
         self.stage = stage
         self.details = dict(details or {})
-        if error_code:
-            self.error_code = error_code
 
 
 class ExtractionRequestError(ExtractionError):
@@ -224,8 +215,6 @@ class ExtractionRun:
         accepted_entities: int,
         accepted_relations: int,
         stop_reason: str = "validation_complete",
-        failure_code: str = "",
-        failure_message: str = "",
     ) -> None:
         if self.status not in {RunStatus.PENDING, RunStatus.RUNNING}:
             raise RuntimeError(f"run {self.run_id} is already terminal")
@@ -234,8 +223,6 @@ class ExtractionRun:
         self.accepted_entities = max(0, int(accepted_entities))
         self.accepted_relations = max(0, int(accepted_relations))
         failure = self.primary_failure()
-        if failure is None and failure_code:
-            failure = (failure_code, failure_message or stop_reason)
         if failure is None:
             self.status = RunStatus.SUCCEEDED
             self.stop_reason = stop_reason

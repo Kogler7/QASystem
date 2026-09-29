@@ -64,7 +64,7 @@ def _chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _unstructured_extract(payload: dict[str, Any]) -> dict[str, Any]:
     """非结构化抽取：无本体时对每个切片生成摘要，不产图谱。"""
-    from algorithm.knowledge_extract.batch import summarize_chunks
+    from algorithm.knowledge_extract.v1.batch import summarize_chunks
 
     items = payload.get("items") or []
     results = summarize_chunks(

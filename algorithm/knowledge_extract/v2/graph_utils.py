@@ -36,11 +36,6 @@ def canonical_name(value: Any) -> str:
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 
-def canonical_relation_name(value: Any) -> str:
-    """Normalize relation IDs across camelCase and separator-based spellings."""
-    return re.sub(r"[_\s-]+", "", canonical_name(value))
-
-
 def entity_uid(entity_type: Any, entity_name: Any, properties: dict[str, Any] | None) -> str:
     """Build a readable, process-stable UID for an extracted entity."""
     normalized_type = coerce_non_empty_name(entity_type) or "Element"

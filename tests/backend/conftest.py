@@ -105,8 +105,8 @@ def protocol_module():
             },
             store_extraction_to_neo4j=lambda **_kwargs: {"success": True},
         ),
-        "algorithm.knowledge_extract.batch": _module(
-            "algorithm.knowledge_extract.batch",
+        "algorithm.knowledge_extract.v1.batch": _module(
+            "algorithm.knowledge_extract.v1.batch",
             summarize_chunks=lambda chunks, **_kwargs: [
                 {"index": index, "text": text, "summary": "摘要", "attempts": []}
                 for index, text in enumerate(chunks)

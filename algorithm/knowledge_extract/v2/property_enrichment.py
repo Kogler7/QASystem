@@ -1,8 +1,7 @@
-"""Evidence-gated closed-world completion for accepted entities.
+"""Evidence-gated closed-world property completion for accepted entities.
 
-Identity mode runs before entity resolution and may fill only declared identity
-fields.  Property mode runs after resolution and may fill only missing,
-non-identity ontology fields on a frozen candidate-id enum.  Neither mode has a
+This pass deliberately runs after entity resolution.  The LLM can update only
+missing ontology-declared properties on a fixed candidate-id enum; it has no
 schema surface for creating entities or relations.
 """
 from __future__ import annotations
@@ -17,15 +16,26 @@ from typing import Any
 from ._logging import get_step_logger
 from .candidate_generation import generate_structured, verify_items_with_llm
 from .chunk_context import ChunkContextManager, ExtractionChunk
-from .evidence import Evidence, locate_quote
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan, PropertySpec
-from .official_document_scope import management_type_ids, official_entity_types, official_role
 from .prompt_router import DocumentRoute, _looks_like_record_table, build_chat_messages
 
 
 logger = get_step_logger(__name__)
+from .semantic_evidence import semantic_support
+
 _EMPTY = (None, [])
+_LITERAL_PROPERTY = re.compile(
+    r"(?:id|identifier|code|number|no|date|time|value|unit|编号|代码|日期|时间|数值|值|单位|名称|标题|姓名|地址|电话)",
+    re.IGNORECASE,
+)
+_SEMANTIC_PROPERTY = re.compile(
+    r"(?:description|definition|purpose|scope|type|category|status|sector|responsib|"
+    r"描述|定义|目的|范围|类型|类别|状态|行业|责任|职责|约束|程度|语言)",
+    re.IGNORECASE,
+)
+_CLASSIFICATION_NAME = re.compile(r"(?:classification|分类).*(?:name|名称)", re.IGNORECASE)
+_IDENTIFIER = re.compile(r"(?:identifier|unique.?id|唯一标识)", re.IGNORECASE)
 _AUTHORITATIVE_SOURCES = {
     "markdown_structure",
     "document_form",
@@ -67,31 +77,15 @@ def _property_schema(data_type: str) -> dict[str, Any]:
     return {"type": "string"}
 
 
-def _declared_properties(
-    plan: ExtractionPlan,
-    entity: Any,
-    *,
-    mode: str = "property",
-) -> dict[str, PropertySpec]:
+def _declared_properties(plan: ExtractionPlan, entity: Any) -> dict[str, PropertySpec]:
     spec = plan.class_specs.get(str(getattr(entity, "canonical_type", "") or ""))
     if spec is None:
         return {}
     existing = {canonical_name(key) for key in (getattr(entity, "properties", None) or {})}
-    identity_properties = {canonical_name(key) for key in spec.identity_properties}
-    if mode == "identity":
-        return {
-            prop.identifier: prop
-            for prop in spec.properties
-            if canonical_name(prop.identifier) not in existing
-            and canonical_name(prop.identifier) in identity_properties
-        }
-    if mode != "property":
-        raise ValueError(f"未知属性补全模式: {mode!r}")
     return {
         prop.identifier: prop
         for prop in spec.properties
         if canonical_name(prop.identifier) not in existing
-        and canonical_name(prop.identifier) not in identity_properties
     }
 
 
@@ -208,146 +202,32 @@ def _catalog_row(entity: Any, allowed: dict[str, PropertySpec]) -> dict[str, Any
     }
 
 
-def _entity_anchor_chunks(entity: Any, manager: ChunkContextManager) -> list[str]:
-    anchors: list[str] = []
+def _entity_anchor_chunk(entity: Any, manager: ChunkContextManager) -> str | None:
     for evidence in getattr(entity, "evidence", ()) or ():
         for block_id in getattr(evidence, "source_block_ids", ()) or ():
-            block_id = str(block_id)
-            if manager.has_chunk(block_id) and block_id not in anchors:
-                anchors.append(block_id)
-    return anchors
+            if manager.has_chunk(str(block_id)):
+                return str(block_id)
+    return None
 
 
-_CONTEXT_BOUNDARIES = "\n\r。！？!?；;"
-_CONTEXT_RADIUS = 240
+def _normalized_literal(value: Any) -> str:
+    return re.sub(r"\s+", "", str(value or "")).casefold()
 
 
-def _iter_record_spans(text: str) -> list[tuple[int, int, dict[str, Any]]]:
-    """Locate top-level JSON objects in a record-table chunk (brace scanning)."""
-    spans: list[tuple[int, int]] = []
-    depth = 0
-    start: int | None = None
-    in_string = False
-    escaped = False
-    for index, char in enumerate(text):
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            continue
-        if char == '"':
-            in_string = True
-        elif char == "{":
-            if depth == 0:
-                start = index
-            depth += 1
-        elif char == "}":
-            if depth > 0:
-                depth -= 1
-                if depth == 0 and start is not None:
-                    spans.append((start, index + 1))
-                    start = None
-    records: list[tuple[int, int, dict[str, Any]]] = []
-    for span_start, span_end in spans:
-        try:
-            payload = json.loads(text[span_start:span_end])
-        except Exception:
-            continue
-        if isinstance(payload, dict):
-            records.append((span_start, span_end, payload))
-    return records
+def _literal_supported(value: Any, text: str) -> bool:
+    if isinstance(value, list):
+        return bool(value) and all(_normalized_literal(item) in _normalized_literal(text) for item in value)
+    return bool(_normalized_literal(value)) and _normalized_literal(value) in _normalized_literal(text)
 
 
-def _entity_record_windows(
-    entity: Any,
-    chunk: ExtractionChunk,
-    *,
-    max_records: int = 5,
-) -> list[tuple[int, int, str]]:
-    """记录表实体：用实体所属的整条 JSON 记录（含同分类多条）作为核验上下文。"""
-    name = str(getattr(entity, "name", "") or "")
-    quotes = {
-        str(getattr(evidence, "quote", "") or "")
-        for evidence in (getattr(entity, "evidence", ()) or ())
-        if chunk.chunk_id in {str(item) for item in getattr(evidence, "source_block_ids", ()) or ()}
-    }
-    matched: list[tuple[int, int]] = []
-    for span_start, span_end, record in _iter_record_spans(chunk.text):
-        values = [str(value) for value in record.values() if isinstance(value, str)]
-        hit = bool(name) and any(value.strip() == name for value in values)
-        if not hit and name:
-            hit = any(name in value for value in values)
-        if not hit and quotes:
-            hit = any(
-                quote and quote in str(record.get(key, ""))
-                for quote in quotes
-                for key in record
-            )
-        if hit:
-            matched.append((span_start, span_end))
-        if len(matched) >= max_records:
-            break
-    return [(span_start, span_end, chunk.text[span_start:span_end]) for span_start, span_end in matched]
+def _may_be_semantic(prop: PropertySpec) -> bool:
+    symbols = f"{prop.identifier} {prop.display_name} {prop.comment}"
+    return bool(_SEMANTIC_PROPERTY.search(symbols) or _CLASSIFICATION_NAME.search(symbols))
 
 
-def _entity_context_windows(
-    entity: Any,
-    chunk: ExtractionChunk,
-) -> list[tuple[int, int, str]]:
-    """Return sentence/record windows anchored to this entity, not the whole chunk.
-
-    A window may support several properties together.  It is intentionally not
-    split into one evidence item per property.
-    """
-    if (chunk.metadata or {}).get("official_document_role") == "form":
-        return [(0, len(chunk.text), chunk.text)]
-    # 记录表：整条记录（或同分类多条记录）必须完整进入核验上下文，
-    # 避免因为 +/- 字符窗口截断而误判为证据不足。
-    if _looks_like_record_table(chunk):
-        record_windows = _entity_record_windows(entity, chunk)
-        if record_windows:
-            return record_windows
-    anchors: list[tuple[int, int]] = []
-    for evidence in getattr(entity, "evidence", ()) or ():
-        source_ids = {str(item) for item in getattr(evidence, "source_block_ids", ()) or ()}
-        if chunk.chunk_id not in source_ids:
-            continue
-        start = getattr(evidence, "start_char", None)
-        end = getattr(evidence, "end_char", None)
-        if isinstance(start, int) and isinstance(end, int) and 0 <= start < end <= len(chunk.text):
-            anchors.append((start, end))
-    if not anchors:
-        name = str(getattr(entity, "name", "") or "")
-        if name:
-            span = chunk.text.find(name)
-            if span >= 0:
-                anchors.append((span, span + len(name)))
-
-    windows: list[tuple[int, int]] = []
-    for anchor_start, anchor_end in anchors:
-        floor = max(0, anchor_start - _CONTEXT_RADIUS)
-        ceiling = min(len(chunk.text), anchor_end + _CONTEXT_RADIUS)
-        left = max((chunk.text.rfind(mark, floor, anchor_start) for mark in _CONTEXT_BOUNDARIES), default=-1)
-        start = floor if left < floor else left + 1
-        right_candidates = [
-            position
-            for mark in _CONTEXT_BOUNDARIES
-            if (position := chunk.text.find(mark, anchor_end, ceiling)) >= 0
-        ]
-        end = min(right_candidates) + 1 if right_candidates else ceiling
-        if start < end:
-            windows.append((start, end))
-
-    merged: list[tuple[int, int]] = []
-    for start, end in sorted(set(windows)):
-        if merged and start <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        else:
-            merged.append((start, end))
-    return [(start, end, chunk.text[start:end]) for start, end in merged]
+def _requires_literal(prop: PropertySpec) -> bool:
+    symbols = f"{prop.identifier} {prop.display_name}"
+    return bool(_LITERAL_PROPERTY.search(symbols)) and not _may_be_semantic(prop)
 
 
 def _valid_update(
@@ -364,27 +244,11 @@ def _valid_update(
         canonical_name(key) for key in (getattr(entity, "properties", None) or {})
     }:
         return False
-    if isinstance(value, str) and not value.strip():
-        return False
-    if isinstance(value, list) and not any(
-        not isinstance(item, str) or item.strip() for item in value
-    ):
-        return False
-    # 属性值不需要在 evidence.quote 中逐字出现。调用方会对
-    # “实体 + 本次属性集合 + current chunk”做整体语义一致性核验。
+    # 允许字符串属性显式置为空字符串，用于表示“原文无值/缺失”，不删除属性。
+    if value == "":
+        return True
+    # 是否逐字定位不再决定丢弃：调用方先做语义比对，不一致时交由大模型核验。
     return True
-
-
-def _contextual_evidence(chunk: ExtractionChunk, start: int, end: int) -> Evidence:
-    """Represent bundle-level support with a valid, entity-anchored span."""
-    return Evidence(
-        span_id=f"{chunk.chunk_id}:{start}:{end}",
-        source_block_ids=[chunk.chunk_id],
-        quote=chunk.text[start:end],
-        start_char=start,
-        end_char=end,
-        evidence_type="contextual",
-    )
 
 
 def _batches(values: list[Any], size: int) -> Iterable[list[Any]]:
@@ -458,7 +322,6 @@ def enrich_entity_properties(
     llm: Any,
     *,
     route: DocumentRoute,
-    route_map: dict[str, DocumentRoute] | None = None,
     attempts: list[dict[str, Any]],
     warnings: list[dict[str, Any]],
     call_metrics: list[dict[str, Any]] | None = None,
@@ -470,58 +333,27 @@ def enrich_entity_properties(
     retry_base_seconds: float = 0.05,
     batch_size: int = 24,
     max_workers: int = 1,
-    mode: str = "property",
-    coverage_round: int = 0,
-    max_coverage_rounds: int = 1,
 ) -> dict[str, int]:
-    """Fill identity or ordinary properties without changing the entity universe."""
-    if mode not in {"identity", "property"}:
-        raise ValueError("属性补全 mode 仅支持 identity 或 property")
+    """Fill properties without changing the resolved entity/relation universe."""
     grouped: dict[str, list[Any]] = defaultdict(list)
     allowed_by_id: dict[str, dict[str, PropertySpec]] = {}
-    applied = rejected = calls = verifications = 0
-    touched: set[str] = set()
     for entity in pool.accepted_entities():
-        if entity.source == "official_attachment":
-            continue
         # Deterministic extractors own the complete property set for the
         # entities they create.  Letting the LLM fill their remaining schema
         # fields re-introduces cross-entity leakage and turns optional fields
         # into false positives under a complete golden set.
-        if (
-            mode == "property"
-            and str(getattr(entity, "source", "") or "") in _AUTHORITATIVE_SOURCES
-        ):
+        if str(getattr(entity, "source", "") or "") in _AUTHORITATIVE_SOURCES:
             continue
-        declared = _declared_properties(plan, entity, mode=mode)
-        anchors = _entity_anchor_chunks(entity, manager)
-        if entity.canonical_type in management_type_ids(plan):
-            sources = {
-                (manager.get_chunk(anchor).document_id, (manager.get_chunk(anchor).metadata or {}).get("source_file"))
-                for anchor in anchors
-            }
-            sources.discard((None, None))
-            sources = {source for source in sources if any(source)}
-            anchors = list(dict.fromkeys([*anchors, *[
-                chunk.chunk_id for chunk in manager if official_role(plan, chunk) == "form"
-                and (chunk.document_id, (chunk.metadata or {}).get("source_file")) in sources
-            ]]))
-        anchors = [anchor for anchor in anchors if entity.canonical_type in
-                   official_entity_types(plan, manager.get_chunk(anchor), {entity.canonical_type})]
+        declared = _declared_properties(plan, entity)
+        anchor = _entity_anchor_chunk(entity, manager)
         if not declared:
             continue
-        if not anchors:
-            rejected += len(declared)
-            _warn(
-                warnings,
-                "PROPERTY_ENTITY_WITHOUT_ANCHOR",
-                "实体没有可绑定的原文 chunk，闭世属性补全已跳过",
-                f"entities.{entity.candidate_id}.properties",
-                sorted(declared),
-            )
-            continue
-        for anchor in anchors:
-            grouped[anchor].append(entity)
+        if anchor is None:
+            if not manager.chunk_ids:
+                continue
+            # 没有可绑定 span 的实体用首个 chunk 作为归纳上下文。
+            anchor = manager.chunk_ids[0]
+        grouped[anchor].append(entity)
         allowed_by_id[str(entity.candidate_id)] = declared
 
     def _run_batch(
@@ -531,12 +363,9 @@ def enrich_entity_properties(
         batch: list[Any],
         local_context: str,
     ) -> tuple[int, int, int, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]] | None]:
-        """单个补全批次：LLM 补全 + 锚定窗口语义核验 + 证据落库。
+        """单个属性补全批次：LLM 补全 + 证据核验 + 应用。
 
-        批次按 (chunk, 兼容组) 划分、批次内实体固定；同一实体可能因多 anchor
-        进入不同 chunk 的批次，属性写入为幂等覆盖、证据按 span_id 去重，
-        max_workers>1 并发时不会破坏实体数据。
-        本轮至少补到一个属性的实体 id 会并入外层 touched 集合，供覆盖率兜底判断。
+        批次间实体互不重叠（按 anchor 唯一分组），可安全并发；
         返回 (applied, rejected, verifications, 本地 warnings/attempts/call_metrics)。
         """
         batch_allowed = {
@@ -548,9 +377,9 @@ def enrich_entity_properties(
         local_call_metrics: list[dict[str, Any]] | None = [] if call_metrics is not None else None
         output_schema = _schema(batch, batch_allowed)
         messages = build_chat_messages(
-            task=mode,
+            task="property",
             plan=plan,
-            route=(route_map or {}).get(chunk_id, route),
+            route=route,
             chunk=chunk,
             local_context=local_context,
             known_entities=[
@@ -565,7 +394,7 @@ def enrich_entity_properties(
             output_schema,
             use_scheduler=use_scheduler,
             attempts=local_attempts,
-            pass_name=mode,
+            pass_name="property",
             chunk_id=f"{chunk_id}:batch-{batch_index}",
             max_attempts=max_attempts,
             retry_base_seconds=retry_base_seconds,
@@ -575,10 +404,6 @@ def enrich_entity_properties(
         if parsed is None:
             return 0, 0, 0, local_warnings, local_attempts, local_call_metrics
         entities_by_id = {str(entity.candidate_id): entity for entity in batch}
-        context_windows_by_id = {
-            entity_id: _entity_context_windows(entity, chunk)
-            for entity_id, entity in entities_by_id.items()
-        }
         seen_ids: set[str] = set()
         planned: list[dict[str, Any]] = []
         pending: list[dict[str, Any]] = []
@@ -592,40 +417,42 @@ def enrich_entity_properties(
                 continue
             seen_ids.add(entity_id)
             quote = str((update.get("evidence") or {}).get("quote") or "")
-            context_windows = context_windows_by_id.get(entity_id) or []
-            if not context_windows:
-                batch_rejected += 1
-                _warn(
-                    local_warnings,
-                    "PROPERTY_ENTITY_CONTEXT_UNRESOLVED",
-                    "实体虽引用当前 chunk，但无法解析局部锚定窗口，属性更新已拒绝",
-                    path,
-                    entity_id,
-                )
-                continue
-            context_text = "\n…\n".join(window[2] for window in context_windows)
-            quote_mode = ""
+            evidence_mode = ""
             if quote and manager.find_span(chunk_id, quote) is not None:
-                quote_mode = "exact"
+                evidence_mode = "exact"
             else:
                 if quote and _looks_like_record_table(chunk):
                     normalized_quote = _locate_record_table_quote(manager, chunk_id, quote)
                     if normalized_quote is not None:
                         quote = normalized_quote
-                        quote_mode = "normalized"
-            # Presence/similarity is not proof that a value belongs to this
-            # entity.  Every bundle therefore goes through the scoped
-            # semantic verifier, including exact quotes and record rows.
-            pending.append({
-                "item_id": f"{chunk_id}:batch-{batch_index}:update[{update_index}]",
+                        evidence_mode = "normalized"
+                if not evidence_mode:
+                    semantic_values = [
+                        str(value)
+                        for value in dict(update.get("properties") or {}).values()
+                    ]
+                    semantic_values.append(str(getattr(entity, "name", "") or ""))
+                    if quote:
+                        semantic_values.append(quote)
+                    if semantic_support(chunk.text, semantic_values):
+                        evidence_mode = "semantic"
+                if not evidence_mode:
+                    pending.append({
+                        "item_id": f"{chunk_id}:batch-{batch_index}:update[{update_index}]",
+                        "path": path,
+                        "entity": entity,
+                        "entity_id": entity_id,
+                        "update": update,
+                        "quote": quote,
+                    })
+                    continue
+            planned.append({
                 "path": path,
                 "entity": entity,
                 "entity_id": entity_id,
                 "update": update,
                 "quote": quote,
-                "context_windows": context_windows,
-                "context_text": context_text,
-                "quote_mode": quote_mode,
+                "mode": evidence_mode,
             })
 
         if pending:
@@ -636,15 +463,10 @@ def enrich_entity_properties(
                     {
                         "item_id": item["item_id"],
                         "kind": "property",
-                        "entity_type": str(
-                            getattr(item["entity"], "canonical_type", "")
-                            or getattr(item["entity"], "proposed_type", "")
-                            or ""
-                        ),
+                        "entity_type": str(getattr(item["entity"], "type", "") or ""),
                         "entity": str(getattr(item["entity"], "name", "") or ""),
                         "properties": dict(item["update"].get("properties") or {}),
                         "evidence_quote": item["quote"],
-                        "entity_context": item["context_text"],
                     }
                     for item in pending
                 ],
@@ -660,41 +482,30 @@ def enrich_entity_properties(
             batch_verifications += 1
             for item in pending:
                 verdict = verdicts.get(item["item_id"], "uncertain")
-                if verdict != "yes":
+                if verdict == "no":
                     batch_rejected += 1
-                    code = (
-                        "PROPERTY_EVIDENCE_REJECTED"
-                        if verdict == "no"
-                        else "PROPERTY_EVIDENCE_UNVERIFIED"
-                    )
-                    message = (
-                        "语义核验判定属性更新不受原文支持，已拒绝"
-                        if verdict == "no"
-                        else "语义核验不确定或失败，闭世属性更新已拒绝"
-                    )
                     _warn(
                         local_warnings,
-                        code,
-                        message,
+                        "PROPERTY_EVIDENCE_REJECTED",
+                        "语义比对不一致且大模型核验判定不属于原文，已拒绝",
                         item["path"],
                         item["quote"][:200],
                     )
                     continue
-                _warn(
-                    local_warnings,
-                    "PROPERTY_EVIDENCE_LLM_VERIFIED",
-                    "快速语义比对未通过，大模型核验确认整条属性更新受原文支持",
-                    item["path"],
-                    item["quote"][:200],
+                code = "PROPERTY_EVIDENCE_LLM_VERIFIED" if verdict == "yes" else "PROPERTY_EVIDENCE_UNVERIFIED"
+                message = (
+                    "语义比对不一致，大模型核验确认属于原文"
+                    if verdict == "yes"
+                    else "语义比对不一致，大模型核验不确定，保留并标记"
                 )
+                _warn(local_warnings, code, message, item["path"], item["quote"][:200])
                 planned.append({
                     "path": item["path"],
                     "entity": item["entity"],
                     "entity_id": item["entity_id"],
                     "update": item["update"],
                     "quote": item["quote"],
-                    "context_windows": item["context_windows"],
-                    "mode": f"{item['quote_mode'] or 'contextual'}_llm_yes",
+                    "mode": f"llm_{verdict}",
                 })
 
         for item in planned:
@@ -703,10 +514,10 @@ def enrich_entity_properties(
             update = item["update"]
             path = item["path"]
             quote = item["quote"]
-            if item["mode"].startswith("normalized"):
+            if item["mode"] == "normalized":
                 _warn(local_warnings, "PROPERTY_EVIDENCE_NORMALIZED", "属性证据经 JSON 记录表归一化后定位", path, quote[:200])
-            if "semantic" in item["mode"]:
-                _warn(local_warnings, "PROPERTY_EVIDENCE_SEMANTIC", "实体、属性集合与当前 chunk 整体语义比对通过", path, quote[:200])
+            elif item["mode"] == "semantic":
+                _warn(local_warnings, "PROPERTY_EVIDENCE_SEMANTIC", "属性证据未逐字定位，语义比对通过", path, quote[:200])
             accepted_values: dict[str, Any] = {}
             for prop_id, value in dict(update.get("properties") or {}).items():
                 prop = batch_allowed[entity_id].get(prop_id)
@@ -726,25 +537,13 @@ def enrich_entity_properties(
                         value,
                     )
                     continue
+                if value == "" and _looks_like_record_table(chunk):
+                    # 记录表里归纳出的规则没有唯一标识时，不输出空属性占位。
+                    continue
                 accepted_values[prop_id] = value
             if accepted_values:
                 entity.properties.update(accepted_values)
-                located = locate_quote(manager, quote, chunk_ids=(chunk_id,)) if quote else None
-                supporting_evidence = (
-                    [located]
-                    if located is not None
-                    else [
-                        _contextual_evidence(chunk, start, end)
-                        for start, end, _text in item["context_windows"]
-                    ]
-                )
-                for prop_id in accepted_values:
-                    evidence_rows = entity.property_evidence.setdefault(prop_id, [])
-                    for evidence in supporting_evidence:
-                        if not any(row.span_id == evidence.span_id for row in evidence_rows):
-                            evidence_rows.append(evidence)
                 batch_applied += len(accepted_values)
-                touched.add(str(entity.candidate_id))
         return batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics
 
     jobs: list[tuple[ExtractionChunk, str, int, list[Any], str]] = []
@@ -762,12 +561,6 @@ def enrich_entity_properties(
                 same_section=same_section,
             )
             if item.chunk_id != chunk_id
-            and official_role(plan, item) == official_role(plan, chunk)
-            and (official_role(plan, chunk) != "form" or (
-                bool(chunk.document_id or (chunk.metadata or {}).get("source_file"))
-                and (item.document_id, (item.metadata or {}).get("source_file"))
-                == (chunk.document_id, (chunk.metadata or {}).get("source_file"))
-            ))
         ]
         local_context = json.dumps(
             _truncated_neighbor_context(neighbors),
@@ -775,19 +568,7 @@ def enrich_entity_properties(
             sort_keys=True,
             default=str,
         )
-        compatible_groups: dict[tuple[str, tuple[str, ...]], list[Any]] = defaultdict(list)
-        for entity in candidates:
-            entity_id = str(entity.candidate_id)
-            compatible_groups[(
-                str(getattr(entity, "canonical_type", "") or ""),
-                tuple(sorted(allowed_by_id[entity_id])),
-            )].append(entity)
-        compatible_batches = [
-            batch
-            for group in compatible_groups.values()
-            for batch in _batches(group, batch_size)
-        ]
-        for batch_index, batch in enumerate(compatible_batches, start=1):
+        for batch_index, batch in enumerate(_batches(candidates, batch_size), start=1):
             jobs.append((chunk, chunk_id, batch_index, batch, local_context))
 
     # 批次间互不依赖，整体并发执行；max_workers=1 时退化为原有串行行为。
@@ -798,6 +579,7 @@ def enrich_entity_properties(
         with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ke-property") as executor:
             job_results = list(executor.map(lambda job: _run_batch(*job), jobs))
 
+    applied = rejected = calls = verifications = 0
     for batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics in job_results:
         applied += batch_applied
         rejected += batch_rejected
@@ -807,70 +589,9 @@ def enrich_entity_properties(
         attempts.extend(local_attempts)
         if local_call_metrics is not None:
             call_metrics.extend(local_call_metrics)
-    # 覆盖率兜底：本轮完全没有补到属性的实体，自动定向补跑一轮。
-    retry_calls = retry_applied = retry_rejected = retry_verifications = 0
-    if coverage_round < max_coverage_rounds:
-        retry_candidates = [
-            entity
-            for entity in pool.accepted_entities()
-            if str(entity.candidate_id) not in touched
-            and _declared_properties(plan, entity, mode=mode)
-            and _entity_anchor_chunks(entity, manager)
-            and (
-                mode != "property"
-                or str(getattr(entity, "source", "") or "") not in _AUTHORITATIVE_SOURCES
-            )
-        ]
-        if retry_candidates:
-            retry_summary = enrich_entity_properties(
-                _EntityPoolView(retry_candidates),
-                manager,
-                plan,
-                llm,
-                route=route,
-                route_map=route_map,
-                attempts=attempts,
-                warnings=warnings,
-                call_metrics=call_metrics,
-                use_scheduler=use_scheduler,
-                local_previous=local_previous,
-                local_next=local_next,
-                same_section=same_section,
-                max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds,
-                batch_size=batch_size,
-                max_workers=max_workers,
-                mode=mode,
-                coverage_round=coverage_round + 1,
-                max_coverage_rounds=max_coverage_rounds,
-            )
-            retry_calls = int(retry_summary.get("calls", 0))
-            retry_applied = int(retry_summary.get("applied", 0))
-            retry_rejected = int(retry_summary.get("rejected", 0))
-            retry_verifications = int(retry_summary.get("verifications", 0))
-    for entity in pool.accepted_entities():
-        missing = _declared_properties(plan, entity, mode=mode)
-        if missing:
-            _warn(
-                warnings,
-                "IDENTITY_UPDATES_MISSING" if mode == "identity" else "PROPERTY_UPDATES_MISSING",
-                "属性补全后仍有缺失字段（原文可能确实未提供）",
-                f"entities.{entity.candidate_id}.properties",
-                sorted(missing),
-            )
-    summary = {
-        "calls": calls,
-        "applied": applied,
-        "rejected": rejected,
-        "verifications": verifications,
-        "retry_calls": retry_calls,
-        "retry_applied": retry_applied,
-        "retry_rejected": retry_rejected,
-        "retry_verifications": retry_verifications,
-    }
+    summary = {"calls": calls, "applied": applied, "rejected": rejected, "verifications": verifications}
     logger.info(
-        "[步骤][%s补全] 输出: 实体=%d 批次调用=%d 应用=%d 拒绝=%d 语义核验=%d",
-        "身份" if mode == "identity" else "属性",
+        "[步骤][属性补全] 输出: 实体=%d 批次调用=%d 应用=%d 拒绝=%d 语义核验=%d",
         len(pool.accepted_entities()),
         calls,
         applied,
@@ -880,20 +601,4 @@ def enrich_entity_properties(
     return summary
 
 
-class _EntityPoolView:
-    """Minimal pool view exposing only the entities that need a coverage retry."""
-
-    def __init__(self, entities: Iterable[Any]) -> None:
-        self._entities = list(entities)
-
-    def accepted_entities(self) -> list[Any]:
-        return list(self._entities)
-
-
-def enrich_entity_identities(*args: Any, **kwargs: Any) -> dict[str, int]:
-    """Complete only ontology-declared identities before the freeze boundary."""
-    kwargs["mode"] = "identity"
-    return enrich_entity_properties(*args, **kwargs)
-
-
-__all__ = ["enrich_entity_identities", "enrich_entity_properties"]
+__all__ = ["enrich_entity_properties"]

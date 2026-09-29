@@ -529,7 +529,7 @@ class KnowledgePrecipitationService:
                     {"artifacts": {"markdown": origin}} if origin is not None else None,
                 )
         else:
-            from algorithm.knowledge_extract.batch import summarize_chunks
+            from algorithm.knowledge_extract.v1.batch import summarize_chunks
             from algorithm.knowledge_extract.v2.config import get_llm_config as _get_llm_config
 
             summaries = summarize_chunks(

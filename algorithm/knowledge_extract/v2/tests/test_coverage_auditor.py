@@ -1,7 +1,7 @@
 """Phase 1 Step 9 单元测试：通用 Coverage Auditor（§22-§23 / AC-8）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract/v2/tests/test_coverage_auditor.py
+    python algorithm/knowledge_extract_v2/tests/test_coverage_auditor.py
 
 覆盖：
 - §23.2 Feature Coverage（非 required 提示 / required 硬错误）；

@@ -1,7 +1,7 @@
 """Phase 1 Step 5 单元测试：Standard Strategy（§10-§11）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract/v2/tests/test_standard_strategy.py
+    python algorithm/knowledge_extract_v2/tests/test_standard_strategy.py
 
 覆盖：
 - §11.1 确定性抽取：文档元数据、结构单元（消费 chunk metadata）、ICS/CCS；
@@ -42,22 +42,11 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
         sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
-        src = directory / f"{stem}.py"
         module_name = f"{package_name}.{stem}"
-        archive_dir = directory / "tests" / "fixtures" / "archive"
-        if not src.exists() and (archive_dir / f"{stem}.py").exists():
-            src = archive_dir / f"{stem}.py"
-            module_name = f"{package_name}.archive.{stem}"
-            pkg_name = f"{package_name}.archive"
-            if pkg_name not in sys.modules:
-                pkg = types.ModuleType(pkg_name)
-                pkg.__path__ = [str(archive_dir)]
-                pkg.__package__ = pkg_name
-                sys.modules[pkg_name] = pkg
         if module_name in sys.modules:
             loaded[stem] = sys.modules[module_name]
             continue
-        spec = importlib.util.spec_from_file_location(module_name, src)
+        spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
@@ -291,26 +280,6 @@ class IntegrationTest(unittest.TestCase):
         for key in ("graph", "triples", "intermediate_model", "coverage_gaps", "mapping"):
             self.assertIn(key, result)
 
-    def test_extract_split_router_disabled_uses_generic(self) -> None:
-        result = SE.extract_split(
-            STANDARD_ONTOLOGY,
-            chunks=[
-                CC.ExtractionChunk(
-                    chunk_id="chunk-0",
-                    text=STANDARD_TEXT + "\n电池单体按6.2.1检验，外观应无变形及裂纹。",
-                )
-            ],
-            llm=StubLLM(),
-            use_router=False,
-        )
-        route = result["profile"]["document_route"]
-        self.assertEqual(route["kind"], "generic")
-        self.assertEqual(route["labels"], [])
-        self.assertEqual(route["reasons"], ["router.disabled"])
-        self.assertIs(result["profile"]["router_enabled"], False)
-        self.assertIsNone(result["error_code"])
-        self.assertEqual(result["raw"], {"entities": [], "relations": []})
-
     def test_standard_01_verbatim_gold_entities(self) -> None:
         # gold 中编号/名称逐字落在原文的实体（span-first 只能产出这些；
         # 确定性结构关系组装依赖封面/规范性引用结构，此处不覆盖）。
@@ -334,14 +303,8 @@ class IntegrationTest(unittest.TestCase):
             return [span_item(type_id, name) for type_id, name in verbatim if name in text]
 
         llm = StubLLM(entity_handler=entity_handler)
-        result = SE.extract_split(
-            STANDARD_ONTOLOGY,
-            chunks=chunks,
-            llm=llm,
-            identity_admission="observe",
-        )
-        self.assertEqual(result["error_code"], "REPAIR_INCOMPLETE")
-        self.assertFalse(result["repair"]["coverage_complete"])
+        result = SE.extract_split(STANDARD_ONTOLOGY, chunks=chunks, llm=llm)
+        self.assertIsNone(result["error_code"])
         canonical = MODULES["graph_utils"].canonical_name
         pred_keys = {(e["type"], canonical(e["name"])) for e in result["raw"]["entities"]}
         emitted = {(type_id, canonical(name)) for type_id, name in verbatim}

@@ -20,24 +20,6 @@ _ERROR_TYPES = {
 }
 
 
-def _confidence_fields(item: dict[str, Any]) -> dict[str, Any]:
-    if item.get("confidence") is None:
-        return {}
-    payload = {
-        key: item[key]
-        for key in (
-            "mapping_score",
-            "confidence",
-            "confidence_status",
-            "gate_status",
-        )
-        if item.get(key) is not None
-    }
-    if isinstance(item.get("confidence_details"), dict):
-        payload["confidence_details"] = dict(item["confidence_details"])
-    return payload
-
-
 def to_public_result(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     """Return only the stable business contract or raise a typed failure."""
     status = str(result.get("status") or ("failed" if result.get("error_code") else "succeeded"))
@@ -64,7 +46,6 @@ def to_public_result(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
                 for key, value in dict(entity.get("properties") or {}).items()
                 if key != "name"
             },
-            **_confidence_fields(entity),
         }
         for entity in raw.get("entities") or []
     ]
@@ -75,7 +56,6 @@ def to_public_result(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
             "rel_type": relation.get("rel_type"),
             "to_type": relation.get("to_type"),
             "to_name": relation.get("to_name"),
-            **_confidence_fields(relation),
         }
         for relation in raw.get("relations") or []
     ]

@@ -1,4 +1,4 @@
-from algorithm.knowledge_extract.graph_utils import merge_node_properties
+from algorithm.knowledge_extract.v1.graph_utils import merge_node_properties
 
 
 def test_merge_node_properties_uses_late_scalar_values_including_falsy_updates():

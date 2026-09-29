@@ -1,21 +1,30 @@
-from .batch import deduplicate_chunk_graphs, extract_chunks, summarize_chunks
-from .extractor import extract_v2, summarize_text
-from typing import Any
+"""知识抽取算法包。
 
+目录约定（运行版本由 ``KG_EXTRACT_ALGO_VERSION`` 选择，见 ``version.py``）：
 
-def _graph_write_unavailable(*args: Any, **kwargs: Any):
-    raise RuntimeError(
-        "Graph write and knowledge-space operations are unavailable; "
-        "use the application service when the capability is opened."
-    )
+- ``v1/``：旧 batch 契约（batch / extractor / ontology_schema / scheduler / uml）
+- ``v2/``：V2 聚合流水线
+- ``v3/``：V3 聚合流水线
+- ``latest/``：当前默认版本（独立代码副本）
+- ``version.py``：版本路由
 
-
-init_knowledge_space = _graph_write_unavailable
-init_knowledge_space_tree = _graph_write_unavailable
-init_knowledge_map_spaces = _graph_write_unavailable
-get_dimension_scales = _graph_write_unavailable
-store_extraction_to_neo4j = _graph_write_unavailable
-
+为兼容历史调用，顶层仍重导出 V1 的公开 API；新代码请直接
+``from algorithm.knowledge_extract.v1 import ...``。
+"""
+from .v1 import (  # noqa: F401
+    deduplicate_chunk_graphs,
+    extract_chunks,
+    extract_v2,
+    summarize_chunks,
+    summarize_text,
+)
+from .v1 import (  # noqa: F401
+    get_dimension_scales,
+    init_knowledge_map_spaces,
+    init_knowledge_space,
+    init_knowledge_space_tree,
+    store_extraction_to_neo4j,
+)
 
 __all__ = [
     "extract_v2",

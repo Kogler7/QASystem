@@ -1,17 +1,56 @@
-"""Ontology-driven extraction V3. Existing V2 callers remain unchanged."""
-from .context import ExtractionChunk
-from .harness import extract_detailed
+"""版本包入口：暴露 backend 适配器需要的 aggregate / public 契约。"""
+from collections.abc import Iterable
+from typing import Any
+
+from .batch import deduplicate_chunk_graphs
+from .chunk_context import ExtractionChunk
+from .harness_extractor import extract_harness
+from .result_contract import to_public_result
+from .split_extractor import extract_split
 
 
-def extract(chunks, ontology: str, **kwargs):
-    """Return scored facts. Inspect status before using an incomplete result."""
-    return extract_detailed(chunks, ontology, **kwargs)
+def extract(
+    chunks: Iterable[ExtractionChunk],
+    ontology: str,
+    **kwargs: Any,
+) -> dict[str, list[dict[str, Any]]]:
+    """Extract the stable public ``entities`` / ``relations`` contract."""
+    return to_public_result(extract_harness(ontology=ontology, chunks=chunks, **kwargs))
 
 
-# Import adapter after ``extract_detailed`` is defined so the adapter can re-export
-# the package-level symbol; this also lets tests monkeypatch
-# ``algorithm.knowledge_extract.v3.extract_detailed`` and affect ``extract_aggregate``.
-from .adapter import extract_aggregate
+def extract_aggregate(
+    ontology: str,
+    chunks: Iterable[ExtractionChunk],
+    *,
+    target_types: list[str] | None = None,
+    validation_mode: str = "permissive",
+    best_effort: bool = True,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    max_workers: int | None = None,
+    llm: Any | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    """Run the pipeline over ``chunks`` and return the aggregate contract."""
+    return extract_harness(
+        ontology=ontology,
+        chunks=chunks,
+        target_types=target_types,
+        validation_mode=validation_mode,
+        best_effort=best_effort,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        max_workers=max_workers,
+        llm=llm,
+    )
 
 
-__all__ = ['ExtractionChunk', 'extract', 'extract_aggregate', 'extract_detailed']
+__all__ = [
+    "extract",
+    "extract_aggregate",
+    "extract_split",
+    "extract_harness",
+    "deduplicate_chunk_graphs",
+]

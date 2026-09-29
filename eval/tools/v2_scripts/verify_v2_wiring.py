@@ -108,7 +108,7 @@ def check_wiring():
         )
 
     merged = adapter.__dict__  # noqa: F841 - merged graph rebuilt by V1's dedup below
-    from algorithm.knowledge_extract import deduplicate_chunk_graphs
+    from algorithm.knowledge_extract.v1 import deduplicate_chunk_graphs
 
     merged = deduplicate_chunk_graphs(items)
     print("\n=== 合并图（经既有 deduplicate_chunk_graphs） ===")

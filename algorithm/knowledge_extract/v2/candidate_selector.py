@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from .graph_utils import canonical_name
-from .structured_text import has_json_table_payload, is_structured_payload
+from .structured_text import is_structured_payload
 
 _NUMBERED_HEADING = re.compile(
     r"^\s{0,3}(?:#{1,6}\s+)?(?P<number>\d+(?:\.\d+)*)[.)]?\s+\S"
@@ -28,15 +28,7 @@ _MATH_ATOM = re.compile(
 _SEPARATOR = re.compile(r"[,，、;；|]\s*|\n(?!\s*\n)")
 _TABLE_ROW = re.compile(r"^\s*\|.+\|\s*$")
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)|<(?:img|svg)\b", re.IGNORECASE)
-#: 表结构支撑。§10 之后解析层把表格统一输出为 json 代码块，切片还会把围栏
-#: 留在表题所在片段里，因此围栏开头也算表结构；.md/.txt 原文直读时是 <table> 或管道表格。
-_TABLE = re.compile(
-    r"<table\b"
-    r"|```\s*json\b"
-    r"|^\s*\{\s*\"(?:columns|rows)\""
-    r"|^\s*\|.+\|\s*$",
-    re.IGNORECASE | re.MULTILINE,
-)
+_TABLE = re.compile(r"<table\b|^\s*\|.+\|\s*$", re.IGNORECASE | re.MULTILINE)
 _EQUATION = re.compile(r"\$\$[\s\S]*?\$\$|\\begin\{(?:equation|align)\}|[^\n]{1,160}=[^\n]{1,160}")
 _ANNEX = re.compile(r"^\s{0,3}(?:#{1,6}\s+)?附录\s*[A-Za-z0-9一二三四五六七八九十]", re.MULTILINE)
 _REFERENCE = re.compile(r"^\s*\[\d+\]\s+\S", re.MULTILINE)
@@ -207,37 +199,6 @@ def _following_paragraph(candidate: Any, manager: Any, limit: int = 4000) -> str
     return "\n".join(values)
 
 
-def _adjacent_chunk_text(candidate: Any, manager: Any, limit: int = 1200) -> str:
-    """证据 chunk 之后的相邻 chunk 文本（同一文档，不跨段，各取前 ``limit`` 字符）。
-
-    表题与其表格数据常被 500-700 字符的切片分到相邻两片：表题片自身没有表格
-    结构，结构支撑必须能看到下一片（与 standard_semantics 的表定位同口径）。
-    """
-    if manager is None or not hasattr(manager, "local_context"):
-        return ""
-    values: list[str] = []
-    seen: set[str] = set()
-    for evidence in _evidence(candidate):
-        for block_id in getattr(evidence, "source_block_ids", None) or ():
-            block_id = str(block_id)
-            if not block_id or block_id in seen:
-                continue
-            seen.add(block_id)
-            try:
-                neighbours = manager.local_context(
-                    block_id, previous=0, next=1, same_section=False
-                )
-            except (KeyError, AttributeError):
-                continue
-            for chunk in neighbours:
-                if str(getattr(chunk, "chunk_id", "")) == block_id:
-                    continue
-                text = str(getattr(chunk, "text", "") or "")
-                if text:
-                    values.append(text[:limit])
-    return "\n".join(values)
-
-
 def _warn(
     candidate: Any,
     code: str,
@@ -358,36 +319,6 @@ def _has_date_property(plan: Any, type_id: str) -> bool:
 def _math_atom(value: str) -> bool:
     normalized = value.strip().strip("$ ").replace(" ", "")
     return bool(_MATH_ATOM.fullmatch(normalized))
-
-
-def _downgrade(
-    candidate: Any,
-    code: str,
-    reason: str,
-    sink: list[dict[str, Any]] | None,
-) -> None:
-    """记录问题但不拒绝：命中护栏时降级保留（低置信标记，实体仍进入后续流程）。"""
-    if getattr(candidate, "mapping_status", "accepted") == "rejected":
-        return
-    candidate_warnings = getattr(candidate, "warnings", None)
-    if isinstance(candidate_warnings, list) and code not in candidate_warnings:
-        candidate_warnings.append(code)
-    if getattr(candidate, "mapping_score_status", None) in (None, "accepted"):
-        candidate.mapping_score_status = "low_confidence"
-    if sink is not None:
-        candidate_id = str(getattr(candidate, "candidate_id", "") or "")
-        sink.append(
-            {
-                "code": code,
-                "message": reason,
-                "path": f"entities.{candidate_id}" if candidate_id else "entities",
-                "value": {
-                    "type": _type(candidate),
-                    "name": getattr(candidate, "name", ""),
-                    "downgraded": True,
-                },
-            }
-        )
 
 
 class CandidateSelector:
@@ -593,10 +524,7 @@ class CandidateSelector:
         for candidate in items:
             if getattr(candidate, "mapping_status", "accepted") != "accepted":
                 continue
-            if getattr(candidate, "source", "") in {
-                "markdown_structure", "standard_semantics", "technical_semantics",
-                "official_form_structure", "official_structure",
-            } or any(
+            if getattr(candidate, "source", "") == "markdown_structure" or any(
                 getattr(evidence, "evidence_type", "") == "structural"
                 for evidence in _evidence(candidate)
             ):
@@ -625,10 +553,10 @@ class CandidateSelector:
             if len(distinct_names) < 5 or separators < len(unique) - 1:
                 continue
             for candidate in unique:
-                _downgrade(
+                _warn(
                     candidate,
                     "CANDIDATE_DENSE_ENUMERATION",
-                    "同一原文段落中的高密度同类枚举缺少独立实体结构，已降级保留",
+                    "同一原文段落中的高密度同类枚举缺少独立实体结构",
                     self.warnings,
                 )
 
@@ -695,15 +623,9 @@ class CandidateSelector:
                 if any(token in type_identifiers for token in ("figure", "diagram", "image")) or type_display == "图":
                     structural_support = bool(_IMAGE.search(window))
                 elif "table" in type_identifiers or type_display == "表":
-                    following = _following_paragraph(candidate, self.manager)
-                    adjacent = _adjacent_chunk_text(candidate, self.manager)
                     structural_support = bool(
                         _TABLE.search(window)
-                        or _TABLE.search(following)
-                        or _TABLE.search(adjacent)
-                        or has_json_table_payload(window)
-                        or has_json_table_payload(following)
-                        or has_json_table_payload(adjacent)
+                        or _TABLE.search(_following_paragraph(candidate, self.manager))
                     )
                 elif any(token in type_identifiers for token in ("equation", "formula", "math")) or type_display == "数学公式":
                     structural_support = bool(_EQUATION.search(window)) and not _math_atom(

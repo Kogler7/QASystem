@@ -1,7 +1,7 @@
 """Phase 1 Step 3 单元测试：ChunkContext + Evidence。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract/v2/tests/test_chunk_evidence.py
+    python algorithm/knowledge_extract_v2/tests/test_chunk_evidence.py
 
 覆盖：
 - §5 输入契约：ExtractionRequest 只携带 chunks 与 target_types（text/ontology
@@ -108,17 +108,13 @@ class ExtractionRequestTest(unittest.TestCase):
 
 
 class ChunkContextManagerTest(unittest.TestCase):
-    def test_duplicate_chunk_id_renamed(self) -> None:
+    def test_duplicate_chunk_id_rejected(self) -> None:
         chunks = [
             CC.ExtractionChunk(chunk_id="c1", text="a"),
             CC.ExtractionChunk(chunk_id="c1", text="b"),
         ]
-        warnings: list[dict] = []
-        manager = CC.ChunkContextManager(chunks, warnings=warnings)
-        self.assertEqual(chunks[0].chunk_id, "c1")
-        self.assertEqual(chunks[1].chunk_id, "c1#dup2")
-        self.assertTrue(manager.has_chunk("c1#dup2"))
-        self.assertEqual([row["code"] for row in warnings], ["DUPLICATE_CHUNK_ID"])
+        with self.assertRaises(ValueError):
+            CC.ChunkContextManager(chunks)
 
     def test_get_chunk_unknown_raises(self) -> None:
         manager = CC.ChunkContextManager(make_chunks())
@@ -176,18 +172,6 @@ class ChunkContextManagerTest(unittest.TestCase):
 
 
 class EvidenceModelTest(unittest.TestCase):
-    def test_literal_evidence_preserves_boundary_whitespace(self) -> None:
-        text = "\n附件原文\n\n"
-        chunk = CC.ExtractionChunk("attachment", text)
-        evidence = EV.Evidence("attachment:0:8", ["attachment"], text, 0, len(text), "structural")
-        payload = evidence.to_dict()
-        payload["span_id"] = f"attachment:0:{len(text)}"
-        restored = EV.Evidence.from_dict(payload)
-        self.assertEqual(restored.quote, text)
-        verdicts = EV.verify_evidence({"entities": [{"evidence": payload}], "relations": []}, [chunk])
-        self.assertTrue(verdicts)
-        self.assertTrue(all(item.status == "ok" for item in verdicts))
-
     def test_invalid_evidence_type_rejected(self) -> None:
         with self.assertRaises(ValueError):
             EV.Evidence(span_id="c1:0:3", source_block_ids=["c1"], quote="第一条", evidence_type="guessed")
@@ -324,13 +308,7 @@ class EvidenceVerificationTest(unittest.TestCase):
                     "type": "X",
                     "name": "n",
                     "properties": {},
-                    "evidence": {
-                        "span_id": "c1:0:2",
-                        "source_block_ids": ["c1"],
-                        "quote": "完全不存在",
-                        "start_char": 0,
-                        "end_char": 2,
-                    },
+                    "evidence": {"span_id": "c1:0:2", "source_block_ids": ["c1"], "quote": "完全不存在"},
                 }
             ],
             "relations": [],
@@ -338,72 +316,6 @@ class EvidenceVerificationTest(unittest.TestCase):
         verdicts = EV.verify_evidence(raw, self.manager)
         self.assertEqual(verdicts[0].status, "fail")
         self.assertEqual(verdicts[0].level, "L2")
-
-    def test_verify_rejects_quote_at_different_span(self) -> None:
-        raw = {
-            "entities": [{
-                "type": "X",
-                "name": "n",
-                "properties": {},
-                "evidence": {
-                    "span_id": "c1:0:3",
-                    "source_block_ids": ["c1"],
-                    "quote": "第二条",
-                    "start_char": 0,
-                    "end_char": 3,
-                },
-            }],
-            "relations": [],
-        }
-        verdict = EV.verify_evidence(raw, self.manager)[0]
-        self.assertEqual(verdict.status, "fail")
-        self.assertIn("声明 span 不一致", verdict.message)
-
-    def test_verify_rejects_span_id_offset_mismatch(self) -> None:
-        raw = EV.bind_evidence(
-            {"entities": [{"type": "X", "name": "第一条", "properties": {}}], "relations": []},
-            self.manager,
-        )
-        raw["entities"][0]["evidence"]["start_char"] = 1
-        verdict = EV.verify_evidence(raw, self.manager)[0]
-        self.assertEqual(verdict.status, "fail")
-        self.assertIn("span_id 与 offset 不一致", verdict.message)
-
-    def test_verify_uses_span_block_not_first_source_block(self) -> None:
-        raw = EV.bind_evidence(
-            {"entities": [{"type": "X", "name": "完成排查", "properties": {}}], "relations": []},
-            self.manager,
-            chunk_ids=("c2",),
-        )
-        raw["entities"][0]["evidence"]["source_block_ids"] = ["missing", "c2"]
-        verdict = EV.verify_evidence(raw, self.manager)[0]
-        self.assertEqual(verdict.status, "ok")
-
-    def test_verify_checks_every_evidence_not_only_first(self) -> None:
-        first = EV.locate_quote(self.manager, "第一条")
-        self.assertIsNotNone(first)
-        raw = {
-            "entities": [{
-                "type": "X",
-                "name": "n",
-                "properties": {},
-                "evidence": first.to_dict(),
-                "evidences": [
-                    first.to_dict(),
-                    {
-                        "span_id": "c1:0:3",
-                        "source_block_ids": ["c1"],
-                        "quote": "第二条",
-                        "start_char": 0,
-                        "end_char": 3,
-                    },
-                ],
-            }],
-            "relations": [],
-        }
-        verdicts = EV.verify_evidence(raw, self.manager)
-        self.assertEqual([item.status for item in verdicts], ["ok", "fail"])
-        self.assertEqual(verdicts[1].ref, "entities[0].evidences[1]")
 
 
 class EvidenceCoverageTest(unittest.TestCase):

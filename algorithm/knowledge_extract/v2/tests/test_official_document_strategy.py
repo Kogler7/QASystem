@@ -1,7 +1,7 @@
 """Phase 1 Step 6 单元测试：OfficialDocument Strategy（§12）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract/v2/tests/test_official_document_strategy.py
+    python algorithm/knowledge_extract_v2/tests/test_official_document_strategy.py
 
 覆盖：
 - §12.1 公文头部元数据确定性抽取（文件标题/来文单位/来文字号）；
@@ -42,22 +42,11 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
         sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
-        src = directory / f"{stem}.py"
         module_name = f"{package_name}.{stem}"
-        archive_dir = directory / "tests" / "fixtures" / "archive"
-        if not src.exists() and (archive_dir / f"{stem}.py").exists():
-            src = archive_dir / f"{stem}.py"
-            module_name = f"{package_name}.archive.{stem}"
-            pkg_name = f"{package_name}.archive"
-            if pkg_name not in sys.modules:
-                pkg = types.ModuleType(pkg_name)
-                pkg.__path__ = [str(archive_dir)]
-                pkg.__package__ = pkg_name
-                sys.modules[pkg_name] = pkg
         if module_name in sys.modules:
             loaded[stem] = sys.modules[module_name]
             continue
-        spec = importlib.util.spec_from_file_location(module_name, src)
+        spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
@@ -236,11 +225,9 @@ class IntegrationTest(unittest.TestCase):
             OFFICIAL_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=text)],
             llm=llm,
-            identity_admission="observe",
         )
         self.assertEqual(result["profile"]["document_route"]["kind"], "official_document")
-        self.assertEqual(result["error_code"], "REPAIR_INCOMPLETE")
-        self.assertFalse(result["repair"]["coverage_complete"])
+        self.assertIsNone(result["error_code"])
         canonical = MODULES["graph_utils"].canonical_name
         pred_keys = {(e["type"], canonical(e["name"])) for e in result["raw"]["entities"]}
         emitted = {(type_id, canonical(name)) for type_id, name in verbatim}

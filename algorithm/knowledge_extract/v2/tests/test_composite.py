@@ -1,7 +1,7 @@
 """Phase 1 Step 7 单元测试：复合元素（§21 CompositeElementHandler，AC-6）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract/v2/tests/test_composite.py
+    python algorithm/knowledge_extract_v2/tests/test_composite.py
 
 覆盖：
 - §21 CompositeSpec 自动发现（CompositeRule hasSubRule SimpleRule +
@@ -320,7 +320,6 @@ class IntegrationTest(unittest.TestCase):
             RULE_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=case["text"])],
             llm=self._gold_stub(relations),
-            identity_admission="observe",
         )
 
     def test_composite_rule_01_auto_assembly_matches_gold(self) -> None:
