@@ -236,7 +236,7 @@ class StandardExtractionStrategy:
 
         return {
             "type": "Standard",
-            "name": f"{standard_number} {document_name}".strip(),
+            "name": standard_number,
             "properties": properties,
             "evidence": {"quote": _entity_quote(text, standard_number)},
         }

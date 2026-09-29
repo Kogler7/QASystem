@@ -187,3 +187,10 @@ algorithm/knowledge_extract_v2/tests/
 .claude/settings.local.json
 backend/data/execution/
 offline_ingestion/_runs/
+
+# Agent工作流相关
+AGENT.md
+.omx
+
+# 前端插件
+vsix-20260807-153551

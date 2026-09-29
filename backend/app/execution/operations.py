@@ -76,7 +76,8 @@ def _unstructured_extract(payload: dict[str, Any]) -> dict[str, Any]:
         chunks.append({
             "index": res["index"],
             "text": res["text"],
-            "range": source.get("range"),
+            "range": source.get("ranges", source.get("range")),
+            "metadata": dict(source.get("metadata") or {}),
             "summary": res["summary"],
             "error": res.get("error"),
             "error_code": res.get("error_code"),

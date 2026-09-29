@@ -71,6 +71,16 @@ def _parse_payload(payload: str) -> Any | None:
         return None
 
 
+def _strip_fence_edges(text: str) -> str:
+    """去掉首尾的孤立围栏行：JSON 保护切片会把 ```json/``` 留在相邻片段里。"""
+    lines = text.splitlines()
+    while lines and _FENCE.match(lines[0]):
+        lines.pop(0)
+    while lines and _FENCE.match(lines[-1]):
+        lines.pop()
+    return "\n".join(lines)
+
+
 def _is_record_payload(data: Any) -> bool:
     """记录表的合法形态：记录数组，或表对象（解析层固定输出 {"columns", "rows"}）。"""
     if isinstance(data, list):
@@ -116,9 +126,12 @@ def extract_json_payload(
 
     body = _strip_leading_scaffolding(raw)
 
-    # 形态 1：整段 JSON
+    # 形态 1：整段 JSON（容忍 JSON 保护切片残留的首尾围栏行）
     stripped = body.strip()
     data = _parse_payload(stripped)
+    if data is None or not _is_record_payload(data):
+        stripped = _strip_fence_edges(stripped).strip()
+        data = _parse_payload(stripped)
     if data is not None and _is_record_payload(data):
         return StructuredPayload(text=stripped, blocks=(data,))
 
@@ -167,9 +180,20 @@ def is_structured_payload(text: str, *, min_ratio: float = DEFAULT_MIN_RATIO) ->
     return extract_json_payload(text, min_ratio=min_ratio) is not None
 
 
+def has_json_table_payload(text: str) -> bool:
+    """``text`` 中是否含表格 JSON（不要求它占主体）。
+
+    用途是结构支撑判定：表单识别、标准「表」实体补全、候选结构门控只需要确认
+    「这里有表格数据」，正文夹带少量 JSON 不影响这些结论。策略选择
+    （记录表提示词、空数组重试）仍用 ``is_structured_payload`` 的占比口径。
+    """
+    return extract_json_payload(text, min_ratio=0.0) is not None
+
+
 __all__ = [
     "DEFAULT_MIN_RATIO",
     "StructuredPayload",
     "extract_json_payload",
+    "has_json_table_payload",
     "is_structured_payload",
 ]

@@ -63,11 +63,14 @@ class CoverageAuditor:
     ) -> list[CoverageGap]:
         gaps: list[CoverageGap] = []
         self._gap_counter = 0
-        gaps.extend(self._feature_coverage(plan, entities))
-        gaps.extend(self._relation_coverage(plan, entities, relations))
+        # Attachments preserve a source file; they do not claim the business
+        # facts or relationships required of extracted information entities.
+        semantic_entities = [entity for entity in entities if not _attachment_container(entity, manager)]
+        gaps.extend(self._feature_coverage(plan, semantic_entities))
+        gaps.extend(self._relation_coverage(plan, semantic_entities, relations))
         gaps.extend(self._evidence_coverage(entities, relations))
         gaps.extend(self._structural_coverage(plan, manager, entities))
-        gaps.extend(self._composite_coverage(plan, entities, relations))
+        gaps.extend(self._composite_coverage(plan, semantic_entities, relations))
         return gaps
 
     def _next_gap(
@@ -298,6 +301,16 @@ class CoverageAuditor:
                     )
                 )
         return gaps
+
+
+def _attachment_container(entity: dict[str, Any], manager: Any) -> bool:
+    evidence = entity.get("evidences") or [entity.get("evidence") or {}]
+    block_ids = [block for item in evidence for block in item.get("source_block_ids", ())]
+    return bool(entity.get("source_files") and block_ids) and all(
+        manager.has_chunk(block) and
+        (manager.get_chunk(block).metadata or {}).get("official_document_role") == "attachment"
+        for block in block_ids
+    )
 
 
 def _entity_span(entity: dict[str, Any]) -> str:

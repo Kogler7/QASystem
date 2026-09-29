@@ -36,7 +36,10 @@ VERIFICATION_SCHEMA: dict[str, Any] = {
 }
 
 VERIFICATION_SYSTEM_PROMPT = """你是抽取结果的证据核验器。
-只依据给定的 current chunk 原文判断候选实体/属性是否属于原文，不引入外部知识。
+只依据给定的 current chunk 原文核验候选事实。候选可能是实体属性更新，也可能是 source-relation-target 关系断言。
+实体属性值可以是对原文的忠实归纳，不要求每个属性值在 quote 中逐字出现，也不要求一个属性对应一条独立证据。
+关系候选必须由原文支持指定方向、指定关系和两个指定端点；只同时出现两个实体、主题相关或依赖常识推断都不能判为 yes。
+yes 必须表示 current chunk 能支持候选的完整事实，不得引入外部知识、混淆实体、颠倒关系方向或把邻近事实错误拼接。
 supported 只能取 yes（原文能够支持）、no（与原文矛盾或明显不属于原文）、uncertain（无法判断）。
 只输出 JSON object，且只包含 output schema 允许的键。"""
 
@@ -89,12 +92,18 @@ def build_verification_messages(
     chunk: ExtractionChunk,
     items: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
-    """构造 LLM 核验消息：判断候选实体/属性是否属于 current chunk。"""
+    """构造 LLM 核验消息：判断候选实体属性或关系是否被 current chunk 支持。"""
+    scoped = all(str(item.get("entity_context") or "").strip() for item in items)
+    chunk_payload = {
+        "chunk_id": chunk.chunk_id,
+        "document_id": chunk.document_id,
+        "text": "（候选项已提供实体锚定上下文，不开放整个 chunk）" if scoped else chunk.text,
+    }
     user = f"""## task
 evidence_verification
 
 ## current chunk
-{json.dumps({"chunk_id": chunk.chunk_id, "document_id": chunk.document_id, "text": chunk.text}, ensure_ascii=False)}
+{json.dumps(chunk_payload, ensure_ascii=False)}
 
 ## candidates
 {json.dumps(items, ensure_ascii=False, sort_keys=True, default=str)}
@@ -104,7 +113,10 @@ evidence_verification
 
 ## output constraints
 - 逐项核验 candidates，按 item_id 输出 verdicts，不得遗漏任何 item_id。
-- yes=原文支持；no=与原文矛盾或明显不属于原文；uncertain=无法判断。
+- claim_kind=entity 时，按整个实体属性更新做语义核验；不要做属性值与 quote 的逐字一一对齐。
+- claim_kind=relation 时，必须核验 source、relation、target、方向和 evidence_quote 组成的完整关系断言。
+- candidate 含 entity_context 时，只能依据该实体锚定上下文判断，不得借用其他候选实体的事实。
+- yes=原文支持完整候选事实；no=与原文矛盾、关系不成立或属于其他实体；uncertain=无法判断。
 - 只输出 JSON object；不要解释。"""
     return [
         {"role": "system", "content": VERIFICATION_SYSTEM_PROMPT},

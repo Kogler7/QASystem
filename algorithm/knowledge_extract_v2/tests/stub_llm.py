@@ -5,7 +5,7 @@
   mention/quote 必须逐字来自 current chunk；
 - property pass：响应 {"updates": [{entity_id, properties, evidence:{quote}}]}；
 - relation pass：prompt 列出候选 pair（``- `pair-x`: entity-0(T) -[rel]-> entity-1(T)``），
-  响应 {"decisions": [{pair_id, label, evidence:{quote}}]}，label 为 pair 的 relation_id 或 NONE；
+  响应 {"decisions": {pair_id: {label, evidence:{quote}}}}，每个 pair 必须明确输出 relation_id 或 NONE；
 - repair   pass：按 prompt 内 output schema 的顶层 required 键返回空集合。
 
 StubLLM 接收 ChatMessages（list[dict]），按 "## task" 段落路由到对应 handler；
@@ -69,6 +69,19 @@ def output_schema_required(prompt: str) -> list[str]:
     return []
 
 
+def verification_items(prompt: str) -> list[dict[str, Any]]:
+    """解析 evidence_verification prompt 中的 candidates JSON。"""
+    lines = prompt.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() == "## candidates" and index + 1 < len(lines):
+            try:
+                value = json.loads(lines[index + 1])
+            except json.JSONDecodeError:
+                return []
+            return value if isinstance(value, list) else []
+    return []
+
+
 def parse_relation_pairs(prompt: str) -> list[dict[str, str]]:
     """解析 relation pass prompt 中枚举的候选 pair。"""
     return [match.groupdict() for match in _PAIR_ROW.finditer(prompt)]
@@ -100,12 +113,16 @@ class StubLLM:
     def __init__(
         self,
         entity_handler: Callable[[str, dict[str, Any]], list[dict[str, Any]]] | None = None,
+        identity_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
         property_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        evidence_handler: Callable[[str, dict[str, Any], list[dict[str, Any]]], dict[str, Any]] | None = None,
         relation_handler: Callable[[str, list[dict[str, str]], dict[str, Any]], list[dict[str, Any]]] | None = None,
         repair_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
         self.entity_handler = entity_handler
+        self.identity_handler = identity_handler
         self.property_handler = property_handler
+        self.evidence_handler = evidence_handler
         self.relation_handler = relation_handler
         self.repair_handler = repair_handler
         self.calls: list[tuple[str, str]] = []
@@ -131,15 +148,51 @@ class StubLLM:
         if task == "entity":
             items = self.entity_handler(prompt, chunk) if self.entity_handler else []
             payload: dict[str, Any] = {"entities": [self._ground(item, chunk) for item in items]}
+        elif task == "identity":
+            payload = (
+                self.identity_handler(prompt, chunk) if self.identity_handler else {"updates": []}
+            )
         elif task == "property":
             payload = (
                 self.property_handler(prompt, chunk) if self.property_handler else {"updates": []}
             )
+        elif task == "evidence_verification":
+            items = verification_items(prompt)
+            payload = (
+                self.evidence_handler(prompt, chunk, items)
+                if self.evidence_handler
+                else {
+                    "verdicts": [
+                        {
+                            "item_id": str(item.get("item_id") or ""),
+                            "supported": "yes",
+                            "reason": "test stub accepts the semantic claim bundle",
+                        }
+                        for item in items
+                    ]
+                }
+            )
         elif task == "relation":
             pairs = parse_relation_pairs(prompt)
-            decisions = (
+            raw_decisions = (
                 self.relation_handler(prompt, pairs, chunk) if self.relation_handler else []
             )
+            if isinstance(raw_decisions, dict):
+                decisions = dict(raw_decisions)
+            else:
+                decisions = {
+                    str(item.get("pair_id") or ""): {
+                        "label": str(item.get("label") or "NONE"),
+                        "evidence": dict(item.get("evidence") or {"quote": ""}),
+                    }
+                    for item in raw_decisions
+                    if isinstance(item, dict) and item.get("pair_id")
+                }
+            for pair in pairs:
+                decisions.setdefault(
+                    pair["pair_id"],
+                    {"label": "NONE", "evidence": {"quote": ""}},
+                )
             payload = {"decisions": decisions}
         else:  # repair 或其他：按 output schema 顶层 required 键返回空集合
             if self.repair_handler is not None:

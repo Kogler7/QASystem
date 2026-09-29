@@ -9,10 +9,23 @@ from langchain_text_splitters import MarkdownTextSplitter, RecursiveCharacterTex
 
 # ======================== JSON 保护核心函数 ========================
 
-def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
-    """提取文本中所有完整、合法的 JSON 块（对象 {...} 和数组 [...]）。
+def _is_protectable_json(data: object) -> bool:
+    """只有对象、或「含对象的数组」值得保护。
 
-    使用括号匹配 + json.loads 双重验证，避免把代码中的花括号误判为 JSON。
+    标量数组（`[1]`、`["参考文献"]`）多是正文里的文献角标或列举，保护它们会把
+    `[1] 标准号…` 撕成 `"[1]"` + 正文两片，确定性参考文献抽取也会因此失效。
+    口径与结构化文本判定（structured_text._is_record_payload）保持一致。
+    """
+    if isinstance(data, dict):
+        return True
+    return isinstance(data, list) and any(isinstance(item, dict) for item in data)
+
+
+def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
+    """提取文本中所有完整、合法的 JSON 块（对象 {...} 和含对象的数组 [...]）。
+
+    使用括号匹配 + json.loads 双重验证，避免把代码中的花括号误判为 JSON；
+    标量数组不算 JSON 块。
     返回 list of (start_pos, end_pos, json_text)。
     """
     blocks: list[tuple[int, int, str]] = []
@@ -51,13 +64,17 @@ def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
                     if depth == 0:
                         candidate = text[i:j + 1]
                         try:
-                            json.loads(candidate)
-                            blocks.append((i, j + 1, candidate))
-                            i = j + 1
-                            break
+                            data = json.loads(candidate)
                         except json.JSONDecodeError:
                             i += 1
                             break
+                        if _is_protectable_json(data):
+                            blocks.append((i, j + 1, candidate))
+                            i = j + 1
+                        else:
+                            # 标量数组不保护：跳过开头字符继续向后扫描
+                            i += 1
+                        break
             j += 1
         else:
             i += 1
@@ -65,10 +82,40 @@ def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
     return blocks
 
 
+#: 围栏行：```json 开行 / ``` 闭行。围栏必须和 JSON 同属一个片段，否则会被切成
+#: 孤立的 "```json" / "```" 小片（白占一次 LLM 调用，且没有任何信息量）。
+_FENCE_OPENER = re.compile(r"`{3,}\s*(?:json)?", re.IGNORECASE)
+_FENCE_CLOSER = re.compile(r"`{3,}\s*")
+
+
+def _absorb_fence_lines(text: str, start: int, end: int) -> tuple[int, int]:
+    """把紧贴 JSON 两侧的围栏行并入 (start, end)；裸 JSON 边界原样返回。"""
+    head = start
+    while head > 0 and text[head - 1] in " \t\r\n":
+        head -= 1
+    line_start = text.rfind("\n", 0, head) + 1
+    opener = text[line_start:head]
+    if opener and _FENCE_OPENER.fullmatch(opener):
+        start = line_start
+
+    tail = end
+    while tail < len(text) and text[tail] in " \t\r\n":
+        tail += 1
+    line_end = text.find("\n", tail)
+    if line_end == -1:
+        line_end = len(text)
+    closer = text[tail:line_end]
+    if closer and _FENCE_CLOSER.fullmatch(closer):
+        end = line_end
+
+    return start, end
+
+
 def _split_text_with_json_protection(text: str) -> list[tuple[str, bool]]:
     """将文本按 JSON 块边界拆分为 (片段, is_json) 列表。
 
-    JSON 块作为独立片段且 is_json=True，非 JSON 部分 is_json=False。
+    JSON 块连同紧贴的 ```json / ``` 围栏作为独立片段且 is_json=True，
+    非 JSON 部分 is_json=False。
     """
     json_blocks = _extract_json_blocks(text)
     if not json_blocks:
@@ -76,17 +123,18 @@ def _split_text_with_json_protection(text: str) -> list[tuple[str, bool]]:
 
     result: list[tuple[str, bool]] = []
     last_end = 0
-    for start, end, json_text in json_blocks:
+    for start, end, _json_text in json_blocks:
+        start, end = _absorb_fence_lines(text, start, end)
         if start > last_end:
             non_json = text[last_end:start]
-            if non_json and non_json.strip():
+            if non_json:
                 result.append((non_json, False))
-        result.append((json_text, True))
+        result.append((text[start:end], True))
         last_end = end
 
     if last_end < len(text):
         remaining = text[last_end:]
-        if remaining and remaining.strip():
+        if remaining:
             result.append((remaining, False))
 
     return result if result else [(text, False)]
@@ -467,22 +515,36 @@ def split_by_characters(
     chunk_overlap: int = 0,
 ) -> list[Document]:
     """Split documents through every configured separator, then pack chunks.
-    JSON 块受保护，不会从中间断开。"""
+    JSON 块受保护，不会从中间断开，可以独占一个超长切片。"""
+    if chunk_size <= 0 or not 0 <= chunk_overlap < chunk_size:
+        raise ValueError("chunk_size 必须大于 0，且 0 <= chunk_overlap < chunk_size")
+    plain_limit = chunk_size - chunk_overlap
     active_separators = [separator for separator in (separators or ["\n"]) if separator]
     if not active_separators:
         active_separators = ["\n"]
 
     fragments: list[Document] = []
-    for document in documents:
+    for document_index, document in enumerate(documents):
         text = document.page_content
         protected = _split_text_with_json_protection(text)
+        source_cursor = 0
 
         for part_text, is_json in protected:
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            part_end = part_start + len(part_text)
+            source_cursor = part_end
             if is_json:
                 # JSON 块直接作为完整 fragment
                 fragments.append(Document(
                     page_content=part_text,
-                    metadata={**dict(document.metadata), "_is_json": True},
+                    metadata={
+                        **dict(document.metadata),
+                        "_is_json": True,
+                        "__source_range": [part_start, part_end],
+                        "__document_index": document_index,
+                    },
                 ))
             else:
                 # 非 JSON 走原有 separator 拆分
@@ -497,11 +559,24 @@ def split_by_characters(
                             if p or idx < len(parts) - 1
                         )
                     texts = next_texts
+                part_cursor = 0
                 for t in texts:
-                    if t:
+                    t_start = part_text.find(t, part_cursor)
+                    if t_start < 0:
+                        t_start = part_cursor
+                    part_cursor = t_start + len(t)
+                    for start in range(0, len(t), plain_limit):
                         fragments.append(Document(
-                            page_content=t,
-                            metadata={**dict(document.metadata), "_is_json": False},
+                            page_content=t[start:start + plain_limit],
+                            metadata={
+                                **dict(document.metadata),
+                                "_is_json": False,
+                                "__source_range": [
+                                    part_start + t_start + start,
+                                    part_start + t_start + min(start + plain_limit, len(t)),
+                                ],
+                                "__document_index": document_index,
+                            },
                         ))
 
     if chunk_overlap > 0:
@@ -510,34 +585,62 @@ def split_by_characters(
     # 打包：JSON 块不拆分
     chunks: list[Document] = []
     buf_texts: list[str] = []
+    buf_ranges: list[list[int]] = []
     buf_len = 0
+    active_document: int | None = None
+    buf_metadata: dict = {}
 
     for fragment in fragments:
         frag_text = fragment.page_content
         is_json = fragment.metadata.get("_is_json", False)
         frag_len = len(frag_text)
 
+        document_index = fragment.metadata.get("__document_index")
+        if buf_texts and document_index != active_document:
+            metadata = dict(buf_metadata)
+            if buf_ranges:
+                metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+            chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
+            buf_texts, buf_ranges, buf_len = [], [], 0
+        active_document = document_index
+
         if is_json and frag_len > chunk_size:
             if buf_texts:
-                chunks.append(Document(page_content="".join(buf_texts), metadata=dict(fragment.metadata)))
-                buf_texts = []
+                metadata = dict(buf_metadata)
+                if buf_ranges:
+                    metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+                chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
+                buf_texts, buf_ranges = [], []
                 buf_len = 0
             chunks.append(Document(page_content=frag_text, metadata=dict(fragment.metadata)))
             continue
 
         if buf_len + frag_len > chunk_size and buf_texts:
-            chunks.append(Document(page_content="".join(buf_texts), metadata=dict(fragment.metadata)))
+            metadata = dict(buf_metadata)
+            if buf_ranges:
+                metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+            chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
             buf_texts = [frag_text]
+            buf_metadata = dict(fragment.metadata)
+            buf_ranges = [list(fragment.metadata["__source_range"])] if fragment.metadata.get("__source_range") else []
             buf_len = frag_len
         else:
+            if not buf_texts:
+                buf_metadata = dict(fragment.metadata)
             buf_texts.append(frag_text)
+            if fragment.metadata.get("__source_range"):
+                buf_ranges.append(list(fragment.metadata["__source_range"]))
             buf_len += frag_len
 
     if buf_texts:
-        chunks.append(Document(page_content="".join(buf_texts), metadata=dict(fragments[-1].metadata)))
+        metadata = dict(buf_metadata)
+        if buf_ranges:
+            metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+        chunks.append(Document(page_content="".join(buf_texts), metadata=metadata))
 
     for c in chunks:
         c.metadata.pop("_is_json", None)
+        c.metadata.pop("__document_index", None)
 
     return chunks
 
@@ -552,24 +655,35 @@ def _pack_with_overlap(
 
     chunks: list[Document] = []
     buf_frags: list[str] = []
+    buf_ranges: list[list[int]] = []
     buf_len = 0
-    meta = {k: v for k, v in dict(fragments[0].metadata).items() if k != "_is_json"}
+    active_document: int | None = None
+    buf_metadata: dict = {}
 
     def flush(force: bool = False) -> None:
-        nonlocal buf_frags, buf_len
+        nonlocal buf_frags, buf_ranges, buf_len, buf_metadata
         if not buf_frags:
             return
         text = "".join(buf_frags)
         if len(text) <= chunk_size or force:
             if text.strip():
-                chunks.append(Document(page_content=text, metadata=dict(meta)))
-            buf_frags, buf_len = [], 0
+                metadata = dict(buf_metadata)
+                if buf_ranges:
+                    metadata["__source_range"] = [buf_ranges[0][0], buf_ranges[-1][1]]
+                metadata.pop("_is_json", None)
+                chunks.append(Document(page_content=text, metadata=metadata))
+            buf_frags, buf_ranges, buf_len, buf_metadata = [], [], 0, {}
 
     for frag in fragments:
         content = frag.page_content
         is_json = frag.metadata.get("_is_json", False)
         if not content:
             continue
+
+        document_index = frag.metadata.get("__document_index")
+        if buf_frags and document_index != active_document:
+            flush(force=True)
+        active_document = document_index
 
         if is_json and len(content) > chunk_size:
             flush(force=True)
@@ -579,30 +693,60 @@ def _pack_with_overlap(
             ))
             continue
 
-        if buf_len + len(content) > chunk_size and buf_frags:
+        if buf_len + len(content) > chunk_size - chunk_overlap and buf_frags:
             flush(force=True)
+        if not buf_frags:
+            buf_metadata = dict(frag.metadata)
         buf_frags.append(content)
+        if frag.metadata.get("__source_range"):
+            buf_ranges.append(list(frag.metadata["__source_range"]))
         buf_len += len(content)
 
     flush(force=True)
 
     if chunk_overlap <= 0 or len(chunks) < 2:
+        for chunk in chunks:
+            chunk.metadata.pop("__document_index", None)
         return chunks
 
     overlapped: list[Document] = [chunks[0]]
     for k in range(1, len(chunks)):
         prev_text = overlapped[-1].page_content
         tail = _tail_with_boundary(prev_text, chunk_overlap)
+        previous_range = overlapped[-1].metadata.get("__source_range")
+        # A boundary-aligned tail may intentionally omit trailing whitespace
+        # from the previous source span.  It is then not a contiguous source
+        # suffix; drop the overlap rather than inventing a range containing
+        # characters absent from the emitted chunk.
+        if (
+            tail
+            and previous_range
+            and chunks[k].metadata.get("__source_range")
+            and chunks[k].metadata["__source_range"][0] != previous_range[1]
+            and len(prev_text) == previous_range[1] - previous_range[0]
+        ):
+            tail = ""
         if tail and tail != prev_text:
             new_text = tail + chunks[k].page_content
-            if len(new_text) > chunk_size + chunk_overlap:
-                allowed_tail_len = max(0, (chunk_size + chunk_overlap) - len(chunks[k].page_content))
+            if len(new_text) > chunk_size:
+                allowed_tail_len = max(0, chunk_size - len(chunks[k].page_content))
                 tail = tail[-allowed_tail_len:] if allowed_tail_len > 0 else ""
                 new_text = tail + chunks[k].page_content
-            overlapped.append(Document(page_content=new_text, metadata=dict(chunks[k].metadata)))
+            metadata = dict(chunks[k].metadata)
+            current_range = metadata.get("__source_range")
+            if current_range and previous_range:
+                metadata["__source_range"] = [
+                    max(previous_range[1] - len(tail), previous_range[0]),
+                    current_range[1],
+                ]
+            elif current_range:
+                metadata["__source_range"] = list(current_range)
+            overlapped.append(Document(page_content=new_text, metadata=metadata))
         else:
             overlapped.append(chunks[k])
 
+    for chunk in overlapped:
+        chunk.metadata.pop("__document_index", None)
     return overlapped
 
 
@@ -615,22 +759,47 @@ def split_recursively(
     """递归切片 + JSON 保护。"""
     result: list[Document] = []
 
-    for document in documents:
+    for document_index, document in enumerate(documents):
         text = document.page_content
         protected = _split_text_with_json_protection(text)
+        source_cursor = 0
 
         for part_text, is_json in protected:
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            source_cursor = part_start + len(part_text)
             if is_json:
-                result.append(Document(page_content=part_text, metadata=dict(document.metadata)))
+                result.append(Document(
+                    page_content=part_text,
+                    metadata={
+                        **dict(document.metadata),
+                        "__source_range": [part_start, source_cursor],
+                        "__document_index": document_index,
+                    },
+                ))
             else:
-                sub_doc = Document(page_content=part_text, metadata=dict(document.metadata))
-                result.extend(
-                    RecursiveCharacterTextSplitter(
-                        separators=separators or ["\n\n", "\n", "。", "！", "？", ".", "!", "?", " ", ""],
-                        chunk_size=chunk_size,
-                        chunk_overlap=chunk_overlap,
-                    ).split_documents([sub_doc])
+                splitter = RecursiveCharacterTextSplitter(
+                    separators=separators or ["\n\n", "\n", "。", "！", "？", ".", "!", "?", " ", ""],
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    add_start_index=True,
                 )
+                for chunk in splitter.split_documents([Document(page_content=part_text, metadata=dict(document.metadata))]):
+                    local_start = int(chunk.metadata.pop("start_index", -1))
+                    if local_start < 0:
+                        raise ValueError("切片器未返回有效 start_index")
+                    result.append(Document(
+                        page_content=chunk.page_content,
+                        metadata={
+                            **dict(chunk.metadata),
+                            "__source_range": [
+                                part_start + local_start,
+                                part_start + local_start + len(chunk.page_content),
+                            ],
+                            "__document_index": document_index,
+                        },
+                    ))
 
     return result
 
@@ -643,19 +812,46 @@ def split_by_markdown(
     """Markdown 切片 + JSON 保护。"""
     result: list[Document] = []
 
-    for document in documents:
+    for document_index, document in enumerate(documents):
         text = document.page_content
         protected = _split_text_with_json_protection(text)
+        source_cursor = 0
 
         for part_text, is_json in protected:
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            source_cursor = part_start + len(part_text)
             if is_json:
-                result.append(Document(page_content=part_text, metadata=dict(document.metadata)))
+                result.append(Document(
+                    page_content=part_text,
+                    metadata={
+                        **dict(document.metadata),
+                        "__source_range": [part_start, source_cursor],
+                        "__document_index": document_index,
+                    },
+                ))
             else:
-                sub_doc = Document(page_content=part_text, metadata=dict(document.metadata))
-                result.extend(
-                    MarkdownTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-                    .split_documents([sub_doc])
+                splitter = MarkdownTextSplitter(
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    add_start_index=True,
                 )
+                for chunk in splitter.split_documents([Document(page_content=part_text, metadata=dict(document.metadata))]):
+                    local_start = int(chunk.metadata.pop("start_index", -1))
+                    if local_start < 0:
+                        raise ValueError("切片器未返回有效 start_index")
+                    result.append(Document(
+                        page_content=chunk.page_content,
+                        metadata={
+                            **dict(chunk.metadata),
+                            "__source_range": [
+                                part_start + local_start,
+                                part_start + local_start + len(chunk.page_content),
+                            ],
+                            "__document_index": document_index,
+                        },
+                    ))
 
     return result
 
@@ -1175,7 +1371,7 @@ def main():
 
 def _check_json_integrity(text: str) -> bool:
     """检查文本中的 JSON 块是否完整（没有被截断）。
-    
+
     返回 True 表示所有 JSON 块都完整，False 表示存在截断。
     """
     # 找到文本中所有 { 和 [ 开头的 JSON 块

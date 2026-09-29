@@ -20,7 +20,7 @@ import json
 import re
 from typing import Any, Iterable
 
-from .graph_utils import canonical_name, coerce_non_empty_name
+from .graph_utils import canonical_name, canonical_relation_name, coerce_non_empty_name
 
 
 _CLASS_HEADER = re.compile(
@@ -51,6 +51,15 @@ _RELATION = re.compile(
     + r'(?:"(?P<target_cardinality>[^"]*)"\s+)?'
     + _TYPE_REFERENCE.format(name="target")
     + r'\s*:\s*(?P<label>.+?)\s*$'
+)
+_UNSUPPORTED_DECLARATION = re.compile(
+    r"^\s*(?:abstract\s+)?(?:interface|enum|entity|component|artifact|node|object|package|namespace)\b"
+    r"|^\s*[^']*(?:<\|\.\.|\.\.\|>|<\|\.\.\s*)[^']*$",
+    re.IGNORECASE,
+)
+_UNSUPPORTED_PREPROCESSOR = re.compile(
+    r"^\s*!(?!\s*(?:startuml|enduml)\b)|%(?:getenv|load_json|load_yaml|load_data)\s*\(",
+    re.IGNORECASE,
 )
 _NUMBER = re.compile(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)')
 
@@ -86,6 +95,12 @@ def _clean_relation_identifier(value: str) -> str:
 
 def _key(value: Any) -> str:
     return canonical_name(_unquote(coerce_non_empty_name(value)))
+
+
+def _dotted_suffixes(key: str) -> list[str]:
+    """``a.b.Class`` → ``["b.Class", "Class"]``（长的在前），用于匹配点分元类 UID。"""
+    parts = [part.strip() for part in key.split(".") if part.strip()]
+    return [".".join(parts[index:]) for index in range(1, len(parts))]
 
 
 def _warning(code: str, message: str, path: str, value: Any = None) -> dict[str, Any]:
@@ -185,17 +200,23 @@ class OntologySchema:
     parents: dict[str, tuple[str, ...]] = field(default_factory=dict)
     unresolved: list[dict[str, Any]] = field(default_factory=list)
     _symbols: dict[str, OntologyClass] = field(init=False, repr=False)
+    _suffixes: dict[str, set[str]] = field(init=False, repr=False)
     _relations: dict[str, list[OntologyRelation]] = field(init=False, repr=False)
     classes_by_id: dict[str, OntologyClass] = field(init=False)
 
     def __post_init__(self) -> None:
         self._symbols = {}
+        self._suffixes = {}
         self.classes_by_id = {}
         for ontology_class in self.classes:
             self.classes_by_id[ontology_class.identifier] = ontology_class
             for symbol in ontology_class.symbols:
-                if _key(symbol):
-                    self._symbols[_key(symbol)] = ontology_class
+                key = _key(symbol)
+                if not key:
+                    continue
+                self._symbols[key] = ontology_class
+                for suffix in _dotted_suffixes(key):
+                    self._suffixes.setdefault(suffix, set()).add(ontology_class.identifier)
         self._relations = {}
         for relation in self.relations:
             self._relations.setdefault(_key(relation.identifier), []).append(relation)
@@ -247,20 +268,6 @@ class OntologySchema:
             current.properties.append(prop)
 
         provisional = cls(classes)
-        for line in source.splitlines():
-            identity_match = _IDENTITY.match(line)
-            if not identity_match:
-                continue
-            ontology_class = provisional.resolve_class(identity_match.group("class_name"))
-            if ontology_class is None:
-                continue
-            identities = []
-            for raw_property in identity_match.group("properties").split(","):
-                identifier = ontology_class.resolve_property(raw_property.strip())
-                if identifier and identifier not in identities:
-                    identities.append(identifier)
-            ontology_class.identity_properties = tuple(identities)
-
         parents: dict[str, list[str]] = {}
         relations: list[OntologyRelation] = []
         for line in source.splitlines():
@@ -301,6 +308,17 @@ class OntologySchema:
 
             relation_match = _RELATION.match(line)
             if not relation_match:
+                if _UNSUPPORTED_PREPROCESSOR.search(line):
+                    provisional.unresolved.append(
+                        {"kind": "unsupported_preprocessor", "line": stripped}
+                    )
+                    continue
+                # Keep the dialect intentionally narrow, but never silently
+                # discard a declaration that has PlantUML semantic intent.
+                if _UNSUPPORTED_DECLARATION.search(line) and not stripped.startswith(("@", "!")):
+                    provisional.unresolved.append(
+                        {"kind": "unsupported_declaration", "line": stripped}
+                    )
                 continue
             source_symbol = relation_match.group("source")
             target_symbol = relation_match.group("target")
@@ -343,6 +361,48 @@ class OntologySchema:
                 )
             )
 
+        # Identity resolution must happen after inheritance is known so that
+        # inherited attributes are valid identity fields as well.
+        provisional.parents = {
+            identifier: tuple(values) for identifier, values in parents.items()
+        }
+        for line in source.splitlines():
+            identity_match = _IDENTITY.match(line)
+            if not identity_match:
+                continue
+            class_symbol = identity_match.group("class_name")
+            ontology_class = provisional.resolve_class(class_symbol)
+            if ontology_class is None:
+                provisional.unresolved.append(
+                    {
+                        "kind": "identity",
+                        "error": "unknown_class",
+                        "class": _unquote(class_symbol),
+                        "line": line.strip(),
+                    }
+                )
+                continue
+            identities = []
+            for raw_property in identity_match.group("properties").split(","):
+                raw_property = raw_property.strip()
+                if not raw_property:
+                    continue
+                prop = provisional.resolve_property(ontology_class.identifier, raw_property)
+                if prop is None:
+                    provisional.unresolved.append(
+                        {
+                            "kind": "identity",
+                            "error": "unknown_property",
+                            "class": ontology_class.identifier,
+                            "property": _unquote(raw_property),
+                            "line": line.strip(),
+                        }
+                    )
+                    continue
+                if prop.identifier not in identities:
+                    identities.append(prop.identifier)
+            ontology_class.identity_properties = tuple(identities)
+
         return cls(
             classes,
             relations=relations,
@@ -351,10 +411,34 @@ class OntologySchema:
         )
 
     def resolve_class(self, symbol: Any) -> OntologyClass | None:
-        return self._symbols.get(_key(symbol))
+        key = _key(symbol)
+        resolved = self._symbols.get(key)
+        if resolved is not None:
+            return resolved
+        # 点分元类 UID（插件元模型 key 形如 "包.子包.类"）：逐级去掉包前缀后按
+        # 符号名回退，长后缀优先；命中唯一简单名即可接受。
+        for suffix in _dotted_suffixes(key):
+            resolved = self._symbols.get(suffix)
+            if resolved is not None:
+                return resolved
+        # 反向：本体符号自带点分路径、查询为简单名时，只在无歧义时生效。
+        candidates = self._suffixes.get(key)
+        if candidates and len(candidates) == 1:
+            return self.classes_by_id[next(iter(candidates))]
+        return None
 
     def resolve_relation(self, identifier: Any) -> list[OntologyRelation]:
-        return list(self._relations.get(_key(identifier), []))
+        exact = self._relations.get(_key(identifier))
+        if exact is not None:
+            return list(exact)
+        alias = canonical_relation_name(identifier)
+        matching_keys = [
+            key for key in self._relations
+            if canonical_relation_name(key) == alias
+        ]
+        if len(matching_keys) != 1:
+            return []
+        return list(self._relations[matching_keys[0]])
 
     def ancestors(self, class_symbol: Any) -> set[str]:
         ontology_class = self.resolve_class(class_symbol)
@@ -429,11 +513,15 @@ class OntologySchema:
         if ontology_class.identifier in trail:
             return ()
         next_trail = {*trail, ontology_class.identifier}
-        for parent_id in self.parents.get(ontology_class.identifier, ()):
-            inherited = self.identity_properties_for(parent_id, next_trail)
-            if inherited:
-                return inherited
-        return ()
+        inherited = {
+            self.identity_properties_for(parent_id, next_trail)
+            for parent_id in self.parents.get(ontology_class.identifier, ())
+        }
+        inherited.discard(())
+        # Conflicting multiple inheritance has no safe effective identity.
+        # The compiler emits a hard diagnostic; permissive callers get an
+        # empty identity instead of a declaration-order-dependent choice.
+        return next(iter(inherited)) if len(inherited) == 1 else ()
 
     @staticmethod
     def _coerce_value(value: Any, data_type: str) -> Any:

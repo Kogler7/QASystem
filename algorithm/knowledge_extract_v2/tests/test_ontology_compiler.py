@@ -426,5 +426,101 @@ class PlanSerializationTest(unittest.TestCase):
         self.assertEqual(warning_dict["severity"], "error")
 
 
+class OntologyHardeningTest(unittest.TestCase):
+    def test_identity_unknown_property_and_unsupported_declaration_are_diagnostics(self) -> None:
+        source = '''@startuml hardening
+interface IgnoredInterface
+class Base {
+  + id (id): String
+}
+class Child {
+  + own (own): String
+}
+Child --|> Base
+' @identity Child: missing
+' @identity Missing: id
+@enduml'''
+        plan = COMPILER.compile_plan(source)
+        codes = {warning.code for warning in plan.schema_warnings}
+        self.assertIn("IDENTITY_UNKNOWN_PROPERTY", codes)
+        self.assertIn("IDENTITY_UNKNOWN_CLASS", codes)
+        self.assertIn("UNSUPPORTED_DECLARATION", codes)
+
+    def test_deep_inheritance_materializes_all_ancestor_properties(self) -> None:
+        source = '''@startuml deep
+class Grand {
+  + grand (grand): String
+}
+class Parent {
+  + parent (parent): Integer
+}
+class Child {
+  + child (child): Boolean
+}
+Parent --|> Grand
+Child --|> Parent
+' @identity Grand: grand
+@enduml'''
+        plan = COMPILER.compile_plan(source)
+        self.assertEqual(
+            [prop.identifier for prop in plan.class_specs["Child"].properties],
+            ["child", "grand", "parent"],
+        )
+
+    def test_multiple_parent_identity_and_override_type_conflicts_are_errors(self) -> None:
+        source = '''@startuml conflicts
+class Left {
+  + left (left): String
+}
+class Right {
+  + right (right): String
+}
+class Child {
+  + left (left): Integer
+}
+Child --|> Left
+Child --|> Right
+' @identity Left: left
+' @identity Right: right
+@enduml'''
+        plan = COMPILER.compile_plan(source)
+        codes = {warning.code for warning in plan.schema_warnings}
+        self.assertIn("MULTIPLE_INHERITED_IDENTITY_CONFLICT", codes)
+        self.assertIn("INHERITED_PROPERTY_DATATYPE_MISMATCH", codes)
+        self.assertEqual(plan.identity_specs["Child"].properties, ())
+
+    def test_preprocessor_is_rejected_by_restricted_dialect(self) -> None:
+        source = '''@startuml unsafe
+!include https://example.invalid/ontology.puml
+class Safe {
+  + id (id): String
+}
+' @identity Safe: id
+@enduml'''
+        plan = COMPILER.compile_plan(source)
+        warning = next(
+            warning for warning in plan.schema_warnings
+            if warning.code == "UNSUPPORTED_PREPROCESSOR"
+        )
+        self.assertEqual(warning.severity, "error")
+        self.assertIn("!include", warning.value)
+
+    def test_duplicate_class_has_deterministic_error(self) -> None:
+        source = '''@startuml duplicate
+class Item {
+  + id (id): String
+}
+class Item {
+  + other (other): String
+}
+@enduml'''
+        plan = COMPILER.compile_plan(source)
+        self.assertEqual(
+            sum(warning.code == "DUPLICATE_CLASS" for warning in plan.schema_warnings),
+            1,
+        )
+        self.assertEqual(plan.class_specs["Item"].properties[0].identifier, "other")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

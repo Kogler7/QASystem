@@ -12,9 +12,12 @@
 """
 from __future__ import annotations
 
+from copy import deepcopy
+import json
 from typing import Any
 
-from .graph_utils import build_node_properties, entity_uid
+from .graph_utils import build_node_properties, entity_uid, merge_node_properties
+from .mapping_scorer import mapping_confidence_payload, merge_confidence_payload
 
 
 class GraphIntegrityError(ValueError):
@@ -28,6 +31,73 @@ class GraphAssembler:
     def uid_for(type_id: str, identity: str) -> str:
         """§27：稳定 UID 只由稳定类型 + canonical identity 生成。"""
         return entity_uid(type_id, identity, None)
+
+    @staticmethod
+    def _confidence_payload(item: dict[str, Any]) -> dict[str, Any]:
+        if item.get("confidence") is not None:
+            payload = {
+                key: item[key]
+                for key in (
+                    "mapping_score",
+                    "confidence",
+                    "confidence_status",
+                    "gate_status",
+                )
+                if item.get(key) is not None
+            }
+            if isinstance(item.get("confidence_details"), dict):
+                payload["confidence_details"] = dict(item["confidence_details"])
+            return payload
+        mapping = item.get("mapping") or {}
+        if not isinstance(mapping, dict):
+            return {}
+        is_relation = any(
+            key in item for key in ("from", "to", "from_uid", "to_uid")
+        )
+        return mapping_confidence_payload(
+            mapping.get("score"),
+            str(mapping.get("status") or "accepted"),
+            evidences=item.get("evidence") if isinstance(item.get("evidence"), list) else None,
+            canonical_mapping_valid=bool(item.get("type")),
+            aggregate_evidence=not is_relation,
+            aggregate_canonical_mapping=not is_relation,
+        )
+
+    @staticmethod
+    def _evidence_items(item: dict[str, Any]) -> list[dict[str, Any]]:
+        evidence = item.get("evidences")
+        if not isinstance(evidence, list):
+            evidence = item.get("evidence")
+        if isinstance(evidence, dict):
+            evidence = [evidence]
+        if not isinstance(evidence, list):
+            return []
+        unique: dict[str, dict[str, Any]] = {}
+        for value in evidence:
+            if not isinstance(value, dict):
+                continue
+            key = json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+                separators=(",", ":"),
+            )
+            unique[key] = deepcopy(value)
+        return [unique[key] for key in sorted(unique)]
+
+    @classmethod
+    def _merge_evidence(
+        cls,
+        existing: dict[str, Any],
+        incoming: dict[str, Any],
+    ) -> None:
+        evidences = cls._evidence_items(existing) + cls._evidence_items(incoming)
+        if not evidences:
+            return
+        merged = cls._evidence_items({"evidences": evidences})
+        existing["evidence"] = merged[0]
+        existing["evidences"] = merged
 
     def build_graph(
         self,
@@ -46,19 +116,39 @@ class GraphAssembler:
                 node = {
                     "uid": uid,
                     "label": type_id,
+                    **({"source_files": deepcopy(obj["source_files"])} if obj.get("source_files") else {}),
                     "properties": build_node_properties(
                         obj.get("display_name") or identity,
                         compat_properties
                         if isinstance(compat_properties, dict)
                         else obj.get("properties") or {},
                     ),
+                    **self._confidence_payload(obj),
                 }
+                self._merge_evidence(node, obj)
                 nodes.append(node)
                 node_index[uid] = node
+            else:
+                compat_properties = obj.get("compat_properties")
+                node_index[uid]["properties"] = merge_node_properties(
+                    node_index[uid].get("properties"),
+                    build_node_properties(
+                        obj.get("display_name") or identity,
+                        compat_properties
+                        if isinstance(compat_properties, dict)
+                        else obj.get("properties") or {},
+                    ),
+                )
+                self._merge_evidence(node_index[uid], obj)
+                merged_confidence = merge_confidence_payload(
+                    self._confidence_payload(node_index[uid]),
+                    self._confidence_payload(obj),
+                )
+                node_index[uid].update(merged_confidence)
 
         by_id = {obj.get("id"): obj for obj in objects}
         relationships: list[dict[str, Any]] = []
-        relationship_keys: set[tuple[str, str, str]] = set()
+        relationship_index: dict[tuple[str, str, str], dict[str, Any]] = {}
         for relation in relations:
             from_obj = by_id.get(relation.get("from"))
             to_obj = by_id.get(relation.get("to"))
@@ -71,22 +161,39 @@ class GraphAssembler:
             to_uid = self.uid_for(str(to_obj.get("type") or ""), str(to_obj.get("identity") or ""))
             relation_type = str(relation.get("type") or "")
             key = (from_uid, to_uid, relation_type)
-            if key in relationship_keys:
+            if key in relationship_index:
+                self._merge_evidence(relationship_index[key], relation)
+                relationship_index[key].update(
+                    merge_confidence_payload(
+                        self._confidence_payload(relationship_index[key]),
+                        self._confidence_payload(relation),
+                    )
+                )
                 continue
-            relationship_keys.add(key)
-            relationships.append({"from_uid": from_uid, "to_uid": to_uid, "type": relation_type})
+            assembled = {
+                "from_uid": from_uid,
+                "to_uid": to_uid,
+                "type": relation_type,
+                **self._confidence_payload(relation),
+            }
+            self._merge_evidence(assembled, relation)
+            relationships.append(assembled)
+            relationship_index[key] = assembled
 
         return {"nodes": nodes, "relationships": relationships}
 
     def build_triples(self, graph: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-        return [
-            {
+        triples: list[dict[str, Any]] = []
+        for relationship in graph.get("relationships", []):
+            triple = {
                 "head": relationship["from_uid"],
                 "relation": relationship["type"],
                 "tail": relationship["to_uid"],
+                **self._confidence_payload(relationship),
             }
-            for relationship in graph.get("relationships", [])
-        ]
+            self._merge_evidence(triple, relationship)
+            triples.append(triple)
+        return triples
 
     @staticmethod
     def compat_raw(
@@ -107,10 +214,13 @@ class GraphAssembler:
                     else obj.get("properties") or {}
                 ),
                 "candidate_id": obj.get("id"),
+                **({"source_files": list(obj["source_files"])} if obj.get("source_files") else {}),
+                **GraphAssembler._confidence_payload(obj),
             }
             evidence = obj.get("evidence") or []
             if evidence:
                 entity["evidence"] = evidence[0]
+                entity["evidences"] = list(evidence)
             entities.append(entity)
             by_id[obj.get("id")] = obj
 
@@ -125,17 +235,50 @@ class GraphAssembler:
                 )
             raw_relation: dict[str, Any] = {
                 "from_id": relation.get("from"),
+                "from_uid": GraphAssembler.uid_for(
+                    str(from_obj.get("type") or ""),
+                    str(from_obj.get("identity") or ""),
+                ),
                 "from_type": from_obj.get("type"),
                 "from_name": from_obj.get("display_name") or from_obj.get("identity"),
                 "rel_type": relation.get("type"),
                 "to_type": to_obj.get("type"),
                 "to_name": to_obj.get("display_name") or to_obj.get("identity"),
                 "to_id": relation.get("to"),
+                "to_uid": GraphAssembler.uid_for(
+                    str(to_obj.get("type") or ""),
+                    str(to_obj.get("identity") or ""),
+                ),
+                **GraphAssembler._confidence_payload(relation),
             }
             evidence = relation.get("evidence") or []
             if evidence:
                 raw_relation["evidence"] = evidence[0]
+                raw_relation["evidences"] = list(evidence)
             raw_relations.append(raw_relation)
         return {"entities": entities, "relations": raw_relations}
+
+    @staticmethod
+    def canonical_raw(
+        objects: list[dict[str, Any]],
+        relations: list[dict[str, Any]],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return the internal validation view with ontology property IDs.
+
+        ``compat_raw`` deliberately exposes display labels for legacy clients.
+        Coverage and schema verification must inspect the stable ontology
+        identifiers, otherwise a display label such as ``"规则文本"`` is
+        mistaken for a missing ``ruleText`` property.
+        """
+        raw = GraphAssembler.compat_raw(objects, relations)
+        properties_by_id = {
+            obj.get("id"): dict(obj.get("properties") or {})
+            for obj in objects
+        }
+        for entity in raw["entities"]:
+            candidate_id = entity.get("candidate_id")
+            if candidate_id in properties_by_id:
+                entity["properties"] = properties_by_id[candidate_id]
+        return raw
 
 __all__ = ["GraphAssembler", "GraphIntegrityError"]

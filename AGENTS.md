@@ -11,3 +11,9 @@
 - Use `APPLICATION_SERVICE_URL` for the application-team server and keep `FILE_SERVICE_URL` only as a fallback. Register external endpoints in `external_services/application.py`; do not scatter third-party paths through algorithms.
 - Preserve queue execution for authenticated external calls. Queue records carry only `auth_context_id`; never place Authorization headers in payload artifacts, logs, SSE, `execution`, or results.
 - SQL may retain the configured direct connection compatibility. Do not restore direct Neo4j or Elasticsearch access; unopened graph-write, confidence, and document-evidence capabilities must fail explicitly when invoked.
+
+# Documentation Index
+
+- [Plugin and database environment](docs/插件与数据库环境索引.md): local VSIX, Attu/Milvus, Neo4j browser, and data-access boundaries.
+- [Application-service API](docs/应用服务API索引.md): live knowledge-map service endpoint directory and ingestion contract; see [Swagger UI](https://zhongche.zhouhao.work/docs) for current schemas.
+- [QASystem documentation index](docs/文档索引.md): all local architecture, API, deployment, and test documents.

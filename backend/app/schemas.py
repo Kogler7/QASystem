@@ -77,6 +77,7 @@ class PipelineOptions(StrictModel):
 class TextChunk(StrictModel):
     text: str
     ranges: list[int] | None = Field(default=None, min_length=2, max_length=2)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -92,8 +93,8 @@ class TextEmbeddingItem(StrictModel):
     text: str
 
 
-class GraphExtractionItem(StrictModel):
-    text: str
+class GraphExtractionItem(TextChunk):
+    """Extraction input with optional source offsets and provenance metadata."""
 
 
 class GraphItem(StrictModel):

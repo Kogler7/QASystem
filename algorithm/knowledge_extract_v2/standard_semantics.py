@@ -29,7 +29,16 @@ _EQUATION_LABEL = re.compile(
 )
 _FORMULA_BLOCK = re.compile(r"\$\$[\s\S]+?\$\$")
 _TABLE_LABEL = re.compile(r"(?m)^\s*(?P<label>表\s*\d+(?:[.\-]\d+)?\s+[^\n<]{2,80})\s*$")
-_TABLE_BLOCK = re.compile(r"<table\b", re.IGNORECASE)
+#: 表题之后的结构支撑。解析层 §10 已把表格统一输出为 JSON（docx/OCR/Excel），
+#: .md/.txt 原文直读时仍是 <table> 或管道表格；切片还可能把表题与表格数据
+#: 分到相邻 chunk，因此裸 JSON 开头的形态也要认。
+_TABLE_BLOCK = re.compile(
+    r"<table\b"
+    r"|```\s*json\b"
+    r"|^\s*\{\s*\"(?:columns|rows)\""
+    r"|^\s*\|.+\|\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 _ISSUED_DATE = re.compile(r"(?m)^(?P<date>\d{4}-\d{2}-\d{2})\s*发布\s*$")
 _STANDARDIZED_OBJECT = re.compile(
     r"本文件规定了(?P<name>[^，。；;]{2,80}?)(?:（以下简称|\(以下简称|的(?:技术|电|性能|要求))"

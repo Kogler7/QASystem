@@ -33,12 +33,121 @@ def test_text_pdf_prefers_docling(tmp_path, monkeypatch):
     assert engine == "docling"
 
 
+def test_auto_text_pdf_falls_back_when_docling_only_returns_image(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "text", "reason": "test"})
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    calls = []
+
+    class FakeRuntime:
+        def process(self, _path, **kwargs):
+            calls.append(kwargs["backend"] if "backend" in kwargs else "docling")
+            if len(calls) == 1:
+                return {"content": "<!-- image -->", "metadata": {}}
+            return {"content": "# parsed form", "metadata": {}}
+
+    monkeypatch.setattr(processor, "_processor", lambda _engine: FakeRuntime())
+    result = processor.process_file(str(path))
+
+    assert result["success"] is True
+    assert result["metadata"]["model_used"] == "mineru"
+    assert calls == ["docling", "pipeline"]
+
+
+def test_forced_docling_image_only_result_stays_failure(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+
+    class FakeRuntime:
+        def process(self, _path, **_kwargs):
+            return {"content": "<!-- image -->", "metadata": {}}
+
+    monkeypatch.setattr(processor, "_processor", lambda _engine: FakeRuntime())
+    result = processor.process_file(str(path), model_name="docling", force=True)
+
+    assert result["success"] is False
+    assert "未生成有效内容" in result["error"]
+
+
+def test_bounded_page_placeholder_is_not_treated_as_empty_page(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+
+    class FakeRuntime:
+        def process(self, _path, **_kwargs):
+            return {"content": "<!-- image -->", "metadata": {}}
+
+    monkeypatch.setattr(processor, "_processor", lambda _engine: FakeRuntime())
+    result = processor._run_processor(
+        "docling",
+        str(path),
+        ".pdf",
+        "ch",
+        start_page_id=2,
+        end_page_id=3,
+        allow_empty_content=True,
+    )
+
+    assert result["success"] is False
+    assert "未生成有效内容" in result["error"]
+
+
 def test_scanned_pdf_prefers_vlm(tmp_path, monkeypatch):
     path = tmp_path / "sample.pdf"
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: False)
     engine, _ = processor.select_engine(str(path))
+    assert engine == "vlm"
+
+
+def test_scanned_pdf_uses_local_pipeline_when_vlm_endpoint_is_missing(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
+    monkeypatch.delenv("MINERU_VL_SERVER", raising=False)
+    monkeypatch.delenv("MINERU_VLM_BACKEND", raising=False)
+
+    engine, details = processor.select_engine(str(path))
+
+    assert engine == "mineru"
+    assert details["preferred_engine"] == "mineru"
+    assert "HTTP endpoint" in details["auto_fallback_reason"]
+
+
+def test_forced_vlm_remains_strict_without_endpoint(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
+
+    engine, details = processor.select_engine(str(path), requested="vlm", force=True)
+
+    assert engine == "vlm"
+    assert details["mode"] == "forced"
+
+
+def test_native_mineru_vl_server_counts_as_vlm_endpoint(tmp_path, monkeypatch):
+    path = tmp_path / "sample.pdf"
+    path.write_bytes(b"%PDF-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
+    monkeypatch.setenv("MINERU_VL_SERVER", "http://127.0.0.1:30000")
+
+    engine, _ = processor.select_engine(str(path))
+
     assert engine == "vlm"
 
 
@@ -144,6 +253,7 @@ def test_requested_docling_does_not_override_scanned_pdf_profile(tmp_path, monke
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
+    monkeypatch.setenv("MINERU_VLM_SERVER_URL", "http://127.0.0.1:30000")
 
     engine, details = processor.select_engine(str(path), requested="docling")
 
@@ -173,11 +283,47 @@ def test_complex_docx_defaults_to_vlm_without_request(tmp_path, monkeypatch):
     path.write_bytes(b"docx-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_docx", lambda _path: {"kind": "complex", "reason": "test"})
+    # This test covers the configured HTTP-VLM branch.  Without an endpoint,
+    # auto selection should intentionally prefer the local MinerU pipeline.
+    monkeypatch.setenv("MINERU_VLM_SERVER_URL", "http://127.0.0.1:30000")
 
     engine, details = processor.select_engine(str(path))
 
     assert engine == "vlm"
     assert "requested_engine" not in details
+
+
+def test_complex_docx_auto_uses_local_pipeline_without_vlm_endpoint(tmp_path, monkeypatch):
+    path = tmp_path / "sample.docx"
+    path.write_bytes(b"docx-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_profile_docx", lambda _path: {"kind": "complex", "reason": "test"})
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
+    monkeypatch.delenv("MINERU_VL_SERVER", raising=False)
+    monkeypatch.delenv("MINERU_VLM_BACKEND", raising=False)
+
+    engine, details = processor.select_engine(str(path))
+
+    assert engine == "mineru"
+    assert details["preferred_engine"] == "mineru"
+    assert "HTTP endpoint" in details["auto_fallback_reason"]
+
+
+def test_png_auto_uses_local_pipeline_without_vlm_endpoint(tmp_path, monkeypatch):
+    path = tmp_path / "attachment.png"
+    path.write_bytes(b"png-test")
+    processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
+    monkeypatch.delenv("MINERU_VL_SERVER", raising=False)
+    monkeypatch.delenv("MINERU_VLM_BACKEND", raising=False)
+
+    engine, details = processor.select_engine(str(path))
+
+    assert engine == "mineru"
+    assert details["preferred_engine"] == "mineru"
+    assert "HTTP endpoint" in details["auto_fallback_reason"]
 
 
 def test_requested_engine_is_preferred_when_primary_engine_fails(tmp_path, monkeypatch):
@@ -279,8 +425,9 @@ def test_plain_text_is_read_by_text_engine(tmp_path):
     assert details["request_role"] == "matched_default"
 
 
-def test_new_image_and_presentation_formats_have_expected_routes(tmp_path):
+def test_new_image_and_presentation_formats_have_expected_routes(tmp_path, monkeypatch):
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
+    monkeypatch.setattr(processor, "_vlm_server_url", lambda: "http://configured-vlm.test")
     expected_defaults = {
         ".png": "vlm",
         ".jpg": "vlm",

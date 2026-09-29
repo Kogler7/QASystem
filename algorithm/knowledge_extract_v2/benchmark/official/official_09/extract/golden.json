@@ -52,7 +52,7 @@
     },
     {
       "type": "DocumentUnit",
-      "name": "附件列表",
+      "name": "附件说明",
       "properties": {
         "单元标题": "附件",
         "单元类型": "附件说明",
@@ -521,7 +521,7 @@
       "from_name": "关于印发2026年总部信息化项目工作计划及管理要求的通知",
       "rel_type": "HAS_PART",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表",
+      "to_name": "附件说明",
       "evidence": {
         "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）",
         "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
@@ -1225,7 +1225,7 @@
       "from_name": "2026年总部信息化项目工作计划（A类项目）",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表",
+      "to_name": "附件说明",
       "evidence": {
         "quote": "附件：1.2026年总部信息化项目工作计划（A类项目）\n\n2. 2026 年总部信息化项目工作计划（B 类项目）",
         "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
@@ -1241,7 +1241,7 @@
       "from_name": "2026年总部信息化项目工作计划（B类项目）",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表",
+      "to_name": "附件说明",
       "evidence": {
         "quote": "B类项目（标准软硬件采购类）由科信部组织评审，共7项，预算3225万元，主要包括：信创实验云（四期）、信创基础软件采购、计算机终端采购、数据安全能力建设、统一互联网出口设备升级等。",
         "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
@@ -1257,7 +1257,7 @@
       "from_name": "A、B类信息化项目建设方案模板",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表",
+      "to_name": "附件说明",
       "evidence": {
         "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）\n\n3. A、B 类信息化项目建设方案模板",
         "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
@@ -1273,7 +1273,7 @@
       "from_name": "项目建设任务书模板",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表",
+      "to_name": "附件说明",
       "evidence": {
         "quote": "请相关部门与信息公司依据年度工作计划，于2026年4月30日前完成任务书签订，作为项目正式启动、验收和考核的依据。",
         "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
@@ -1289,7 +1289,7 @@
       "from_name": "信息化项目变更申请表",
       "rel_type": "EVIDENCED_BY",
       "to_type": "DocumentUnit",
-      "to_name": "附件列表",
+      "to_name": "附件说明",
       "evidence": {
         "quote": "2. 2026 年总部信息化项目工作计划（B 类项目）\n\n3. A、B 类信息化项目建设方案模板\n\n4. 项目建设任务书模板\n\n5. 信息化项目变更申请表",
         "document": "关于印发2026年总部信息化项目工作计划及管理要求的通知.md",
