@@ -74,7 +74,8 @@ class PipelineOptions(StrictModel):
     storage: StorageOptions = Field(default_factory=StorageOptions)
 
 
-class TextChunk(StrictModel):
+class TextChunk(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     text: str
     ranges: list[int] | None = Field(default=None, min_length=2, max_length=2)
     metadata: dict[str, Any] = Field(default_factory=dict)
