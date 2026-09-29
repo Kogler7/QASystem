@@ -4,7 +4,7 @@
 实体链接、SQL 取数与图表生成都在这里实现。MCP 工具与 HTTP 路由只做参数适配与编排，真正的逻辑在本目录。
 
 ```text
-入库线：preproc → knowledge_pipeline → knowledge_extract_v2 / _v3 → embedding_runtime → 外部写入
+入库线：preproc → knowledge_pipeline → knowledge_extract.{latest,v2,v3} → embedding_runtime → 外部写入
 检索线：ans/QA（空间定位 / 实体链接）→ data_access（取数）/ visualization（图表）
 支撑 ：term_vector（向量索引）、NL_to_cypher（切片与向量工具）、external_services（第三方接口）
 ```
@@ -17,10 +17,10 @@
 | --- | --- |
 | `preproc/` | 各类文档解析为 Markdown（PDF/图片/Word/Excel/HTML/OFD） |
 | `knowledge_pipeline/` | 语义切片、演示视图与向量存储编排 |
-| `knowledge_extract/` | 第一版知识抽取（本体驱动）；现承担契约/共享件与无本体摘要 |
-| `knowledge_extract_v2/` | 新版抽取与本体编译（当前主用，默认版本） |
-| `knowledge_extract_v3/` | 第三代抽取（独立重写），与 V2 二选一 |
-| `knowledge_extract_version.py` | 抽取版本开关：读取 `KG_EXTRACT_ALGO_VERSION`（`v2`/`v3`，默认 `v2`） |
+| `knowledge_extract/` | 第一版知识抽取（本体驱动）；现同时承载 V1 契约/共享件、版本路由 shim 与无本体摘要 |
+| `knowledge_extract/{version,latest,v2,v3}.py` | 版本路由：`version` 读取 `KG_EXTRACT_ALGO_VERSION`；`latest` 指向当前主版本；`v2`/`v3` 提供统一签名 shim |
+| `knowledge_extract_v2/` | 新版抽取与本体编译 |
+| `knowledge_extract_v3/` | 第三代抽取（独立重写），与 V2 并行存在 |
 | `embedding_runtime.py` | 文本向量化运行时（本地模型 / 远程服务自动选择） |
 | `knowledge_precipitation.py` | 图谱沉淀总编排（解析→切片→抽取→向量化→入库） |
 | `term_vector/` | Term 语义向量索引的构建与检索 |
@@ -102,14 +102,25 @@
 
 > 抽取的产物是**知识单元与关系**，最终由 `embedding_runtime` 向量化、经外部接口写入图谱。
 
-### 4.3 `knowledge_extract_v3/` 与版本开关
+### 4.3 `knowledge_extract/` 版本路由与 `latest` 默认
 
-`knowledge_extract_v3/` 是第三代抽取实现（独立重写，入口为 `harness.py` 的 `extract_detailed`），
-与 V2 并行存在、互不改写。`knowledge_extract_version.py` 读取环境变量
-`KG_EXTRACT_ALGO_VERSION`（`v2` / `v3`，默认 `v2`）决定实际调用哪一版：
-Backend `graph.extract` 与 MCP `kg_extract_v2` 共用该开关，评测脚本借此对同一评测集
-分别跑 v2 / v3 而无需改代码。V2/V3 是聚合式流水线（整篇文档一次通过、返回合并结果），
-其结果由 `backend/app/services/knowledge_extract_adapter.py` 投影回 V1 的逐 chunk 契约。
+`knowledge_extract/` 现在不仅是 V1 兼容层，还集中了版本路由 shim：
+
+| 文件 | 作用 |
+| --- | --- |
+| `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3`，默认 `latest`），并做合法性校验 |
+| `knowledge_extract/latest.py` | `latest` 标记：始终指向当前最新实现（当前解析为 v3） |
+| `knowledge_extract/v2.py` | 统一签名 shim，实际调用 `knowledge_extract_v2.extract_harness` |
+| `knowledge_extract/v3.py` | 统一签名 shim，实际调用 `knowledge_extract_v3.extract_detailed` 并把 flat facts 转成 V2 聚合契约 |
+
+Backend `graph.extract` 与 MCP `kg_extract_v2` 通过
+`backend/app/services/knowledge_extract_adapter.py` 调用上述 shim。
+调用方只需指定 `KG_EXTRACT_ALGO_VERSION`：
+
+- `latest`（默认）：运行当前最新版本（v3），结果投影回 V1 逐 chunk 契约；
+- `v2` / `v3`：固定跑对应版本，便于算法版本对比评测。
+
+V2/V3 都是聚合式流水线（整篇文档一次通过、返回合并结果），adapter 再按每 chunk 的证据锚点把结果投影回 V1 的逐 chunk 契约，因此上层代码无需随版本切换而改动。
 
 ---
 
@@ -188,7 +199,7 @@ Term 向量索引用于实体链接的**语义召回**：把用户问题拆成�
 ## 10. 模块调用关系
 
 ```text
-preproc ──▶ knowledge_pipeline ──▶ knowledge_extract_v2/_v3 ──▶ embedding_runtime
+preproc ──▶ knowledge_pipeline ──▶ knowledge_extract.{latest,v2,v3} ──▶ embedding_runtime
                                         │                             │
                                         ▼                             ▼
                                    (本体/图谱结构)              external_services（写入）

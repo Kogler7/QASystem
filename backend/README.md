@@ -119,3 +119,48 @@ routers/（HTTP 参数与契约）
 
 - 路由与编排层**不实现业务算法**，只做参数校验、调用与结果封装；
 - 需要长耗时或占用特定资源的操作走执行框架，避免阻塞请求线程。
+
+---
+
+## 5. 本地运行与测试
+
+### 本地运行
+
+Backend 依赖仓库根 `.env` 中的配置（如 `KG_EXTRACT_LLM_*`、`GRAPH_LLM_*`、`AGENT_LLM_*`、`APPLICATION_SERVICE_URL` 等），
+建议先复制 `.env.example` 并填入实际值：
+
+```bash
+cp .env.example .env
+```
+
+从仓库根目录启动：
+
+```bash
+python -m backend.app.main
+```
+
+默认监听 `0.0.0.0:8006`（由 `BACKEND_BIND` 与 `BACKEND_PORT` 控制，见 `.env.example`）。
+
+容器化启动参考根目录 `docker-compose.yml`：
+
+```bash
+docker compose up -d backend
+```
+
+### 运行测试
+
+根 `pytest.ini` 已配置测试路径，从仓库根目录执行：
+
+```bash
+pytest
+```
+
+即可运行 `backend/tests`、`agent/tests`、`algorithm/knowledge_extract_v2/tests` 等已注册测试。
+若只跑后端测试：
+
+```bash
+pytest backend/tests
+```
+
+backend 的额外解析依赖（如 MinerU 相关包）见 `backend/requirements.mineru-extras.txt`，
+按实际解析器按需安装。
