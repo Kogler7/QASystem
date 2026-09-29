@@ -113,19 +113,18 @@ class _StreamingLLM(LLMBackend):
                             sys.stdout.write(f"{_C['green']}{text}{_C['reset']}")
                             sys.stdout.flush()
 
-                        if "tool_calls" in delta:
-                            for tc in delta["tool_calls"]:
-                                idx = tc.get("index", 0)
-                                if idx not in accumulated_tool_calls:
-                                    accumulated_tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
-                                if "id" in tc and tc["id"]:
-                                    accumulated_tool_calls[idx]["id"] = tc["id"]
-                                if "function" in tc:
-                                    fn = tc["function"]
-                                    if "name" in fn and fn["name"]:
-                                        accumulated_tool_calls[idx]["name"] += fn["name"]
-                                    if "arguments" in fn and fn["arguments"]:
-                                        accumulated_tool_calls[idx]["arguments"] += fn["arguments"]
+                        # 同 worker.py：网关可能显式下发 "tool_calls": null
+                        for tc in (delta.get("tool_calls") or []):
+                            idx = tc.get("index", 0)
+                            if idx not in accumulated_tool_calls:
+                                accumulated_tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                            if "id" in tc and tc["id"]:
+                                accumulated_tool_calls[idx]["id"] = tc["id"]
+                            fn = tc.get("function") or {}
+                            if fn.get("name"):
+                                accumulated_tool_calls[idx]["name"] += fn["name"]
+                            if fn.get("arguments"):
+                                accumulated_tool_calls[idx]["arguments"] += fn["arguments"]
         except httpx.HTTPStatusError as exc:
             try:
                 body = exc.response.read().decode("utf-8")[:500]
