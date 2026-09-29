@@ -1,15 +1,14 @@
 # Knowledge Extract V2
 
-本目录只包含两部分：
+本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
 
-- `benchmark/`：17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash；
-- 算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
+Benchmark 数据集（17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v2/`，评测脚本位于 `eval/legacy/`，均不属于本目录。
 
 ## 公共入口
 
 ```python
-from algorithm.knowledge_extract_v2 import extract
-from algorithm.knowledge_extract_v2.chunk_context import ExtractionChunk
+from algorithm.knowledge_extract.v2 import extract
+from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
 
 result = extract(
     ontology=ontology,
@@ -45,10 +44,10 @@ V2 只消费上游已解析、已切分的 `ExtractionChunk`，不接收完整 M
 ## Benchmark 校验与评测
 
 ```bash
-.venv/bin/python -m algorithm.knowledge_extract_v2.benchmark_lint
-.venv/bin/python eval_knowledge_extract_v2_simple.py --local
-.venv/bin/python eval_knowledge_extract_v2_official.py --local
-.venv/bin/python eval_knowledge_extract_v2_standard.py --local
+.venv/bin/python -m algorithm.knowledge_extract.v2.benchmark_lint
+.venv/bin/python eval/legacy/v2_benchmark_eval.py --datasets simple
+.venv/bin/python eval/legacy/v2_benchmark_eval.py --datasets official
+.venv/bin/python eval/legacy/v2_benchmark_eval.py --datasets standard
 ```
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。

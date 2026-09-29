@@ -12,14 +12,19 @@
 - Preserve queue execution for authenticated external calls. Queue records carry only `auth_context_id`; never place Authorization headers in payload artifacts, logs, SSE, `execution`, or results.
 - SQL may retain the configured direct connection compatibility. Do not restore direct Neo4j or Elasticsearch access; unopened graph-write, confidence, and document-evidence capabilities must fail explicitly when invoked.
 
+# Git Workflow Rules
+
+- 合并一律禁止使用 fast-forward（`git merge --no-ff`），即使可以快进也要生成合并提交，保留功能分支的提交分组与回滚边界；禁止 `git merge --ff-only` 与 `git pull --rebase` 等会抹平分支拓扑的操作。仓库已配置 `merge.ff=false` 作为兜底。
+
 # Directory Layout Constraints
 
 - `tests/`、`test_data/`、`eval/`、`tmp/` 不属于运行时应用源码，不得进入交付镜像或 `deploy/runtime` 源码包；`.dockerignore` 与 `package-deploy.ps1` 已将其排除。
-- `algorithm/knowledge_extract/v2/`、`v3/`、`latest/` 只保留算法代码：
-  - `v2/benchmark/` 已迁至 `test_data/eval-v2/`；
-  - `v2/scripts/`、`v2/golden_task/` 已迁至 `eval/tools/`；
-  - `v2/v2_benchmark_eval.py`、`v2/v2_fixed_judge.py`、`v3/benchmark.py` 已迁至 `eval/legacy/`；
-  - `v2/archive/` 已迁至 `v2/tests/fixtures/archive/`（旧策略 fixture）。
+- `algorithm/knowledge_extract/v1/`、`v2/`、`v3/`、`latest/` 只保留算法代码与其单元测试：
+  - benchmark 数据集统一放 `test_data/`：`v2` 对应 `test_data/eval-v2/`，`v3` 对应 `test_data/eval-v3/`；golden、评测文档（PDF/MD）一律不得进入算法目录；
+  - benchmark 评测/打分脚本统一放 `eval/legacy/`（如 `v2_benchmark_eval.py`、`v2_fixed_judge.py`、`v2v3_benchmark.py`），算法目录下不得出现 `*_benchmark_eval.py`、`*_fixed_judge.py` 等评测脚本；
+  - 评测辅助脚本放 `eval/tools/`（如 `v2_scripts/merge_official_results.py`）；
+  - `v2` 的策略模块（`standard_strategy.py`、`official_document_strategy.py`）与 benchmark 数据门禁（`benchmark_lint.py`、`markdown_quality.py`）是在线包模块，保留在 `v2/` 内，可用 `-m algorithm.knowledge_extract.v2.benchmark_lint` 运行；旧策略 fixture 归档在 `v2/tests/fixtures/archive/`。
+- 从其他分支合并带入的文件与上述布局冲突时，合并方须在合并提交内按约定归位（移动/删除冲突文件，并同步修正 README、脚本与测试引用），不得把 benchmark 数据、评测脚本重新引入算法目录。
 - `latest` 必须是带完整代码的实体目录，不得是 `v3` 的软链或运行时映射；`KG_EXTRACT_ALGO_VERSION=latest` 直接运行 `latest` 包。
 - 评测输出统一写到 `./tmp/` 并按算法/版本/时间隔离，不污染源码目录或 golden 数据。
 

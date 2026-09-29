@@ -36,11 +36,11 @@
               接口返回
 ```
 
-主要实现：
+主要实现（第一版，均位于 `v1/` 子包）：
 
-- `ontology_schema.py`：解析本体类、alias、stereotype、属性和稳定标识。
-- `extractor.py`：构建提示词、调用 LLM、校验 JSON、规范化结果并生成图结构。
-- `uml/`：项目内置的本体示例。接口不会自动加载这些文件，调用方仍需传入 `ontology`。
+- `v1/ontology_schema.py`：解析本体类、alias、stereotype、属性和稳定标识。
+- `v1/extractor.py`：构建提示词、调用 LLM、校验 JSON、规范化结果并生成图结构。
+- `v1/uml/`：项目内置的本体示例。接口不会自动加载这些文件，调用方仍需传入 `ontology`。
 
 ## 推荐的本体格式
 
@@ -256,7 +256,7 @@ from algorithm.knowledge_extract.v1 import summarize_text
 summary = summarize_text(text=document_text)
 ```
 
-`extractor.py` 中的 `extract_v2` 是第一版内部的历史抽取器，已无生产调用方；
+`v1/extractor.py` 中的 `extract_v2` 是第一版内部的历史抽取器，已无生产调用方；
 新代码请使用 `knowledge_extract/v2` / `knowledge_extract/v3`。
 
 ## LLM 配置

@@ -4,18 +4,17 @@ tags: []
 
 ---
 
-# Knowledge Extract V2
+# Knowledge Extract V3
 
-本目录只包含两部分：
+本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
 
-- `benchmark/`：17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash；
-- 算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
+Benchmark 数据集（official/standard/simple/rule 冻结 case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v3/`，评测脚本位于 `eval/legacy/`，均不属于本目录。
 
 ## 公共入口
 
 ```python
-from algorithm.knowledge_extract_v2 import extract
-from algorithm.knowledge_extract_v2.chunk_context import ExtractionChunk
+from algorithm.knowledge_extract.v3 import extract
+from algorithm.knowledge_extract.v3.chunk_context import ExtractionChunk
 
 result = extract(
     ontology=ontology,
@@ -23,7 +22,7 @@ result = extract(
 )
 ```
 
-V2 只消费上游已解析、已切分的 chunk，不接收完整 Markdown 或 raw string，不在算法内解析或改变 chunk 边界。
+V3 只消费上游已解析、已切分的 chunk，不接收完整 Markdown 或 raw string，不在算法内解析或改变 chunk 边界。
 chunk 可以是 `ExtractionChunk`，也可以是符合其字段契约的 dict（缺少 `chunk_id` 时自动生成并给出 `CHUNK_ID_GENERATED` 警告；重复 `chunk_id` 改名保留并给出 `DUPLICATE_CHUNK_ID` 警告）。
 入口会深拷贝 chunk 与嵌套 metadata；元数据补全、重复 ID 消歧和路由不会修改调用方对象。offset 回退、非法 span、缺失/自引用/跨文档邻接引用会形成结构化 warning，并汇总到 `profile.chunk_contract`。
 完全缺失 `document_id` 时按顺序补默认文档号；文档确有标题结构（Markdown 标题、`第X章/节/条` 或编号标题）时，为缺失者派生 `section_id` / `section_title` / `clause_number`（见 `profile.metadata_enrichment`），无标题的平文文档不注入假结构，文本内容始终不变。
@@ -31,7 +30,7 @@ chunk 可以是 `ExtractionChunk`，也可以是符合其字段契约的 dict（
 本体为空或未解析出任何 class 时：strict 模式抛出 `ExtractionValidationError(error_code="ONTOLOGY_EMPTY")`；
 permissive 模式返回结构化失败（`error_code="ONTOLOGY_EMPTY"` / `TARGET_SCOPE_EMPTY`，不调用 LLM）。
 目标类型可为插件元类 UID（点分 key，如 `公文本体元模型.公文管理单元`），按逐级去包前缀回退到类符号解析；简单名跨包歧义时不静默选中。
-调用方不能传入 legacy document-type 字段或抽取策略；V2 会根据 ontology 指纹与 chunk 文本确定性生成 `profile.document_route`。
+调用方不能传入 legacy document-type 字段或抽取策略；V3 会根据 ontology 指纹与 chunk 文本确定性生成 `profile.document_route`。
 PlantUML 在这里是受限本体 DSL，不是渲染器：只编译 class、属性、继承、identity 与白名单关系；interface/enum/entity 等未支持语义会显式诊断，`!include`、宏、环境变量和外部数据读取等预处理能力一律以 `UNSUPPORTED_PREPROCESSOR` 拒绝。identity 必须引用本类或继承属性；深层继承属性会物化，多父类 identity 冲突与父子属性类型冲突是编译错误。
 路由只信强信号（标准号、文号〔YYYY〕N号、公文标题形式；词汇与"第X条"不参与），匹配前先做 NFKC 与全角/排版斜杠（∕、／、⁄）、破折号变体折叠；段内采信规则为文档头锚定 + 正文多命中阈值——首个实质内容 chunk（空行、批量头与纯标题行不算文档头）命中的信号视为文档身份直接生效，仅出现在正文后续 chunk 的信号需 ≥2 个 chunk 且命中比例 ≥50% 才采信，单次正文命中按疑似引用记录（`route.chunks.*.unconfirmed`）不贴标签；产出多标签 `labels`（`official_document` 与 `standard` 可并存，`kind` 以公文优先，`source` 为 `chunks`/`ontology`/`fallback`）；批量拼接上传时按 `document_id` 与 `## 文件:` 头分段，每个 chunk 使用本段的领域提示词，标准确定性补全以 `"standard" in labels` 门控、不随聚合 `kind` 被公文抢占而跳过。
 调用时输出逐 chunk 路由（日志「逐chunk路由输出」），并在 `profile.chunk_routes` 以 `{chunk_id: kind}` 保持兼容；完整解释位于 `profile.chunk_route_details`，包含 `scores`、`signals`、`decision`、`abstain_reason` 和 `router_version`。chunk 中部出现新的 `## 文件:` 头时不会自行重切片，而会拒判为 generic/ambiguous，要求上游按文档边界重新切片。`profile.ontology_compiler_version` 用于回放本体编译行为。
@@ -113,15 +112,15 @@ JSON 形态仍用于表格结构保护、公文表单字段保存与标准「表
 
 附件文件以“附件/附录/attachment/appendix”前缀或明确的角色 metadata 识别；正文中的独立附件标题会切出附件后续片段，普通“见附件”引用不会切分。无角色信息且无可识别名称/标题的独立文件需要上游补充来源 metadata。`profile.chunk_source_ids` 保留拆分片段到原输入的映射，保证返回图的证据位置不漂移。附件节点随抽取结果返回，由应用服务持久化；此逻辑不会调用未开放的图写入能力。
 
-Excel/CSV 仍由上游解析：每个工作表渲染为 `## <sheet>` 加一个 JSON 记录表。后端适配器把 `source_file`、`source_type`、字符 range、sheet 名、列名和数据行范围写入 `ExtractionChunk`；V2 不重新解析工作簿。记录表在实体候选阶段按“最多 20 行且约 6000 字符”双阈值无损分窗，子窗保留原 sheet 与行范围。旧式 `.xls` 只有在 pandas 环境提供 `xlrd` 时可读，否则返回明确错误并要求转为 `.xlsx`/`.csv`；公式按缓存值读取，合并单元格只保留左上角值，这两项限制会出现在解析 metadata 的 `table_semantics` 中。
+Excel/CSV 仍由上游解析：每个工作表渲染为 `## <sheet>` 加一个 JSON 记录表。后端适配器把 `source_file`、`source_type`、字符 range、sheet 名、列名和数据行范围写入 `ExtractionChunk`；V3 不重新解析工作簿。记录表在实体候选阶段按“最多 20 行且约 6000 字符”双阈值无损分窗，子窗保留原 sheet 与行范围。旧式 `.xls` 只有在 pandas 环境提供 `xlrd` 时可读，否则返回明确错误并要求转为 `.xlsx`/`.csv`；公式按缓存值读取，合并单元格只保留左上角值，这两项限制会出现在解析 metadata 的 `table_semantics` 中。
 
 ## Benchmark 校验与评测
 
 ```bash
-.venv/bin/python -m algorithm.knowledge_extract_v2.benchmark_lint
-.venv/bin/python eval_knowledge_extract_v2_simple.py --local
-.venv/bin/python eval_knowledge_extract_v2_official.py --local
-.venv/bin/python eval_knowledge_extract_v2_standard.py --local
+.venv/bin/python -m algorithm.knowledge_extract.v2.benchmark_lint
+.venv/bin/python eval/legacy/v2v3_benchmark.py --versions v3 --output-dir tmp/eval-v3
 ```
+
+v3 的 benchmark 数据集在 `test_data/eval-v3/`（official/standard/simple/rule 四组）；评测输出写入 `./tmp/` 下按版本与时间隔离的目录。
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。
