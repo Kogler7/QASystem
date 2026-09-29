@@ -1,7 +1,7 @@
 """Phase 1 Step 10 单元测试：GraphAssembler + Compat（§26-§28）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract/v2/tests/test_graph_assembler.py
+    python algorithm/knowledge_extract_v2/tests/test_graph_assembler.py
 
 覆盖：
 - §26 O2：O1 objects/relations -> nodes / relationships / triples；
@@ -17,8 +17,6 @@ import json
 import sys
 import types
 import unittest
-from copy import deepcopy
-from itertools import permutations
 from pathlib import Path
 
 
@@ -68,15 +66,12 @@ MODULES = _load_package_modules(
         "coverage",
         "composite",
         "graph_assembler",
-        "batch",
         "split_extractor",
     ],
 )
 GA = MODULES["graph_assembler"]
 GU = MODULES["graph_utils"]
 SE = MODULES["split_extractor"]
-BATCH = MODULES["batch"]
-COVERAGE = MODULES["coverage"]
 
 from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
@@ -107,7 +102,6 @@ RELATIONS = [
         "from": "entity-0",
         "to": "entity-1",
         "evidence": [{"span_id": "chunk-0:0:10", "quote": "示例"}],
-        "mapping": {"score": 0.88, "status": "accepted"},
     }
 ]
 
@@ -124,13 +118,6 @@ class GraphAssemblerTest(unittest.TestCase):
             graph["nodes"][0]["uid"],
             GU.entity_uid("CompositeRule", "CR-001", None),
         )
-        self.assertEqual(graph["nodes"][0]["mapping_score"], 0.95)
-        self.assertLess(graph["nodes"][0]["confidence"], 0.95)
-        self.assertFalse(graph["nodes"][0]["confidence_details"]["calibrated"])
-        self.assertEqual(graph["relationships"][0]["mapping_score"], 0.88)
-        self.assertEqual(graph["relationships"][0]["confidence"], 0.88)
-        self.assertEqual(graph["nodes"][0]["evidences"], OBJECTS[0]["evidence"])
-        self.assertEqual(graph["relationships"][0]["evidences"], RELATIONS[0]["evidence"])
         self.assertEqual(len(graph["relationships"]), 1)
         relationship = graph["relationships"][0]
         self.assertEqual(relationship["type"], "hasSubRule")
@@ -149,232 +136,6 @@ class GraphAssemblerTest(unittest.TestCase):
             len(graph["relationships"]),
         )
 
-    def test_duplicate_confidence_is_order_independent(self) -> None:
-        low = {**OBJECTS[0], "id": "low", "mapping": {"score": 0.62, "status": "rejected"}}
-        high = {**OBJECTS[0], "id": "high", "mapping": {"score": 0.95, "status": "accepted"}}
-        forward = self.assembler.build_graph([low, high], [])["nodes"][0]
-        reverse = self.assembler.build_graph([high, low], [])["nodes"][0]
-
-        self.assertEqual(forward["mapping_score"], 0.62)
-        self.assertEqual(forward["confidence"], reverse["confidence"])
-        self.assertEqual(forward["confidence_details"], reverse["confidence_details"])
-        self.assertEqual(
-            forward["confidence_details"]["source_mapping_scores"],
-            [0.62, 0.95],
-        )
-        self.assertEqual(
-            forward["confidence_details"]["score_spread"],
-            0.1975,
-        )
-
-    def test_three_equal_duplicate_details_are_order_independent(self) -> None:
-        objects = [
-            {
-                **OBJECTS[0],
-                "id": method,
-                "confidence": 0.8,
-                "confidence_details": {"method": method, "status": "accepted"},
-            }
-            for method in ("c", "a", "b")
-        ]
-        nodes = [
-            self.assembler.build_graph(list(ordered), [])["nodes"][0]
-            for ordered in permutations(objects)
-        ]
-
-        self.assertTrue(
-            all(node["confidence_details"] == nodes[0]["confidence_details"] for node in nodes)
-        )
-        self.assertEqual(nodes[0]["confidence_details"]["method"], "a")
-        self.assertEqual(nodes[0]["confidence_details"]["observation_count"], 3)
-
-    def test_three_equal_chunk_nodes_have_order_independent_details(self) -> None:
-        items = [
-            {
-                "index": index,
-                "graph": {
-                    "nodes": [
-                        {
-                            "uid": "Term::制动系统",
-                            "label": "Term",
-                            "properties": {"name": "制动系统"},
-                            "confidence": 0.8,
-                            "confidence_details": {
-                                "method": method,
-                                "status": "accepted",
-                            },
-                        }
-                    ],
-                    "relationships": [],
-                },
-                "raw": {"relations": []},
-            }
-            for index, method in enumerate(("c", "a", "b"))
-        ]
-        details = [
-            BATCH.deduplicate_chunk_graphs(list(ordered))["nodes"][0]["confidence_details"]
-            for ordered in permutations(items)
-        ]
-
-        self.assertTrue(all(item == details[0] for item in details))
-        self.assertEqual(details[0]["method"], "a")
-        self.assertEqual(details[0]["observation_count"], 3)
-
-    def test_projected_aggregate_payload_is_counted_once(self) -> None:
-        aggregate_details = {
-            "aggregation": "minimum_duplicate_score",
-            "source_scores": [0.72, 0.91],
-            "source_mapping_scores": [0.8, 0.95],
-            "observation_count": 2,
-            "score_min": 0.72,
-            "score_max": 0.91,
-            "score_spread": 0.19,
-        }
-        raw = {
-            "entities": [
-                {
-                    "type": "Term",
-                    "name": "制动系统",
-                    "evidence": [{"span_id": "chunk-0:0:4", "quote": "制动系统"}],
-                }
-            ],
-            "relations": [],
-        }
-        items = [
-            {
-                "index": index,
-                "graph": {
-                    "nodes": [
-                        {
-                            "uid": "Term::制动系统",
-                            "label": "Term",
-                            "properties": {"name": "制动系统"},
-                            "confidence": 0.72,
-                            "confidence_details": aggregate_details,
-                        }
-                    ],
-                    "relationships": [],
-                },
-                "raw": deepcopy(raw),
-            }
-            for index in range(2)
-        ]
-
-        merged = BATCH.deduplicate_chunk_graphs(items)
-        details = merged["nodes"][0]["confidence_details"]
-        self.assertEqual(details["observation_count"], 2)
-        self.assertEqual(details["source_scores"], [0.72, 0.91])
-
-    def test_projected_single_payload_is_not_promoted_to_multiple_observations(self) -> None:
-        raw = {
-            "entities": [{"type": "Term", "name": "制动系统"}],
-            "relations": [],
-        }
-        items = [
-            {
-                "index": index,
-                "graph": {
-                    "nodes": [
-                        {
-                            "uid": "Term::制动系统",
-                            "label": "Term",
-                            "properties": {"name": "制动系统"},
-                            "confidence": 0.82,
-                            "confidence_details": {"method": "single"},
-                        }
-                    ],
-                    "relationships": [],
-                },
-                "raw": deepcopy(raw),
-            }
-            for index in range(2)
-        ]
-
-        details = BATCH.deduplicate_chunk_graphs(items)["nodes"][0]["confidence_details"]
-        self.assertNotIn("observation_count", details)
-        self.assertNotIn("source_scores", details)
-
-    def test_independent_aggregate_payloads_still_merge(self) -> None:
-        aggregate_details = {
-            "aggregation": "minimum_duplicate_score",
-            "source_scores": [0.72, 0.91],
-            "observation_count": 2,
-        }
-        items = [
-            {
-                "index": index,
-                "graph": {
-                    "nodes": [
-                        {
-                            "uid": "Term::制动系统",
-                            "label": "Term",
-                            "properties": {"name": "制动系统"},
-                            "confidence": 0.72,
-                            "confidence_details": aggregate_details,
-                        }
-                    ],
-                    "relationships": [],
-                },
-                "raw": {
-                    "entities": [
-                        {
-                            "type": "Term",
-                            "name": "制动系统",
-                            "evidence": [{"span_id": f"chunk-{index}:0:4", "quote": "制动系统"}],
-                        }
-                    ],
-                    "relations": [],
-                },
-            }
-            for index in range(2)
-        ]
-
-        merged = BATCH.deduplicate_chunk_graphs(items)
-        details = merged["nodes"][0]["confidence_details"]
-        self.assertEqual(details["observation_count"], 4)
-        self.assertEqual(details["source_scores"], [0.72, 0.72, 0.91, 0.91])
-
-    def test_chunk_deduplication_does_not_mutate_inputs(self) -> None:
-        items = [
-            {
-                "index": index,
-                "graph": {
-                    "nodes": [
-                        {
-                            "uid": "Term::制动系统",
-                            "label": "Term",
-                            "properties": {"name": "制动系统"},
-                            "confidence": score,
-                            "confidence_details": {"method": "test", "status": "accepted"},
-                        }
-                    ],
-                    "relationships": [],
-                },
-                "raw": {"relations": []},
-            }
-            for index, score in enumerate((0.8, 0.9))
-        ]
-        before = deepcopy(items)
-
-        BATCH.deduplicate_chunk_graphs(items)
-
-        self.assertEqual(items, before)
-
-    def test_batch_counts_identical_document_projection_once(self) -> None:
-        graph = self.assembler.build_graph(OBJECTS, RELATIONS)
-        raw = self.assembler.compat_raw(OBJECTS, RELATIONS)
-        items = [
-            {"index": index, "graph": deepcopy(graph), "raw": deepcopy(raw)}
-            for index in range(2)
-        ]
-
-        merged = BATCH.deduplicate_chunk_graphs(items)
-
-        self.assertEqual(len(merged["relationships"]), 1)
-        details = merged["relationships"][0]["confidence_details"]
-        self.assertNotIn("observation_count", details)
-        self.assertNotIn("source_scores", details)
-
     def test_uid_stable_regardless_of_properties(self) -> None:
         objects = [
             {"id": "a", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "A"}},
@@ -383,66 +144,6 @@ class GraphAssemblerTest(unittest.TestCase):
         graph = self.assembler.build_graph(objects, [])
         self.assertEqual(len(graph["nodes"]), 1)
         self.assertEqual(graph["nodes"][0]["uid"], GU.entity_uid("SimpleRule", "R-001", None))
-        self.assertEqual(
-            graph["nodes"][0]["properties"],
-            {"action": "A", "name": "R-001"},
-        )
-
-    def test_duplicate_uid_merges_complementary_properties(self) -> None:
-        objects = [
-            {
-                "id": "a",
-                "type": "Term",
-                "identity": "T-001",
-                "properties": {"code": "T-001"},
-                "evidence": [{"span_id": "chunk-0:0:5", "quote": "T-001"}],
-            },
-            {
-                "id": "b",
-                "type": "Term",
-                "identity": "T-001",
-                "properties": {"title": "制动系统"},
-                "evidence": [{"span_id": "chunk-1:0:4", "quote": "制动系统"}],
-            },
-        ]
-
-        node = self.assembler.build_graph(objects, [])["nodes"][0]
-
-        self.assertEqual(
-            node["properties"],
-            {"code": "T-001", "title": "制动系统", "name": "T-001"},
-        )
-        self.assertEqual(
-            {item["span_id"] for item in node["evidences"]},
-            {"chunk-0:0:5", "chunk-1:0:4"},
-        )
-
-    def test_raw_relation_keeps_canonical_endpoint_uids(self) -> None:
-        objects = [
-            {"id": "a", "type": "Term", "identity": "T-001", "display_name": "制动系统"},
-            {"id": "b", "type": "Term", "identity": "T-002", "display_name": "控制器"},
-        ]
-        relations = [{"id": "r", "type": "contains", "from": "a", "to": "b"}]
-
-        relation = self.assembler.compat_raw(objects, relations)["relations"][0]
-
-        self.assertEqual(relation["from_uid"], GU.entity_uid("Term", "T-001", None))
-        self.assertEqual(relation["to_uid"], GU.entity_uid("Term", "T-002", None))
-
-        graph = self.assembler.build_graph(objects, [])
-        merged = BATCH.deduplicate_chunk_graphs(
-            [{"index": 0, "graph": graph, "raw": {"entities": [], "relations": [relation]}}]
-        )
-        self.assertEqual(
-            merged["relationships"],
-            [
-                {
-                    "from_uid": GU.entity_uid("Term", "T-001", None),
-                    "to_uid": GU.entity_uid("Term", "T-002", None),
-                    "type": "contains",
-                }
-            ],
-        )
 
     def test_triples(self) -> None:
         graph = self.assembler.build_graph(OBJECTS, RELATIONS)
@@ -451,16 +152,6 @@ class GraphAssemblerTest(unittest.TestCase):
         self.assertEqual(triples[0]["relation"], "hasSubRule")
         self.assertEqual(triples[0]["head"], graph["relationships"][0]["from_uid"])
         self.assertEqual(triples[0]["tail"], graph["relationships"][0]["to_uid"])
-        self.assertEqual(triples[0]["mapping_score"], 0.88)
-        self.assertEqual(
-            triples[0]["confidence"],
-            graph["relationships"][0]["confidence"],
-        )
-        self.assertEqual(
-            triples[0]["confidence_details"],
-            graph["relationships"][0]["confidence_details"],
-        )
-        self.assertEqual(triples[0]["evidences"], RELATIONS[0]["evidence"])
 
     def test_dangling_relation_rejected_and_duplicate_uid_merged(self) -> None:
         # 当前实现不再提供 validate()：悬空关系在 build_graph 时直接拒绝
@@ -485,136 +176,20 @@ class GraphAssemblerTest(unittest.TestCase):
         entity = raw["entities"][0]
         self.assertEqual(
             set(entity),
-            {
-                "type", "name", "properties", "candidate_id", "evidence", "evidences",
-                "mapping_score", "confidence", "confidence_status", "gate_status",
-                "confidence_details",
-            },
+            {"type", "name", "properties", "candidate_id", "evidence"},
         )
         self.assertEqual(entity["type"], "CompositeRule")
         self.assertEqual(entity["name"], "CR-001")
         self.assertEqual(entity["candidate_id"], "entity-0")
-        self.assertEqual(entity["evidences"], OBJECTS[0]["evidence"])
         relation = raw["relations"][0]
         self.assertEqual(
             set(relation),
-            {
-                "from_id", "from_uid", "from_type", "from_name", "rel_type", "to_type", "to_name",
-                "to_id", "to_uid", "evidence", "evidences",
-                "mapping_score", "confidence", "confidence_status", "gate_status",
-                "confidence_details",
-            },
+            {"from_id", "from_type", "from_name", "rel_type", "to_type", "to_name", "to_id", "evidence"},
         )
         self.assertEqual(relation["rel_type"], "hasSubRule")
-        self.assertEqual(relation["mapping_score"], 0.88)
-
-    def test_canonical_raw_keeps_ids_for_internal_validation(self) -> None:
-        objects = [
-            {
-                "id": "rule-1",
-                "type": "SimpleRule",
-                "identity": "R-001",
-                "display_name": "规则一",
-                "properties": {"ruleText": "必须检查", "action": "检查"},
-                "compat_properties": {"规则文本": "必须检查", "动作": "检查"},
-            }
-        ]
-
-        compat = self.assembler.compat_raw(objects, [])
-        canonical = self.assembler.canonical_raw(objects, [])
-
-        self.assertEqual(compat["entities"][0]["properties"], {"规则文本": "必须检查", "动作": "检查"})
-        self.assertEqual(
-            canonical["entities"][0]["properties"],
-            {"ruleText": "必须检查", "action": "检查"},
-        )
-
-    def test_canonical_properties_are_covered_but_missing_id_is_reported(self) -> None:
-        plan = SE.compile_plan((ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8"))
-        intrinsic = [
-            spec
-            for spec in plan.feature_specs["SimpleRule"]
-            if spec.kind == "intrinsic"
-        ]
-        properties = {spec.identifier: "present" for spec in intrinsic}
-        labels = {
-            spec.identifier: spec.display_name or spec.identifier
-            for spec in plan.class_specs["SimpleRule"].properties
-        }
-        objects = [{
-            "id": "rule-1",
-            "type": "SimpleRule",
-            "identity": "R-001",
-            "display_name": "规则一",
-            "properties": properties,
-            "compat_properties": {labels[key]: value for key, value in properties.items()},
-        }]
-        canonical = self.assembler.canonical_raw(objects, [])
-
-        complete_gaps = COVERAGE.CoverageAuditor().audit(plan, [], None, canonical["entities"], [])
-        self.assertEqual(
-            [gap for gap in complete_gaps if gap.gap_type == "feature_coverage"],
-            [],
-        )
-
-        missing_id = next(iter(properties))
-        canonical["entities"][0]["properties"].pop(missing_id)
-        missing_gaps = COVERAGE.CoverageAuditor().audit(
-            plan, [], None, canonical["entities"], []
-        )
-        feature_gaps = [gap for gap in missing_gaps if gap.gap_type == "feature_coverage"]
-        self.assertEqual(len(feature_gaps), 1)
-        self.assertIn(missing_id, feature_gaps[0].expected_features)
 
 
 class IntegrationTest(unittest.TestCase):
-    def test_extract_split_verifies_required_properties_by_canonical_id(self) -> None:
-        ontology = """@startuml
-class "设备" as Equipment {
-  + 编号 (code): String
-}
-' @required Equipment:code
-@enduml"""
-        text = "设备A的编号为00123。"
-
-        def entity_handler(prompt: str, chunk: dict) -> list[dict]:
-            return [span_item("Equipment", "设备A")]
-
-        def property_handler(prompt: str, chunk: dict) -> dict:
-            updates = []
-            for row in parse_known_entities(prompt):
-                updates.append({
-                    "entity_id": row["id"],
-                    "properties": {"code": "00123"},
-                    "evidence": {"quote": text},
-                })
-            return {"updates": updates}
-
-        def run(property_updates: bool) -> dict:
-            llm = StubLLM(
-                entity_handler=entity_handler,
-                property_handler=property_handler if property_updates else lambda _p, _c: {"updates": []},
-            )
-            return SE.extract_split(
-                ontology,
-                chunks=[SE.ExtractionChunk(chunk_id="chunk-0", text=text)],
-                llm=llm,
-                identity_admission="observe",
-            )
-
-        present = run(True)
-        present_codes = {
-            issue["code"] for issue in present["verification"]["issues"]
-        }
-        self.assertNotIn("REQUIRED_PROPERTY_MISSING", present_codes)
-        self.assertEqual(present["raw"]["entities"][0]["properties"], {"编号": "00123"})
-
-        missing = run(False)
-        missing_codes = {
-            issue["code"] for issue in missing["verification"]["issues"]
-        }
-        self.assertIn("REQUIRED_PROPERTY_MISSING", missing_codes)
-
     def test_result_contract_and_graph_consistency(self) -> None:
         case = json.loads((CASES_DIR / "06_composite_rule.json").read_text(encoding="utf-8"))
         ontology = (ONTOLOGIES_DIR / case["ontology_file"]).read_text(encoding="utf-8")
@@ -672,7 +247,6 @@ class "设备" as Equipment {
             ontology,
             chunks=[SE.ExtractionChunk(chunk_id="chunk-0", text=text)],
             llm=llm,
-            identity_admission="observe",
         )
         # 保留现有 API + 新字段
         for key in ("raw", "graph", "warnings", "attempts", "profile", "error_code"):

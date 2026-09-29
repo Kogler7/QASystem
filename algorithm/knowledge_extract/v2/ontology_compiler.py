@@ -18,14 +18,12 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from ._logging import get_step_logger
-from .graph_utils import canonical_name, canonical_relation_name, coerce_non_empty_name
+from .graph_utils import canonical_name, coerce_non_empty_name
 from .ontology_schema import OntologyClass, OntologyProperty, OntologySchema
 from .composite import CompositeSpec, discover_composite_specs
 
 
 logger = get_step_logger(__name__)
-
-ONTOLOGY_COMPILER_VERSION = "ontology-compiler-v2"
 
 
 _ENUM_KEYWORDS = ("枚举", "enum")
@@ -84,7 +82,6 @@ class ClassSpec:
     properties: tuple[PropertySpec, ...] = ()
     identity_properties: tuple[str, ...] = ()
     is_abstract: bool = False
-    comment: str = ""
 
 
 @dataclass(frozen=True)
@@ -95,7 +92,6 @@ class RelationSpec:
     source_cardinality: str = ""
     target_cardinality: str = ""
     display_label: str = ""
-    comment: str = ""
 
     @property
     def signature(self) -> str:
@@ -178,17 +174,7 @@ class ExtractionPlan:
 
     def resolve_relation(self, identifier: Any) -> tuple[RelationSpec, ...]:
         """按稳定标识（大小写不敏感）解析关系签名。"""
-        exact = self.relation_specs.get(canonical_name(identifier))
-        if exact is not None:
-            return exact
-        alias = canonical_relation_name(identifier)
-        matching_keys = [
-            key for key in self.relation_specs
-            if canonical_relation_name(key) == alias
-        ]
-        if len(matching_keys) != 1:
-            return ()
-        return self.relation_specs[matching_keys[0]]
+        return self.relation_specs.get(canonical_name(identifier), ())
 
     def allows(self, class_id: Any) -> bool:
         """目标范围是否允许指定类型（AC-2）。"""
@@ -211,7 +197,6 @@ class ExtractionPlan:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "compiler_version": ONTOLOGY_COMPILER_VERSION,
             "ontology_id": self.ontology_id,
             "allowed_types": sorted(self.allowed_types),
             "target_scope": self.target_scope.to_dict(),
@@ -266,16 +251,6 @@ class TargetScopeResolver:
             expanded.add(ontology_class.identifier)
             if include_subclasses:
                 expanded.update(schema.descendants(ontology_class.identifier))
-        if requested and not expanded:
-            warning_sink.append(
-                SchemaWarning(
-                    "TARGET_SCOPE_EMPTY",
-                    f"目标类型全部不在本体中: {', '.join(requested)}",
-                    "target_types",
-                    "error",
-                    list(requested),
-                )
-            )
         if not requested:
             # 全文覆盖：未指定目标类型时允许本体全部已声明类型。
             expanded = {ontology_class.identifier for ontology_class in schema.classes}
@@ -441,44 +416,6 @@ def run_schema_qa(schema: OntologySchema, *, mode: str = "strict") -> list[Schem
                 )
             )
 
-        # A child may override an inherited slot only with the same datatype.
-        # Otherwise normalization has no principled answer when the child is
-        # used through its parent type.
-        for parent_id in schema.ancestors(ontology_class.identifier):
-            parent_prop_ids = {
-                canonical_name(prop.identifier): prop for prop in schema.resolve_class(parent_id).properties
-            } if schema.resolve_class(parent_id) is not None else {}
-            for prop in ontology_class.properties:
-                parent_prop = parent_prop_ids.get(canonical_name(prop.identifier))
-                if parent_prop is not None and _normalized_type(parent_prop.data_type) != _normalized_type(prop.data_type):
-                    warnings.append(
-                        SchemaWarning(
-                            "INHERITED_PROPERTY_DATATYPE_MISMATCH",
-                            f"类 {ontology_class.identifier!r} 覆盖继承属性 {prop.identifier!r} 时数据类型冲突",
-                            f"classes.{ontology_class.identifier}.properties.{prop.identifier}",
-                            "error",
-                            {"child": prop.data_type, "parent": parent_prop.data_type, "parent_class": parent_id},
-                        )
-                    )
-
-        # Multiple parents must agree on effective identity.  Picking the
-        # first parent would make output depend on declaration order.
-        inherited_identities = {
-            parent_id: schema.identity_properties_for(parent_id)
-            for parent_id in schema.parents.get(ontology_class.identifier, ())
-            if schema.identity_properties_for(parent_id)
-        }
-        if len(set(inherited_identities.values())) > 1 and not ontology_class.identity_properties:
-            warnings.append(
-                SchemaWarning(
-                    "MULTIPLE_INHERITED_IDENTITY_CONFLICT",
-                    f"类 {ontology_class.identifier!r} 的多个父类声明了冲突 identity",
-                    f"classes.{ontology_class.identifier}.identity",
-                    "error",
-                    inherited_identities,
-                )
-            )
-
     # cardinality 缺失
     for index, relation in enumerate(schema.relations):
         if not relation.source_cardinality or not relation.target_cardinality:
@@ -497,41 +434,6 @@ def run_schema_qa(schema: OntologySchema, *, mode: str = "strict") -> list[Schem
 
     # 关系/继承端点引用未声明类型
     for entry in schema.unresolved:
-        if entry.get("kind") == "unsupported_preprocessor":
-            warnings.append(
-                SchemaWarning(
-                    "UNSUPPORTED_PREPROCESSOR",
-                    "受限 PlantUML 本体 DSL 禁止预处理器、include、宏和外部数据读取",
-                    "unresolved",
-                    "error",
-                    entry.get("line"),
-                )
-            )
-            continue
-        if entry.get("kind") == "unsupported_declaration":
-            warnings.append(
-                SchemaWarning(
-                    "UNSUPPORTED_DECLARATION",
-                    "本体包含当前受限 PlantUML DSL 不支持的语义声明",
-                    "unresolved",
-                    unresolved_severity,
-                    entry.get("line"),
-                )
-            )
-            continue
-        if entry.get("kind") == "identity":
-            error = entry.get("error")
-            code = "IDENTITY_UNKNOWN_CLASS" if error == "unknown_class" else "IDENTITY_UNKNOWN_PROPERTY"
-            warnings.append(
-                SchemaWarning(
-                    code,
-                    f"@identity 引用了未声明的{'类' if error == 'unknown_class' else '属性'}",
-                    "unresolved",
-                    "error",
-                    entry,
-                )
-            )
-            continue
         if entry.get("kind") == "relation":
             code = "UNRESOLVED_RELATION_ENDPOINT_TYPE"
             message = (
@@ -619,24 +521,6 @@ def _compile_class_specs(
         )
 
     specs: dict[str, ClassSpec] = {}
-
-    def property_source(class_id: str, property_id: str) -> str:
-        """Return the nearest declaring class for an effective property."""
-        ontology_class = schema.resolve_class(class_id)
-        if ontology_class is not None and any(
-            canonical_name(prop.identifier) == canonical_name(property_id)
-            for prop in ontology_class.properties
-        ):
-            return class_id
-        for ancestor_id in schema.ancestors(class_id):
-            ancestor = schema.resolve_class(ancestor_id)
-            if ancestor is not None and any(
-                canonical_name(prop.identifier) == canonical_name(property_id)
-                for prop in ancestor.properties
-            ):
-                return ancestor_id
-        return class_id
-
     for ontology_class in schema.classes:
         identifier = ontology_class.identifier
         own_properties = tuple(
@@ -651,26 +535,26 @@ def _compile_class_specs(
             for prop in ontology_class.properties
         )
         inherited_properties: list[PropertySpec] = []
-        seen_identifiers = {canonical_name(prop.identifier) for prop in own_properties}
-        # OntologySchema materializes the complete transitive ancestor chain,
-        # preserving ancestor declaration order and child overrides.
-        for prop in schema._properties_for(identifier):
-            prop_key = canonical_name(prop.identifier)
-            if prop_key in seen_identifiers:
+        seen_identifiers = {prop.identifier for prop in own_properties}
+        for parent in schema.parents.get(identifier, ()):
+            parent_class = schema.resolve_class(parent)
+            if parent_class is None:
                 continue
-            seen_identifiers.add(prop_key)
-            source_class = property_source(identifier, prop.identifier)
-            inherited_properties.append(
-                PropertySpec(
-                    identifier=prop.identifier,
-                    display_name=prop.display_name,
-                    data_type=prop.data_type,
-                    source_class=source_class,
-                    comment=prop.comment,
-                    inherited=True,
-                    required=True if is_required(identifier, prop.identifier) else None,
+            for prop in parent_class.properties:
+                if prop.identifier in seen_identifiers:
+                    continue
+                seen_identifiers.add(prop.identifier)
+                inherited_properties.append(
+                    PropertySpec(
+                        identifier=prop.identifier,
+                        display_name=prop.display_name,
+                        data_type=prop.data_type,
+                        source_class=parent,
+                        comment=prop.comment,
+                        inherited=True,
+                        required=True if is_required(identifier, prop.identifier) else None,
+                    )
                 )
-            )
         specs[identifier] = ClassSpec(
             class_id=identifier,
             display_name=ontology_class.display_name,
@@ -680,7 +564,6 @@ def _compile_class_specs(
             properties=own_properties + tuple(inherited_properties),
             identity_properties=schema.identity_properties_for(identifier),
             is_abstract=ontology_class.is_abstract,
-            comment=getattr(ontology_class, "comment", ""),
         )
     return specs
 
@@ -695,7 +578,6 @@ def _compile_relation_specs(schema: OntologySchema) -> dict[str, tuple[RelationS
             source_cardinality=relation.source_cardinality,
             target_cardinality=relation.target_cardinality,
             display_label=relation.identifier,
-            comment=getattr(relation, "comment", ""),
         )
         specs.setdefault(canonical_name(relation.identifier), []).append(spec)
     return {key: tuple(value) for key, value in specs.items()}
@@ -898,17 +780,6 @@ class OntologyCompiler:
     ) -> ExtractionPlan:
         schema = OntologySchema.parse(ontology or "")
         warnings: list[SchemaWarning] = []
-        if not schema.classes:
-            # 零类本体无法支撑任何抽取：输出硬告警，由调用方决定失败方式。
-            warnings.append(
-                SchemaWarning(
-                    "ONTOLOGY_EMPTY",
-                    "本体未解析出任何 class 声明（空本体或语法不被识别）",
-                    "ontology",
-                    "error",
-                    len(ontology or ""),
-                )
-            )
         scope = TargetScopeResolver().resolve(
             schema,
             target_types,

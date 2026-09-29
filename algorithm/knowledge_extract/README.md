@@ -251,7 +251,7 @@ curl -X POST http://127.0.0.1:8006/api/knowledge/precipitation \
 本包对外保留的调用是无本体文本摘要：
 
 ```python
-from algorithm.knowledge_extract import summarize_text
+from algorithm.knowledge_extract.v1 import summarize_text
 
 summary = summarize_text(text=document_text)
 ```

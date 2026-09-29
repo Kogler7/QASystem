@@ -1,3 +1,4 @@
+"""版本包入口：暴露 backend 适配器需要的 aggregate / public 契约。"""
 from collections.abc import Iterable
 from typing import Any
 
@@ -28,9 +29,10 @@ def extract_aggregate(
     base_url: str | None = None,
     api_key: str | None = None,
     max_workers: int | None = None,
+    llm: Any | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    """Run the V2 aggregate pipeline over ``chunks`` and return the V2 aggregate contract."""
+    """Run the pipeline over ``chunks`` and return the aggregate contract."""
     return extract_harness(
         ontology=ontology,
         chunks=chunks,
@@ -41,6 +43,7 @@ def extract_aggregate(
         base_url=base_url,
         api_key=api_key,
         max_workers=max_workers,
+        llm=llm,
     )
 
 

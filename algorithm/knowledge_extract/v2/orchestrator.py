@@ -30,31 +30,7 @@ class RepairLoopResult:
 
     @property
     def succeeded(self) -> bool:
-        # A report can be structurally valid while still containing an
-        # unresolved coverage gap.  Such a run must remain observable as
-        # incomplete instead of being reported as a successful repair.
-        return self.report.valid and not self.report.repairable_issues
-
-    @property
-    def coverage_complete(self) -> bool:
-        """Whether the targeted repair loop resolved all repairable issues."""
-        return not self.report.repairable_issues
-
-    @property
-    def unresolved_repairable_count(self) -> int:
-        return len(self.report.repairable_issues)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "succeeded": self.succeeded,
-            "coverage_complete": self.coverage_complete,
-            "unresolved_repairable_count": self.unresolved_repairable_count,
-            "unresolved_repairable": [
-                issue.to_dict() for issue in self.report.repairable_issues
-            ],
-            "rounds": [round_result.to_dict() for round_result in self.rounds],
-            "stop_reason": self.stop_reason,
-        }
+        return self.report.valid
 
 
 class TargetedRepairOrchestrator:

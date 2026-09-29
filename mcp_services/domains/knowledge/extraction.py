@@ -30,7 +30,7 @@ def extract_knowledge(
 def _extract(ontology, text, model, base_url):
     if not (ontology or "").strip():
         # 非结构化：无本体时不按元模型抽取，直接生成文本摘要
-        from algorithm.knowledge_extract import summarize_text
+        from algorithm.knowledge_extract.v1 import summarize_text
 
         return summarize_text(text=text, model=model, base_url=base_url)
     return _extract_with_ontology(ontology, text, model, base_url)

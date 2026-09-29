@@ -3,8 +3,8 @@ from __future__ import annotations
 import threading
 import time
 
-from algorithm.knowledge_extract.batch import deduplicate_chunk_graphs, extract_chunks
-from algorithm.knowledge_extract.scheduler import LLMRateLimits, LLMRequestScheduler
+from algorithm.knowledge_extract.v1.batch import deduplicate_chunk_graphs, extract_chunks
+from algorithm.knowledge_extract.v1.scheduler import LLMRateLimits, LLMRequestScheduler
 
 
 def test_extract_chunks_runs_concurrently_and_preserves_index_order():

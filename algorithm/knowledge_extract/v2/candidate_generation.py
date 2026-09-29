@@ -15,28 +15,17 @@ from copy import deepcopy
 from typing import Any
 
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
-from .evidence import Evidence, bind_evidence, locate_quote, verify_evidence
+from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import canonical_name
-from .jev_client import partition_relation_pairs
-from .llm_client import thinking_enabled_for
 from .ontology_compiler import ExtractionPlan
 from .ontology_schema import OntologySchema
 from ._logging import get_step_logger
-from .config import (
-    KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH as ENTITY_SEGMENT_MAX_DEPTH,
-    KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS as ENTITY_SEGMENT_MIN_CHARS,
-    KG_EXTRACT_ENTITY_SEGMENT_OVERLAP as ENTITY_SEGMENT_OVERLAP,
-    KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS as ENTITY_SEGMENT_TARGET_CHARS,
-)
 from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table, build_chat_messages
-from .table_semantics import analyze_table_semantics, table_entity_types
-from .table_evidence import rule_candidate_in_scope, table_source_span
-from .official_document_scope import official_entity_types
 
 
 logger = get_step_logger(__name__)
 from .relation_resolver import enumerate_relation_pairs
-from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages
+from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages, semantic_support
 from .scheduler import get_llm_scheduler
 from .structured_output import validate_json_schema
 
@@ -46,25 +35,11 @@ MAX_LOCAL_RELATION_CATALOG = 160
 # token，默认 max_tokens=16384 最多容纳约 150~250 条。超限会导致响应 JSON 截断、
 # generate_structured 解析失败后整批丢弃（批越大丢得越多），故取 150。
 RELATION_PAIR_BATCH_SIZE = 200
-THINKING_RELATION_PAIR_BATCH_SIZE = 8
-RELATION_MAX_BATCHES = 12
-RELATION_CONTEXT_CHARS = 12000
-# A failed batch may be too large for a model to complete, but recursively
-# splitting all the way to single pairs can amplify one permanent failure into
-# dozens of calls.  One split recovers the common length/complexity case while
-# keeping the worst case bounded at three generated batches per initial batch.
-RELATION_MAX_SPLIT_DEPTH = 1
-RELATION_VERIFICATION_BATCH_SIZE = 16
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
-MAX_THINKING_LENGTH_TOKENS = 65536
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
 # 同时按字符封顶，防止"行少但单元格极长"的表格把单次 prompt 撑爆。
 TABLE_ROWS_PER_PART = 20
 TABLE_CHARS_PER_PART = 6000
-_TABLE_JSON_FENCE = re.compile(
-    r"(?ims)^[ \t]*```[ \t]*json[ \t]*\r?\n(?P<body>.*?)^[ \t]*```[ \t]*$"
-)
-_MARKDOWN_HEADING = re.compile(r"(?m)^\s{0,3}#{1,6}\s+.+?\s*$")
 
 
 def _structured_row_segments(chunk: ExtractionChunk) -> list[tuple[int, ExtractionChunk]]:
@@ -74,114 +49,44 @@ def _structured_row_segments(chunk: ExtractionChunk) -> list[tuple[int, Extracti
     子表自带 columns 与完整围栏，是合法 JSON；子表文本由原始单元格值重新序列化，
     引文仍可在原文中逐字定位。返回空表示"不是可拆的结构化表格"，上层回落原逻辑。
     """
-    if (chunk.metadata or {}).get("table_windowed"):
-        return []
     text = chunk.text or ""
-    fenced_blocks = list(_TABLE_JSON_FENCE.finditer(text))
-    if len(fenced_blocks) > 1 and not (chunk.metadata or {}).get("table_blocks_split"):
-        parts: list[tuple[int, ExtractionChunk]] = []
-        previous_end = 0
-        table_metadata = (chunk.metadata or {}).get("tables")
-        for table_index, match in enumerate(fenced_blocks):
-            scaffolding = text[previous_end:match.start()]
-            headings = list(_MARKDOWN_HEADING.finditer(scaffolding))
-            prefix = scaffolding[headings[-1].start():] if headings else ""
-            part_metadata = dict(chunk.metadata)
-            part_metadata["table_blocks_split"] = True
-            part_metadata["table_source_block_index"] = table_index + 1
-            if isinstance(table_metadata, list) and table_index < len(table_metadata):
-                table_info = dict(table_metadata[table_index] or {})
-                part_metadata["table_count"] = 1
-                part_metadata["tables"] = [table_info]
-                for key in ("source_file", "sheet_name", "source_row_start", "source_row_end"):
-                    if table_info.get(key) is not None:
-                        part_metadata[key] = table_info[key]
-            parts.append((
-                0,
-                ExtractionChunk(
-                    chunk_id=chunk.chunk_id,
-                    text=prefix + match.group(0),
-                    document_id=chunk.document_id,
-                    section_id=chunk.section_id,
-                    section_title=(
-                        str(part_metadata.get("sheet_name") or chunk.section_title or "") or None
-                    ),
-                    clause_number=chunk.clause_number,
-                    page_no=chunk.page_no,
-                    start_offset=chunk.start_offset,
-                    end_offset=chunk.end_offset,
-                    parent_chunk_id=chunk.parent_chunk_id,
-                    previous_chunk_id=chunk.previous_chunk_id,
-                    next_chunk_id=chunk.next_chunk_id,
-                    metadata=part_metadata,
-                ),
-            ))
-            previous_end = match.end()
-        return parts
     fence = chr(96) * 3
     open_at = text.find(fence)
-    fenced = open_at >= 0
-    if fenced:
-        body_start = text.find("\n", open_at)
-        close_at = text.rfind(fence)
-        if body_start < 0 or close_at <= body_start:
-            return []
-        body = text[body_start + 1:close_at]
-        prefix = text[:body_start + 1]
-        suffix = text[close_at:]
-    else:
-        body = text.strip()
-        prefix = ""
-        suffix = ""
+    if open_at < 0:
+        return []
+    body_start = text.find("\n", open_at)
+    close_at = text.rfind(fence)
+    if body_start < 0 or close_at <= body_start:
+        return []
     try:
-        payload = json.loads(body)
+        payload = json.loads(text[body_start + 1:close_at])
     except Exception:
         return []
     if not isinstance(payload, dict):
         return []
     rows = payload.get("rows")
-    if not isinstance(rows, list) or not rows:
+    if not isinstance(rows, list) or len(rows) <= TABLE_ROWS_PER_PART:
         return []
-    serialized_size = len(text) if fenced else len(body)
-    if len(rows) <= TABLE_ROWS_PER_PART and serialized_size <= TABLE_CHARS_PER_PART:
-        return []
-    windows: list[tuple[int, int, list[Any]]] = []
+    prefix = text[:body_start + 1]
+    suffix = text[close_at:]
+    windows: list[list[Any]] = []
     window: list[Any] = []
-    window_start = 0
-    for row_index, row in enumerate(rows):
-        candidate_rows = [*window, row]
-        candidate_body = json.dumps(
-            {**payload, "rows": candidate_rows},
-            ensure_ascii=False,
-            indent=1,
-            default=str,
-        )
-        candidate_size = (
-            len(prefix) + len(candidate_body) + (len(suffix) + 1 if fenced else 0)
-        )
-        if window and (len(window) >= TABLE_ROWS_PER_PART or candidate_size > TABLE_CHARS_PER_PART):
-            windows.append((window_start, row_index, window))
+    size = 0
+    for row in rows:
+        row_size = len(json.dumps(row, ensure_ascii=False, default=str))
+        if window and (len(window) >= TABLE_ROWS_PER_PART or size + row_size > TABLE_CHARS_PER_PART):
+            windows.append(window)
             window = []
-            window_start = row_index
+            size = 0
         window.append(row)
+        size += row_size
     if window:
-        windows.append((window_start, len(rows), window))
+        windows.append(window)
+    if len(windows) < 2:
+        return []
     parts: list[tuple[int, ExtractionChunk]] = []
-    for row_start, row_end, window_rows in windows:
-        rebuilt_body = json.dumps({**payload, "rows": window_rows}, ensure_ascii=False, indent=1)
-        rebuilt = prefix + rebuilt_body + (("\n" + suffix) if fenced else "")
-        metadata = dict(chunk.metadata)
-        metadata.update(
-            {
-                "table_windowed": True,
-                "table_data_row_start": row_start + 1,
-                "table_data_row_end": row_end,
-            }
-        )
-        source_row_start = metadata.get("source_row_start")
-        if isinstance(source_row_start, int):
-            metadata["source_row_start"] = source_row_start + row_start
-            metadata["source_row_end"] = source_row_start + row_end - 1
+    for window in windows:
+        rebuilt = prefix + json.dumps({**payload, "rows": window}, ensure_ascii=False, indent=1) + "\n" + suffix
         parts.append((
             0,
             ExtractionChunk(
@@ -197,7 +102,7 @@ def _structured_row_segments(chunk: ExtractionChunk) -> list[tuple[int, Extracti
                 parent_chunk_id=chunk.parent_chunk_id,
                 previous_chunk_id=chunk.previous_chunk_id,
                 next_chunk_id=chunk.next_chunk_id,
-                metadata=metadata,
+                metadata=dict(chunk.metadata),
             ),
         ))
     return parts
@@ -354,66 +259,6 @@ def _recovery_summary(collection_name: str, items: list[dict[str, Any]]) -> str:
     return "; ".join(labels)
 
 
-def _entity_segment_ranges(text: str, target: int, min_chars: int, overlap: int) -> list[tuple[int, int]]:
-    """按行/markdown 标题边界把长文本切成带重叠的 segment 区间（左闭右开）。
-
-    只在整块实体调用因 finish_reason=length 失败后使用；重叠用于避免跨边界的
-    mention/quote 在两个片段都定位不到。返回区间保证按原文顺序排列。
-    """
-    if not text:
-        return []
-    if len(text) <= max(1, target):
-        return [(0, len(text))]
-    lines = text.splitlines(keepends=True)
-    if not lines:
-        return [(0, len(text))]
-    ranges: list[tuple[int, int]] = []
-    cur: list[tuple[int, int]] = []
-
-    def flush(keep_overlap: bool) -> None:
-        if not cur:
-            return
-        ranges.append((cur[0][0], cur[-1][1]))
-        if not keep_overlap:
-            cur.clear()
-            return
-        tail: list[tuple[int, int]] = []
-        tail_len = 0
-        for item_start, item_end in reversed(cur):
-            line_len = item_end - item_start
-            if tail and tail_len + line_len > max(0, overlap):
-                break
-            tail.insert(0, (item_start, item_end))
-            tail_len += line_len
-        cur.clear()
-        cur.extend(tail)
-
-    pos = 0
-    for line in lines:
-        start, end = pos, pos + len(line)
-        pos = end
-        cur_len = (cur[-1][1] - cur[0][0]) if cur else 0
-        heading = bool(_MARKDOWN_HEADING.match(line.rstrip("\r\n")))
-        if cur and cur_len + len(line) > target and cur_len >= min_chars:
-            flush(True)
-        elif heading and cur and cur_len >= max(min_chars, int(target * 0.6)):
-            flush(False)
-        cur.append((start, end))
-    if cur:
-        ranges.append((cur[0][0], cur[-1][1]))
-    # 过短片段并入相邻片段（保持区间递增、不重排）
-    merged: list[tuple[int, int]] = []
-    for start, end in ranges:
-        if merged and (end - start) < min_chars:
-            merged[-1] = (merged[-1][0], end)
-        else:
-            merged.append((start, end))
-    if len(merged) > 1 and (merged[-1][1] - merged[-1][0]) < min_chars:
-        merged[-2] = (merged[-2][0], merged[-1][1])
-        merged.pop()
-    return merged
-
-
 def relation_catalog_for_context(
     catalog: list[dict[str, Any]],
     chunk: ExtractionChunk,
@@ -473,44 +318,27 @@ def output_schema_for_types(
 
 
 def relation_pair_decision_schema(pairs: list[dict[str, Any]]) -> dict[str, Any]:
-    """Build an exact, pair-keyed decision contract for one relation batch.
-
-    An array schema can constrain the number of rows, but it cannot guarantee
-    that every pair is decided exactly once.  Making pair IDs required object
-    keys turns omissions, duplicates, and unknown IDs into schema errors that
-    the bounded structured-output retry loop can repair.
-    """
+    """Strict provider schema for classifying a pre-enumerated pair batch."""
     pair_ids = [str(pair["pair_id"]) for pair in pairs]
-    decision_properties: dict[str, Any] = {}
-    for pair in pairs:
-        pair_id = str(pair["pair_id"])
-        decision_properties[pair_id] = {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string",
-                    "enum": [str(pair["relation_id"]), "NONE", "ABSTAIN"],
-                },
-                "evidence": {
-                    "type": "object",
-                    "properties": {"quote": {"type": "string"}},
-                    "required": ["quote"],
-                    "additionalProperties": False,
-                },
-            },
-            "required": ["label", "evidence"],
-            "additionalProperties": False,
-        }
-    return {
+    labels = sorted({str(pair["relation_id"]) for pair in pairs} | {"NONE"})
+    decision = {
         "type": "object",
         "properties": {
-            "decisions": {
+            "pair_id": {"type": "string", "enum": pair_ids},
+            "label": {"type": "string", "enum": labels},
+            "evidence": {
                 "type": "object",
-                "properties": decision_properties,
-                "required": pair_ids,
+                "properties": {"quote": {"type": "string"}},
+                "required": ["quote"],
                 "additionalProperties": False,
-            }
+            },
         },
+        "required": ["pair_id", "label", "evidence"],
+        "additionalProperties": False,
+    }
+    return {
+        "type": "object",
+        "properties": {"decisions": {"type": "array", "items": decision}},
         "required": ["decisions"],
         "additionalProperties": False,
     }
@@ -588,8 +416,6 @@ def _response_metadata(response: Any) -> dict[str, Any]:
                 "incomplete_details": trace.get("incomplete_details") or {},
                 "usage": trace.get("usage"),
                 "usage_unavailable": bool(trace.get("usage_unavailable", trace.get("usage") is None)),
-                "thinking": trace.get("thinking"),
-                "max_tokens": trace.get("max_tokens"),
             }
     usage = getattr(response, "usage", None)
     status = getattr(response, "status", None)
@@ -602,8 +428,6 @@ def _response_metadata(response: Any) -> dict[str, Any]:
         "incomplete_details": getattr(response, "incomplete_details", {}) or {},
         "usage": usage,
         "usage_unavailable": usage is None,
-        "thinking": getattr(response, "thinking", None),
-        "max_tokens": getattr(response, "max_tokens", None),
     }
 
 
@@ -625,13 +449,6 @@ def _pre_parse_response_error(response: Any) -> tuple[str, str] | None:
     return None
 
 
-def relation_pair_batch_size(llm: Any) -> int:
-    """Use a smaller pair batch when the relation pass spends a thinking budget."""
-    if thinking_enabled_for(llm, "relation"):
-        return THINKING_RELATION_PAIR_BATCH_SIZE
-    return RELATION_PAIR_BATCH_SIZE
-
-
 def _invoke_generation(
     llm: Any,
     schema: dict[str, Any],
@@ -642,21 +459,21 @@ def _invoke_generation(
     attempt_number: int,
     response_mode: str,
     record_table: bool = False,
-    run_overrides: dict[str, Any] | None = None,
 ) -> Any:
     structured = getattr(llm, "generate_structured", None)
     if callable(structured):
-        context = {
-            "schema_name": f"{pass_name}_candidates",
-            "pass_name": pass_name,
-            "chunk_id": chunk_id,
-            "attempt": attempt_number,
-            "response_mode": response_mode,
-            "record_table": record_table,
-        }
-        if run_overrides:
-            context.update(run_overrides)
-        return structured(schema, messages, context)
+        return structured(
+            schema,
+            messages,
+            {
+                "schema_name": f"{pass_name}_candidates",
+                "pass_name": pass_name,
+                "chunk_id": chunk_id,
+                "attempt": attempt_number,
+                "response_mode": response_mode,
+                "record_table": record_table,
+            },
+        )
     return llm(messages)
 
 
@@ -674,7 +491,6 @@ def generate_structured(
     call_metrics: list[dict[str, Any]] | None = None,
     retry_empty_collection: bool = False,
     record_table: bool | None = None,
-    return_recovered_on_failure: bool = False,
 ) -> dict[str, Any] | None:
     """Call one required pass with bounded retry and conservative prefix recovery."""
     attempt_messages = messages
@@ -684,8 +500,6 @@ def generate_structured(
     recovered_items: list[dict[str, Any]] = []
     largest_invalid_response = 0
     record_table_flag = retry_empty_collection if record_table is None else bool(record_table)
-    run_overrides: dict[str, Any] = {}
-    length_retry_stage = ""
     for attempt_number in range(1, resolved_max_attempts + 1):
         started = time.monotonic()
         error_type = ""
@@ -714,7 +528,6 @@ def generate_structured(
                         attempt_number=attempt_number,
                         response_mode=response_mode,
                         record_table=record_table_flag,
-                        run_overrides=run_overrides or None,
                     )
             else:
                 response = _invoke_generation(
@@ -726,7 +539,6 @@ def generate_structured(
                     attempt_number=attempt_number,
                     response_mode=response_mode,
                     record_table=record_table_flag,
-                    run_overrides=run_overrides or None,
                 )
             pre_parse_error = _pre_parse_response_error(response)
             if pre_parse_error is not None:
@@ -844,9 +656,6 @@ def generate_structured(
                 "elapsed_seconds": round(time.monotonic() - started, 6),
                 "retryable": retryable,
                 "terminal": False,
-                "thinking": response_metadata.get("thinking"),
-                "max_tokens": response_metadata.get("max_tokens"),
-                "length_retry": length_retry_stage or None,
             }
         )
         _record_call(
@@ -864,27 +673,6 @@ def generate_structured(
         if not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
-        if error_type == "incomplete" and thinking_enabled_for(
-            llm,
-            pass_name,
-            disable_thinking=run_overrides.get("disable_thinking"),
-        ):
-            thinking_max = int(getattr(llm, "thinking_max_tokens", 0) or 32768)
-            default_max = int(getattr(llm, "max_tokens", 0) or 16384)
-            if length_retry_stage != "budget_bump":
-                length_retry_stage = "budget_bump"
-                run_overrides = {
-                    "max_tokens": min(max(thinking_max * 2, thinking_max), MAX_THINKING_LENGTH_TOKENS),
-                }
-            elif length_retry_stage != "disable_thinking":
-                length_retry_stage = "disable_thinking"
-                run_overrides = {
-                    "disable_thinking": True,
-                    "max_tokens": default_max,
-                }
-            else:
-                attempts[-1]["terminal"] = True
-                break
         if error_type in {"json", "schema", "empty_collection"}:
             response_size = len(_response_text(response))
             recovery_instruction = ""
@@ -917,24 +705,6 @@ def generate_structured(
         response_mode = next_response_mode
         if retry_base_seconds > 0:
             time.sleep(retry_base_seconds * (2 ** (attempt_number - 1)))
-    if return_recovered_on_failure and collection_name and recovered_items:
-        attempts.append({
-            "attempt": resolved_max_attempts + 1,
-            "type": "recovered_prefix",
-            "pass": pass_name,
-            "chunk": chunk_id,
-            "finish_reason": "length",
-            "recovered_items": len(recovered_items),
-            "terminal": False,
-            "message": "所有尝试失败，使用前缀恢复候选兜底",
-        })
-        logger.warning(
-            "[步骤][LLM] 输出: pass=%s chunk=%s status=recovered_prefix items=%d（输出被截断，已保留前缀候选）",
-            pass_name,
-            chunk_id,
-            len(recovered_items),
-        )
-        return {collection_name: recovered_items}
     return None
 
 
@@ -951,12 +721,10 @@ def verify_items_with_llm(
     retry_base_seconds: float = 0.05,
     call_metrics: list[dict[str, Any]] | None = None,
     record_table: bool = False,
-    verdict_diagnostics: dict[str, Any] | None = None,
 ) -> dict[str, str]:
-    """把快速语义比对未通过的候选交给 LLM 核验。
+    """把语义比对不一致的实体/属性交给 LLM 核验，返回 item_id -> yes/no/uncertain。
 
-    核验失败（网络/解析问题）返回空 dict。事实写入调用方必须
-    fail closed：只有显式 ``yes`` 可以提交，缺失结论不能视为通过。
+    核验失败（网络/解析问题）返回空 dict，调用方应保留原结果而不是丢弃。
     """
     if not items:
         return {}
@@ -975,169 +743,18 @@ def verify_items_with_llm(
             call_metrics=call_metrics,
             record_table=record_table,
         )
-    except Exception as exc:  # noqa: BLE001 - fail closed, but preserve diagnostics
-        logger.warning(
-            "[步骤][LLM] 证据核验异常: pass=%s chunk=%s type=%s message=%s",
-            pass_name,
-            chunk_id or chunk.chunk_id,
-            type(exc).__name__,
-            str(exc),
-        )
-        if attempts is not None:
-            attempts.append({
-                "attempt": 1,
-                "pass": pass_name,
-                "chunk": chunk_id or chunk.chunk_id,
-                "type": "request",
-                "message": str(exc),
-                "incomplete_details": {"exception_type": type(exc).__name__},
-                "terminal": True,
-            })
+    except Exception:  # noqa: BLE001 - 核验失败时保留原结果，不丢弃
         return {}
     verdicts: dict[str, str] = {}
-    raw_item_ids: list[str] = []
     if isinstance(parsed, dict):
         for row in parsed.get("verdicts") or []:
             if not isinstance(row, dict):
                 continue
             item_id = str(row.get("item_id") or "")
-            raw_item_ids.append(item_id)
             supported = str(row.get("supported") or "").casefold()
             if item_id and supported in {"yes", "no", "uncertain"}:
-                previous = verdicts.get(item_id)
-                if previous is None or previous == supported:
-                    verdicts[item_id] = supported
-                else:
-                    # Contradictory duplicate verdicts are ambiguous regardless
-                    # of response order and must fail closed at the caller.
-                    verdicts[item_id] = "uncertain"
-    if verdict_diagnostics is not None:
-        verdict_diagnostics["raw_item_ids"] = raw_item_ids
+                verdicts[item_id] = supported
     return verdicts
-
-
-def verify_relation_claims(
-    llm: Any,
-    *,
-    chunk: ExtractionChunk,
-    relations: list[dict[str, Any]],
-    entity_catalog: Iterable[dict[str, Any]] = (),
-    use_scheduler: bool = False,
-    attempts: list[dict[str, Any]] | None = None,
-    warnings: list[dict[str, Any]] | None = None,
-    pass_name: str = "relation_evidence_verification",
-    chunk_id: str = "",
-    max_attempts: int = 2,
-    retry_base_seconds: float = 0.05,
-    call_metrics: list[dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
-    """Fail-closed semantic gate shared by Pass 2 and repair relations.
-
-    Verification is bounded in small batches.  A syntactically valid but
-    incomplete verdict set is recorded as a terminal schema failure so a run
-    cannot silently report success after dropping undecided relations.
-    """
-    if not relations:
-        return []
-    attempt_rows = attempts if attempts is not None else []
-    catalog_by_id = {
-        str(entity.get("id") or ""): entity
-        for entity in entity_catalog
-        if isinstance(entity, dict) and str(entity.get("id") or "")
-    }
-    accepted: list[dict[str, Any]] = []
-    resolved_chunk_id = chunk_id or chunk.chunk_id
-    for offset in range(0, len(relations), RELATION_VERIFICATION_BATCH_SIZE):
-        batch = relations[offset : offset + RELATION_VERIFICATION_BATCH_SIZE]
-        items: list[dict[str, Any]] = []
-        for index, relation in enumerate(batch, start=offset):
-            from_id = str(relation.get("from_id") or "")
-            to_id = str(relation.get("to_id") or "")
-            source = catalog_by_id.get(from_id) or {}
-            target = catalog_by_id.get(to_id) or {}
-            items.append({
-                "item_id": f"relation-{index}",
-                "claim_kind": "relation",
-                "source": {
-                    "id": from_id,
-                    "name": str(relation.get("from_name") or source.get("name") or ""),
-                    "type": str(relation.get("from_type") or source.get("type") or ""),
-                },
-                "relation": str(relation.get("rel_type") or ""),
-                "target": {
-                    "id": to_id,
-                    "name": str(relation.get("to_name") or target.get("name") or ""),
-                    "type": str(relation.get("to_type") or target.get("type") or ""),
-                },
-                "evidence_quote": str((relation.get("evidence") or {}).get("quote") or ""),
-            })
-        verdict_diagnostics: dict[str, Any] = {}
-        verdicts = verify_items_with_llm(
-            llm,
-            chunk=chunk,
-            items=items,
-            pass_name=pass_name,
-            chunk_id=f"{resolved_chunk_id}.batch-{offset // RELATION_VERIFICATION_BATCH_SIZE}",
-            use_scheduler=use_scheduler,
-            attempts=attempt_rows,
-            max_attempts=max_attempts,
-            retry_base_seconds=retry_base_seconds,
-            call_metrics=call_metrics,
-            verdict_diagnostics=verdict_diagnostics,
-        )
-        expected_ids = {str(item["item_id"]) for item in items}
-        raw_item_ids = [
-            str(item_id)
-            for item_id in verdict_diagnostics.get("raw_item_ids") or []
-        ]
-        duplicate_ids = sorted({
-            item_id for item_id in raw_item_ids if raw_item_ids.count(item_id) > 1
-        })
-        unknown_ids = sorted(set(raw_item_ids) - expected_ids)
-        missing_ids = sorted(expected_ids - set(verdicts))
-        protocol_errors = {
-            "missing_item_ids": missing_ids,
-            "duplicate_item_ids": duplicate_ids,
-            "unknown_item_ids": unknown_ids,
-        }
-        if any(protocol_errors.values()):
-            attempt_rows.append({
-                "attempt": 1,
-                "type": "schema",
-                "pass": pass_name,
-                "chunk": resolved_chunk_id,
-                "message": "关系语义核验 item_id 集合不完整或不唯一",
-                "incomplete_details": protocol_errors,
-                "terminal": True,
-            })
-            _append_warning(
-                warnings,
-                "RELATION_EVIDENCE_VERIFIER_INCOMPLETE",
-                "关系语义核验 item_id 集合不完整或不唯一",
-                resolved_chunk_id,
-                protocol_errors,
-            )
-        for duplicate_id in duplicate_ids:
-            verdicts.pop(duplicate_id, None)
-        for relation, item in zip(batch, items):
-            item_id = str(item["item_id"])
-            verdict = verdicts.get(item_id)
-            if verdict == "yes":
-                accepted.append(relation)
-                continue
-            _append_warning(
-                warnings,
-                "RELATION_SEMANTIC_EVIDENCE_REJECTED",
-                "关系 evidence 未能明确支持完整三元组，候选已拒绝",
-                f"{resolved_chunk_id}.{item_id}",
-                {
-                    "from_id": relation.get("from_id"),
-                    "to_id": relation.get("to_id"),
-                    "rel_type": relation.get("rel_type"),
-                    "verdict": verdict or "missing",
-                },
-            )
-    return accepted
 
 
 def _normalize_entities(
@@ -1162,7 +779,6 @@ def _normalize_span_entities(
     schema: OntologySchema,
     target_types: Iterable[str] | None,
     warnings: list[dict[str, Any]],
-    deduplicate: bool = True,
 ) -> list[dict[str, Any]]:
     """Turn strict span candidates into the legacy graph entity contract.
 
@@ -1251,17 +867,20 @@ def _normalize_span_entities(
                 name,
             )
         else:
+            # 不再强制 span-first：实体名/证据都不是原文逐字片段时（例如由多条
+            # 记录归纳出的规则）同样保留，证据问题只作为告警。
             _append_warning(
                 warnings,
-                "ENTITY_EVIDENCE_REJECTED",
-                "mention 与 evidence.quote 均无法在当前 chunk 定位，候选已拒绝",
+                "ENTITY_UNGROUNDED",
+                "mention 与 evidence.quote 均非原文片段，按生成式实体保留",
                 path,
                 name,
             )
-            continue
+            start = start if isinstance(start, int) and start >= 0 else 0
+            end = end if isinstance(end, int) and end >= start else start
 
         key = (ontology_class.identifier, name)
-        if deduplicate and key in seen:
+        if key in seen:
             _append_warning(warnings, "ENTITY_DUPLICATE_MENTION", "同一 type+mention 在 chunk 内重复，已去重", path)
             continue
         seen.add(key)
@@ -1279,84 +898,13 @@ def bind_entity_evidence(
     manager: ChunkContextManager,
     *,
     chunk_ids: Iterable[str] | None = None,
-    source_chunk: ExtractionChunk | None = None,
 ) -> list[dict[str, Any]]:
-    # Preserve the selected table row across repeated values and reconstructed
-    # windows. Global first-quote matching can otherwise change its provenance.
-    verified_spans: dict[int, dict[str, Any]] = {}
-    if source_chunk is not None:
-        original_chunk = manager.get_chunk(source_chunk.chunk_id)
-        for index, entity in enumerate(entities):
-            span = table_source_span(source_chunk, original_chunk, entity)
-            if span is not None:
-                start, end = span
-                verified_spans[index] = Evidence(
-                    span_id=f"{original_chunk.chunk_id}:{start}:{end}", source_block_ids=[original_chunk.chunk_id],
-                    quote=original_chunk.text[start:end], start_char=start, end_char=end, evidence_type="explicit",
-                ).to_dict()
     bound = bind_evidence(
         {"entities": entities, "relations": []},
         manager,
         chunk_ids=chunk_ids,
     )
-    for index, evidence in verified_spans.items():
-        bound["entities"][index]["evidence"] = evidence
     return bound.get("entities", [])
-
-
-def _deterministic_relation_quote(
-    pair: dict[str, Any],
-    pool: Any,
-    manager: ChunkContextManager,
-    chunk_id: str,
-) -> Evidence | None:
-    """Ground a Jev-accepted pair to a literal window covering both endpoints."""
-    accepted = getattr(pool, "accepted_entities", None)
-    entities = {entity.candidate_id: entity for entity in (accepted() if callable(accepted) else [])}
-    spans: list[tuple[int, int]] = []
-    for candidate_id, name in (
-        (pair.get("source_id"), pair.get("source_name")),
-        (pair.get("target_id"), pair.get("target_name")),
-    ):
-        entity = entities.get(str(candidate_id or ""))
-        for evidence in getattr(entity, "evidence", ()) or ():
-            if chunk_id not in (getattr(evidence, "source_block_ids", None) or []):
-                continue
-            start = getattr(evidence, "start_char", None)
-            end = getattr(evidence, "end_char", None)
-            if start is not None and end is not None and int(end) > int(start):
-                spans.append((int(start), int(end)))
-                continue
-            quote = str(getattr(evidence, "quote", "") or "")
-            located = locate_quote(manager, quote, chunk_ids=(chunk_id,)) if quote else None
-            if (
-                located is not None
-                and located.start_char is not None
-                and located.end_char is not None
-            ):
-                spans.append((int(located.start_char), int(located.end_char)))
-        if name:
-            found = manager.find_span(chunk_id, str(name))
-            if found is not None:
-                spans.append(found)
-    if not spans:
-        return None
-    quote = manager.evidence_text(
-        chunk_id,
-        min(item[0] for item in spans),
-        max(item[1] for item in spans),
-    )
-    if not quote.strip():
-        return None
-    return locate_quote(manager, quote, chunk_ids=(chunk_id,))
-
-
-def _llm_relation_pairs(pairs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Drop Jev diagnostic keys before the LLM pair schema sees the batch."""
-    cleaned: list[dict[str, Any]] = []
-    for pair in pairs:
-        cleaned.append({key: value for key, value in pair.items() if key != "judgment"})
-    return cleaned
 
 
 def bind_relation_evidence(
@@ -1388,7 +936,6 @@ def entity_pass(
     llm: Any,
     *,
     route: DocumentRoute,
-    route_map: dict[str, DocumentRoute] | None = None,
     max_workers: int,
     use_scheduler: bool,
     attempts: list[dict[str, Any]],
@@ -1397,7 +944,6 @@ def entity_pass(
     local_next: int,
     same_section: bool,
     known_entities: list[dict[str, Any]] | None = None,
-    structure_hint: str = "",
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
     call_metrics: list[dict[str, Any]] | None = None,
@@ -1427,27 +973,12 @@ def entity_pass(
                 local_warnings.extend(part_warnings)
                 local_call_metrics.extend(part_metrics)
                 merged_entities.extend(part_entities)
-            if any((part.metadata or {}).get("table_blocks_split") for _, part in row_parts):
-                _append_warning(
-                    local_warnings,
-                    "ENTITY_TABLE_SPLIT_BY_BLOCKS",
-                    f"包含多个 JSON 表格的切片已拆为 {len(row_parts)} 个独立表格",
-                    chunk.chunk_id,
-                )
-            elif len(row_parts) == 1:
-                _append_warning(
-                    local_warnings,
-                    "ENTITY_TABLE_OVERSIZED_ATOMIC",
-                    "表格的列定义或单行内容已超过字符预算，无法无损继续拆分，已保持完整并单独抽取",
-                    chunk.chunk_id,
-                )
-            else:
-                _append_warning(
-                    local_warnings,
-                    "ENTITY_TABLE_SPLIT_BY_ROWS",
-                    f"表格切片按行拆为 {len(row_parts)} 个子表",
-                    chunk.chunk_id,
-                )
+            _append_warning(
+                local_warnings,
+                "ENTITY_TABLE_SPLIT_BY_ROWS",
+                f"表格切片按行拆为 {len(row_parts)} 个子表",
+                chunk.chunk_id,
+            )
             return chunk.chunk_id, merged_entities, local_attempts, local_warnings, local_call_metrics
         neighbors = [
             item
@@ -1459,256 +990,116 @@ def entity_pass(
             )
             if item.chunk_id != chunk.chunk_id
         ]
-        allowed_entity_types = official_entity_types(
-            plan, chunk, table_entity_types(plan, chunk), (route_map or {}).get(chunk.chunk_id, route)
+        scoped_known_entities = relation_catalog_for_context(
+            known_entities or [],
+            chunk,
+            neighbors,
         )
-        if not allowed_entity_types:
-            _append_warning(
-                local_warnings,
-                "TABLE_NO_SUPPORTED_ENTITY_TYPES",
-                "表格没有支持本体规则语义的记录，且本体未开放其他事实类型，已跳过规则生成",
-                chunk.chunk_id,
-            )
-            return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
-        output_schema = output_schema_for_types(plan, "entity_candidates", allowed_entity_types)
+        output_schema = output_schema_for_types(
+            plan,
+            "entity_candidates",
+            plan.relevant_types(chunk.text),
+        )
+        messages = build_chat_messages(
+            task="entity",
+            plan=plan,
+            route=route,
+            chunk=chunk,
+            local_context="\n".join(item.text for item in neighbors),
+            known_entities=scoped_known_entities,
+            output_schema=output_schema,
+        )
         retry_empty = bool(_looks_like_record_table(chunk) and _is_deepseek_llm(llm))
-
-        def extract_once(
-            target: ExtractionChunk,
-            *,
-            label: str,
-            max_attempts: int,
-            return_recovered: bool = False,
-        ) -> tuple[
-            list[dict[str, Any]],
-            bool,
-            list[dict[str, Any]],
-            list[dict[str, Any]],
-            list[dict[str, Any]],
-        ]:
-            """对 target（可能是原 chunk 或 segment）做一次实体 pass 并完成证据绑定/校验。"""
-            scoped_known = relation_catalog_for_context(known_entities or [], target, neighbors)
-            messages = build_chat_messages(
-                task="entity",
-                plan=plan,
-                route=(route_map or {}).get(target.chunk_id, route),
-                chunk=target,
-                local_context="\n".join(item.text for item in neighbors),
-                known_entities=scoped_known,
-                output_schema=output_schema,
-                structure_hint=structure_hint,
-            )
-            target_attempts: list[dict[str, Any]] = []
-            target_warnings: list[dict[str, Any]] = []
-            target_metrics: list[dict[str, Any]] = []
-            parsed = generate_structured(
-                llm,
-                messages,
-                output_schema,
-                use_scheduler=use_scheduler,
-                attempts=target_attempts,
-                pass_name="entity",
-                chunk_id=label,
-                max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds,
-                call_metrics=target_metrics,
-                retry_empty_collection=retry_empty,
-                return_recovered_on_failure=return_recovered,
-            )
-            if parsed is None:
-                return [], False, target_attempts, target_warnings, target_metrics
-            entities = _normalize_span_entities(
-                parsed,
-                chunk=target,
-                schema=schema,
-                target_types=sorted(allowed_entity_types),
-                warnings=target_warnings,
-                deduplicate=False,
-            )
-            for entity in entities:
-                if entity.get("type") not in allowed_entity_types:
-                    _append_warning(
-                        target_warnings, "ENTITY_OUT_OF_SCOPE",
-                        "实体类型未通过当前表格语义范围校验，候选已拒绝",
-                        target.chunk_id, entity.get("type"),
-                    )
-            entities = [entity for entity in entities if entity.get("type") in allowed_entity_types]
-            table_decision = analyze_table_semantics(plan, target)
-            scoped_entities = []
-            for entity in entities:
-                if rule_candidate_in_scope(target, table_decision, entity):
-                    scoped_entities.append(entity)
-                else:
-                    _append_warning(
-                        target_warnings, "RULE_TABLE_ROW_OUT_OF_SCOPE",
-                        "规则候选证据未落在自动判定允许的记录行，候选已拒绝",
-                        target.chunk_id, entity.get("name"),
-                    )
-            bound_entities = bind_entity_evidence(
-                scoped_entities,
-                manager,
-                chunk_ids=(target.chunk_id,),
-                source_chunk=target,
-            )
-            grounded_entities: list[dict[str, Any]] = []
-            seen_entities: set[tuple[str, str]] = set()
-            original_chunk = manager.get_chunk(target.chunk_id)
-            original_decision = analyze_table_semantics(plan, original_chunk)
-            for index, entity in enumerate(bound_entities):
-                if not rule_candidate_in_scope(original_chunk, original_decision, entity):
-                    _append_warning(
-                        target_warnings, "RULE_TABLE_ROW_OUT_OF_SCOPE",
-                        "绑定后的原文证据未落在允许的规则记录行，候选已拒绝",
-                        target.chunk_id, entity.get("name"),
-                    )
-                    continue
-                verdicts = verify_evidence({"entities": [entity], "relations": []}, manager)
-                if verdicts and all(verdict.status == "ok" for verdict in verdicts):
-                    key = (entity["type"], entity["name"])
-                    if key not in seen_entities:
-                        grounded_entities.append(entity)
-                        seen_entities.add(key)
-                    continue
-                evidence = entity.get("evidence") or {}
-                _append_warning(
-                    target_warnings,
-                    "ENTITY_EVIDENCE_REJECTED",
-                    "实体 evidence 未通过 source/span/quote 一致性校验，候选已拒绝",
-                    f"{target.chunk_id}.entities[{index}].evidence",
-                    evidence.get("quote"),
-                )
-            return grounded_entities, True, target_attempts, target_warnings, target_metrics
-
-        def segment_chunk(target: ExtractionChunk, start: int, end: int) -> ExtractionChunk:
-            metadata = dict(target.metadata or {})
-            metadata["entity_segment_start"] = start
-            metadata["entity_segment_end"] = end
-            return ExtractionChunk(
-                chunk_id=target.chunk_id,
-                text=target.text[start:end],
-                document_id=target.document_id,
-                section_id=target.section_id,
-                section_title=target.section_title,
-                clause_number=target.clause_number,
-                page_no=target.page_no,
-                start_offset=target.start_offset,
-                end_offset=target.end_offset,
-                parent_chunk_id=target.parent_chunk_id,
-                previous_chunk_id=target.previous_chunk_id,
-                next_chunk_id=target.next_chunk_id,
-                metadata=metadata,
-            )
-
-        def run_focus(target: ExtractionChunk, depth: int, label: str) -> list[dict[str, Any]]:
-            """先按 segment 调用；仍截断则二分下切，最后用前缀恢复兜底。"""
-            entities, parsed_ok, atts, warns, mets = extract_once(
-                target, label=label, max_attempts=1 if depth > 0 else 2
-            )
-            local_attempts.extend(atts)
-            local_warnings.extend(warns)
-            local_call_metrics.extend(mets)
-            if parsed_ok:
-                return entities
-            text = target.text or ""
-            if depth < ENTITY_SEGMENT_MAX_DEPTH and len(text) > ENTITY_SEGMENT_MIN_CHARS:
-                split_at = text.rfind("\n", 0, max(1, len(text) // 2))
-                if split_at <= 0:
-                    split_at = max(1, len(text) // 2)
-                overlap = min(ENTITY_SEGMENT_OVERLAP, max(0, split_at // 4))
-                second_start = max(0, split_at + 1 - overlap)
-                ranges = [(0, min(len(text), split_at + 1))]
-                if second_start < len(text):
-                    ranges.append((second_start, len(text)))
-                _append_warning(
-                    local_warnings,
-                    "ENTITY_SEGMENT_RETRY",
-                    f"分段调用仍被截断，二分下切 depth={depth + 1}",
-                    target.chunk_id,
-                )
-                merged: list[dict[str, Any]] = []
-                for index, (start, end) in enumerate(ranges):
-                    if end - start < 40:
-                        continue
-                    child = segment_chunk(target, start, end)
-                    merged.extend(run_focus(child, depth + 1, f"{label}.s{index}"))
-                return merged
-            recovered, _recovered_ok, atts2, warns2, mets2 = extract_once(
-                target, label=f"{label}.recover", max_attempts=1, return_recovered=True
-            )
-            local_attempts.extend(atts2)
-            local_warnings.extend(warns2)
-            local_call_metrics.extend(mets2)
-            if recovered:
-                _append_warning(
-                    local_warnings,
-                    "ENTITY_RECOVERED_PREFIX",
-                    f"截断后使用前缀恢复候选 {len(recovered)} 条",
-                    target.chunk_id,
-                )
-            return recovered
-
-        full_entities, primary_ok, primary_attempts, primary_warnings, primary_metrics = extract_once(
-            chunk, label=chunk.chunk_id, max_attempts=1
+        parsed = generate_structured(
+            llm,
+            messages,
+            output_schema,
+            use_scheduler=use_scheduler,
+            attempts=local_attempts,
+            pass_name="entity",
+            chunk_id=chunk.chunk_id,
+            max_attempts=max(max_attempts, 4) if retry_empty else max_attempts,
+            retry_base_seconds=retry_base_seconds,
+            call_metrics=local_call_metrics,
+            retry_empty_collection=retry_empty,
         )
-        local_attempts.extend(primary_attempts)
-        local_warnings.extend(primary_warnings)
-        local_call_metrics.extend(primary_metrics)
-        if not primary_ok:
-            terminal_type = ""
-            for item in reversed(primary_attempts):
-                if item.get("terminal"):
-                    terminal_type = str(item.get("type") or "")
-                    break
-            segment_ranges = _entity_segment_ranges(
-                chunk.text or "",
-                ENTITY_SEGMENT_TARGET_CHARS,
-                ENTITY_SEGMENT_MIN_CHARS,
-                ENTITY_SEGMENT_OVERLAP,
-            )
-            if len(segment_ranges) > 1:
+        if parsed is None:
+            return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
+        entities = _normalize_span_entities(
+            parsed,
+            chunk=chunk,
+            schema=schema,
+            target_types=request.target_types,
+            warnings=local_warnings,
+        )
+        bound_entities = bind_entity_evidence(
+            entities,
+            manager,
+            chunk_ids=(chunk.chunk_id,),
+        )
+        grounded_entities: list[dict[str, Any]] = []
+        unverified_entities: list[dict[str, Any]] = []
+        for index, entity in enumerate(bound_entities):
+            evidence = entity.get("evidence") or {}
+            source_ids = set(evidence.get("source_block_ids") or [])
+            if evidence.get("span_id") and chunk.chunk_id in source_ids:
+                grounded_entities.append(entity)
+                continue
+            quote = str(evidence.get("quote") or "")
+            outside_chunk = bool(quote and locate_quote(manager, quote) is not None)
+            if semantic_support(chunk.text, [str(entity.get("name") or ""), quote]):
                 _append_warning(
                     local_warnings,
-                    "ENTITY_SEGMENTED",
-                    f"整块调用失败（{terminal_type or 'unknown'}），改为 {len(segment_ranges)} 段分段输出后组装",
-                    chunk.chunk_id,
+                    "ENTITY_EVIDENCE_SEMANTIC",
+                    "实体证据未逐字定位，语义比对通过",
+                    f"{chunk.chunk_id}.entities[{index}].evidence",
+                    quote,
                 )
-                merged: list[dict[str, Any]] = []
-                seen: set[tuple[str, str]] = set()
-                for index, (start, end) in enumerate(segment_ranges):
-                    child = segment_chunk(chunk, start, end)
-                    part_entities = run_focus(child, 1, f"{chunk.chunk_id}#seg{index}")
-                    for entity in part_entities:
-                        key = (entity.get("type"), entity.get("name"))
-                        if key in seen:
-                            _append_warning(
-                                local_warnings,
-                                "ENTITY_SEGMENT_MERGED",
-                                "跨段重复实体已合并",
-                                chunk.chunk_id,
-                                entity.get("name"),
-                            )
-                            continue
-                        seen.add(key)
-                        merged.append(entity)
-                full_entities = merged
             else:
-                recovered, _ok, atts2, warns2, mets2 = extract_once(
-                    chunk, label=f"{chunk.chunk_id}.recover", max_attempts=1, return_recovered=True
+                unverified_entities.append({"index": index, "entity": entity, "quote": quote})
+            # 实体永不因证据未逐字定位而丢弃；不一致项交给 LLM 核验并留痕。
+            grounded_entities.append(entity)
+        if unverified_entities:
+            verdicts = verify_items_with_llm(
+                llm,
+                chunk=chunk,
+                items=[
+                    {
+                        "item_id": f"{chunk.chunk_id}:entity[{item['index']}]",
+                        "kind": "entity",
+                        "type": str(item["entity"].get("type") or ""),
+                        "mention": str(item["entity"].get("name") or ""),
+                        "evidence_quote": item["quote"],
+                    }
+                    for item in unverified_entities
+                ],
+                pass_name="evidence_verification",
+                chunk_id=chunk.chunk_id,
+                use_scheduler=use_scheduler,
+                attempts=local_attempts,
+                max_attempts=min(2, max(1, max_attempts)),
+                retry_base_seconds=retry_base_seconds,
+                call_metrics=local_call_metrics,
+                record_table=_looks_like_record_table(chunk),
+            )
+            for item in unverified_entities:
+                verdict = verdicts.get(f"{chunk.chunk_id}:entity[{item['index']}]", "uncertain")
+                if verdict == "yes":
+                    code, message = "ENTITY_EVIDENCE_LLM_VERIFIED", "语义比对不一致，大模型核验确认属于原文"
+                elif verdict == "no":
+                    code, message = "ENTITY_EVIDENCE_LLM_UNSUPPORTED", "语义比对不一致，大模型核验认为不属于原文，保留并标记"
+                else:
+                    code, message = "ENTITY_EVIDENCE_UNVERIFIED", "语义比对不一致，大模型核验不确定，保留并标记"
+                _append_warning(
+                    local_warnings,
+                    code,
+                    message,
+                    f"{chunk.chunk_id}.entities[{item['index']}].evidence",
+                    item["quote"],
                 )
-                local_attempts.extend(atts2)
-                local_warnings.extend(warns2)
-                local_call_metrics.extend(mets2)
-                if recovered:
-                    _append_warning(
-                        local_warnings,
-                        "ENTITY_RECOVERED_PREFIX",
-                        f"整块截断且无法分段，使用前缀恢复候选 {len(recovered)} 条",
-                        chunk.chunk_id,
-                    )
-                full_entities = recovered
         return (
             chunk.chunk_id,
-            full_entities,
+            grounded_entities,
             local_attempts,
             local_warnings,
             local_call_metrics,
@@ -1738,7 +1129,6 @@ def relation_pass(
     pool: Any,
     *,
     route: DocumentRoute,
-    route_map: dict[str, DocumentRoute] | None = None,
     max_workers: int,
     use_scheduler: bool,
     attempts: list[dict[str, Any]],
@@ -1746,120 +1136,13 @@ def relation_pass(
     local_previous: int,
     local_next: int,
     same_section: bool,
-    structure_hint: str = "",
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
     call_metrics: list[dict[str, Any]] | None = None,
 ) -> list[tuple[str, list[dict[str, Any]]]]:
-    """Generate raw relation candidates from bounded same-document windows."""
+    """Generate raw relation candidates; acceptance stays globally ordered."""
     chunks = list(request.chunks)
     catalog = pool.entity_catalog()
-    entity_objects = pool.accepted_entities()
-    context_ids_by_chunk: dict[str, tuple[str, ...]] = {}
-    for chunk in chunks:
-        document_id = (chunk.document_id or "").strip()
-        # Relation extraction treats an absent document_id as its own explicit
-        # group instead of the manager's compatibility wildcard.  This keeps a
-        # mixed known/unknown multi-document request from creating cross-doc
-        # relation windows.
-        context_ids_by_chunk[chunk.chunk_id] = tuple(
-            item.chunk_id
-            for item in manager.local_context(
-                chunk.chunk_id,
-                previous=local_previous,
-                next=local_next,
-                same_section=same_section,
-            )
-            if (item.document_id or "").strip() == document_id
-        )
-    entity_chunk_ids: dict[str, set[str]] = {}
-    for entity in entity_objects:
-        evidenced = {
-            block_id
-            for evidence in entity.evidence
-            for block_id in evidence.source_block_ids
-            if manager.has_chunk(block_id)
-        }
-        normalized_name = canonical_name(entity.name)
-        if normalized_name:
-            evidenced.update(
-                chunk.chunk_id
-                for chunk in chunks
-                if normalized_name in canonical_name(chunk.text)
-            )
-        entity_chunk_ids[entity.candidate_id] = evidenced
-    anchor_ids = {
-        entity.candidate_id
-        for entity in entity_objects
-        if entity.source == "document_anchor"
-    }
-
-    def anchors_for(chunk_id: str) -> set[str]:
-        """Keep document anchors inside their evidenced document when known."""
-        chunk = manager.get_chunk(chunk_id)
-        document_id = (chunk.document_id or "").strip()
-        scoped: set[str] = set()
-        for anchor_id in anchor_ids:
-            evidence_docs = {
-                (manager.get_chunk(block_id).document_id or "").strip()
-                for block_id in entity_chunk_ids.get(anchor_id, set())
-                if manager.has_chunk(block_id)
-            }
-            known_evidence_docs = evidence_docs - {""}
-            if document_id:
-                accepted = not known_evidence_docs or document_id in known_evidence_docs
-            else:
-                accepted = not known_evidence_docs
-            if accepted:
-                scoped.add(anchor_id)
-        return scoped
-
-    permitted_by_chunk: dict[str, set[str]] = {}
-    for chunk in chunks:
-        window_ids = set(context_ids_by_chunk[chunk.chunk_id])
-        window_entities = {
-            entity_id
-            for entity_id, evidence_ids in entity_chunk_ids.items()
-            if evidence_ids.intersection(window_ids)
-        }
-        permitted_by_chunk[chunk.chunk_id] = window_entities | anchors_for(chunk.chunk_id)
-
-    anchor_types = {
-        canonical_name(entity.canonical_type)
-        for entity in entity_objects
-        if entity.candidate_id in anchor_ids
-    }
-    owned_pairs_by_chunk: dict[str, list[dict[str, Any]]] = {
-        chunk.chunk_id: [] for chunk in chunks
-    }
-    assigned_pair_ids: set[str] = set()
-    for candidate_chunk in chunks:
-        permitted = permitted_by_chunk[candidate_chunk.chunk_id]
-        permitted_objects = [
-            entity for entity in entity_objects
-            if entity.candidate_id in permitted
-        ]
-        for pair in enumerate_relation_pairs(plan, permitted_objects):
-            pair_id = str(pair.get("pair_id") or "")
-            if not pair_id or pair_id in assigned_pair_ids:
-                continue
-            if (
-                canonical_name(pair["source_type"]) in anchor_types
-                and pair["source_id"] not in anchor_ids
-            ):
-                continue
-            source_id = str(pair.get("source_id") or "")
-            target_id = str(pair.get("target_id") or "")
-            non_anchor_ids = {source_id, target_id} - anchor_ids
-            # Anchor-to-entity relations belong to a chunk where the business
-            # endpoint is actually mentioned, not merely a preceding window.
-            if len(non_anchor_ids) == 1 and not any(
-                candidate_chunk.chunk_id in entity_chunk_ids.get(entity_id, set())
-                for entity_id in non_anchor_ids
-            ):
-                continue
-            assigned_pair_ids.add(pair_id)
-            owned_pairs_by_chunk[candidate_chunk.chunk_id].append(pair)
 
     def run(chunk: ExtractionChunk) -> tuple[
         str,
@@ -1871,13 +1154,38 @@ def relation_pass(
         local_attempts: list[dict[str, Any]] = []
         local_warnings: list[dict[str, Any]] = []
         local_call_metrics: list[dict[str, Any]] = []
-        window_chunk_ids = context_ids_by_chunk[chunk.chunk_id]
         neighbors = [
-            manager.get_chunk(chunk_id)
-            for chunk_id in window_chunk_ids
-            if chunk_id != chunk.chunk_id
+            item
+            for item in manager.local_context(
+                chunk.chunk_id,
+                previous=local_previous,
+                next=local_next,
+                same_section=same_section,
+            )
+            if item.chunk_id != chunk.chunk_id
         ]
-        permitted_ids = permitted_by_chunk[chunk.chunk_id]
+        entity_objects = pool.accepted_entities()
+        current_text = canonical_name(chunk.text)
+        current_ids = {
+            entity.candidate_id
+            for entity in entity_objects
+            if chunk.chunk_id
+            in {
+                block_id
+                for evidence in entity.evidence
+                for block_id in evidence.source_block_ids
+            }
+            or (
+                canonical_name(entity.name)
+                and canonical_name(entity.name) in current_text
+            )
+        }
+        anchor_ids = {
+            entity.candidate_id
+            for entity in entity_objects
+            if entity.source == "document_anchor"
+        }
+        permitted_ids = current_ids | anchor_ids
         local_catalog = [
             entry
             for entry in catalog
@@ -1885,89 +1193,56 @@ def relation_pass(
         ]
         if not local_catalog:
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
-        # Ownership was precomputed once in stable chunk order.  Workers only
-        # consume their immutable slice, avoiding repeated O(chunks) scans.
-        pairs = owned_pairs_by_chunk[chunk.chunk_id]
+        # Enumerate only among entities permitted for this chunk; pairs outside
+        # this set are dropped by the filters below anyway.
+        permitted_objects = [
+            entity for entity in entity_objects
+            if entity.candidate_id in permitted_ids
+        ]
+        pairs = enumerate_relation_pairs(plan, permitted_objects)
+        anchor_types = {
+            canonical_name(entity.canonical_type)
+            for entity in entity_objects
+            if entity.candidate_id in anchor_ids
+        }
+        # Metadata visible on the current document belongs only to its primary
+        # anchor.  Normative-reference documents are targets of citations, not
+        # alternate owners of the current cover metadata.
+        pairs = [
+            pair
+            for pair in pairs
+            if canonical_name(pair["source_type"]) not in anchor_types
+            or pair["source_id"] in anchor_ids
+        ]
+        # Relation evidence is required to be literal in the current chunk.
+        # Therefore both endpoints must be evidenced/mentioned here, except
+        # for the primary document anchor which may be implicit ("this
+        # document") in metadata and cross-section statements.
+        pairs = [
+            pair for pair in pairs
+            if pair["source_id"] in permitted_ids
+            and pair["target_id"] in permitted_ids
+            and (
+                pair["source_id"] in current_ids
+                or pair["target_id"] in current_ids
+            )
+        ]
         if not pairs:
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
         all_relations: list[dict[str, Any]] = []
-        accepted_pairs, rejected_pairs, gray_pairs = partition_relation_pairs(
-            pairs,
-            chunk_text=chunk.text,
-        )
-        for pair in rejected_pairs:
-            _append_warning(
-                local_warnings,
-                "JEV_RELATION_REJECTED",
-                "Jev 高置信判定当前 chunk 不支持该关系",
-                f"{chunk.chunk_id}.pairs.{pair.get('pair_id')}",
-                pair.get("judgment"),
-            )
-        llm_pairs: list[dict[str, Any]] = []
-        for pair in accepted_pairs:
-            evidence = _deterministic_relation_quote(pair, pool, manager, chunk.chunk_id)
-            if evidence is None:
-                llm_pairs.append(pair)
-                _append_warning(
-                    local_warnings,
-                    "JEV_RELATION_EVIDENCE_FALLBACK",
-                    "Jev 判定成立但无法确定性锚定 quote，回退 LLM",
-                    f"{chunk.chunk_id}.pairs.{pair.get('pair_id')}",
-                    pair.get("judgment"),
-                )
-                continue
-            _append_warning(
-                local_warnings,
-                "JEV_RELATION_ACCEPTED",
-                "Jev 高置信接受关系并由端点 span 锚定证据",
-                f"{chunk.chunk_id}.pairs.{pair.get('pair_id')}",
-                pair.get("judgment"),
-            )
-            all_relations.append({
-                "from_id": pair["source_id"],
-                "to_id": pair["target_id"],
-                "rel_type": pair["relation_id"],
-                "evidence": evidence.to_dict(),
-                "judgment": pair.get("judgment"),
-            })
-        llm_pairs.extend(gray_pairs)
-        chunk_route = (route_map or {}).get(chunk.chunk_id, route)
-        pair_batch_size = relation_pair_batch_size(llm)
-        pending_batches = [
-            (
-                _llm_relation_pairs(llm_pairs[offset : offset + pair_batch_size]),
-                f"{offset // pair_batch_size}",
-                0,
-            )
-            for offset in range(0, len(llm_pairs), pair_batch_size)
-        ]
-        if len(pending_batches) > RELATION_MAX_BATCHES:
-            _append_warning(
-                local_warnings,
-                "RELATION_BATCH_BUDGET",
-                f"关系批次超过上限 {RELATION_MAX_BATCHES}，本 chunk 仅处理前 {RELATION_MAX_BATCHES} 批",
-                chunk.chunk_id,
-                {"total_batches": len(pending_batches), "pair_count": len(llm_pairs)},
-            )
-            pending_batches = pending_batches[:RELATION_MAX_BATCHES]
-        while pending_batches:
-            pair_batch, batch_tag, split_depth = pending_batches.pop(0)
+        for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE):
+            pair_batch = pairs[offset : offset + RELATION_PAIR_BATCH_SIZE]
             output_schema = relation_pair_decision_schema(pair_batch)
             messages = build_chat_messages(
                 task="relation",
                 plan=plan,
-                route=chunk_route,
+                route=route,
                 chunk=chunk,
-                local_context="\n\n".join(
-                    f"[chunk_id={item.chunk_id}]\n{item.text}"
-                    for item in neighbors
-                )[:RELATION_CONTEXT_CHARS],
+                local_context="\n".join(item.text for item in neighbors),
                 known_entities=local_catalog,
                 output_schema=output_schema,
                 relation_pairs=pair_batch,
-                structure_hint=structure_hint,
             )
-            attempt_start = len(local_attempts)
             parsed = generate_structured(
                 llm,
                 messages,
@@ -1975,138 +1250,43 @@ def relation_pass(
                 use_scheduler=use_scheduler,
                 attempts=local_attempts,
                 pass_name="relation",
-                chunk_id=f"{chunk.chunk_id}.batch-{batch_tag}",
-                max_attempts=1,
+                chunk_id=f"{chunk.chunk_id}.batch-{offset // RELATION_PAIR_BATCH_SIZE}",
+                max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=local_call_metrics,
             )
             if parsed is None:
-                batch_attempts = local_attempts[attempt_start:]
-                terminal_type = str((batch_attempts[-1] if batch_attempts else {}).get("type") or "")
-                split_eligible = terminal_type in {"empty", "incomplete", "json", "schema"}
-                if (
-                    len(pair_batch) > 1
-                    and split_depth < RELATION_MAX_SPLIT_DEPTH
-                    and split_eligible
-                ):
-                    # The failed parent batch is recovered by an explicit
-                    # fallback path.  It must not remain a terminal run
-                    # failure when its child batches subsequently succeed.
-                    for attempt in batch_attempts:
-                        attempt["terminal"] = False
-                        attempt["recovered_by"] = "relation_batch_split"
-                    midpoint = len(pair_batch) // 2
-                    pending_batches[0:0] = [
-                        (pair_batch[:midpoint], f"{batch_tag}a", split_depth + 1),
-                        (pair_batch[midpoint:], f"{batch_tag}b", split_depth + 1),
-                    ]
-                    _append_warning(
-                        local_warnings,
-                        "RELATION_BATCH_SPLIT_RETRY",
-                        "关系批次多次生成失败，已拆分为更小批次重试",
-                        f"relation_batches[{batch_tag}]",
-                        {"pair_count": len(pair_batch)},
-                    )
-                else:
-                    pair_ids = [str(pair["pair_id"]) for pair in pair_batch]
-                    code = (
-                        "RELATION_PAIR_UNDECIDED"
-                        if len(pair_batch) == 1
-                        else "RELATION_BATCH_UNDECIDED"
-                    )
-                    _append_warning(
-                        local_warnings,
-                        code,
-                        "关系候选生成失败，未将缺失决策解释为 NONE",
-                        f"relation_batches[{batch_tag}]",
-                        {
-                            "failure_type": terminal_type or "unknown",
-                            "pair_ids": pair_ids,
-                            "split_depth": split_depth,
-                        },
-                    )
                 continue
             by_id = {pair["pair_id"]: pair for pair in pair_batch}
-            decisions = parsed.get("decisions")
-            if not isinstance(decisions, dict):
-                _append_warning(
-                    local_warnings,
-                    "INVALID_RELATION_DECISIONS",
-                    "关系决策必须是以 pair_id 为键的对象",
-                    "decisions",
-                )
-                continue
-            for pair_id, pair in by_id.items():
-                decision = decisions.get(pair_id)
+            seen_decisions: set[str] = set()
+            for index, decision in enumerate(parsed.get("decisions", [])):
                 if not isinstance(decision, dict):
-                    _append_warning(
-                        local_warnings,
-                        "MISSING_RELATION_PAIR_DECISION",
-                        "关系 pair 缺少明确决策，未将其解释为 NONE",
-                        f"decisions.{pair_id}",
-                        pair_id,
-                    )
+                    _append_warning(local_warnings, "INVALID_RELATION_DECISION", "关系决策必须是对象", f"decisions[{index}]")
                     continue
+                pair_id = str(decision.get("pair_id") or "")
+                pair = by_id.get(pair_id)
+                if pair is None:
+                    _append_warning(local_warnings, "UNKNOWN_RELATION_PAIR_ID", "关系决策引用未知 pair_id", f"decisions[{index}].pair_id", pair_id)
+                    continue
+                if pair_id in seen_decisions:
+                    _append_warning(local_warnings, "DUPLICATE_RELATION_PAIR_DECISION", "同一 pair 重复决策", f"decisions[{index}].pair_id", pair_id)
+                    continue
+                seen_decisions.add(pair_id)
                 label = str(decision.get("label") or "")
                 if label == "NONE":
                     continue
-                if label == "ABSTAIN":
-                    _append_warning(
-                        local_warnings,
-                        "RELATION_PAIR_ABSTAINED",
-                        "关系 pair 因证据不足或指代歧义主动弃权，未解释为 NONE",
-                        f"decisions.{pair_id}.label",
-                        {
-                            "pair_id": pair_id,
-                            "from_id": pair["source_id"],
-                            "to_id": pair["target_id"],
-                            "rel_type": pair["relation_id"],
-                        },
-                    )
-                    continue
                 if label != pair["relation_id"]:
-                    _append_warning(local_warnings, "RELATION_PAIR_SIGNATURE_MISMATCH", "关系标签不符合 pair 本体签名", f"decisions.{pair_id}.label", label)
+                    _append_warning(local_warnings, "RELATION_PAIR_SIGNATURE_MISMATCH", "关系标签不符合 pair 本体签名", f"decisions[{index}].label", label)
                     continue
-                evidence = bind_relation_evidence(
-                    decision,
-                    manager,
-                    chunk_ids=window_chunk_ids,
-                )
+                evidence = bind_relation_evidence(decision, manager, chunk_ids=(chunk.chunk_id,))
                 if evidence is None:
                     quote = str((decision.get("evidence") or {}).get("quote") or "")
-                    _append_warning(local_warnings, "RELATION_EVIDENCE_INVALID", "关系 evidence 无法在有界上下文窗口定位", f"decisions.{pair_id}.evidence", quote)
+                    _append_warning(local_warnings, "RELATION_EVIDENCE_INVALID", "关系 evidence 无法在当前 chunk 定位", f"decisions[{index}].evidence", quote)
                     continue
                 all_relations.append({
                     "from_id": pair["source_id"], "to_id": pair["target_id"],
-                    "from_name": pair["source_name"], "to_name": pair["target_name"],
                     "rel_type": label, "evidence": evidence.to_dict(),
-                    "judgment": {"source": "llm_thinking" if thinking_enabled_for(llm, "relation") else "llm"},
                 })
-        if all_relations:
-            relations_by_evidence_chunk: dict[str, list[dict[str, Any]]] = {}
-            for relation in all_relations:
-                source_ids = list((relation.get("evidence") or {}).get("source_block_ids") or [])
-                evidence_chunk_id = source_ids[0] if source_ids else chunk.chunk_id
-                relations_by_evidence_chunk.setdefault(evidence_chunk_id, []).append(relation)
-            all_relations = []
-            for evidence_chunk_id, chunk_relations in relations_by_evidence_chunk.items():
-                all_relations.extend(verify_relation_claims(
-                    llm,
-                    chunk=manager.get_chunk(evidence_chunk_id),
-                    relations=chunk_relations,
-                    entity_catalog=local_catalog,
-                    pass_name="relation_evidence_verification",
-                    chunk_id=evidence_chunk_id,
-                    use_scheduler=use_scheduler,
-                    attempts=local_attempts,
-                    warnings=local_warnings,
-                    max_attempts=max_attempts,
-                    retry_base_seconds=retry_base_seconds,
-                    call_metrics=local_call_metrics,
-                ))
-            for relation in all_relations:
-                relation.pop("from_name", None)
-                relation.pop("to_name", None)
         return chunk.chunk_id, all_relations, local_attempts, local_warnings, local_call_metrics
 
     worker_count = max(1, max_workers)
@@ -2174,8 +1354,6 @@ __all__ = [
     "generate_structured",
     "output_schema_for_types",
     "relation_catalog_for_context",
-    "relation_pair_batch_size",
     "relation_pair_decision_schema",
     "relation_pass",
-    "verify_relation_claims",
 ]
