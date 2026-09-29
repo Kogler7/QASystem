@@ -1,5 +1,5 @@
 # knowledge_extract_v2 官方 benchmark 本地直连评测所需核心依赖
-# 安装方式：setup_conda_eval_env.bat
+# 安装方式：pip install -r algorithm/knowledge_extract_v2/requirements_benchmark.txt
 # Python 版本：建议 3.10 或 3.11
 
 # LLM 抽取（OpenAI 兼容接口）

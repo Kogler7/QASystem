@@ -4,7 +4,7 @@
 
 默认连 `http://127.0.0.1:8006`。机器上 Backend 已在跑时，拷走本目录即可评测。
 
-抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`v2` 默认 / `v3`）：后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；切换版本只需改 Backend 环境并重启，再跑同一套评测即可对比。
+抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3`）：默认 `latest` 会自动解析为当前最新版本（当前为 v3）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2` 或 `v3`，再跑同一套评测即可对比。
 
 ## 做了什么
 
@@ -85,16 +85,18 @@ python3 offline_ingestion/run.py offline_ingestion/公文/关于开展OpenClaw�
 
 **对比抽取算法版本（v2/v3）**
 
+默认 `KG_EXTRACT_ALGO_VERSION=latest` 跑的是当前最新版本（v3）。要对比 v2/v3，先显式固定 Backend 环境：
+
 ```bash
-# 1. Backend 用当前版本（默认 v2），先冻结切片
-./offline_ingestion/run.sh 标准 --mode chunk-extract
+# 1. 固定 Backend 环境为 v2，先冻结切片
+KG_EXTRACT_ALGO_VERSION=v2 ./offline_ingestion/run.sh 标准 --mode chunk-extract
 #    记下运行目录 _runs/<时间戳>
 
-# 2. 改 Backend 环境 KG_EXTRACT_ALGO_VERSION=v3 并重启，然后只重跑抽取：
-./offline_ingestion/run.sh 标准 --mode extract --from-run <时间戳>
+# 2. 改 Backend 环境为 v3，然后只重跑抽取（喂入完全相同的切片）：
+KG_EXTRACT_ALGO_VERSION=v3 ./offline_ingestion/run.sh 标准 --mode extract --from-run <时间戳>
 ```
 
-两次喂入的切片完全相同，分数差只来自算法版本。每次运行的 `summary.json` 会记录服务端回报的 `extract_versions`。
+两次切片完全相同，分数差只来自算法版本。每次运行的 `summary.json` 会记录服务端回报的 `extract_versions`。
 
 ---
 

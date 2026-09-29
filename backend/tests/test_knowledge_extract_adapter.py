@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from algorithm.knowledge_extract_version import get_extract_version
+from algorithm.knowledge_extract.version import LATEST, get_extract_version, get_extract_version_label
 from backend.app.schemas import TextChunk
 from backend.app.services import algorithm_capabilities as capabilities
 from backend.app.services import knowledge_extract_adapter as adapter
@@ -147,7 +147,8 @@ def test_graph_service_forwards_ranges_and_metadata(monkeypatch):
 
 
 def test_partial_verification_quality_reaches_public_batch_contract(monkeypatch):
-    monkeypatch.delenv("KG_EXTRACT_ALGO_VERSION", raising=False)
+    # 固定 v2，验证 V2 部分失败场景下的 quality 契约不受 latest 默认影响
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v2")
 
     def partial_runner(**_kwargs):
         return {
@@ -418,8 +419,15 @@ def test_relationship_evidence_controls_projection_and_closure_context():
     }
 
 
-def test_extract_version_defaults_to_v2(monkeypatch):
+def test_extract_version_defaults_to_latest_and_resolves_to_v3(monkeypatch):
     monkeypatch.delenv("KG_EXTRACT_ALGO_VERSION", raising=False)
+    assert get_extract_version_label() == "latest"
+    assert get_extract_version() == "v3"
+
+
+def test_extract_version_label_can_be_pinned(monkeypatch):
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v2")
+    assert get_extract_version_label() == "v2"
     assert get_extract_version() == "v2"
 
 
@@ -431,10 +439,6 @@ def test_extract_version_rejects_unknown_value(monkeypatch):
     with pytest.raises(ValueError, match="KG_EXTRACT_ALGO_VERSION"):
         adapter.extract_chunks("class Term", ["内容"])
 
-
-def test_default_runner_follows_configured_version():
-    assert adapter._default_runner("v3") is adapter._run_v3_aggregate
-    assert adapter._default_runner("v2") is not adapter._run_v3_aggregate
 
 
 def test_extract_chunks_stamps_extract_version_in_quality(monkeypatch):
@@ -452,7 +456,7 @@ def test_extract_chunks_stamps_extract_version_in_quality(monkeypatch):
     items = adapter.extract_chunks("class Term", ["内容"], runner=empty_runner)
 
     assert items[0]["error"] is None
-    assert items[0]["quality"]["extract_version"] == "v2"
+    assert items[0]["quality"]["extract_version"] == "v3"
 
 
 def _stub_v3_client(monkeypatch):
