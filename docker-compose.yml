@@ -57,6 +57,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - "${AGENT_BIND:-0.0.0.0}:${AGENT_HOST_PORT:-9180}:9180"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9180/health"]
       interval: 30s
