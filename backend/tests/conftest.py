@@ -123,8 +123,8 @@ def protocol_module():
         # Production extraction runs Knowledge Extract V2 through this adapter,
         # which would reach the LLM.  Protocol tests stay hermetic by stubbing
         # the adapter instead of the algorithm package.
-        "algorithm.knowledge_extract.adapter": _module(
-            "algorithm.knowledge_extract.adapter",
+        "backend.app.services.knowledge_extract_adapter": _module(
+            "backend.app.services.knowledge_extract_adapter",
             extract_chunks=lambda ontology, chunks, **_kwargs: [
                 {
                     "index": index,

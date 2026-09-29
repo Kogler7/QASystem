@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp_services import execution_bridge
 from mcp_services.result import ToolCode, tool_error, tool_success
 from mcp_services.runtime import mcp
 
 
 def _manager():
-    return execution_bridge.get_execution_manager()
+    from backend.app.execution.manager import get_execution_manager
+
+    return get_execution_manager()
 
 
 @mcp.tool(name="get_job")

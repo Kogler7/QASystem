@@ -58,7 +58,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "algorithm.knowledge_extract.v2",
+    "knowledge_extract_v2",
     PACKAGE_DIR,
     [
         "config",

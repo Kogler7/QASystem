@@ -7,7 +7,7 @@ import pytest
 from algorithm.knowledge_extract.version import LATEST, get_extract_version, get_extract_version_label
 from backend.app.schemas import TextChunk
 from backend.app.services import algorithm_capabilities as capabilities
-from algorithm.knowledge_extract import adapter
+from backend.app.services import knowledge_extract_adapter as adapter
 
 
 def test_embedded_attachment_projection_keeps_original_chunk_and_file_reference():

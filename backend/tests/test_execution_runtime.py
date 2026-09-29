@@ -269,10 +269,10 @@ def test_mcp_heavy_tool_can_return_durable_handle(monkeypatch):
                 "executions_url": "/api/v1/jobs/job-1/executions",
             }
 
-    import mcp_services.execution_bridge as execution_bridge
+    import backend.app.execution.manager as execution_manager
     from mcp_services.domains.visualization import charts
 
-    monkeypatch.setattr(execution_bridge, "get_execution_manager", lambda: FakeManager())
+    monkeypatch.setattr(execution_manager, "get_execution_manager", lambda: FakeManager())
     result = charts.draw_bar_chart(["A"], [1])
     assert result["code"] == 0
     assert result["data"]["accepted"] is True
@@ -307,9 +307,9 @@ def test_mcp_sync_mode_queues_but_preserves_original_tool_result(monkeypatch):
             assert job_id == "job-sync-mcp"
             return {"code": 0, "info": "图表生成成功", "data": {"path": "result.png"}}
 
-    import mcp_services.execution_bridge as execution_bridge
+    import backend.app.execution.manager as execution_manager
     from mcp_services.domains.visualization import charts
 
-    monkeypatch.setattr(execution_bridge, "get_execution_manager", lambda: FakeManager())
+    monkeypatch.setattr(execution_manager, "get_execution_manager", lambda: FakeManager())
     result = charts.draw_bar_chart(["A"], [1])
     assert result == {"code": 0, "info": "图表生成成功", "data": {"path": "result.png"}}
