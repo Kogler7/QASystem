@@ -93,7 +93,7 @@ Question
 
 ## 下一步
 
-1. 将旧系统 `algorithm/ans/mcp_servers/answer_generation/server1.py` 的图谱工具接入 `McpToolClient`。
-2. 将 `algorithm/intent_recognition_model/mcp/*` 接入意图、计划和 SQL 查询路径。
-3. 将 `algorithm/knowledge_extract/mcp_server.py` 接入图谱构建/更新路径。
+1. 将统一 MCP 层 `mcp_services/domains/graph/` 的图谱检索工具接入 `McpToolClient`。
+2. 将 `algorithm/intent_recognition_model/mcp/*`（draw / intent / plan / sql_search）接入意图、计划和 SQL 查询路径。
+3. 将知识抽取与沉淀能力（MCP `kg_extract_v2`，见 `mcp_services/domains/knowledge/extraction.py`）接入图谱构建/更新路径。
 4. 给前端增加证据路径展示：实体、关系、SQL、原文片段、置信度。

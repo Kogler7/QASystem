@@ -242,16 +242,22 @@ curl -X POST http://127.0.0.1:8006/api/knowledge/precipitation \
 }
 ```
 
+> 注意：`kg_extract_v2` 是共享入口，实际由 `KG_EXTRACT_ALGO_VERSION` 指定的
+> `knowledge_extract_v2` / `knowledge_extract_v3` 执行（见 `algorithm/knowledge_extract_version.py`）；
+> 本包仅在无本体时提供文本摘要能力。
+
 ### Python 调用
 
-```python
-from algorithm.knowledge_extract import extract_v2
+本包对外保留的调用是无本体文本摘要：
 
-result = extract_v2(
-    ontology=ontology_text,
-    text=document_text,
-)
+```python
+from algorithm.knowledge_extract import summarize_text
+
+summary = summarize_text(text=document_text)
 ```
+
+`extractor.py` 中的 `extract_v2` 是第一版内部的历史抽取器，已无生产调用方；
+新代码请使用 `knowledge_extract_v2` / `knowledge_extract_v3`。
 
 ## LLM 配置
 

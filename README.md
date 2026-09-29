@@ -64,7 +64,8 @@ QASystem 是一个**知识图谱驱动的问答/求解系统**：先把文档解
 按“入库”和“检索/求解”两条线组织：
 
 **入库线**：`preproc/`（文档→Markdown）→ `knowledge_pipeline/`（语义切片、向量存储）
-→ `knowledge_extract(_v2)/`（按本体抽取知识单元与关系）→ `embedding_runtime.py`（向量化）
+→ `knowledge_extract_v2/` 或 `knowledge_extract_v3/`（按本体抽取知识单元与关系，
+由 `KG_EXTRACT_ALGO_VERSION` 选择，默认 v2）→ `embedding_runtime.py`（向量化）
 → `external_services`（写入图谱/向量库）。
 
 **检索与求解线**：

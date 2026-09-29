@@ -184,9 +184,7 @@ intent/dataset
 test_docs/中车待抽取pdf/
 test_docs/抽取结果md/
 
-# 抽取算法相关
-algorithm/knowledge_extract_v2/benchmark/
-algorithm/knowledge_extract_v2/tests/
+# 抽取算法相关（tests/ 与 benchmark/ 已纳入版本控制，勿再加忽略规则）
 algorithm/knowledge_extract_v2/ontology_backups
 algorithm/knowledge_extract_v2/__pycache__
 algorithm/knowledge_extract_v2/algorithm_docs
@@ -196,6 +194,10 @@ algorithm/knowledge_extract_v2/algorithm_docs
 backend/data/execution/
 offline_ingestion/_runs/
 algorithm/knowledge_extract_v2/eval_results
+agent/image_result/
+agent/log/
+ofd_converter/target/
+/processed/
 
 # Agent工作流相关
 AGENT.md

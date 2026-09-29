@@ -4,7 +4,7 @@
 实体链接、SQL 取数与图表生成都在这里实现。MCP 工具与 HTTP 路由只做参数适配与编排，真正的逻辑在本目录。
 
 ```text
-入库线：preproc → knowledge_pipeline → knowledge_extract(_v2) → embedding_runtime → 外部写入
+入库线：preproc → knowledge_pipeline → knowledge_extract_v2 / _v3 → embedding_runtime → 外部写入
 检索线：ans/QA（空间定位 / 实体链接）→ data_access（取数）/ visualization（图表）
 支撑 ：term_vector（向量索引）、NL_to_cypher（切片与向量工具）、external_services（第三方接口）
 ```
@@ -17,8 +17,10 @@
 | --- | --- |
 | `preproc/` | 各类文档解析为 Markdown（PDF/图片/Word/Excel/HTML/OFD） |
 | `knowledge_pipeline/` | 语义切片、演示视图与向量存储编排 |
-| `knowledge_extract/` | 第一版知识抽取（本体驱动） |
-| `knowledge_extract_v2/` | 新版抽取与本体编译（当前主用） |
+| `knowledge_extract/` | 第一版知识抽取（本体驱动）；现承担契约/共享件与无本体摘要 |
+| `knowledge_extract_v2/` | 新版抽取与本体编译（当前主用，默认版本） |
+| `knowledge_extract_v3/` | 第三代抽取（独立重写），与 V2 二选一 |
+| `knowledge_extract_version.py` | 抽取版本开关：读取 `KG_EXTRACT_ALGO_VERSION`（`v2`/`v3`，默认 `v2`） |
 | `embedding_runtime.py` | 文本向量化运行时（本地模型 / 远程服务自动选择） |
 | `knowledge_precipitation.py` | 图谱沉淀总编排（解析→切片→抽取→向量化→入库） |
 | `term_vector/` | Term 语义向量索引的构建与检索 |
@@ -58,13 +60,13 @@
 
 ---
 
-## 4. `knowledge_extract/` 与 `knowledge_extract_v2/` —— 知识抽取
+## 4. `knowledge_extract/`、`knowledge_extract_v2/` 与 `knowledge_extract_v3/` —— 知识抽取
 
 ### 4.1 `knowledge_extract/`（第一版，仅保留文本摘要）
 
-> **抽取与图合并已全部由 4.2 的 V2 承担。** V1 的 `extractor.py` 里虽然还有一个叫 `extract_v2` 的函数，
-> 那是第一版内部的第二个抽取器，**与 4.2 的包无关**，目前没有任何生产调用方。
-> V1 只保留 V2 没有的能力：**无本体时的 `summarize_text` / `summarize_chunks`**，
+> **抽取与图合并已全部由 V2/V3 承担（版本选择见 4.3）。** V1 的 `extractor.py` 里虽然还有一个叫 `extract_v2` 的函数，
+> 那是第一版内部的第二个抽取器，**与 V2 的包无关**，目前没有任何生产调用方。
+> V1 只保留新版抽取没有的能力：**无本体时的 `summarize_text` / `summarize_chunks`**，
 > 两处调用分别在 MCP 的 `kg_extract_v2`（`mcp_services/domains/knowledge/extraction.py`）
 > 与沉淀流程的无本体分支（`backend/app/services/knowledge_precipitation.py`）。
 
@@ -76,23 +78,38 @@
 | `config.py` / `batch.py` / `scheduler.py` | 配置、批处理与限流调度 |
 | `uml/` | 本体定义（业务指标、数据模型、术语等） |
 
-### 4.2 `knowledge_extract_v2/`（当前主用）
+### 4.2 `knowledge_extract_v2/`（当前主用，默认版本）
 
 | 文件 | 作用 |
 | --- | --- |
-| `extractor.py` | 抽取主流程 |
-| `composite.py` / `split_extractor.py` | 复合/分片抽取 |
-| `standard_strategy.py` / `official_document_strategy.py` | 不同文档类型的抽取策略 |
-| `chunk_context.py` | 切片上下文组织 |
-| `coverage.py` / `evidence.py` / `mapping_scorer.py` | 抽取覆盖度、证据与映射打分 |
+| `harness_extractor.py` | 抽取主流程入口（包级 `extract` 由此导出） |
+| `orchestrator.py` | 有界的 Plan/Verify/Repair 定向修复循环 |
+| `composite.py` / `split_extractor.py` | 复合元素处理 / Entity-Relation 两轮拆分抽取 |
+| `standard_skeleton.py` / `standard_alignment.py` / `standard_requirements.py` / `standard_semantics.py` | 标准类文档：结构骨架、对齐与条款语义抽取 |
+| `official_structure.py` / `official_document_scope.py` / `official_attachments.py` | 公文类文档：结构抽取、来源边界与附件保留 |
+| `chunk_context.py` / `chunk_metadata.py` | 切片上下文契约与确定性元数据补全 |
+| `candidate_generation.py` / `candidate_models.py` / `candidate_selector.py` | 候选生成与本体感知的候选取舍 |
+| `evidence.py` / `semantic_evidence.py` / `table_evidence.py` / `coverage.py` / `mapping_scorer.py` | 证据绑定与核验、覆盖度与映射打分 |
 | `ontology_compiler.py` / `ontology_schema.py` | 本体编译与结构定义 |
-| `graph_assembler.py` / `graph_utils.py` | 图谱组装与工具 |
-| `llm_client.py` | 抽取用 LLM 客户端 |
+| `document_entities.py` / `structure_entities.py` / `property_enrichment.py` / `hierarchy.py` | 确定性实体抽取与属性/层级补全 |
+| `graph_assembler.py` / `graph_utils.py` / `entity_resolver.py` / `relation_resolver.py` | 图谱组装、实体/关系解析 |
+| `llm_client.py` / `prompt_router.py` / `jev_client.py` | 抽取用 LLM 客户端、提示词构建与裁判客户端 |
+| `result_contract.py` / `run_state.py` / `verification.py` | 对外结果契约、运行状态与最终校验 |
+| `structured_text.py` / `structured_output.py` / `table_semantics.py` | 结构化文本/表格处理与输出校验 |
 | `batch.py` / `scheduler.py` / `config.py` | 批处理、调度与配置 |
-| `benchmark/` | 逐步验证脚本（step2~step10）与评测 |
-| `tests/`、`uml/`、`docs/`、`simple/` | 测试、本体、说明文档与简化示例 |
+| `benchmark/` / `golden_task/` | 逐步验证脚本、评测与基准数据 |
+| `tests/` / `archive/` | 测试与归档代码 |
 
 > 抽取的产物是**知识单元与关系**，最终由 `embedding_runtime` 向量化、经外部接口写入图谱。
+
+### 4.3 `knowledge_extract_v3/` 与版本开关
+
+`knowledge_extract_v3/` 是第三代抽取实现（独立重写，入口为 `harness.py` 的 `extract_detailed`），
+与 V2 并行存在、互不改写。`knowledge_extract_version.py` 读取环境变量
+`KG_EXTRACT_ALGO_VERSION`（`v2` / `v3`，默认 `v2`）决定实际调用哪一版：
+Backend `graph.extract` 与 MCP `kg_extract_v2` 共用该开关，评测脚本借此对同一评测集
+分别跑 v2 / v3 而无需改代码。V2/V3 是聚合式流水线（整篇文档一次通过、返回合并结果），
+其结果由 `backend/app/services/knowledge_extract_adapter.py` 投影回 V1 的逐 chunk 契约。
 
 ---
 
@@ -171,7 +188,7 @@ Term 向量索引用于实体链接的**语义召回**：把用户问题拆成�
 ## 10. 模块调用关系
 
 ```text
-preproc ──▶ knowledge_pipeline ──▶ knowledge_extract(_v2) ──▶ embedding_runtime
+preproc ──▶ knowledge_pipeline ──▶ knowledge_extract_v2/_v3 ──▶ embedding_runtime
                                         │                             │
                                         ▼                             ▼
                                    (本体/图谱结构)              external_services（写入）
