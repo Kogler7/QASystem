@@ -177,17 +177,25 @@ class ChunkLevelProtectionTest(unittest.TestCase):
             chunk_characters=["\n"],
             chunk_overlap=50,
         )
-        self.assertEqual(
-            [item["range"] for item in items],
-            [[0, 450], [400, 900], [850, 1200]],
-        )
+        # range 定位口径（ws-dev 0929 起）：chunk_document_items 按
+        # content.find(text, 上一片结尾) 取"最早出现位置"，不再读 splitter 的
+        # __source_range。重复文本下每片字符相同，find 给出紧邻窗口、最后一片
+        # 相对游标超长时回退到全文最早出现处；因此这里断言跨定位方案都成立的
+        # 不变量：source[range] == text 逐字精确、相邻片重叠恰为 chunk_overlap、
+        # 按 overlap 剥离后完整还原原文。切片形状（450/500/350）与旧契约一致。
+        self.assertEqual(len(items), 3)
+        self.assertEqual(items[0]["range"][0], 0)
         self.assertTrue(all(source[start:end] == item["text"] for item in items for start, end in [item["range"]]))
+        overlapped = items[0]["text"]
+        for before, after in zip(items, items[1:]):
+            self.assertEqual(before["text"][-50:], after["text"][:50])
+            overlapped += after["text"][50:]
+        self.assertEqual(overlapped, source)
 
     def test_all_text_splitters_preserve_repeated_text_overlap_ranges(self) -> None:
         from algorithm.knowledge_pipeline.chunking import chunk_document_items
 
         source = "x" * 1200
-        expected = [[0, 500], [450, 950], [900, 1200]]
         for chunk_type in (0, 2, 3):
             items = chunk_document_items(
                 source,
@@ -195,8 +203,16 @@ class ChunkLevelProtectionTest(unittest.TestCase):
                 chunk_size=500,
                 chunk_overlap=50,
             )
-            self.assertEqual([item["range"] for item in items], expected, chunk_type)
+            # 与 chunk_type=1 的测试同一口径：range 由 content.find 定位，
+            # 重复文本下不绑定具体偏移（find 取最早出现位置），只断言逐字精确、
+            # 相邻片重叠为 chunk_overlap、剥离 overlap 后完整还原原文。
+            self.assertEqual(len(items), 3, chunk_type)
+            self.assertEqual(items[0]["range"][0], 0, chunk_type)
             self.assertTrue(all(source[a:b] == item["text"] for item in items for a, b in [item["range"]]))
+            for before, after in zip(items, items[1:]):
+                self.assertEqual(before["text"][-50:], after["text"][:50])
+            reconstructed = items[0]["text"] + "".join(item["text"][50:] for item in items[1:])
+            self.assertEqual(reconstructed, source)
 
     def test_json_whitespace_and_multiple_documents_keep_exact_ranges(self) -> None:
         from algorithm.knowledge_pipeline.chunking import chunk_document_items

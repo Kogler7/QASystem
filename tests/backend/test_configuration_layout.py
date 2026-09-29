@@ -64,8 +64,8 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "vllm-0:" not in compose
     assert "AGENT_MCP_URL=http://backend:8000/mcp" in template
     assert "environment:" not in compose
-    assert "${QASYSTEM_SOURCE_DIR:-.}/backend:/app/backend:ro" in compose
-    assert "AGENT_HOST_PORT" not in compose
+    assert "${QASYSTEM_SOURCE_DIR:-.}:/app:ro" in compose
+    assert "${AGENT_HOST_PORT:-9180}:9180" in compose
     assert "MCP_PORT" not in template
 
 

@@ -7,8 +7,9 @@
 - split_semantically     ：语义切片（需 embedding 模型）
 - split_by_tree          ：树状切片
 
-所有方法都会先做 JSON 块识别（_split_text_with_json_protection），JSON 块独立
-成片、不被切坏；其中 split_recursively 对超长 JSON 也做结构切分兜底。
+所有方法都会先做 JSON 块识别（_split_text_with_json_protection）：对象与含对象的
+数组受保护（标量数组如 [1] 文献角标不算），JSON 块连同 ```json 围栏独立成片、
+不被切坏；其中 split_recursively 对超长 JSON 也做结构切分兜底。
 
 核心约束（统一适用于 JSON 与纯文本）：
 - 小于阈值（chunk_size * min_block_ratio）的片一律视为碎片，必须并入相邻片
@@ -54,11 +55,24 @@ _SENTENCE_SEPARATORS: list[str] = [
 
 # ======================== JSON 识别与结构切分 ========================
 
+def _is_protectable_json(data: object) -> bool:
+    """只有对象、或「含对象的数组」值得保护。
+
+    标量数组（`[1]`、`["参考文献"]`）多是正文里的文献角标或列举，保护它们会把
+    `[1] 标准号…` 撕成 `"[1]"` + 正文两片，确定性参考文献抽取也会因此失效。
+    口径与结构化文本判定（structured_text._is_record_payload）保持一致。
+    """
+    if isinstance(data, dict):
+        return True
+    return isinstance(data, list) and any(isinstance(item, dict) for item in data)
+
+
 def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
-    """提取文本中所有完整、合法的顶层 JSON 块（对象 {...} 与数组 [...]）。
+    """提取文本中所有完整、合法的顶层 JSON 块（对象 {...} 和含对象的数组 [...]）。
 
     用括号匹配 + json.loads 双重验证，避免把正文里的花括号误判为 JSON。
-    只识别顶层块，嵌套结构（如 {"a": [1,2,3]} 里的 [1,2,3]）不再拆出。
+    只识别顶层块，嵌套结构（如 {"a": [1,2,3]} 里的 [1,2,3]）不再拆出；
+    标量数组不算 JSON 块。
     返回的是纯 JSON 文本（不含围栏标记）。
     """
     blocks: list[tuple[int, int, str]] = []
@@ -117,12 +131,13 @@ def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
 
         candidate_text = text[i:matched_end + 1]
         try:
-            json.loads(candidate_text)
-            json_ok = True
+            data = json.loads(candidate_text)
         except json.JSONDecodeError:
-            json_ok = False
-        if not json_ok:
             i = matched_end + 1
+            continue
+        if not _is_protectable_json(data):
+            # 标量数组不保护：跳过开头字符继续向后扫描
+            i += 1
             continue
 
         # 向后检查：闭合后必须是合理边界。
@@ -145,10 +160,56 @@ def _extract_json_blocks(text: str) -> list[tuple[int, int, str]]:
     return blocks
 
 
+#: 围栏行：```json 开行 / ``` 闭行。围栏必须和 JSON 同属一个片段，否则会被切成
+#: 孤立的 "```json" / "```" 小片（白占一次 LLM 调用，且没有任何信息量）。
+_FENCE_OPENER = re.compile(r"`{3,}\s*(?:json)?", re.IGNORECASE)
+_FENCE_CLOSER = re.compile(r"`{3,}\s*")
+
+
+def _absorb_fence_lines(text: str, start: int, end: int) -> tuple[int, int]:
+    """把紧贴 JSON 两侧的围栏行并入 (start, end)；裸 JSON 边界原样返回。"""
+    head = start
+    while head > 0 and text[head - 1] in " \t\r\n":
+        head -= 1
+    line_start = text.rfind("\n", 0, head) + 1
+    opener = text[line_start:head]
+    if opener and _FENCE_OPENER.fullmatch(opener):
+        start = line_start
+
+    tail = end
+    while tail < len(text) and text[tail] in " \t\r\n":
+        tail += 1
+    line_end = text.find("\n", tail)
+    if line_end == -1:
+        line_end = len(text)
+    closer = text[tail:line_end]
+    if closer and _FENCE_CLOSER.fullmatch(closer):
+        end = line_end
+
+    return start, end
+
+
+def _strip_fence_edges(text: str) -> tuple[str, str, str]:
+    """剥离首尾的围栏行，返回 (核心文本, 开头围栏, 结尾围栏)；无围栏原样返回。"""
+    lines = text.split("\n")
+    opener = ""
+    closer = ""
+    if lines and _FENCE_OPENER.fullmatch(lines[0]):
+        opener = lines[0] + "\n"
+        lines = lines[1:]
+    if lines and _FENCE_CLOSER.fullmatch(lines[-1]):
+        closer = "\n" + lines[-1]
+        lines = lines[:-1]
+    if not opener and not closer:
+        return text, "", ""
+    return "\n".join(lines), opener, closer
+
+
 def _split_text_with_json_protection(text: str) -> list[tuple[str, bool]]:
     """把文本按 JSON 块边界拆成 (片段, is_json) 列表。
 
-    JSON 块独立成片（is_json=True）；非 JSON 部分 is_json=False。
+    JSON 块连同紧贴的 ```json / ``` 围栏作为独立片段（is_json=True）；
+    非 JSON 部分 is_json=False，且所有片段按序拼接后与原文逐字一致。
     """
     if not text:
         return []
@@ -159,17 +220,14 @@ def _split_text_with_json_protection(text: str) -> list[tuple[str, bool]]:
 
     result: list[tuple[str, bool]] = []
     last_end = 0
-    for start, end, json_text in json_blocks:
+    for start, end, _json_text in json_blocks:
+        start, end = _absorb_fence_lines(text, start, end)
         if start > last_end:
-            prefix = text[last_end:start]
-            if prefix.strip():
-                result.append((prefix, False))
-        result.append((json_text, True))
+            result.append((text[last_end:start], False))
+        result.append((text[start:end], True))
         last_end = end
     if last_end < len(text):
-        suffix = text[last_end:]
-        if suffix.strip():
-            result.append((suffix, False))
+        result.append((text[last_end:], False))
 
     return result if result else [(text, False)]
 
@@ -251,13 +309,19 @@ def _split_json_array(arr: list, chunk_size: int) -> list[str]:
 def _split_json_by_structure(text: str, chunk_size: int) -> list[str] | None:
     """按顶层结构切分 JSON。返回 None 表示无法/不需切分。
 
-    修复：计算长度时使用完整的 JSON 序列化结果，确保切割后的每块都是合法 JSON。
+    计算长度时使用完整的 JSON 序列化结果，确保切割后的每块都是合法 JSON。
+    带 ```json 围栏的块先剥离围栏、切完再把围栏贴回首尾两块，
+    围栏既不阻挡结构切分，也不会被中间块带走。
     """
     stripped = text.strip()
-    if not stripped or stripped[0] not in '{[':
+    if not stripped:
+        return None
+
+    core, opener, closer = _strip_fence_edges(stripped)
+    if not core or core[0] not in '{[':
         return None
     try:
-        obj = json.loads(stripped)
+        obj = json.loads(core)
     except json.JSONDecodeError:
         return None
     if not isinstance(obj, (dict, list)):
@@ -280,9 +344,13 @@ def _split_json_by_structure(text: str, chunk_size: int) -> list[str] | None:
         except json.JSONDecodeError:
             continue
 
-    if len(valid_pieces) > 1:
-        return valid_pieces
-    return None
+    if len(valid_pieces) <= 1:
+        return None
+
+    if opener or closer:
+        valid_pieces[0] = opener + valid_pieces[0]
+        valid_pieces[-1] = valid_pieces[-1] + closer
+    return valid_pieces
 
 
 def _hard_split_json(
@@ -459,9 +527,10 @@ def _cleanup_blocks(
     - 任何 < min_len 的块（无论 JSON 还是文本，无论天然短还是切出来的碎片）
       都算碎片，必须并入相邻块
     - 任何 > max_len 的块都必须切分，JSON 允许结构切分，结构切分失败时硬切
-    - 优先并入同类型块（不超 chunk_size 就合），无同类型邻居则允许略微超长
+    - 优先并入同类型块（不超 chunk_size 就合），无同类型邻居则并入最近的
+      文本块（允许略微超长）；碎片绝不并入 JSON 块，避免污染 JSON/围栏结构
     - 类型隔离只在"可合法并入"的前提下维持；若并入必然超长，才保留原块
-    - 若整个列表只有一块碎片，则整块保留（无法并入任何块）
+    - 若碎片没有可并入的对象（仅剩自己，或邻居全是 JSON 块），则保留
     """
     # 归一化：补齐第三元素
     norm: list[tuple[str, bool, bool]] = []
@@ -615,9 +684,19 @@ def _cleanup_blocks(
             merged.pop(frag_idx)
             continue
 
-        # 没有同类型邻居：尝试并入最近的任意类型块（允许略微超长）。
-        left_any = frag_idx - 1 if frag_idx > 0 else -1
-        right_any = frag_idx + 1 if frag_idx < len(merged) - 1 else -1
+        # 没有同类型邻居：尝试并入最近的文本块（允许略微超长）。
+        # 碎片绝不并入 JSON 块——文本黏在 JSON/围栏上会破坏其结构
+        # （如 '```' 闭行后直接续上正文，下游 structured_text 表格识别失效）。
+        def _nearest_text(idx: int, step: int) -> int:
+            j = idx + step
+            while 0 <= j < len(merged):
+                if not merged[j][1]:
+                    return j
+                j += step
+            return -1
+
+        left_any = _nearest_text(frag_idx, -1)
+        right_any = _nearest_text(frag_idx, 1)
 
         if left_any >= 0 and right_any >= 0:
             if (frag_idx - left_any) <= (right_any - frag_idx):
@@ -634,7 +713,7 @@ def _cleanup_blocks(
             merged.pop(frag_idx)
             continue
 
-        # 实在没有可并入的对象（仅当列表只剩这一块碎片），保留。
+        # 实在没有可并入的对象（列表只剩这一块碎片，或邻居全是 JSON 块），保留。
         break
 
     return merged
@@ -1053,36 +1132,156 @@ def split_by_characters(
     separators: list[str] | None = None,
     chunk_overlap: int = 0,
 ) -> list[Document]:
-    """按配置的所有分隔符逐级切分后打包。JSON 块独立成片。"""
+    """按配置的所有分隔符逐级切分后打包。JSON 块（连同围栏）独立成片。
+
+    - plain_limit = chunk_size - chunk_overlap：overlap 预算内嵌在片宽里，
+      施加 overlap 后成品片长仍 ≤ chunk_size
+    - 分隔符拆分逐字守恒（分隔符跟随前一段、空段保留为分隔符片），
+      拼接所有片后与原文一致；切不动且超宽的大块按宽度兜底硬切
+    - 超大 JSON 块独占一片不参与打包，其余片段按类型隔离贪心装入 chunk_size
+    - 每篇文档独立打包：不跨文档合并，metadata 逐篇保留，并记录 __source_range
+    """
+    if chunk_size <= 0 or not 0 <= chunk_overlap < chunk_size:
+        raise ValueError("chunk_size 必须大于 0，且 0 <= chunk_overlap < chunk_size")
+    plain_limit = chunk_size - chunk_overlap
     active_separators = [s for s in (separators or ["\n"]) if s] or ["\n"]
 
-    fragments: list[tuple[str, bool]] = []
+    result: list[Document] = []
     for document in documents:
         text = document.page_content
         if not text.strip():
             continue
+        base_meta = dict(document.metadata)
 
+        fragments: list[tuple[str, bool]] = []
+        ranges: list[list[int]] = []
+        source_cursor = 0
         for part_text, is_json in _split_text_with_json_protection(text):
+            part_start = text.find(part_text, source_cursor)
+            if part_start < 0:
+                part_start = source_cursor
+            source_cursor = part_start + len(part_text)
+
             if is_json:
                 fragments.append((part_text, True))
-            else:
-                segs = [part_text]
-                for separator in active_separators:
-                    next_segs: list[str] = []
-                    for t in segs:
-                        if len(t) <= chunk_size:
-                            next_segs.append(t)
-                        else:
-                            next_segs.extend(
-                                p + separator for p in t.split(separator) if p
-                            )
-                    segs = next_segs
-                fragments.extend((s, False) for s in segs if s)
+                ranges.append([part_start, source_cursor])
+                continue
 
-    packed = _merge_no_leftover(fragments, chunk_size)
-    if chunk_overlap > 0:
-        packed = _apply_overlap(packed, chunk_size, chunk_overlap)
-    return _finalize(packed, documents[0].metadata if documents else {})
+            segs = [part_text]
+            for separator in active_separators:
+                next_segs: list[str] = []
+                for t in segs:
+                    if len(t) <= plain_limit:
+                        next_segs.append(t)
+                        continue
+                    parts = t.split(separator)
+                    # 分隔符逐字守恒：非空段带上后缀分隔符；空段仅在非末尾时
+                    # 保留为独立的分隔符片，保证所有片拼接后与原段一致
+                    next_segs.extend(
+                        p + (separator if idx < len(parts) - 1 else "")
+                        for idx, p in enumerate(parts)
+                        if p or idx < len(parts) - 1
+                    )
+                segs = next_segs
+
+            part_cursor = 0
+            for seg in segs:
+                if not seg:
+                    continue
+                seg_start = part_start + part_cursor
+                part_cursor += len(seg)
+                if len(seg) <= plain_limit:
+                    fragments.append((seg, False))
+                    ranges.append([seg_start, seg_start + len(seg)])
+                else:
+                    for head_start in range(0, len(seg), plain_limit):
+                        head = seg[head_start:head_start + plain_limit]
+                        fragments.append((head, False))
+                        ranges.append([seg_start + head_start, seg_start + head_start + len(head)])
+
+        # 打包：同类型片段贪心装入 chunk_size，类型切换落盘；超大 JSON 独占一片。
+        # 不强制消除极小片——它们无法在不超宽的前提下并入邻块时允许独立成块，
+        # 这是 chunk_document_items 逐字定位与拼接还原的硬前提。
+        blocks: list[tuple[str, bool]] = []
+        block_ranges: list[list[int]] = []
+        buf_text = ""
+        buf_type = False
+        buf_range: list[int] | None = None
+        buf_len = 0
+
+        def _flush_buf() -> None:
+            nonlocal buf_text, buf_range, buf_len
+            if not buf_text:
+                return
+            blocks.append((buf_text, buf_type))
+            block_ranges.append(list(buf_range) if buf_range is not None else [0, buf_len])
+            buf_text, buf_range, buf_len = "", None, 0
+
+        for (frag_text, frag_type), frag_range in zip(fragments, ranges):
+            if frag_type and len(frag_text) > chunk_size:
+                _flush_buf()
+                blocks.append((frag_text, True))
+                block_ranges.append(list(frag_range))
+                continue
+            if buf_text and (frag_type != buf_type or buf_len + len(frag_text) > chunk_size):
+                _flush_buf()
+            if buf_text:
+                buf_text += frag_text
+                buf_len += len(frag_text)
+            else:
+                buf_text, buf_type, buf_range, buf_len = frag_text, frag_type, list(frag_range), len(frag_text)
+        _flush_buf()
+
+        # 施加 overlap：前块尾巴（对齐句子边界）作为当前块前缀，成品 ≤ chunk_size。
+        # chunk_document_items 依赖片文本是原文连续子串来定位偏移，因此边界对齐
+        # 的尾巴若跳过了前块尾部的空白字符（不再是连续后缀），宁可放弃 overlap。
+        if chunk_overlap > 0:
+            overlapped: list[tuple[str, bool]] = []
+            overlapped_ranges: list[list[int]] = []
+            for idx, (block_text, block_type) in enumerate(blocks):
+                block_range = block_ranges[idx]
+                if idx == 0:
+                    overlapped.append((block_text, block_type))
+                    overlapped_ranges.append(list(block_range))
+                    continue
+                prev_text, prev_type = overlapped[-1]
+                prev_range = overlapped_ranges[-1]
+                if block_type != prev_type or prev_type:
+                    overlapped.append((block_text, block_type))
+                    overlapped_ranges.append(list(block_range))
+                    continue
+                tail = _tail_with_boundary(prev_text, chunk_overlap)
+                if (
+                    tail
+                    and block_range[0] != prev_range[1]
+                    and len(prev_text) == prev_range[1] - prev_range[0]
+                ):
+                    tail = ""
+                if tail and tail != prev_text:
+                    new_text = tail + block_text
+                    if len(new_text) > chunk_size:
+                        allowed = max(0, chunk_size - len(block_text))
+                        tail = tail[-allowed:] if allowed > 0 else ""
+                        new_text = tail + block_text
+                    overlapped.append((new_text, block_type))
+                    overlapped_ranges.append(
+                        [max(prev_range[1] - len(tail), prev_range[0]), block_range[1]]
+                    )
+                else:
+                    overlapped.append((block_text, block_type))
+                    overlapped_ranges.append(list(block_range))
+            blocks, block_ranges = overlapped, overlapped_ranges
+
+        for (block_text, block_type), block_range in zip(blocks, block_ranges):
+            if not block_text:
+                continue
+            meta = dict(base_meta)
+            if block_type:
+                meta["_is_json"] = True
+            meta["__source_range"] = list(block_range)
+            result.append(Document(page_content=block_text, metadata=meta))
+
+    return result
 
 
 def split_recursively(
