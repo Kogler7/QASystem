@@ -66,23 +66,29 @@ def get_llm_config() -> dict:
 
 
 def get_jev_config() -> dict:
-    accept = float(_env("KG_EXTRACT_JEV_NOUL_ACCEPT", default="0.9"))
-    reject = float(_env("KG_EXTRACT_JEV_NOUL_REJECT", default="0.1"))
-    if not (0.0 <= reject <= accept <= 1.0):
+    # 新名优先；仍接受旧 NOUL_*，避免已有部署一开 JEV 就因变量更名失效。
+    accept = float(_env("KG_EXTRACT_JEV_ACCEPT", "KG_EXTRACT_JEV_NOUL_ACCEPT", default="0.9"))
+    reject = float(_env("KG_EXTRACT_JEV_REJECT", "KG_EXTRACT_JEV_NOUL_REJECT", default="0.9"))
+    if not (0.0 <= accept <= 1.0 and 0.0 <= reject <= 1.0):
         raise ValueError(
-            "Jev 阈值需满足 0 <= noul_reject <= noul_accept <= 1，"
+            "Jev 阈值需分别落在 [0, 1]，"
             f"收到 accept={accept}, reject={reject}"
         )
     confidence = float(_env("KG_EXTRACT_JEV_CHOICE_CONFIDENCE", default="0.9"))
     if not (0.0 <= confidence <= 1.0):
         raise ValueError(f"KG_EXTRACT_JEV_CHOICE_CONFIDENCE 需在 [0, 1]，收到 {confidence}")
+    precision = _env("KG_EXTRACT_JEV_PRECISION", default="bf16")
+    if precision not in {"bf16", "fp32"}:
+        raise ValueError(f"KG_EXTRACT_JEV_PRECISION 仅支持 bf16 或 fp32，收到 {precision}")
+    batch_questions = int(_env("KG_EXTRACT_JEV_BATCH_QUESTIONS", default="32"))
+    if batch_questions < 0:
+        raise ValueError(f"KG_EXTRACT_JEV_BATCH_QUESTIONS 需 >= 0，收到 {batch_questions}")
     return {
         "enabled": _env("KG_EXTRACT_JEV_ENABLED", default="0") != "0",
-        "model_path": _env(
-            "KG_EXTRACT_JEV_MODEL_PATH",
-            default="/models/open-jev-deberta-v3-large",
-        ),
-        "noul_accept": accept,
-        "noul_reject": reject,
+        "model_path": _env("KG_EXTRACT_JEV_MODEL_PATH", default="/models/nanojev"),
+        "accept": accept,
+        "reject": reject,
         "choice_confidence": confidence,
+        "precision": precision,
+        "batch_questions": batch_questions,
     }

@@ -265,6 +265,45 @@ def test_v4_flash_entity_disables_thinking_on_chat_json_schema():
     assert calls[0][1]["extra_body"] == {"thinking": {"type": "disabled"}}
 
 
+def test_v4_flash_does_not_fall_back_to_responses_when_chat_json_schema_unsupported():
+    calls: list[str] = []
+    replies = [_response('{"decisions":[]}')]
+
+    def chat_create(**kwargs):
+        calls.append("chat")
+        fmt = kwargs.get("response_format") or {}
+        if fmt.get("type") == "json_schema":
+            raise RuntimeError("json_schema is not supported")
+        return replies.pop(0)
+
+    def responses_create(**kwargs):
+        calls.append("responses")
+        raise AssertionError("deepseek-v4-flash 不应回落 Responses")
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=chat_create)),
+        responses=SimpleNamespace(create=responses_create),
+    )
+    llm = OpenAICompatibleLLM(
+        client,
+        model="deepseek-v4-flash",
+        max_tokens=16384,
+        disable_thinking=False,
+        thinking_passes=frozenset({"relation", "repair_relation"}),
+        thinking_max_tokens=32768,
+    )
+    result = llm.generate_structured(
+        COMPATIBLE_SCHEMA,
+        MESSAGES,
+        {"pass_name": "entity", "response_mode": "json_schema"},
+    )
+    assert result.thinking == "disabled"
+    assert result.api == "chat.completions"
+    assert "responses" not in calls
+    assert calls[-1] == "chat"
+    assert result.text == '{"decisions":[]}'
+
+
 def test_usage_dict_exposes_reasoning_tokens():
     usage = _usage_dict(
         SimpleNamespace(

@@ -555,11 +555,14 @@ class OpenAICompatibleLLM:
                 **chat_kwargs,
             )
         official_deepseek = _is_official_deepseek_endpoint(self.base_url)
+        # 该模型在 MaaS 的 Responses 路径上会超时/返回空数组/截断 JSON；
+        # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
+        # 对所有 pass（实体/属性/关系/修复/核验）统一生效；官方 DeepSeek 端点除外。
+        # v4-flash Responses 默认开思考且无法带 extra_body，关/开思考都必须走 chat；
+        # json_schema 不被支持时降到 json_object，不再回落 Responses。
+        skip_responses = _is_deepseek_v4_flash(self.model) and not official_deepseek
         prefer_chat_json_schema = (
-            # 该模型在 MaaS 的 Responses 路径上会超时/返回空数组/截断 JSON；
-            # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
-            # 对所有 pass（实体/属性/关系/修复/核验）统一生效；官方 DeepSeek 端点除外。
-            (_is_deepseek_v4_flash(self.model) and not official_deepseek)
+            skip_responses
             or (not official_deepseek and bool(context.get("record_table")))
             or bool(context.get("prefer_chat_json_schema"))
             or not disable
@@ -575,16 +578,17 @@ class OpenAICompatibleLLM:
             except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
                 if not _unsupported_parameter(exc):
                     raise
-        try:
-            return self._responses_structured(
-                messages,
-                response_format=response_format,
-                disable_thinking=disable,
-                max_tokens=token_budget,
-            )
-        except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
-            if not _unsupported_parameter(exc):
-                raise
+        if not skip_responses:
+            try:
+                return self._responses_structured(
+                    messages,
+                    response_format=response_format,
+                    disable_thinking=disable,
+                    max_tokens=token_budget,
+                )
+            except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
+                if not _unsupported_parameter(exc):
+                    raise
         try:
             return self._chat_structured(
                 messages,

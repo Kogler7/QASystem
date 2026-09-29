@@ -5,7 +5,8 @@ from typing import Any, Callable, Iterable
 
 from .chunk_context import ExtractionChunk
 from .config import get_llm_config
-from .jev_client import default_entity_adjudicator, get_jev_client, jev_enabled
+from .jev_client import get_jev_client, jev_enabled
+from .jev_harness import default_entity_adjudicator
 from .llm_client import create_llm_client
 from .run_state import ExtractionValidationError
 from .split_extractor import extract_split

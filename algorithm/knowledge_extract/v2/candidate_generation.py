@@ -17,7 +17,7 @@ from typing import Any
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .evidence import Evidence, bind_evidence, locate_quote, verify_evidence
 from .graph_utils import canonical_name
-from .jev_client import partition_relation_pairs
+from .jev_harness import partition_relation_pairs
 from .llm_client import thinking_enabled_for
 from .ontology_compiler import ExtractionPlan
 from .ontology_schema import OntologySchema

@@ -15,14 +15,18 @@ from algorithm.knowledge_extract.v2.chunk_context import (
 from algorithm.knowledge_extract.v2.evidence import Evidence
 from algorithm.knowledge_extract.v2.jev_client import (
     CallableJevClient,
-    ChoiceAnswer,
     JevUnavailableError,
+    Judgment,
+    answers_from_nanojev,
     create_jev_client,
-    default_entity_adjudicator,
     get_jev_config,
     jev_enabled,
-    partition_relation_pairs,
     reset_jev_client_cache,
+)
+from algorithm.knowledge_extract.v2.jev_harness import (
+    default_entity_adjudicator,
+    partition_relation_pairs,
+    relation_facts,
 )
 from algorithm.knowledge_extract.v2.ontology_compiler import compile_plan
 from algorithm.knowledge_extract.v2.prompt_router import DocumentRoute
@@ -60,18 +64,42 @@ def test_jev_enabled_without_model_fails_explicitly(monkeypatch, tmp_path):
         create_jev_client()
 
 
+def test_incomplete_checkpoint_fails_without_touching_cuda(monkeypatch, tmp_path):
+    monkeypatch.setenv("KG_EXTRACT_JEV_ENABLED", "1")
+    monkeypatch.setenv("KG_EXTRACT_JEV_MODEL_PATH", str(tmp_path))
+    monkeypatch.setenv("ALGORITHM_RUNTIME_PROFILE", "full-runtime")
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    reset_jev_client_cache()
+    with pytest.raises(JevUnavailableError, match="不完整"):
+        create_jev_client()
+
+
+def test_remote_only_refuses_local_nanojev(monkeypatch, tmp_path):
+    monkeypatch.setenv("KG_EXTRACT_JEV_ENABLED", "1")
+    monkeypatch.setenv("KG_EXTRACT_JEV_MODEL_PATH", str(tmp_path))
+    monkeypatch.setenv("ALGORITHM_RUNTIME_PROFILE", "remote-only")
+    reset_jev_client_cache()
+    with pytest.raises(JevUnavailableError, match="remote-only"):
+        create_jev_client()
+
+
 def test_entity_adjudicator_keeps_uncertain_below_confidence(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_JEV_CHOICE_CONFIDENCE", "0.9")
-    client = CallableJevClient(
-        choice_fn=lambda *_args: ChoiceAnswer(
-            choice="same_entity",
-            probabilities={"same_entity": 0.4, "different_entity": 0.3, "uncertain": 0.3},
-            confidence=0.4,
-        )
-    )
+
+    def predict(_states):
+        return {
+            "entity": {
+                "verdict": Judgment(
+                    choice="same_entity",
+                    probabilities={"same_entity": 0.4, "different_entity": 0.3, "uncertain": 0.3},
+                    confidence=0.4,
+                )
+            }
+        }
+
     monkeypatch.setattr(
-        "algorithm.knowledge_extract.v2.jev_client.get_jev_client",
-        lambda: client,
+        "algorithm.knowledge_extract.v2.jev_harness.get_jev_client",
+        lambda: CallableJevClient(predict),
     )
     verdict = default_entity_adjudicator(
         {
@@ -85,16 +113,22 @@ def test_entity_adjudicator_keeps_uncertain_below_confidence(monkeypatch):
 
 
 def test_entity_adjudicator_accepts_high_confidence_same_entity(monkeypatch):
-    client = CallableJevClient(
-        choice_fn=lambda *_args: ChoiceAnswer(
-            choice="same_entity",
-            probabilities={"same_entity": 0.97, "different_entity": 0.02, "uncertain": 0.01},
-            confidence=0.97,
-        )
-    )
+    def predict(states):
+        assert "left_name: 知识地图" in states[0]["state"]
+        assert states[0]["questions"]["verdict"]["type"] == "choice"
+        return {
+            "entity": {
+                "verdict": Judgment(
+                    choice="same_entity",
+                    probabilities={"same_entity": 0.97, "different_entity": 0.02, "uncertain": 0.01},
+                    confidence=0.97,
+                )
+            }
+        }
+
     monkeypatch.setattr(
-        "algorithm.knowledge_extract.v2.jev_client.get_jev_client",
-        lambda: client,
+        "algorithm.knowledge_extract.v2.jev_harness.get_jev_client",
+        lambda: CallableJevClient(predict),
     )
     verdict = default_entity_adjudicator(
         {
@@ -108,25 +142,122 @@ def test_entity_adjudicator_accepts_high_confidence_same_entity(monkeypatch):
 
 
 def test_partition_relation_pairs_routes_gray_zone_to_llm():
+    chunk = "知识地图属于知识管理。办公室不得授权外单位。"
     pairs = [
-        {"pair_id": "pair-reject", "relation_id": "belongs_to", "source_name": "A", "target_name": "B"},
-        {"pair_id": "pair-accept", "relation_id": "belongs_to", "source_name": "知识地图", "target_name": "知识管理"},
-        {"pair_id": "pair-gray", "relation_id": "belongs_to", "source_name": "C", "target_name": "D"},
+        {
+            "pair_id": "pair-reject",
+            "relation_id": "AUTHORIZES",
+            "source_name": "办公室",
+            "source_type": "Org",
+            "target_name": "外单位",
+            "target_type": "Org",
+        },
+        {
+            "pair_id": "pair-accept",
+            "relation_id": "BELONGS_TO",
+            "source_name": "知识地图",
+            "source_type": "Term",
+            "target_name": "知识管理",
+            "target_type": "Domain",
+        },
+        {
+            "pair_id": "pair-gray",
+            "relation_id": "BELONGS_TO",
+            "source_name": "知识地图",
+            "source_type": "Term",
+            "target_name": "知识管理",
+            "target_type": "Domain",
+        },
+        {
+            "pair_id": "pair-missing",
+            "relation_id": "BELONGS_TO",
+            "source_name": "不存在甲",
+            "source_type": "Term",
+            "target_name": "不存在乙",
+            "target_type": "Domain",
+        },
     ]
-    scores = {"pair-reject": 0.02, "pair-accept": 0.96, "pair-gray": 0.4}
 
-    def noul_fn(state: str, _question: str) -> float:
-        if "source: 知识地图" in state:
-            return scores["pair-accept"]
-        if "source: A" in state:
-            return scores["pair-reject"]
-        return scores["pair-gray"]
+    def predict(states):
+        ids = {item["id"] for item in states}
+        assert "pair-missing" not in ids
+        assert "pair-accept" in ids and "pair-gray" in ids
+        accept_state = next(item for item in states if item["id"] == "pair-accept")
+        question = accept_state["questions"]["label"]
+        assert question["type"] == "choice"
+        assert set(question["criteria"]) == {"BELONGS_TO", "NONE"}
+        assert "window: 知识地图属于知识管理" in accept_state["state"]
+        answers = {}
+        for state in states:
+            relation_id = "BELONGS_TO" if state["id"] != "pair-reject" else "AUTHORIZES"
+            if state["id"] == "pair-accept":
+                probabilities = {relation_id: 0.96, "NONE": 0.04}
+                choice = relation_id
+            elif state["id"] == "pair-reject":
+                probabilities = {relation_id: 0.03, "NONE": 0.97}
+                choice = "NONE"
+            else:
+                probabilities = {relation_id: 0.55, "NONE": 0.45}
+                choice = relation_id
+            answers[state["id"]] = {
+                "label": Judgment(
+                    choice=choice,
+                    probabilities=probabilities,
+                    confidence=max(probabilities.values()),
+                )
+            }
+        return answers
 
-    client = CallableJevClient(noul_fn=noul_fn)
-    accepted, rejected, gray = partition_relation_pairs(pairs, chunk_text="知识地图属于知识管理。", client=client)
+    client = CallableJevClient(predict)
+    accepted, rejected, gray = partition_relation_pairs(pairs, chunk_text=chunk, client=client)
     assert [item["pair_id"] for item in rejected] == ["pair-reject"]
     assert [item["pair_id"] for item in accepted] == ["pair-accept"]
-    assert [item["pair_id"] for item in gray] == ["pair-gray"]
+    assert [item["pair_id"] for item in gray] == ["pair-missing", "pair-gray"]
+    missing = next(item for item in gray if item["pair_id"] == "pair-missing")
+    assert missing["judgment"]["reason"] == "endpoints_not_in_chunk"
+
+
+def test_relation_facts_mark_same_sentence_window():
+    facts = relation_facts(
+        "前文。术语“应答器”属于通信设备。后文。",
+        {"source_name": "应答器", "target_name": "通信设备", "relation_id": "BELONGS_TO"},
+    )
+    assert facts["complete"] is True
+    assert facts["same_sentence"] is True
+    assert "应答器" in facts["window"] and "通信设备" in facts["window"]
+    assert "前文" not in facts["window"]
+
+
+def test_answers_from_nanojev_reads_choice_distribution():
+    parsed = answers_from_nanojev(
+        {
+            "states": [
+                {
+                    "id": "pair-1",
+                    "answers": {
+                        "label": {
+                            "type": "choice",
+                            "choice": "NONE",
+                            "probabilities": {"BELONGS_TO": 0.1, "NONE": 0.9},
+                        }
+                    },
+                }
+            ]
+        }
+    )
+    judgment = parsed["pair-1"]["label"]
+    assert judgment.choice == "NONE"
+    assert judgment.confidence == 0.9
+
+
+def test_disabled_partition_leaves_every_pair_for_llm(monkeypatch):
+    monkeypatch.delenv("KG_EXTRACT_JEV_ENABLED", raising=False)
+    reset_jev_client_cache()
+    pairs = [{"pair_id": "pair-1", "relation_id": "BELONGS_TO", "source_name": "甲", "target_name": "乙"}]
+    accepted, rejected, gray = partition_relation_pairs(pairs, chunk_text="甲属于乙。", client=None)
+    assert accepted == []
+    assert rejected == []
+    assert gray == pairs
 
 
 def test_deterministic_quote_covers_both_endpoint_mentions():
