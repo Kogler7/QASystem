@@ -125,3 +125,13 @@ Excel/CSV 仍由上游解析：每个工作表渲染为 `## <sheet>` 加一个 J
 ```
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。
+
+Thinking 默认全局关闭（`KG_EXTRACT_LLM_DISABLE_THINKING=1`）。设为 `0` 后，仅 `KG_EXTRACT_THINKING_PASSES`（默认 `relation,repair_relation`）使用更大的 `KG_EXTRACT_THINKING_MAX_TOKENS`；实体/属性 pass 仍关闭思考。
+
+本地 Jev 判别默认关闭（`KG_EXTRACT_JEV_ENABLED=0`）。打开前先把 HF 分类器挂到 `KG_EXTRACT_JEV_MODEL_PATH`（可用 `docker/download_models.py --jev`），再跑：
+
+```bash
+.venv/bin/python -m algorithm.knowledge_extract_v2.jev_probe
+```
+
+中文公文/标准分布不校准就保持关闭。Jev 只做实体模糊合并和关系 pair 判断，不替代确定性去重或 `HAS_PART` 组边。

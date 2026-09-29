@@ -70,6 +70,18 @@ def _is_deepseek_v4_flash(model: str) -> bool:
     return model.casefold().startswith("deepseek-v4-flash")
 
 
+def _chat_json_schema_format(schema_name: str, schema: dict[str, Any]) -> dict[str, Any]:
+    """Chat Completions 的 json_schema 包一层 ``json_schema`` 字段。"""
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": schema_name or "extraction",
+            "strict": True,
+            "schema": schema,
+        },
+    }
+
+
 def _unsupported_parameter(exc: Exception) -> bool:
     message = str(exc).casefold()
     parameter = r"(thinking|response_format|json_schema|json_object|responses? API|client\.responses)"
@@ -108,6 +120,21 @@ def _field(value: Any, name: str, default: Any = None) -> Any:
     return getattr(value, name, default)
 
 
+def thinking_enabled_for(llm: Any, pass_name: str, *, disable_thinking: bool | None = None) -> bool:
+    """Whether this call should spend a thinking budget.
+
+    ``disable_thinking=True`` forces thinking off (length-retry fallback).
+    ``None`` / ``False`` still consult the pass allowlist; False must not
+    enable thinking for entity/property/repair_entity.
+    """
+    if disable_thinking is True:
+        return False
+    getter = getattr(llm, "thinking_enabled_for", None)
+    if callable(getter):
+        return bool(getter(pass_name))
+    return False
+
+
 class StructuredLLMResponse:
     """Internal structured response envelope with string-like compatibility."""
 
@@ -122,6 +149,8 @@ class StructuredLLMResponse:
         incomplete_details: dict[str, Any] | None = None,
         usage: dict[str, Any] | None = None,
         usage_unavailable: bool = False,
+        thinking: str | None = None,
+        max_tokens: int | None = None,
     ) -> None:
         self.text = text or ""
         self.api = api
@@ -131,6 +160,8 @@ class StructuredLLMResponse:
         self.incomplete_details = dict(incomplete_details or {})
         self.usage = dict(usage or {}) if usage is not None else None
         self.usage_unavailable = usage is None or usage_unavailable
+        self.thinking = thinking
+        self.max_tokens = max_tokens
 
     def __str__(self) -> str:
         return self.text
@@ -159,30 +190,55 @@ class StructuredLLMResponse:
             "incomplete_details": dict(self.incomplete_details),
             "usage": self.usage,
             "usage_unavailable": self.usage_unavailable,
+            "thinking": self.thinking,
+            "max_tokens": self.max_tokens,
         }
+
+
+def _nested_token_count(payload: Any, *keys: str) -> int | None:
+    current = payload
+    for key in keys:
+        if not isinstance(current, dict):
+            current = _field(current, key)
+        else:
+            current = current.get(key)
+        if current is None:
+            return None
+    try:
+        return int(current)
+    except (TypeError, ValueError):
+        return None
 
 
 def _usage_dict(usage: Any) -> dict[str, Any] | None:
     if usage is None:
         return None
     if isinstance(usage, dict):
-        return dict(usage)
-    model_dump = getattr(usage, "model_dump", None)
-    if callable(model_dump):
-        dumped = model_dump()
-        if isinstance(dumped, dict):
-            return dumped
-    result: dict[str, Any] = {}
-    for name in (
-        "input_tokens",
-        "output_tokens",
-        "total_tokens",
-        "prompt_tokens",
-        "completion_tokens",
-    ):
-        value = getattr(usage, name, None)
-        if value is not None:
-            result[name] = value
+        result = dict(usage)
+    else:
+        model_dump = getattr(usage, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump()
+            result = dict(dumped) if isinstance(dumped, dict) else {}
+        else:
+            result = {}
+            for name in (
+                "input_tokens",
+                "output_tokens",
+                "total_tokens",
+                "prompt_tokens",
+                "completion_tokens",
+                "completion_tokens_details",
+                "output_tokens_details",
+            ):
+                value = getattr(usage, name, None)
+                if value is not None:
+                    result[name] = value
+    reasoning = _nested_token_count(result, "completion_tokens_details", "reasoning_tokens")
+    if reasoning is None:
+        reasoning = _nested_token_count(result, "output_tokens_details", "reasoning_tokens")
+    if reasoning is not None:
+        result["reasoning_tokens"] = reasoning
     return result or None
 
 
@@ -215,19 +271,55 @@ class OpenAICompatibleLLM:
         max_tokens: int,
         disable_thinking: bool,
         base_url: str = "",
+        thinking_passes: frozenset[str] | None = None,
+        thinking_max_tokens: int | None = None,
     ) -> None:
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.disable_thinking = disable_thinking
         self.base_url = base_url
+        self.thinking_passes = frozenset(thinking_passes or ())
+        self.thinking_max_tokens = max(max_tokens, int(thinking_max_tokens or max_tokens))
 
-    def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None) -> Any:
+    def thinking_enabled_for(self, pass_name: str) -> bool:
+        if self.disable_thinking:
+            return False
+        return (pass_name or "").casefold() in self.thinking_passes
+
+    def resolve_call_budget(
+        self,
+        pass_name: str = "",
+        *,
+        disable_thinking: bool | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[bool, int]:
+        """Return ``(disable_thinking, max_tokens)`` for one request."""
+        thinking = thinking_enabled_for(self, pass_name, disable_thinking=disable_thinking)
+        disable = not thinking
+        if max_tokens is not None:
+            return disable, int(max_tokens)
+        return disable, self.thinking_max_tokens if thinking else self.max_tokens
+
+    def _create(
+        self,
+        messages: ChatMessages,
+        *,
+        response_format: dict[str, Any] | None = None,
+        disable_thinking: bool | None = None,
+        max_tokens: int | None = None,
+        pass_name: str = "",
+    ) -> Any:
+        disable, token_budget = self.resolve_call_budget(
+            pass_name,
+            disable_thinking=disable_thinking,
+            max_tokens=max_tokens,
+        )
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": 0,
-            "max_tokens": self.max_tokens,
+            "max_tokens": token_budget,
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
@@ -236,26 +328,28 @@ class OpenAICompatibleLLM:
             self.model,
             len(messages),
             sum(len(str(item.get("content") or "")) for item in messages),
-            self.max_tokens,
+            token_budget,
             (response_format or {}).get("type") if isinstance(response_format, dict) else None,
-            "disabled" if self.disable_thinking else "default",
+            "disabled" if disable else "enabled",
         )
+        extra_body = {"thinking": {"type": "disabled" if disable else "enabled"}}
         try:
-            if self.disable_thinking:
-                response = self.client.chat.completions.create(
-                    **kwargs,
-                    # OpenAI-compatible SDKs forward provider-specific fields
-                    # through ``extra_body``.  DeepSeek V4 documents the
-                    # thinking toggle in this location rather than as a
-                    # top-level SDK argument.
-                    extra_body={"thinking": {"type": "disabled"}},
-                )
-            else:
-                response = self.client.chat.completions.create(**kwargs)
+            response = self.client.chat.completions.create(
+                **kwargs,
+                # OpenAI-compatible SDKs forward provider-specific fields
+                # through ``extra_body``.  DeepSeek V4 documents the
+                # thinking toggle in this location rather than as a
+                # top-level SDK argument.
+                extra_body=extra_body,
+            )
         except Exception as exc:  # noqa: BLE001 - compatible providers vary
-            if not self.disable_thinking or not _thinking_unsupported(exc):
+            if not _thinking_unsupported(exc):
                 raise
-            logger.info("[步骤][LLM-Client] thinking 参数不被支持，改用默认思考模式重试")
+            logger.info("[步骤][LLM-Client] thinking 参数不被支持，去掉 extra_body 重试")
+            if disable:
+                # Backend ignored the disable switch and will use its default
+                # (often thinking-on). Keep the thinking token budget.
+                kwargs["max_tokens"] = max(token_budget, self.thinking_max_tokens)
             response = self.client.chat.completions.create(**kwargs)
         logger.info(
             "[步骤][LLM-Client] 响应: id=%s finish_reason=%s usage=%s 文本=%d字符",
@@ -309,20 +403,30 @@ class OpenAICompatibleLLM:
         messages: ChatMessages,
         *,
         response_format: dict[str, Any],
+        disable_thinking: bool | None = None,
+        max_tokens: int | None = None,
     ) -> Any:
         responses = getattr(self.client, "responses", None)
         create = getattr(responses, "create", None)
         if not callable(create):
             raise RuntimeError("responses API is unavailable: client.responses.create missing")
+        if disable_thinking is None:
+            disable_thinking = self.disable_thinking
+        if max_tokens is None:
+            max_tokens = self.max_tokens
         kwargs: dict[str, Any] = {
             "model": self.model,
             "input": messages,
             "temperature": 0,
-            "max_output_tokens": self.max_tokens,
+            "max_output_tokens": max_tokens,
             "text": {"format": response_format},
         }
+        # disable_thinking=True 时直接省略 reasoning 字段即可关闭思考：
+        # 部分 OpenAI 兼容的 Responses 实现会拒绝 reasoning 参数，
+        # 不下发它比先下发再回退更稳妥。thinking 开时同样省略该字段，
+        # 但使用更大的 max_output_tokens，避免思考链把 JSON 截断。
         if (
-            self.disable_thinking
+            disable_thinking
             and _is_official_deepseek_endpoint(self.base_url)
             and _is_deepseek_model(self.model)
         ):
@@ -337,8 +441,22 @@ class OpenAICompatibleLLM:
         *,
         response_mode: str,
         response_format: dict[str, Any] | None = None,
+        disable_thinking: bool | None = None,
+        max_tokens: int | None = None,
+        pass_name: str = "",
     ) -> StructuredLLMResponse:
-        response = self._create(messages, response_format=response_format)
+        disable, token_budget = self.resolve_call_budget(
+            pass_name,
+            disable_thinking=disable_thinking,
+            max_tokens=max_tokens,
+        )
+        response = self._create(
+            messages,
+            response_format=response_format,
+            disable_thinking=disable,
+            max_tokens=token_budget,
+            pass_name=pass_name,
+        )
         text = self._chat_text(response)
         finish_reason = self._chat_finish_reason(response)
         return StructuredLLMResponse(
@@ -348,6 +466,8 @@ class OpenAICompatibleLLM:
             status=self._response_status(response, text=text, finish_reason=finish_reason),
             finish_reason=finish_reason,
             usage=_usage_dict(_field(response, "usage")),
+            thinking="disabled" if disable else "enabled",
+            max_tokens=token_budget,
         )
 
     def _responses_structured(
@@ -355,8 +475,15 @@ class OpenAICompatibleLLM:
         messages: ChatMessages,
         *,
         response_format: dict[str, Any],
+        disable_thinking: bool,
+        max_tokens: int,
     ) -> StructuredLLMResponse:
-        response = self._responses_create(messages, response_format=response_format)
+        response = self._responses_create(
+            messages,
+            response_format=response_format,
+            disable_thinking=disable_thinking,
+            max_tokens=max_tokens,
+        )
         text = self._responses_text(response)
         incomplete_details = _incomplete_details_dict(_field(response, "incomplete_details"))
         return StructuredLLMResponse(
@@ -367,6 +494,8 @@ class OpenAICompatibleLLM:
             finish_reason=str(_field(response, "finish_reason", "") or "") or None,
             incomplete_details=incomplete_details,
             usage=_usage_dict(_field(response, "usage")),
+            thinking="disabled" if disable_thinking else "enabled",
+            max_tokens=max_tokens,
         )
 
     def __call__(self, messages: ChatMessages) -> str:
@@ -383,6 +512,14 @@ class OpenAICompatibleLLM:
         response_mode = str(context.get("response_mode") or "json_schema")
         if response_mode not in {"json_schema", "json_object", "plain"}:
             raise ValueError(f"response_mode 仅支持 json_schema/json_object/plain，收到 {response_mode!r}")
+        pass_name = str(context.get("pass_name") or "")
+        disable_thinking = context.get("disable_thinking")
+        requested_max_tokens = context.get("max_tokens")
+        disable, token_budget = self.resolve_call_budget(
+            pass_name,
+            disable_thinking=None if disable_thinking is None else bool(disable_thinking),
+            max_tokens=None if requested_max_tokens is None else int(requested_max_tokens),
+        )
         schema_name = str(context.get("schema_name") or context.get("pass_name") or "extraction")
         schema_name = "".join(char if char.isalnum() or char in "_-" else "_" for char in schema_name)[:64]
         response_format = {
@@ -391,46 +528,60 @@ class OpenAICompatibleLLM:
             "strict": True,
             "schema": schema,
         }
+        chat_kwargs = {
+            "disable_thinking": disable,
+            "max_tokens": token_budget,
+            "pass_name": pass_name,
+        }
         if response_mode == "plain":
-            return self._chat_structured(messages, response_mode="plain")
+            return self._chat_structured(messages, response_mode="plain", **chat_kwargs)
         if response_mode == "json_object":
             try:
                 return self._chat_structured(
                     messages,
                     response_mode="json_object",
                     response_format={"type": "json_object"},
+                    **chat_kwargs,
                 )
             except Exception as exc:  # noqa: BLE001 - older providers may reject all JSON modes
                 if not _unsupported_parameter(exc):
                     raise
-            return self._chat_structured(messages, response_mode="plain")
+            return self._chat_structured(messages, response_mode="plain", **chat_kwargs)
         if _is_deepseek_model(self.model) and not _deepseek_strict_schema_compatible(schema):
             return self._chat_structured(
                 messages,
                 response_mode="json_object",
                 response_format={"type": "json_object"},
+                **chat_kwargs,
             )
-        if _is_deepseek_v4_flash(self.model) and not _is_official_deepseek_endpoint(self.base_url):
+        official_deepseek = _is_official_deepseek_endpoint(self.base_url)
+        prefer_chat_json_schema = (
             # 该模型在 MaaS 的 Responses 路径上会超时/返回空数组/截断 JSON；
             # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
-            # 对所有 pass（实体/属性/关系/修复/核验）统一生效。
+            # 对所有 pass（实体/属性/关系/修复/核验）统一生效；官方 DeepSeek 端点除外。
+            (_is_deepseek_v4_flash(self.model) and not official_deepseek)
+            or (not official_deepseek and bool(context.get("record_table")))
+            or bool(context.get("prefer_chat_json_schema"))
+            or not disable
+        )
+        if prefer_chat_json_schema:
             try:
                 return self._chat_structured(
                     messages,
                     response_mode="json_schema",
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": schema_name or "extraction",
-                            "strict": True,
-                            "schema": schema,
-                        },
-                    },
+                    response_format=_chat_json_schema_format(schema_name, schema),
+                    **chat_kwargs,
                 )
-            except Exception:  # noqa: BLE001 - 兼容性回退，继续走原有链路
-                pass
+            except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
+                if not _unsupported_parameter(exc):
+                    raise
         try:
-            return self._responses_structured(messages, response_format=response_format)
+            return self._responses_structured(
+                messages,
+                response_format=response_format,
+                disable_thinking=disable,
+                max_tokens=token_budget,
+            )
         except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
             if not _unsupported_parameter(exc):
                 raise
@@ -439,11 +590,12 @@ class OpenAICompatibleLLM:
                 messages,
                 response_mode="json_object",
                 response_format={"type": "json_object"},
+                **chat_kwargs,
             )
         except Exception as exc:  # noqa: BLE001 - older providers may reject all JSON modes
             if not _unsupported_parameter(exc):
                 raise
-        return self._chat_structured(messages, response_mode="plain")
+        return self._chat_structured(messages, response_mode="plain", **chat_kwargs)
 
 
 def create_llm_client(
@@ -483,7 +635,14 @@ def create_llm_client(
             config["disable_thinking"] if disable_thinking is None else disable_thinking
         ),
         base_url=effective_base_url,
+        thinking_passes=config["thinking_passes"],
+        thinking_max_tokens=config["thinking_max_tokens"],
     )
 
 
-__all__ = ["OpenAICompatibleLLM", "StructuredLLMResponse", "create_llm_client"]
+__all__ = [
+    "OpenAICompatibleLLM",
+    "StructuredLLMResponse",
+    "create_llm_client",
+    "thinking_enabled_for",
+]
