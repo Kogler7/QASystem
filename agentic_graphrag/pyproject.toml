@@ -1,0 +1,23 @@
+[project]
+name = "agentic-graphrag"
+version = "0.1.0"
+description = "Skill and MCP driven Agentic GraphRAG system."
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "pydantic>=2",
+  "uvicorn>=0.27",
+]
+
+[project.optional-dependencies]
+mcp = [
+  "mcp>=1.0.0",
+  "fastmcp>=0.4.0",
+]
+test = [
+  "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

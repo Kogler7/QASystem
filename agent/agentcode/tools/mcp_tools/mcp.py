@@ -35,6 +35,11 @@ def _normalize_windows_stdio_command(
     return command, args or [], env or {}
 
 
+def _merge_stdio_env(env: dict[str, str] | None) -> dict[str, str]:
+    """Merge stdio server env overrides with the current process env."""
+    return {**os.environ, **(env or {})}
+
+
 async def connect_single_server(
     name: str, cfg: dict[str, Any]
 ) -> tuple[str, Any, Any]:
@@ -75,11 +80,18 @@ async def connect_single_server(
             command, args, env = _normalize_windows_stdio_command(
                 cfg.get("command") or "",
                 cfg.get("args", []),
-                cfg.get("env"),
+                _merge_stdio_env(cfg.get("env")),
             )
             if not command:
                 raise ValueError("stdio transport requires 'command' field")
-            params = StdioServerParameters(command=command, args=args, env=env)
+            params_kwargs = {"command": command, "args": args, "env": env}
+            if cfg.get("cwd"):
+                params_kwargs["cwd"] = cfg["cwd"]
+            try:
+                params = StdioServerParameters(**params_kwargs)
+            except TypeError:
+                params_kwargs.pop("cwd", None)
+                params = StdioServerParameters(**params_kwargs)
             read, write = await stack.enter_async_context(stdio_client(params))
 
         elif transport == "sse":
@@ -231,6 +243,8 @@ class MCPToolWrapper:
                     cfg["command"] = srv.command
                 if srv.args:
                     cfg["args"] = srv.args
+                if srv.cwd:
+                    cfg["cwd"] = srv.cwd
                 if srv.env:
                     cfg["env"] = srv.env
                 if srv.headers:

@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "graph-search": {
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:51006/mcp"
+    },
+    "knowledge-space-locator": {
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:51015/mcp"
+    },
+    "intent": {
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:8891/mcp"
+    },
+    "plan": {
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:8892/mcp"
+    },
+    "sql": {
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:8889/mcp"
+    }
+  }
+}
