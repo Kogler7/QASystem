@@ -23,6 +23,12 @@
 - `latest` 必须是带完整代码的实体目录，不得是 `v3` 的软链或运行时映射；`KG_EXTRACT_ALGO_VERSION=latest` 直接运行 `latest` 包。
 - 评测输出统一写到 `./tmp/` 并按算法/版本/时间隔离，不污染源码目录或 golden 数据。
 
+# Test Maintenance Rules
+
+- Any commit that changes observable behavior of an algorithm or service must update the tests covering that behavior in the same commit. Do not push behavior changes with failing or stale tests.
+- Tests under `tests/` encode production contracts (e.g. the splitter's `__source_range` metadata consumed by `algorithm/knowledge_pipeline/chunking.py`). Dropping or changing such a contract requires updating every consumer in the same commit.
+- If a merge brings in changes that break existing tests, the person merging must reconcile them before pushing — either restore the contract or update the tests to the new intended behavior. Never delete or silence failing tests just to get green.
+
 # Documentation Index
 
 - [Plugin and database environment](docs/插件与数据库环境索引.md): local VSIX, Attu/Milvus, Neo4j browser, and data-access boundaries.
