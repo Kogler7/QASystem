@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 import unittest
 
-from knowledge_extract_v2.llm_client import OpenAICompatibleLLM
+from algorithm.knowledge_extract.v3.llm_client import OpenAICompatibleLLM
 
 
 class _Completions:

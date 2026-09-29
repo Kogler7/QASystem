@@ -16,7 +16,7 @@ class BenchmarkTests(unittest.TestCase):
                   'diagnostics':[{'code':'HTTP_402'}], 'stats':{'calls':1}}
         with patch('eval.legacy.v2v3_benchmark._chunks',return_value=[]), \
              patch('eval.legacy.v2v3_benchmark.ontology_files',return_value=[]), \
-             patch('algorithm.knowledge_extract.v3.extract_detailed',return_value=result):
+             patch('algorithm.knowledge_extract.v3.harness_extractor.extract_harness',return_value=result):
             run = run_case({}, 'v3', object())
         self.assertEqual(run['status'],'failed')
         self.assertEqual(run['diagnostics'],result['diagnostics'])

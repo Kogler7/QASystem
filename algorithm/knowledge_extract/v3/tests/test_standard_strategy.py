@@ -1,7 +1,7 @@
 """Phase 1 Step 5 单元测试：Standard Strategy（§10-§11）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_standard_strategy.py
+    python algorithm/knowledge_extract/v3/tests/test_standard_strategy.py
 
 覆盖：
 - §11.1 确定性抽取：文档元数据、结构单元（消费 chunk metadata）、ICS/CCS；
@@ -41,16 +41,19 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
         parent.__package__ = package_name
         sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
+    # 策略模块（standard_strategy / official_document_strategy）现作为在线代码
+    # 维护在 v2 包内；v3 不携带副本，测试从 v2 目录加载并以 archive 子包命名。
+    strategy_dir = directory.parent / "v2"
     for stem in stems:
         src = directory / f"{stem}.py"
         module_name = f"{package_name}.{stem}"
-        if not src.exists() and (directory / "archive" / f"{stem}.py").exists():
-            src = directory / "archive" / f"{stem}.py"
+        if not src.exists() and (strategy_dir / f"{stem}.py").exists():
+            src = strategy_dir / f"{stem}.py"
             module_name = f"{package_name}.archive.{stem}"
             pkg_name = f"{package_name}.archive"
             if pkg_name not in sys.modules:
                 pkg = types.ModuleType(pkg_name)
-                pkg.__path__ = [str(directory / "archive")]
+                pkg.__path__ = [str(strategy_dir)]
                 pkg.__package__ = pkg_name
                 sys.modules[pkg_name] = pkg
         if module_name in sys.modules:
@@ -65,7 +68,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -86,7 +89,9 @@ OC = MODULES["ontology_compiler"]
 SS = MODULES["standard_strategy"]
 SE = MODULES["split_extractor"]
 
-from stub_llm import StubLLM, span_item  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_standard_strategy.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM, span_item  # noqa: E402
 
 
 STANDARD_ONTOLOGY = (ONTOLOGIES_DIR / "standard_ontology.puml").read_text(encoding="utf-8")
@@ -141,7 +146,9 @@ class DeterministicExtractionTest(unittest.TestCase):
         standards = [entity for entity in result["entities"] if entity["type"] == "Standard"]
         self.assertEqual(len(standards), 1)
         standard = standards[0]
-        self.assertEqual(standard["name"], "GB/T 31486—2024")
+        # 现行 golden（test_data/eval-v2、eval-v3 的 standard_01）中 Standard 实体
+        # name 采用「标准号 标准名」全标题形式，与确定性补充输出一致。
+        self.assertEqual(standard["name"], "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法")
         self.assertEqual(standard["properties"]["standardNumber"], "GB/T 31486—2024")
         self.assertEqual(standard["properties"]["documentName"], "电动汽车用动力蓄电池电性能要求及试验方法")
         self.assertEqual(standard["properties"]["issuedDate"], "2024-09-29")
@@ -285,8 +292,20 @@ class IntegrationTest(unittest.TestCase):
         )
         self.assertEqual(result["profile"]["document_route"]["kind"], "standard")
         self.assertIsNone(result["error_code"])
-        # 空 LLM 输出 -> 无实体，但契约字段齐全
-        self.assertEqual(result["raw"], {"entities": [], "relations": []})
+        # 空 LLM 输出 -> 无候选实体，但标准结构骨架会确定性补出「参考文献」信息单元
+        self.assertEqual(
+            result["raw"],
+            {
+                "entities": [
+                    {
+                        "type": "InformationUnit",
+                        "name": "参考文献",
+                        "properties": {"内容描述": "", "唯一标识符": ""},
+                    }
+                ],
+                "relations": [],
+            },
+        )
         for key in ("graph", "triples", "intermediate_model", "coverage_gaps", "mapping"):
             self.assertIn(key, result)
 
@@ -316,17 +335,25 @@ class IntegrationTest(unittest.TestCase):
         # ExternalResource 被 CandidateSelector 要求 ontology 关系支撑
         # （referencesExternalResource 属确定性关系、不进入 pair 枚举，
         # 无支撑关系时以 CANDIDATE_UNSUPPORTED_INFORMATION 拒绝），故排除。
+        # Clause 不接受裸 LLM 候选：现行 golden（test_data/eval-v3/standard_01）中
+        # Clause 由结构骨架按「N 标题」确定性产出，命名形式与裸候选不同，故排除。
+        # Property「外观」不在现行 golden 的映射范围内，故排除。
         case = json.loads((CASES_DIR / "01_standard.json").read_text(encoding="utf-8"))
         gold = case["expected"]
         chunks = [CC.ExtractionChunk.from_dict(payload) for payload in structure_chunks(case)]
+        excluded = {("Property", "外观")}
         verbatim = [
             (entity["type"], entity["name"])
             for entity in gold["entities"]
             if entity["name"]
             and entity["type"] != "ExternalResource"
+            and entity["type"] != "Clause"
+            and (entity["type"], entity["name"]) not in excluded
             and any(entity["name"] in chunk.text for chunk in chunks)
         ]
-        self.assertGreaterEqual(len(verbatim), 10)
+        # 排除后剩余 verbatim 样本（Clause 由结构骨架确定性产出、Property「外观」不在
+        # 现行 golden 映射范围内，均排除后约 8 条），仍需覆盖足够多的类型才有意义。
+        self.assertGreaterEqual(len(verbatim), 8)
 
         def entity_handler(prompt: str, chunk: dict) -> list[dict]:
             text = chunk.get("text") or ""

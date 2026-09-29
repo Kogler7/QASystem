@@ -1,4 +1,4 @@
-"""knowledge_extract_v2 测试共享的 stub LLM（重构后两段式 + 属性补全 + pair 关系分类协议）。
+"""knowledge_extract_v3 测试共享的 stub LLM（重构后两段式 + 属性补全 + pair 关系分类协议）。
 
 当前 extract_split 的 LLM 契约（见 prompt_router.build_chat_messages）：
 - entity   pass：响应 {"entities": [{type, mention, start_char, end_char, evidence:{quote}}]}，

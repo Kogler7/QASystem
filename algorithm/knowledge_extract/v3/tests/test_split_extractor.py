@@ -1,7 +1,7 @@
 """Phase 1 Step 4 单元测试：Entity / Relation 拆分（Two-Pass）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_split_extractor.py
+    python algorithm/knowledge_extract/v3/tests/test_split_extractor.py
 
 覆盖（重构后协议）：
 - prompt 契约：实体 pass 只给类型目录、禁关系；关系 pass 为候选 pair 分类；
@@ -58,7 +58,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -87,7 +87,9 @@ CG = MODULES["candidate_generation"]
 PE = MODULES["property_enrichment"]
 V = MODULES["verification"]
 
-from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_split_extractor.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 RULE_ONTOLOGY = """@startuml rule-ontology
@@ -1845,8 +1847,8 @@ class FailureAndEdgeTest(unittest.TestCase):
             llm=llm,
         )
         self.assertEqual(result["raw"], {"entities": [], "relations": []})
-        # 实体 pass 有界重试（默认 3 次）后终止；无实体 -> 不触发关系/属性 pass
-        self.assertEqual(len(result["attempts"]), 3)
+        # v3 实体 pass：1 次 json 尝试 + 1 次 json 恢复尝试后终止；无实体 -> 不触发关系/属性 pass
+        self.assertEqual(len(result["attempts"]), 2)
         self.assertTrue(all(attempt["type"] == "json" for attempt in result["attempts"]))
         self.assertEqual(result["error_code"], "LLM_JSON_PARSE_FAILED")
 

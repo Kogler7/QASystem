@@ -23,11 +23,19 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
             uid = str(node.get("uid") or "")
             if not uid:
                 continue
+            # 投影节点自带证据回溯的 chunk_indices（跨 chunk 闭包拷贝也保留来源），
+            # 合并时必须沿用；仅当节点未携带来源信息时才回退到所在 item 的下标。
+            projected_indices = node.get("chunk_indices")
+            source_indices = (
+                list(dict.fromkeys(projected_indices))
+                if isinstance(projected_indices, list)
+                else [chunk_index]
+            )
             if uid not in nodes_by_uid:
                 nodes_by_uid[uid] = {
                     **node,
                     "properties": dict(node.get("properties") or {}),
-                    "chunk_indices": [chunk_index],
+                    "chunk_indices": source_indices,
                 }
             else:
                 nodes_by_uid[uid]["properties"] = merge_node_properties(
@@ -35,8 +43,9 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                     node.get("properties") or {},
                 )
                 chunk_indices = nodes_by_uid[uid].setdefault("chunk_indices", [])
-                if chunk_index not in chunk_indices:
-                    chunk_indices.append(chunk_index)
+                for source_index in source_indices:
+                    if source_index not in chunk_indices:
+                        chunk_indices.append(source_index)
 
     valid_uids = set(nodes_by_uid)
 

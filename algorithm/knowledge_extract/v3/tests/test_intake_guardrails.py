@@ -1,7 +1,7 @@
 """第一步入口护栏测试：空本体失败、chunk 容错与元数据补全、点分 UID 解析。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_intake_guardrails.py
+    python algorithm/knowledge_extract/v3/tests/test_intake_guardrails.py
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -69,7 +69,9 @@ RS = MODULES["run_state"]
 OS = MODULES["ontology_schema"]
 HE = MODULES["harness_extractor"]
 
-from stub_llm import StubLLM  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_intake_guardrails.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM  # noqa: E402
 
 
 SIMPLE_ONTOLOGY = '@startuml\nclass "术语" as Terminology\n@enduml'

@@ -4,18 +4,18 @@ import json
 import unittest
 from unittest.mock import patch
 
-from algorithm.knowledge_extract_v2.chunk_context import ExtractionChunk
-from algorithm.knowledge_extract_v2.official_document_scope import (
+from algorithm.knowledge_extract.v3.chunk_context import ExtractionChunk
+from algorithm.knowledge_extract.v3.official_document_scope import (
     annotate_official_roles,
     looks_like_official_form,
     management_type_ids,
     official_entity_types,
     official_role,
 )
-from algorithm.knowledge_extract_v2.ontology_compiler import compile_plan
-from algorithm.knowledge_extract_v2.prompt_router import DocumentRoute
-from algorithm.knowledge_extract_v2.split_extractor import extract_split
-from algorithm.knowledge_extract_v2.verification import VerificationIssue, VerificationReport
+from algorithm.knowledge_extract.v3.ontology_compiler import compile_plan
+from algorithm.knowledge_extract.v3.prompt_router import DocumentRoute
+from algorithm.knowledge_extract.v3.split_extractor import extract_split
+from algorithm.knowledge_extract.v3.verification import VerificationIssue, VerificationReport
 
 
 ONTOLOGY = """
@@ -254,7 +254,7 @@ class OfficialDocumentScopeTests(unittest.TestCase):
             return {"relations": []}
 
         with patch(
-            "algorithm.knowledge_extract_v2.split_extractor.ExtractionVerifier.verify",
+            "algorithm.knowledge_extract.v3.split_extractor.ExtractionVerifier.verify",
             return_value=VerificationReport((issue,)),
         ):
             result = extract_split(

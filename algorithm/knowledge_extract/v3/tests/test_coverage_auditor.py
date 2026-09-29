@@ -1,7 +1,7 @@
 """Phase 1 Step 9 单元测试：通用 Coverage Auditor（§22-§23 / AC-8）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_coverage_auditor.py
+    python algorithm/knowledge_extract/v3/tests/test_coverage_auditor.py
 
 覆盖：
 - §23.2 Feature Coverage（非 required 提示 / required 硬错误）；
@@ -54,7 +54,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -74,7 +74,9 @@ CV = MODULES["coverage"]
 OC = MODULES["ontology_compiler"]
 SE = MODULES["split_extractor"]
 
-from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_coverage_auditor.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8")

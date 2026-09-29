@@ -460,16 +460,16 @@ def test_extract_chunks_stamps_extract_version_in_quality(monkeypatch):
 
 
 def _stub_v3_client(monkeypatch):
-    """v3 shim 经 v2 的 create_llm_client 取客户端；测试里替换成哑对象即可。"""
+    """v3 的 create_llm_client 在 fake 路径下不应被调用；测试里替换成哑对象兜底。"""
 
     class DummyLLM:
         max_tokens = 16384
 
         def generate_structured(self, *_args, **_kwargs):  # pragma: no cover - 不会被调到
-            raise AssertionError("fake extract_detailed 不应真的调用 LLM")
+            raise AssertionError("fake extract_aggregate 不应真的调用 LLM")
 
     monkeypatch.setattr(
-        "algorithm.knowledge_extract.v2.llm_client.create_llm_client",
+        "algorithm.knowledge_extract.v3.llm_client.create_llm_client",
         lambda **_kwargs: DummyLLM(),
     )
 
@@ -478,44 +478,58 @@ def test_v3_result_is_converted_and_projected_onto_chunks(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3")
     _stub_v3_client(monkeypatch)
 
-    def fake_extract_detailed(chunks, ontology, *, llm=None, max_workers=4, **_kwargs):
+    def fake_extract_aggregate(ontology, *, chunks, **_kwargs):
         assert ontology == "class Term"
         assert [chunk.chunk_id for chunk in chunks] == ["chunk-0000", "chunk-0001"]
+        # 新契约：extract_aggregate 返回 harness 聚合契约（graph/raw/
+        # intermediate_model/attempts/warnings/profile/verification）。
         return {
-            "status": "success",
-            "entities": [
-                {
-                    "type": "Term",
-                    "name": "A",
-                    "properties": {"定义": "甲"},
-                    "source_refs": [{"chunk_id": "chunk-0000", "quote": "A"}],
-                },
-                {
-                    "type": "Term",
-                    "name": "B",
-                    "properties": {},
-                    "source_refs": [{"chunk_id": "chunk-0001"}],
-                },
+            "status": "succeeded",
+            "graph": {
+                "nodes": [
+                    {"uid": "Term::a", "label": "Term", "properties": {"name": "A", "定义": "甲"}},
+                    {"uid": "Term::b", "label": "Term", "properties": {"name": "B"}},
+                ],
+                "relationships": [
+                    {
+                        "from_uid": "Term::a",
+                        "to_uid": "Term::b",
+                        "type": "RELATED",
+                        "evidence": {"source_block_ids": ["chunk-0001"], "quote": "A 与 B 相关"},
+                    }
+                ],
+            },
+            "raw": {
+                "entities": [],
+                "relations": [
+                    {
+                        "from_type": "Term",
+                        "from_name": "A",
+                        "rel_type": "RELATED",
+                        "to_type": "Term",
+                        "to_name": "B",
+                    }
+                ],
+            },
+            "intermediate_model": {
+                "objects": [
+                    {"id": "e0", "type": "Term", "identity": "A",
+                     "evidence": [{"source_block_ids": ["chunk-0000"], "quote": "A"}]},
+                    {"id": "e1", "type": "Term", "identity": "B",
+                     "evidence": [{"source_block_ids": ["chunk-0001"], "quote": "B"}]},
+                ],
+                "relations": [],
+            },
+            "attempts": [
+                {"type": "invalid_json", "chunk": "chunk-0001",
+                 "message": "return one complete JSON object"},
             ],
-            "relations": [
-                {
-                    "from_type": "Term",
-                    "from_name": "A",
-                    "rel_type": "RELATED",
-                    "to_type": "Term",
-                    "to_name": "B",
-                    "source_refs": [{"chunk_id": "chunk-0001", "quote": "A 与 B 相关"}],
-                }
-            ],
-            "diagnostics": [
-                {"code": "AUDIT_COVERAGE", "document_id": "doc", "visited": 1},
-                {"code": "INVALID_JSON", "message": "return one complete JSON object",
-                 "observation_id": "chunk-0001"},
-            ],
-            "stats": {"calls": 2, "prompt_version": "v3.7-source-names"},
+            "warnings": [],
+            "profile": {},
+            "verification": {"valid": True},
         }
 
-    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_detailed", fake_extract_detailed)
+    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_aggregate", fake_extract_aggregate)
 
     items = adapter.extract_chunks("class Term", ["文本A", "文本B"])
 
@@ -523,7 +537,7 @@ def test_v3_result_is_converted_and_projected_onto_chunks(monkeypatch):
     assert all(item["quality"]["extract_version"] == "v3" for item in items)
     assert all(item["quality"]["status"] == "succeeded" for item in items)
 
-    # 实体按 source_refs 的 chunk_id 投影：A 在 chunk 0，B 在 chunk 1
+    # 实体按证据 source_block_ids 投影：A 在 chunk 0，B 在 chunk 1
     assert [node["uid"] for node in items[0]["graph"]["nodes"]] == ["Term::a"]
     assert items[0]["graph"]["nodes"][0]["properties"] == {"name": "A", "定义": "甲"}
     assert items[0]["graph"]["relationships"] == []
@@ -543,33 +557,43 @@ def test_v3_result_is_converted_and_projected_onto_chunks(monkeypatch):
     merged = capabilities.deduplicate_chunk_graphs(items)
     assert {node["uid"] for node in merged["nodes"]} == {"Term::a", "Term::b"}
 
-    # v3 的诊断转成非终态 attempts，只作观察，不把 chunk 标失败
+    # 非终态 attempt（invalid_json）只作观察，不把 chunk 标失败
     assert any(attempt["type"] == "invalid_json" for attempt in items[1]["attempts"])
-    assert items[1]["profile"]["extract_stats"]["prompt_version"] == "v3.7-source-names"
+    assert items[1]["error"] is None
 
 
 def test_v3_incomplete_status_keeps_chunks_publishable(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3")
     _stub_v3_client(monkeypatch)
 
-    def fake_extract_detailed(chunks, ontology, *, llm=None, **_kwargs):
+    def fake_extract_aggregate(ontology, *, chunks, **_kwargs):
         return {
             "status": "incomplete",
-            "entities": [
-                {"type": "Term", "name": "A", "properties": {},
-                 "source_refs": [{"chunk_id": "chunk-0000"}]},
-            ],
-            "relations": [],
-            "diagnostics": [{"code": "CALL_BUDGET_EXHAUSTED", "message": "request not sent"}],
-            "stats": {},
+            "graph": {
+                "nodes": [{"uid": "Term::a", "label": "Term", "properties": {"name": "A"}}],
+                "relationships": [],
+            },
+            "raw": {"entities": [], "relations": []},
+            "intermediate_model": {
+                "objects": [
+                    {"id": "e0", "type": "Term", "identity": "A",
+                     "evidence": [{"source_block_ids": ["chunk-0000"]}]},
+                ],
+                "relations": [],
+            },
+            "attempts": [],
+            "warnings": [],
+            "profile": {},
+            "verification": {"valid": True},
         }
 
-    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_detailed", fake_extract_detailed)
+    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_aggregate", fake_extract_aggregate)
 
     items = adapter.extract_chunks("class Term", ["文本A", "文本B"])
 
     assert all(item["error"] is None for item in items)
-    assert all(item["quality"]["status"] == "partial" for item in items)
+    # quality.status 由聚合 status 原样透传：incomplete -> partial 语义由评测侧解释
+    assert all(item["quality"]["status"] == "incomplete" for item in items)
     assert all(item["quality"]["graph_publishable"] is True for item in items)
     assert [node["uid"] for node in items[0]["graph"]["nodes"]] == ["Term::a"]
 
@@ -578,16 +602,19 @@ def test_v3_failed_status_fails_every_chunk(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3")
     _stub_v3_client(monkeypatch)
 
-    def fake_extract_detailed(chunks, ontology, *, llm=None, **_kwargs):
+    def fake_extract_aggregate(ontology, *, chunks, **_kwargs):
         return {
             "status": "failed",
-            "entities": [],
-            "relations": [],
-            "diagnostics": [{"code": "TRANSPORT_ERROR", "message": "LLM request failed"}],
-            "stats": {},
+            "graph": {"nodes": [], "relationships": []},
+            "raw": {"entities": [], "relations": []},
+            "intermediate_model": {"objects": [], "relations": []},
+            "attempts": [],
+            "warnings": [],
+            "profile": {},
+            "verification": {"valid": False},
         }
 
-    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_detailed", fake_extract_detailed)
+    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_aggregate", fake_extract_aggregate)
 
     items = adapter.extract_chunks("class Term", ["文本A", "文本B"])
 

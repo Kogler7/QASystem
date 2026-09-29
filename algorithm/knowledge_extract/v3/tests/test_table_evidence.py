@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from knowledge_extract_v2.table_evidence import rule_candidate_in_scope, table_source_span
+from algorithm.knowledge_extract.v3.table_evidence import rule_candidate_in_scope, table_source_span
 
 
 def _decision(*rows, reasons=()):

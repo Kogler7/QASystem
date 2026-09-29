@@ -4,14 +4,14 @@ import json
 import unittest
 from pathlib import Path
 
-from algorithm.knowledge_extract_v2.candidate_generation import entity_pass
-from algorithm.knowledge_extract_v2.chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
-from algorithm.knowledge_extract_v2.ontology_compiler import compile_plan
-from algorithm.knowledge_extract_v2.ontology_schema import OntologySchema
-from algorithm.knowledge_extract_v2.prompt_router import DocumentRoute, build_chat_messages
-from algorithm.knowledge_extract_v2.table_semantics import analyze_table_semantics
-from algorithm.knowledge_extract_v2.split_extractor import extract_split
-from algorithm.knowledge_extract_v2.tests.stub_llm import (
+from algorithm.knowledge_extract.v3.candidate_generation import entity_pass
+from algorithm.knowledge_extract.v3.chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
+from algorithm.knowledge_extract.v3.ontology_compiler import compile_plan
+from algorithm.knowledge_extract.v3.ontology_schema import OntologySchema
+from algorithm.knowledge_extract.v3.prompt_router import DocumentRoute, build_chat_messages
+from algorithm.knowledge_extract.v3.table_semantics import analyze_table_semantics
+from algorithm.knowledge_extract.v3.split_extractor import extract_split
+from algorithm.knowledge_extract.v3.tests.stub_llm import (
     StubLLM,
     current_chunk,
     parse_known_entities,
@@ -20,8 +20,8 @@ from algorithm.knowledge_extract_v2.tests.stub_llm import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[3]
-RULE_ONTOLOGY = (ROOT / "offline_ingestion/规则/ontology/rule.puml").read_text(
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+RULE_ONTOLOGY = (FIXTURES / "ontologies/rule_ontology.puml").read_text(
     encoding="utf-8"
 )
 

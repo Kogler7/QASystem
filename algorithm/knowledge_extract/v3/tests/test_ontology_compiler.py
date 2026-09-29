@@ -1,7 +1,7 @@
 """Phase 1 Step 2 单元测试：Ontology Compiler / TargetScope / Schema QA。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_ontology_compiler.py
+    python algorithm/knowledge_extract/v3/tests/test_ontology_compiler.py
 
 覆盖：
 - class hierarchy / properties（含继承）/ relations / identity / cardinality 编译；
@@ -49,7 +49,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     ["graph_utils", "ontology_schema", "ontology_compiler"],
 )

@@ -1,7 +1,7 @@
 """Phase 1 Step 10 单元测试：GraphAssembler + Compat（§26-§28）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_graph_assembler.py
+    python algorithm/knowledge_extract/v3/tests/test_graph_assembler.py
 
 覆盖：
 - §26 O2：O1 objects/relations -> nodes / relationships / triples；
@@ -55,7 +55,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -78,7 +78,9 @@ SE = MODULES["split_extractor"]
 BATCH = MODULES["batch"]
 COVERAGE = MODULES["coverage"]
 
-from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_graph_assembler.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 OBJECTS = [

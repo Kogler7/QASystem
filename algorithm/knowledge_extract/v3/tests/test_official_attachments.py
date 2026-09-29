@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from knowledge_extract_v2.official_attachments import (
+from algorithm.knowledge_extract.v3.official_attachments import (
     add_official_attachment_entities,
     build_official_attachment_entities,
 )

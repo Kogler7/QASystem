@@ -1,7 +1,7 @@
 """文档路由改造（强信号多标签 + 按文档分段）单元测试。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_document_route_multilabel.py
+    python algorithm/knowledge_extract/v3/tests/test_document_route_multilabel.py
 
 覆盖：
 - 强信号修复：CJK 相邻标准号（无空格）、企业公文标题、文号；
@@ -35,7 +35,8 @@ REPO_ROOT = PACKAGE_DIR.parents[1]
 FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
 ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
 CASES_DIR = FIXTURES_DIR / "cases"
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
+REPO_ROOT = Path(__file__).resolve().parents[4]
+BENCHMARK_DIR = REPO_ROOT / "test_data" / "eval-v3"
 TESTS_DIR = PACKAGE_DIR / "tests"
 if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
@@ -68,7 +69,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -102,7 +103,9 @@ CS = MODULES["candidate_selector"]
 MODELS = MODULES["candidate_models"]
 EVID = MODULES["evidence"]
 
-from stub_llm import StubLLM  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_document_route_multilabel.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM  # noqa: E402
 
 
 OFFICIAL_ONTOLOGY = (ONTOLOGIES_DIR / "official_document_ontology.puml").read_text(encoding="utf-8")

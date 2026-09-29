@@ -1,7 +1,7 @@
 """Phase 1 Step 7 单元测试：复合元素（§21 CompositeElementHandler，AC-6）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_composite.py
+    python algorithm/knowledge_extract/v3/tests/test_composite.py
 
 覆盖：
 - §21 CompositeSpec 自动发现（CompositeRule hasSubRule SimpleRule +
@@ -54,7 +54,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -72,7 +72,9 @@ CC = MODULES["chunk_context"]
 OC = MODULES["ontology_compiler"]
 SE = MODULES["split_extractor"]
 
-from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_composite.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8")

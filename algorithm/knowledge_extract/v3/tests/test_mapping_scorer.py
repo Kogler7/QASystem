@@ -1,7 +1,7 @@
 """Phase 1 Step 8 单元测试：Mapping Scorer（§17-§19）。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_mapping_scorer.py
+    python algorithm/knowledge_extract/v3/tests/test_mapping_scorer.py
 
 覆盖：
 - §17 权重/阈值配置（归一化、非法阈值拒绝、权重影响总分）；
@@ -55,7 +55,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     [
         "config",
@@ -75,7 +75,9 @@ OC = MODULES["ontology_compiler"]
 SE = MODULES["split_extractor"]
 CC = MODULES["chunk_context"]
 
-from stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # 允许独立运行（python tests/test_mapping_scorer.py）
+
+from algorithm.knowledge_extract.v3.tests.stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
 
 
 RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-8")

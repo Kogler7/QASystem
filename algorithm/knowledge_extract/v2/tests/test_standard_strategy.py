@@ -131,7 +131,9 @@ class DeterministicExtractionTest(unittest.TestCase):
         standards = [entity for entity in result["entities"] if entity["type"] == "Standard"]
         self.assertEqual(len(standards), 1)
         standard = standards[0]
-        self.assertEqual(standard["name"], "GB/T 31486—2024")
+        # 现行 golden（test_data/eval-v2、eval-v3 的 standard_01）中 Standard 实体
+        # name 采用「标准号 标准名」全标题形式，与确定性补充输出一致。
+        self.assertEqual(standard["name"], "GB/T 31486—2024 电动汽车用动力蓄电池电性能要求及试验方法")
         self.assertEqual(standard["properties"]["standardNumber"], "GB/T 31486—2024")
         self.assertEqual(standard["properties"]["documentName"], "电动汽车用动力蓄电池电性能要求及试验方法")
         self.assertEqual(standard["properties"]["issuedDate"], "2024-09-29")

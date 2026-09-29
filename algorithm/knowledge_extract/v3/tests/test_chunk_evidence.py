@@ -1,7 +1,7 @@
 """Phase 1 Step 3 单元测试：ChunkContext + Evidence。
 
 运行（无需 openai / pytest）：
-    python algorithm/knowledge_extract_v2/tests/test_chunk_evidence.py
+    python algorithm/knowledge_extract/v3/tests/test_chunk_evidence.py
 
 覆盖：
 - §5 输入契约：ExtractionRequest 只携带 chunks 与 target_types（text/ontology
@@ -46,7 +46,7 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
 
 
 MODULES = _load_package_modules(
-    "knowledge_extract_v2",
+    "knowledge_extract_v3",
     PACKAGE_DIR,
     ["graph_utils", "chunk_context", "evidence"],
 )

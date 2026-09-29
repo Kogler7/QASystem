@@ -304,6 +304,24 @@ def _chunks(case: dict[str, Any]) -> list[Any]:
     return chunks
 
 
+def _public_result(raw: dict[str, Any], to_public_result: Any) -> dict[str, Any]:
+    """把 harness 聚合契约统一成 benchmark 的 public 结果（v2/v3 共用）。
+
+    旧版 v3 的 extract_detailed 已随 v3 重构移除，v3 与 v2 走同一
+    extract_harness + to_public_result 契约。
+    """
+    if raw.get('status', 'succeeded') == 'succeeded' and not raw.get('error_code'):
+        return to_public_result(raw)
+    accepted = raw.get('raw') or {}
+    return {
+        'status': 'incomplete' if accepted.get('entities') else (raw.get('status') or 'failed'),
+        'entities': [{'type': e.get('type'), 'name': e.get('name'), 'properties': {k: v for k, v in (e.get('properties') or {}).items() if k != 'name'}} for e in accepted.get('entities', [])],
+        'relations': [{key: r.get(key) for key in ('from_type', 'from_name', 'rel_type', 'to_type', 'to_name')} for r in accepted.get('relations', [])],
+        'diagnostics': raw.get('diagnostics') or [{'code': raw.get('error_code') or 'EXTRACTION_INCOMPLETE'}],
+        'stats': raw.get('stats') or {},
+    }
+
+
 def run_case(case: dict[str, Any], version: str, client: Any) -> dict[str, Any]:
     try:
         ontology = "\n\n".join(read_text(p) for p in ontology_files(case)).strip()
@@ -311,20 +329,11 @@ def run_case(case: dict[str, Any], version: str, client: Any) -> dict[str, Any]:
         if version == "v2":
             from algorithm.knowledge_extract.v2.harness_extractor import extract_harness
             from algorithm.knowledge_extract.v2.result_contract import to_public_result
-            raw = extract_harness(ontology=ontology, chunks=chunks, llm=client)
-            if raw.get('status','succeeded') == 'succeeded' and not raw.get('error_code'):
-                result = to_public_result(raw)
-            else:
-                accepted = raw.get('raw') or {}
-                result = {
-                    'status':'incomplete' if accepted.get('entities') else 'failed',
-                    'entities':[{'type':e.get('type'),'name':e.get('name'),'properties':{k:v for k,v in (e.get('properties') or {}).items() if k!='name'}} for e in accepted.get('entities',[])],
-                    'relations':[{key:r.get(key) for key in ('from_type','from_name','rel_type','to_type','to_name')} for r in accepted.get('relations',[])],
-                    'diagnostics':[{'code':raw.get('error_code') or 'V2_INCOMPLETE'}],
-                }
         else:
-            from algorithm.knowledge_extract.v3 import extract_detailed
-            result = extract_detailed(chunks, ontology, llm=client)
+            from algorithm.knowledge_extract.v3.harness_extractor import extract_harness
+            from algorithm.knowledge_extract.v3.result_contract import to_public_result
+        raw = extract_harness(ontology=ontology, chunks=chunks, llm=client)
+        result = _public_result(raw, to_public_result)
         if not isinstance(result, dict) or result.get("status") not in (None, "succeeded", "success", "incomplete", "failed"):
             raise RuntimeError("EXTRACTION_FAILED")
         return {"status": str(result.get("status") or "succeeded"), "prediction": {"entities": result.get("entities") or [], "relations": result.get("relations") or []},
@@ -340,7 +349,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--runs", type=int, default=1)
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--output-dir", required=True, type=Path)
-    ap.add_argument("--api-config", type=Path, default=Path("eval_api.md"))
+    ap.add_argument("--api-config", type=Path, default=Path("eval_api.md"),
+                    help="（已弃用）旧版 client.py 移除后 LLM 连接由 KG_EXTRACT_* 环境变量提供，此参数不再读取")
     ap.add_argument("--freeze-only", action="store_true")
     args = ap.parse_args(argv)
     cases = discover_cases(datasets=DEFAULT_DATASETS)
@@ -363,8 +373,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.freeze_only: return 0
-    from algorithm.knowledge_extract.v3.client import JSONClient, ProviderConfig
-    config = ProviderConfig.from_file(args.api_config)
+    # 旧版 v3/client.py（JSONClient/ProviderConfig）已随 v3 重构移除；
+    # LLM 连接统一由 KG_EXTRACT_* 环境变量提供（两版 harness 的 llm=None 默认路径）。
+    from algorithm.knowledge_extract.v3.config import get_llm_config
+    config = get_llm_config()
     code_hashes = {}
     for version in args.versions:
         version_dir = ROOT / "algorithm" / "knowledge_extract" / f"v{version}"
@@ -376,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     atomic_json_write(out / "run_metadata.json", {
         "started_at": datetime.now(timezone.utc).isoformat(),
         "options": vars(args) | {"output_dir": str(args.output_dir), "api_config": str(args.api_config)},
-        "provider": config.safe_dict(), "code_hashes": code_hashes,
+        "provider": config, "code_hashes": code_hashes,
         "manifest_hash": sha256_file(manifest_path),
     })
     results = {v: [] for v in args.versions}
@@ -393,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
                 checkpoint = out / "checkpoints" / version / f"{case['group']}__{case['case']}__{run_number+1}.json"
                 checkpoint.parent.mkdir(parents=True, exist_ok=True)
                 entry = next(x for x in frozen if x['group'] == case['group'] and x['case'] == case['case'])
-                fingerprint = cache_key(version=version, source_hash=entry['source_hash'], config=config.safe_dict(), version_source_hash=code_hashes[version])
+                fingerprint = cache_key(version=version, source_hash=entry['source_hash'], config=config, version_source_hash=code_hashes[version])
                 if checkpoint.exists():
                     cached = json.loads(checkpoint.read_text(encoding="utf-8"))
                     if cached.get('fingerprint') != fingerprint:
@@ -404,13 +416,13 @@ def main(argv: list[str] | None = None) -> int:
                     run.update(group=case["group"], case=case["case"], run=run_number + 1, score=None, elapsed_seconds=0.0, fingerprint=fingerprint)
                     atomic_json_write(checkpoint, run)
                     return run
-                local_client = JSONClient(config, trace_dir=out / 'calls' / version / f"{case['group']}__{case['case']}__{run_number+1}")
                 print(f"[{datetime.now().isoformat(timespec='seconds')}] {version} run={run_number+1} {case['group']}/{case['case']} started", flush=True)
-                run = run_case(case_frozen, version, local_client)
+                run = run_case(case_frozen, version, None)  # llm=None：由 KG_EXTRACT_* 环境变量构造默认客户端
                 score = score_case(load_golden(case_frozen), run["prediction"], failed=run["status"] == "failed")
                 strict_score = score_case(load_golden(case_frozen),run['prediction'],failed=run['status'] not in {'success','succeeded'})
                 run.update(group=case["group"], case=case["case"], run=run_number + 1, score=score,
-                           strict_score=strict_score, elapsed_seconds=round(time.time()-started, 3), fingerprint=fingerprint, calls=local_client.records)
+                           strict_score=strict_score, elapsed_seconds=round(time.time()-started, 3), fingerprint=fingerprint,
+                           calls=[])  # client.py 移除后逐调用记录暂缺，cost 汇总为空
                 atomic_json_write(checkpoint, run)
                 return run
             with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
@@ -423,7 +435,7 @@ def main(argv: list[str] | None = None) -> int:
                "domain_summary": {v: aggregate_by_domain([r for r in rs if r.get("score")]) for v, rs in results.items()},
                "run_statistics":{v:run_statistics(rows) for v,rows in results.items()},
                "strict_summary":{v:aggregate([r['strict_score'] for r in rows if r.get('strict_score')]) for v,rows in results.items()},
-               "provider":config.safe_dict(), "code_hashes":code_hashes,
+               "provider":config, "code_hashes":code_hashes,
                "cost": {"records": [call for rows in results.values() for row in rows for call in row.get('calls',[])]}}
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     (out / "summary.md").write_text(render_summary(summary), encoding="utf-8")

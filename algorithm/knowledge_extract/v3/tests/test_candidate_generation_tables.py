@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import unittest
 
-from algorithm.knowledge_extract_v2.candidate_generation import _structured_row_segments
-from algorithm.knowledge_extract_v2.chunk_context import ExtractionChunk
+from algorithm.knowledge_extract.v3.candidate_generation import _structured_row_segments
+from algorithm.knowledge_extract.v3.chunk_context import ExtractionChunk
 
 
 def _fenced_table(rows: list[dict[str, str]]) -> str:
