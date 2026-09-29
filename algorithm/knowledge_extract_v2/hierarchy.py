@@ -575,6 +575,7 @@ def assemble_standard_semantic_relations(
         "defines": 0,
         "hasRepresentationForm": 0,
         "usesTerm": 0,
+        "hasNote": 0,
     }
 
     def add(source: Any, target: Any, relation_id: str) -> None:
@@ -628,19 +629,58 @@ def assemble_standard_semantic_relations(
             ]
             owner = matches[0] if len(matches) == 1 else None
         elif clause_number:
+            owner_candidates: list[tuple[str, ...]] = []
             if len(clause_number) == 2 and not str(clause.name).endswith("要求"):
-                owner_number = clause_number[:1]
-            else:
-                owner_number = clause_number
-            matches = [
-                entity for entity in structural
-                if numbered_identifier(entity) == owner_number
-                and _same_source_scope(entity, clause, manager)
-            ]
-            owner = matches[0] if len(matches) == 1 else None
+                owner_candidates.append(clause_number[:1])
+            owner_candidates.append(clause_number)
+            owner = None
+            for owner_number in owner_candidates:
+                matches = [
+                    entity for entity in structural
+                    if numbered_identifier(entity) == owner_number
+                    and _same_source_scope(entity, clause, manager)
+                ]
+                if len(matches) == 1:
+                    owner = matches[0]
+                    break
+            if owner is None:
+                prefixes = [
+                    entity for entity in structural
+                    if (entity_number := numbered_identifier(entity))
+                    and len(entity_number) < len(clause_number)
+                    and tuple(clause_number[: len(entity_number)]) == entity_number
+                    and _same_source_scope(entity, clause, manager)
+                ]
+                if prefixes:
+                    owner = max(prefixes, key=lambda item: len(numbered_identifier(item) or ()))
         if owner is not None:
             add(owner, clause, "hasClause")
     counts["hasClause"] = len(pool.accepted_relations()) - before
+
+    notes = [
+        entity for entity in entities
+        if canonical_name(entity.canonical_type) == canonical_name("Additional Information")
+    ]
+    heading_clauses = [
+        clause for clause in clauses
+        if numbered_identifier(clause) is not None or str(clause.name).startswith(("附录", "参考文献"))
+    ]
+    heading_clauses.sort(key=lambda clause: _position(clause, manager))
+    before = len(pool.accepted_relations())
+    for note in notes:
+        note_position = _position(note, manager)
+        owner = None
+        for clause in heading_clauses:
+            if not _same_source_scope(clause, note, manager):
+                continue
+            clause_position = _position(clause, manager)
+            if clause_position[0] > note_position[0]:
+                break
+            if clause_position[0] == note_position[0] and clause_position[1] <= note_position[1]:
+                owner = clause
+        if owner is not None:
+            add(owner, note, "hasNote")
+    counts["hasNote"] = len(pool.accepted_relations()) - before
 
     terminology = [entity for entity in entities if entity.source == "terminology_definition"]
     before = len(pool.accepted_relations())
@@ -683,7 +723,7 @@ def assemble_standard_semantic_relations(
                 and _same_source_scope(clause, form, manager)
             ]
             owner = matches[0] if len(matches) == 1 else None
-        elif form_type in {"equation", "table"}:
+        elif form_type in {"equation", "table", "figure"}:
             form_position = _position(form, manager)
             preceding = [
                 entity for position, entity in structural_positions

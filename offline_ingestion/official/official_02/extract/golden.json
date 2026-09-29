@@ -1,0 +1,1140 @@
+{
+  "entities": [
+    {
+      "type": "OfficialDocument",
+      "name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "properties": {
+        "领导批示": "请各位领导阅，请各部门经理阅。请技术中心阅办，请规划运营部协同，依据工作方案，按业务领域，明确落实信息公司、数科公司相关工作承担部门与责任人，按期督促，确保按期高质量完成相应工作。规划运营部要结合工作落实需要，协助做好资源配置与投入，确保按计划实施。（赵清宁 2026-05-26 08:51）",
+        "联系电话": "62099",
+        "缓急": "",
+        "来文字号": "中车股份办科信〔2026〕4号",
+        "来文单位": "中国中车股份有限公司",
+        "文件标题": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "文件备注": "",
+        "收文部门": "综合管理部（党群工作部、董事会办公室、企业文化部）",
+        "收文日期": "2026-05-25",
+        "收文号": "信息公司收〔2026〕337号",
+        "拟办意见": "请赵总阅批。（白雪峰 2026-05-25 16:11）",
+        "抄送": "公司领导，总师级领导，纪委副书记、工会副主席。",
+        "密级": "核心商密（保密期限3年）",
+        "主送": "齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部",
+        "主办部门": ""
+      },
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 94,
+        "end_char": 125,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "通知正文",
+      "properties": {
+        "单元标题": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "单元类型": "正文",
+        "原文位置": "《关于印发〈轨道交通装备行业高质量数据集链主任务工作方案〉的通知》正文",
+        "原文内容": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "顺序号": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 391,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "附件说明",
+      "properties": {
+        "单元标题": "附件",
+        "单元类型": "附件说明",
+        "原文位置": "《关于印发〈轨道交通装备行业高质量数据集链主任务工作方案〉的通知》附件",
+        "原文内容": "附件：轨道交通装备行业高质量数据集链主任务工作方案.docx",
+        "顺序号": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "中国中车股份有限公司",
+      "properties": {
+        "主体名称": "中国中车股份有限公司",
+        "主体类型": "组织",
+        "组织层级": "股份公司",
+        "职责": "编制并印发《轨道交通装备行业高质量数据集链主任务工作方案》，组织各承担单位分解落实"
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "各承担单位",
+      "properties": {
+        "主体名称": "各承担单位",
+        "主体类型": "组织",
+        "组织层级": "子公司",
+        "职责": "按照任务分工进行分解落实，健全项目管理机制，加强资源投入，确保按计划完成项目实施"
+      },
+      "evidence": {
+        "quote": "按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 328,
+        "end_char": 371,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "信息公司",
+      "properties": {
+        "主体名称": "信息公司",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "承担方案相关工作任务，按业务领域落实工作承担部门与责任人"
+      },
+      "evidence": {
+        "quote": "收文号: 信息公司收(2026)337号",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 100,
+        "end_char": 120,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "数科公司",
+      "properties": {
+        "主体名称": "数科公司",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "承担方案相关工作任务，按业务领域落实工作承担部门与责任人"
+      },
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "技术中心",
+      "properties": {
+        "主体名称": "技术中心",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "阅办方案，按业务领域牵头落实相关部门工作"
+      },
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "规划运营部",
+      "properties": {
+        "主体名称": "规划运营部",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "协同落实，结合工作落实需要协助做好资源配置与投入"
+      },
+      "evidence": {
+        "quote": "规划运营部要结合工作落实需要,协助做好资源配置与投入,确保按计划实施。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 780,
+        "end_char": 815,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalObject",
+      "name": "轨道交通装备行业高质量数据集",
+      "properties": {
+        "对象类型": "数据",
+        "对象描述": "根据国家数据局行业高质量数据集建设链主任务要求建设的行业高质量数据集",
+        "对象名称": "轨道交通装备行业高质量数据集",
+        "所属领域": "轨道交通装备制造"
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalObject",
+      "name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "properties": {
+        "对象类型": "制度",
+        "对象描述": "股份公司编制的链主任务工作方案（见附件），作为任务分解落实的依据",
+        "对象名称": "轨道交通装备行业高质量数据集链主任务工作方案",
+        "所属领域": "轨道交通装备制造"
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "按任务分工分解落实方案",
+      "properties": {
+        "活动名称": "按任务分工分解落实",
+        "活动描述": "各承担单位按照任务分工进行分解落实",
+        "活动类型": "管理",
+        "动作词": "分解、落实",
+        "预期结果": "按照任务分工进行分解落实",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "健全项目管理机制",
+      "properties": {
+        "活动名称": "健全项目管理机制",
+        "活动描述": "健全项目管理机制",
+        "活动类型": "管理",
+        "动作词": "健全",
+        "预期结果": "健全项目管理机制",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "加强资源投入",
+      "properties": {
+        "活动名称": "加强资源投入",
+        "活动描述": "加强资源投入",
+        "活动类型": "管理",
+        "动作词": "加强",
+        "预期结果": "加强资源投入",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "按计划完成项目实施",
+      "properties": {
+        "活动名称": "按计划完成项目实施",
+        "活动描述": "确保按计划完成项目实施",
+        "活动类型": "实施",
+        "动作词": "完成",
+        "预期结果": "确保按计划完成项目实施",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "打造人工智能高质量数据集建设标杆示范",
+      "properties": {
+        "活动名称": "打造人工智能高质量数据集建设标杆示范",
+        "活动描述": "打造人工智能高质量数据集建设标杆示范",
+        "活动类型": "建设",
+        "动作词": "打造",
+        "预期结果": "打造人工智能高质量数据集建设标杆示范",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "明确工作承担部门与责任人",
+      "properties": {
+        "活动名称": "明确工作承担部门与责任人",
+        "活动描述": "技术中心阅办，规划运营部协同，按业务领域明确落实信息公司、数科公司相关工作承担部门与责任人",
+        "活动类型": "管理",
+        "动作词": "明确、督促",
+        "预期结果": "按业务领域明确落实信息公司、数科公司相关工作承担部门与责任人，按期督促，确保按期高质量完成相应工作",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "将任务分工纳入部门重点工作",
+      "properties": {
+        "活动名称": "将任务分工纳入部门重点工作",
+        "活动描述": "根据各部门任务分工纳入部门重点工作",
+        "活动类型": "管理",
+        "动作词": "纳入",
+        "预期结果": "根据各部门任务分工纳入部门重点工作",
+        "优先级": ""
+      },
+      "evidence": {
+        "quote": "请张欣超阅知，根据各部门任务分工纳入部门重点工作黄准 2026-05-27 16:34",
+        "document": "表单.md",
+        "line_start": 49,
+        "line_end": 49,
+        "start_char": 1648,
+        "end_char": 1691,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "properties": {
+        "信息名称": "轨道交通装备行业高质量数据集链主任务工作方案",
+        "信息类型": "附件",
+        "定义": "股份公司编制的链主任务工作方案，作为通知附件印发",
+        "来源文本": "附件：轨道交通装备行业高质量数据集链主任务工作方案.docx"
+      },
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 92,
+        "end_char": 125,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "印发工作方案通知",
+      "properties": {
+        "交互类型": "通知",
+        "交互描述": "中国中车股份有限公司向各承担单位印发《关于印发〈轨道交通装备行业高质量数据集链主任务工作方案〉的通知》"
+      },
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 92,
+        "end_char": 125,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "协同落实方案任务",
+      "properties": {
+        "交互类型": "协同",
+        "交互描述": "技术中心阅办，规划运营部协同，按业务领域落实信息公司、数科公司相关工作"
+      },
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "semantic_alignment"
+      }
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "按任务分工分解落实要求",
+      "properties": {
+        "强制程度": "应当",
+        "约束原文": "请各承担单位按照任务分工进行分解落实，健全项目管理机制，加强资源投入",
+        "约束名称": "按任务分工分解落实",
+        "约束类型": "流程约束",
+        "校验规则": ""
+      },
+      "evidence": {
+        "quote": "请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 322,
+        "end_char": 358,
+        "support": "explicit"
+      }
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "按计划完成项目实施要求",
+      "properties": {
+        "强制程度": "必须",
+        "约束原文": "确保按计划完成项目实施，打造人工智能高质量数据集建设标杆示范",
+        "约束名称": "按计划完成项目实施",
+        "约束类型": "时间约束",
+        "校验规则": ""
+      },
+      "evidence": {
+        "quote": "确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 360,
+        "end_char": 391,
+        "support": "explicit"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 391,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "附件说明",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车股份有限公司",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "各承担单位",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 371,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "轨道交通装备行业高质量数据集",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 92,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 92,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "健全项目管理机制",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "加强资源投入",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "按计划完成项目实施",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "打造人工智能高质量数据集建设标杆示范",
+      "evidence": {
+        "quote": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 94,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "印发工作方案通知",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 92,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "协同落实方案任务",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "按计划完成项目实施",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "轨道交通装备行业高质量数据集",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "打造人工智能高质量数据集建设标杆示范",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "轨道交通装备行业高质量数据集",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "按计划完成项目实施",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各承担单位",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "明确工作承担部门与责任人",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "信息公司",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "明确工作承担部门与责任人",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "数科公司",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "明确工作承担部门与责任人",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "技术中心",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "将任务分工纳入部门重点工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各承担单位",
+      "evidence": {
+        "quote": "请张欣超阅知，根据各部门任务分工纳入部门重点工作黄准 2026-05-27 16:34",
+        "document": "表单.md",
+        "line_start": 49,
+        "line_end": 49,
+        "start_char": 1648,
+        "end_char": 1691,
+        "support": "endpoint_context"
+      }
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按计划完成项目实施要求",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "按计划完成项目实施",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按任务分工分解落实要求",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "各承担单位",
+      "evidence": {
+        "quote": "请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 322,
+        "end_char": 371,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按计划完成项目实施要求",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "各承担单位",
+      "evidence": {
+        "quote": "按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 328,
+        "end_char": 391,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按计划完成项目实施要求",
+      "rel_type": "CONSTRAINS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "轨道交通装备行业高质量数据集",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "中国中车股份有限公司",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "各承担单位",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 391,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "轨道交通装备行业高质量数据集",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件说明",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件说明",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 92,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "健全项目管理机制",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强资源投入",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "按计划完成项目实施",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "打造人工智能高质量数据集建设标杆示范",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按任务分工分解落实要求",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 391,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按计划完成项目实施要求",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 15,
+        "line_end": 15,
+        "start_char": 259,
+        "end_char": 391,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发工作方案通知",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 92,
+        "end_char": 391,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发工作方案通知",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车股份有限公司",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施, 打造人工智能高质量数据集建设标杆示范。",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 92,
+        "end_char": 392,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发工作方案通知",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "各承担单位",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求, 股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》(见附件), 请各承担单位按照任务分工进行分解落实, 健全项目管理机制, 加强资源投入, 确保按计划完成项目实施",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 15,
+        "start_char": 92,
+        "end_char": 371,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "协同落实方案任务",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "技术中心",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "协同落实方案任务",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "规划运营部",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。规划运营部要结合工作落实需要,协助做好资源配置与投入,确保按计划实施。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 815,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发工作方案通知",
+      "rel_type": "EXCHANGES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "轨道交通装备行业高质量数据集链主任务工作方案",
+      "evidence": {
+        "quote": "# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知",
+        "document": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 92,
+        "end_char": 125,
+        "support": "explicit_endpoints"
+      }
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "协同落实方案任务",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "明确工作承担部门与责任人",
+      "evidence": {
+        "quote": "请技术中心阅办,请规划运营部协同,依据工作方案,按业务领域,明确落实信息公司、数科公司相关工作承担部门与责任人,按期督促,确保按期高质量完成相应工作。",
+        "document": "表单.md",
+        "line_start": 11,
+        "line_end": 11,
+        "start_char": 705,
+        "end_char": 780,
+        "support": "explicit_endpoints"
+      }
+    }
+  ]
+}

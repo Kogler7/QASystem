@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import logging
 import json
 import os
 import sys
@@ -61,6 +62,32 @@ from typing import Any, Iterable
 #   2. algorithm 包内: <根>/algorithm/knowledge_extract_v2/eval_...py
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PACKAGE_PARENT = _SCRIPT_DIR.parent
+
+
+class _Tee:
+    """把 stdout/stderr 同时写到控制台和输出目录的 run.log。"""
+
+    def __init__(self, *streams: Any) -> None:
+        self._streams = streams
+
+    def write(self, data: str) -> int:
+        for stream in self._streams:
+            try:
+                stream.write(data)
+                stream.flush()
+            except Exception:  # noqa: BLE001 - 日志失败不影响评测
+                pass
+        return len(data)
+
+    def flush(self) -> None:
+        for stream in self._streams:
+            try:
+                stream.flush()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def isatty(self) -> bool:
+        return False
 
 
 def _load_env_file(env_path: Path) -> None:
@@ -104,6 +131,7 @@ _BENCHMARK_DIR = _SCRIPT_DIR / "benchmark"
 _DEFAULT_MODEL = os.environ.get("KG_EXTRACT_LLM_MODEL") or "deepseek-v4-flash"
 _DEFAULT_BASE_URL = os.environ.get("KG_EXTRACT_LLM_BASE_URL")
 _DEFAULT_API_KEY = os.environ.get("KG_EXTRACT_LLM_API_KEY")
+_DEFAULT_MAX_TOKENS = int(os.environ.get("KG_EXTRACT_LLM_MAX_TOKENS") or 32768)
 
 _DOC_SUFFIXES = {".md", ".markdown"}
 _ONTOLOGY_SUFFIXES = {".puml", ".uml", ".plantuml"}
@@ -316,6 +344,36 @@ def _result_entities_relations(result: dict[str, Any]) -> tuple[list[dict[str, A
     return entities, relations
 
 
+def _result_entities_relations_partial(result: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """best_effort 模式下接受 partial 结果，直接从 raw 取已接受的事实。"""
+    raw = result.get("raw") or {}
+    entities: list[dict[str, Any]] = []
+    for entity in raw.get("entities") or []:
+        if not isinstance(entity, dict):
+            continue
+        entities.append({
+            "type": entity.get("type"),
+            "name": entity.get("name"),
+            "properties": {
+                key: value
+                for key, value in dict(entity.get("properties") or {}).items()
+                if key != "name"
+            },
+        })
+    relations: list[dict[str, Any]] = []
+    for relation in raw.get("relations") or []:
+        if not isinstance(relation, dict):
+            continue
+        relations.append({
+            "from_type": relation.get("from_type"),
+            "from_name": relation.get("from_name"),
+            "rel_type": relation.get("rel_type"),
+            "to_type": relation.get("to_type"),
+            "to_name": relation.get("to_name"),
+        })
+    return entities, relations
+
+
 def call_extract(
     case: dict[str, Any],
     *,
@@ -325,6 +383,7 @@ def call_extract(
     max_tokens: int | None,
     max_workers: int | None,
     best_effort: bool = False,
+    use_router: bool = True,
     max_attempts: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """调用 knowledge_extract_v2 抽取一个 case，返回 (entities, relations)。"""
@@ -347,6 +406,7 @@ def call_extract(
         "api_key": api_key,
         "max_tokens": max_tokens,
         "max_workers": max_workers,
+        "use_router": use_router,
     }
     if best_effort:
         extract_kwargs["best_effort"] = True
@@ -355,7 +415,9 @@ def call_extract(
 
     result = algorithm.extract_harness(**extract_kwargs)
 
-    if result.get("status") != "succeeded" or result.get("error_code"):
+    status = str(result.get("status") or "")
+    accept_partial = bool(best_effort and status == "partial")
+    if (status != "succeeded" or result.get("error_code")) and not accept_partial:
         error = (
             result.get("_error")
             or result.get("error")
@@ -373,6 +435,14 @@ def call_extract(
             indent=2,
         ) if terminal_attempts else ""
         raise RuntimeError(f"{error}\nterminal_attempts:\n{detail}")
+
+    if accept_partial:
+        entities, relations = _result_entities_relations_partial(result)
+        print(
+            f"[extract][partial] {case['group']}/{case['case']}: "
+            f"repair 未完成，保留部分结果，实体={len(entities)}，关系={len(relations)}"
+        )
+        return entities, relations
 
     entities, relations = _result_entities_relations(result)
     if not entities and not relations:
@@ -868,6 +938,12 @@ def parse_args() -> argparse.Namespace:
         help="评测匹配方式：identity=精确集合匹配，llm=大模型判断是否抽对（默认 llm）",
     )
     parser.add_argument(
+        "--judge-mode",
+        choices=["fixed"],
+        default="fixed",
+        help="LLM judge 实现：仅保留 fixed（本地短名单 + 名称级小批校验）",
+    )
+    parser.add_argument(
         "--model",
         default=_DEFAULT_MODEL,
         help="LLM 模型名；默认使用 KG_EXTRACT_LLM_MODEL 或 deepseek-v4-flash",
@@ -885,8 +961,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-tokens",
         type=int,
-        default=None,
-        help="LLM 输出最大 token 数；不传则使用环境变量/算法默认",
+        default=_DEFAULT_MAX_TOKENS,
+        help=f"LLM 输出最大 token 数；默认取 KG_EXTRACT_LLM_MAX_TOKENS（当前 {_DEFAULT_MAX_TOKENS}）",
     )
     parser.add_argument(
         "--max-attempts",
@@ -896,8 +972,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--best-effort",
-        action="store_true",
-        help="允许部分 chunk 抽取失败时返回已有结果，不因单个 chunk 失败中断整个 case",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="允许部分 chunk 抽取失败时返回已有结果（默认开启；可用 --no-best-effort 关闭）",
+    )
+    parser.add_argument(
+        "--use-router",
+        "--router",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="是否启用文档类型路由（--no-use-router / --no-router 关闭后只用通用算法与通用 prompt；默认启用）",
     )
     parser.add_argument(
         "--max-workers",
@@ -1020,6 +1104,17 @@ def main() -> int:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = _SCRIPT_DIR / f"eval_results_{'_'.join(args.datasets)}_{timestamp}"
         output_dir.mkdir(parents=True, exist_ok=True)
+    log_path = output_dir / "run.log"
+    log_handle = log_path.open("a", encoding="utf-8")
+    sys.stdout = _Tee(sys.stdout, log_handle)
+    file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    logging.getLogger().addHandler(file_handler)
+    # ensure_logging 会给每个模块 logger 挂 stderr handler 且 propagate=False，
+    # 因此 run.log 的 FileHandler 也要挂到这些 logger 上才能收到步骤日志。
+    for _logger in list(logging.root.manager.loggerDict.values()):
+        if isinstance(_logger, logging.Logger) and getattr(_logger, "_qasystem_stage_handler", None) is not None:
+            _logger.addHandler(file_handler)
     print(f"[info] 保存目录: {output_dir}")
 
     cases = discover_cases(args.benchmark_dir, args.datasets)
@@ -1033,6 +1128,7 @@ def main() -> int:
     )
 
     judge_client: Any = None
+    fixed_judge: Any = None
     if args.match_mode == "llm":
         try:
             judge_client = _build_judge_client(
@@ -1042,6 +1138,12 @@ def main() -> int:
                 max_tokens=args.max_tokens,
             )
             print(f"[info] LLM 评测模式：使用 {args.model} 作为 judge")
+            if args.judge_mode == "fixed":
+                module = importlib.import_module(f"{algorithm.__name__}.v2_fixed_judge")
+                fixed_judge = module.FixedJudge(judge_client)
+                print("[info] judge 模式: fixed（短名单 + 名称级小批校验，输出 pair_id）")
+            else:
+                print("[info] judge 模式: legacy（旧版全量 index 配对，不推荐）")
         except Exception as exc:
             print(f"[error] 创建 LLM judge client 失败: {exc}")
             return 1
@@ -1081,6 +1183,7 @@ def main() -> int:
                     max_tokens=args.max_tokens,
                     max_workers=args.max_workers,
                     best_effort=args.best_effort,
+                    use_router=args.use_router,
                     max_attempts=args.max_attempts,
                 )
                 print(
@@ -1114,13 +1217,21 @@ def main() -> int:
 
         try:
             if args.match_mode == "llm":
-                metrics = llm_judge_score_case(
-                    golden_entities,
-                    golden_relations,
-                    predicted_entities,
-                    predicted_relations,
-                    judge_client,
-                )
+                if fixed_judge is not None:
+                    metrics = fixed_judge.score_case(
+                        golden_entities,
+                        golden_relations,
+                        predicted_entities,
+                        predicted_relations,
+                    )
+                else:
+                    metrics = llm_judge_score_case(
+                        golden_entities,
+                        golden_relations,
+                        predicted_entities,
+                        predicted_relations,
+                        judge_client,
+                    )
             else:
                 metrics = score_case(
                     golden_entities,
@@ -1169,6 +1280,7 @@ def main() -> int:
         "max_attempts": args.max_attempts,
         "max_workers": args.max_workers,
         "best_effort": args.best_effort,
+        "use_router": args.use_router,
         "output_dir": str(output_dir),
         "overall": aggregate_metrics(per_case),
         "datasets": {},
@@ -1189,6 +1301,9 @@ def main() -> int:
     print(f"\n评测结果已写入: {summary_path}")
     print_summary(summary)
     print(f"\n所有结果已保存到: {output_dir}")
+    log_handle.flush()
+    file_handler.flush()
+    file_handler.close()
     return 0 if not errors else 1
 
 

@@ -769,8 +769,9 @@ class TwoPassPipelineTest(unittest.TestCase):
         tasks = [task for task, _ in llm.calls]
         self.assertEqual(tasks[0], "entity")
         self.assertEqual(tasks[-2:], ["relation", "evidence_verification"])
-        self.assertEqual(tasks.count("identity"), 2)
-        self.assertEqual(tasks.count("property"), 2)
+        # 覆盖率兜底会对本轮完全没补到属性的实体再跑一轮，因此次数上不封顶为 2。
+        self.assertGreaterEqual(tasks.count("identity"), 2)
+        self.assertGreaterEqual(tasks.count("property"), 2)
         self.assertIn("evidence_verification", tasks)
         self.assertNotIn("PROPERTY_EVIDENCE_UNVERIFIED", {w["code"] for w in result["warnings"]})
         self.assertIsNone(result["error_code"])
@@ -792,7 +793,10 @@ class TwoPassPipelineTest(unittest.TestCase):
         self.assertEqual(len(result["graph"]["relationships"]), 2)
         self.assertEqual(len(result["intermediate_model"]["objects"]), 3)
         self.assertEqual(len(result["intermediate_model"]["relations"]), 2)
-        self.assertTrue(all("规则编号" not in entity["properties"] for entity in result["raw"]["entities"]))
+        # 新契约：本体声明的字段全部保留，缺失值用空字符串占位（不得填默认编号）。
+        self.assertTrue(
+            all(not entity["properties"].get("规则编号") for entity in result["raw"]["entities"])
+        )
         self.assertTrue(all("ruleId" not in obj["properties"] for obj in result["intermediate_model"]["objects"]))
         self.assertEqual(result["profile"]["resolution_quality"]["unresolved_count"], 3)
         self.assertEqual(result["profile"]["resolution_quality"]["quarantined_count"], 0)
@@ -828,7 +832,8 @@ class "规则" <<RuleType>> {
         self.assertEqual(result["profile"]["resolution_quality"]["unresolved_count"], 1)
         self.assertIn("RULE_ID_MISSING", {warning["code"] for warning in result["warnings"]})
         self.assertNotIn("ENTITY_IDENTITY_QUARANTINED", {warning["code"] for warning in result["warnings"]})
-        self.assertNotIn("RuleID", result["raw"]["entities"][0]["properties"])
+        # 新契约：字段存在但值为空；identifier 统一映射为 display name。
+        self.assertFalse(result["raw"]["entities"][0]["properties"].get("RuleID"))
         self.assertNotIn("规则ID", result["raw"]["entities"][0]["properties"])
 
     def test_entity_dedup_merge_across_chunks(self) -> None:
@@ -1972,6 +1977,42 @@ class FinalVerificationStatusTest(unittest.TestCase):
             "final_verification_failed",
             entity["confidence_details"]["gates"],
         )
+
+
+class OntologyPropertyFormatTest(unittest.TestCase):
+    """输出实体 properties 必须覆盖本体声明的全部字段（缺失用空值占位）。"""
+
+    ONTOLOGY = """@startuml ont-props
+class "规则" <<RuleType>> {
+  - RuleID (规则ID) //规则的唯一标识符
+  - RuleName (RuleName) //对规则语义的简要描述
+  - antecedent (antecedent) //规则成立所依赖的前提条件
+  - tags (tags): String[] //标签
+}
+@enduml"""
+
+    def _plan(self):
+        OC = MODULES["ontology_compiler"]
+        return OC.compile_plan(
+            self.ONTOLOGY, include_subclasses=True, mode="strict", unknown_content_policy="ignore"
+        )
+
+    def test_identifier_keys_are_mapped_and_missing_values_filled(self) -> None:
+        plan = self._plan()
+        entities = [{"type": "RuleType", "name": "电源板", "properties": {"规则ID": "电源板", "RuleName": "电源板"}}]
+        out = SE._complete_ontology_properties(entities, plan)
+        props = out[0]["properties"]
+        self.assertEqual(props["RuleID"], "电源板")
+        self.assertEqual(props["RuleName"], "电源板")
+        self.assertEqual(props["antecedent"], "")
+        self.assertEqual(props["tags"], [])
+
+    def test_all_declared_keys_present(self) -> None:
+        plan = self._plan()
+        entities = [{"type": "RuleType", "name": "x", "properties": {}}]
+        out = SE._complete_ontology_properties(entities, plan)
+        declared = {str(p.display_name or p.identifier) for p in plan.class_specs["RuleType"].properties}
+        self.assertEqual(set(out[0]["properties"].keys()), declared)
 
 
 if __name__ == "__main__":

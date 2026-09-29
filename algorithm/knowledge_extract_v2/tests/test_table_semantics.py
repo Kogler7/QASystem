@@ -21,7 +21,7 @@ from algorithm.knowledge_extract_v2.tests.stub_llm import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-RULE_ONTOLOGY = (ROOT / "offline_ingestion/规则/ontology/rule.puml").read_text(
+RULE_ONTOLOGY = (ROOT / "offline_ingestion/rule/ontology/rule.puml").read_text(
     encoding="utf-8"
 )
 

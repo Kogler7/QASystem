@@ -42,11 +42,21 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
         sys.modules[package_name] = parent
     loaded: dict[str, types.ModuleType] = {}
     for stem in stems:
+        src = directory / f"{stem}.py"
         module_name = f"{package_name}.{stem}"
+        if not src.exists() and (directory / "archive" / f"{stem}.py").exists():
+            src = directory / "archive" / f"{stem}.py"
+            module_name = f"{package_name}.archive.{stem}"
+            pkg_name = f"{package_name}.archive"
+            if pkg_name not in sys.modules:
+                pkg = types.ModuleType(pkg_name)
+                pkg.__path__ = [str(directory / "archive")]
+                pkg.__package__ = pkg_name
+                sys.modules[pkg_name] = pkg
         if module_name in sys.modules:
             loaded[stem] = sys.modules[module_name]
             continue
-        spec = importlib.util.spec_from_file_location(module_name, directory / f"{stem}.py")
+        spec = importlib.util.spec_from_file_location(module_name, src)
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
@@ -279,6 +289,26 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(result["raw"], {"entities": [], "relations": []})
         for key in ("graph", "triples", "intermediate_model", "coverage_gaps", "mapping"):
             self.assertIn(key, result)
+
+    def test_extract_split_router_disabled_uses_generic(self) -> None:
+        result = SE.extract_split(
+            STANDARD_ONTOLOGY,
+            chunks=[
+                CC.ExtractionChunk(
+                    chunk_id="chunk-0",
+                    text=STANDARD_TEXT + "\n电池单体按6.2.1检验，外观应无变形及裂纹。",
+                )
+            ],
+            llm=StubLLM(),
+            use_router=False,
+        )
+        route = result["profile"]["document_route"]
+        self.assertEqual(route["kind"], "generic")
+        self.assertEqual(route["labels"], [])
+        self.assertEqual(route["reasons"], ["router.disabled"])
+        self.assertIs(result["profile"]["router_enabled"], False)
+        self.assertIsNone(result["error_code"])
+        self.assertEqual(result["raw"], {"entities": [], "relations": []})
 
     def test_standard_01_verbatim_gold_entities(self) -> None:
         # gold 中编号/名称逐字落在原文的实体（span-first 只能产出这些；

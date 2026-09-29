@@ -27,7 +27,25 @@ class ChatMessage(TypedDict):
 ChatMessages = list[ChatMessage]
 
 
-BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
+GENERIC_STRUCTURE_RULES = """[通用归类与粒度规则]
+- 使用最具体的类型；不要用父类/抽象类型重复表达同一实体。
+- 同一现实对象只保留一个实体：全称、简称、别名、编号不拆成多个；同一对象的不同表达应复用同一实体。
+- 结构实体只按实际标题层级创建；一个标题只用一个最合适的结构类型；段落、列表、条目类内容优先抽为结构单元，不要拆成零散活动。
+- 行为/工作事项以“一个动宾事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合为一个；原文中并列出现的多个动宾事项必须分别抽取，不得只取其一或强行合并。
+- 字段缺失保持缺失，不要用模板标题、编号或其他字段填充；不要把普通名词都抽成业务对象，只有作为管理/治理/建设/约束/交换/引用对象出现的才抽取。
+"""
+
+
+GENERIC_SEMANTIC_RULES = """[通用语义归类规则]
+- 属性类实体是事实：对对象、能力、状态或测量结果的客观陈述，回答是什么、值多少；约束类实体是规则：要求、限定、条件或允许范围，回答应当/必须/不得超过/不得低于/适用什么条件。
+- 规则句归约束，事实句归属性；同一特性可分别以事实和规则出现，不要合并或改名。
+- 义务/禁止性表述（应/不应/不得/严禁/禁止/未经……不得）优先归约束类实体，不要把其中的动作短语拆成独立活动；试验方法、操作步骤、单位、公式、计算过程不作为约束。
+- 同一范围内同一特性或同一规则的多个数值先合并为一条，再用属性记录最大值/最小值/范围/单位，不要按条件或测试项拆成多条。
+- 实体/属性名只写名词短语本身，不要带“要求/条件/方法/步骤/单位/计算/试验/计量”等结构词尾。
+"""
+
+
+_BASE_SYSTEM_PROMPT_HEAD = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v5
 你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。
 只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。
 
@@ -36,14 +54,18 @@ BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 - mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。
 - evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。
 - 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。
+"""
 
-[实体提取规则]
+
+_BASE_SYSTEM_PROMPT_TAIL = """[实体提取规则]
 - 优先提取显式命名的实体。
 - 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。
 - 同类型实体的 mention 长度应合理（避免截断或过度包含）。
 - 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。
 - 数值、单位、标量属性值、字段标签和修饰词不是独立实体。
 - 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。
+- 输出预算：单次调用最多输出 60 个实体；候选很多时优先覆盖不同标题/条款，不要重复同一事实。
+- evidence.quote 只给最短可逐字定位的片段（建议不超过 80 字），不要整段复制正文；同一候选/同一证据不得重复输出。
 
 [关系提取规则]
 - 只提取原文明确表达的关系。
@@ -60,38 +82,60 @@ BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 - 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。
 """
 
-OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v6
+
+BASE_SYSTEM_PROMPT = (
+    _BASE_SYSTEM_PROMPT_HEAD
+    + "\n"
+    + GENERIC_STRUCTURE_RULES
+    + "\n"
+    + GENERIC_SEMANTIC_RULES
+    + "\n"
+    + _BASE_SYSTEM_PROMPT_TAIL
+)
+
+OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v10
 领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。
-这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
 公文抽取精度规则：
-- 表单仅用于抽取一个 OfficialDocument（公文管理单元），mention 优先使用文件标题，缺失时可使用明确的收文号或来文字号；正文仅抽取结构单元和其他业务内容，不从正文新增公文管理单元。
-- 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit，而不是拆成多个 OperationalActivity。
-- 正文中提到的材料、反馈表、报告等信息对象可按本体抽取；附件文件由系统保存为 OperationalInformation 容器，信息类型为附件，附件内容不参与知识抽取。
-- 发布通知、报送反馈、安全事件报告等明确传递/报送行为应抽取为 OperationalExchange。
-- OperationalActivity 以“动宾工作事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合成一个活动；但原文中并列出现的多个动宾事项必须分别抽取，不得只取其中一个或强行合并。
-  · 例如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“高等级网络系统部署管控”“其他网络系统风险防范”“安全监测与事件处置”“报送排查反馈表”各为一个活动。
-  · 又如“……按照任务分工进行分解落实、健全项目管理机制、加强资源投入、确保按计划完成项目实施、打造人工智能高质量数据集建设标杆示范”这类并列动宾，应各自抽为一个活动。
-  · 不要把“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”这类同一动宾事项的状语/结果短语再拆成独立活动。
-- 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不应把其中的动作短语拆成 OperationalActivity。
-- 不要把风险描述中的“病毒”“内部系统”“邮箱”等普通名词都抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。
+- 一份公文只保留一个 OfficialDocument（公文管理单元），name 使用文件标题；文号、收文号、来文字号、密级、收文日期等是属性或证据，不要作为单独的 OfficialDocument 或 OperationalInformation 实体。
+- 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit（命名如：通知正文 / 排查要求一 / 报送要求 / 附件列表），用 单元标题/单元类型/原文内容/顺序号/原文位置 描述，而不是拆成多个 OperationalActivity。
+- 公文中明确提到的附件、材料、反馈表、报告等信息对象应抽取为 OperationalInformation，命名沿用原文（如“附件1 关于防范OpenClaw建议”“附件2 排查反馈表”），信息类型取 附件/报告/材料/依据 等。
+- 发布通知、报送反馈、协同落实、安全事件报告等明确传递/交互行为应抽取为 OperationalExchange，name 用动宾短语（如“发布专项排查通知”“报送排查反馈”“协同落实方案任务”），交互类型取 通知/报送/报告/协同/审批/反馈/监督/备案。
+- OperationalActivity 以动宾工作事项为粒度：name 用原文动宾短语（如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“健全项目管理机制”），并填写 活动名称/活动类型（排查/管理/防范/监测/报送/实施/建设等）/动作词（组织、排查、执行、禁止、论证、监测、处置、报送等）/优先级（重点/一般/紧急/长期）；同一动宾短语连同其状语、否定词、结果短语聚合成一个；原文并列出现的多个动宾事项必须分别抽取，不得只取其一或强行合并；不要把同一事项的状语/结果短语再拆成独立活动。
+- OperationalAgent：机构/部门/角色使用最具体粒度，name=主体名称，并填写 主体类型（组织/部门/岗位/角色/外部机构）、组织层级（集团/子公司/部门/集团部门/境外机构/项目组）、职责（该主体在文中明确承担的工作）；同一主体的不同表述复用同一实体。
+- OperationalConstraint：包含“不得/必须/应当/严禁/禁止/原则上/鼓励”等要求的表述优先作为 OperationalConstraint，name 用“主题+约束”，并填写 约束类型（时间/权限/安全/流程/质量/合规约束）、强制程度（必须/应当/原则上/鼓励/禁止）、约束原文（原文句子）；不要把其中的动作短语拆成 OperationalActivity。
+- OperationalObject：name 用原文对象名词短语（如“OpenClaw（龙虾）等开源智能体”“办公设备与终端”“等保三级及以上网络系统”），并填写 对象类型（平台/系统/数据/模型/项目/制度/场景/设备）、所属领域、对象描述；风险描述中的普通名词（病毒、内部系统、邮箱等）不要抽成 OperationalObject，只有作为治理/建设/约束/交换/使用对象的业务对象才抽取。
 
 公文表单/收文处理单规则：
-- “收文处理单”“表单”“领导批示”不是文件标题。文件标题字段缺失时保持缺失，不用模板标题、编号或其他文件标题填充。
-- 收文处理单、表单、审批单只提供公文管理单元属性。拟办意见、领导批示、收文号、来文单位、收文日期、主送、抄送等均保留为 OfficialDocument 的本体属性。
-- 表单中即使出现明确的职责、任务、约束或报送行为，也不拆成 OperationalAgent / OperationalActivity / OperationalConstraint / OperationalExchange；不抽取 DocumentUnit。"""
+- “收文处理单”“表单”“审批单”“领导批示”不是文件标题；文件标题字段缺失时保持缺失，不用模板标题、编号或其他文件标题填充。表单本身不是 DocumentUnit 或独立业务实体。
+- 表单字段（收文号、来文字号、来文单位、收文日期、收文部门、拟办意见、领导批示、联系电话、主送、抄送、主办部门等）作为对应 OfficialDocument 的本体属性或证据，不要为字段名或字段值单独建实体。
+- 但表单文字中明确承担职责的部门/单位（如“请技术中心阅办，请规划运营部协同”“明确落实信息公司、数科公司相关工作承担部门与责任人”）应抽取为 OperationalAgent；明确的动宾工作事项（如“明确工作承担部门与责任人”）应抽取为 OperationalActivity；明确的协同/报送/通知行为（如“协同落实方案任务”）应抽取为 OperationalExchange；明确的要求/时限应抽取为 OperationalConstraint。
+- 不要在审批流转记录中为每个“已阅/批示/签名”的人名单独创建 OperationalAgent，除非该人/岗位在文中承担了明确职责。
+- 低价值候选抑制：姓名、日期、电话、邮箱、部门名单独出现且无明确职责/工作事项时，不建实体。
+- 表单中即使出现大量“已阅/签名”记录，也不要因此整体放弃该片段：必须检查来文单位、主办部门、拟办意见、领导批示中是否出现承担职责的单位、明确的工作事项或报送/协同行为，并把它们抽取出来。
+- 岗位/职务泛称（如 公司领导、工会副主席、纪委书记、总师级领导、部门负责人等）不是 OperationalAgent；只有文中明确给出该岗位承担的具体工作事项或职责时才抽取。"""
 
-STANDARD_PROMPT_EXTENSION = """STANDARD_PROMPT_EXTENSION v2
+STANDARD_PROMPT_EXTENSION = """STANDARD_PROMPT_EXTENSION v3
 领域表达提示：若文本是标准/规范，重点识别标准号、标准标题、章条编号、要求/试验/检验条款、引用标准、约束指标和适用对象。
-这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
 标准抽取精度规则：
-- 机构角色优先使用最具体的类型：发布机构 Publishing Organization、提出机构 Proposing Organization、归口部门 CompetentDepartment、起草单位 Drafting Organization、组织实施单位 Implementing Organization 等；不要额外创建父类 Organization 来表达同一个机构。
 - 一个标准只保留一个 Standard 实体，不要将标准编号、标题或简称拆成多个 Standard。
-- 标准整体对象使用 StandardizationObject（例如“电动汽车用动力蓄电池单体”）；不要在条款中为同一对象的简称/别名另建 Subject of Standardization。
-- 若文本中的“电池单体”“锂离子电池单体”“金属氢化物镍电池单体”等只是同一标准化对象在不同条款中的表达，应复用已有 StandardizationObject，不要创建冗余对象实体。
-- Clause、Subclause、Section、Annex 等结构实体只按实际标题层级创建，不要同时用多个结构类型重复表达同一个标题。
-- 不要因为条款中出现了多个约束数值，就把同一条要求拆成多个互相独立的 Constrain；先合并为同一特性的约束，再在属性中记录最大值/最小值/单位。"""
+- 标准整体对象使用 StandardizationObject（例如“电动汽车用动力蓄电池单体”）；不要为同一对象另建 Subject of Standardization。
+- 机构角色优先使用最具体的类型：发布机构 Publishing Organization、提出机构 Proposing Organization、归口部门 CompetentDepartment、起草单位 Drafting Organization、组织实施单位 Implementing Organization 等。
+- Clause、Subclause、Section、Annex 等结构实体按实际标题层级选择最匹配的一类创建，不要用多个结构类型重复表达同一个标题。
+- Property 字段：name(<=8字)、type(描述型/能力型/约束型)、value、quote。
+- Constrain 字段：name(<=20字)、type(时间/权限/安全/流程/质量/合规约束)、min、max、range、unit、property、quote。
+- quote 必须逐字来自正文；同一名称只输出一次；无依据不输出。
+- 正文中的「引用」指注释（Note）或第 2 章「规范性引用文件」（ReferencedDocuments）；不要把「引用」与文末「参考文献」混为一类。
+- 条款正文中的「注：…」抽取为「引用」（Reference / InformationForm），由所属条款通过 hasRepresentationForm 关联；不要抽成 Additional Information 或 Note。
+- 标准文末的「参考文献」是文档中名为「参考文献」的独立章节（信息性要素），不是附录；其条目使用 Reference，容器使用 InformationUnit 参考文献；不要与第 2 章规范性引用文件混为一类。"""
+
+
+PROMPT_VERSIONS = {
+    "base": "v5",
+    "official_document": "v10",
+    "standard": "v3",
+}
 
 
 _DOMAIN_ORDER: tuple[RouteKind, RouteKind] = ("official_document", "standard")
@@ -510,6 +554,21 @@ def resolve_document_route(
     )
 
 
+ROUTER_DISABLED_REASON = "router.disabled"
+
+
+def disabled_document_route() -> DocumentRoute:
+    """路由关闭时的占位路由：不识别文档类型，只用通用算法与通用 prompt。"""
+    return DocumentRoute(
+        kind="generic",
+        source="fallback",
+        labels=(),
+        reasons=(ROUTER_DISABLED_REASON,),
+        decision="disabled",
+        router_version=ROUTER_VERSION,
+    )
+
+
 def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> str:
     lines: list[str] = []
     for type_id in sorted(plan.allowed_types):
@@ -519,12 +578,15 @@ def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> st
         line = f"- `{spec.display_name}` -> type `{type_id}`"
         if spec.identity_properties:
             line += f"；identity: {', '.join(spec.identity_properties)}"
+        class_comment = " ".join((getattr(spec, "comment", "") or "").split())
+        if class_comment:
+            line += f" // {class_comment[:500]}"
         lines.append(line)
         for prop in spec.properties:
             suffix = ""
             if include_comments:
                 comment = " ".join((prop.comment or "").split())
-                suffix = f" // {comment[:200]}" if comment else ""
+                suffix = f" // {comment[:500]}" if comment else ""
             lines.append(f"  - `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type}){suffix}")
     return "\n".join(lines) if lines else "（无本体类目录）"
 
@@ -535,7 +597,11 @@ def _type_catalog_text(plan: ExtractionPlan, type_ids: Iterable[str] | None = No
     for type_id in sorted(plan.allowed_types if type_ids is None else type_ids):
         spec = plan.class_specs.get(type_id)
         if spec is not None:
-            lines.append(f"- `{spec.display_name}` -> type `{type_id}`")
+            line = f"- `{spec.display_name}` -> type `{type_id}`"
+            class_comment = " ".join((getattr(spec, "comment", "") or "").split())
+            if class_comment:
+                line += f" // {class_comment[:500]}"
+            lines.append(line)
     return "\n".join(lines) if lines else "（无本体类目录）"
 
 
@@ -552,14 +618,20 @@ def _feature_text(plan: ExtractionPlan) -> str:
 
 
 def _signature_text(plan: ExtractionPlan) -> str:
-    lines = sorted(
-        {
-            f"`{spec.source}` -[`{spec.relation_id}`]-> `{spec.target}`"
-            for specs in plan.relation_specs.values()
-            for spec in specs
-            if spec.source in plan.allowed_types and spec.target in plan.allowed_types
-        }
-    )
+    seen: set[str] = set()
+    lines: list[str] = []
+    for specs in plan.relation_specs.values():
+        for spec in specs:
+            if spec.source not in plan.allowed_types or spec.target not in plan.allowed_types:
+                continue
+            text = f"`{spec.source}` -[`{spec.relation_id}`]-> `{spec.target}`"
+            comment = " ".join((getattr(spec, "comment", "") or "").split())
+            if comment:
+                text += f" // {comment[:500]}"
+            if text not in seen:
+                seen.add(text)
+                lines.append(text)
+    lines.sort()
     return "\n".join(lines) if lines else "（无关系签名）"
 
 
@@ -700,10 +772,13 @@ def build_chat_messages(
     output_schema: dict[str, Any] | None = None,
     repair_issues: list[dict[str, Any]] | None = None,
     relation_pairs: list[dict[str, Any]] | None = None,
+    structure_hint: str = "",
 ) -> ChatMessages:
     system = BASE_SYSTEM_PROMPT
     if route.prompt_extension:
         system = f"{system}\n\n{route.prompt_extension}"
+    if structure_hint:
+        system = f"{system}\n\n{structure_hint}"
 
     span_entity_task = task == "entity" or (
         isinstance(output_schema, dict)
@@ -780,7 +855,6 @@ def build_chat_messages(
 - 每项只能包含 type、mention、start_char、end_char、evidence.quote；禁止 name、properties 或其他键。
 - mention 可以是 current chunk.text 中逐字连续的原文片段，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。
 - start_char/end_char 是 chunk-relative、左闭右开区间；mention 无法逐字定位时填 0，系统会按 evidence.quote 兜底。
-- 数值、单位、标量属性值、字段标签和修饰词不是独立实体；同一 type + 完全相同 mention 每个 chunk 只输出一次。
 - 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。"""
         if has_table:
             entity_rules += _RECORD_TABLE_ENTITY_RULES + rule_scope
@@ -789,7 +863,7 @@ def build_chat_messages(
         if _looks_like_official_form(chunk):
             entity_rules += _OFFICIAL_FORM_RULES
     else:
-        ontology_section = _catalog_text(plan, include_comments=record_table)
+        ontology_section = _catalog_text(plan, include_comments=record_table or task in {"property", "identity"})
         feature_section = _feature_text(plan)
         relation_section = _signature_text(plan)
         known_section = _known_entities_text(known_entities, task=task)
@@ -835,7 +909,7 @@ def build_chat_messages(
             for pair in relation_pairs
         )
         feature_section = "（关系 pair 分类不展示属性目录）"
-        relation_section = "（关系 pair 分类不开放关系目录）"
+        relation_section = _signature_text(plan)
         known_section = "（关系端点已由候选 pair 固定）"
         context_section = local_context or "（无）"
         entity_rules = """
@@ -902,4 +976,8 @@ __all__ = [
     "build_chat_messages",
     "resolve_chunk_routes",
     "resolve_document_route",
+    "disabled_document_route",
+    "GENERIC_STRUCTURE_RULES",
+    "GENERIC_SEMANTIC_RULES",
+    "PROMPT_VERSIONS",
 ]

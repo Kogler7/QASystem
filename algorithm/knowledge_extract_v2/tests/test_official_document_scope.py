@@ -89,7 +89,7 @@ class OfficialDocumentScopeTests(unittest.TestCase):
         node = result["graph"]["nodes"][0]
         self.assertEqual(_prop(node["properties"], "sourceText", "来源文本"), text)
 
-    def test_form_json_and_markdown_are_management_only(self) -> None:
+    def test_form_allows_management_and_operational_types(self) -> None:
         plan = _plan()
         for text, metadata in (
             (
@@ -101,7 +101,11 @@ class OfficialDocumentScopeTests(unittest.TestCase):
             chunk = ExtractionChunk("form", text, metadata=metadata)
             self.assertTrue(looks_like_official_form(chunk))
             self.assertEqual(official_role(plan, chunk), "form")
-            self.assertEqual(official_entity_types(plan, chunk, plan.allowed_types), {"OfficialDocument"})
+            # 表单不放行结构单元，但放行管理类型与 operational 业务类型。
+            self.assertEqual(
+                official_entity_types(plan, chunk, plan.allowed_types),
+                {"OfficialDocument", "OperationalActivity", "OperationalInformation"},
+            )
 
     def test_form_filename_and_metadata_are_strong_role_signals(self) -> None:
         plan = _plan()

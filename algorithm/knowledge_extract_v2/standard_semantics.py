@@ -62,6 +62,9 @@ _COMPARATOR = re.compile(r"不应低于|不得低于|不低于|不应大于|不�
 _PERCENT = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>%|％)")
 _ENVIRONMENT_PREFIX = re.compile(r"^(?:室温|常温|低温|高温|超低温|超高温)")
 
+_FIGURE_LABEL = re.compile(r"(?m)^\s*图\s*(?P<label>[A-Z]?\.?\d+)\s+(?P<title>.+?)\s*$")
+
+
 def _spec(plan: Any, type_id: str) -> Any | None:
     specs = getattr(plan, "class_specs", {}) or {}
     if type_id in specs:
@@ -435,6 +438,27 @@ def _add_forms(pool: Any, manager: Any, plan: Any, warnings: Any) -> dict[str, i
                     warnings=warnings,
                 )
                 counts["Table"] += pool.entity_candidate_count - before
+    figure_spec = _spec(plan, "Figure")
+    if figure_spec is not None:
+        for chunk in chunks:
+            text = chunk.text or ""
+            for label in _FIGURE_LABEL.finditer(text):
+                name = f"图{label.group('label')} {label.group('title').strip()}"
+                before = pool.entity_candidate_count
+                pool.add_entity(
+                    _candidate(
+                        "Figure",
+                        name,
+                        {},
+                        chunk.chunk_id,
+                        text,
+                        label.start(),
+                        label.end(),
+                        "document_form",
+                    ),
+                    warnings=warnings,
+                )
+                counts["Figure"] += pool.entity_candidate_count - before
     return dict(counts)
 
 
@@ -1070,10 +1094,104 @@ def _add_technical_entities(pool: Any, manager: Any, plan: Any, warnings: Any) -
     return dict(counts)
 
 
-def _add_content_entities(pool: Any, plan: Any, warnings: Any) -> dict[str, int]:
+def _first_sentence_text(body: Any, limit: int = 200) -> str:
+    text = re.sub(r"\s+", " ", str(body or "")).strip()
+    if not text:
+        return ""
+    parts = re.split(r"(?<=[。！？；])", text)
+    return (parts[0] if parts else text)[:limit].strip()
+
+
+def _short_name(value: Any, limit: int = 24) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    head = re.split(r"[，,；;：:]", text)[0].strip()
+    if 4 <= len(head) <= limit:
+        return head
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    for sep in ("。", "；", ";", "，", ",", "：", ":"):
+        pos = cut.rfind(sep)
+        if pos >= limit // 2:
+            cut = cut[:pos]
+            break
+    return cut.strip("；;，,。：: ")
+
+
+def _clause_type_text(text: Any) -> str:
+    text = str(text or "")
+    if re.search(r"不应|不得|应(?:当|该|能|予|按)", text):
+        return "要求型"
+    if "宜" in text:
+        return "推荐型"
+    if re.search(r"(?<!不)可(?:以|按|采用|使用|设置|选)", text):
+        return "允许型"
+    if re.search(r"说明|指明|给出|表示", text):
+        return "指示型"
+    return "陈述型"
+
+
+def _constraint_type_text(text: Any) -> str:
+    text = str(text or "")
+    if re.search(r"应符合|符合.{0,12}规定|按规定", text):
+        return "合规约束"
+    if re.search(r"不低于|不超过|不大于|极差|容量|性能|质量", text):
+        return "质量约束"
+    if "安全" in text:
+        return "安全约束"
+    if re.search(r"期限|时间|日期|时限", text):
+        return "时间约束"
+    if re.search(r"权限|授权", text):
+        return "权限约束"
+    if re.search(r"流程|程序|步骤", text):
+        return "流程约束"
+    return ""
+
+
+_LIST_LETTER = re.compile(r"(?m)^\s*([a-z])[）)]\s*(.+?)\s*$")
+_LIST_DASH = re.compile(r"(?m)^\s*——\s*(.+?)\s*$")
+
+
+def _heading_body(entity: Any, manager: Any) -> tuple[Any, int, str] | None:
+    evidence = next(iter(getattr(entity, "evidence", ()) or ()), None)
+    if evidence is None:
+        return None
+    chunk = None
+    for block_id in list(getattr(evidence, "source_block_ids", ()) or ()):
+        try:
+            chunk = manager.get_chunk(block_id)
+            break
+        except Exception:
+            continue
+    if chunk is None:
+        return None
+    text = chunk.text or ""
+    start = evidence.end_char if isinstance(evidence.end_char, int) else 0
+    if not 0 <= start <= len(text):
+        start = 0
+    match = re.search(r"(?m)^\s{0,3}#{1,6}\s+", text[start:])
+    end = start + match.start() if match else len(text)
+    return chunk, start, text[start:end]
+
+
+def _clause_properties(spec: Any, name: str, body: Any) -> dict[str, Any]:
+    return _properties(
+        spec,
+        (
+            (("uniqueidentifier", "unique_identifier", "identifier", "唯一标识符"),
+             "IU-" + re.sub(r"[^\w.]+", "-", name)[:24]),
+            (("contentdescription", "content_description", "内容描述"), _first_sentence_text(body)),
+            (("clausetype", "clause_type", "条款类型"), _clause_type_text(body)),
+            (("constrainttype", "constraint_type", "约束类型"), _constraint_type_text(body)),
+        ),
+    )
+
+
+def _add_content_entities(pool: Any, manager: Any, plan: Any, warnings: Any) -> dict[str, int]:
     normative_spec = _spec(plan, "Normative Element")
     informative_spec = _spec(plan, "Informative Element")
     clause_spec = _spec(plan, "Clause")
+    extra_spec = _spec(plan, "Additional Information")
     if normative_spec is None or informative_spec is None or clause_spec is None:
         return {}
     counts: dict[str, int] = defaultdict(int)
@@ -1082,59 +1200,98 @@ def _add_content_entities(pool: Any, plan: Any, warnings: Any) -> dict[str, int]
         for entity in pool.accepted_entities()
         if getattr(entity, "source", "") == "markdown_structure"
     ]
-    sections: dict[str, tuple[Any, str]] = {}
-    for entity in structural:
-        numbered = _numbered_name(entity)
-        if numbered and "." not in numbered[0]:
-            sections[numbered[0]] = (entity, numbered[1])
-            before = pool.entity_candidate_count
-            pool.add_entity(
-                _from_entity(
-                    "Normative Element",
-                    numbered[1],
-                    {},
-                    entity,
-                    "content_element",
-                ),
-                warnings=warnings,
-            )
-            counts["Normative Element"] += pool.entity_candidate_count - before
-
+    # 1) every numbered heading yields a Clause ("<number> <title>条款")
     for entity in structural:
         numbered = _numbered_name(entity)
         if numbered is None:
             continue
         number, title = numbered
-        parts = number.split(".")
-        clause_name: str | None = None
-        clause_kind = "条款"
-        if len(parts) == 1 and ("范围" in title or "引用" in title):
-            clause_name = f"{number} {title}条款"
-        elif len(parts) == 2 and parts[0] in sections:
-            parent_title = sections[parts[0]][1]
-            if "要求" in parent_title:
-                clause_name = f"{number} {title}要求"
-                clause_kind = "要求"
-            elif "方法" in parent_title:
-                clause_name = f"{number} {title}条款"
-        if clause_name is None:
-            continue
-        properties = _properties(
-            clause_spec,
-            (
-                (("clausenumber", "条编号"), number),
-                (("clausetitle", "条标题"), title),
-                (("clausetype", "条款类型"), clause_kind),
-                (("uniqueidentifier", "唯一标识符"), number),
-            ),
-        )
+        if "." not in number:
+            before = pool.entity_candidate_count
+            pool.add_entity(
+                _from_entity("Normative Element", title, {}, entity, "content_element"),
+                warnings=warnings,
+            )
+            counts["Normative Element"] += pool.entity_candidate_count - before
+        name = f"{number} {title}条款"
+        body = ""
+        info = _heading_body(entity, manager)
+        if info is not None:
+            body = info[2]
         before = pool.entity_candidate_count
         pool.add_entity(
-            _from_entity("Clause", clause_name, properties, entity, "standard_semantics"),
+            _from_entity(
+                "Clause",
+                name,
+                _clause_properties(clause_spec, name, body),
+                entity,
+                "standard_semantics",
+            ),
             warnings=warnings,
         )
         counts["Clause"] += pool.entity_candidate_count - before
-
+    # 2) explicit list items inside each heading body (a/b/c -> Clause, —— -> Additional Information)
+    for entity in structural:
+        numbered = _numbered_name(entity)
+        if numbered is None:
+            continue
+        number, _title = numbered
+        info = _heading_body(entity, manager)
+        if info is None:
+            continue
+        chunk, body_start, body = info
+        text = chunk.text or ""
+        for match in _LIST_LETTER.finditer(body):
+            item = re.sub(r"\s+", " ", match.group(2)).strip()
+            if not item:
+                continue
+            name = f"{number}.{match.group(1)} {_short_name(item)}条款"
+            before = pool.entity_candidate_count
+            pool.add_entity(
+                _candidate(
+                    "Clause",
+                    name,
+                    _clause_properties(clause_spec, name, item),
+                    chunk.chunk_id,
+                    text,
+                    body_start + match.start(2),
+                    body_start + match.end(2),
+                    "standard_semantics",
+                ),
+                warnings=warnings,
+            )
+            counts["Clause"] += pool.entity_candidate_count - before
+        if extra_spec is None:
+            continue
+        for match in _LIST_DASH.finditer(body):
+            item = re.sub(r"\s+", " ", match.group(1)).strip()
+            if not item:
+                continue
+            name = f"{number}：{_short_name(item)}"
+            properties = _properties(
+                extra_spec,
+                (
+                    (("uniqueidentifier", "unique_identifier", "identifier", "唯一标识符"),
+                     "AI-" + re.sub(r"[^\w.]+", "-", name)[:24]),
+                    (("contentdescription", "content_description", "内容描述"), item),
+                ),
+            )
+            before = pool.entity_candidate_count
+            pool.add_entity(
+                _candidate(
+                    "Additional Information",
+                    name,
+                    properties,
+                    chunk.chunk_id,
+                    text,
+                    body_start + match.start(1),
+                    body_start + match.end(1),
+                    "standard_semantics",
+                ),
+                warnings=warnings,
+            )
+            counts["Additional Information"] += pool.entity_candidate_count - before
+    # 3) annex content element + clause
     forms = [
         entity
         for entity in pool.accepted_entities()
@@ -1143,43 +1300,23 @@ def _add_content_entities(pool: Any, plan: Any, warnings: Any) -> dict[str, int]
     annex = next((entity for entity in forms if canonical_name(entity.canonical_type) == "annex"), None)
     if annex is not None:
         before = pool.entity_candidate_count
-        content = pool.add_entity(
-            _from_entity(
-                "Normative Element",
-                annex.name,
-                {},
-                annex,
-                "content_element",
-            ),
+        pool.add_entity(
+            _from_entity("Normative Element", annex.name, {}, annex, "content_element"),
             warnings=warnings,
         )
         counts["Normative Element"] += pool.entity_candidate_count - before
-        annex_match = re.match(r"^(附录\S+)\s+(.+)$", annex.name)
-        if content is not None and annex_match:
-            title = annex_match.group(2)
-            tail = next(
-                (token for token in ("工装", "装置", "程序", "方法", "记录", "数据") if title.endswith(token)),
-                title,
-            )
-            clause_name = f"{annex_match.group(1)} {tail}要求"
-            before = pool.entity_candidate_count
-            pool.add_entity(
-                _from_entity("Clause", clause_name, {}, annex, "standard_semantics"),
-                warnings=warnings,
-            )
-            counts["Clause"] += pool.entity_candidate_count - before
-
+        before = pool.entity_candidate_count
+        pool.add_entity(
+            _from_entity("Clause", f"{annex.name}条款", {}, annex, "standard_semantics"),
+            warnings=warnings,
+        )
+        counts["Clause"] += pool.entity_candidate_count - before
+    # 4) reference section
     reference = next((entity for entity in forms if canonical_name(entity.canonical_type) == "reference"), None)
     if reference is not None:
         before = pool.entity_candidate_count
         pool.add_entity(
-            _from_entity(
-                "Informative Element",
-                "参考文献",
-                {},
-                reference,
-                "content_element",
-            ),
+            _from_entity("Informative Element", "参考文献", {}, reference, "content_element"),
             warnings=warnings,
         )
         counts["Informative Element"] += pool.entity_candidate_count - before
@@ -1300,7 +1437,7 @@ def enrich_standard_semantics(
     terminology = _add_terminology(pool, manager, plan, warnings)
     forms = _add_forms(pool, manager, plan, warnings)
     metadata = _add_metadata_semantics(pool, manager, plan, warnings)
-    content = _add_content_entities(pool, plan, warnings)
+    content = _add_content_entities(pool, manager, plan, warnings)
     technical = _add_technical_entities(pool, manager, plan, warnings)
     return {
         "terminology": terminology,

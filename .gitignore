@@ -181,12 +181,18 @@ intent/dataset
 test_docs/中车待抽取pdf/
 test_docs/抽取结果md/
 
+# 抽取算法相关
 algorithm/knowledge_extract_v2/benchmark/
 algorithm/knowledge_extract_v2/tests/
+algorithm/knowledge_extract_v2/ontology_backups
+algorithm/knowledge_extract_v2/__pycache__
+algorithm/knowledge_extract_v2/algorithm_docs
+
 # 本地编辑器与运行时产物（勿提交）
 .claude/settings.local.json
 backend/data/execution/
 offline_ingestion/_runs/
+algorithm/knowledge_extract_v2/eval_results
 
 # Agent工作流相关
 AGENT.md
@@ -194,3 +200,9 @@ AGENT.md
 
 # 前端插件
 vsix-20260807-153551
+
+# V3 本地模型凭据（勿提交）
+eval_api.md
+
+# 本地备份（不提交）
+algorithm/knowledge_extract_v2/backups/

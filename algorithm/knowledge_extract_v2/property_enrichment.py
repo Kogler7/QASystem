@@ -222,6 +222,77 @@ _CONTEXT_BOUNDARIES = "\n\r。！？!?；;"
 _CONTEXT_RADIUS = 240
 
 
+def _iter_record_spans(text: str) -> list[tuple[int, int, dict[str, Any]]]:
+    """Locate top-level JSON objects in a record-table chunk (brace scanning)."""
+    spans: list[tuple[int, int]] = []
+    depth = 0
+    start: int | None = None
+    in_string = False
+    escaped = False
+    for index, char in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            if depth == 0:
+                start = index
+            depth += 1
+        elif char == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    spans.append((start, index + 1))
+                    start = None
+    records: list[tuple[int, int, dict[str, Any]]] = []
+    for span_start, span_end in spans:
+        try:
+            payload = json.loads(text[span_start:span_end])
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            records.append((span_start, span_end, payload))
+    return records
+
+
+def _entity_record_windows(
+    entity: Any,
+    chunk: ExtractionChunk,
+    *,
+    max_records: int = 5,
+) -> list[tuple[int, int, str]]:
+    """记录表实体：用实体所属的整条 JSON 记录（含同分类多条）作为核验上下文。"""
+    name = str(getattr(entity, "name", "") or "")
+    quotes = {
+        str(getattr(evidence, "quote", "") or "")
+        for evidence in (getattr(entity, "evidence", ()) or ())
+        if chunk.chunk_id in {str(item) for item in getattr(evidence, "source_block_ids", ()) or ()}
+    }
+    matched: list[tuple[int, int]] = []
+    for span_start, span_end, record in _iter_record_spans(chunk.text):
+        values = [str(value) for value in record.values() if isinstance(value, str)]
+        hit = bool(name) and any(value.strip() == name for value in values)
+        if not hit and name:
+            hit = any(name in value for value in values)
+        if not hit and quotes:
+            hit = any(
+                quote and quote in str(record.get(key, ""))
+                for quote in quotes
+                for key in record
+            )
+        if hit:
+            matched.append((span_start, span_end))
+        if len(matched) >= max_records:
+            break
+    return [(span_start, span_end, chunk.text[span_start:span_end]) for span_start, span_end in matched]
+
+
 def _entity_context_windows(
     entity: Any,
     chunk: ExtractionChunk,
@@ -233,6 +304,12 @@ def _entity_context_windows(
     """
     if (chunk.metadata or {}).get("official_document_role") == "form":
         return [(0, len(chunk.text), chunk.text)]
+    # 记录表：整条记录（或同分类多条记录）必须完整进入核验上下文，
+    # 避免因为 +/- 字符窗口截断而误判为证据不足。
+    if _looks_like_record_table(chunk):
+        record_windows = _entity_record_windows(entity, chunk)
+        if record_windows:
+            return record_windows
     anchors: list[tuple[int, int]] = []
     for evidence in getattr(entity, "evidence", ()) or ():
         source_ids = {str(item) for item in getattr(evidence, "source_block_ids", ()) or ()}
@@ -394,6 +471,8 @@ def enrich_entity_properties(
     batch_size: int = 24,
     max_workers: int = 1,
     mode: str = "property",
+    coverage_round: int = 0,
+    max_coverage_rounds: int = 1,
 ) -> dict[str, int]:
     """Fill identity or ordinary properties without changing the entity universe."""
     if mode not in {"identity", "property"}:
@@ -401,6 +480,7 @@ def enrich_entity_properties(
     grouped: dict[str, list[Any]] = defaultdict(list)
     allowed_by_id: dict[str, dict[str, PropertySpec]] = {}
     applied = rejected = calls = verifications = 0
+    touched: set[str] = set()
     for entity in pool.accepted_entities():
         if entity.source == "official_attachment":
             continue
@@ -456,6 +536,7 @@ def enrich_entity_properties(
         批次按 (chunk, 兼容组) 划分、批次内实体固定；同一实体可能因多 anchor
         进入不同 chunk 的批次，属性写入为幂等覆盖、证据按 span_id 去重，
         max_workers>1 并发时不会破坏实体数据。
+        本轮至少补到一个属性的实体 id 会并入外层 touched 集合，供覆盖率兜底判断。
         返回 (applied, rejected, verifications, 本地 warnings/attempts/call_metrics)。
         """
         batch_allowed = {
@@ -663,6 +744,7 @@ def enrich_entity_properties(
                         if not any(row.span_id == evidence.span_id for row in evidence_rows):
                             evidence_rows.append(evidence)
                 batch_applied += len(accepted_values)
+                touched.add(str(entity.candidate_id))
         return batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics
 
     jobs: list[tuple[ExtractionChunk, str, int, list[Any], str]] = []
@@ -725,7 +807,67 @@ def enrich_entity_properties(
         attempts.extend(local_attempts)
         if local_call_metrics is not None:
             call_metrics.extend(local_call_metrics)
-    summary = {"calls": calls, "applied": applied, "rejected": rejected, "verifications": verifications}
+    # 覆盖率兜底：本轮完全没有补到属性的实体，自动定向补跑一轮。
+    retry_calls = retry_applied = retry_rejected = retry_verifications = 0
+    if coverage_round < max_coverage_rounds:
+        retry_candidates = [
+            entity
+            for entity in pool.accepted_entities()
+            if str(entity.candidate_id) not in touched
+            and _declared_properties(plan, entity, mode=mode)
+            and _entity_anchor_chunks(entity, manager)
+            and (
+                mode != "property"
+                or str(getattr(entity, "source", "") or "") not in _AUTHORITATIVE_SOURCES
+            )
+        ]
+        if retry_candidates:
+            retry_summary = enrich_entity_properties(
+                _EntityPoolView(retry_candidates),
+                manager,
+                plan,
+                llm,
+                route=route,
+                route_map=route_map,
+                attempts=attempts,
+                warnings=warnings,
+                call_metrics=call_metrics,
+                use_scheduler=use_scheduler,
+                local_previous=local_previous,
+                local_next=local_next,
+                same_section=same_section,
+                max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds,
+                batch_size=batch_size,
+                max_workers=max_workers,
+                mode=mode,
+                coverage_round=coverage_round + 1,
+                max_coverage_rounds=max_coverage_rounds,
+            )
+            retry_calls = int(retry_summary.get("calls", 0))
+            retry_applied = int(retry_summary.get("applied", 0))
+            retry_rejected = int(retry_summary.get("rejected", 0))
+            retry_verifications = int(retry_summary.get("verifications", 0))
+    for entity in pool.accepted_entities():
+        missing = _declared_properties(plan, entity, mode=mode)
+        if missing:
+            _warn(
+                warnings,
+                "IDENTITY_UPDATES_MISSING" if mode == "identity" else "PROPERTY_UPDATES_MISSING",
+                "属性补全后仍有缺失字段（原文可能确实未提供）",
+                f"entities.{entity.candidate_id}.properties",
+                sorted(missing),
+            )
+    summary = {
+        "calls": calls,
+        "applied": applied,
+        "rejected": rejected,
+        "verifications": verifications,
+        "retry_calls": retry_calls,
+        "retry_applied": retry_applied,
+        "retry_rejected": retry_rejected,
+        "retry_verifications": retry_verifications,
+    }
     logger.info(
         "[步骤][%s补全] 输出: 实体=%d 批次调用=%d 应用=%d 拒绝=%d 语义核验=%d",
         "身份" if mode == "identity" else "属性",
@@ -736,6 +878,16 @@ def enrich_entity_properties(
         verifications,
     )
     return summary
+
+
+class _EntityPoolView:
+    """Minimal pool view exposing only the entities that need a coverage retry."""
+
+    def __init__(self, entities: Iterable[Any]) -> None:
+        self._entities = list(entities)
+
+    def accepted_entities(self) -> list[Any]:
+        return list(self._entities)
 
 
 def enrich_entity_identities(*args: Any, **kwargs: Any) -> dict[str, int]:

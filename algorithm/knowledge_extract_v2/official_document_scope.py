@@ -16,6 +16,18 @@ def management_type_ids(plan: Any) -> frozenset[str]:
                for value in (type_id, spec.display_name, *spec.stereotypes))
     )
 
+def operational_type_ids(plan: Any) -> frozenset[str]:
+    """公文业务实体类型（Operational*）：表单文字中明确的职责/事项/交互同样可以抽取。"""
+    return frozenset(
+        type_id for type_id, spec in plan.class_specs.items()
+        if any(
+            str(value).strip().casefold().startswith("operational")
+            for value in (type_id, spec.display_name, *spec.stereotypes)
+        )
+    )
+
+
+
 
 def looks_like_official_form(chunk: Any) -> bool:
     text = unicodedata.normalize("NFKC", chunk.text or "")
@@ -103,7 +115,10 @@ def official_entity_types(plan: Any, chunk: Any, types: Iterable[str], route: An
     role = official_role(plan, chunk, route)
     management = management_type_ids(plan)
     if role == "form":
-        return frozenset(plan.allowed_types & management)
+        # 表单仍作为官方文档属性来源、不放行结构单元，但表单文字里明确的职责/事项/交互
+        # 应当可以产生 operational 业务实体（与 golden 标注一致）。
+        allowed = set(management) | operational_type_ids(plan)
+        return frozenset(set(plan.allowed_types) & allowed)
     if role == "body":
         return frozenset(set(types) - management)
     if role == "attachment":
@@ -129,7 +144,7 @@ def entity_in_official_scope(plan: Any, manager: Any, candidate: Any) -> bool:
 def relation_in_official_scope(plan: Any, manager: Any, candidate: Any) -> bool:
     return all(
         not manager.has_chunk(chunk_id)
-        or official_role(plan, manager.get_chunk(chunk_id)) not in {"form", "attachment"}
+        or official_role(plan, manager.get_chunk(chunk_id)) != "attachment"
         for evidence in candidate.evidence or ()
         for chunk_id in evidence.source_block_ids
     )
@@ -139,4 +154,5 @@ __all__ = [
     "management_type_ids", "looks_like_official_form", "official_role", "annotate_official_roles",
     "split_embedded_attachments", "official_entity_types", "entity_in_official_scope",
     "relation_in_official_scope",
+    "operational_type_ids",
 ]
