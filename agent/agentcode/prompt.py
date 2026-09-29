@@ -128,18 +128,18 @@ def build_domain_knowledge(skill_loader: Any, skills: list[Any]) -> str:
     lines.append("If the graph does not contain the required knowledge or solution, report the gap instead of inventing it.")
     lines.append("")
 
-    # ── 标准工作流 ──
-    lines.append("## Standard Data Query Workflow")
+    # ── 通用求解路径（不设固定链路，细节由 Skill 定义）──
+    lines.append("## Workflow")
     lines.append("")
-    lines.append("```")
-    lines.append("1. Understand Request    →  The agent determines intent from the conversation")
-    lines.append("2. Entity Extraction     →  Identify key entities (names, metrics, dimensions)")
-    lines.append("3. Knowledge Graph Lookup →  Link entities, get properties, compute SQL")
-    lines.append("4. SQL Execution         →  Run queries, retrieve data")
-    lines.append("5. Result Analysis       →  Interpret results, identify patterns")
-    lines.append("6. Visualization         →  Generate charts if appropriate")
-    lines.append("7. Delivery              →  Format answer per delivery schema")
-    lines.append("```")
+    lines.append("There is **no fixed tool chain**. For each request, decide the next step yourself "
+                 "based on the request, the available tools, and the loaded skills.")
+    lines.append("For knowledge-graph questions, the default heuristic is: "
+                 "**locate the knowledge space first** to narrow the scope "
+                 "(one root space and its subspaces), **then find the data inside that scope** — "
+                 "entity linking and graph exploration first; execution tools (SQL, charts) only "
+                 "after the graph has provided their complete inputs. "
+                 "Detailed procedures are defined in the skills below — load the matching skill "
+                 "with the `Skill` tool before answering factual questions.")
     lines.append("")
 
     # ── 问题求解策略 ──
@@ -201,7 +201,7 @@ When you are ready to finish (no further tool calls), the assistant message MUST
 - `confidence` must be exactly `high`, `medium`, or `low` (not 高/中/低).
 - If the evidence gate fails, still return this JSON: `confidence` is `low`, `gaps` is non-empty, and `evidence` / `charts` / `solution_path` may be empty arrays.
 - `charts[].path` is the path returned by `draw_*` tools. Use `[]` when there is no chart.
-- `solution_path` is the template step list already shown via `problem-resolve-path-display`. Use `[]` when that tool was not called.
+- `solution_path` is a reserved field for the frontend contract; always output `[]`.
 
 {schema_prompt_text(delivery)}
 """

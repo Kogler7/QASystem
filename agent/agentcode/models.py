@@ -14,7 +14,6 @@ class McpServerConfig(BaseModel):
     url: str | None = None
     command: str | None = None
     args: list[str] = Field(default_factory=list)
-    cwd: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     auth_ref: str | None = None

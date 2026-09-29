@@ -187,6 +187,9 @@ class _StreamingWorkerLLM:
                         chunk = json_mod.loads(data_str)
                     except json_mod.JSONDecodeError:
                         continue
+                    # 网关可能下发非对象 chunk（如 `data: null`），跳过而不是让它炸在 .get 上。
+                    if not isinstance(chunk, dict):
+                        continue
 
                     choice = (chunk.get("choices") or [{}])[0]
                     delta = choice.get("delta") or {}
@@ -201,21 +204,34 @@ class _StreamingWorkerLLM:
                         accumulated_text += text
                         self._publish("token", {"text": text})
 
-                    if "tool_calls" in delta:
-                        for tc in delta["tool_calls"]:
-                            idx = tc.get("index", 0)
-                            if idx not in accumulated_tool_calls:
-                                accumulated_tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
-                            if "id" in tc and tc["id"]:
-                                accumulated_tool_calls[idx]["id"] = tc["id"]
-                            if "function" in tc:
-                                fn = tc["function"]
-                                if "name" in fn and fn["name"]:
-                                    accumulated_tool_calls[idx]["name"] += fn["name"]
-                                if "arguments" in fn and fn["arguments"]:
-                                    accumulated_tool_calls[idx]["arguments"] += fn["arguments"]
+                    # 兼容"显式下发 null"的网关（MSE 网关无工具调用时会给出
+                    # "tool_calls": null，键存在、值为 null）；只判断键是否存在会让
+                    # for 遍历 None 抛 'NoneType' object is not iterable，整轮会话失败。
+                    for tc in (delta.get("tool_calls") or []):
+                        idx = tc.get("index", 0)
+                        if idx not in accumulated_tool_calls:
+                            accumulated_tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                        if "id" in tc and tc["id"]:
+                            accumulated_tool_calls[idx]["id"] = tc["id"]
+                        fn = tc.get("function") or {}
+                        if fn.get("name"):
+                            accumulated_tool_calls[idx]["name"] += fn["name"]
+                        if fn.get("arguments"):
+                            accumulated_tool_calls[idx]["arguments"] += fn["arguments"]
         except Exception as exc:
-            self._publish("error", {"error": str(exc)})
+            # 网关返回 4xx/5xx 时把响应体带出来，否则线上只剩一句 "401 Unauthorized"，
+            # 完全看不出对方说了什么（httpx 异常才有 .response）。
+            detail = ""
+            response = getattr(exc, "response", None)
+            if response is not None:
+                try:
+                    detail = response.read().decode("utf-8", "replace")[:500]
+                except Exception:
+                    detail = "(unable to read response body)"
+            message = f"{type(exc).__name__}: {exc}"
+            if detail:
+                message = f"{message} | body={detail}"
+            self._publish("error", {"error": message})
             raise
 
         blocks = []
@@ -356,29 +372,13 @@ def _process_one(
 
                 def _on_tool_results(results, elapsed_ms):
                     for r in results:
-                        name = r.get("name", "")
-                        content = r.get("content", "") if not r.get("is_error") else None
                         broker.publish(task_id, {
                             "type": "tool_result",
-                            "name": name,
+                            "name": r.get("name", ""),
                             "is_error": r.get("is_error", False),
-                            "content": content,
+                            "content": r.get("content", "") if not r.get("is_error") else None,
                             "error": r.get("error") if r.get("is_error") else None,
                         })
-                        if (
-                            not r.get("is_error")
-                            and "problem-resolve-path-display" in name
-                            and content
-                        ):
-                            try:
-                                import json as json_mod
-                                path_payload = json_mod.loads(content) if isinstance(content, str) else content
-                            except (TypeError, ValueError):
-                                path_payload = content
-                            broker.publish(task_id, {
-                                "type": "solution_path",
-                                "path": path_payload,
-                            })
 
                 history = request_data.get("history") or []
                 with pool.borrow(timeout=120.0) as tm:
