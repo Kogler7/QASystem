@@ -22,9 +22,10 @@ import os
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin
 from urllib.request import Request, urlopen
@@ -41,6 +42,10 @@ PARSE_PATH = "/api/v1/documents/parse"
 CHUNK_PATH = "/api/v1/documents/chunk"
 EXTRACT_PATH = "/api/v1/graphs/extract"
 MCP_TOOL_NAME = "kg_extract_v2"
+MAX_ATTEMPTS = 3
+RETRY_SLEEP_SECONDS = 1.0
+FILE_RETRY_ERRORS = (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError)
+T = TypeVar("T")
 DEFAULT_PARAMS: dict[str, Any] = {
     "backend_url": "http://127.0.0.1:8006",
     "mcp_url": None,
@@ -140,6 +145,14 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any] | None) -> dict[st
     return merged
 
 
+def default_params_path(workspace: Path) -> Path:
+    """默认 eval/params.yaml；工作区若有 params.yaml 则覆盖。"""
+    for candidate in (workspace / "params.yaml", KIT_DIR / "params.yaml"):
+        if candidate.is_file():
+            return candidate
+    return KIT_DIR / "params.yaml"
+
+
 def load_params(path: Path) -> dict[str, Any]:
     try:
         import yaml
@@ -156,7 +169,35 @@ def load_params(path: Path) -> dict[str, Any]:
 
 def write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    tmp = path.with_name(path.name + f".tmp-{os.getpid()}")
+    tmp.write_text(payload, encoding="utf-8")
+    tmp.replace(path)
+
+
+def call_with_retries(
+    operation: Callable[[], T],
+    *,
+    label: str,
+    attempts: int = MAX_ATTEMPTS,
+    retry_sleep: float | None = None,
+) -> tuple[T, int]:
+    """失败立即重试，用尽次数后把最后一次异常抛出。"""
+    delay = RETRY_SLEEP_SECONDS if retry_sleep is None else retry_sleep
+    last_exc: BaseException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return operation(), attempt
+        except FILE_RETRY_ERRORS as exc:
+            last_exc = exc
+            if attempt >= attempts:
+                log(f"{label} 已重试 {attempts} 次仍失败，跳过: {exc}")
+                break
+            log(f"{label} 第 {attempt}/{attempts} 次失败，{delay:g}s 后重试: {exc}")
+            if delay > 0:
+                time.sleep(delay)
+    assert last_exc is not None
+    raise last_exc
 
 
 def write_text(path: Path, text: str) -> None:
@@ -1612,42 +1653,88 @@ def _parse_sources(
     params: dict[str, Any],
     out_dir: Path,
 ) -> tuple[str, dict[str, Any]]:
-    """模块 parse：docs/ 原文件 → 拼接 Markdown。"""
+    """模块 parse：docs/ 原文件 → 拼接 Markdown。单文件最多试 3 次，失败则跳过。"""
     markdown_parts: list[str] = []
     parse_failures: list[dict[str, Any]] = []
     per_file: list[dict[str, Any]] = []
     parse_started = time.perf_counter()
     for source in sources:
         file_started = time.perf_counter()
+        skipped_path = out_dir / f"parse_{source.stem}.skipped.json"
+        skipped_payload = _load_json_file(skipped_path)
+        if skipped_payload:
+            parse_failures.append(skipped_payload)
+            per_file.append(
+                {
+                    "file": source.name,
+                    "status": "failed",
+                    "attempts": int(skipped_payload.get("attempts") or MAX_ATTEMPTS),
+                    "elapsed_seconds": elapsed_seconds(file_started),
+                    "error": skipped_payload.get("message") or "已跳过",
+                }
+            )
+            log(f"模块 parse 沿用跳过 {source.name}")
+            continue
+        existing = out_dir / f"parse_{source.stem}.json"
+        if existing.is_file():
+            try:
+                envelope = json.loads(existing.read_text(encoding="utf-8"))
+                parsed = str((envelope.get("data") or {}).get("markdown") or "")
+                if parsed.strip():
+                    markdown_parts.append(parsed)
+                    per_file.append(
+                        {
+                            "file": source.name,
+                            "status": "reused",
+                            "attempts": 0,
+                            "elapsed_seconds": elapsed_seconds(file_started),
+                            "markdown_length": len(parsed),
+                            "source": str(existing),
+                        }
+                    )
+                    continue
+            except json.JSONDecodeError:
+                pass
         try:
-            envelope = parse_document(base_url, source, options, params)
+            def _parse_once(src: Path = source) -> dict[str, Any]:
+                envelope = parse_document(base_url, src, options, params)
+                parsed = str((envelope.get("data") or {}).get("markdown") or "")
+                if not parsed.strip():
+                    raise RuntimeError(f"解析结果为空: {src.name}")
+                return envelope
+
+            envelope, attempts = call_with_retries(
+                _parse_once,
+                label=f"模块 parse {source.name}",
+            )
             write_json(out_dir / f"parse_{source.stem}.json", envelope)
-            data = envelope.get("data") or {}
-            parsed = str(data.get("markdown") or "")
-            if not parsed.strip():
-                raise RuntimeError(f"解析结果为空: {source.name}")
+            parsed = str((envelope.get("data") or {}).get("markdown") or "")
             markdown_parts.append(parsed)
             per_file.append(
                 {
                     "file": source.name,
                     "status": "succeeded",
+                    "attempts": attempts,
                     "elapsed_seconds": elapsed_seconds(file_started),
                     "markdown_length": len(parsed),
                 }
             )
-        except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        except FILE_RETRY_ERRORS as exc:
             failed = fail_payload(exc)
             failed["file"] = source.name
+            failed["attempts"] = MAX_ATTEMPTS
             parse_failures.append(failed)
             per_file.append(
                 {
                     "file": source.name,
                     "status": "failed",
+                    "attempts": MAX_ATTEMPTS,
                     "elapsed_seconds": elapsed_seconds(file_started),
                     "error": failed["message"],
                 }
             )
-            log(f"模块 parse 失败 {source.name}: {failed['message']}")
+            write_json(out_dir / f"parse_{source.stem}.skipped.json", failed)
+            log(f"模块 parse 跳过 {source.name}: {failed['message']}")
     parse_elapsed = elapsed_seconds(parse_started)
     markdown = "\n\n".join(markdown_parts)
     if markdown.strip():
@@ -1777,8 +1864,47 @@ def _run_system(
     system_started = time.perf_counter()
     for source in sources:
         file_started = time.perf_counter()
+        skipped_path = out_dir / f"backend_system_{source.stem}.skipped.json"
+        skipped_payload = _load_json_file(skipped_path)
+        if skipped_payload:
+            ingest_failures.append(skipped_payload)
+            per_file.append(
+                {
+                    "file": source.name,
+                    "status": "failed",
+                    "attempts": int(skipped_payload.get("attempts") or MAX_ATTEMPTS),
+                    "elapsed_seconds": elapsed_seconds(file_started),
+                    "error": skipped_payload.get("message") or "已跳过",
+                }
+            )
+            log(f"系统 knowledge-ingestion 沿用跳过 {source.name}")
+            continue
+        existing = out_dir / f"backend_system_{source.stem}.json"
+        if existing.is_file():
+            try:
+                envelope = json.loads(existing.read_text(encoding="utf-8"))
+                graph = extract_graph_from_envelope(envelope)
+                graphs.append(graph)
+                version = version or extract_version_from(envelope)
+                per_file.append(
+                    {
+                        "file": source.name,
+                        "status": "reused",
+                        "attempts": 0,
+                        "elapsed_seconds": elapsed_seconds(file_started),
+                        "nodes": len(graph.get("nodes") or []),
+                        "relationships": len(graph.get("relationships") or []),
+                        "source": str(existing),
+                    }
+                )
+                continue
+            except json.JSONDecodeError:
+                pass
         try:
-            envelope = ingest_file(base_url, source, ontology, options, params)
+            envelope, attempts = call_with_retries(
+                lambda src=source: ingest_file(base_url, src, ontology, options, params),
+                label=f"沉淀 {source.name}",
+            )
             write_json(out_dir / f"backend_system_{source.stem}.json", envelope)
             graph = extract_graph_from_envelope(envelope)
             graphs.append(graph)
@@ -1787,24 +1913,28 @@ def _run_system(
                 {
                     "file": source.name,
                     "status": "succeeded",
+                    "attempts": attempts,
                     "elapsed_seconds": elapsed_seconds(file_started),
                     "nodes": len(graph.get("nodes") or []),
                     "relationships": len(graph.get("relationships") or []),
                 }
             )
-        except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        except FILE_RETRY_ERRORS as exc:
             failed = fail_payload(exc)
             failed["file"] = source.name
+            failed["attempts"] = MAX_ATTEMPTS
             ingest_failures.append(failed)
             per_file.append(
                 {
                     "file": source.name,
                     "status": "failed",
+                    "attempts": MAX_ATTEMPTS,
                     "elapsed_seconds": elapsed_seconds(file_started),
                     "error": failed["message"],
                 }
             )
-            log(f"系统 knowledge-ingestion 失败 {source.name}: {failed['message']}")
+            write_json(out_dir / f"backend_system_{source.stem}.skipped.json", failed)
+            log(f"系统 knowledge-ingestion 跳过 {source.name}: {failed['message']}")
     system_elapsed = elapsed_seconds(system_started)
     if not graphs:
         return {
@@ -1841,16 +1971,52 @@ def _run_system(
     return block
 
 
-def _reused_chunks(case_reuse_dir: Path) -> tuple[list[dict[str, Any]] | None, Path]:
-    path = case_reuse_dir / "chunks.json"
+def _load_json_file(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
-        return None, path
+        return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _reused_chunks(case_reuse_dir: Path) -> tuple[list[dict[str, Any]] | None, Path]:
+    path = case_reuse_dir / "chunks.json"
+    payload = _load_json_file(path)
+    if payload is None:
         return None, path
     items = (payload.get("data") or {}).get("items")
     return (list(items) if isinstance(items, list) and items else None), path
+
+
+def _extract_block_from_envelope(
+    envelope: dict[str, Any],
+    golden: dict[str, Any] | None,
+    out_dir: Path,
+    score_ctx: dict[str, Any] | None,
+    *,
+    status: str = "succeeded",
+    source: str | None = None,
+    elapsed: float = 0.0,
+) -> dict[str, Any]:
+    graph = extract_graph_from_envelope(envelope)
+    score_started = time.perf_counter()
+    metrics = split_match_details(out_dir, "backend_extract", maybe_score(golden, graph, score_ctx))
+    block: dict[str, Any] = {
+        "status": status,
+        "nodes": len(graph.get("nodes") or []),
+        "relationships": len(graph.get("relationships") or []),
+        "metrics": metrics,
+        "elapsed_seconds": elapsed,
+        "score_elapsed_seconds": elapsed_seconds(score_started),
+    }
+    if source:
+        block["source"] = source
+    version = extract_version_from(envelope)
+    if version:
+        block["extract_version"] = version
+    return block
 
 
 def run_backend_case(
@@ -1885,7 +2051,10 @@ def run_backend_case(
             result["modules"]["parse"] = {"status": "skipped", "message": "extract 模式只复用切片"}
             reused: list[dict[str, Any]] | None = None
             chunks_path: Path | None = None
-            if reuse_dir is not None:
+            local_reused, local_chunks_path = _reused_chunks(out_dir)
+            if local_reused:
+                reused, chunks_path = local_reused, local_chunks_path
+            elif reuse_dir is not None:
                 reused, chunks_path = _reused_chunks(reuse_dir)
             if reused:
                 items = [{"text": str(item.get("text") or "")} for item in reused]
@@ -1908,10 +2077,12 @@ def run_backend_case(
                 }
                 log(result["modules"]["extract"]["message"])
         else:
-            md_path = (reuse_dir or Path("__no_reuse__")) / "document.md"
-            if reuse_dir is not None and md_path.is_file():
+            local_md = out_dir / "document.md"
+            md_path = local_md if local_md.is_file() else ((reuse_dir / "document.md") if reuse_dir is not None else None)
+            if md_path is not None and md_path.is_file():
                 markdown = md_path.read_text(encoding="utf-8")
-                write_text(out_dir / "document.md", markdown)
+                if md_path != local_md:
+                    write_text(local_md, markdown)
                 result["modules"]["parse"] = {
                     "status": "reused",
                     "source": str(md_path),
@@ -1921,14 +2092,37 @@ def run_backend_case(
             else:
                 markdown, result["modules"]["parse"] = _parse_sources(base_url, sources, options, params, out_dir)
             if markdown.strip():
-                file_name = sources[0].with_suffix(".md").name if sources else "document.md"
-                items, result["modules"]["chunk"] = _chunk_markdown(
-                    base_url, markdown, file_name, options, params, out_dir
-                )
+                local_chunks, local_chunks_path = _reused_chunks(out_dir)
+                if local_chunks:
+                    items = [{"text": str(item.get("text") or "")} for item in local_chunks]
+                    result["modules"]["chunk"] = {
+                        "status": "reused",
+                        "chunk_count": len(items),
+                        "source": str(local_chunks_path),
+                    }
+                    log(f"模块 chunk 复用 {local_chunks_path}（{len(items)} 片）")
+                else:
+                    file_name = sources[0].with_suffix(".md").name if sources else "document.md"
+                    items, result["modules"]["chunk"] = _chunk_markdown(
+                        base_url, markdown, file_name, options, params, out_dir
+                    )
             else:
                 result["modules"]["chunk"] = {"status": "skipped", "message": "解析无可用 Markdown"}
                 result["modules"]["extract"] = {"status": "skipped", "message": "解析无可用 Markdown"}
-        if items:
+        extract_path = out_dir / "backend_extract.json"
+        chunk_status = str(((result.get("modules") or {}).get("chunk") or {}).get("status") or "")
+        existing_extract = _load_json_file(extract_path) if chunk_status in {"succeeded", "reused"} else None
+        if existing_extract and items:
+            result["modules"]["extract"] = _extract_block_from_envelope(
+                existing_extract,
+                golden,
+                out_dir,
+                score_ctx,
+                status="reused",
+                source=str(extract_path),
+            )
+            log(f"模块 extract 复用 {extract_path}")
+        elif items:
             result["modules"]["extract"] = _extract_items(
                 base_url, ontology, items, options, params, golden, out_dir, score_ctx
             )
@@ -1989,21 +2183,171 @@ def run_plugin_case(
         return failed
 
 
+def persist_run_summary(
+    run_dir: Path,
+    summary: dict[str, Any],
+    running: dict[str, Any],
+    running_identity: dict[str, Any],
+    *,
+    match_mode: str,
+    extract_versions: set[str],
+    run_started: float,
+    finished: bool = False,
+    interrupted: bool = False,
+) -> None:
+    payload = dict(summary)
+    payload["overall"] = {key: finalize_metrics(value) for key, value in running.items()}
+    if match_mode == "llm":
+        payload["overall_identity"] = {key: finalize_metrics(value) for key, value in running_identity.items()}
+    payload["extract_versions"] = sorted(extract_versions)
+    if interrupted:
+        payload["interrupted"] = True
+    if finished or interrupted:
+        payload["finished_at"] = datetime.now().isoformat()
+        payload["elapsed_seconds"] = elapsed_seconds(run_started)
+    summary.update(payload)
+    write_json(run_dir / "summary.json", payload)
+
+
+def run_case_stages(
+    *,
+    run_backend: bool,
+    run_plugin: bool,
+    base_url: str,
+    mcp_url: str,
+    ontology: str,
+    sources: list[Path],
+    options: dict[str, Any],
+    params: dict[str, Any],
+    golden: dict[str, Any] | None,
+    out_dir: Path,
+    score_ctx: dict[str, Any] | None,
+    modes: list[str],
+    reuse_dir: Path | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str]:
+    markdown = ""
+    backend: dict[str, Any] | None = None
+    plugin: dict[str, Any] | None = None
+    if run_backend:
+        backend = run_backend_case(
+            base_url=base_url,
+            ontology=ontology,
+            sources=sources,
+            options=options,
+            params=params,
+            golden=golden,
+            out_dir=out_dir,
+            score_ctx=score_ctx,
+            modes=modes,
+            reuse_dir=reuse_dir,
+        )
+        markdown = str(backend.pop("markdown", "") or "")
+    if run_plugin:
+        if not markdown:
+            markdown, parse_block = _parse_sources(base_url, sources, options, params, out_dir)
+            if not markdown.strip():
+                plugin = {
+                    "status": "failed",
+                    "message": parse_block.get("message") or "插件阶段解析无可用 Markdown",
+                    "failed_files": parse_block.get("failed_files") or [],
+                    "per_file": parse_block.get("per_file") or [],
+                }
+        if markdown.strip() and (plugin or {}).get("status") != "failed":
+            plugin = run_plugin_case(
+                mcp_url=mcp_url,
+                base_url=base_url,
+                ontology=ontology,
+                markdown=markdown,
+                options=options,
+                params=params,
+                golden=golden,
+                out_dir=out_dir,
+                score_ctx=score_ctx,
+            )
+    return backend, plugin, markdown
+
+
+def run_case_with_retries(
+    *,
+    label: str,
+    run_backend: bool,
+    run_plugin: bool,
+    base_url: str,
+    mcp_url: str,
+    ontology: str,
+    sources: list[Path],
+    options: dict[str, Any],
+    params: dict[str, Any],
+    golden: dict[str, Any] | None,
+    out_dir: Path,
+    score_ctx: dict[str, Any] | None,
+    modes: list[str],
+    reuse_dir: Path | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str, int, str | None]:
+    """同一 case 最多试 3 次；未捕获异常不会冒出。返回 (backend, plugin, markdown, attempts, error)."""
+    last_backend: dict[str, Any] | None = None
+    last_plugin: dict[str, Any] | None = None
+    markdown = ""
+    last_error: str | None = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            backend, plugin, markdown = run_case_stages(
+                run_backend=run_backend,
+                run_plugin=run_plugin,
+                base_url=base_url,
+                mcp_url=mcp_url,
+                ontology=ontology,
+                sources=sources,
+                options=options,
+                params=params,
+                golden=golden,
+                out_dir=out_dir,
+                score_ctx=score_ctx,
+                modes=modes,
+                reuse_dir=reuse_dir,
+            )
+            last_backend, last_plugin = backend, plugin
+            failed = stage_failed(backend) or stage_failed(plugin)
+            if not failed:
+                return backend, plugin, markdown, attempt, None
+            last_error = None
+            if isinstance(backend, dict) and backend.get("message"):
+                last_error = str(backend.get("message"))
+            elif isinstance(plugin, dict) and plugin.get("message"):
+                last_error = str(plugin.get("message"))
+            log(f"{label} 第 {attempt}/{MAX_ATTEMPTS} 次失败" + (f": {last_error}" if last_error else ""))
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:  # noqa: BLE001 - 单个 case 失败后继续后续 case
+            last_error = str(exc)
+            if last_backend is None and run_backend:
+                last_backend = fail_payload(exc)
+            if last_plugin is None and run_plugin:
+                last_plugin = fail_payload(exc)
+            log(f"{label} 第 {attempt}/{MAX_ATTEMPTS} 次未捕获异常: {exc}")
+        if attempt < MAX_ATTEMPTS:
+            delay = RETRY_SLEEP_SECONDS
+            if delay > 0:
+                time.sleep(delay)
+    log(f"{label} 已重试 {MAX_ATTEMPTS} 次仍失败，跳过")
+    return last_backend, last_plugin, markdown, MAX_ATTEMPTS, last_error
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="知识沉淀评测：默认只测后台切片+抽取（chunk-extract）。可直接传 case/类型目录。",
-        epilog="示例: python3 eval/run.py eval/公文/关于开展OpenClaw开源智能体安全风险排查工作的通知",
+        epilog="示例: python3 eval/run.py test_data/eval/official/official_01",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "targets",
         nargs="*",
         metavar="路径",
-        help="评测目录，如 公文/<case> 或 test_data/eval/公文/<case>；传类型目录则跑该类型全部 case",
+        help="评测目录，如 official/official_01 或 test_data/eval/official；传类型目录则跑该类型全部 case",
     )
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE), help="工作区根目录，默认 test_data/eval")
-    parser.add_argument("--params", default=None, help="参数 YAML，默认工作区 params.yaml")
-    parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 公文,标准,规则")
+    parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml")
+    parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
     parser.add_argument(
         "--stage",
@@ -2113,7 +2457,7 @@ def lowest_entity_f1(record: dict[str, Any]) -> float | None:
 def main() -> int:
     args = parse_args()
     workspace = Path(args.workspace).expanduser().resolve()
-    params_path = Path(args.params).expanduser().resolve() if args.params else workspace / "params.yaml"
+    params_path = Path(args.params).expanduser().resolve() if args.params else default_params_path(workspace)
     group_filter = [item.strip() for item in str(args.groups or "").split(",") if item.strip()]
     case_filter = [item.strip() for item in str(args.cases or "").split(",") if item.strip()]
     if args.targets and (group_filter or case_filter):
@@ -2241,6 +2585,7 @@ def main() -> int:
         "cases": [],
         "succeeded": 0,
         "failed": 0,
+        "skipped": 0,
         "unscored": 0,
         "overall": {
             "backend_system": empty_metrics(),
@@ -2261,59 +2606,81 @@ def main() -> int:
 
     found_cases = False
     extract_versions: set[str] = set()
-    for type_dir in types:
-        cases = discover_cases(
-            type_dir,
-            case_names_for_type(type_dir.name, selection=selection, case_filter=case_filter),
-        )
-        log(f"类型 {type_dir.name}: {len(cases)} 个 case")
-        summary["groups"].append({"name": type_dir.name, "cases": len(cases)})
-        for case_dir in cases:
-            found_cases = True
-            sources = collect_source_files(case_dir / "docs")
-            golden_path, golden, golden_reason = load_golden(case_dir)
-            out_dir = run_dir / type_dir.name / case_dir.name
-            out_dir.mkdir(parents=True, exist_ok=True)
-            record: dict[str, Any] = {
-                "group": type_dir.name,
-                "case": case_dir.name,
-                "files": [path.name for path in sources],
-                "golden": str(golden_path) if golden_path else None,
-                "scored": golden is not None,
-                "status": "failed",
-                "backend": None,
-                "plugin": None,
-                "error": None,
-            }
-            case_started = time.perf_counter()
-            log(f"开始 {type_dir.name}/{case_dir.name} files={len(sources)} golden={'yes' if golden else golden_reason}")
-            if golden and match_mode == "llm":
-                gold_ent, gold_rel = normalize_graph(golden)
-                if len(gold_ent) + len(gold_rel) > 150:
-                    log(
-                        f"提示: golden 较大（{len(gold_ent)} 实体 / {len(gold_rel)} 关系），"
-                        "LLM-judge 会多次调用且较慢；可先 --match-mode identity 看精确匹配"
+    try:
+        for type_dir in types:
+            cases = discover_cases(
+                type_dir,
+                case_names_for_type(type_dir.name, selection=selection, case_filter=case_filter),
+            )
+            log(f"类型 {type_dir.name}: {len(cases)} 个 case")
+            summary["groups"].append({"name": type_dir.name, "cases": len(cases)})
+            for case_dir in cases:
+                found_cases = True
+                sources = collect_source_files(case_dir / "docs")
+                golden_path, golden, golden_reason = load_golden(case_dir)
+                out_dir = run_dir / type_dir.name / case_dir.name
+                out_dir.mkdir(parents=True, exist_ok=True)
+                record: dict[str, Any] = {
+                    "group": type_dir.name,
+                    "case": case_dir.name,
+                    "files": [path.name for path in sources],
+                    "golden": str(golden_path) if golden_path else None,
+                    "scored": golden is not None,
+                    "status": "failed",
+                    "backend": None,
+                    "plugin": None,
+                    "error": None,
+                }
+                case_started = time.perf_counter()
+                label = f"{type_dir.name}/{case_dir.name}"
+                log(f"开始 {label} files={len(sources)} golden={'yes' if golden else golden_reason}")
+                if golden and match_mode == "llm":
+                    gold_ent, gold_rel = normalize_graph(golden)
+                    if len(gold_ent) + len(gold_rel) > 150:
+                        log(
+                            f"提示: golden 较大（{len(gold_ent)} 实体 / {len(gold_rel)} 关系），"
+                            "LLM-judge 会多次调用且较慢；可先 --match-mode identity 看精确匹配"
+                        )
+                if not sources:
+                    record["error"] = "docs/ 中没有原文件"
+                    record["elapsed_seconds"] = elapsed_seconds(case_started)
+                    summary["cases"].append(record)
+                    summary["failed"] += 1
+                    persist_run_summary(
+                        run_dir,
+                        summary,
+                        running,
+                        running_identity,
+                        match_mode=match_mode,
+                        extract_versions=extract_versions,
+                        run_started=run_started,
                     )
-            if not sources:
-                record["error"] = "docs/ 中没有原文件"
-                record["elapsed_seconds"] = elapsed_seconds(case_started)
-                summary["cases"].append(record)
-                summary["failed"] += 1
-                continue
-            try:
-                ontology = read_ontology(resolve_ontology_path(workspace, type_dir, case_dir, group_cfg))
-            except Exception as exc:  # noqa: BLE001 - 单个 case 失败后继续
-                record["error"] = str(exc)
-                record["elapsed_seconds"] = elapsed_seconds(case_started)
-                summary["cases"].append(record)
-                summary["failed"] += 1
-                log(f"读取本体失败: {exc}")
-                continue
+                    continue
+                try:
+                    ontology = read_ontology(resolve_ontology_path(workspace, type_dir, case_dir, group_cfg))
+                except Exception as exc:  # noqa: BLE001 - 配置错误不重试
+                    record["error"] = str(exc)
+                    record["elapsed_seconds"] = elapsed_seconds(case_started)
+                    summary["cases"].append(record)
+                    summary["failed"] += 1
+                    log(f"读取本体失败: {exc}")
+                    persist_run_summary(
+                        run_dir,
+                        summary,
+                        running,
+                        running_identity,
+                        match_mode=match_mode,
+                        extract_versions=extract_versions,
+                        run_started=run_started,
+                    )
+                    continue
 
-            markdown = ""
-            if run_backend:
-                backend = run_backend_case(
+                backend, plugin, _markdown, attempts, case_error = run_case_with_retries(
+                    label=label,
+                    run_backend=run_backend,
+                    run_plugin=run_plugin,
                     base_url=base_url,
+                    mcp_url=mcp_url,
                     ontology=ontology,
                     sources=sources,
                     options=options,
@@ -2324,89 +2691,106 @@ def main() -> int:
                     modes=modes,
                     reuse_dir=(reuse_run_dir / type_dir.name / case_dir.name) if reuse_run_dir is not None else None,
                 )
-                markdown = str(backend.pop("markdown", "") or "")
                 record["backend"] = backend
-                add_metrics(running["backend_system"], (backend.get("system") or {}).get("metrics"))
-                add_metrics(running["backend_extract"], ((backend.get("modules") or {}).get("extract") or {}).get("metrics"))
-                add_metrics(
-                    running_identity["backend_system"],
-                    ((backend.get("system") or {}).get("metrics") or {}).get("identity"),
-                )
-                add_metrics(
-                    running_identity["backend_extract"],
-                    (((backend.get("modules") or {}).get("extract") or {}).get("metrics") or {}).get("identity"),
-                )
-            if run_plugin:
-                if not markdown:
-                    try:
-                        parts = []
-                        for source in sources:
-                            envelope = parse_document(base_url, source, options, params)
-                            parts.append(str((envelope.get("data") or {}).get("markdown") or ""))
-                        markdown = "\n\n".join(part for part in parts if part.strip())
-                        write_text(out_dir / "document.md", markdown)
-                    except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-                        record["plugin"] = fail_payload(exc)
-                        log(f"插件阶段解析失败: {record['plugin']['message']}")
-                if markdown.strip() and (record.get("plugin") or {}).get("status") != "failed":
-                    record["plugin"] = run_plugin_case(
-                        mcp_url=mcp_url,
-                        base_url=base_url,
-                        ontology=ontology,
-                        markdown=markdown,
-                        options=options,
-                        params=params,
-                        golden=golden,
-                        out_dir=out_dir,
-                        score_ctx=score_ctx,
+                record["plugin"] = plugin
+                record["attempts"] = attempts
+                if case_error:
+                    record["error"] = case_error
+                if backend:
+                    add_metrics(running["backend_system"], (backend.get("system") or {}).get("metrics"))
+                    add_metrics(
+                        running["backend_extract"],
+                        ((backend.get("modules") or {}).get("extract") or {}).get("metrics"),
                     )
-                    add_metrics(running["plugin_extract"], (record["plugin"] or {}).get("metrics"))
+                    add_metrics(
+                        running_identity["backend_system"],
+                        ((backend.get("system") or {}).get("metrics") or {}).get("identity"),
+                    )
+                    add_metrics(
+                        running_identity["backend_extract"],
+                        (((backend.get("modules") or {}).get("extract") or {}).get("metrics") or {}).get("identity"),
+                    )
+                if plugin:
+                    add_metrics(running["plugin_extract"], plugin.get("metrics"))
                     add_metrics(
                         running_identity["plugin_extract"],
-                        ((record["plugin"] or {}).get("metrics") or {}).get("identity"),
+                        (plugin.get("metrics") or {}).get("identity"),
                     )
-            for block in (
-                (record.get("backend") or {}).get("system"),
-                ((record.get("backend") or {}).get("modules") or {}).get("extract"),
-                record.get("plugin"),
-            ):
-                version = (block or {}).get("extract_version") if isinstance(block, dict) else None
-                if version:
-                    record["extract_version"] = str(version)
-                    extract_versions.add(str(version))
-            if golden is None:
-                record["unscored_reason"] = golden_reason
-                summary["unscored"] += 1
-            failed = stage_failed(record.get("backend")) or stage_failed(record.get("plugin")) or bool(record.get("error"))
-            record["status"] = "failed" if failed else "succeeded"
-            record["elapsed_seconds"] = elapsed_seconds(case_started)
-            if failed:
-                summary["failed"] += 1
-            else:
-                summary["succeeded"] += 1
-            write_json(out_dir / "scores.json", record)
-            summary["cases"].append(record)
-            log(
-                f"完成 {type_dir.name}/{case_dir.name}: status={record['status']} "
-                f"{format_duration(record['elapsed_seconds'])}"
-            )
+                for block in (
+                    (record.get("backend") or {}).get("system"),
+                    ((record.get("backend") or {}).get("modules") or {}).get("extract"),
+                    record.get("plugin"),
+                ):
+                    version = (block or {}).get("extract_version") if isinstance(block, dict) else None
+                    if version:
+                        record["extract_version"] = str(version)
+                        extract_versions.add(str(version))
+                if golden is None:
+                    record["unscored_reason"] = golden_reason
+                    summary["unscored"] += 1
+                failed = (
+                    stage_failed(record.get("backend"))
+                    or stage_failed(record.get("plugin"))
+                    or bool(record.get("error"))
+                )
+                record["status"] = "failed" if failed else "succeeded"
+                if failed and attempts >= MAX_ATTEMPTS:
+                    record["skipped_after_retries"] = True
+                    summary["skipped"] += 1
+                record["elapsed_seconds"] = elapsed_seconds(case_started)
+                if failed:
+                    summary["failed"] += 1
+                else:
+                    summary["succeeded"] += 1
+                write_json(out_dir / "scores.json", record)
+                summary["cases"].append(record)
+                persist_run_summary(
+                    run_dir,
+                    summary,
+                    running,
+                    running_identity,
+                    match_mode=match_mode,
+                    extract_versions=extract_versions,
+                    run_started=run_started,
+                )
+                log(
+                    f"完成 {label}: status={record['status']} attempts={attempts} "
+                    f"{format_duration(record['elapsed_seconds'])}"
+                )
+    except KeyboardInterrupt:
+        log("用户中断，已保存当前进度")
+        persist_run_summary(
+            run_dir,
+            summary,
+            running,
+            running_identity,
+            match_mode=match_mode,
+            extract_versions=extract_versions,
+            run_started=run_started,
+            interrupted=True,
+        )
+        raise
 
     if not found_cases:
         log("未发现任何 case（需要 <类型>/<case>/docs 与同级 extract/golden.json）")
         return 1
 
-    summary["overall"] = {key: finalize_metrics(value) for key, value in running.items()}
-    if match_mode == "llm":
-        summary["overall_identity"] = {key: finalize_metrics(value) for key, value in running_identity.items()}
-    summary["extract_versions"] = sorted(extract_versions)
-    summary["finished_at"] = datetime.now().isoformat()
-    summary["elapsed_seconds"] = elapsed_seconds(run_started)
-    write_json(run_dir / "summary.json", summary)
+    persist_run_summary(
+        run_dir,
+        summary,
+        running,
+        running_identity,
+        match_mode=match_mode,
+        extract_versions=extract_versions,
+        run_started=run_started,
+        finished=True,
+    )
 
     print("\n---------- 评测总览 ----------")
     print(
         f"{match_mode}  {format_duration(summary['elapsed_seconds'])}  "
-        f"成功 {summary['succeeded']}  失败 {summary['failed']}  未评分 {summary['unscored']}"
+        f"成功 {summary['succeeded']}  失败 {summary['failed']}  "
+        f"跳过 {summary.get('skipped') or 0}  未评分 {summary['unscored']}"
     )
     if run_backend:
         version_note = f"  抽取版本: {', '.join(summary['extract_versions'])}" if summary["extract_versions"] else ""

@@ -13,7 +13,15 @@ MINERU_VLM_DIR = MODELS_DIR / "mineru" / "vlm"
 EMBEDDING_MODELS = {
     "bge_small_zh": ("BAAI/bge-small-zh-v1.5", MODELS_DIR / "bge-small-zh-v1.5"),
 }
-JEV_MODEL = ("com-kotobalabs/open-jev-deberta-v3-large", MODELS_DIR / "open-jev-deberta-v3-large")
+JEV_MODEL = ("C-Tianyu/NanoJev", MODELS_DIR / "nanojev")
+JEV_REVISION = "unified-games-v1"
+JEV_ALLOW_PATTERNS = (
+    "best.safetensors",
+    "config.json",
+    "backbone_config/**",
+    "tokenizer/**",
+    "source/**",
+)
 
 MINERU_REPOSITORIES = {
     "huggingface": {
@@ -53,7 +61,16 @@ def _download_jev_model() -> None:
 
     repository, destination = JEV_MODEL
     destination.mkdir(parents=True, exist_ok=True)
-    snapshot_download(repo_id=repository, local_dir=destination)
+    snapshot_download(
+        repo_id=repository,
+        revision=JEV_REVISION,
+        local_dir=destination,
+        allow_patterns=list(JEV_ALLOW_PATTERNS),
+    )
+    weights = destination / "best.safetensors"
+    predictor = destination / "source" / "scripts" / "predict_toy_decisions.py"
+    if not weights.is_file() or not predictor.is_file():
+        raise RuntimeError(f"NanoJev download missing weights or inference source: {destination}")
 
 
 def main() -> None:
@@ -66,7 +83,7 @@ def main() -> None:
     parser.add_argument(
         "--jev",
         action="store_true",
-        help="Download the local Jev-shaped classifier into /models/open-jev-deberta-v3-large",
+        help="Download C-Tianyu/NanoJev into /models/nanojev",
     )
     args = parser.parse_args()
 

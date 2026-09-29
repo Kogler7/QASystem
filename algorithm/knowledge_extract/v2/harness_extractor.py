@@ -5,6 +5,8 @@ from typing import Any, Callable, Iterable
 
 from .chunk_context import ExtractionChunk
 from .config import get_llm_config
+from .jev_client import get_jev_client, jev_enabled
+from .jev_harness import default_entity_adjudicator
 from .llm_client import create_llm_client
 from .split_extractor import extract_split
 
@@ -50,6 +52,11 @@ def extract_harness(
             else request_timeout
         ),
     )
+    resolved_adjudicator = entity_adjudicator
+    if jev_enabled():
+        get_jev_client()
+        if resolved_adjudicator is None:
+            resolved_adjudicator = default_entity_adjudicator
     return extract_split(
         ontology,
         chunks=chunks,
@@ -62,7 +69,7 @@ def extract_harness(
         use_scheduler=use_scheduler,
         best_effort=best_effort,
         repairer=repairer,
-        entity_adjudicator=entity_adjudicator,
+        entity_adjudicator=resolved_adjudicator,
         max_repair_rounds=max_repair_rounds,
         max_attempts=max_attempts,
         retry_base_seconds=retry_base_seconds,
