@@ -2,7 +2,7 @@
 
 > 状态：单机多 GPU 架构已落地，RTX 3090 环境已完成阶段性验证，目标 A40 环境仍需容量调优与验收
 >
-> 范围：Backend HTTP API、统一 MCP、文档解析、知识沉淀、Embedding、Confidence 及其统一执行基础设施
+> 范围：Backend HTTP API、统一 MCP、文档解析、知识沉淀、Embedding、Confidence 及其统一执行基础设施；Agent 服务的并发模型在第 7.3 节概述，完整细节见 `agent/docs/架构设计.md`
 
 本文说明当前 `develop` 分支已经实现的服务并发、任务队列、GPU 调度、VLM PDF 分片、可观测性和部署架构。它描述的是现行实现，不再作为重构计划或未来组件选型清单。
 
@@ -54,6 +54,37 @@ supervisor 的启动顺序为：
 5. 写入 runtime ready 标记；任一受管子进程异常退出时，supervisor 结束本次运行并统一清理子进程。
 
 API、CPU Worker、每卡 VLM Worker 数量由环境变量控制；其中 CPU 和 VLM Worker 支持 `auto`，根据主机 CPU 数和选中 GPU 数派生。当前实现不会在运行期间根据负载动态增减 vLLM engine 或 Worker 进程。
+
+### 2.1 一次请求的处理生命周期
+
+以下是一次典型重计算请求在系统中的完整路径，也是理解各组件如何协作的主线：
+
+```text
+客户端
+  -> API 进程
+       鉴权中间件捕获用户请求头 -> ContextVar（不落日志、不落 payload）
+       路由映射到资源类别
+       ExecutionManager.submit：
+         1. 鉴权头写入带 TTL 的独立 Redis KV，得到随机 auth_context_id
+         2. 业务 payload 写入 ArtifactStore，队列消息只携带引用
+         3. XADD 到资源类别共享 Stream
+       同步语义：在独立线程中轮询结果（Prefer: wait=N 限时等待）；异步语义：立即返回 202
+  -> Worker（先查本 Worker 定向 Stream 处理重试回补，再从共享 Stream 抢占）
+       GPU 任务：Redis Lua 脚本原子申请 GPU Lease / Worker slot（见 §5.2）
+       容量不足：任务回到共享队列，Job 进入 waiting_for_capacity
+       load_auth_context -> bind_user_headers 恢复用户上下文
+       执行算法；页段级子 Job 由编排器并行下发并合并
+       delete_auth_context；Lease 释放
+       结果与事件写回 Redis（ArtifactStore / Event Hub）
+  -> 客户端
+       轮询/限时等待返回，或 SSE 事件流（Last-Event-ID 断线续传），或 result_url 拉取 envelope
+```
+
+这条路径上有三个不变量贯穿始终：
+
+1. **凭证不进队列**：队列消息、Job 记录、SSE 和结果中只出现 `auth_context_id`；Authorization 头只存在于带 TTL 的独立 KV 和 Worker 执行期间的内存上下文中。
+2. **重计算不进 API 进程**：API 进程只做协议转换、入队和等待，天然无状态，Uvicorn 副本数可以远小于执行进程数。
+3. **执行现场完全可追溯**：每一次尝试都能从 Job 关联到 Worker 实例、物理 GPU、Lease、显存预算和排队/调度/执行/持久化分段耗时（见 §8）。
 
 ## 3. 统一执行层
 
@@ -221,6 +252,8 @@ Redis Lua 脚本原子检查并写入 GPU Lease 和 Worker-slot Lease。拿不�
 
 异步调用在 SSE 收到 `job.completed` 后访问 `execution.result_url`，得到包含最终业务 `data` 和最终 `execution` 的完整 envelope。结果未成功完成时该接口返回 `409`。
 
+同步兼容语义有明确的容量含义：默认 `wait` 在 ASGI 线程池中轮询等待，长任务高并发下大量等待请求会占满线程池并推高 API 延迟。高并发场景应优先使用 `respond-async` 或 `wait=N` 上限，把结果等待转移到客户端轮询或 SSE。
+
 作业接口包括：
 
 | 方法 | 路径 | 用途 |
@@ -233,6 +266,15 @@ Redis Lua 脚本原子检查并写入 GPU Lease 和 Worker-slot Lease。拿不�
 | `GET` | `/api/v1/jobs/{job_id}/events` | SSE 订阅任务事件 |
 
 MCP 生产默认使用 `MCP_EXECUTION_MODE=sync`：重工具进入同一执行队列并等待原 MCP 结果，现有 Agent 不必改调用协议。只有显式配置 `async` 才返回任务句柄；`inline` 仅用于测试或本地算法断点调试。
+
+### 7.3 Agent 服务的并发模型
+
+Agent 服务是与 Backend 并列的独立任务型入口，复用同一套"入队返回句柄"范式，但有自己独立的并发层次（完整细节、幂等与取消约束见 `agent/docs/架构设计.md`）：
+
+- **总并发 = W × min(C, P)**：W 个 uvicorn 进程（`AGENT_API_WORKERS`；多进程必须由 Redis 承载共享队列，否则拒绝启动）× 每进程 C 个工作线程（`AGENT_WORKER_CONCURRENCY`，生产默认 4）× ToolManager 连接池大小 P（`AGENT_WORKER_POOL_SIZE`，默认等于 C）。每个 ToolManager 绑定专属的事件循环线程，通过 `run_coroutine_threadsafe` 调用 MCP。
+- **任务队列是"至少一次"语义**：Redis List 主队列 + processing 队列，Worker 每 30 秒续约租约，超过 `TASK_STORE_VISIBILITY_TIMEOUT`（默认 1500s）未完成的处理中任务由 requeue 线程自动重新入队。崩溃恢复路径简单，代价是有副作用的工具必须自身幂等。
+- **流式输出跨进程**：Worker 线程把 LLM 的逐 token delta 同步发布到任务事件 Stream；SSE 订阅端按游标独立读取，支持 `Last-Event-ID` 断线重放，发布者与订阅者可以不在同一进程。
+- **与统一执行层的关系**：生产默认 `MCP_EXECUTION_MODE=sync`，Agent 线程发起的重型工具调用仍进入 Backend 的统一执行队列并等待原结果，因此 Agent 工作线程不会被单卡计算长时间独占。
 
 ## 8. 执行可观测性
 
@@ -344,3 +386,20 @@ docker compose logs --tail=300 backend
 - 目标 A40 机器通过 `GPU_DEVICE_IDS=4,5,6,7` 限定后四卡。
 
 尚未实现、不得写入现行能力承诺的演进项包括：运行时副本自动扩缩、同卡多 vLLM 副本自动部署、跨节点调度、基于页面复杂度的预测分片、慢页在线二次拆分，以及自动学习调度参数。是否引入 Kubernetes、Ray Serve、Triton、HAMi 或 NVIDIA Dynamo，应在单机 A40 容量验收后根据确切瓶颈决定；它们不是当前架构的运行依赖。
+
+## 12. 架构设计决策与权衡
+
+以下决策把系统从"一个 API 进程跑所有算法"的常见形态，约束为今天这套多进程、队列化、准入化的执行架构。每一项都记录了当时的取舍，后续演进应尊重这些取舍而不是绕过它们：
+
+| 决策 | 理由 | 代价/边界 |
+| --- | --- | --- |
+| 重计算不进 API 进程，全部队列化 | API 进程保持无状态、低延迟，副本数可以远小于执行进程数；崩溃影响面以单个任务为界 | Redis 成为吞吐枢纽和单点；同步语义需要线程池等待 |
+| 任务不预绑定 GPU，领取后才申请 Lease | 负载均衡由运行时显存快照决定，形成跨卡 work stealing，避免热点卡排队、空闲卡闲置 | 准入依赖心跳快照时效性（nvidia-smi 1s 缓存 + Worker 5s 心跳） |
+| 分片数量与显存准入分成两个控制量 | 分片负责跨卡负载均衡与页段级重试，显存负责防超配，二者解耦后可独立调优 | 不按页面复杂度预测耗时，慢页段无法在线二次拆分 |
+| 正式部署失败关闭（Redis 不可用返回 503） | 避免半初始化状态下 inline 降级产生不可信结果或部分副作用 | Redis 不可用期间全部任务型接口不可用 |
+| 鉴权上下文独立存储，队列只携带随机 ID | 凭证不进入任务产物、日志、SSE 和结果，交付与审计边界清晰 | 执行前必须成功恢复上下文，否则任务失败重试 |
+| vLLM engine 常驻 + readiness/warmup 前置 | 首个请求不承担模型编译与冷启动，GPU Worker 只接"已就绪"的请求 | engine 数量静态，不随队列压力扩缩 |
+| Worker 单循环同步执行、以进程为并发单位 | 算法库保持同步实现，进程崩溃隔离干净，调试路径单一 | IO 型长尾任务（`io.llm`/`io.db`）会占满整个 Worker，需靠 Worker 数量覆盖 |
+| "至少一次"执行语义 + 显式重试与退避 | 崩溃恢复不需要分布式事务，失败路径简单可观测 | 业务副作用需要幂等，重复执行是允许行为 |
+
+这些取舍共同保证了四件事：容量可以被计算（Lease 预算），负载可以被观察（execution 分段耗时），故障可以被重放（事件序列 + SSE 断线续传），演进可以被约束（§11 的边界清单）。这也是当前架构区别于"异步装饰过的单体服务"的核心。
