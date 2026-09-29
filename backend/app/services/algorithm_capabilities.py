@@ -12,8 +12,8 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from algorithm.NL_to_cypher.vector import batch_text_to_vectors
-from algorithm.knowledge_extract_v2 import deduplicate_chunk_graphs
-from algorithm.knowledge_extract_v2.config import get_llm_config
+from algorithm.knowledge_extract.v2 import deduplicate_chunk_graphs
+from algorithm.knowledge_extract.v2.config import get_llm_config
 from algorithm.knowledge_pipeline import chunk_document_items, normalize_document_content
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 

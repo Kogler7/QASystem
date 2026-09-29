@@ -12,13 +12,13 @@ environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 
 * ``latest`` (default): resolves to the newest version and runs it through the
   same per-chunk projection.
-* ``v2``: run ``extract_harness`` once, then project the document-level result
-  back onto the individual chunks using each entity's evidence anchor, so the
-  caller keeps seeing one item per chunk and ``deduplicate_chunk_graphs`` can
-  still rebuild the merged graph (and its ``chunk_indices``) exactly as before.
-* ``v3``: run ``extract_detailed`` with the V2-configured LLM client, reshape
-  its flat ``entities``/``relations`` result into the V2 aggregate contract
-  (via ``algorithm.knowledge_extract.v3``), then share the same projection.
+* ``v2``: run ``v2.extract_aggregate`` once, then project the document-level
+  result back onto the individual chunks using each entity's evidence anchor,
+  so the caller keeps seeing one item per chunk and ``deduplicate_chunk_graphs``
+  can still rebuild the merged graph (and its ``chunk_indices``) exactly as before.
+* ``v3``: run ``v3.extract_aggregate`` with the V2-configured LLM client; it
+  reshapes the flat ``entities``/``relations`` result into the V2 aggregate
+  contract, then shares the same projection.
 
 Two deliberate choices worth knowing about for the V2 path:
 
@@ -221,7 +221,7 @@ def build_chunks(
     Chunk text is passed through untouched.  Callers must not pre-strip Markdown
     headings: V2's structural extractors rely on the ``#`` markers.
     """
-    from algorithm.knowledge_extract_v2.chunk_context import ExtractionChunk
+    from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
 
     chunks = []
     for position, text in enumerate(texts):
@@ -261,9 +261,9 @@ def run_aggregate(
     concrete_version = ke_version.get_extract_version()
     if runner is None:
         runner = {
-            ke_version.V2: v2.extract,
-            ke_version.V3: v3.extract,
-            ke_version.LATEST: latest.extract,
+            ke_version.V2: v2.extract_aggregate,
+            ke_version.V3: v3.extract_aggregate,
+            ke_version.LATEST: latest.extract_aggregate,
         }[label]
     result = runner(
         ontology=ontology,
@@ -283,7 +283,7 @@ def run_aggregate(
 
 def _uid_for(type_id: Any, identity: Any) -> str:
     """Reproduce ``GraphAssembler.uid_for`` so objects can be matched to nodes."""
-    from algorithm.knowledge_extract_v2.graph_utils import entity_uid
+    from algorithm.knowledge_extract.v2.graph_utils import entity_uid
 
     return entity_uid(type_id, identity, None)
 

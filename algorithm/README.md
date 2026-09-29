@@ -18,9 +18,10 @@
 | `preproc/` | 各类文档解析为 Markdown（PDF/图片/Word/Excel/HTML/OFD） |
 | `knowledge_pipeline/` | 语义切片、演示视图与向量存储编排 |
 | `knowledge_extract/` | 第一版知识抽取（本体驱动）；现同时承载 V1 契约/共享件、版本路由 shim 与无本体摘要 |
-| `knowledge_extract/{version,latest,v2,v3}.py` | 版本路由：`version` 读取 `KG_EXTRACT_ALGO_VERSION`；`latest` 指向当前主版本；`v2`/`v3` 提供统一签名 shim |
-| `knowledge_extract_v2/` | 新版抽取与本体编译 |
-| `knowledge_extract_v3/` | 第三代抽取（独立重写），与 V2 并行存在 |
+| `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3`，默认 `latest`），并做合法性校验 |
+| `knowledge_extract/latest/` | `latest` 标记：始终指向当前最新实现（当前解析为 v3） |
+| `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
+| `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
 | `embedding_runtime.py` | 文本向量化运行时（本地模型 / 远程服务自动选择） |
 | `knowledge_precipitation.py` | 图谱沉淀总编排（解析→切片→抽取→向量化→入库） |
 | `term_vector/` | Term 语义向量索引的构建与检索 |
@@ -60,7 +61,7 @@
 
 ---
 
-## 4. `knowledge_extract/`、`knowledge_extract_v2/` 与 `knowledge_extract_v3/` —— 知识抽取
+## 4. `knowledge_extract/`、`knowledge_extract/v2/` 与 `knowledge_extract/v3/` —— 知识抽取
 
 ### 4.1 `knowledge_extract/`（第一版，仅保留文本摘要）
 
@@ -78,7 +79,7 @@
 | `config.py` / `batch.py` / `scheduler.py` | 配置、批处理与限流调度 |
 | `uml/` | 本体定义（业务指标、数据模型、术语等） |
 
-### 4.2 `knowledge_extract_v2/`（当前主用，默认版本）
+### 4.2 `knowledge_extract/v2/`（当前主用，默认版本）
 
 | 文件 | 作用 |
 | --- | --- |
@@ -109,9 +110,9 @@
 | 文件 | 作用 |
 | --- | --- |
 | `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3`，默认 `latest`），并做合法性校验 |
-| `knowledge_extract/latest.py` | `latest` 标记：始终指向当前最新实现（当前解析为 v3） |
-| `knowledge_extract/v2.py` | 统一签名 shim，实际调用 `knowledge_extract_v2.extract_harness` |
-| `knowledge_extract/v3.py` | 统一签名 shim，实际调用 `knowledge_extract_v3.extract_detailed` 并把 flat facts 转成 V2 聚合契约 |
+| `knowledge_extract/latest/` | `latest` 标记：始终指向当前最新实现（当前解析为 v3） |
+| `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
+| `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
 
 Backend `graph.extract` 与 MCP `kg_extract_v2` 通过
 `backend/app/services/knowledge_extract_adapter.py` 调用上述 shim。

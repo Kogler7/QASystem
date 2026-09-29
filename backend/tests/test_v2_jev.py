@@ -2,18 +2,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from algorithm.knowledge_extract_v2.candidate_generation import (
+from algorithm.knowledge_extract.v2.candidate_generation import (
     _deterministic_relation_quote,
     relation_pass,
 )
-from algorithm.knowledge_extract_v2.candidate_models import EntityCandidate
-from algorithm.knowledge_extract_v2.chunk_context import (
+from algorithm.knowledge_extract.v2.candidate_models import EntityCandidate
+from algorithm.knowledge_extract.v2.chunk_context import (
     ChunkContextManager,
     ExtractionChunk,
     ExtractionRequest,
 )
-from algorithm.knowledge_extract_v2.evidence import Evidence
-from algorithm.knowledge_extract_v2.jev_client import (
+from algorithm.knowledge_extract.v2.evidence import Evidence
+from algorithm.knowledge_extract.v2.jev_client import (
     CallableJevClient,
     ChoiceAnswer,
     JevUnavailableError,
@@ -24,8 +24,8 @@ from algorithm.knowledge_extract_v2.jev_client import (
     partition_relation_pairs,
     reset_jev_client_cache,
 )
-from algorithm.knowledge_extract_v2.ontology_compiler import compile_plan
-from algorithm.knowledge_extract_v2.prompt_router import DocumentRoute
+from algorithm.knowledge_extract.v2.ontology_compiler import compile_plan
+from algorithm.knowledge_extract.v2.prompt_router import DocumentRoute
 
 
 ONTOLOGY = """
@@ -70,7 +70,7 @@ def test_entity_adjudicator_keeps_uncertain_below_confidence(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.jev_client.get_jev_client",
+        "algorithm.knowledge_extract.v2.jev_client.get_jev_client",
         lambda: client,
     )
     verdict = default_entity_adjudicator(
@@ -93,7 +93,7 @@ def test_entity_adjudicator_accepts_high_confidence_same_entity(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.jev_client.get_jev_client",
+        "algorithm.knowledge_extract.v2.jev_client.get_jev_client",
         lambda: client,
     )
     verdict = default_entity_adjudicator(
@@ -230,7 +230,7 @@ def test_relation_pass_does_not_call_llm_for_high_confidence_none(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.candidate_generation.partition_relation_pairs",
+        "algorithm.knowledge_extract.v2.candidate_generation.partition_relation_pairs",
         lambda pairs, chunk_text, client=None: ([], list(pairs), []),
     )
     calls: list[object] = []
@@ -240,7 +240,7 @@ def test_relation_pass_does_not_call_llm_for_high_confidence_none(monkeypatch):
         return {"decisions": []}
 
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.candidate_generation.generate_structured",
+        "algorithm.knowledge_extract.v2.candidate_generation.generate_structured",
         fake_generate,
     )
     results = relation_pass(
@@ -320,7 +320,7 @@ def test_relation_pass_sends_gray_pairs_to_llm(monkeypatch):
         return [], [], list(pairs)
 
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.candidate_generation.partition_relation_pairs",
+        "algorithm.knowledge_extract.v2.candidate_generation.partition_relation_pairs",
         fake_partition,
     )
     calls: list[object] = []
@@ -330,7 +330,7 @@ def test_relation_pass_sends_gray_pairs_to_llm(monkeypatch):
         return {"decisions": []}
 
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.candidate_generation.generate_structured",
+        "algorithm.knowledge_extract.v2.candidate_generation.generate_structured",
         fake_generate,
     )
     relation_pass(

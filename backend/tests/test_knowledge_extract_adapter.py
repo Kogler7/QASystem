@@ -469,7 +469,7 @@ def _stub_v3_client(monkeypatch):
             raise AssertionError("fake extract_detailed 不应真的调用 LLM")
 
     monkeypatch.setattr(
-        "algorithm.knowledge_extract_v2.llm_client.create_llm_client",
+        "algorithm.knowledge_extract.v2.llm_client.create_llm_client",
         lambda **_kwargs: DummyLLM(),
     )
 
@@ -515,7 +515,7 @@ def test_v3_result_is_converted_and_projected_onto_chunks(monkeypatch):
             "stats": {"calls": 2, "prompt_version": "v3.7-source-names"},
         }
 
-    monkeypatch.setattr("algorithm.knowledge_extract_v3.extract_detailed", fake_extract_detailed)
+    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_detailed", fake_extract_detailed)
 
     items = adapter.extract_chunks("class Term", ["文本A", "文本B"])
 
@@ -564,7 +564,7 @@ def test_v3_incomplete_status_keeps_chunks_publishable(monkeypatch):
             "stats": {},
         }
 
-    monkeypatch.setattr("algorithm.knowledge_extract_v3.extract_detailed", fake_extract_detailed)
+    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_detailed", fake_extract_detailed)
 
     items = adapter.extract_chunks("class Term", ["文本A", "文本B"])
 
@@ -587,7 +587,7 @@ def test_v3_failed_status_fails_every_chunk(monkeypatch):
             "stats": {},
         }
 
-    monkeypatch.setattr("algorithm.knowledge_extract_v3.extract_detailed", fake_extract_detailed)
+    monkeypatch.setattr("algorithm.knowledge_extract.v3.extract_detailed", fake_extract_detailed)
 
     items = adapter.extract_chunks("class Term", ["文本A", "文本B"])
 

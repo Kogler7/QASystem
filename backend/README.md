@@ -155,7 +155,7 @@ docker compose up -d backend
 pytest
 ```
 
-即可运行 `backend/tests`、`agent/tests`、`algorithm/knowledge_extract_v2/tests` 等已注册测试。
+即可运行 `backend/tests`、`agent/tests`、`algorithm/knowledge_extract/v2/tests` 等已注册测试。
 若只跑后端测试：
 
 ```bash

@@ -112,12 +112,12 @@ def protocol_module():
                 for index, text in enumerate(chunks)
             ],
         ),
-        "algorithm.knowledge_extract_v2": _module(
-            "algorithm.knowledge_extract_v2",
+        "algorithm.knowledge_extract.v2": _module(
+            "algorithm.knowledge_extract.v2",
             deduplicate_chunk_graphs=deduplicate_chunk_graphs,
         ),
-        "algorithm.knowledge_extract_v2.config": _module(
-            "algorithm.knowledge_extract_v2.config",
+        "algorithm.knowledge_extract.v2.config": _module(
+            "algorithm.knowledge_extract.v2.config",
             get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
         ),
         # Production extraction runs Knowledge Extract V2 through this adapter,

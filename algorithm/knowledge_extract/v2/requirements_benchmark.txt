@@ -1,0 +1,16 @@
+# algorithm.knowledge_extract.v2 官方 benchmark 本地直连评测所需核心依赖
+# 安装方式：pip install -r algorithm/knowledge_extract/v2/requirements_benchmark.txt
+# Python 版本：建议 3.10 或 3.11
+
+# LLM 抽取（OpenAI 兼容接口）
+openai==2.24.0
+
+# Markdown 切片与文本处理
+langchain-core==1.2.17
+langchain-text-splitters==1.1.1
+
+# 根目录 .env 配置加载
+python-dotenv==1.2.2
+
+# backend 模式回退与 HTTP 请求
+requests==2.32.5

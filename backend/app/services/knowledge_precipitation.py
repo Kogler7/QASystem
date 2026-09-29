@@ -104,7 +104,7 @@ def _ontology_digest(ontology: str) -> dict[str, Any]:
     if not text.strip():
         return info
     try:
-        from algorithm.knowledge_extract_v2.ontology_schema import OntologySchema
+        from algorithm.knowledge_extract.v2.ontology_schema import OntologySchema
 
         schema = OntologySchema.parse(text)
         info["classes"] = [item.identifier for item in schema.classes]
@@ -132,7 +132,7 @@ def _ontology_catalog(ontology: str) -> dict[str, Any]:
     if not text.strip():
         return catalog
     try:
-        from algorithm.knowledge_extract_v2.ontology_schema import OntologySchema
+        from algorithm.knowledge_extract.v2.ontology_schema import OntologySchema
 
         schema = OntologySchema.parse(text)
         for item in schema.classes:
@@ -530,7 +530,7 @@ class KnowledgePrecipitationService:
                 )
         else:
             from algorithm.knowledge_extract.batch import summarize_chunks
-            from algorithm.knowledge_extract_v2.config import get_llm_config as _get_llm_config
+            from algorithm.knowledge_extract.v2.config import get_llm_config as _get_llm_config
 
             summaries = summarize_chunks(
                 [item["text"] for item in chunks],

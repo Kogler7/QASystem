@@ -1,11 +1,11 @@
 from types import SimpleNamespace
 
-from algorithm.knowledge_extract_v2.candidate_generation import (
+from algorithm.knowledge_extract.v2.candidate_generation import (
     RELATION_PAIR_BATCH_SIZE,
     generate_structured,
     relation_pair_batch_size,
 )
-from algorithm.knowledge_extract_v2.llm_client import OpenAICompatibleLLM, _usage_dict
+from algorithm.knowledge_extract.v2.llm_client import OpenAICompatibleLLM, _usage_dict
 
 
 INCOMPATIBLE_SCHEMA = {

@@ -185,15 +185,15 @@ test_docs/中车待抽取pdf/
 test_docs/抽取结果md/
 
 # 抽取算法相关（tests/ 与 benchmark/ 已纳入版本控制，勿再加忽略规则）
-algorithm/knowledge_extract_v2/ontology_backups
-algorithm/knowledge_extract_v2/__pycache__
-algorithm/knowledge_extract_v2/algorithm_docs
+algorithm/knowledge_extract/v2/ontology_backups
+algorithm/knowledge_extract/v2/__pycache__
+algorithm/knowledge_extract/v2/algorithm_docs
 
 # 本地编辑器与运行时产物（勿提交）
 .claude/settings.local.json
 backend/data/execution/
 offline_ingestion/_runs/
-algorithm/knowledge_extract_v2/eval_results
+algorithm/knowledge_extract/v2/eval_results
 agent/image_result/
 agent/log/
 ofd_converter/target/
@@ -210,4 +210,4 @@ vsix-20260807-153551
 eval_api.md
 
 # 本地备份（不提交）
-algorithm/knowledge_extract_v2/backups/
+algorithm/knowledge_extract/v2/backups/
