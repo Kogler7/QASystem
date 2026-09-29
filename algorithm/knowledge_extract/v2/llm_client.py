@@ -201,11 +201,13 @@ class OpenAICompatibleLLM:
         model: str,
         max_tokens: int,
         disable_thinking: bool,
+        base_url: str = "",
     ) -> None:
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.disable_thinking = disable_thinking
+        self.base_url = base_url
 
     def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None) -> Any:
         kwargs: dict[str, Any] = {
@@ -402,7 +404,8 @@ class OpenAICompatibleLLM:
             or (not official_deepseek and bool(context.get("record_table")))
             or bool(context.get("prefer_chat_json_schema"))
             or not self.disable_thinking
-        ):
+        )
+        if prefer_chat_json_schema:
             # 该模型在 MaaS 的 Responses 路径上高频返回空数组/截断 JSON；
             # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
             try:
@@ -474,6 +477,7 @@ def create_llm_client(
         disable_thinking=(
             config["disable_thinking"] if disable_thinking is None else disable_thinking
         ),
+        base_url=base_url or config["base_url"],
     )
 
 
