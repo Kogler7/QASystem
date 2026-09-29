@@ -697,6 +697,28 @@ def calculate_metrics(tp: int, fp: int, fn: int) -> dict[str, Any]:
     }
 
 
+def _entity_display(key: tuple[str, str]) -> dict[str, str]:
+    return {"type": key[0], "name": key[1]}
+
+
+def _relation_display(key: tuple[str, str, str, str, str]) -> dict[str, str]:
+    return {
+        "from_type": key[0],
+        "from_name": key[1],
+        "rel_type": key[2],
+        "to_type": key[3],
+        "to_name": key[4],
+    }
+
+
+def _identity_details(gold_keys: set, pred_keys: set, display: Any) -> dict[str, Any]:
+    return {
+        "matched": [display(key) for key in sorted(gold_keys & pred_keys)],
+        "missing": [display(key) for key in sorted(gold_keys - pred_keys)],
+        "extra": [display(key) for key in sorted(pred_keys - gold_keys)],
+    }
+
+
 def score_entities_relations(
     golden_entities: list[dict[str, Any]],
     golden_relations: list[dict[str, Any]],
@@ -717,6 +739,10 @@ def score_entities_relations(
             "golden": len(gold_rel),
             "predicted": len(pred_rel),
             **calculate_metrics(len(gold_rel & pred_rel), len(pred_rel - gold_rel), len(gold_rel - pred_rel)),
+        },
+        "details": {
+            "entities": _identity_details(gold_ent, pred_ent, _entity_display),
+            "relations": _identity_details(gold_rel, pred_rel, _relation_display),
         },
     }
 
@@ -967,10 +993,18 @@ def _judge_one_batch(
     golden_items: list[dict[str, Any]],
     batch_predicted_items: list[dict[str, Any]],
     predicted_start: int,
-) -> list[tuple[int, int]]:
+) -> tuple[list[tuple[int, int]], dict[str, Any]]:
+    info: dict[str, Any] = {
+        "collection": collection_name,
+        "predicted_start": predicted_start,
+        "predicted_count": len(batch_predicted_items),
+        "response_mode": None,
+        "errors": [],
+        "elapsed_seconds": None,
+    }
+    started = time.perf_counter()
     messages = _build_judge_messages(collection_name, golden_items, batch_predicted_items)
     schema = _judge_schema(collection_name)
-    errors: list[str] = []
     for response_mode in ("json_schema", "json_object", "plain"):
         try:
             data = judge_client.generate_structured(
@@ -982,15 +1016,18 @@ def _judge_one_batch(
             if raw_matches is None:
                 raise ValueError(f"响应缺少字段: {collection_name}")
             batch_pairs = _unique_matches(raw_matches)
+            info["response_mode"] = response_mode
+            info["elapsed_seconds"] = elapsed_seconds(started)
             return [
                 (g, predicted_start + p)
                 for g, p in batch_pairs
                 if g < len(golden_items) and p < len(batch_predicted_items)
-            ]
+            ], info
         except Exception as exc:  # noqa: BLE001 - 按 v2 口径依次降级 json_schema/json_object/plain
-            errors.append(f"{response_mode}: {type(exc).__name__}: {exc}")
+            info["errors"].append(f"{response_mode}: {type(exc).__name__}: {exc}")
+    info["elapsed_seconds"] = elapsed_seconds(started)
     raise RuntimeError(
-        f"LLM judge {collection_name} 失败，json_schema/json_object/plain 均未成功: " + " | ".join(errors)
+        f"LLM judge {collection_name} 失败，json_schema/json_object/plain 均未成功: " + " | ".join(info["errors"])
     )
 
 
@@ -1001,14 +1038,78 @@ def _judge_collection(
     predicted_items: list[dict[str, Any]],
     *,
     batch_size: int = 20,
-) -> list[tuple[int, int]]:
+) -> tuple[list[tuple[int, int]], list[dict[str, Any]]]:
     all_pairs: list[tuple[int, int]] = []
+    batch_infos: list[dict[str, Any]] = []
     if not golden_items or not predicted_items:
-        return all_pairs
+        return all_pairs, batch_infos
     for start in range(0, len(predicted_items), batch_size):
         batch = predicted_items[start : start + batch_size]
-        all_pairs.extend(_judge_one_batch(judge_client, collection_name, golden_items, batch, start))
-    return _unique_matches(all_pairs)
+        pairs, info = _judge_one_batch(judge_client, collection_name, golden_items, batch, start)
+        all_pairs.extend(pairs)
+        batch_infos.append(info)
+    return _unique_matches(all_pairs), batch_infos
+
+
+def _item_display(item: dict[str, Any], *, relation: bool) -> dict[str, Any]:
+    if relation:
+        return {
+            "from_type": item.get("from_type"),
+            "from_name": item.get("from_name"),
+            "rel_type": item.get("rel_type"),
+            "to_type": item.get("to_type"),
+            "to_name": item.get("to_name"),
+        }
+    return {"type": item.get("type"), "name": item.get("name")}
+
+
+def _llm_match_details(
+    golden_items: list[dict[str, Any]],
+    predicted_items: list[dict[str, Any]],
+    pairs: list[tuple[int, int]],
+    *,
+    relation: bool,
+) -> dict[str, Any]:
+    matched_golden = {g for g, _ in pairs}
+    matched_predicted = {p for _, p in pairs}
+    return {
+        "matched": [
+            {
+                "golden": _item_display(golden_items[g], relation=relation),
+                "predicted": _item_display(predicted_items[p], relation=relation),
+            }
+            for g, p in sorted(pairs)
+        ],
+        "missing": [
+            _item_display(golden_items[i], relation=relation)
+            for i in range(len(golden_items))
+            if i not in matched_golden
+        ],
+        "extra": [
+            _item_display(predicted_items[i], relation=relation)
+            for i in range(len(predicted_items))
+            if i not in matched_predicted
+        ],
+    }
+
+
+def split_match_details(out_dir: Path, block: str, metrics: dict[str, Any] | None) -> dict[str, Any] | None:
+    """把逐条匹配明细从 metrics 摘到 match_details.json；scores.json 只留计数，避免臃肿。"""
+    if not metrics:
+        return metrics
+    details = metrics.pop("details", None)
+    if not details:
+        return metrics
+    path = out_dir / "match_details.json"
+    payload: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = {}
+    payload[block] = details
+    write_json(path, payload)
+    return metrics
 
 
 def llm_judge_score_case(
@@ -1024,19 +1125,15 @@ def llm_judge_score_case(
     golden_relations = _strip_evidence(golden_relations)
     predicted_entities = _strip_evidence(predicted_entities)
     predicted_relations = _strip_evidence(predicted_relations)
-    entity_pairs = [
-        (g, p)
-        for g, p in _judge_collection(
-            judge_client, "entity_matches", golden_entities, predicted_entities, batch_size=batch_size
-        )
-        if g < len(golden_entities) and p < len(predicted_entities)
-    ]
+    entity_pairs_raw, entity_batches = _judge_collection(
+        judge_client, "entity_matches", golden_entities, predicted_entities, batch_size=batch_size
+    )
+    relation_pairs_raw, relation_batches = _judge_collection(
+        judge_client, "relation_matches", golden_relations, predicted_relations, batch_size=batch_size
+    )
+    entity_pairs = [(g, p) for g, p in entity_pairs_raw if g < len(golden_entities) and p < len(predicted_entities)]
     relation_pairs = [
-        (g, p)
-        for g, p in _judge_collection(
-            judge_client, "relation_matches", golden_relations, predicted_relations, batch_size=batch_size
-        )
-        if g < len(golden_relations) and p < len(predicted_relations)
+        (g, p) for g, p in relation_pairs_raw if g < len(golden_relations) and p < len(predicted_relations)
     ]
     return {
         "entities": {
@@ -1057,9 +1154,10 @@ def llm_judge_score_case(
                 max(0, len(golden_relations) - len(relation_pairs)),
             ),
         },
-        "judge_pairs": {
-            "entity_matches": entity_pairs,
-            "relation_matches": relation_pairs,
+        "details": {
+            "entities": _llm_match_details(golden_entities, predicted_entities, entity_pairs, relation=False),
+            "relations": _llm_match_details(golden_relations, predicted_relations, relation_pairs, relation=True),
+            "judge_batches": entity_batches + relation_batches,
         },
     }
 
@@ -1123,6 +1221,9 @@ def score_against_golden(
             batch_size=batch_size,
         )
         metrics["match_mode"] = "llm"
+        identity_details = identity.pop("details", None)
+        if identity_details:
+            metrics["details"]["identity"] = identity_details
         metrics["identity"] = identity
         metrics["predicted_graph"] = predicted_graph
         return metrics
@@ -1514,8 +1615,10 @@ def _parse_sources(
     """模块 parse：docs/ 原文件 → 拼接 Markdown。"""
     markdown_parts: list[str] = []
     parse_failures: list[dict[str, Any]] = []
+    per_file: list[dict[str, Any]] = []
     parse_started = time.perf_counter()
     for source in sources:
+        file_started = time.perf_counter()
         try:
             envelope = parse_document(base_url, source, options, params)
             write_json(out_dir / f"parse_{source.stem}.json", envelope)
@@ -1524,10 +1627,26 @@ def _parse_sources(
             if not parsed.strip():
                 raise RuntimeError(f"解析结果为空: {source.name}")
             markdown_parts.append(parsed)
+            per_file.append(
+                {
+                    "file": source.name,
+                    "status": "succeeded",
+                    "elapsed_seconds": elapsed_seconds(file_started),
+                    "markdown_length": len(parsed),
+                }
+            )
         except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
             failed = fail_payload(exc)
             failed["file"] = source.name
             parse_failures.append(failed)
+            per_file.append(
+                {
+                    "file": source.name,
+                    "status": "failed",
+                    "elapsed_seconds": elapsed_seconds(file_started),
+                    "error": failed["message"],
+                }
+            )
             log(f"模块 parse 失败 {source.name}: {failed['message']}")
     parse_elapsed = elapsed_seconds(parse_started)
     markdown = "\n\n".join(markdown_parts)
@@ -1539,6 +1658,7 @@ def _parse_sources(
             "parsed": len(markdown_parts),
             "content_length": len(markdown),
             "failed_files": parse_failures,
+            "per_file": per_file,
             "elapsed_seconds": parse_elapsed,
         }
         log(f"模块 parse {block['status']} {format_duration(parse_elapsed)}")
@@ -1549,6 +1669,7 @@ def _parse_sources(
             "parsed": 0,
             "message": "docs/ 全部解析失败或结果为空",
             "failed_files": parse_failures,
+            "per_file": per_file,
             "elapsed_seconds": parse_elapsed,
         }
         log(f"模块 parse 失败 {format_duration(parse_elapsed)}")
@@ -1613,7 +1734,7 @@ def _extract_items(
         write_json(out_dir / "backend_extract.json", envelope)
         graph = extract_graph_from_envelope(envelope)
         score_started = time.perf_counter()
-        metrics = maybe_score(golden, graph, score_ctx)
+        metrics = split_match_details(out_dir, "backend_extract", maybe_score(golden, graph, score_ctx))
         block: dict[str, Any] = {
             "status": "succeeded",
             "nodes": len(graph.get("nodes") or []),
@@ -1651,18 +1772,38 @@ def _run_system(
     """模式 pipeline：POST knowledge-ingestion 整条沉淀（内部解析→切片→抽取）。"""
     graphs: list[dict[str, Any]] = []
     ingest_failures: list[dict[str, Any]] = []
+    per_file: list[dict[str, Any]] = []
     version: str | None = None
     system_started = time.perf_counter()
     for source in sources:
+        file_started = time.perf_counter()
         try:
             envelope = ingest_file(base_url, source, ontology, options, params)
             write_json(out_dir / f"backend_system_{source.stem}.json", envelope)
-            graphs.append(extract_graph_from_envelope(envelope))
+            graph = extract_graph_from_envelope(envelope)
+            graphs.append(graph)
             version = version or extract_version_from(envelope)
+            per_file.append(
+                {
+                    "file": source.name,
+                    "status": "succeeded",
+                    "elapsed_seconds": elapsed_seconds(file_started),
+                    "nodes": len(graph.get("nodes") or []),
+                    "relationships": len(graph.get("relationships") or []),
+                }
+            )
         except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
             failed = fail_payload(exc)
             failed["file"] = source.name
             ingest_failures.append(failed)
+            per_file.append(
+                {
+                    "file": source.name,
+                    "status": "failed",
+                    "elapsed_seconds": elapsed_seconds(file_started),
+                    "error": failed["message"],
+                }
+            )
             log(f"系统 knowledge-ingestion 失败 {source.name}: {failed['message']}")
     system_elapsed = elapsed_seconds(system_started)
     if not graphs:
@@ -1671,12 +1812,13 @@ def _run_system(
             "message": "全部文件知识沉淀失败",
             "files": len(sources),
             "failed_files": ingest_failures,
+            "per_file": per_file,
             "elapsed_seconds": system_elapsed,
         }
     graph = merge_graphs(graphs) if len(graphs) > 1 else graphs[0]
     write_json(out_dir / "backend_system_graph.json", graph)
     score_started = time.perf_counter()
-    metrics = maybe_score(golden, graph, score_ctx)
+    metrics = split_match_details(out_dir, "backend_system", maybe_score(golden, graph, score_ctx))
     block: dict[str, Any] = {
         "status": "partial" if ingest_failures else "succeeded",
         "nodes": len(graph.get("nodes") or []),
@@ -1685,6 +1827,7 @@ def _run_system(
         "files": len(sources),
         "ingested": len(graphs),
         "failed_files": ingest_failures,
+        "per_file": per_file,
         "elapsed_seconds": system_elapsed,
         "score_elapsed_seconds": elapsed_seconds(score_started),
     }
@@ -1820,7 +1963,7 @@ def run_plugin_case(
         graph = payload.get("graph") or {"nodes": [], "relationships": []}
         extract_elapsed = elapsed_seconds(started)
         score_started = time.perf_counter()
-        metrics = maybe_score(golden, graph, score_ctx)
+        metrics = split_match_details(out_dir, "plugin_extract", maybe_score(golden, graph, score_ctx))
         score_elapsed = elapsed_seconds(score_started)
         emit_metrics(
             f"插件 {MCP_TOOL_NAME} {format_duration(extract_elapsed)} 评分 {format_duration(score_elapsed)}",

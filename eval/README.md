@@ -40,7 +40,7 @@ test_data/eval/
 
 插件侧没有独立的 parse / chunk 工具：插件阶段复用后台解析出的 Markdown；若只跑 `--stage plugin`，会先调一次解析接口再调 MCP。
 
-**打分。** 默认 LLM-judge（语义一对一匹配，允许同义、别名、格式差），summary 里附 identity（type+name 精确集合）对照。judge 失败则该 case 降级 identity。需要纯精确匹配时加 `--match-mode identity`。空 golden 仍会跑并落盘预测，但不计入分数。
+**打分。** 默认 LLM-judge（语义一对一匹配，允许同义、别名、格式差），summary 里附 identity（type+name 精确集合）对照。judge 失败则该 case 降级 identity。需要纯精确匹配时加 `--match-mode identity`。空 golden 仍会跑并落盘预测，但不计入分数。两种口径的逐条结果（对上/漏抽/多抽清单，LLM-judge 另有每批评分耗时）都落在该 case 的 `match_details.json`，scores.json 只留计数。
 
 预测只写 `tmp/eval/runs/<时间戳>/`，不会覆盖 `test_data/eval/<类型>/<case>/extract/golden.json`。
 
@@ -210,6 +210,7 @@ _runs/<YYYYMMDD-HHMMSS>/
     chunks.json               # 切片回包
     backend_extract.json      # 后台抽取回包（预测图在 data 里）
     scores.json               # 该 case 状态、分数、各步耗时
+    match_details.json        # 逐条匹配明细（对上/漏抽/多抽清单，judge 分批耗时）
     backend_system_<文件>.json  # 仅 --system：沉淀流水线回包
     plugin_extract.json       # 仅插件阶段：MCP 抽图结果
     plugin_error.json         # 仅插件失败时
@@ -218,7 +219,8 @@ _runs/<YYYYMMDD-HHMMSS>/
 | 文件 | 看什么 |
 | --- | --- |
 | `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时 |
-| `scores.json` | 单案明细。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长） |
+| `scores.json` | 单案明细。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
+| `match_details.json` | 每个已评分块（`backend_extract` / `backend_system` / `plugin_extract`）的逐条明细：`entities` / `relations` 各自的 `matched`（golden+predicted 对照）、`missing`（漏抽）、`extra`（多抽）。LLM-judge 时另有 `judge_batches`（每批评分的预测区间、耗时、成功的 `response_mode`、失败尝试）和 `identity`（精确匹配口径的对上/漏抽/多抽清单） |
 | `document.md` | 解析结果，便于对照原文 |
 | `chunks.json` | 实际送进抽取的切片 |
 | `backend_extract.json` | 生产接口原样回包，排抽取失败或图结构时用 |
@@ -233,7 +235,7 @@ _runs/<YYYYMMDD-HHMMSS>/
 
 - 标准类 golden 很大（数百实体/关系）。默认 LLM-judge 会多次调模型，耗时长；想先看字面匹配用 `--match-mode identity`。
 - `规则/故障记录test(1)` 未标注，只跑通不评分。
-- 公文 case 含多附件：单个文件解析失败不再拖死整案，会记 `failed_files`，其余文件继续。`--mode pipeline` 时沉淀同样按文件继续。
+- 公文 case 含多附件：单个文件解析失败不再拖死整案，会记 `failed_files`，其余文件继续；逐文件耗时与产出在 `per_file`。`--mode pipeline` 时沉淀同样按文件继续。
 - parse / chunk 只验接口成功和输出非空，没有独立 golden；质量分只打在图抽取上。
 - 插件没有 parse/chunk 工具，抽取的是整篇 Markdown，和后台「先切片再抽取」路径不完全相同。
 - `中车RAG验证数据集/` 是造集源，不是评测入口。拷目录做评测时可以不带它。
