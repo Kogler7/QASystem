@@ -11,11 +11,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ${QASYSTEM_SOURCE_DIR:-.}/backend:/app/backend:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/algorithm:/app/algorithm:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/mcp_services:/app/mcp_services:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/agent:/app/agent:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/external_services:/app/external_services:ro
+      # 整项目目录挂载为 /app（只读）；backend 数据与 Agent 输出由下方
+      # 命名卷覆盖，写操作不回落到源码目录。
+      - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
       # MinerU 4.0 会在模型根目录下写 .locks 互斥锁（下载/加载时），模型本体仍只读：
       # 这里只把 .locks 这一层叠成可写挂载。宿主需先建好该目录。
@@ -46,11 +44,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ${QASYSTEM_SOURCE_DIR:-.}/backend:/app/backend:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/algorithm:/app/algorithm:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/mcp_services:/app/mcp_services:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/agent:/app/agent:ro
-      - ${QASYSTEM_SOURCE_DIR:-.}/external_services:/app/external_services:ro
+      # 整项目目录挂载为 /app（只读）；Agent 输出写入下方命名卷。
+      - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - agent-output:/app/agent/image_result
     working_dir: /app
     command: python -m agentcode.api --host 0.0.0.0 --port 9180
