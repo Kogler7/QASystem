@@ -9,7 +9,15 @@ from typing import Any
 from ...errors import ErrorCode
 from .mcp import MCPToolWrapper
 from ...models import SessionConfig
-from ..base_tools.path_display import PathDisplayTool
+
+#: 这些错误重试没有意义（会话/身份/超时类），重试只会把一次超时放大成 N 次。
+_NON_RETRYABLE_PREFIXES = (
+    "Error: MCP tool timed out",
+    "Error: MCP identity not bound",
+    "Error: MCP session for",
+    "Error: MCP server",
+    "Error: Task cancelled",
+)
 from ..base_tools.shell_tool import ShellTool
 from ...cancellation import CancellationToken
 
@@ -42,13 +50,11 @@ class ToolManager:
         self._config = config
         self._mcp_wrapper = MCPToolWrapper()
         self._shell_tool = ShellTool() if include_shell else None
-        self._path_display = PathDisplayTool()
         self._tool_map: dict[str, tuple[str, str]] = {}
         self._handlers: dict[str, Any] = {}
 
         self._mcp_wrapper.connect_all(config.mcp_servers)
         self._register_mcp_tools()
-        self._register_display_tools()
         if include_shell:
             self._register_base_tools()
 
@@ -63,11 +69,6 @@ class ToolManager:
             parts = tool_name.split("__", 1)
             if len(parts) == 2:
                 self._tool_map[tool_name] = (parts[0], parts[1])
-
-    def _register_display_tools(self) -> None:
-        for tool_name, schema in self._path_display.get_tool_definitions().items():
-            self._handlers[tool_name] = self._path_display.get_tool_handlers()[tool_name]
-            self._tool_map[tool_name] = ("base", tool_name)
 
     def _register_base_tools(self) -> None:
         """将内置基础工具（如命令行执行）注册到 handler 字典和反向索引。
@@ -89,19 +90,27 @@ class ToolManager:
         Returns:
             工具描述列表，每个元素包含 ``name``、``description``、``input_schema`` 字段。
         """
-        schemas = self._mcp_wrapper.get_tool_schemas() + self._path_display.get_tool_schemas()
+        schemas = self._mcp_wrapper.get_tool_schemas()
         if self._shell_tool is not None:
             schemas = schemas + self._shell_tool.get_tool_schemas()
         return schemas
 
     @contextmanager
     def bind_user_headers(self, headers: dict[str, str] | None):
-        """Apply caller identity headers to MCP HTTP for this borrowed connection."""
-        self._mcp_wrapper.apply_user_headers(headers or {})
+        """为本任务绑定调用方身份。
+
+        身份变化时会在 MCP 层重建会话（身份必须在建连请求上），身份没变则
+        直接复用已有会话；结束时只失效标记，不做匿名重连。
+        """
+        self._mcp_wrapper.bind_identity(headers or {})
         try:
             yield
         finally:
-            self._mcp_wrapper.apply_user_headers({})
+            self._mcp_wrapper.end_task()
+
+    def end_task(self) -> None:
+        """任务结束：失效"本任务已绑身份"标记（保留会话缓存供同身份复用）。"""
+        self._mcp_wrapper.end_task()
 
     @staticmethod
     def is_tool_allowed(tool_name: str, allowlist: list[str]) -> bool:
@@ -167,6 +176,13 @@ class ToolManager:
                 )
                 if isinstance(raw, str) and raw.startswith("Error:"):
                     last_error = raw
+                    if raw.startswith(_NON_RETRYABLE_PREFIXES):
+                        logger.warning(
+                            "tool=%s 不重试（会话/身份/超时类错误）: %s",
+                            tool_name, raw[:160],
+                        )
+                        break
+                    logger.info("tool=%s 返回错误，准备重试: %s", tool_name, raw[:120])
                     continue
                 return {"ok": True, "content": raw}
             except Exception as exc:
