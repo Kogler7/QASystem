@@ -1,0 +1,395 @@
+"""MinerU 4.x 解析处理器（本地推理）。
+
+与 2.x 的 ``OCRProcessor`` 保持**同样的入参与返回契约**，因此可以直接挂在
+``DocumentProcessor`` 上作为一个新引擎使用，不改变上层任何调用方式与输出格式：
+
+* 入参：``process(file_path, **kwargs)``，识别 ``output_dir`` / ``lang`` /
+  ``ocr_mode`` / ``table_enable`` / ``formula_enable`` / ``start_page_id`` /
+  ``end_page_id`` / ``keep_page_edges`` / ``page_edge_min_chars``；
+* 返回：``{"content": markdown, "metadata": {...}}``，失败时把原因放进 ``metadata["error"]``；
+* 内容格式与其它引擎一致：正文 Markdown，**表格输出为 ```json 代码块**（复用
+  ``table_json``），``keep_page_edges`` 命中时用**同一套页边规则**（复用 ``page_edges``，
+  文本层取行 + 只补缺失行）补回页眉/页脚。
+
+4.0 与 2.x 的差异（本模块负责抹平）：
+
+* 4.0 是公开 API ``mineru.parse(...)`` + ``ParseResult``，2.x 的内部模块已全部移除；
+* 4.0 用 ``tier``（flash/basic/standard/advanced）而不是 pipeline/vlm 后端，
+  默认取 ``standard``，可用环境变量 ``MINERU4_TIER`` 覆盖；
+* 4.0 没有 ``table_enable`` / ``formula_enable`` 开关，也没有语言参数：这些入参被接受但忽略，
+  并在元数据 ``mineru4_options.ignored_options`` 中如实记录；
+* 4.0 的页范围是 1 基闭区间字符串，本模块把 ``start_page_id`` / ``end_page_id``（0 基闭区间）
+  换算过去，语义与其它引擎一致。
+
+注意：4.0 内部 API 与 2.x 不兼容（``pypdfium2`` 等依赖互斥），也和 docling 需要的
+transformers 4.x 互斥。因此本处理器支持两种运行方式，对外契约完全一致：
+
+* **进程内**：当前解释器里能 import 到 MinerU 4.x 时直接调用（本地评估/独立环境）；
+* **子进程**：当前解释器里是 2.x（镜像默认布局）时，改用 ``MINERU4_PYTHON``
+  （默认 ``/opt/mineru4/venv/bin/python``）执行 ``mineru4_worker.py``，把 4.0 关在独立 venv 里。
+  这样镜像无需升级 docling/transformers，也不会影响 ``mineru``(2.x) 与 ``docling`` 现有行为。
+
+两种方式的差异只体现在元数据 ``mineru4_options.mode`` 上（``in-process`` / ``subprocess``）。
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, Iterable
+
+from loguru import logger
+
+from . import BaseProcessor
+from ..page_edges import (
+    DEFAULT_MIN_CHARS,
+    extract_edge_lines,
+    merge_page_edges,
+    missing_lines,
+    normalize_keep_page_edges,
+    page_is_kept,
+)
+from ..table_json import convert_tables_to_json
+
+# 4.0 档位；默认 standard（4.0 自身默认），部署可用 MINERU4_TIER 覆盖。
+DEFAULT_TIER = "standard"
+# 镜像里 4.0 独立 venv 的解释器；本地评估可用 MINERU4_PYTHON 覆盖
+DEFAULT_VENV_PYTHON = "/opt/mineru4/venv/bin/python"
+# 子进程解析超时（秒），大文档可调
+DEFAULT_TIMEOUT_SECONDS = 1800
+WORKER_NAME = "mineru4_worker.py"
+TIERS = ("flash", "basic", "standard", "advanced")
+# 我们的 ocr_mode -> 4.0 的 ocr_mode，语义保持一致
+OCR_MODE_MAP = {"auto": "auto", "on": "ocr", "off": "txt"}
+# MinerU 4.x 只对 PDF/图片提供分档解析；Office、OFD、HTML、CSV、EPUB 仅 flash 档
+# （见 mineru/filetypes.py 的 FLASH_ONLY_PARSE_EXTENSIONS）。
+FLASH_ONLY_SUFFIXES = frozenset({
+    "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf",
+    "odt", "ods", "odp", "ofd", "html", "htm", "shtml", "csv", "tsv", "epub",
+})
+# 4.0 只对 PDF 支持 page_range
+PAGE_RANGE_SUFFIXES = frozenset({"pdf"})
+
+
+def mineru_major_version() -> int | None:
+    """返回当前解释器里 MinerU 的主版本号；不可导入或读不到版本时返回 None。"""
+    try:
+        from importlib.metadata import version as _dist_version
+
+        return int(str(_dist_version("mineru")).split(".", 1)[0])
+    except Exception:
+        return None
+
+
+def _normalized_index(text: str) -> tuple[str, list[int]]:
+    """返回"去掉空白后的文本"及其中每个字符在原串中的下标，用于宽松定位。"""
+    chars: list[str] = []
+    positions: list[int] = []
+    for index, char in enumerate(text):
+        if char.isspace():
+            continue
+        chars.append(char)
+        positions.append(index)
+    return "".join(chars), positions
+
+
+def _page_anchor_texts(structured: Any) -> list[str]:
+    """取每页第一个"会出现在 Markdown 里"的块文本，作为分页锚点。"""
+    anchors: list[str] = []
+    if not isinstance(structured, dict):
+        return anchors
+    for page in (structured or {}).get("pages", []) or []:
+        anchor = ""
+        for block in page.get("blocks", []) or []:
+            if block.get("type") in {"header", "footer"}:
+                continue
+            content = str(block.get("content") or "").strip()
+            if len(content) >= 4:
+                anchor = content
+                break
+        anchors.append(anchor)
+    return anchors
+
+
+def _block_start(markdown: str, position: int) -> int:
+    """把锚点位置回退到所在「块」的开头。
+
+    锚点匹配到的是块内文字（例如 ``## 1 范围`` 里的 ``1 范围``），直接按字符位置拼接会把
+    Markdown 结构前缀（``## ``、``- ``、``| `` 等）切开，所以这里回退到行首，并继续跨过空行，
+    保证插入点落在块边界上。
+    """
+    if position <= 0:
+        return 0
+    line_start = markdown.rfind("\n", 0, position) + 1
+    while line_start > 0:
+        previous_end = line_start - 1
+        previous_start = markdown.rfind("\n", 0, previous_end) + 1
+        if markdown[previous_start:previous_end].strip():
+            break
+        line_start = previous_start
+    return line_start
+
+
+def _page_boundaries(markdown: str, anchors: list[str]) -> list[tuple[int, int]]:
+    """把每页锚点定位到 Markdown 上，返回 [(start, end)]；定位不到的页退化为 (-1, -1)。"""
+    normalized, positions = _normalized_index(markdown)
+    boundaries: list[tuple[int, int]] = []
+    cursor = 0
+    for anchor in anchors:
+        key = "".join(anchor.split())
+        start = None
+        if key:
+            found = normalized.find(key, cursor)
+            if found >= 0:
+                start = _block_start(markdown, positions[found])
+        boundaries.append((start if start is not None else -1, -1))
+    # 每页的结束位置 = 下一个定位成功页的起点
+    for index in range(len(boundaries)):
+        if boundaries[index][0] < 0:
+            continue
+        end = len(markdown)
+        for later in range(index + 1, len(boundaries)):
+            if boundaries[later][0] >= 0:
+                end = boundaries[later][0]
+                break
+        boundaries[index] = (boundaries[index][0], max(end, boundaries[index][0]))
+    return boundaries
+
+
+class Mineru4Processor(BaseProcessor):
+    """MinerU 4.x（本地推理）处理器，契约与 ``OCRProcessor`` 一致。"""
+
+    def __init__(self, tier: str | None = None, engine_name: str = "mineru4") -> None:
+        self.tier = tier
+        # engine=mineru / vlm 在 4.x 环境下复用本处理器，元数据里保留调用方请求的引擎名
+        self.engine_name = engine_name
+
+    # ------------------------------------------------------------ 内部工具
+
+    @staticmethod
+    def _load_mineru():
+        """导入并校验 MinerU 4.x，返回模块。"""
+        import importlib.metadata as metadata
+
+        import mineru  # noqa: F401  (导入失败由调用方转成 metadata['error'])
+
+        try:
+            version = metadata.version("mineru")
+        except Exception:  # pragma: no cover - 极端环境
+            version = getattr(mineru, "__version__", "")
+        major = str(version).split(".", 1)[0]
+        if not major.isdigit() or int(major) < 4:
+            raise RuntimeError(
+                f"engine=mineru4 需要 MinerU 4.x，当前安装的是 {version}；"
+                "4.0 与 2.x 依赖互斥，请使用独立环境（如 work/mineru4/venv）并设置 PYTHONPATH"
+            )
+        return mineru, version
+
+    @staticmethod
+    def _venv_python() -> str:
+        return os.getenv("MINERU4_PYTHON") or DEFAULT_VENV_PYTHON
+
+    def _run_in_subprocess(
+        self,
+        file_path: str,
+        *,
+        tier: str,
+        ocr_mode: str,
+        page_range: str,
+    ) -> tuple[str, dict, dict]:
+        """用独立 venv 的解释器解析，返回 (markdown, structured, info)。"""
+        python = self._venv_python()
+        if not os.path.exists(python):
+            raise RuntimeError(
+                f"当前环境没有可 import 的 MinerU 4.x，且 MINERU4_PYTHON 指向的解释器不存在：{python}；"
+                "镜像需包含 /opt/mineru4/venv，或显式设置 MINERU4_PYTHON"
+            )
+        worker = Path(__file__).with_name(WORKER_NAME)
+        if not worker.is_file():
+            raise RuntimeError(f"缺少 4.x 子进程 worker：{worker}")
+
+        timeout = int(os.getenv("MINERU4_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS)
+        workdir = tempfile.mkdtemp(prefix="mineru4-")
+        try:
+            cmd = [
+                python, str(worker),
+                "--pdf", str(file_path),
+                "--out-dir", workdir,
+                "--tier", tier,
+                "--ocr-mode", {v: k for k, v in OCR_MODE_MAP.items()}.get(ocr_mode, "auto"),
+                "--page-range", page_range,
+            ]
+            completed = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout, env=os.environ.copy()
+            )
+            info_path = Path(workdir) / "result.json"
+            info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.is_file() else {}
+            if completed.returncode != 0 or not info.get("ok"):
+                detail = info.get("error") or (completed.stderr or "").strip().splitlines()[-1:] or "未知错误"
+                raise RuntimeError(f"MinerU 4.x 子进程解析失败：{detail}")
+            markdown = (Path(workdir) / "markdown.md").read_text(encoding="utf-8")
+            structured_path = Path(workdir) / "structured.json"
+            structured = (
+                json.loads(structured_path.read_text(encoding="utf-8"))
+                if structured_path.is_file() else {}
+            )
+            return markdown, structured, info
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    @staticmethod
+    def _resolve_tier(explicit: str | None) -> str:
+        tier = (explicit or os.getenv("MINERU4_TIER") or DEFAULT_TIER).strip().lower()
+        return tier if tier in TIERS else DEFAULT_TIER
+
+    @staticmethod
+    def _page_range(start_page_id: int, end_page_id: int | None) -> str:
+        """0 基闭区间 -> 4.0 的 1 基闭区间字符串；未限定范围时返回空串。"""
+        if not start_page_id and end_page_id is None:
+            return ""
+        first = max(int(start_page_id), 0) + 1
+        last = (int(end_page_id) + 1) if end_page_id is not None else first
+        return f"{first}-{last}" if last > first else str(first)
+
+    def _inject_page_edges(
+        self,
+        *,
+        markdown: str,
+        structured: Any,
+        source_path: str,
+        start_page_id: int,
+        selection: Any,
+        min_chars: int,
+    ) -> tuple[str, list[dict]]:
+        """按与其它引擎相同的规则补回页眉/页脚。
+
+        页内位置用 4.0 自己的 structured_content 锚点定位（宽松匹配，忽略空白差异），
+        文本仍取自 PDF 文本层，保证与 docling/mineru 路线输出一致。
+        """
+        anchors = _page_anchor_texts(structured)
+        boundaries = _page_boundaries(markdown, anchors)
+        injections: list[dict] = []
+        # 从后往前插入，避免前面的插入影响后面的偏移
+        for index in range(len(anchors) - 1, -1, -1):
+            page_number = index + 1  # 解析范围内 1 基页号
+            if not page_is_kept(selection, page_number, 1):
+                continue
+            absolute_page = int(start_page_id) + page_number
+            start, end = boundaries[index]
+            if start < 0:
+                start, end = 0, len(markdown)
+            chunk = markdown[start:end]
+            edges = extract_edge_lines(source_path, absolute_page, min_chars=min_chars)
+            top = missing_lines(edges["top"], chunk)
+            bottom = missing_lines(edges["bottom"], chunk)
+            if not top and not bottom:
+                continue
+            replacement = merge_page_edges(chunk, top, bottom)
+            # merge_page_edges 会裁剪首尾空白，这里保持与原片段一致的边界
+            markdown = markdown[:start] + replacement + markdown[end:]
+            injections.append({"page": page_number, "top": top, "bottom": bottom})
+        injections.reverse()
+        return markdown, injections
+
+    # ------------------------------------------------------------ 主流程
+
+    def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {
+            "file_type": "pdf",
+            "processor": "mineru4",
+            "backend": "mineru-4",
+            "engine": self.engine_name,
+            "supported_formats": [".pdf", ".ofd", ".docx", ".doc", ".pptx", ".ppt", ".png", ".jpg", ".jpeg"],
+        }
+
+        if not os.path.exists(file_path):
+            return {"content": "", "metadata": {**metadata, "error": f"文件不存在 - {file_path}"}}
+
+        ocr_mode = str(kwargs.get("ocr_mode") or "auto").strip().lower()
+        start_page_id = int(kwargs.get("start_page_id") or 0)
+        end_page_id = kwargs.get("end_page_id")
+        selection = normalize_keep_page_edges(kwargs.get("keep_page_edges"))
+        page_edge_min_chars = kwargs.get("page_edge_min_chars")
+        min_chars = DEFAULT_MIN_CHARS if page_edge_min_chars is None else int(page_edge_min_chars)
+        suffix = Path(file_path).suffix.lower().lstrip(".")
+        tier = self._resolve_tier(kwargs.get("tier") or self.tier)
+        tier_reason = None
+        if suffix in FLASH_ONLY_SUFFIXES and tier != "flash":
+            # 4.0 对这些格式只提供 flash 档，强行用其它档位会被拒绝
+            tier_reason = f"{suffix} 在 MinerU 4.x 仅支持 flash 档"
+            tier = "flash"
+
+        ignored = {
+            key: kwargs.get(key)
+            for key in ("lang", "table_enable", "formula_enable")
+            if kwargs.get(key) is not None
+        }
+
+        try:
+            page_range = (
+                self._page_range(start_page_id, end_page_id)
+                if suffix in PAGE_RANGE_SUFFIXES else ""
+            )
+            mode = "in-process"
+            version = ""
+            structured: Any = {}
+            try:
+                mineru, version = self._load_mineru()
+                result = mineru.parse(
+                    file_path,
+                    tier=tier,
+                    ocr_mode=OCR_MODE_MAP.get(ocr_mode, "auto"),
+                    page_range=page_range,
+                )
+                content = result.markdown() or ""
+                try:
+                    structured = result.structured_content() or {}
+                except Exception:
+                    structured = {}
+            except Exception as in_process_error:
+                # 当前环境没有 4.x（镜像默认是 2.x + docling）：改走独立 venv 子进程
+                logger.info("进程内不可用 MinerU 4.x（{}），改用子进程模式", in_process_error)
+                content, structured, info = self._run_in_subprocess(
+                    file_path, tier=tier, ocr_mode=ocr_mode, page_range=page_range
+                )
+                mode = "subprocess"
+                version = str(info.get("mineru_version") or "")
+
+            metadata["mineru4_options"] = {
+                "tier": tier,
+                "ocr_mode": ocr_mode,
+                "page_range": page_range,
+                "version": version,
+                "mode": mode,
+                "file_suffix": suffix,
+                **({"tier_reason": tier_reason} if tier_reason else {}),
+                # 4.0 无这些开关/参数，这里如实记录，避免调用方以为生效了
+                "ignored_options": ignored,
+            }
+
+            # 表格统一转 JSON（与其它引擎同一套规则、同一形态）
+            content, table_count = convert_tables_to_json(content)
+            metadata["tables_json"] = {"count": table_count}
+
+            # 页眉/页脚按需补回（同一套 page_edges 规则）；关闭时也记录，便于确认是有意不补回
+            injected: list[dict] = []
+            if selection is not None and suffix in PAGE_RANGE_SUFFIXES:
+                content, injected = self._inject_page_edges(
+                    markdown=content,
+                    structured=structured,
+                    source_path=file_path,
+                    start_page_id=start_page_id,
+                    selection=selection,
+                    min_chars=min_chars,
+                )
+                if injected:
+                    logger.info("保留页眉/页脚: {} 页补回边缘文本 {}", len(injected), injected)
+            metadata["page_edges"] = {"mode": str(kwargs.get("keep_page_edges")), "injected": injected}
+
+            return {"content": content, "metadata": metadata}
+        except Exception as exc:  # 与 OCRProcessor 一致：失败信息进 metadata['error']
+            logger.error("MinerU 4.x 解析失败: {}", exc)
+            return {"content": "", "metadata": {**metadata, "error": str(exc)}}

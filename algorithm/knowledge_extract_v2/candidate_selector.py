@@ -6,13 +6,13 @@ the structural/relational support required by that ontology role.
 """
 from __future__ import annotations
 
-import json
 import re
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any
 
 from .graph_utils import canonical_name
+from .structured_text import is_structured_payload
 
 _NUMBERED_HEADING = re.compile(
     r"^\s{0,3}(?:#{1,6}\s+)?(?P<number>\d+(?:\.\d+)*)[.)]?\s+\S"
@@ -147,14 +147,14 @@ def _is_structured_chunk(text: str) -> bool:
     is often stored with a ``.md`` extension.
     """
     stripped = (text or "").strip()
+    # 知识沉淀批量路径会在文档前拼接 "\n## 文件: <文件名>\n\n" 头，剥掉后再判断。
+    if stripped.startswith("## 文件:"):
+        stripped = stripped.split("\n", 1)[1].strip() if "\n" in stripped else ""
     if not stripped:
         return False
-    if stripped[0] in "[{":
-        try:
-            json.loads(stripped)
-            return True
-        except (ValueError, TypeError):
-            return False
+    # 裸 JSON 与 Markdown 外壳包裹的表格 JSON（解析行为规范 §10 产物）都算结构化。
+    if is_structured_payload(stripped):
+        return True
     lines = [line for line in stripped.splitlines() if line.strip()]
     return bool(len(lines) >= 3 and all("\t" in line for line in lines[:8]))
 

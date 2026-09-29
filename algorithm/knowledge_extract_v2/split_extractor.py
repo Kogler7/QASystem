@@ -77,6 +77,19 @@ from .run_state import ExtractionRun, ExtractionValidationError
 from .standard_semantics import enrich_standard_semantics
 from .structure_entities import add_structural_heading_entities
 from .verification import ExtractionVerifier
+from ._logging import get_step_logger, preview
+
+
+logger = get_step_logger(__name__)
+
+
+def _warning_codes(warnings: Iterable[dict[str, Any]]) -> dict[str, int]:
+    """把告警按 code 归类，日志里一眼看出是哪一类问题。"""
+    counter: dict[str, int] = {}
+    for row in warnings or ():
+        code = str((row or {}).get("code") or "UNKNOWN")
+        counter[code] = counter.get(code, 0) + 1
+    return dict(sorted(counter.items(), key=lambda item: (-item[1], item[0])))
 
 
 @lru_cache(maxsize=32)
@@ -119,7 +132,7 @@ def _repair_context_chunks(
     *,
     entities: list[dict[str, Any]],
     relations: list[dict[str, Any]],
-    max_chunks: int = 6,
+    max_chunks: int = 3,
 ) -> list[ExtractionChunk]:
     """Resolve verifier issues to evidence chunks without guessing document prefixes."""
     known_ids = set(manager.chunk_ids)
@@ -484,6 +497,22 @@ def extract_split(
             stage="ontology_compile",
             details={"warnings": [warning.to_dict() for warning in compile_errors]},
         )
+    started = time.monotonic()
+    logger.info(
+        "[步骤][抽取] 输入: 本体=%d字符 chunks=%d target_types=%s model=%s 校验模式=%s include_subclasses=%s",
+        len(ontology or ""),
+        len(resolved_chunks),
+        list(resolved_target_types) if resolved_target_types is not None else "全部",
+        model or "env默认",
+        resolved_validation_mode,
+        include_subclasses,
+    )
+    logger.info(
+        "[步骤][抽取] 本体编译输出: types=%s 关系=%d schema_warnings=%d",
+        sorted(plan.allowed_types),
+        len(getattr(plan, "relation_specs", {}) or {}),
+        len(plan.schema_warnings),
+    )
     request = ExtractionRequest(
         chunks=resolved_chunks,
         target_types=list(resolved_target_types) if resolved_target_types is not None else None,
@@ -491,6 +520,12 @@ def extract_split(
     extraction_chunks = list(request.chunks)
     manager = ChunkContextManager(extraction_chunks)
     route = resolve_document_route(plan, extraction_chunks)
+    logger.info(
+        "[步骤][抽取] 文档路由输出: kind=%s source=%s reasons=%s",
+        route.kind,
+        route.source,
+        ",".join(route.reasons) or "-",
+    )
     warnings: list[dict[str, Any]] = [warning.to_dict() for warning in plan.schema_warnings]
     attempts: list[dict[str, Any]] = []
     call_metrics: list[dict[str, Any]] = []
@@ -567,6 +602,14 @@ def extract_split(
                 warnings=warnings,
             )
 
+    logger.info(
+        "[步骤][抽取] Pass1 实体候选输出: chunks=%d 候选=%d 逐片=%s 池内=%d",
+        len(entity_results),
+        sum(len(items) for _, items in entity_results),
+        preview([len(items) for _, items in entity_results], 80),
+        pool.entity_candidate_count,
+    )
+
     # Deterministic supplement: the cover and normative-reference section
     # define the complete document-entity set before semantic relations.
     document_entities = enrich_document_entities(
@@ -578,7 +621,7 @@ def extract_split(
 
     # Deterministic supplement: numbered Markdown headings are structural
     # evidence, and must be present before relation candidates are proposed.
-    add_structural_heading_entities(
+    structural_headings = add_structural_heading_entities(
         pool,
         manager,
         allowed_types=plan.allowed_types,
@@ -589,9 +632,25 @@ def extract_split(
         if route.kind == "standard"
         else {}
     )
-
+    logger.info(
+        "[步骤][抽取] 确定性补充输出: 结构标题实体=%d 文档实体=%s 标准语义=%s 池内候选=%d",
+        structural_headings,
+        preview(document_entities, 120),
+        preview(standard_semantics, 120),
+        pool.entity_candidate_count,
+    )
     selector = CandidateSelector(plan, manager, warnings)
     selector.pre_relation(pool.entity_candidates())
+    logger.info(
+        "[步骤][抽取] 候选选择 pre_relation 输出: accepted=%d rejected=%d warnings=%s",
+        len(pool.accepted_entities()),
+        sum(
+            1
+            for item in pool.entity_candidates()
+            if getattr(item, "mapping_status", "accepted") != "accepted"
+        ),
+        preview(_warning_codes(warnings), 200),
+    )
 
     # Closed-world property pass: entity identities/types are frozen here.
     # The model can only fill missing ontology-declared properties on the
@@ -611,6 +670,12 @@ def extract_split(
         same_section=same_section,
         max_attempts=max_attempts,
         retry_base_seconds=retry_base_seconds,
+        max_workers=max_workers,
+    )
+
+    logger.info(
+        "[步骤][抽取] 属性补全输出: %s",
+        preview(property_enrichment, 240),
     )
 
     # Pass 2：关系候选（LLM，基于 accepted/resolved 实体目录）
@@ -648,6 +713,13 @@ def extract_split(
             evidence = _bind_relation_evidence(raw_relation, manager)
             if evidence is not None:
                 resolved.evidence = [evidence]
+
+    logger.info(
+        "[步骤][抽取] Pass2 关系候选输出: pairs=%d 池内关系=%d accepted=%d",
+        sum(len(items) for _, items in relation_results),
+        pool.relation_candidate_count,
+        len(pool.accepted_relations()),
+    )
 
     document_relations = assemble_document_relations(
         pool,
@@ -687,6 +759,15 @@ def extract_split(
     composite_handler = CompositeElementHandler.from_plan(plan)
     composite_issues = composite_handler.assemble(pool, plan, manager, warnings=warnings)
     selector.post_relation(pool.entity_candidates(), pool.relation_candidates())
+    logger.info(
+        "[步骤][抽取] 关系后处理输出: 复合组装问题=%d 文档关系=%s 层级关系=%d accepted_entities=%d accepted_relations=%d warnings=%s",
+        len(composite_issues),
+        preview(document_relations, 80),
+        numbered_hierarchy_relations,
+        len(pool.accepted_entities()),
+        len(pool.accepted_relations()),
+        preview(_warning_codes(warnings), 240),
+    )
 
     repair_rounds: list[dict[str, Any]] = []
     repair_stop_reason = "validation_complete"
@@ -727,7 +808,8 @@ def extract_split(
                 f"repair[{payload['round']}]",
             )
             return {"entities": [], "relations": []}
-        repair_text = "\n\n".join(chunk.text for chunk in referenced_chunks)
+        # repair 只需要证据定位用的原文，过长的上下文会撑爆 repair prompt。
+        repair_text = "\n\n".join(chunk.text for chunk in referenced_chunks)[:15000]
         repair_chunk = ExtractionChunk(
             chunk_id=f"repair-{payload['round']}",
             text=repair_text,
@@ -970,6 +1052,13 @@ def extract_split(
         raw["relations"],
         rejected_warnings=pool.unresolved_relation_rejections(),
     )
+    logger.info(
+        "[步骤][抽取] 校验输出: valid=%s hard_issues=%d repairable_issues=%d L1/L2覆盖=%s",
+        verification_report.valid,
+        len(verification_report.hard_issues),
+        len(verification_report.repairable_issues),
+        preview(coverage, 120),
+    )
     if resolved_validation_mode == "strict" and verification_report.hard_issues:
         attempts.append(
             {
@@ -1023,6 +1112,24 @@ def extract_split(
         "hard_issue_count": len(verification_report.hard_issues),
         "repairable_issue_count": len(verification_report.repairable_issues),
     }
+    logger.info(
+        "[步骤][抽取] 映射评分输出: accepted=%s low_confidence=%s rejected=%s",
+        mapping_summary.get("accepted"),
+        mapping_summary.get("low_confidence"),
+        mapping_summary.get("rejected"),
+    )
+    logger.info(
+        "[步骤][抽取] 输出: nodes=%d relationships=%d triples=%d accepted_entities=%d accepted_relations=%d warnings=%d attempts=%d repair=%s 耗时=%.2fs",
+        len(graph.get("nodes", [])),
+        len(graph.get("relationships", [])),
+        len(triples),
+        len(accepted_entities),
+        len(accepted_relations),
+        len(warnings),
+        len(attempts),
+        repair_stop_reason,
+        time.monotonic() - started,
+    )
     result = {
         "raw": raw,
         "graph": graph,

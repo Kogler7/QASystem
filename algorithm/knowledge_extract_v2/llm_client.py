@@ -8,8 +8,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ._logging import get_step_logger
 from .config import get_llm_config
 from .prompt_router import ChatMessages
+
+
+logger = get_step_logger(__name__)
 
 
 # DeepSeek's Responses strict-schema implementation intentionally supports a
@@ -58,6 +62,11 @@ def _deepseek_strict_schema_compatible(schema: Any) -> bool:
 
 def _is_deepseek_model(model: str) -> bool:
     return model.casefold().startswith("deepseek")
+
+
+def _is_deepseek_v4_flash(model: str) -> bool:
+    """MaaS 上的 deepseek-v4-flash / -0731 在 Responses 路径上输出不稳定。"""
+    return model.casefold().startswith("deepseek-v4-flash")
 
 
 def _unsupported_parameter(exc: Exception) -> bool:
@@ -201,9 +210,18 @@ class OpenAICompatibleLLM:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        logger.info(
+            "[步骤][LLM-Client] 请求: model=%s messages=%d prompt=%d字符 max_tokens=%s response_format=%s thinking=%s",
+            self.model,
+            len(messages),
+            sum(len(str(item.get("content") or "")) for item in messages),
+            self.max_tokens,
+            (response_format or {}).get("type") if isinstance(response_format, dict) else None,
+            "disabled" if self.disable_thinking else "default",
+        )
         try:
             if self.disable_thinking:
-                return self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     **kwargs,
                     # OpenAI-compatible SDKs forward provider-specific fields
                     # through ``extra_body``.  DeepSeek V4 documents the
@@ -212,11 +230,20 @@ class OpenAICompatibleLLM:
                     extra_body={"thinking": {"type": "disabled"}},
                 )
             else:
-                return self.client.chat.completions.create(**kwargs)
+                response = self.client.chat.completions.create(**kwargs)
         except Exception as exc:  # noqa: BLE001 - compatible providers vary
             if not self.disable_thinking or not _unsupported_parameter(exc):
                 raise
-            return self.client.chat.completions.create(**kwargs)
+            logger.info("[步骤][LLM-Client] thinking 参数不被支持，改用默认思考模式重试")
+            response = self.client.chat.completions.create(**kwargs)
+        logger.info(
+            "[步骤][LLM-Client] 响应: id=%s finish_reason=%s usage=%s 文本=%d字符",
+            _field(response, "id"),
+            self._chat_finish_reason(response),
+            _usage_dict(_field(response, "usage")),
+            len(self._chat_text(response) or ""),
+        )
+        return response
 
     @staticmethod
     def _chat_text(response: Any) -> str:
@@ -357,6 +384,27 @@ class OpenAICompatibleLLM:
                 response_mode="json_object",
                 response_format={"type": "json_object"},
             )
+        if _is_deepseek_v4_flash(self.model) and (
+            bool(context.get("record_table"))
+            or bool(context.get("prefer_chat_json_schema"))
+        ):
+            # 该模型在 MaaS 的 Responses 路径上高频返回空数组/截断 JSON；
+            # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
+            try:
+                return self._chat_structured(
+                    messages,
+                    response_mode="json_schema",
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": schema_name or "extraction",
+                            "strict": True,
+                            "schema": schema,
+                        },
+                    },
+                )
+            except Exception:  # noqa: BLE001 - 兼容性回退，继续走原有链路
+                pass
         try:
             return self._responses_structured(messages, response_format=response_format)
         except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back

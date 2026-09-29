@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from algorithm.NL_to_cypher.vector import batch_text_to_vectors
 from algorithm.knowledge_extract_v2 import deduplicate_chunk_graphs
@@ -83,6 +86,16 @@ _UNUSABLE_RESPONSE_CODES = frozenset(
         "LLM_EMPTY_RESPONSE",
     }
 )
+
+
+def _strict_chunk_failures() -> bool:
+    """单片抽取失败是否直接失败整篇。
+
+    默认 False（降级）：失败片以 error/warning 标记保留，其余片照常合并，
+    避免"一片失败 → 整篇 500"；需要旧行为时设环境变量
+    KG_EXTRACT_STRICT_CHUNK_FAILURES=1。
+    """
+    return str(os.environ.get("KG_EXTRACT_STRICT_CHUNK_FAILURES", "")).strip().lower() in {"1", "true", "yes"}
 
 
 def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCode:
@@ -272,24 +285,29 @@ class GraphExtractionService:
             result["ranges"] = list(ranges) if ranges is not None else None
         failed = [item for item in results if item.get("error")]
         if failed:
-            raise CapabilityError(
-                _extraction_error(failed, len(results)),
-                "部分文本切片知识抽取失败",
-                "knowledge_extract",
+            failed_items = [
                 {
-                    "failed_count": len(failed),
-                    "failed_items": [
-                        {
-                            "position": item["index"],
-                            "error_code": item.get("error_code"),
-                            "info": item.get("error"),
-                            "attempts": item.get("attempts", []),
-                            "raw_response": item.get("raw_response", ""),
-                        }
-                        for item in failed
-                    ],
-                },
-            )
+                    "position": item["index"],
+                    "error_code": item.get("error_code"),
+                    "info": item.get("error"),
+                    "attempts": item.get("attempts", []),
+                    "raw_response": str(item.get("raw_response", ""))[:2000],
+                }
+                for item in failed
+            ]
+            if _strict_chunk_failures():
+                raise CapabilityError(
+                    _extraction_error(failed, len(results)),
+                    "部分文本切片知识抽取失败",
+                    "knowledge_extract",
+                    {"failed_count": len(failed), "failed_items": failed_items},
+                )
+            # 降级：单片失败不再作废整篇。失败片保留在 items 里（带 error 标记），
+            # 其余片照常合并出图谱，并把失败明细落到日志，便于定位。
+            logger.error("[算法能力] 部分文本切片知识抽取失败，已降级继续: %s", failed_items)
+            for item in failed:
+                item.setdefault("graph", {"nodes": [], "relationships": []})
+                item.setdefault("warning", f"chunk 抽取失败: {item.get('error_code') or item.get('error')}")
         config = get_llm_config()
         attempts = [
                 {"position": item["index"], **attempt}

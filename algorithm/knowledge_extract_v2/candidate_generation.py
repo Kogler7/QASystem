@@ -19,15 +19,93 @@ from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
 from .ontology_schema import OntologySchema
-from .prompt_router import ChatMessages, DocumentRoute, build_chat_messages
+from ._logging import get_step_logger
+from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table, build_chat_messages
+
+
+logger = get_step_logger(__name__)
 from .relation_resolver import enumerate_relation_pairs
+from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages, semantic_support
 from .scheduler import get_llm_scheduler
 from .structured_output import validate_json_schema
 
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
 MAX_LOCAL_RELATION_CATALOG = 160
-RELATION_PAIR_BATCH_SIZE = 40
+# 批大小受输出上限约束：每条 pair 决策（pair_id+label+evidence.quote）约 60~90
+# token，默认 max_tokens=16384 最多容纳约 150~250 条。超限会导致响应 JSON 截断、
+# generate_structured 解析失败后整批丢弃（批越大丢得越多），故取 150。
+RELATION_PAIR_BATCH_SIZE = 200
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
+# 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
+# 同时按字符封顶，防止"行少但单元格极长"的表格把单次 prompt 撑爆。
+TABLE_ROWS_PER_PART = 20
+TABLE_CHARS_PER_PART = 6000
+
+
+def _structured_row_segments(chunk: ExtractionChunk) -> list[tuple[int, ExtractionChunk]]:
+    """把超长表格切片按行拆成多个自洽子表，返回 (偏移, 子片)（偏移恒为 0）。
+
+    分片规则：先到 TABLE_ROWS_PER_PART 行、或 TABLE_CHARS_PER_PART 字符即封片。
+    子表自带 columns 与完整围栏，是合法 JSON；子表文本由原始单元格值重新序列化，
+    引文仍可在原文中逐字定位。返回空表示"不是可拆的结构化表格"，上层回落原逻辑。
+    """
+    text = chunk.text or ""
+    fence = chr(96) * 3
+    open_at = text.find(fence)
+    if open_at < 0:
+        return []
+    body_start = text.find("\n", open_at)
+    close_at = text.rfind(fence)
+    if body_start < 0 or close_at <= body_start:
+        return []
+    try:
+        payload = json.loads(text[body_start + 1:close_at])
+    except Exception:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or len(rows) <= TABLE_ROWS_PER_PART:
+        return []
+    prefix = text[:body_start + 1]
+    suffix = text[close_at:]
+    windows: list[list[Any]] = []
+    window: list[Any] = []
+    size = 0
+    for row in rows:
+        row_size = len(json.dumps(row, ensure_ascii=False, default=str))
+        if window and (len(window) >= TABLE_ROWS_PER_PART or size + row_size > TABLE_CHARS_PER_PART):
+            windows.append(window)
+            window = []
+            size = 0
+        window.append(row)
+        size += row_size
+    if window:
+        windows.append(window)
+    if len(windows) < 2:
+        return []
+    parts: list[tuple[int, ExtractionChunk]] = []
+    for window in windows:
+        rebuilt = prefix + json.dumps({**payload, "rows": window}, ensure_ascii=False, indent=1) + "\n" + suffix
+        parts.append((
+            0,
+            ExtractionChunk(
+                chunk_id=chunk.chunk_id,
+                text=rebuilt,
+                document_id=chunk.document_id,
+                section_id=chunk.section_id,
+                section_title=chunk.section_title,
+                clause_number=chunk.clause_number,
+                page_no=chunk.page_no,
+                start_offset=chunk.start_offset,
+                end_offset=chunk.end_offset,
+                parent_chunk_id=chunk.parent_chunk_id,
+                previous_chunk_id=chunk.previous_chunk_id,
+                next_chunk_id=chunk.next_chunk_id,
+                metadata=dict(chunk.metadata),
+            ),
+        ))
+    return parts
 
 
 def _append_warning(
@@ -276,6 +354,11 @@ def _pair_catalog_text(pairs: list[dict[str, Any]]) -> str:
     )
 
 
+def _is_deepseek_llm(llm: Any) -> bool:
+    """识别 DeepSeek 系列模型（含 MaaS 上的 deepseek-v4-flash / -0731）。"""
+    return str(getattr(llm, "model", "") or "").casefold().startswith("deepseek")
+
+
 def _is_timeout(exc: Exception) -> bool:
     return isinstance(exc, TimeoutError) or "timeout" in type(exc).__name__.casefold()
 
@@ -375,6 +458,7 @@ def _invoke_generation(
     chunk_id: str,
     attempt_number: int,
     response_mode: str,
+    record_table: bool = False,
 ) -> Any:
     structured = getattr(llm, "generate_structured", None)
     if callable(structured):
@@ -387,6 +471,7 @@ def _invoke_generation(
                 "chunk_id": chunk_id,
                 "attempt": attempt_number,
                 "response_mode": response_mode,
+                "record_table": record_table,
             },
         )
     return llm(messages)
@@ -404,6 +489,8 @@ def generate_structured(
     max_attempts: int,
     retry_base_seconds: float,
     call_metrics: list[dict[str, Any]] | None = None,
+    retry_empty_collection: bool = False,
+    record_table: bool | None = None,
 ) -> dict[str, Any] | None:
     """Call one required pass with bounded retry and conservative prefix recovery."""
     attempt_messages = messages
@@ -412,12 +499,23 @@ def generate_structured(
     collection_name = _array_collection_name(schema)
     recovered_items: list[dict[str, Any]] = []
     largest_invalid_response = 0
+    record_table_flag = retry_empty_collection if record_table is None else bool(record_table)
     for attempt_number in range(1, resolved_max_attempts + 1):
         started = time.monotonic()
         error_type = ""
         message = ""
         response: Any = None
         retryable = True
+        logger.info(
+            "[步骤][LLM] 输入: pass=%s chunk=%s attempt=%d/%d mode=%s 消息=%d prompt=%d字符",
+            pass_name,
+            chunk_id,
+            attempt_number,
+            resolved_max_attempts,
+            response_mode,
+            len(attempt_messages),
+            sum(len(str(item.get("content") or "")) for item in attempt_messages),
+        )
         try:
             if use_scheduler:
                 with get_llm_scheduler().request_slot():
@@ -429,6 +527,7 @@ def generate_structured(
                         chunk_id=chunk_id,
                         attempt_number=attempt_number,
                         response_mode=response_mode,
+                        record_table=record_table_flag,
                     )
             else:
                 response = _invoke_generation(
@@ -439,6 +538,7 @@ def generate_structured(
                     chunk_id=chunk_id,
                     attempt_number=attempt_number,
                     response_mode=response_mode,
+                    record_table=record_table_flag,
                 )
             pre_parse_error = _pre_parse_response_error(response)
             if pre_parse_error is not None:
@@ -486,6 +586,14 @@ def generate_structured(
                     ):
                         error_type = "schema"
                         message = "前序大体量响应校验失败，重试不得用空集合覆盖"
+                    elif (
+                        retry_empty_collection
+                        and collection_name == "entities"
+                        and not (parsed.get(collection_name) or [])
+                        and attempt_number < resolved_max_attempts
+                    ):
+                        error_type = "empty_collection"
+                        message = "实体阶段返回空集合，按提示词要求重试补全"
                     else:
                         _record_call(
                             call_metrics,
@@ -498,6 +606,16 @@ def generate_structured(
                             response=response,
                             response_mode=response_mode,
                         )
+                        logger.info(
+                            "[步骤][LLM] 输出: pass=%s chunk=%s attempt=%d status=succeeded response=%d字符 %s=%d 耗时=%.2fs",
+                            pass_name,
+                            chunk_id,
+                            attempt_number,
+                            len(_response_text(response)),
+                            collection_name or "items",
+                            len(parsed.get(collection_name) or []) if collection_name else len(parsed),
+                            time.monotonic() - started,
+                        )
                         return parsed
         except Exception as exc:  # noqa: BLE001 - recorded as typed run evidence
             error_type = "timeout" if _is_timeout(exc) else "request"
@@ -505,6 +623,17 @@ def generate_structured(
             retryable = _is_retryable_exception(exc)
 
         next_response_mode = _next_response_mode(response_mode, error_type)
+        logger.warning(
+            "[步骤][LLM] 输出: pass=%s chunk=%s attempt=%d status=%s response=%d字符 恢复片段=%d 下一模式=%s message=%s",
+            pass_name,
+            chunk_id,
+            attempt_number,
+            error_type or "unknown",
+            len(_response_text(response)),
+            len(recovered_items),
+            next_response_mode,
+            message,
+        )
 
         response_metadata = _response_metadata(response)
         attempts.append(
@@ -544,7 +673,7 @@ def generate_structured(
         if not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
-        if error_type in {"json", "schema"}:
+        if error_type in {"json", "schema", "empty_collection"}:
             response_size = len(_response_text(response))
             recovery_instruction = ""
             if collection_name and recovered_items:
@@ -552,6 +681,12 @@ def generate_structured(
                     f"\n上一次前缀中检测到 {len(recovered_items)} 条完整候选（仅作诊断）："
                     f"{_recovery_summary(collection_name, recovered_items)}\n"
                     "本次必须重新输出该批次的完整 JSON；不要依赖前缀恢复。"
+                )
+            empty_instruction = ""
+            if error_type == "empty_collection":
+                empty_instruction = (
+                    "上一次输出是空集合，不允许交白卷：请逐条检查 current chunk 中的记录/条目/条款，"
+                    "凡可归纳为 ontology 实体的对象都必须输出；只有整个 chunk 与 ontology 完全无关时才可输出空集合。\n"
                 )
             attempt_messages = [
                 messages[0],
@@ -562,6 +697,7 @@ def generate_structured(
                         f"错误类型：{error_type}\n错误：{message}\n"
                         f"上一次输出摘要：已省略原文，字符数 {response_size}\n"
                         f"{recovery_instruction}"
+                        f"{empty_instruction}"
                         "不得解释错误，只输出符合 schema 的 JSON 对象。"
                     ),
                 },
@@ -570,6 +706,55 @@ def generate_structured(
         if retry_base_seconds > 0:
             time.sleep(retry_base_seconds * (2 ** (attempt_number - 1)))
     return None
+
+
+def verify_items_with_llm(
+    llm: Any,
+    *,
+    chunk: ExtractionChunk,
+    items: list[dict[str, Any]],
+    pass_name: str = "evidence_verification",
+    chunk_id: str = "",
+    use_scheduler: bool = False,
+    attempts: list[dict[str, Any]] | None = None,
+    max_attempts: int = 2,
+    retry_base_seconds: float = 0.05,
+    call_metrics: list[dict[str, Any]] | None = None,
+    record_table: bool = False,
+) -> dict[str, str]:
+    """把语义比对不一致的实体/属性交给 LLM 核验，返回 item_id -> yes/no/uncertain。
+
+    核验失败（网络/解析问题）返回空 dict，调用方应保留原结果而不是丢弃。
+    """
+    if not items:
+        return {}
+    messages = build_verification_messages(chunk=chunk, items=items)
+    try:
+        parsed = generate_structured(
+            llm,
+            messages,
+            VERIFICATION_SCHEMA,
+            use_scheduler=use_scheduler,
+            attempts=attempts if attempts is not None else [],
+            pass_name=pass_name,
+            chunk_id=chunk_id or chunk.chunk_id,
+            max_attempts=max(1, int(max_attempts)),
+            retry_base_seconds=retry_base_seconds,
+            call_metrics=call_metrics,
+            record_table=record_table,
+        )
+    except Exception:  # noqa: BLE001 - 核验失败时保留原结果，不丢弃
+        return {}
+    verdicts: dict[str, str] = {}
+    if isinstance(parsed, dict):
+        for row in parsed.get("verdicts") or []:
+            if not isinstance(row, dict):
+                continue
+            item_id = str(row.get("item_id") or "")
+            supported = str(row.get("supported") or "").casefold()
+            if item_id and supported in {"yes", "no", "uncertain"}:
+                verdicts[item_id] = supported
+    return verdicts
 
 
 def _normalize_entities(
@@ -775,6 +960,26 @@ def entity_pass(
         local_attempts: list[dict[str, Any]] = []
         local_warnings: list[dict[str, Any]] = []
         local_call_metrics: list[dict[str, Any]] = []
+        # 表格切片按行拆子表：几十/几百/几千行的 Excel 若整块送进单次调用，
+        # 要么被输出上限截断、要么 prompt 过大超时，最终整片判失败、整篇报错。
+        # 拆成自洽子表后每片只裁决 TABLE_ROWS_PER_PART 行，单次调用恒有界；
+        # 子表行数不超过上限，因此递归在下一层自然终止。
+        row_parts = _structured_row_segments(chunk)
+        if row_parts:
+            merged_entities: list[dict[str, Any]] = []
+            for _, part in row_parts:
+                _, part_entities, part_attempts, part_warnings, part_metrics = run(part)
+                local_attempts.extend(part_attempts)
+                local_warnings.extend(part_warnings)
+                local_call_metrics.extend(part_metrics)
+                merged_entities.extend(part_entities)
+            _append_warning(
+                local_warnings,
+                "ENTITY_TABLE_SPLIT_BY_ROWS",
+                f"表格切片按行拆为 {len(row_parts)} 个子表",
+                chunk.chunk_id,
+            )
+            return chunk.chunk_id, merged_entities, local_attempts, local_warnings, local_call_metrics
         neighbors = [
             item
             for item in manager.local_context(
@@ -804,6 +1009,7 @@ def entity_pass(
             known_entities=scoped_known_entities,
             output_schema=output_schema,
         )
+        retry_empty = bool(_looks_like_record_table(chunk) and _is_deepseek_llm(llm))
         parsed = generate_structured(
             llm,
             messages,
@@ -812,9 +1018,10 @@ def entity_pass(
             attempts=local_attempts,
             pass_name="entity",
             chunk_id=chunk.chunk_id,
-            max_attempts=max_attempts,
+            max_attempts=max(max_attempts, 4) if retry_empty else max_attempts,
             retry_base_seconds=retry_base_seconds,
             call_metrics=local_call_metrics,
+            retry_empty_collection=retry_empty,
         )
         if parsed is None:
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
@@ -831,6 +1038,7 @@ def entity_pass(
             chunk_ids=(chunk.chunk_id,),
         )
         grounded_entities: list[dict[str, Any]] = []
+        unverified_entities: list[dict[str, Any]] = []
         for index, entity in enumerate(bound_entities):
             evidence = entity.get("evidence") or {}
             source_ids = set(evidence.get("source_block_ids") or [])
@@ -839,19 +1047,56 @@ def entity_pass(
                 continue
             quote = str(evidence.get("quote") or "")
             outside_chunk = bool(quote and locate_quote(manager, quote) is not None)
-            _append_warning(
-                local_warnings,
-                "ENTITY_EVIDENCE_OUTSIDE_CHUNK" if outside_chunk else "ENTITY_EVIDENCE_INVALID",
-                (
-                    "实体 evidence 只能来自当前 chunk"
-                    if outside_chunk
-                    else "实体 evidence 无法在当前 chunk 定位"
-                ),
-                f"{chunk.chunk_id}.entities[{index}].evidence",
-                quote,
-            )
-            # 不再强制证据绑定：无法定位的实体同样保留，问题只作为告警。
+            if semantic_support(chunk.text, [str(entity.get("name") or ""), quote]):
+                _append_warning(
+                    local_warnings,
+                    "ENTITY_EVIDENCE_SEMANTIC",
+                    "实体证据未逐字定位，语义比对通过",
+                    f"{chunk.chunk_id}.entities[{index}].evidence",
+                    quote,
+                )
+            else:
+                unverified_entities.append({"index": index, "entity": entity, "quote": quote})
+            # 实体永不因证据未逐字定位而丢弃；不一致项交给 LLM 核验并留痕。
             grounded_entities.append(entity)
+        if unverified_entities:
+            verdicts = verify_items_with_llm(
+                llm,
+                chunk=chunk,
+                items=[
+                    {
+                        "item_id": f"{chunk.chunk_id}:entity[{item['index']}]",
+                        "kind": "entity",
+                        "type": str(item["entity"].get("type") or ""),
+                        "mention": str(item["entity"].get("name") or ""),
+                        "evidence_quote": item["quote"],
+                    }
+                    for item in unverified_entities
+                ],
+                pass_name="evidence_verification",
+                chunk_id=chunk.chunk_id,
+                use_scheduler=use_scheduler,
+                attempts=local_attempts,
+                max_attempts=min(2, max(1, max_attempts)),
+                retry_base_seconds=retry_base_seconds,
+                call_metrics=local_call_metrics,
+                record_table=_looks_like_record_table(chunk),
+            )
+            for item in unverified_entities:
+                verdict = verdicts.get(f"{chunk.chunk_id}:entity[{item['index']}]", "uncertain")
+                if verdict == "yes":
+                    code, message = "ENTITY_EVIDENCE_LLM_VERIFIED", "语义比对不一致，大模型核验确认属于原文"
+                elif verdict == "no":
+                    code, message = "ENTITY_EVIDENCE_LLM_UNSUPPORTED", "语义比对不一致，大模型核验认为不属于原文，保留并标记"
+                else:
+                    code, message = "ENTITY_EVIDENCE_UNVERIFIED", "语义比对不一致，大模型核验不确定，保留并标记"
+                _append_warning(
+                    local_warnings,
+                    code,
+                    message,
+                    f"{chunk.chunk_id}.entities[{item['index']}].evidence",
+                    item["quote"],
+                )
         return (
             chunk.chunk_id,
             grounded_entities,

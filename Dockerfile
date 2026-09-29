@@ -102,6 +102,10 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
 # Application-aware verification is performed by build-image.ps1 with the
 # repository source mounted read-only.
 RUN python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
+    python -c "import mineru, docling, transformers; from importlib.metadata import version; \
+    assert version('mineru').startswith('4.'), version('mineru'); \
+    assert version('transformers').startswith('5.'), version('transformers'); \
+    from mineru import parse" && \
     node --version && \
     opencode --version && \
     test -x /usr/bin/soffice && \

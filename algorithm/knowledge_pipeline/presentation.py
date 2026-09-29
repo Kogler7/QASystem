@@ -66,4 +66,5 @@ def generate_understanding(graph: dict[str, Any]) -> str:
         label = node.get("label", "Unknown")
         labels[label] = labels.get(label, 0) + 1
     summary = "、".join(f"{count} 个 {label}" for label, count in labels.items())
-    return f"共抽取 {len(nodes)} 个节点（{summary}）和 {len(relationships)} 条关系。"
+    text = f"共抽取 {len(nodes)} 个节点（{summary}）和 {len(relationships)} 条关系。"
+    return text

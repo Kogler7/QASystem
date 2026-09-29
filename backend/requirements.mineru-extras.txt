@@ -1,14 +1,16 @@
-# Required by the actual MinerU pipeline and VLM routes, which are not included
-# in MinerU's base package.
-mineru[pipeline,vlm,vllm]==2.7.6
+# MinerU 4.x（本地推理，不调用远程 API）。
+#
+# 4.0 重写了内部 API，本仓库通过 engine=mineru4（以及由它承接的 engine=mineru/vlm）调用；
+# 2.x 已退役，相关的 mineru.json / MINERU_MODEL_PIPELINE_PATH / MINERU_MODEL_VLM_PATH 不再使用。
+#
+# 4.0 要求 transformers>=5.10.1，因此主 requirements 里的 docling 一并升到 2.129.0、
+# sentence-transformers 升到 6.1.0（见 requirements.txt），numpy 由解析器统一到 2.2.x。
+mineru[torch]==4.0.4
+# GPU 侧提速用镜像自带的 vLLM（base image vllm/vllm-openai）。
+# 注意：不要安装 mineru[full]，它要求 vllm>=0.19.1，与镜像里的 vllm 0.11.2 冲突；
+# 4.0 的 vLLM 引擎只需 vllm>=0.10.1，通过 MINERU_MODEL_VLM_ENGINE=vllm 启用。
 # OpenCV 5.0 bundles Qt with a Linux 3.17 ABI tag, while the target A40 host
 # runs a 3.10 kernel. Keep the GUI and headless distributions aligned because
-# MinerU requires the former and vLLM/albumentations require the latter.
+# MinerU/OCR requires the former and vLLM/albumentations require the latter.
 opencv-python==4.11.0.86
 opencv-python-headless==4.11.0.86
-# MinerU's supported baseline avoids newer Ultralytics' optional Polars runtime.
-ultralytics==8.3.48
-# mineru.model.mfr.unimernet (formula recognition, loaded whenever
-# formula_enable=true) imports ftfy but MinerU does not declare it; without it
-# the pipeline route fails at DocAnalysis init with "No module named 'ftfy'".
-ftfy==6.3.1

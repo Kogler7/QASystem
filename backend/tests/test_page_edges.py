@@ -183,3 +183,29 @@ def test_process_file_rejects_invalid_page_edge_min_chars(tmp_path):
     )
     assert result["success"] is False
     assert result["error_code"] == "INVALID_PAGE_EDGE_MIN_CHARS"
+
+
+# ---------------------------------------------------------------- 图片矩形兼容
+
+def test_displayed_rect_supports_both_pypdfium2_apis():
+    """pypdfium2 4.x 用 get_pos()，5.x 用 get_bounds()，都要能取到。
+
+    注意用模块级导入的 DocumentProcessor：conftest 的 session 级桩会在测试内部
+    重新 import 时返回假实现。
+    """
+    class OldApi:
+        def get_pos(self):
+            return (1.0, 2.0, 3.0, 4.0)
+
+    class NewApi:
+        def get_bounds(self):
+            return (5.0, 6.0, 7.0, 8.0)
+
+    class Broken:
+        def get_pos(self):
+            raise RuntimeError("接口不兼容")
+
+    assert DocumentProcessor._displayed_rect(OldApi()) == (1.0, 2.0, 3.0, 4.0)
+    assert DocumentProcessor._displayed_rect(NewApi()) == (5.0, 6.0, 7.0, 8.0)
+    assert DocumentProcessor._displayed_rect(Broken()) is None
+    assert DocumentProcessor._displayed_rect(object()) is None
