@@ -49,7 +49,7 @@ services:
       PYTHONUNBUFFERED: "1"
     volumes:
       - ${QASYSTEM_SOURCE_DIR:-..}/docker:/app/docker:ro
-      - ${OFFLINE_SAMPLES_DIR:-../test_artifacts/parser}:/samples:ro
+      - ${OFFLINE_SAMPLES_DIR:-../test_data/parse}:/samples:ro
     entrypoint: ["python", "/app/docker/offline_validation.py"]
     command: ["--samples", "/samples"]
     networks: [offline]

@@ -8,7 +8,7 @@
 .\run-offline-validation.ps1 -ImageName qasystem-env-v1 -ModelsDir .\deploy\models
 ```
 
-验收使用 `test_artifacts/parser/解析测试数据` 中的 PDF、扫描 PDF、DOC、XLSX、Markdown 和 PNG 样本，并验证：
+验收使用 `test_data/parse/解析测试数据` 中的 PDF、扫描 PDF、DOC、XLSX、Markdown 和 PNG 样本，并验证：
 
 - `GET /health?full=true` 的本地运行依赖与模型目录；
 - Docling、MinerU VLM、Pandas 和文本解析路由；

@@ -19,7 +19,7 @@
 | `knowledge_pipeline/` | 语义切片、演示视图与向量存储编排 |
 | `knowledge_extract/` | 第一版知识抽取（本体驱动）；现同时承载 V1 契约/共享件、版本路由 shim 与无本体摘要 |
 | `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3`，默认 `latest`），并做合法性校验 |
-| `knowledge_extract/latest/` | `latest` 标记：始终指向当前最新实现（当前解析为 v3） |
+| `knowledge_extract/latest/` | `latest` 实体包：当前主版本代码副本，不是 v3 的软链/映射 |
 | `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
 | `embedding_runtime.py` | 文本向量化运行时（本地模型 / 远程服务自动选择） |
@@ -98,7 +98,7 @@
 | `result_contract.py` / `run_state.py` / `verification.py` | 对外结果契约、运行状态与最终校验 |
 | `structured_text.py` / `structured_output.py` / `table_semantics.py` | 结构化文本/表格处理与输出校验 |
 | `batch.py` / `scheduler.py` / `config.py` | 批处理、调度与配置 |
-| `benchmark/` / `golden_task/` | 逐步验证脚本、评测与基准数据 |
+| （已迁出） | 原 `benchmark/` / `golden_task/` / `scripts/` / `archive/` 已迁到 `test_data/eval-v2` / `eval/tools/` / `eval/legacy/` / `tests/fixtures`，版本目录只保留算法代码 |
 | `tests/` / `archive/` | 测试与归档代码 |
 
 > 抽取的产物是**知识单元与关系**，最终由 `embedding_runtime` 向量化、经外部接口写入图谱。
@@ -110,7 +110,7 @@
 | 文件 | 作用 |
 | --- | --- |
 | `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3`，默认 `latest`），并做合法性校验 |
-| `knowledge_extract/latest/` | `latest` 标记：始终指向当前最新实现（当前解析为 v3） |
+| `knowledge_extract/latest/` | `latest` 实体包：当前主版本代码副本，不是 v3 的软链/映射 |
 | `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
 
@@ -118,7 +118,7 @@ Backend `graph.extract` 与 MCP `kg_extract_v2` 通过
 `algorithm/knowledge_extract/adapter.py` 调用上述 shim。
 调用方只需指定 `KG_EXTRACT_ALGO_VERSION`：
 
-- `latest`（默认）：运行当前最新版本（v3），结果投影回 V1 逐 chunk 契约；
+- `latest`（默认）：运行独立的 `latest` 包，结果投影回 V1 逐 chunk 契约；
 - `v2` / `v3`：固定跑对应版本，便于算法版本对比评测。
 
 V2/V3 都是聚合式流水线（整篇文档一次通过、返回合并结果），adapter 再按每 chunk 的证据锚点把结果投影回 V1 的逐 chunk 契约，因此上层代码无需随版本切换而改动。

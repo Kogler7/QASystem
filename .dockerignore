@@ -35,9 +35,12 @@ backend/chroma_db/**
 backend/app.log
 backend/*.log
 
-# 文档（不参与运行）
+# 文档、测试、评测数据与产物不参与运行时镜像
 docs/
-test_artifacts/
+tests/
+test_data/
+eval/
+tmp/
 
 # Milvus / 本地编排产生的数据目录
 volumes

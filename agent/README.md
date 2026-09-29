@@ -203,14 +203,14 @@ result = runtime.run_session(
 
 ```powershell
 $env:PYTHONPATH = "$PWD\agent"
-.\.venv\Scripts\python.exe -m pytest agent/tests -q
+.\.venv\Scripts\python.exe -m pytest tests/agent -q
 ```
 
 Redis 集成测试：
 
 ```powershell
 $env:TEST_REDIS_URL = "redis://127.0.0.1:6379/15"
-.\.venv\Scripts\python.exe -m pytest agent/tests/test_task_store_redis.py -q
+.\.venv\Scripts\python.exe -m pytest tests/agent/test_task_store_redis.py -q
 ```
 
 Shell 资源限制测试依赖 POSIX `resource`，在 Windows 上会自动跳过，应在 Linux 镜像或 CI 中执行。

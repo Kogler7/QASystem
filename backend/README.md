@@ -155,11 +155,11 @@ docker compose up -d backend
 pytest
 ```
 
-即可运行 `backend/tests`、`agent/tests`、`algorithm/knowledge_extract/v2/tests` 等已注册测试。
+即可运行 `tests/backend`、`tests/agent`、`algorithm/knowledge_extract/v2/tests` 等已注册测试。
 若只跑后端测试：
 
 ```bash
-pytest backend/tests
+pytest tests/backend
 ```
 
 backend 的额外解析依赖（如 MinerU 相关包）见 `backend/requirements.mineru-extras.txt`，

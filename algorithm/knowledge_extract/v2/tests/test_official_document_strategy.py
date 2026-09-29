@@ -44,13 +44,14 @@ def _load_package_modules(package_name: str, directory: Path, stems: list[str]) 
     for stem in stems:
         src = directory / f"{stem}.py"
         module_name = f"{package_name}.{stem}"
-        if not src.exists() and (directory / "archive" / f"{stem}.py").exists():
-            src = directory / "archive" / f"{stem}.py"
+        archive_dir = directory / "tests" / "fixtures" / "archive"
+        if not src.exists() and (archive_dir / f"{stem}.py").exists():
+            src = archive_dir / f"{stem}.py"
             module_name = f"{package_name}.archive.{stem}"
             pkg_name = f"{package_name}.archive"
             if pkg_name not in sys.modules:
                 pkg = types.ModuleType(pkg_name)
-                pkg.__path__ = [str(directory / "archive")]
+                pkg.__path__ = [str(archive_dir)]
                 pkg.__package__ = pkg_name
                 sys.modules[pkg_name] = pkg
         if module_name in sys.modules:

@@ -1,7 +1,7 @@
 # MinerU 4.0 评估与部署说明
 
 评估对象：MinerU **4.0.4**（2026-09 发布）对比当前在用的 **2.7.6**。全部为**本地推理，未调用任何远程 API**（见第 4 节本地性验证）。
-评估样本：`test_artifacts/parser/解析测试数据/GBT+48000.4-2026 标准数字化 第4部分：协同制定要求.pdf`。
+评估样本：`test_data/parse/解析测试数据/GBT+48000.4-2026 标准数字化 第4部分：协同制定要求.pdf`。
 复现方式见文末。
 
 ## 1. 结论速览
@@ -166,7 +166,7 @@ env MINERU_HOME=/tmp/m4home MINERU_MODEL_BASE_DIR=/mnt/data3/qasys/models/mineru
     HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
     work/mineru4/venv/bin/python -c "
 import mineru
-pdf='test_artifacts/parser/解析测试数据/GBT+48000.4-2026 标准数字化 第4部分：协同制定要求.pdf'
+pdf='test_data/parse/解析测试数据/GBT+48000.4-2026 标准数字化 第4部分：协同制定要求.pdf'
 for tier in ('basic','standard'):
     print(tier, len(mineru.parse(pdf, tier=tier, page_range='1').markdown()), 'chars')"
 # 实测：basic 5.1s / standard 10.7s，各 162 字符
@@ -182,7 +182,7 @@ for tier in ('basic','standard'):
 | `main_processor.py` | `ENGINE_MATRIX` 增加 `mineru4`；`_processor()` 分支；Office/图片转 PDF 分支覆盖它；参数与元数据透传 |
 | `backend/app/schemas.py` | `ParserConfig.engine` 增加 `"mineru4"`（原有取值不变） |
 | `docs/文档解析行为规范.md` | 引擎表、允许引擎表、`keep_page_edges` 适用范围补 `mineru4` |
-| `backend/tests/test_mineru4_processor.py` | **新增** 19 例：契约、参数换算、JSON 表格、页边补回、版本不符报错、引擎注册 |
+| `tests/backend/test_mineru4_processor.py` | **新增** 19 例：契约、参数换算、JSON 表格、页边补回、版本不符报错、引擎注册 |
 
 契约保持不变（这些都没有动）：
 
@@ -332,8 +332,8 @@ export HF_HOME=$PWD/work/mineru4/hf-home
 work/mineru4/venv/bin/mineru-models-download --tier basic --small-backend onnx -s modelscope
 
 # 3) 新旧对比（旧版走系统 python + 仓库 preproc，新版走 venv）
-python3 test_artifacts/parser/test_mineru_version_compare.py --pages 7 --tier basic
-python3 test_artifacts/parser/test_mineru_version_compare.py --pages 14-16 --tier basic
+python3 tests/algorithm/preproc/test_mineru_version_compare.py --pages 7 --tier basic
+python3 tests/algorithm/preproc/test_mineru_version_compare.py --pages 14-16 --tier basic
 ```
 
 报告与产物：`work/mineru4/compare/report_*.json`、`work/mineru4/compare/{old,new}_*.md`。

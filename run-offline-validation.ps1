@@ -2,7 +2,7 @@ param(
     [string]$ImageName = "qasystem-env-v1",
     [string]$SourceDir = $PSScriptRoot,
     [string]$ModelsDir = "",
-    [string]$SamplesDir = (Join-Path $PSScriptRoot "test_artifacts\parser")
+    [string]$SamplesDir = (Join-Path $PSScriptRoot "test_data\parse")
 )
 
 $ErrorActionPreference = "Stop"

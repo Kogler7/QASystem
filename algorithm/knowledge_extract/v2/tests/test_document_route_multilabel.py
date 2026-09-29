@@ -31,11 +31,11 @@ from pathlib import Path
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-REPO_ROOT = PACKAGE_DIR.parents[1]
+REPO_ROOT = PACKAGE_DIR.parents[2]
 FIXTURES_DIR = PACKAGE_DIR / "tests" / "fixtures"
 ONTOLOGIES_DIR = FIXTURES_DIR / "ontologies"
 CASES_DIR = FIXTURES_DIR / "cases"
-BENCHMARK_DIR = PACKAGE_DIR / "benchmark"
+BENCHMARK_DIR = REPO_ROOT / "test_data" / "eval-v2"
 TESTS_DIR = PACKAGE_DIR / "tests"
 if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))

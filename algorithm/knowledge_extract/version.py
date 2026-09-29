@@ -26,8 +26,8 @@ def get_extract_version_label() -> str:
 
 
 def get_extract_version() -> str:
-    """返回实际要跑的算法版本：latest 解析为当前最新版本。"""
+    """返回实际要跑的算法版本：latest 使用独立的 latest 包，不再解析为 v3。"""
     label = get_extract_version_label()
     if label == LATEST:
-        return V3
+        return LATEST
     return label

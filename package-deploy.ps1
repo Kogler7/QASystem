@@ -63,7 +63,7 @@ foreach ($item in @(
 Copy-Item -LiteralPath (Join-Path $repoRoot "docker/docker-compose.offline-test.yml") -Destination (Join-Path $offlineDir "docker-compose.offline-test.yml") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "docker/OFFLINE_VALIDATION.md") -Destination (Join-Path $offlineDir "README.md") -Force
 if (Test-Path -LiteralPath (Join-Path $offlineDir "parser")) { Remove-Item -LiteralPath (Join-Path $offlineDir "parser") -Recurse -Force }
-Copy-Item -LiteralPath (Join-Path $repoRoot "test_artifacts/parser") -Destination (Join-Path $offlineDir "parser") -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot "test_data/parse") -Destination (Join-Path $offlineDir "parser") -Recurse -Force
 $envTemplate = Get-Content -LiteralPath (Join-Path $repoRoot ".env.example") -Raw
 $deliveryEnv = $envTemplate `
     -replace "(?m)^HOST_MODELS_DIR=.*$", "HOST_MODELS_DIR=./models" `
