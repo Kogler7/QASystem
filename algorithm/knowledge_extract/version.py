@@ -5,6 +5,7 @@
 ``latest`` 是现行 ``v3`` 的同步副本（独立实体目录，非软链/映射）；
 ``KG_EXTRACT_ALGO_VERSION=latest``（默认）直接运行 ``latest`` 包，不做版本解析。
 做算法版本对比评测时再显式设为 ``v2`` 或 ``v3``。
+``jev`` 只在显式设置时运行 ``jev_extract``，不改变默认抽取。
 """
 from __future__ import annotations
 
@@ -13,12 +14,13 @@ import os
 LATEST = "latest"
 V2 = "v2"
 V3 = "v3"
-SUPPORTED_VERSIONS = (LATEST, V2, V3)
+JEV = "jev"
+SUPPORTED_VERSIONS = (LATEST, V2, V3, JEV)
 DEFAULT_VERSION = LATEST
 
 
 def get_extract_version_label() -> str:
-    """返回配置原值（可能是 latest / v2 / v3），不做 latest 解析。"""
+    """返回配置原值（可能是 latest / v2 / v3 / jev），不做 latest 解析。"""
     value = os.getenv("KG_EXTRACT_ALGO_VERSION", DEFAULT_VERSION).strip().lower()
     if value in SUPPORTED_VERSIONS:
         return value

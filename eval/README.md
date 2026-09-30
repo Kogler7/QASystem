@@ -4,7 +4,7 @@
 
 默认连 `http://127.0.0.1:8006`。Backend 已在跑时，在仓库根目录执行即可；评测数据在 `test_data/eval/`，不要只拷 `eval/` 目录。
 
-抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2` 或 `v3`，再跑同一套评测即可对比。
+抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3` / `jev`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。`jev` 只在显式设置时运行 `jev_extract`，不改变默认抽取。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2` 或 `v3`，再跑同一套评测即可对比。
 
 ## 做了什么
 
