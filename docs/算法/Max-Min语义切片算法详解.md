@@ -67,12 +67,13 @@ $$\text{MaxSim}(s_k, C) = \max_{0 \leq i < k} \cos(\mathbf{e}_k, \mathbf{e}_i)$$
 **决策规则**：
 
 - 当 $|C| = 1$（chunk 内只有 1 个片段）时：
-  - 若 $\text{MaxSim}(s_1, C) \geq \tau$ → 合并
+  - 若 $\text{MaxSim}(s_1, C) \geq \tau$ 且 $\text{MaxSim}(s_1, C) \geq \theta_{\min}$ → 合并
   - 否则 → 切断
   - 其中 $\tau$ 为初始阈值（由 `similarity` 参数控制，默认 0.6）
 
 - 当 $|C| \geq 2$ 时：
   - 若 $\text{MaxSim}(s_k, C) \geq \text{MinSim}(C)$ 且 $\text{MaxSim}(s_k, C) \geq \theta_{\min}$ → 合并
+  - 若上述条件不满足，但 $|C| < k_{\min}$（`min_segments` 保底，由 `split_semantically` 以 `min_segments_per_chunk` 传入，默认 2）且加入后不超过 `chunk_size` → 仍强制合并
   - 否则 → 切断
   - 其中 $\theta_{\min}$ 为相似度下限（由 $\tau - 0.15$ 自动推导，下限 0.3）
 
@@ -89,7 +90,7 @@ Max-Min 不依赖聚合向量，而是直接比较 segment 之间的 pairwise �
 ### 2.4 算法伪代码
 
 ```python
-def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoints):
+def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoints, min_segments):
     chunks = []
     chunk_segs = [segments[0]]
     chunk_embs = [embeddings[0]]
@@ -129,17 +130,23 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
             else:
                 chunks.append("".join(chunk_segs))
                 chunk_segs = [seg]; chunk_embs = [emb]; chunk_minsim = 1.0
+        elif max_sim >= chunk_minsim and max_sim >= min_similarity:
+            # 更新 MinSim：检查是否有新 pair 比当前 MinSim 更弱
+            for sim in pairwise_sims:
+                if sim < chunk_minsim:
+                    chunk_minsim = sim
+            chunk_segs.append(seg)
+            chunk_embs.append(emb)
+        elif len(chunk_segs) < min_segments and current_length + len(seg) <= chunk_size:
+            # 最小片段数保底：Max-Min 判定不合并时也先凑够 min_segments
+            for sim in pairwise_sims:
+                if sim < chunk_minsim:
+                    chunk_minsim = sim
+            chunk_segs.append(seg)
+            chunk_embs.append(emb)
         else:
-            if max_sim >= chunk_minsim and max_sim >= min_similarity:
-                # 更新 MinSim：检查是否有新 pair 比当前 MinSim 更弱
-                for sim in pairwise_sims:
-                    if sim < chunk_minsim:
-                        chunk_minsim = sim
-                chunk_segs.append(seg)
-                chunk_embs.append(emb)
-            else:
-                chunks.append("".join(chunk_segs))
-                chunk_segs = [seg]; chunk_embs = [emb]; chunk_minsim = 1.0
+            chunks.append("".join(chunk_segs))
+            chunk_segs = [seg]; chunk_embs = [emb]; chunk_minsim = 1.0
 
     if chunk_segs:
         chunks.append("".join(chunk_segs))
@@ -150,7 +157,10 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
 
 ## 3. 完整处理流水线
 
-`split_semantically()` 实现的完整流水线包含 7 个步骤：
+`split_semantically()` 实现的完整流水线包含 8 个步骤。进入流水线之前还有两道前置处理：
+
+- **JSON 块保护**：与其它策略一致，先识别 JSON 块（对象 / 含对象数组连同围栏独立成片，不参与语义切分）。
+- **模型加载回退**：本地 SentenceTransformer 与 remote-only 远程 embedding 均不可用时，整个 section 退化为规则递归切分（等价 `recursive` 策略），不执行向量化。
 
 ### 3.1 流水线总览
 
@@ -176,7 +186,10 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
 [6] Max-Min 语义分组      ← 核心算法
   │
   ▼
-[7] 字符级重叠后处理       ← 按 chunk_overlap 应用滑动窗口
+[7] 装箱合并              ← 相邻片段按 chunk_size 顺序装箱，消除过小碎片
+  │
+  ▼
+[8] 字符级重叠后处理       ← 按 chunk_overlap 应用滑动窗口（仅相邻文本块）
   │
   ▼
 输出切片列表
@@ -274,11 +287,16 @@ elif method == "none":
 
 - **消除 centroid 漂移**：用 pairwise 比较替代 centroid 聚合
 - **自适应阈值**：MinSim 随 chunk 大小自动调整
-- **硬断点优先**：步骤 5 检测到的断点强制切分，不受 Max-Min 规则影响
+- **最小片段数保底**：`min_segments_per_chunk`（默认 2）保证单片至少包含的片段数，判定不合并时也强制凑够
+- **硬断点优先**：步骤 5 检测到的断点强制切分，不受 Max-Min 规则影响；加入新片段会超过 `chunk_size` 时也直接切断
 
-#### Step 7: 字符级重叠后处理
+#### Step 7: 装箱合并
 
-若配置了 `chunk_overlap > 0`，对最终切片结果应用字符级滑动窗口重叠。
+分组得到的切片按原文顺序装箱：相邻且合并后不超过 `chunk_size` 的切片合并为一块，消除过小碎片（碎片一律并入相邻块）。
+
+#### Step 8: 字符级重叠后处理
+
+若配置了 `chunk_overlap > 0`，对最终切片结果应用字符级滑动窗口重叠（对齐句子/段落边界，JSON 块与类型切换处不施加）。
 
 ## 4. 参数说明
 
@@ -286,8 +304,9 @@ elif method == "none":
 | --- | --- | --- | --- |
 | `similarity` | float (0–1) | 0.6 | Max-Min 的 tau（初始阈值），控制前两个片段合并的敏感度。也用于自动推导 `min_similarity` |
 | `breakpoint_method` | string | `"percentile"` | 断点检测策略：`"percentile"` / `"stddev"` / `"none"` |
-| `size` | int | 500 | 目标切片字符长度（Unicode 字符数） |
+| `size` | int | 4000 | 目标切片字符长度（Unicode 字符数）；底层函数签名默认 500，API 层 `ChunkOptions.size` 默认 4000 |
 | `chunk_overlap` | int | 0 | 相邻切片重叠字符数 |
+| `min_segments_per_chunk` | int | 2 | 单片最小片段数保底（函数级参数，API 未暴露） |
 
 **自动推导参数**：
 
@@ -344,26 +363,27 @@ elif method == "none":
 
 | 指标 | 数值 |
 | --- | --- |
-| Embedding 模型 | BAAI/bge-small-zh-v1.5（512 维） |
-| 模型内存占用 | ~100 MB |
+| Embedding 模型 | BAAI/bge-small-zh-v1.5（512 维）；remote-only 模式走远程 embedding 服务 |
+| 模型内存占用 | ~100 MB（本地模式） |
 | 100 片段编码耗时 | < 1s（Mac M 系列）/ 数秒（x86） |
 | 批量编码策略 | 所有片段一次性编码，避免多次模型调用 |
 | 分组计算复杂度 | O(n × k²)，k 为 chunk 内平均片段数（通常 3–10） |
 
-断点检测 (`"percentile"` / `"stddev"`) 在 30+ 片段时额外耗时 < 5ms，可忽略不计。`"none"` 模式最快。
+断点检测 (`"percentile"` / `"stddev"`) 在 30+ 片段时额外耗时 < 5ms，可忽略不计。`"none"` 模式最快。模型不可用时整条语义路径回退为规则递归切分，无 embedding 开销。
 
 ## 7. 实现位置
 
 | 文件 | 函数/类 | 作用 |
 | --- | --- | --- |
-| `algorithm/NL_to_cypher/splitter.py` | `split_semantically()` | 流水线编排 |
+| `algorithm/NL_to_cypher/splitter.py` | `split_semantically()` | 流水线编排（含 JSON 保护、模型回退） |
 | 同上 | `_split_by_markdown_headers()` | Markdown 标题预拆分 |
 | 同上 | `_split_into_segments()` | 句子级片段拆分 |
 | 同上 | `_merge_tiny_segments()` | 微小片段合并 |
 | 同上 | `_detect_breakpoints()` | 语义断点检测 |
 | 同上 | `_group_segments_maxmin()` | Max-Min 核心算法 |
-| 同上 | `_apply_overlap_to_chunks()` | 字符级重叠后处理 |
-| `algorithm/NL_to_cypher/vector.py` | `_load_model()` | 模型加载与缓存 |
+| 同上 | `_merge_no_leftover()` | 装箱合并（碎片消除） |
+| 同上 | `_apply_overlap()` | 字符级重叠后处理 |
+| `algorithm/NL_to_cypher/vector.py` | `_load_model()` | 模型加载与缓存（remote-only 走远程服务） |
 | `algorithm/knowledge_pipeline/chunking.py` | `chunk_document()` | 策略路由 |
 | `backend/app/schemas.py` | `ChunkOptions` | API 参数定义 |
 

@@ -1,6 +1,6 @@
 # 算法 API v1 迁移说明
 
-> 并发执行架构对现有业务 API 采用增量兼容：不发送 `Prefer` 时仍同步返回原 HTTP 状态和原业务 `data`，只新增顶层 `execution`。`Prefer: respond-async` 才立即返回 `202 + job_id`；`Prefer: wait=N` 提供最多 60 秒的显式有界等待。新增 `POST /api/v1/jobs` 默认返回 `202`。部署变化见[环境镜像与外置源码迁移指引](部署/环境变量迁移说明.md)。
+> 并发执行架构对现有业务 API 采用增量兼容：不发送 `Prefer` 时仍同步返回原 HTTP 状态和原业务 `data`，只新增顶层 `execution`。`Prefer: respond-async` 才立即返回 `202 + job_id`；`Prefer: wait=N` 提供最多 60 秒的显式有界等待。新增 `POST /api/v1/jobs` 默认返回 `202`。部署变化见[环境镜像与外置源码迁移指引](../部署/环境变量迁移说明.md)。
 
 显式异步调用方应保存 `execution.result_url`，订阅 `execution.events_url`，并在收到 SSE `job.completed` 后通过 `GET /api/v1/jobs/{job_id}/result` 获取完整最终 envelope。最终响应的业务结果仍位于顶层 `data`，不是嵌套在任务句柄内部。
 
@@ -105,7 +105,7 @@ data.extraction.ranges[i] ↔ data.extraction.graphs[i] ↔ data.artifacts.vecto
 | `lang` | `options.parser.mineru_options.language` | 默认 `ch` |
 | `parser_engine` | `options.parser.engine` | 不再表示无条件强制；实际引擎以响应 `data.stats.document.parser` 为准 |
 | `chunk_character` | `options.chunking.separators` | 统一为字符串数组，不再接受两种不同格式 |
-| `chunk_size` | `options.chunking.size` | 默认 `500` |
+| `chunk_size` | `options.chunking.size` | 默认 `4000` |
 | `chunk_type` | `options.chunking.strategy` | 从整数枚举改为字符串枚举 |
 | `similarity` | `options.chunking.similarity` | 当前为预留参数，暂不影响四种现行策略 |
 | `save_to_db` | `options.storage.persist_graph` | 字段保留；第三方图谱写入接口开通前必须为 `false` |
@@ -117,12 +117,14 @@ data.extraction.ranges[i] ↔ data.extraction.graphs[i] ↔ data.artifacts.vecto
 
 | 旧值 | 旧名称 | v1 `strategy` | 迁移提示 |
 | ---: | --- | --- | --- |
-| `0` | 语义切分 | `recursive` | v1 默认策略是递归切分，不执行语义相似度切分 |
+| `0` | 语义切分 | `recursive` | v1 默认策略是递归切分；如需保留语义相似度切分，可评估改用 `semantic`（服务端内部编号 4） |
 | `1` | 符号切分 | `symbols` | `separators` 使用字符串数组 |
 | `2` | 递归切分 | `custom_recursive` | 使用调用方提供的 `separators` |
 | `3` | Markdown 切分 | `markdown` | 按 Markdown 结构切分 |
 
-如果旧调用方依赖 `chunk_type=0` 的语义相似度切片，不能机械替换参数，需要先验证新的切片结果。
+v1 切片还新增 `chunk_overlap`（相邻切片重叠字符数，必须小于 `size`）、`breakpoint_method`（`semantic` 的断点方法）等可选参数；`size` 的默认值现为 `4000`。
+
+如果旧调用方依赖 `chunk_type=0` 的语义相似度切片，可评估迁移到 `semantic` 策略（阈值参数为 `similarity`）；无论选择哪个策略，都需要先验证新的切片结果。
 
 旧请求示意：
 

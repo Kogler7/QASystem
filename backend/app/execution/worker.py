@@ -21,7 +21,7 @@ LOGGER = logging.getLogger("qasystem.worker")
 
 
 def _error_retryable(exc: Exception) -> bool:
-    """按错误码协议（docs/错误码协议.md）判断任务失败是否值得重投。
+    """按错误码协议（docs/接口/错误码协议.md）判断任务失败是否值得重投。
 
     协议 retryable 集合的权威常量在 ``backend.app.responses``：业务异常
     携带 ``code``（ErrorCode，如 CapabilityError / PipelineError /

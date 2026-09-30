@@ -12,7 +12,7 @@ AgentCode 是 QASystem 仓库内的单智能体运行时和后台 Agent 服务�
 | [架构设计](../docs/Agent/架构设计.md) | 运行时：任务状态机、队列、SSE 游标、取消和隔离 |
 | [部署运维指南](../docs/Agent/部署运维指南.md) | Compose、环境变量、容量和排障 |
 | [开发扩展指南](../docs/Agent/开发扩展指南.md) | 改代码：模型、MCP、Skill、测试 |
-| [图谱求解方法](../docs/智能体知识图谱驱动求解架构.md) | Agent / Skill / 图谱 / MCP 职责（不是 HTTP 协议） |
+| [图谱求解方法](../docs/架构/智能体知识图谱驱动求解架构.md) | Agent / Skill / 图谱 / MCP 职责（不是 HTTP 协议） |
 
 ## 能力边界
 
@@ -54,7 +54,7 @@ docker compose up -d
 Compose 会启动：
 
 - `backend`：QASystem HTTP 和 MCP Server，容器内端口 `8000`，宿主机默认 `8006`；
-- `agent`：AgentCode API，容器内端口 `9180`，Compose 不映射到宿主机，对外经 Backend `/agent` 反代；
+- `agent`：AgentCode API，容器内端口 `9180`，Compose 经 `AGENT_HOST_PORT`（默认 9180）映射宿主机，也可经 Backend `/agent` 反代访问；
 - `redis`：任务、租约、鉴权上下文和事件流存储。
 
 检查服务：

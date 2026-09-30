@@ -21,7 +21,7 @@
 - `tests/`、`test_data/`、`eval/`、`tmp/` 不属于运行时应用源码，不得进入交付镜像或 `deploy/runtime` 源码包；`.dockerignore` 与 `package-deploy.ps1` 已将其排除。
 - `algorithm/knowledge_extract/v1/`、`v2/`、`v3/`、`latest/` 只保留算法代码与其单元测试：
   - benchmark 数据集统一放 `test_data/`：`v2` 对应 `test_data/eval-v2/`，`v3` 对应 `test_data/eval-v3/`；golden、评测文档（PDF/MD）一律不得进入算法目录；
-  - benchmark 评测/打分脚本统一放 `eval/legacy/`（如 `v2_benchmark_eval.py`、`v2_fixed_judge.py`、`v2v3_benchmark.py`），算法目录下不得出现 `*_benchmark_eval.py`、`*_fixed_judge.py` 等评测脚本；
+  - benchmark 评测/打分脚本统一放 `eval/`（统一入口 `eval/run.py`，直接评测线上链路；旧版 legacy 脚本已清理），算法目录下不得出现 `*_benchmark_eval.py`、`*_fixed_judge.py` 等评测脚本；
   - 评测辅助脚本放 `eval/tools/`（如 `v2_scripts/merge_official_results.py`）；
   - `v2` 的策略模块（`standard_strategy.py`、`official_document_strategy.py`）与 benchmark 数据门禁（`benchmark_lint.py`、`markdown_quality.py`）是在线包模块，保留在 `v2/` 内，可用 `-m algorithm.knowledge_extract.v2.benchmark_lint` 运行；旧策略 fixture 归档在 `v2/tests/fixtures/archive/`。
 - 从其他分支合并带入的文件与上述布局冲突时，合并方须在合并提交内按约定归位（移动/删除冲突文件，并同步修正 README、脚本与测试引用），不得把 benchmark 数据、评测脚本重新引入算法目录。
@@ -42,7 +42,7 @@
 1. **单元测试全绿**：`.venv/Scripts/python.exe -m pytest -q`（Windows 开发机）或 `python3 -m pytest -q`。
 2. **全量评测门禁**（对运行中的 Backend，正式判定用 `--match-mode llm`，先 identity 跑通链路也可）：
    `python3 eval/run.py --match-mode llm --fail-on-empty --min-f1 0.5 --max-case-seconds 1800 --max-stage-seconds parse=300,chunk=120,extract=900`
-   退出码 `0` 才过；`2`=有空抽取或失败 case（必须排查 `summary.json` 的 `gate.empty_failures`）；`4`=F1 或耗时预算未过；`1`=配置错误。阈值以最新基线为准（见 `tmp/eval/runs/` 与 docs/质量管理 记录）。
+   退出码 `0` 才过；`2`=有空抽取或失败 case（必须排查 `summary.json` 的 `gate.empty_failures`）；`4`=F1 或耗时预算未过；`1`=配置错误。阈值以最新基线为准（见 `tmp/eval/runs/` 历次全量记录）。
 3. **基线对比**：与上一次全量基线比，实体 F1 不得明显下降、单 case 耗时不得明显上升；回退即挡。
 4. **生产观测**：确认 `QASYSTEM_ALERT_WEBHOOK` 已配置（空抽取/慢阶段/本体无效告警），`/api/v1/observability/metrics` 可访问；用户反馈的空结果问题凭 `request_id` 与 `stats.extraction.empty_reason` 定位到阶段。
 
@@ -50,6 +50,6 @@
 
 # Documentation Index
 
-- [Plugin and database environment](docs/插件与数据库环境索引.md): local VSIX, Attu/Milvus, Neo4j browser, and data-access boundaries.
-- [Application-service API](docs/应用服务API索引.md): live knowledge-map service endpoint directory and ingestion contract; see [Swagger UI](https://zhongche.zhouhao.work/docs) for current schemas.
+- [Plugin and database environment](docs/部署/插件与数据库环境索引.md): local VSIX, Attu/Milvus, Neo4j browser, and data-access boundaries.
+- [Application-service API](docs/接口/应用服务API索引.md): live knowledge-map service endpoint directory and ingestion contract; see [Swagger UI](https://zhongche.zhouhao.work/docs) for current schemas.
 - [QASystem documentation index](docs/文档索引.md): all local architecture, API, deployment, and test documents.

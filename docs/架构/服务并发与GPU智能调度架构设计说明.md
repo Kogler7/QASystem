@@ -119,7 +119,9 @@ accepted -> queued -> running -> succeeded
                     -> cancelling/cancelled
 ```
 
-每次尝试单独记录 `attempt_id`、Worker、进程实例、GPU Lease、排队/开始/结束时间、耗时和错误。执行失败时按 `EXECUTION_MAX_ATTEMPTS` 重试；VLM PDF 的每个页段是独立子 Job，因此失败只会重试相应页段，而不是重新解析整份 PDF。
+每次尝试单独记录 `attempt_id`、Worker、进程实例、GPU Lease、排队/开始/结束时间、耗时和错误。执行失败时按 `EXECUTION_MAX_ATTEMPTS` 重试，且重试尊重错误码协议：业务异常携带非 retryable 错误码时（参数类 1xxx、解析/切片结果类 2xxx/3xxx、本体无效 4006 等确定性失败）不再白重试，错误对象中标记 `retryable=false`；未知异常（网络/依赖抖动）保持可重试。VLM PDF 的每个页段是独立子 Job，因此失败只会重试相应页段，而不是重新解析整份 PDF。
+
+Worker 还内置 PEL 滞留消息重投（崩溃恢复）：每个 Worker 周期收割本 Worker 名下共享队列与定向队列中 idle 超过 `EXECUTION_REAPER_MIN_IDLE_SECONDS`（默认 600 秒）的滞留消息并重新入队（attempt+1）；滞留期间被取消的任务直接终态化为 `cancelled`，达到 `EXECUTION_MAX_ATTEMPTS` 的按失败终态化。默认 `EXECUTION_REAPER_ENABLED=true`、`EXECUTION_REAPER_INTERVAL_SECONDS=60`。这是崩溃恢复路径，正常完成的消息不受影响。
 
 取消采用协作式语义：未开始任务可直接取消；运行中的父任务会向仍在等待的页段子任务传播取消请求，已经进入算法执行的工作在可返回的边界结束。
 
@@ -167,6 +169,10 @@ document.parse
 
 这使显存负责准入和防止超配，细粒度页段负责跨卡负载均衡。当前尚未实现根据历史页面复杂度预测耗时、运行中继续二次拆分慢页段，或根据反馈自动调整下一份文档分片粒度；这些能力不应被视为现有架构保证。
 
+### 4.3 知识沉淀流水线的可选解析页分片
+
+`document.parse` 的分片是执行框架能力；知识沉淀流水线（`workflow.knowledge`，`POST /api/v1/pipelines/knowledge-ingestion`）内部的 PDF 解析默认仍走整篇编排，可通过 `KNOWLEDGE_PIPELINE_PARSE_SHARDING=true` 打开页分片加速（复用 `EXECUTION_VLM_SHARD_MIN_PAGES` / `EXECUTION_VLM_SHARD_COUNT` 阈值，按存活 VLM Worker 并行）。非 PDF 文件、`options` 显式 `page_sharding=off`、inline 执行环境（无队列）会自动回退整篇解析。默认 `false`；该开关只影响流水线内解析编排，不改变 `document.parse` 的默认行为。
+
 ## 5. GPU 容量与租约调度
 
 ### 5.1 Worker 注册与实时快照
@@ -213,6 +219,8 @@ Redis Lua 脚本原子检查并写入 GPU Lease 和 Worker-slot Lease。拿不�
 每张卡的 vLLM engine 启动后，supervisor 反复执行 readiness 脚本。探针先检查服务健康，再提交一个最小多模态请求，并使用与 engine PID 关联的 marker 避免重复预热。
 
 启动期间端口尚未监听产生的连接拒绝属于预期重试，retry loop 默认不逐次打印失败；只有超过 `VLLM_STARTUP_TIMEOUT_SECONDS`、engine 提前退出或最终无法预热时，supervisor 才将启动判定为失败。只有全部 engine 打印 `ready and warm` 后 GPU Worker 才开始接单，避免首个用户请求承担模型编译和冷启动开销。
+
+VLM 端点注入跟随引擎启动计划：supervisor 只对本次运行计划启动的 engine 注入 `MINERU_VLM_BACKEND=vlm-http-client` 与 `MINERU_VLM_SERVER_URL`（API 进程取第一个端点，CPU Worker 按索引轮转各端点，每卡 VLM Worker 取本卡端点）。引擎不启动时（remote-only 模式或 `VLLM_ENABLED=false`）绝不注入指向空地址的 URL，否则解析选中 vlm-http-client 后必然连接失败，还会因「URL 已配置」跳过本地 MinerU 4.x 的自动回退。
 
 ## 7. HTTP 与 MCP 协议
 
@@ -272,7 +280,7 @@ MCP 生产默认使用 `MCP_EXECUTION_MODE=sync`：重工具进入同一执行�
 Agent 服务是与 Backend 并列的独立任务型入口，复用同一套"入队返回句柄"范式，但有自己独立的并发层次（完整细节、幂等与取消约束见 `docs/Agent/架构设计.md`）：
 
 - **总并发 = W × min(C, P)**：W 个 uvicorn 进程（`AGENT_API_WORKERS`；多进程必须由 Redis 承载共享队列，否则拒绝启动）× 每进程 C 个工作线程（`AGENT_WORKER_CONCURRENCY`，生产默认 4）× ToolManager 连接池大小 P（`AGENT_WORKER_POOL_SIZE`，默认等于 C）。每个 ToolManager 绑定专属的事件循环线程，通过 `run_coroutine_threadsafe` 调用 MCP。
-- **任务队列是"至少一次"语义**：Redis List 主队列 + processing 队列，Worker 每 30 秒续约租约，超过 `TASK_STORE_VISIBILITY_TIMEOUT`（默认 1500s）未完成的处理中任务由 requeue 线程自动重新入队。崩溃恢复路径简单，代价是有副作用的工具必须自身幂等。
+- **任务队列是"至少一次"语义**：Redis List 主队列 + processing 队列，Worker 每 30 秒续约租约，超过 `TASK_STORE_VISIBILITY_TIMEOUT`（默认 1500s）未完成的处理中任务，由其他 Worker 在领取任务前扫描 processing 时自动重新入队。崩溃恢复路径简单，代价是有副作用的工具必须自身幂等。
 - **流式输出跨进程**：Worker 线程把 LLM 的逐 token delta 同步发布到任务事件 Stream；SSE 订阅端按游标独立读取，支持 `Last-Event-ID` 断线重放，发布者与订阅者可以不在同一进程。
 - **与统一执行层的关系**：生产默认 `MCP_EXECUTION_MODE=sync`，Agent 线程发起的重型工具调用仍进入 Backend 的统一执行队列并等待原结果，因此 Agent 工作线程不会被单卡计算长时间独占。
 
@@ -321,6 +329,16 @@ job.completed / job.failed / job.cancelled
 
 当前已实现按 Job 的 SSE；全局 `/api/v1/events/stream` 因租户鉴权和 fan-out 尚未接入而明确返回 `501`，不能作为现有能力对外承诺。
 
+### 8.3 指标、request_id 与告警
+
+进程内可观测性由 `backend/app/observability.py` 提供：
+
+- **request_id 上下文**：HTTP 入口与执行层通过 contextvars 绑定 request/job id，服务层日志经 `context_prefix(request_id=...)` 附加，未绑定时不输出；用户可凭 `request_id` 与 `stats.extraction.empty_reason` 定位空结果问题。
+- **指标端点**：`GET /api/v1/observability/metrics`（不鉴权，暴露方式与 `/health` 一致）输出 `queue_depth`（Redis 队列按各资源流未确认消息数估算）、`job_status_counts`、告警与空抽取计数 `counters`、各阶段近期耗时分位数 `stage_duration_samples`（进程内环形缓冲，每阶段最近 512 次）。执行层不可用时对应字段降级为空值。
+- **告警 webhook**：`QASYSTEM_ALERT_WEBHOOK` 配置钉钉/企业微信机器人（text 消息格式），留空则静默跳过；同 event+request_id 60 秒内去重，发送失败只记 ERROR 日志，绝不影响主流程。
+- **慢阶段预算**：`QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS` / `_CHUNK_` / `_EXTRACT_` 配置知识沉淀流水线各阶段耗时预算（秒），超出即发 `slow_stage` 告警——只告警、不中断任务；留空或 0 表示不告警。
+- **空抽取告警**：抽取结果 0 实体 0 关系且分类出原因时，写入 `stats.extraction.empty_reason`、计数 `empty_extraction_total` 并发送 `empty_extraction` 告警。
+
 ## 9. 配置与目标 A40 部署
 
 目标服务器有 8 张 A40，但本服务只使用后四张卡：
@@ -346,6 +364,13 @@ GPU_DEVICE_IDS=4,5,6,7
 | `VLLM_WARMUP_ENABLED` | `true` | readiness 后执行多模态 warmup |
 | `EXECUTION_VLM_SHARD_MIN_PAGES` | `8` | 自动分片最小页数 |
 | `EXECUTION_VLM_SHARD_COUNT` | `auto` | 按存活 VLM Worker 形成约 1.5 轮页段 backlog |
+| `EXECUTION_MAX_ATTEMPTS` | `3` | 单任务最大尝试次数（含崩溃重投） |
+| `EXECUTION_REAPER_ENABLED` | `true` | PEL 滞留消息重投开关（崩溃恢复） |
+| `EXECUTION_REAPER_MIN_IDLE_SECONDS` | `600` | 消息滞留多久后收回重投 |
+| `EXECUTION_REAPER_INTERVAL_SECONDS` | `60` | 重投扫描间隔 |
+| `KNOWLEDGE_PIPELINE_PARSE_SHARDING` | `false` | 知识沉淀流水线内 PDF 解析页分片开关 |
+| `QASYSTEM_ALERT_WEBHOOK` | 空 | 告警 webhook；留空不发送任何告警 |
+| `QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS` / `_CHUNK_` / `_EXTRACT_` | 空 | 各阶段慢预算（秒）；留空或 0 不告警 |
 | `EXECUTION_GPU_MAX_LEASES_PER_WORKER` | `1` | 单 Worker 同时执行的 GPU 原子任务数 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM` | `2048` | VLM 原子任务调度预算，不是模型常驻显存 |
 
@@ -370,7 +395,7 @@ docker compose exec backend sh -lc 'ps -ef | grep -E "uvicorn|vllm|app.execution
 docker compose logs --tail=300 backend
 ```
 
-日志中应先看到每张选中 GPU 的 `ready and warm`，再看到 `runtime ready`。文档解析性能和 3090 阶段性测试结果见《VLM大文档解析性能对比报告》，A40 参数与吞吐结论必须以目标机实测为准。
+日志中应先看到每张选中 GPU 的 `ready and warm`，再看到 `runtime ready`。文档解析性能和 3090 阶段性测试结果见 [VLM 大文档解析性能对比报告](../算法/VLM大文档解析性能对比报告.md)，A40 参数与吞吐结论必须以目标机实测为准。
 
 ## 11. 已实现能力与后续演进边界
 

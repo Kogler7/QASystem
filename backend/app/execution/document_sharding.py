@@ -15,7 +15,7 @@ from .manager import ExecutionCancelled, ExecutionManager, get_execution_manager
 
 
 class PageShardError(RuntimeError):
-    """页段编排失败。``code`` 按 docs/错误码协议.md 标注，供
+    """页段编排失败。``code`` 按 docs/接口/错误码协议.md 标注，供
     ``backend.app.responses.error_code_for_exception`` 与 worker 的
     协议感知重试归类；未标注时按未知异常（可重试）处理。"""
 

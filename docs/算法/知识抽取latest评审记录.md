@@ -10,12 +10,12 @@ tags: []
 
 |优先级|V2 中的证据|影响|V3 的处理|
 |---|---|---|---|
-|高|`prompt_router.py:598` 的关系配对描述包含 ID/类型，遗漏实际名称；`relation_resolver.py:140` 的上游候选本有名称|模型无法可靠地从 entity-N 知道关系两端是什么|直接用 type/name 标识实体和关系端点，展示属性；关系与端点一起提议|
+|高|`prompt_router.py:622` 的关系配对描述包含 ID/类型，遗漏实际名称；`relation_resolver.py:144` 的上游候选本有名称|模型无法可靠地从 entity-N 知道关系两端是什么|直接用 type/name 标识实体和关系端点，展示属性；关系与端点一起提议|
 |高|`relation_resolver.py:14` 的固定关系集合及后续排除逻辑|部分合法 ontology 关系绕过通用 LLM 抽取，依赖领域规则|关系签名全由输入 ontology 决定，没有固定关系名黑名单|
-|高|`candidate_generation.py:1188` 以当前 chunk 的引文匹配过滤关系|有语义支持但跨段、OCR 换行或引文不完全一致的关系被丢弃|校验真实来源 chunk；引文定位独立于事实接受和 confidence|
-|中|`property_enrichment.py:178` 可接受空字符串更新，`mapping_scorer.py:101` 按属性键覆盖率计分|空值也可能增加覆盖分数。探针中真实值与两个空字符串均得 1.0；该评分默认是注释，并非全部结果的硬过滤|省略空值，分开保存实体与属性支持度，评测具体属性值|
-|中|`candidate_generation.py:618` 的修复请求没有保留实际 assistant 输出|模型难以围绕自己的错误精确修改|保存 assistant JSON，再追加带路径与期望类型的校验问题|
-|中|`prompt_router.py:551` 的首轮实体阶段未展示完整属性和关系约束|关系发现受先前实体集合限制|一次联合提议实体、属性、关系；有限补漏可以补端点|
+|高|`candidate_generation.py:918` 以当前 chunk 的引文匹配过滤关系|有语义支持但跨段、OCR 换行或引文不完全一致的关系被丢弃|校验真实来源 chunk；引文定位独立于事实接受和 confidence|
+|中|`property_enrichment.py:247` 可接受空字符串更新，`mapping_scorer.py:101` 按属性键覆盖率计分|空值也可能增加覆盖分数。探针中真实值与两个空字符串均得 1.0；该评分默认是注释，并非全部结果的硬过滤|省略空值，分开保存实体与属性支持度，评测具体属性值|
+|中|`split_extractor.py:830` 的修复请求没有保留实际 assistant 输出|模型难以围绕自己的错误精确修改|保存 assistant JSON，再追加带路径与期望类型的校验问题|
+|中|`prompt_router.py:584` 的首轮实体阶段未展示完整属性和关系约束|关系发现受先前实体集合限制|一次联合提议实体、属性、关系；有限补漏可以补端点|
 
 这些结论针对 public `extract -> extract_harness -> extract_split` 路径。未把旧版 `extractor.py` 中所有逻辑都当作当前默认路径。以上是代码行为证据，具体指标收益由真实对照决定。
 
@@ -39,4 +39,4 @@ tags: []
 
 修改前与修改后均运行 V2 的 116 项 unittest：114 通过，两个既有失败仍分别是 `test_document_units_match_gold_01` 与 `test_standard_metadata` 的命名期望差异。没有为使这些测试变绿而修改 V2 或 golden。
 
-V3 已通过离线契约测试和真实 JSON Mode 连通/小图抽取。完整效果以最终 benchmark 报告为准，不能用连通测试或 fake LLM 测试替代召回率/F1 证据。无第三方新依赖；当前环境没有 pytest、ruff、mypy/pyright，使用 unittest、AST 解析及独立代码审查验证。
+V3 已通过离线契约测试和真实 JSON Mode 连通/小图抽取。完整效果以最终 benchmark 报告为准，不能用连通测试或 fake LLM 测试替代召回率/F1 证据。无第三方新依赖；评审当时环境没有 pytest、ruff、mypy/pyright，验证依赖 unittest、AST 解析及独立代码审查（本仓库现已统一使用 pytest 运行测试）。

@@ -12,8 +12,10 @@ from algorithm.runtime_profile import is_remote_only
 
 MODEL_PATHS = {
     "docling": Path("/models/docling-models"),
+    # MinerU 2.x pipeline 仍是 VLM 端点未配置时的本地回退层
+    # （main_processor 的 _local_pipeline_available 与 docling 回退都读它），
+    # 并未退役；4.0 模型目录另见 runtime_checks 的 mineru4 检查。
     "mineru_pipeline": Path("/models/mineru/pipeline"),
-    "mineru_vlm": Path("/models/mineru/vlm"),
 }
 OPTIONAL_MODEL_ENV = (
     "VECTOR_MODEL_PATH",
@@ -77,6 +79,11 @@ def runtime_checks() -> dict[str, Any]:
         }
     else:
         checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
+        checks["mineru4"] = _directory_check(Path(os.getenv("MINERU_MODEL_BASE_DIR", "/models/mineru4")))
+        if os.getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+            checks["mineru_vlm"] = {"ok": True, "skipped": True, "reason": "VLLM 未启用，2.x VLM 权重不参与运行"}
+        else:
+            checks["mineru_vlm"] = _directory_check(Path("/models/mineru/vlm"))
         checks.update({name.lower(): _optional_directory_check(name) for name in OPTIONAL_MODEL_ENV})
     return checks
 

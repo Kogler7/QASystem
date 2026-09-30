@@ -12,6 +12,15 @@ from fastapi.testclient import TestClient
 
 from backend.app import observability
 
+# 本体提前阻断（4006）用例依赖真实的 OntologySchema 解析器。protocol_module
+# fixture 会把 v2 包替换成无 __path__ 的桩，单独跑本文件时子模块 import 会失败；
+# 这里预先导入真实子模块，使其缓存进 sys.modules（import 机制按完整名字命中缓存，
+# 不经过桩父包的 __path__），与全量测试运行时的行为保持一致。
+try:  # noqa: SIM105 - 有意的防御性导入
+    import algorithm.knowledge_extract.v2.ontology_schema  # noqa: F401
+except Exception:  # noqa: BLE001 - 解析器缺失时相关用例由自身断言暴露
+    pass
+
 
 @pytest.fixture
 def clean_observability_state(monkeypatch):

@@ -173,6 +173,7 @@ def _ontology_catalog(ontology: str) -> dict[str, Any]:
         "classes": [],
         "relations": [],
         "parse_error": None,
+        "parser_available": True,
     }
     if not text.strip():
         return catalog
@@ -201,6 +202,10 @@ def _ontology_catalog(ontology: str) -> dict[str, Any]:
             {"identifier": rel.identifier, "source": rel.source, "target": rel.target}
             for rel in schema.relations
         ]
+    except ImportError:
+        # 本体解析器栈不可用（如测试桩替换 v2 包）：catalog 不可用不等于本体
+        # 无效，标记后跳过提前阻断，交由抽取器自行报错。
+        catalog["parser_available"] = False
     except Exception as exc:  # noqa: BLE001 - 解析失败本身就是要看的信息
         catalog["parse_error"] = f"{type(exc).__name__}: {exc}"
     return catalog
@@ -641,7 +646,7 @@ class KnowledgePrecipitationService:
                     json.dumps(ontology_catalog["relations"], ensure_ascii=False)
                 ),
             )
-            if ontology_catalog["parse_error"]:
+            if ontology_catalog.get("parser_available", True) and ontology_catalog["parse_error"]:
                 # 本体解析错误提前阻断：不再流到抽取阶段才爆 4006。
                 logger.error(
                     "%s[知识沉淀] 本体解析失败，已阻断: %s",
@@ -664,7 +669,7 @@ class KnowledgePrecipitationService:
                     "ontology",
                     {"parse_error": ontology_catalog["parse_error"]},
                 )
-            if not ontology_catalog["classes"]:
+            if ontology_catalog.get("parser_available", True) and not ontology_catalog["classes"]:
                 # 本体文本非空但一个类都解析不出来（流到抽取也只能 ONTOLOGY_EMPTY），
                 # 同样提前按 ONTOLOGY_INVALID(4006) 失败。
                 logger.error(
