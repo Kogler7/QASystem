@@ -66,6 +66,7 @@ backend/data/documents/
 backend/data/preproc_output/
 backend/data/preproc_upload/
 backend/data/extraction_snapshots/
+backend/data/api_records/
 backend/processed_files/
 backend/temp_files/
 backend/chroma_db/

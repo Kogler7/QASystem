@@ -1,0 +1,310 @@
+"""Final extraction verification with explicit hard and repairable issues."""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Iterable
+
+from .coverage import CoverageAuditor, CoverageGap
+from .evidence import verify_evidence
+from .graph_utils import canonical_name
+
+
+_REJECTED_RELATION_CANDIDATE_CODES = {
+    "UNKNOWN_RELATION_ENDPOINT_ID",
+    "UNKNOWN_RELATION_TYPE",
+    "RELATION_ENDPOINT_TYPE_MISMATCH",
+}
+
+
+@dataclass(frozen=True)
+class VerificationIssue:
+    code: str
+    message: str
+    path: str = ""
+    severity: str = "error"
+    repair_type: str | None = None
+    context: dict[str, Any] | None = None
+
+    @property
+    def is_hard(self) -> bool:
+        return self.severity == "error"
+
+    @property
+    def is_repairable(self) -> bool:
+        return self.repair_type is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "code": self.code,
+            "message": self.message,
+            "path": self.path,
+            "severity": self.severity,
+            "repair_type": self.repair_type,
+            "context": dict(self.context or {}),
+        }
+
+
+@dataclass(frozen=True)
+class VerificationReport:
+    issues: tuple[VerificationIssue, ...]
+    coverage_gaps: tuple[CoverageGap, ...] = ()
+
+    @property
+    def hard_issues(self) -> tuple[VerificationIssue, ...]:
+        return tuple(issue for issue in self.issues if issue.is_hard)
+
+    @property
+    def repairable_issues(self) -> tuple[VerificationIssue, ...]:
+        return tuple(issue for issue in self.issues if issue.is_repairable)
+
+    @property
+    def valid(self) -> bool:
+        return not self.hard_issues
+
+    @property
+    def coverage_complete(self) -> bool:
+        """Coverage is complete only when the auditor found no gaps.
+
+        Coverage gaps remain warnings by design; this field exposes their
+        presence without changing the existing hard-error validity contract.
+        """
+        return not self.coverage_gaps
+
+    @property
+    def unresolved_repairable_count(self) -> int:
+        return len(self.repairable_issues)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "valid": self.valid,
+            "coverage_complete": self.coverage_complete,
+            "hard_issue_count": len(self.hard_issues),
+            "repairable_issue_count": len(self.repairable_issues),
+            "unresolved_repairable_count": self.unresolved_repairable_count,
+            "issues": [issue.to_dict() for issue in self.issues],
+            "coverage_gaps": [gap.to_dict() for gap in self.coverage_gaps],
+        }
+
+
+class ExtractionVerifier:
+    """Verify the frozen business result without creating or deleting facts."""
+
+    def verify(
+        self,
+        plan: Any,
+        schema: Any,
+        manager: Any,
+        request: Any,
+        entities: list[dict[str, Any]],
+        relations: list[dict[str, Any]],
+        *,
+        rejected_warnings: Iterable[dict[str, Any]] = (),
+        repairable_types: Iterable[str] | None = None,
+    ) -> VerificationReport:
+        allowed_repairs = None if repairable_types is None else frozenset(repairable_types)
+        issues: list[VerificationIssue] = []
+        raw = {"entities": entities, "relations": relations}
+        sanitized, schema_warnings = schema.validate_extraction(
+            raw,
+            target_types=request.target_types,
+            mode="strict",
+        )
+        for warning in schema_warnings:
+            issues.append(
+                VerificationIssue(
+                    code=str(warning.get("code") or "SCHEMA_INVALID"),
+                    message=str(warning.get("message") or "final result violates ontology"),
+                    path=str(warning.get("path") or ""),
+                    repair_type=_allowed_repair_type(
+                        _repair_type_for_code(str(warning.get("code") or "")),
+                        allowed_repairs,
+                    ),
+                    context={"value": warning.get("value")},
+                )
+            )
+        if len(sanitized["entities"]) != len(entities) or len(sanitized["relations"]) != len(relations):
+            issues.append(
+                VerificationIssue(
+                    code="FINAL_SCHEMA_FACT_LOSS",
+                    message="strict schema validation would remove accepted facts",
+                )
+            )
+
+        entity_keys: set[tuple[str, str]] = set()
+        entity_identities: set[tuple[str, str, str]] = set()
+        for index, entity in enumerate(entities):
+            key = (str(entity.get("type") or ""), canonical_name(entity.get("name")))
+            # File containers may share a display name while referring to
+            # distinct documents. Match the source identity used by the pool
+            # and graph instead of rejecting those attachments as duplicates.
+            source_identity = json.dumps(entity.get("source_files") or [], sort_keys=True, ensure_ascii=False)
+            identity = (*key, source_identity)
+            if identity in entity_identities:
+                issues.append(
+                    VerificationIssue(
+                        code="DUPLICATE_ENTITY",
+                        message=f"duplicate final entity: {key[0]}::{entity.get('name')}",
+                        path=f"entities[{index}]",
+                    )
+                )
+            entity_keys.add(key)
+            entity_identities.add(identity)
+
+        relation_keys: set[tuple[tuple[str, str], str, tuple[str, str]]] = set()
+        for index, relation in enumerate(relations):
+            source = (
+                str(relation.get("from_type") or ""),
+                canonical_name(relation.get("from_name")),
+            )
+            target = (
+                str(relation.get("to_type") or ""),
+                canonical_name(relation.get("to_name")),
+            )
+            if source not in entity_keys or target not in entity_keys:
+                issues.append(
+                    VerificationIssue(
+                        code="DANGLING_RELATIONSHIP",
+                        message=f"relation endpoints are not in accepted entities: {source} -> {target}",
+                        path=f"relations[{index}]",
+                        repair_type=_allowed_repair_type(
+                            "dangling_relation_endpoint",
+                            allowed_repairs,
+                        ),
+                    )
+                )
+            key = (source, canonical_name(relation.get("rel_type")), target)
+            if key in relation_keys:
+                issues.append(
+                    VerificationIssue(
+                        code="DUPLICATE_RELATION",
+                        message=f"duplicate final relation at relations[{index}]",
+                        path=f"relations[{index}]",
+                    )
+                )
+            relation_keys.add(key)
+
+        for verdict in verify_evidence(raw, manager):
+            if verdict.status == "fail":
+                issues.append(
+                    VerificationIssue(
+                        code="EVIDENCE_INVALID",
+                        message=verdict.message,
+                        path=verdict.ref,
+                        severity="error",
+                    )
+                )
+
+        coverage_gaps = tuple(CoverageAuditor().audit(plan, manager, request, entities, relations))
+        for gap in coverage_gaps:
+            issue = _coverage_issue(gap, plan, allowed_repairs=allowed_repairs)
+            if issue is not None:
+                issues.append(issue)
+
+        for warning in rejected_warnings:
+            code = str(warning.get("code") or "")
+            if code in _REJECTED_RELATION_CANDIDATE_CODES:
+                continue
+            repair_type = _allowed_repair_type(_repair_type_for_code(code), allowed_repairs)
+            if repair_type is None:
+                continue
+            issues.append(
+                VerificationIssue(
+                    code=code,
+                    message=str(warning.get("message") or code),
+                    path=str(warning.get("path") or ""),
+                    repair_type=repair_type,
+                    context={"value": warning.get("value")},
+                )
+            )
+
+        return VerificationReport(tuple(_deduplicate_issues(issues)), coverage_gaps)
+
+
+def _coverage_issue(
+    gap: CoverageGap,
+    plan: Any,
+    *,
+    allowed_repairs: frozenset[str] | None = None,
+) -> VerificationIssue | None:
+    if gap.gap_type == "evidence_missing":
+        return VerificationIssue(
+            code="EVIDENCE_MISSING",
+            message=gap.reason,
+            path=gap.span_id,
+            severity="warning",
+        )
+    if gap.gap_type == "relation_coverage":
+        return VerificationIssue(
+            code="REQUIRED_RELATION_MISSING",
+            message=gap.reason,
+            path=gap.span_id,
+            severity="warning",
+            repair_type=_allowed_repair_type("required_relation", allowed_repairs),
+            context=gap.to_dict(),
+        )
+    if gap.gap_type == "feature_coverage":
+        specs = plan.feature_specs.get(gap.target_type or "", ())
+        required = {
+            spec.identifier
+            for spec in specs
+            if spec.kind == "intrinsic" and spec.required is True
+        }
+        missing_required = required.intersection(gap.expected_features)
+        if missing_required:
+            return VerificationIssue(
+                code="REQUIRED_PROPERTY_MISSING",
+                message=gap.reason,
+                path=gap.span_id,
+                repair_type=_allowed_repair_type("required_property", allowed_repairs),
+                context={**gap.to_dict(), "required": sorted(missing_required)},
+            )
+        return None
+    if gap.gap_type in {"structural_coverage", "composite_membership"}:
+        is_structural = gap.gap_type == "structural_coverage"
+        return VerificationIssue(
+            code="UNCOVERED_BLOCK" if is_structural else "REQUIRED_RELATION_MISSING",
+            message=gap.reason,
+            path=gap.span_id,
+            severity="warning",
+            repair_type=_allowed_repair_type(
+                "uncovered_block" if is_structural else "required_relation",
+                allowed_repairs,
+            ),
+            context=gap.to_dict(),
+        )
+    return None
+
+
+def _repair_type_for_code(code: str) -> str | None:
+    return {
+        "UNKNOWN_RELATION_ENDPOINT_ID": "dangling_relation_endpoint",
+        "DANGLING_RELATIONSHIP": "dangling_relation_endpoint",
+        "RELATION_ENDPOINT_TYPE_MISMATCH": "relation_direction_or_signature",
+        "UNKNOWN_RELATION_TYPE": "relation_direction_or_signature",
+        "UNKNOWN_RELATION_ENDPOINT_TYPE": "relation_direction_or_signature",
+        "RELATION_ENDPOINT_NAME_MISSING": "dangling_relation_endpoint",
+    }.get(code)
+
+
+def _allowed_repair_type(
+    repair_type: str | None,
+    allowed_repairs: frozenset[str] | None,
+) -> str | None:
+    if repair_type is None or allowed_repairs is None:
+        return repair_type
+    return repair_type if repair_type in allowed_repairs else None
+
+
+def _deduplicate_issues(issues: list[VerificationIssue]) -> list[VerificationIssue]:
+    unique: list[VerificationIssue] = []
+    seen: set[tuple[str, str, str]] = set()
+    for issue in issues:
+        key = (issue.code, issue.path, issue.message)
+        if key not in seen:
+            seen.add(key)
+            unique.append(issue)
+    return unique
+
+
+__all__ = ["ExtractionVerifier", "VerificationIssue", "VerificationReport"]

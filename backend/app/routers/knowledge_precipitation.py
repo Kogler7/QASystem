@@ -4,7 +4,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from backend.app import observability
+from backend.app import api_recording, observability
 from backend.app.execution.api import ExecutionUnavailable, ManagedExecutionError, dispatch_operation, prefer_wait_seconds
 from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
 from backend.app.schemas import PipelineOptions
@@ -62,7 +62,10 @@ async def knowledge_ingestion(
 ) -> JSONResponse:
     # 无执行上下文（同步等待）的 HTTP 调用在这里生成 request_id，贯穿日志与告警。
     with observability.request_id_scope():
-        return await _knowledge_ingestion(http_request, ontology, options, file, files)
+        with api_recording.record_request("POST", http_request.url.path) as recorder:
+            response = await _knowledge_ingestion(http_request, ontology, options, file, files)
+            recorder.capture_response(response)
+            return response
 
 
 async def _knowledge_ingestion(
@@ -73,9 +76,12 @@ async def _knowledge_ingestion(
     files: list[UploadFile] | None,
 ) -> JSONResponse:
     deprecated = http_request.url.path != V1_PATH
+    recorder = api_recording.current_recorder()
+    recorder.save_ontology(ontology)
     try:
         config = PipelineOptions.model_validate_json(options or "{}")
     except ValidationError as exc:
+        recorder.set_params({"options_raw": options})
         return error_response(
             ErrorCode.INVALID_REQUEST,
             _info("options 无效", deprecated),
@@ -93,6 +99,15 @@ async def _knowledge_ingestion(
             status_code=400,
         )
 
+    batch = not (len(collected) == 1 and files is None)
+    recorder.set_params(
+        {
+            "options": config.model_dump(),
+            "files": [name for name, _ in collected],
+            "batch": batch,
+        }
+    )
+    recorder.save_uploads(collected)
     try:
         result = await dispatch_operation(
             operation="knowledge.ingestion",
@@ -104,11 +119,13 @@ async def _knowledge_ingestion(
                     {"file_name": name, "content": content}
                     for name, content in collected
                 ],
-                "batch": not (len(collected) == 1 and files is None),
+                "batch": batch,
             },
             total_units=len(collected),
             wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
+        if isinstance(result.data, dict) and result.data.get("extraction") is not None:
+            recorder.write_json("stage_extract/result.json", result.data["extraction"])
         return JSONResponse(
             content=payload(result.data, _info("知识沉淀完成", deprecated), execution=result.execution),
             status_code=result.status_code,

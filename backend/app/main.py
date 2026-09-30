@@ -21,7 +21,7 @@ from .routers.knowledge_precipitation import router as knowledge_router
 from .routers.execution import router as execution_router
 from mcp_services.server import mcp
 from external_services.application import capture_user_headers, reset_user_headers
-from . import observability
+from . import api_recording, observability
 from .responses import ErrorCode, error_response
 
 
@@ -30,6 +30,8 @@ mcp_app = mcp.streamable_http_app()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # 启动时先清一轮过期 API 请求记录；每次新建记录前还会再清（见 api_recording）。
+    api_recording.cleanup_old_records()
     async with mcp.session_manager.run():
         yield
 

@@ -157,10 +157,7 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
 
 ## 3. 完整处理流水线
 
-`split_semantically()` 实现的完整流水线包含 8 个步骤。进入流水线之前还有两道前置处理：
-
-- **JSON 块保护**：与其它策略一致，先识别 JSON 块（对象 / 含对象数组连同围栏独立成片，不参与语义切分）。
-- **模型加载回退**：本地 SentenceTransformer 与 remote-only 远程 embedding 均不可用时，整个 section 退化为规则递归切分（等价 `recursive` 策略），不执行向量化。
+`split_semantically()` 实现的完整流水线包含 9 个步骤。另有一条贯穿全程的回退：本地 SentenceTransformer 与 remote-only 远程 embedding 均不可用时，文本片段退化为规则递归切分（等价 `recursive` 策略），不执行向量化。
 
 ### 3.1 流水线总览
 
@@ -168,38 +165,49 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
 输入文本
   │
   ▼
-[1] Markdown 标题预拆分   ← 按 # / ## 拆分 section
+[1] JSON 块识别与隔离        ← _split_text_with_json_protection / _extract_json_blocks
   │
   ▼
-[2] 句子级拆分            ← 每个 section 内按标点拆分为原子片段
+[2] Markdown 标题预拆分      ← _split_by_markdown_headers，按 # / ## 拆分 section
   │
   ▼
-[3] 批量向量化            ← 所有片段一次性编码（避免多次模型调用）
+[3] 句子级拆分               ← _split_into_segments，每个 section 内按标点拆分为原子片段
   │
   ▼
-[4] 微小片段合并          ← < 20 字符的噪声片段就近合并
+[4] 批量向量化               ← model.encode()，所有片段一次性编码（避免多次模型调用）
   │
   ▼
-[5] 语义断点检测          ← 在 consecutive similarity 谷值处标记硬断点
+[5] 微小片段合并             ← _merge_tiny_segments，< 20 字符的噪声片段就近合并
   │
   ▼
-[6] Max-Min 语义分组      ← 核心算法
+[6] 语义断点检测             ← _detect_breakpoints，在 consecutive similarity 谷值处标记硬断点
   │
   ▼
-[7] 装箱合并              ← 相邻片段按 chunk_size 顺序装箱，消除过小碎片
+[7] Max-Min 语义分组         ← _group_segments_maxmin，核心算法；组内超长由 _hard_split 兜底
   │
   ▼
-[8] 字符级重叠后处理       ← 按 chunk_overlap 应用滑动窗口（仅相邻文本块）
+[8] 跨块碎片清扫             ← _merge_no_leftover / _eliminate_leftovers
+  │
+  ▼
+[9] 字符级重叠后处理         ← _apply_overlap / _tail_with_boundary（仅相邻文本块）
   │
   ▼
 输出切片列表
 ```
 
+步骤 [1] 的 JSON 块识别由所有切片策略共享（见[文档切片算法说明](文档切片算法说明.md) 2.1 节）；识别出的 JSON 块不参与语义切分，直接整块落盘。注意 `semantic`（与 `markdown`）路径对超长 JSON 不做结构切分——`_split_json_by_structure` / `_hard_split_json` 只在 `recursive` / `custom_recursive` 路径执行。另注意步骤 [4] [5] 的顺序：先对全部原子片段批量编码，微小片段合并时用缓冲区各片段向量的均值合成代表向量。
+
 ### 3.2 步骤详解
 
-#### Step 1: Markdown 标题预拆分
+#### Step 1: JSON 块识别与隔离（`_split_text_with_json_protection` / `_extract_json_blocks`）
 
-使用正则 `^(#{1,6}\s)` 识别 Markdown 标题行，将文档拆分为独立 section。每个 section 以标题行开头，包含该标题下的所有内容。
+扫描整段文本，用括号匹配 + `json.loads` 双重验证，识别所有完整的顶层 JSON 块（对象 `{...}` 与数组 `[...]`）。提取时向前检查前一个字符（避免把 `x{"a":1}` 误判）、向后检查后一个字符（避免把 `{"a":1}bc` 误判），只保留真正独立的 JSON 块；JSON 块连同紧贴的 ```` ```json ```` / ```` ``` ```` 围栏作为独立片段。随后将文本拆成有序的 `(片段, is_json)` 列表。
+
+**意义**：保证结构化数据不被切坏。JSON 一旦被拦腰切断，下游向量化、检索都会拿到残缺内容。识别出的 JSON 块不参与语义切分流程，直接整块落盘，结构与语义边界都得以保全。
+
+#### Step 2: Markdown 标题预拆分（`_split_by_markdown_headers`）
+
+使用正则 `^(#{1,6}\s)` 识别 Markdown 标题行，将文档拆分为独立 section。每个 section 以标题行开头，包含该标题下的所有内容。若首个 section 只有标题、无正文内容（标题下无其他行），将其合并进紧随其后的 section，避免产生标题孤岛。
 
 ```
 输入:
@@ -216,13 +224,13 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
   [2] "# 第二章\n内容C..."
 ```
 
-**意义**：标题是作者明确的语义边界标记。在此处预拆分可以防止后续语义分组跨标题合并内容，确保不同章节的内容始终保持独立。
+**意义**：标题是作者明确的语义边界标记。在此处预拆分可以防止后续语义分组跨标题合并内容，确保不同章节的内容始终保持独立。每个 section 独立编码、独立分组，避免跨章节的噪声干扰相似度计算。
 
 无标题的文档作为一个整体 section 处理。
 
-#### Step 2: 句子级拆分
+#### Step 3: 句子级拆分（`_split_into_segments`）
 
-在每个 section 内，按以下分隔符优先级拆分为原子片段：
+在每个 section 内，按以下分隔符优先级逐个匹配前缀，拆分为原子片段。匹配到分隔符时将其并入前一个片段的尾部，保证切分点落在标点之后，不产生半句：
 
 ```python
 [
@@ -236,21 +244,28 @@ def maxmin_group(segments, embeddings, chunk_size, tau, min_similarity, breakpoi
 - 单换行在结构化 Markdown（术语库、表格）中不代表语义边界，使用会导致行级过度切分。
 - 冒号广泛存在于 `术语名称: xxx` 等结构化字段中，误切会拆分属性键值对。
 
-#### Step 3: 批量向量化
+**意义**：把文本降到句子粒度。语义相似度的最小计算单元是句子，粒度再细会引入大量噪声，再粗则无法在句间找到真正的语义断点。
+
+#### Step 4: 批量向量化（`model.encode()`）
 
 将所有 section 的全部片段收集后，**一次性**调用 `model.encode()` 进行批量编码。这利用了 SentenceTransformer 的批量推理优化（GPU/CPU batched inference），避免多次模型调用的开销。
 
 使用 `BAAI/bge-small-zh-v1.5` 模型，输出 512 维向量。
 
-#### Step 4: 微小片段合并
+**意义**：把文本映射到向量空间，使"语义相近"可被余弦相似度量化。这是语义切分区别于递归切分、Markdown 切分的核心——它依据内容含义而非分隔符或标题层级做决策。
 
-长度 < 20 字符的片段（如 YAML frontmatter、空行标记、分隔线 `---` 等）不产生有意义的独立 embedding。它们在向量化后与其相邻的内容片段合并：
+#### Step 5: 微小片段合并（`_merge_tiny_segments`）
 
-- 孤立微小片段向前合并到下一个非微小片段
+长度 < `min_segment_len`（默认 20 字符）的片段（如 YAML frontmatter、空行标记、分隔线 `---` 等）不产生有意义的独立 embedding。它们在向量化后与其相邻的内容片段合并：
+
+- 孤立微小片段向前合并到下一个非微小片段；缓冲区内的多个短片段先对各自向量取均值，合成一个代表向量
 - 尾部微小片段合并到最后一个非微小片段
 - 合并后的 embedding 取各片段 embedding 的均值
+- 若文档全部由短片段组成（无可合并的正常片段），则保留合并后的结果
 
-#### Step 5: 语义断点检测（Breakpoint Detection）
+**意义**：过滤掉标点、编号、孤立短词这类无实际语义的片段。它们单独编码后向量方向随机，会制造大量伪断点，拉低分组质量。
+
+#### Step 6: 语义断点检测（`_detect_breakpoints`，Breakpoint Detection）
 
 在 Max-Min 分组之前，先进行一次全局扫描，识别 consecutive similarity 曲线的**谷值**作为硬断点：
 
@@ -269,7 +284,7 @@ elif method == "none":
 
 相似度低于阈值的相邻位置被标记为**硬断点**（hard breakpoint），Max-Min 算法在这些位置**强制切分**，不执行 Max-Min 决策。
 
-**为什么需要断点检测？** 在某些文档中，segment A 和 segment B 都在同一个宽松主题内（如"技术发展趋势"），Max-Min 可能将它们合并。但 consecutive similarity 的骤降（如从 0.85 骤降到 0.35）可能表明这里存在一个自然的子主题边界。断点检测捕获这些信号，为 Max-Min 提供额外的边界提示。
+**为什么需要断点检测？** 在某些文档中，segment A 和 segment B 都在同一个宽松主题内（如"技术发展趋势"），Max-Min 可能将它们合并。但 consecutive similarity 的骤降（如从 0.85 骤降到 0.35）可能表明这里存在一个自然的子主题边界。断点检测捕获这些信号，为 Max-Min 提供额外的边界提示。它是一道保险：即使 Max-Min 的局部决策倾向于把新片段并入当前组，遇到强断点也必须落盘。
 
 **参数选择建议**：
 
@@ -281,22 +296,30 @@ elif method == "none":
 
 **已知限制**：当片段数 < 4 时，percentile 和 stddev 方法均不可靠（统计样本太少）。此时建议使用 `"none"`。
 
-#### Step 6: Max-Min 语义分组
+#### Step 7: Max-Min 语义分组（`_group_segments_maxmin`）
 
 详见第 2 节。核心改进在于：
 
 - **消除 centroid 漂移**：用 pairwise 比较替代 centroid 聚合
 - **自适应阈值**：MinSim 随 chunk 大小自动调整
 - **最小片段数保底**：`min_segments_per_chunk`（默认 2）保证单片至少包含的片段数，判定不合并时也强制凑够
-- **硬断点优先**：步骤 5 检测到的断点强制切分，不受 Max-Min 规则影响；加入新片段会超过 `chunk_size` 时也直接切断
+- **硬断点优先**：步骤 6 检测到的断点强制切分，不受 Max-Min 规则影响；加入新片段会超过 `chunk_size` 时也直接切断
 
-#### Step 7: 装箱合并
+相比简单的"与组内均值比较"，Max-Min 能持续接受语义连贯的内容，一旦遇到偏离组内主题的内容就及时断开，天然产出边界清晰、主题一致的块。
 
-分组得到的切片按原文顺序装箱：相邻且合并后不超过 `chunk_size` 的切片合并为一块，消除过小碎片（碎片一律并入相邻块）。
+#### Step 8: 组内兜底硬切与碎片清扫（`_hard_split` / `_merge_no_leftover` / `_eliminate_leftovers`）
 
-#### Step 8: 字符级重叠后处理
+Max-Min 分组后，组内内容仍可能超过 `chunk_size`（单个长片段或组边界处的累积）：`_group_segments_maxmin` 对超长组调用 `_hard_split` 按固定宽度切断。
 
-若配置了 `chunk_overlap > 0`，对最终切片结果应用字符级滑动窗口重叠（对齐句子/段落边界，JSON 块与类型切换处不施加）。
+所有组再统一进入 `_merge_no_leftover` 按原文顺序装箱：同类型片段能装就装进同一缓冲块，相邻且合并后不超过 `chunk_size` 的切片合并为一块；类型切换或超长时落盘；最后若末块偏短则并入前一块（允许略微超长），并用 `_eliminate_leftovers` 正向扫描彻底清除残留碎片。
+
+**意义**：补齐两条兜底约束：**无过长段**——语义分组不保证长度收敛，必须硬切；**无碎片**——语义分组可能因断点密集产生大量单片段小块，必须合并。这一步让语义切片的最终输出同样满足"块长在目标区间内"的统一标准。
+
+#### Step 9: 字符级重叠后处理（`_apply_overlap` / `_tail_with_boundary`）
+
+若配置了 `chunk_overlap > 0`，对最终切片结果应用字符级滑动窗口重叠：取前一块末尾最多 `chunk_size` 字符，用 `_tail_with_boundary` 对齐到句子/段落边界作为当前块的前缀。叠加后若块长超过 `chunk_size + chunk_overlap`，从重叠部分头部截掉溢出量。重叠只在相邻文本块之间施加，JSON 块与类型切换处不施加。
+
+**意义**：在相邻块的交界处制造内容重叠，使检索时能命中被切断在块尾的查询词或句子，缓解硬切边界处的信息丢失。JSON 块不参与 overlap，避免污染结构化数据。
 
 ## 4. 参数说明
 
@@ -376,13 +399,15 @@ elif method == "none":
 | 文件 | 函数/类 | 作用 |
 | --- | --- | --- |
 | `algorithm/NL_to_cypher/splitter.py` | `split_semantically()` | 流水线编排（含 JSON 保护、模型回退） |
+| 同上 | `_split_text_with_json_protection()` / `_extract_json_blocks()` | JSON 块识别与隔离（所有策略共享） |
+| 同上 | `_split_json_by_structure()` / `_split_json_object()` / `_split_json_array()` / `_hard_split_json()` | 超长 JSON 结构切分与硬切（仅 `recursive` / `custom_recursive` 路径） |
 | 同上 | `_split_by_markdown_headers()` | Markdown 标题预拆分 |
 | 同上 | `_split_into_segments()` | 句子级片段拆分 |
 | 同上 | `_merge_tiny_segments()` | 微小片段合并 |
 | 同上 | `_detect_breakpoints()` | 语义断点检测 |
-| 同上 | `_group_segments_maxmin()` | Max-Min 核心算法 |
-| 同上 | `_merge_no_leftover()` | 装箱合并（碎片消除） |
-| 同上 | `_apply_overlap()` | 字符级重叠后处理 |
+| 同上 | `_group_segments_maxmin()` | Max-Min 核心算法（组内超长经 `_hard_split()` 兜底） |
+| 同上 | `_merge_no_leftover()` / `_eliminate_leftovers()` | 装箱合并与碎片清扫 |
+| 同上 | `_apply_overlap()` / `_tail_with_boundary()` | 字符级重叠后处理（边界对齐） |
 | `algorithm/NL_to_cypher/vector.py` | `_load_model()` | 模型加载与缓存（remote-only 走远程服务） |
 | `algorithm/knowledge_pipeline/chunking.py` | `chunk_document()` | 策略路由 |
 | `backend/app/schemas.py` | `ChunkOptions` | API 参数定义 |

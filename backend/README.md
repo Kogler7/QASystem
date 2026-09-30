@@ -18,6 +18,7 @@ MCP 入口也由本服务承载：应用把统一 MCP 的 Streamable HTTP 应用
 | `app/schemas.py` | 请求/响应模型 |
 | `app/routers/` | 对外路由（见第 2 节） |
 | `app/services/` | 路由对应的业务编排（调用 `algorithm/`） |
+| `app/api_recording.py` | API 逐请求落盘记录（见 2.6 节） |
 | `app/execution/` | 异步执行框架（见第 3 节） |
 
 ---
@@ -67,6 +68,10 @@ MCP 入口也由本服务承载：应用把统一 MCP 的 Streamable HTTP 应用
 
 - `GET /health`：健康检查；
 - `/agent`、`/agent/{path}`：转发到 Agent 运行时的代理入口。
+
+### 2.6 请求记录（`app/api_recording.py`）
+
+知识沉淀全流程与 parse/chunk/extract 接口默认逐请求落盘完整记录（上传原文、本体与参数、中间产物、各阶段耗时、run.log），目录 `<KG_API_RECORD_DIR>/<日期时间戳>_<request_id>/`，默认保留 7 天自动清理；配置项 `KG_API_RECORD_ENABLED / DIR / RETENTION_DAYS` 见根 `.env.example`，详细约定见 [Backend 请求记录说明](../docs/接口/Backend请求记录说明.md)。
 
 ---
 

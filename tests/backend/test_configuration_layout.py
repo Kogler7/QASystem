@@ -120,8 +120,12 @@ def test_dockerfile_performs_complete_runtime_verification():
 
 
 def test_agent_module_reads_its_own_llm_namespace(monkeypatch):
+    from agentcode import adapter
     from agentcode.adapter import _load_env
 
+    # _load_env 会把仓库根 .env 整体 load 进进程环境（override=False），
+    # 污染后续用例的执行层配置；本用例只关心 AGENT_LLM_* 命名空间，屏蔽掉该副作用。
+    monkeypatch.setattr(adapter, "load_dotenv", lambda *args, **kwargs: False)
     monkeypatch.setenv("AGENT_LLM_BASE_URL", "http://agent-llm:9000")
     monkeypatch.setenv("AGENT_LLM_API_KEY", "agent-key")
     monkeypatch.setenv("AGENT_LLM_MODEL", "agent-model")

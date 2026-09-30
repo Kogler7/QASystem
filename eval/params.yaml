@@ -53,5 +53,10 @@ eval:
   judge_max_tokens: 8192
   judge_batch_size: 20
 
+# 历史批次保留天数：每次启动自动清理 tmp/eval/runs/ 下超过保留期的批次目录
+# （按目录名 <YYYYMMDD-HHMMSS> 时间戳判定，被 --from-run 引用的批次跳过）；
+# <=0 表示不清理；命令行 --runs-retention-days 优先于本配置。
+runs_retention_days: 30
+
 # 每个类型共用一份本体；也可在 <类型>/<case>/ontology 下放 case 级本体。
 groups: {}

@@ -21,7 +21,7 @@ import time
 import uuid
 from collections import Counter, deque
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +169,23 @@ _stage_samples_lock = threading.Lock()
 _counters: Counter[str] = Counter()
 _counters_lock = threading.Lock()
 
+#: 阶段耗时监听器：API 请求记录（api_recording）借此收集单次请求内各阶段耗时。
+_stage_duration_listeners: list[Callable[[str, float], None]] = []
+_stage_duration_listeners_lock = threading.Lock()
+
+
+def add_stage_duration_listener(listener: Callable[[str, float], None]) -> None:
+    """注册阶段耗时监听器；监听器抛错只记 DEBUG 日志，不影响主流程。"""
+    with _stage_duration_listeners_lock:
+        if listener not in _stage_duration_listeners:
+            _stage_duration_listeners.append(listener)
+
+
+def remove_stage_duration_listener(listener: Callable[[str, float], None]) -> None:
+    with _stage_duration_listeners_lock:
+        if listener in _stage_duration_listeners:
+            _stage_duration_listeners.remove(listener)
+
 
 def _stage_budget_seconds(stage: str) -> float | None:
     env_name = _STAGE_BUDGET_ENV.get(stage)
@@ -205,6 +222,13 @@ def record_stage_duration(
     with _stage_samples_lock:
         samples = _stage_samples.setdefault(stage, deque(maxlen=STAGE_SAMPLE_LIMIT))
         samples.append(duration)
+    with _stage_duration_listeners_lock:
+        listeners = list(_stage_duration_listeners)
+    for listener in listeners:
+        try:
+            listener(stage, duration)
+        except Exception:  # noqa: BLE001 - 监听器异常不影响主流程
+            logger.debug("阶段耗时监听器异常: stage=%s", stage, exc_info=True)
     budget = _stage_budget_seconds(stage)
     if budget is None or duration <= budget:
         return
@@ -356,6 +380,7 @@ async def metrics_endpoint() -> dict[str, Any]:
 __all__ = [
     "ALERT_DEDUP_SECONDS",
     "STAGE_SAMPLE_LIMIT",
+    "add_stage_duration_listener",
     "context_prefix",
     "get_request_id",
     "increment_counter",
@@ -363,6 +388,7 @@ __all__ = [
     "metrics_payload",
     "new_request_id",
     "record_stage_duration",
+    "remove_stage_duration_listener",
     "request_id_scope",
     "reset_request_id",
     "send_alert",

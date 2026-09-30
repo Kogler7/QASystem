@@ -1,19 +1,68 @@
 """latest：独立、带完整代码的当前主版本抽取算法。
 
-默认配置 ``KG_EXTRACT_ALGO_VERSION=latest`` 即使用本模块。
+默认配置 ``KG_EXTRACT_ALGO_VERSION=latest`` 直接运行本包。
 本目录是一份独立代码副本，不是 v2/v3 的软链或映射；后续对 v3 的实验性改动
 不会自动影响正在运行的 latest，需要显式把 latest 内容同步/替换后才会生效。
+
+本次同步：2026-09-30，来源为 ``v3``（sxm-dev 版完整流水线）的全量代码副本
+（含 ``tests/``）。旧版实验 harness（adapter/client/context/facts/harness/
+prompts/schema）已随本次同步移除。
+
+包入口：暴露 backend 适配器需要的 aggregate / public 契约。
 """
-from __future__ import annotations
+from collections.abc import Iterable
+from typing import Any
 
-from .adapter import extract_aggregate
-from .context import ExtractionChunk
-from .harness import extract_detailed
-
-
-def extract(chunks, ontology: str, **kwargs):
-    """Return scored facts. Inspect status before using an incomplete result."""
-    return extract_detailed(chunks, ontology, **kwargs)
+from .batch import deduplicate_chunk_graphs
+from .chunk_context import ExtractionChunk
+from .harness_extractor import extract_harness
+from .result_contract import to_public_result
+from .split_extractor import extract_split
 
 
-__all__ = ["extract", "extract_aggregate", "extract_detailed", "ExtractionChunk"]
+def extract(
+    chunks: Iterable[ExtractionChunk],
+    ontology: str,
+    **kwargs: Any,
+) -> dict[str, list[dict[str, Any]]]:
+    """Extract the stable public ``entities`` / ``relations`` contract."""
+    return to_public_result(extract_harness(ontology=ontology, chunks=chunks, **kwargs))
+
+
+def extract_aggregate(
+    ontology: str,
+    chunks: Iterable[ExtractionChunk],
+    *,
+    target_types: list[str] | None = None,
+    validation_mode: str = "permissive",
+    best_effort: bool = True,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    max_workers: int | None = None,
+    llm: Any | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    """Run the pipeline over ``chunks`` and return the aggregate contract."""
+    return extract_harness(
+        ontology=ontology,
+        chunks=chunks,
+        target_types=target_types,
+        validation_mode=validation_mode,
+        best_effort=best_effort,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        max_workers=max_workers,
+        llm=llm,
+    )
+
+
+__all__ = [
+    "extract",
+    "extract_aggregate",
+    "extract_split",
+    "extract_harness",
+    "deduplicate_chunk_graphs",
+    "ExtractionChunk",
+]

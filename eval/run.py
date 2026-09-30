@@ -12,6 +12,9 @@
   chunk-extract 切片+抽取：解析（或复用 document.md）→ 切片 → 抽取并评分（默认）
   pipeline      全流程知识沉淀：POST /api/v1/pipelines/knowledge-ingestion 并评分
 
+每批次结束在批次目录（tmp/eval/runs/<时间戳>/）写 report.md 详细报告；
+启动时按 runs_retention_days（默认 30 天，--runs-retention-days 可覆盖，<=0 关闭）清理过期批次。
+
 本目录只调已有 HTTP / MCP，不 import algorithm / backend。
 """
 from __future__ import annotations
@@ -19,20 +22,29 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import shutil
 import sys
 import time
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin
 from urllib.request import Request, urlopen
 
+try:  # pytest / python3 -m 方式
+    from eval.report import exit_code_for, render_report
+except ImportError:  # python3 eval/run.py 直接执行（sys.path[0] 是 eval/）
+    from report import exit_code_for, render_report
+
 KIT_DIR = Path(__file__).resolve().parent
 DEFAULT_WORKSPACE = KIT_DIR.parent / "test_data" / "eval"
 RUNS_DIR = KIT_DIR.parent / "tmp" / "eval" / "runs"
+RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}$")
+DEFAULT_RUNS_RETENTION_DAYS = 30
 ONTOLOGY_SUFFIXES = {".puml", ".uml"}
 SKIP_DOC_PREFIXES = (".", "~$", ".~")
 TYPE_RESERVED = {"docs", "ontology", "extract", "parse", "chunks"}
@@ -89,6 +101,7 @@ DEFAULT_PARAMS: dict[str, Any] = {
         "judge_batch_size": 20,
     },
     "groups": {},
+    "runs_retention_days": DEFAULT_RUNS_RETENTION_DAYS,
 }
 
 
@@ -203,6 +216,80 @@ def call_with_retries(
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _run_dir_started_at(path: Path) -> datetime:
+    """批次时间：优先目录名时间戳，解析不了退回 mtime。"""
+    try:
+        return datetime.strptime(path.name, "%Y%m%d-%H%M%S")
+    except ValueError:
+        return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def _dir_size_bytes(path: Path) -> int:
+    total = 0
+    for item in path.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def cleanup_old_runs(
+    runs_dir: Path,
+    retention_days: float,
+    *,
+    now: datetime | None = None,
+    protected: set[Path] | None = None,
+) -> dict[str, Any]:
+    """清理 runs_dir 下超过保留期的批次目录；只删符合 run_id 命名的目录。
+
+    retention_days <= 0 不清理。protected 里的目录（如 --from-run 引用的批次）跳过。
+    """
+    result: dict[str, Any] = {
+        "retention_days": retention_days,
+        "deleted": [],
+        "kept_protected": [],
+        "errors": [],
+        "freed_bytes": 0,
+    }
+    if retention_days <= 0 or not runs_dir.is_dir():
+        return result
+    cutoff = (now or datetime.now()) - timedelta(days=retention_days)
+    protected_resolved = {item.resolve() for item in (protected or set())}
+    for child in sorted(runs_dir.iterdir(), key=lambda item: item.name):
+        if not child.is_dir() or not RUN_ID_PATTERN.match(child.name):
+            continue
+        try:
+            started_at = _run_dir_started_at(child)
+        except OSError as exc:
+            result["errors"].append(f"{child.name}: 读取时间失败 {exc}")
+            continue
+        if started_at >= cutoff:
+            continue
+        if child.resolve() in protected_resolved:
+            result["kept_protected"].append(child.name)
+            continue
+        size = _dir_size_bytes(child)
+        try:
+            shutil.rmtree(child)
+        except OSError as exc:
+            result["errors"].append(f"{child.name}: {exc}")
+            continue
+        result["deleted"].append(child.name)
+        result["freed_bytes"] += size
+    return result
+
+
+def write_run_report(run_dir: Path, summary: dict[str, Any]) -> None:
+    """批次结束写 report.md；报告生成失败不影响评测结果。"""
+    try:
+        write_text(run_dir / "report.md", render_report(summary))
+        log(f"报告: {run_dir / 'report.md'}")
+    except Exception as exc:  # noqa: BLE001
+        log(f"生成 report.md 失败（不影响评测结果）: {exc}")
 
 
 def auth_headers() -> dict[str, str]:
@@ -2436,6 +2523,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="只扫描评测集（类型/case/原文件/golden/本体），不调 Backend 或 judge",
     )
+    parser.add_argument(
+        "--runs-retention-days",
+        type=float,
+        default=None,
+        metavar="天数",
+        help="启动时自动清理 tmp/eval/runs/ 下超过保留期的历史批次目录（按目录名时间戳），"
+        "默认读 params.yaml 的 runs_retention_days（再默认 30）；<=0 表示不清理",
+    )
     return parser.parse_args()
 
 
@@ -2562,6 +2657,10 @@ def build_run_gate(
     return {
         "empty_failures": empty_failures,
         "budget_violations": budget_violations,
+        "budgets": {
+            "case_seconds": max_case_seconds,
+            "stage_seconds": dict(stage_budgets or {}),
+        },
         "min_f1": {"threshold": min_f1, "below": below},
         "passed": passed,
     }
@@ -2591,6 +2690,31 @@ def main() -> int:
     except RuntimeError as exc:
         log(str(exc))
         return 1
+    if args.runs_retention_days is not None:
+        retention_days = float(args.runs_retention_days)
+    else:
+        raw_retention = params.get("runs_retention_days")
+        retention_days = float(raw_retention) if raw_retention is not None else float(DEFAULT_RUNS_RETENTION_DAYS)
+    protected_dirs: set[Path] = set()
+    if args.from_run:
+        try:
+            protected_dirs.add(resolve_reuse_dir(workspace, str(args.from_run)))
+        except FileNotFoundError:
+            pass  # --from-run 在后面正式解析时会报错退出
+    cleanup = cleanup_old_runs(RUNS_DIR, retention_days, protected=protected_dirs)
+    if retention_days <= 0:
+        log("历史批次清理：已禁用（runs-retention-days<=0）")
+    else:
+        log(
+            f"历史批次清理：保留 {retention_days:g} 天，删除 {len(cleanup['deleted'])} 个过期批次，"
+            f"释放 {cleanup['freed_bytes'] / 1048576:.1f} MB"
+        )
+        for name in cleanup["deleted"]:
+            log(f"  已删除 {name}")
+        for name in cleanup["kept_protected"]:
+            log(f"  跳过 {name}：正被 --from-run 引用")
+        for error in cleanup["errors"]:
+            log(f"  清理失败: {error}")
     base_url = (os.environ.get("QASYSTEM_BACKEND_URL") or params.get("backend_url") or DEFAULT_PARAMS["backend_url"]).rstrip("/")
     mcp_url = (
         os.environ.get("QASYSTEM_MCP_URL")
@@ -2694,6 +2818,7 @@ def main() -> int:
     snapshot["min_f1"] = args.min_f1
     snapshot["max_case_seconds"] = args.max_case_seconds
     snapshot["max_stage_seconds"] = dict(stage_budgets) if stage_budgets else None
+    snapshot["runs_retention_days"] = retention_days
     if match_mode == "llm":
         snapshot.setdefault("eval", {})
         snapshot["eval"] = dict(eval_cfg)
@@ -2914,6 +3039,7 @@ def main() -> int:
             run_started=run_started,
             interrupted=True,
         )
+        write_run_report(run_dir, summary)
         raise
 
     if not found_cases:
@@ -2936,6 +3062,7 @@ def main() -> int:
         run_started=run_started,
         finished=True,
     )
+    write_run_report(run_dir, summary)
 
     print("\n---------- 评测总览 ----------")
     print(
@@ -2979,10 +3106,9 @@ def main() -> int:
                 print(line)
     print(f"\n{run_dir / 'summary.json'}")
 
-    if summary["failed"]:
-        return 2
-    if (summary.get("gate") or {}).get("passed") is False:
-        gate = summary["gate"]
+    exit_code = exit_code_for(summary)
+    if exit_code == 4:
+        gate = summary.get("gate") or {}
         for violation in gate.get("budget_violations") or []:
             log(
                 f"耗时超预算: {violation['case']} {violation['stage']} "
@@ -2990,8 +3116,7 @@ def main() -> int:
             )
         for item in ((gate.get("min_f1") or {}).get("below")) or []:
             log(f"实体 F1 低于 {args.min_f1:g}: {item['case']}（{item['f1']:.3f}）")
-        return 4
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

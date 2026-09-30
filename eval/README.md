@@ -235,9 +235,10 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
   params.yaml                 # 本次拷贝的评测参数
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
+  report.md                   # 本次评测详细报告：运行信息 / 门禁与退出码 / 总览 / 逐 case / 问题清单 / 最慢 case Top5
   <类型>/<case>/
     parse_<文件名>.json       # 后台解析接口回包
-    document.md               # 拼好的 Markdown
+    document.md               # 拼好的 Markdown（--from-run 的 chunk-extract 模式复用它跳过解析）
     chunks.json               # 切片回包
     backend_extract.json      # 后台抽取回包（预测图在 data 里）
     scores.json               # 该 case 状态、分数、各步耗时
@@ -249,14 +250,24 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时。每跑完一个 case 就会更新，中途可看。`skipped` 是重试 3 次后仍失败并跳过的 case 数。`gate` 是发布门禁块（见「质量门禁」）：`empty_failures` 空抽取清单、`budget_violations` 耗时超预算明细、`min_f1.below` 低于阈值的 case、`passed` 门禁是否通过（全部未评分时为 `null`） |
+| `report.md` | 批次详细报告（每批结束自动生成，含 resume/复用与中断批次）：头部的运行信息（起止时间、backend、评分口径、judge 降级摘要、抽取版本）、门禁与退出码语义（empty_failures、F1/耗时阈值与实际值）、总览表（实体/关系的 golden/predicted/P/R/F1）、逐 case 明细（状态、P/R/F1、parse/chunk/extract 各阶段耗时、总耗时、抽取版本、失败原因）、问题清单（失败/空抽取/judge 降级/超预算）、最慢 case Top5 |
+| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时。每跑完一个 case 就会更新，中途可看。`skipped` 是重试 3 次后仍失败并跳过的 case 数。`gate` 是发布门禁块（见「质量门禁」）：`empty_failures` 空抽取清单、`budget_violations` 耗时超预算明细、`budgets` 配置的耗时预算、`min_f1.below` 低于阈值的 case、`passed` 门禁是否通过（全部未评分时为 `null`） |
 | `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
 | `match_details.json` | 每个已评分块（`backend_extract` / `backend_system` / `plugin_extract`）的逐条明细：`entities` / `relations` 各自的 `matched`（golden+predicted 对照）、`missing`（漏抽）、`extra`（多抽）。LLM-judge 时另有 `judge_batches`（每批评分的预测区间、耗时、成功的 `response_mode`、失败尝试）和 `identity`（精确匹配口径的对上/漏抽/多抽清单） |
-| `document.md` | 解析结果，便于对照原文 |
+| `document.md` | 解析结果，便于对照原文；`--from-run` 且 `--mode chunk-extract` 时复用它跳过解析（同批重试也会复用），因此仍需保留 |
 | `chunks.json` | 实际送进抽取的切片 |
 | `backend_extract.json` | 生产接口原样回包，排抽取失败或图结构时用 |
 
 终端默认只打后台抽取：P/R/F1/Acc 与 标准/抽出/对上/多抽/漏抽（实体、关系分行）。未跑的插件、沉淀不出现在总览里；加 `--system` 或 `--stage plugin|all` 才打印对应块。case 日志同样按步输出耗时和抽取计数。
+
+### 历史批次清理
+
+每次启动 `run.py`（含 `--dry-run`）都会先清理 `tmp/eval/runs/` 下过期的历史批次，再开始评测：
+
+- 保留期默认 **30 天**，按批次目录名的时间戳（`<YYYYMMDD-HHMMSS>`）判定；命名不符合该格式的目录不动。
+- 配置走 `params.yaml` 的 `runs_retention_days`，命令行 `--runs-retention-days <天数>` 优先；`<=0` 表示不清理。
+- 被 `--from-run` 引用的批次即使过期也跳过，并在日志里提示。
+- 清理结束打印摘要：删除了几个批次、释放多少空间；单个目录删除失败只记日志，不影响评测。
 
 ### 加 case
 

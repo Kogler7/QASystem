@@ -19,7 +19,7 @@ from algorithm.logging_setup import ensure_logging
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 from external_services.application import get_application_service_url
 
-from backend.app import observability
+from backend.app import api_recording, observability
 from backend.app.execution.document_sharding import PageShardError, orchestrate_document_parse
 from backend.app.execution.manager import ExecutionCancelled, get_execution_manager
 from backend.app.responses import ErrorCode
@@ -603,6 +603,7 @@ class KnowledgePrecipitationService:
             "chunks.json",
             json.dumps(chunks, ensure_ascii=False, indent=2, default=str),
         )
+        api_recording.current_recorder().write_json("stage_chunk/chunks.json", chunked)
         if recorder is not None:
             recorder.write(
                 "02-chunking",
@@ -1052,6 +1053,7 @@ class KnowledgePrecipitationService:
             )
             # 解析全文不打日志：完整内容见运行目录 01-parse.md。
             _save_stage_artifact(stem, "parsed.md", markdown)
+            api_recording.current_recorder().write_text(f"stage_parse/{stem}.md", markdown)
             recorder.write(
                 "01-parse",
                 "01-parse.md",
@@ -1193,6 +1195,12 @@ class KnowledgePrecipitationService:
                 summary=f"{len(request.ontology)}字符 sha256={hashlib.sha256(request.ontology.encode('utf-8')).hexdigest()[:16]}",
             )
         _save_stage_artifact(combined_stem, "parsed.md", combined_markdown)
+        api_recorder = api_recording.current_recorder()
+        for input_index, parsed_name, parsed_item in file_parsed:
+            api_recorder.write_text(
+                f"stage_parse/{input_index + 1:02d}_{Path(parsed_name).stem}.md",
+                parsed_item["markdown"],
+            )
         recorder.write(
             "01-parse",
             "01-parse.md",

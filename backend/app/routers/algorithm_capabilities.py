@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from backend.app import observability
+from backend.app import api_recording, observability
 from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
 from backend.app.execution.api import ExecutionUnavailable, ManagedExecutionError, dispatch_operation, prefer_wait_seconds
 from backend.app.schemas import (
@@ -46,13 +48,18 @@ async def parse_document(
 ) -> JSONResponse:
     # 无执行上下文（同步等待）的 HTTP 调用在这里生成 request_id，贯穿日志与告警。
     with observability.request_id_scope():
-        return await _parse_document(http_request, file, options)
+        with api_recording.record_request("POST", http_request.url.path) as recorder:
+            response = await _parse_document(http_request, file, options)
+            recorder.capture_response(response)
+            return response
 
 
 async def _parse_document(http_request: Request, file: UploadFile, options: str) -> JSONResponse:
+    recorder = api_recording.current_recorder()
     try:
         config = ParserConfig.model_validate_json(options or "{}")
     except ValidationError as exc:
+        recorder.set_params({"options_raw": options})
         return error_response(
             ErrorCode.INVALID_REQUEST,
             "options 无效",
@@ -60,17 +67,23 @@ async def _parse_document(http_request: Request, file: UploadFile, options: str)
             details={"errors": exc.errors(include_url=False, include_input=False)},
             status_code=400,
         )
+    file_name = file.filename or "upload.bin"
+    content = await file.read()
+    recorder.set_params({"file_name": file_name, "options": config.model_dump()})
+    recorder.save_uploads([(file_name, content)])
     try:
         result = await dispatch_operation(
             operation="document.parse",
             resource_class="cpu.document_orchestrator",
             payload={
-                "file_name": file.filename or "upload.bin",
-                "content": await file.read(),
+                "file_name": file_name,
+                "content": content,
                 "config": config.model_dump(),
             },
             wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
+        if isinstance(result.data, dict) and result.data.get("markdown") is not None:
+            recorder.write_text(f"stage_parse/{Path(file_name).stem or 'document'}.md", result.data["markdown"])
         return JSONResponse(content=payload(result.data, "文档解析完成", execution=result.execution), status_code=result.status_code)
     except ExecutionUnavailable as exc:
         return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
@@ -86,10 +99,15 @@ async def _parse_document(http_request: Request, file: UploadFile, options: str)
 async def chunk_document(http_request: Request, body: ChunkRequest) -> JSONResponse:
     # 无执行上下文（同步等待）的 HTTP 调用在这里生成 request_id，贯穿日志与告警。
     with observability.request_id_scope():
-        return await _chunk_document(http_request, body)
+        with api_recording.record_request("POST", http_request.url.path) as recorder:
+            response = await _chunk_document(http_request, body)
+            recorder.capture_response(response)
+            return response
 
 
 async def _chunk_document(http_request: Request, body: ChunkRequest) -> JSONResponse:
+    recorder = api_recording.current_recorder()
+    recorder.set_params({"request": body.model_dump()})
     try:
         result = await dispatch_operation(
             operation="document.chunk",
@@ -97,6 +115,8 @@ async def _chunk_document(http_request: Request, body: ChunkRequest) -> JSONResp
             payload=body.model_dump(),
             wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
+        if isinstance(result.data, dict):
+            recorder.write_json("stage_chunk/chunks.json", result.data)
         return JSONResponse(content=payload(result.data, "文档切片完成", execution=result.execution), status_code=result.status_code)
     except ExecutionUnavailable as exc:
         return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
@@ -112,10 +132,16 @@ async def _chunk_document(http_request: Request, body: ChunkRequest) -> JSONResp
 async def extract_graphs(http_request: Request, body: GraphExtractionRequest) -> JSONResponse:
     # 无执行上下文（同步等待）的 HTTP 调用在这里生成 request_id，贯穿日志与告警。
     with observability.request_id_scope():
-        return await _extract_graphs(http_request, body)
+        with api_recording.record_request("POST", http_request.url.path) as recorder:
+            response = await _extract_graphs(http_request, body)
+            recorder.capture_response(response)
+            return response
 
 
 async def _extract_graphs(http_request: Request, body: GraphExtractionRequest) -> JSONResponse:
+    recorder = api_recording.current_recorder()
+    recorder.save_ontology(body.ontology)
+    recorder.set_params({"request": body.model_dump()})
     try:
         result = await dispatch_operation(
             operation="graph.extract",
@@ -124,6 +150,8 @@ async def _extract_graphs(http_request: Request, body: GraphExtractionRequest) -
             total_units=len(body.items),
             wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
+        if isinstance(result.data, dict):
+            recorder.write_json("stage_extract/result.json", result.data)
         return JSONResponse(content=payload(result.data, "分片图谱抽取完成", execution=result.execution), status_code=result.status_code)
     except ExecutionUnavailable as exc:
         return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
