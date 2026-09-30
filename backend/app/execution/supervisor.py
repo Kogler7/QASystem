@@ -102,15 +102,29 @@ class RuntimeSupervisor:
         command.extend(shlex.split(os.getenv("VLLM_EXTRA_ARGS", "")))
         return command
 
+    def _planned_engine_ports(self) -> list[int]:
+        """与 _start_engines 同一判定：本次运行是否会真正拉起本地 vLLM 引擎。
+
+        核心 worker 的 VLM 端点注入必须以这里为准——引擎不启动时绝不能
+        注入指向空地址的 URL，否则解析选中 vlm-http-client 后必然连接失败，
+        且会因「URL 已配置」跳过本地 MinerU pipeline 的自动回退。
+        """
+        if is_remote_only():
+            return []
+        if not self.gpu_ids or os.getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+            return []
+        return [self.base_port + index for index in range(len(self.gpu_ids))]
+
     def _start_engines(self) -> None:
         if is_remote_only():
             LOGGER.info("remote-only profile: skip local vLLM engines")
             return
-        if not self.gpu_ids or os.getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+        ports = self._planned_engine_ports()
+        if not ports:
             LOGGER.warning("no vLLM engine started; detected GPUs=%s", self.gpu_ids)
             return
         for index, gpu_id in enumerate(self.gpu_ids):
-            port = self.base_port + index
+            port = ports[index]
             env = os.environ.copy()
             env.update({"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": gpu_id})
             process = self._spawn(f"vllm-gpu-{gpu_id}", self._engine_command(port), env=env)
@@ -186,7 +200,12 @@ class RuntimeSupervisor:
 
     def _start_core_workers(self) -> None:
         api_workers = _env_int("API_WORKERS", 1 if is_remote_only() else 2, minimum=1, maximum=16)
-        vlm_endpoints = [f"http://127.0.0.1:{self.base_port + index}" for index in range(len(self.gpu_ids))]
+        # 仅当 vLLM 引擎计划启动时才注入 VLM 端点（与 _start_engines 同一判定）；
+        # 引擎不启动时不得注入指向空地址的 URL，否则解析选中 vlm-http-client
+        # 后必然连接失败，且会因「URL 已配置」跳过本地 MinerU pipeline 自动回退。
+        vlm_endpoints = [
+            f"http://127.0.0.1:{port}" for port in self._planned_engine_ports()
+        ]
         api_env = os.environ.copy()
         if vlm_endpoints:
             api_env["MINERU_VLM_BACKEND"] = "vlm-http-client"
