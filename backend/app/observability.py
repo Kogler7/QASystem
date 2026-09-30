@@ -291,6 +291,22 @@ def _queue_depth(manager: Any) -> int | None:
     return None
 
 
+def _plain_text(value: Any) -> str:
+    """把 Redis 里 JSON 编码的标量（如带引号的字符串）还原为纯文本。"""
+    if value is None:
+        return "unknown"
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", "replace")
+    text = str(value)
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, str):
+            return parsed
+    except (ValueError, TypeError):
+        pass
+    return text
+
+
 def _job_status_counts(store: Any) -> dict[str, int]:
     jobs = getattr(store, "jobs", None)
     if isinstance(jobs, dict):
@@ -306,7 +322,7 @@ def _job_status_counts(store: Any) -> dict[str, int]:
             scanned = 0
             for key in redis_client.scan_iter(match=f"{prefix}:job:*", count=200):
                 status = redis_client.hget(key, "status")
-                counts[str(status or "unknown")] += 1
+                counts[_plain_text(status)] += 1
                 scanned += 1
                 if scanned >= 10000:
                     break

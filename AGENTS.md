@@ -34,6 +34,19 @@
 - Tests under `tests/` encode production contracts (e.g. the splitter's `__source_range` metadata consumed by `algorithm/knowledge_pipeline/chunking.py`). Dropping or changing such a contract requires updating every consumer in the same commit.
 - If a merge brings in changes that break existing tests, the person merging must reconcile them before pushing — either restore the contract or update the tests to the new intended behavior. Never delete or silence failing tests just to get green.
 
+# Release Quality Gate
+
+改了解析、切片、抽取或沉淀流水线后，发布前必须按顺序过门禁，全绿才允许部署；任何一项失败先排查修复再发布：
+
+1. **单元测试全绿**：`.venv/Scripts/python.exe -m pytest -q`（Windows 开发机）或 `python3 -m pytest -q`。
+2. **全量评测门禁**（对运行中的 Backend，正式判定用 `--match-mode llm`，先 identity 跑通链路也可）：
+   `python3 eval/run.py --match-mode llm --fail-on-empty --min-f1 0.5 --max-case-seconds 1800 --max-stage-seconds parse=300,chunk=120,extract=900`
+   退出码 `0` 才过；`2`=有空抽取或失败 case（必须排查 `summary.json` 的 `gate.empty_failures`）；`4`=F1 或耗时预算未过；`1`=配置错误。阈值以最新基线为准（见 `tmp/eval/runs/` 与 docs/质量管理 记录）。
+3. **基线对比**：与上一次全量基线比，实体 F1 不得明显下降、单 case 耗时不得明显上升；回退即挡。
+4. **生产观测**：确认 `QASYSTEM_ALERT_WEBHOOK` 已配置（空抽取/慢阶段/本体无效告警），`/api/v1/observability/metrics` 可访问；用户反馈的空结果问题凭 `request_id` 与 `stats.extraction.empty_reason` 定位到阶段。
+
+部署沿用 git 同步 + `docker compose restart backend agent`；评测失败 case 必须沉淀为 `test_data/eval/` 回归 case 或对应层单测后再关闭。
+
 # Documentation Index
 
 - [Plugin and database environment](docs/插件与数据库环境索引.md): local VSIX, Attu/Milvus, Neo4j browser, and data-access boundaries.
