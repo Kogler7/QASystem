@@ -7,16 +7,22 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from backend.app.responses import ErrorCode
 from backend.app.schemas import ParserConfig
 
 from .artifacts import ArtifactStore
-from .manager import ExecutionManager, get_execution_manager
+from .manager import ExecutionCancelled, ExecutionManager, get_execution_manager
 
 
 class PageShardError(RuntimeError):
-    def __init__(self, message: str, *, failed: list[dict[str, Any]] | None = None):
+    """页段编排失败。``code`` 按 docs/错误码协议.md 标注，供
+    ``backend.app.responses.error_code_for_exception`` 与 worker 的
+    协议感知重试归类；未标注时按未知异常（可重试）处理。"""
+
+    def __init__(self, message: str, *, failed: list[dict[str, Any]] | None = None, code: ErrorCode | None = None):
         super().__init__(message)
         self.failed = failed or []
+        self.code = code
 
 
 def _read_content(payload: dict[str, Any]) -> bytes:
@@ -138,7 +144,7 @@ def _merge_results(
     markdown_parts = [str(item.get("markdown", "")).strip() for item in ordered]
     markdown = "\n\n".join(part for part in markdown_parts if part).strip()
     if not markdown:
-        raise PageShardError("页段合并后内容为空")
+        raise PageShardError("页段合并后内容为空", code=ErrorCode.DOCUMENT_CONTENT_EMPTY)
     empty_shards = [
         (item.get("page_range") or {}).get("shard_index", index)
         for index, (item, part) in enumerate(zip(ordered, markdown_parts))
@@ -206,12 +212,13 @@ def _monitor_children(manager: ExecutionManager, parent_job_id: str, specs: list
             raise PageShardError(
                 "文档页段任务等待超时",
                 failed=[{"child_job_id": job_id, "status": "timeout"} for job_id in sorted(pending)],
+                code=ErrorCode.DEPENDENCY_TIMEOUT,
             )
         parent = manager.store.get_job(parent_job_id) or {}
         if parent.get("cancel_requested"):
             for job_id in pending:
                 manager.cancel(job_id)
-            raise PageShardError("文档页段任务已取消")
+            raise ExecutionCancelled("文档页段任务已取消")
         for job_id in list(pending):
             spec = by_id[job_id]
             view = manager.execution_view(job_id)
@@ -360,7 +367,7 @@ def orchestrate_document_parse(payload: dict[str, Any]) -> dict[str, Any]:
                 continue
             results.append(manager.result(spec["job_id"]))
         if failed:
-            raise PageShardError("一个或多个文档页段解析失败", failed=failed)
+            raise PageShardError("一个或多个文档页段解析失败", failed=failed, code=ErrorCode.DOCUMENT_PARSE_FAILED)
         merged = _merge_results(payload.get("file_name", "upload.bin"), content, results, ranges)
         manager.store.update_job(parent_job_id, completed_units=len(specs))
         return merged

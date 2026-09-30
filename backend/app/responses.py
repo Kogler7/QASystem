@@ -160,3 +160,18 @@ def error_response(
             execution=execution,
         ),
     )
+
+
+def error_code_for_exception(exc: Exception) -> ErrorCode:
+    """把异常映射到协议错误码（docs/错误码协议.md 的执行层出口）。
+
+    约定：业务异常可携带 ``code`` 属性（本模块的 ``ErrorCode``），
+    execution 层按协议标注后（如 ``document_sharding.PageShardError``），
+    这里原样透出供路由/任务记录归类；未标注 ``code`` 的未知异常一律归
+    ``INTERNAL_ERROR``。协作式取消（``ExecutionCancelled``）不是业务错误，
+    走任务状态而非错误码，这里同样归 ``INTERNAL_ERROR``。
+    """
+    code = getattr(exc, "code", None)
+    if isinstance(code, ErrorCode):
+        return code
+    return ErrorCode.INTERNAL_ERROR

@@ -35,6 +35,17 @@ class MemoryTaskQueue:
     def ack(self, _resource_class: str, _message: dict[str, Any], target_worker: str | None = None) -> None:
         return None
 
+    def reclaim(
+        self,
+        _resource_class: str,
+        _consumer: str,
+        *,
+        min_idle_seconds: float,
+        target_worker: str | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        # 内存队列随进程消亡，不存在跨进程滞留消息。
+        return []
+
 
 class RedisTaskQueue:
     def __init__(self, store: RedisExecutionStore):
@@ -86,6 +97,36 @@ class RedisTaskQueue:
 
     def ack(self, resource_class: str, message_id: str, target_worker: str | None = None) -> None:
         self.redis.xack(self._stream(resource_class, target_worker), self.consumer_group, message_id)
+
+    def reclaim(
+        self,
+        resource_class: str,
+        consumer: str,
+        *,
+        min_idle_seconds: float,
+        count: int = 32,
+        target_worker: str | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """用 XAUTOCLAIM 收回 ``consumer`` 名下滞留超过 ``min_idle_seconds`` 的消息。
+
+        只用于崩溃恢复：正常路径的消息在消费循环的 finally 里即时 ack，
+        不会滞留到 idle 阈值。min-idle-time 取秒级阈值，避免误收正常在途
+        消息（长流程合法，不做超时强杀）。
+        """
+        self.ensure_group(resource_class, target_worker)
+        _cursor, entries, _deleted = self.redis.xautoclaim(
+            self._stream(resource_class, target_worker),
+            self.consumer_group,
+            consumer,
+            min_idle_time=max(0, int(min_idle_seconds * 1000)),
+            start_id="0",
+            count=count,
+        )
+        reclaimed: list[tuple[str, dict[str, Any]]] = []
+        for entry in entries:
+            message_id, values = entry
+            reclaimed.append((message_id, json.loads(values["payload"])))
+        return reclaimed
 
 
 _MEMORY_QUEUE = MemoryTaskQueue()

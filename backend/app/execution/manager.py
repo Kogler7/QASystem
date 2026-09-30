@@ -26,6 +26,14 @@ class ExecutionNotFound(KeyError):
     pass
 
 
+class ExecutionCancelled(RuntimeError):
+    """协作式取消：阶段边界检查到 cancel_requested 后干净中止。
+
+    这不是错误重试路径能挽救的失败——worker 捕获后直接把任务标记为
+    cancelled，不再重投。
+    """
+
+
 @dataclass(slots=True)
 class JobSubmission:
     job_id: str
@@ -365,11 +373,15 @@ class ExecutionManager:
             finished_at = iso_now()
             duration = int((time.monotonic() - started) * 1000)
             error = {"type": type(exc).__name__, "message": str(exc)}
+            cancelled = isinstance(exc, ExecutionCancelled)
+            terminal_status = "cancelled" if cancelled else "failed"
+            task_event = "task.cancelled" if cancelled else "task.failed"
+            job_event = "job.cancelled" if cancelled else "job.failed"
             timestamps["execution_finished_at"] = finished_at
             self.store.update_execution(
                 job_id,
                 execution_id,
-                status="failed",
+                status=terminal_status,
                 allocation=allocation,
                 timestamps=timestamps,
                 durations_ms={
@@ -381,10 +393,10 @@ class ExecutionManager:
                 },
                 error=error,
             )
-            self.hub.emit(job_id, "task.failed", level="ERROR", workflow_id=workflow_id, task_id=execution["task_id"], attempt_id=execution["attempt_id"], operation=operation, stage=operation, source=allocation, details=error)
+            self.hub.emit(job_id, task_event, level="ERROR", workflow_id=workflow_id, task_id=execution["task_id"], attempt_id=execution["attempt_id"], operation=operation, stage=operation, source=allocation, details=error)
             if mark_job_failed:
-                self.store.update_job(job_id, status="failed", stage=operation, error=error)
-                self.hub.emit(job_id, "job.failed", level="ERROR", workflow_id=workflow_id, operation=operation, stage=operation, details=error)
+                self.store.update_job(job_id, status=terminal_status, stage=operation, error=error)
+                self.hub.emit(job_id, job_event, level="ERROR", workflow_id=workflow_id, operation=operation, stage=operation, details=error)
             raise
         finally:
             self._release_allocation(job_id, execution, allocation)
@@ -412,6 +424,7 @@ class ExecutionManager:
             "job_id": job_id,
             "status": job.get("status"),
             "stage": job.get("stage"),
+            "cancel_requested": bool(job.get("cancel_requested")),
             "latest_event_id": job.get("latest_event_id"),
             "summary": summarize_executions(job, executions),
             "events_url": f"/api/v1/jobs/{job_id}/events",
@@ -467,11 +480,30 @@ class ExecutionManager:
         self.hub.emit(job_id, "job.cancelled" if job.get("status") == "queued" else "job.cancelling", operation=job.get("operation"), stage="cancel")
         return self.execution_view(job_id)
 
+    def is_cancel_requested(self, job_id: str | None) -> bool:
+        """协作式取消的阶段边界检查点（execution 层各边界调用）。
+
+        job 不存在时视为未取消：取消标记是运行时状态，不能因为记录被
+        TTL 清掉就把正常任务误判为已取消。
+        """
+        if not job_id:
+            return False
+        job = self.store.get_job(job_id)
+        return bool(job and job.get("cancel_requested"))
+
     def wait_blocking(self, job_id: str, timeout_seconds: float | None) -> dict[str, Any]:
         deadline = None if timeout_seconds is None else time.monotonic() + max(timeout_seconds, 0)
         while True:
             view = self.execution_view(job_id)
-            if view["status"] in TERMINAL_STATUSES or (deadline is not None and time.monotonic() >= deadline):
+            # cancel_requested 不是终态：任务仍在后台运行，但同步等待方
+            # （无 Prefer 头的 HTTP 客户端）应及时松开拿到任务句柄，由
+            # 调用方决定轮询还是放弃；真正的 cancelled 终态由阶段边界检查
+            # （或 worker 出队检查）写入。
+            if (
+                view["status"] in TERMINAL_STATUSES
+                or view.get("cancel_requested")
+                or (deadline is not None and time.monotonic() >= deadline)
+            ):
                 return view
             delay = 0.2 if deadline is None else min(0.2, max(deadline - time.monotonic(), 0.01))
             time.sleep(delay)
