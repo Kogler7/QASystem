@@ -148,11 +148,12 @@ def _knowledge_service():
 
 def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
     # 协作式取消（execution 层挂载点）：此处守住流水线入口，取消发生在
-    # 出队后、开始前的任务在此干净中止。services 层内部的 parse→chunk→
-    # extract 阶段边界不在本层可调（backend/app/services 不在改动范围），
-    # 需在 KnowledgePrecipitationService.process / _run_pipeline 的阶段
-    # 衔接处调用 manager.is_cancel_requested(job_id) 才能在运行中响应——
-    # TODO(阶段边界): 在 parse 完成→chunk 前、chunk 完成→extract 前挂载。
+    # 出队后、开始前的任务在此干净中止。job_id 随请求传入 service，
+    # KnowledgePrecipitationService.process 已在解析阶段边界（解析前、
+    # 解析完成→chunk 前）调用 manager.is_cancel_requested(job_id)，运行中
+    # 也能干净中止；页分片编排（KNOWLEDGE_PIPELINE_PARSE_SHARDING）内部另有
+    # 自己的父任务取消监听，命中后级联取消子页段任务。
+    # TODO(阶段边界): chunk 完成→extract 前的边界仍未挂载。
     from backend.app.execution.manager import ExecutionCancelled, get_execution_manager
 
     execution_meta = payload.get("__execution") or {}
@@ -177,6 +178,7 @@ def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
                 content=_decode_content(item["content"]),
                 ontology=ontology,
                 options=options,
+                job_id=execution_meta.get("job_id"),
             )
         )
     return service.process_batch(

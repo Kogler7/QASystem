@@ -20,6 +20,8 @@ from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 from external_services.application import get_application_service_url
 
 from backend.app import observability
+from backend.app.execution.document_sharding import PageShardError, orchestrate_document_parse
+from backend.app.execution.manager import ExecutionCancelled, get_execution_manager
 from backend.app.responses import ErrorCode
 from backend.app.schemas import PipelineOptions, TextChunk, TextEmbeddingItem
 from backend.app.services.algorithm_capabilities import (
@@ -44,6 +46,28 @@ _LAST_RUN_DIR: Path | None = None
 
 #: 日志里最多展开的本体行数；完整原文始终原样写进运行目录的 00-ontology.puml。
 ONTOLOGY_LOG_LINES = 200
+
+#: KNOWLEDGE_PIPELINE_PARSE_SHARDING 的真值集合（os.getenv + 显式真假集合惯例）。
+_PIPELINE_PARSE_SHARDING_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _pipeline_parse_sharding_enabled() -> bool:
+    """沉淀流水线解析页分片开关（KNOWLEDGE_PIPELINE_PARSE_SHARDING，默认关闭）。"""
+    return (
+        str(os.getenv("KNOWLEDGE_PIPELINE_PARSE_SHARDING", "")).strip().lower()
+        in _PIPELINE_PARSE_SHARDING_TRUE_VALUES
+    )
+
+
+def _raise_if_pipeline_cancelled(job_id: str | None) -> None:
+    """协作式取消的阶段边界检查（operations._knowledge_ingestion 的既有挂载方式）。
+
+    job_id 缺失（不经 execution 层直接调用 service）时视为未取消；命中取消时
+    抛 ExecutionCancelled，由 execution 层把任务标记为 cancelled 而非 failed。
+    """
+    if not job_id or not get_execution_manager().is_cancel_requested(job_id):
+        return
+    raise ExecutionCancelled(f"知识沉淀任务 {job_id} 已在解析阶段被取消")
 
 
 def _log_prefix(document: str | None = None) -> str:
@@ -77,6 +101,9 @@ class KnowledgeIngestionRequest:
     content: bytes
     ontology: str
     options: PipelineOptions = field(default_factory=PipelineOptions)
+    #: execution 层 job_id（operations._knowledge_ingestion 传入）：解析阶段边界的
+    #: 协作式取消检查与页分片编排的父任务关联都靠它；直接调用 service 时为 None。
+    job_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -233,6 +260,9 @@ def _log_pipeline_failure(method):
         try:
             return method(self, request)
         except Exception as exc:
+            if isinstance(exc, ExecutionCancelled):
+                # 协作式取消不是失败：不写报错现场，交由 execution 层标记 cancelled。
+                raise
             if isinstance(request, BatchKnowledgeIngestionRequest):
                 label = (
                     Path(request.files[0].file_name).stem + f"_等{len(request.files)}个文件"
@@ -405,6 +435,97 @@ class KnowledgePrecipitationService:
         if not normalized["id"]:
             raise PipelineError(ErrorCode.FILE_SERVICE_FAILED, "文件服务未返回文件 id", stage, result)
         return normalized
+
+    def _parse_document(
+        self,
+        file_name: str,
+        content: bytes,
+        options: PipelineOptions,
+        fingerprint: str | None = None,
+        job_id: str | None = None,
+    ) -> dict[str, Any]:
+        """解析段入口：KNOWLEDGE_PIPELINE_PARSE_SHARDING 开启时 PDF 走页分片编排。
+
+        开关为 true 且以下条件全部满足时，解析改走
+        ``document_sharding.orchestrate_document_parse`` 的页分片编排（≥8 页切分、
+        多 worker 并行，合并规则与独立 ``/api/v1/documents/parse`` 路由一致）：
+
+        - 文件为 PDF（其他类型不支持页分片）；
+        - ``options.parser.page_sharding`` 未显式设为 ``"off"``（``auto``/``"on"`` 都允许）；
+        - execution 环境为 async 队列模式（eval/单测常见的 inline 内存环境不满足编排条件）。
+
+        任一条件不满足时安静回退现有整篇解析（``self.parsing.parse``），并打 INFO 日志
+        说明原因，不报错。开关为 true 但编排内部不满足分片条件（引擎非 vlm / 页数不足
+        EXECUTION_VLM_SHARD_MIN_PAGES）时，编排自身同样回落整篇解析，结果形状不变。
+
+        分片合并结果与整篇结果同形（``markdown`` / ``content_length`` / ``parser`` /
+        ``file_type``），``parser`` 下仅附加 ``sharding`` 分片明细，切片/抽取阶段无需
+        区分解析来源。错误语义沿用编排层现有约定：空合并/页段失败抛 ``PageShardError``
+        （携带 ``DOCUMENT_CONTENT_EMPTY`` / ``DOCUMENT_PARSE_FAILED`` 等既有错误码），
+        这里归并为 ``CapabilityError(document_parse)`` 走流水线既有出口，不新增错误码；
+        ``ExecutionCancelled``（协作式取消）不在此捕获，原样上抛由 execution 层标记
+        cancelled。
+        """
+        if not _pipeline_parse_sharding_enabled():
+            return self.parsing.parse(file_name, content, options.parser)
+        if Path(file_name or "upload.bin").suffix.lower() != ".pdf":
+            logger.info(
+                "%s[知识沉淀] 解析页分片已回退整篇解析: file=%s 原因=非 PDF 文件",
+                _log_prefix(fingerprint),
+                file_name,
+            )
+            return self.parsing.parse(file_name, content, options.parser)
+        if options.parser.page_sharding == "off":
+            logger.info(
+                "%s[知识沉淀] 解析页分片已回退整篇解析: file=%s 原因=options.parser.page_sharding=off",
+                _log_prefix(fingerprint),
+                file_name,
+            )
+            return self.parsing.parse(file_name, content, options.parser)
+        if not get_execution_manager().is_async:
+            logger.info(
+                "%s[知识沉淀] 解析页分片已回退整篇解析: file=%s 原因=执行环境为 inline（无队列编排）",
+                _log_prefix(fingerprint),
+                file_name,
+            )
+            return self.parsing.parse(file_name, content, options.parser)
+        payload: dict[str, Any] = {
+            "file_name": file_name,
+            "content": content,
+            "config": options.parser.model_dump(),
+        }
+        if job_id:
+            payload["__execution"] = {"job_id": job_id}
+        shard_started = time.monotonic()
+        try:
+            parsed = orchestrate_document_parse(payload)
+        except PageShardError as exc:
+            raise CapabilityError(
+                exc.code or ErrorCode.DOCUMENT_PARSE_FAILED,
+                f"文档页分片解析失败: {exc}",
+                "document_parse",
+                {"failed": exc.failed},
+            ) from exc
+        sharding = parsed.get("sharding") or {}
+        if sharding.get("shard_count"):
+            logger.info(
+                "%s[知识沉淀] 页分片解析完成: file=%s markdown=%d字符 分片数=%s 页数=%s 空分片=%s 耗时=%.2fs",
+                _log_prefix(fingerprint),
+                file_name,
+                len(parsed.get("markdown") or ""),
+                sharding.get("shard_count"),
+                sharding.get("page_count"),
+                sharding.get("empty_shards"),
+                time.monotonic() - shard_started,
+            )
+        else:
+            logger.info(
+                "%s[知识沉淀] 解析页分片未触发（引擎非 vlm 或页数不足），编排已回落整篇解析: file=%s markdown=%d字符",
+                _log_prefix(fingerprint),
+                file_name,
+                len(parsed.get("markdown") or ""),
+            )
+        return parsed
 
     def _run_pipeline(
         self,
@@ -898,7 +1019,17 @@ class KnowledgePrecipitationService:
             )
         try:
             parse_started = time.monotonic()
-            parsed = self.parsing.parse(file_name, request.content, request.options.parser)
+            # 解析阶段的协作式取消边界（operations._knowledge_ingestion 挂载方式的
+            # services 侧落地）：解析前与解析完成→chunk 前各检查一次，命中即干净中止。
+            _raise_if_pipeline_cancelled(request.job_id)
+            parsed = self._parse_document(
+                file_name,
+                request.content,
+                request.options,
+                fingerprint,
+                job_id=request.job_id,
+            )
+            _raise_if_pipeline_cancelled(request.job_id)
             observability.record_stage_duration(
                 "parse",
                 time.monotonic() - parse_started,
