@@ -8,10 +8,10 @@ AgentCode 是 QASystem 仓库内的单智能体运行时和后台 Agent 服务�
 
 | 文档 | 适用场景 |
 | --- | --- |
-| [接口参考](接口参考.md) | 调用方：HTTP、SSE、`answer-v1` 终稿和错误码 |
-| [架构设计](docs/架构设计.md) | 运行时：任务状态机、队列、SSE 游标、取消和隔离 |
-| [部署运维指南](docs/部署运维指南.md) | Compose、环境变量、容量和排障 |
-| [开发扩展指南](docs/开发扩展指南.md) | 改代码：模型、MCP、Skill、测试 |
+| [接口参考](../docs/接口/Agent接口参考.md) | 调用方：HTTP、SSE、`answer-v1` 终稿和错误码 |
+| [架构设计](../docs/Agent/架构设计.md) | 运行时：任务状态机、队列、SSE 游标、取消和隔离 |
+| [部署运维指南](../docs/Agent/部署运维指南.md) | Compose、环境变量、容量和排障 |
+| [开发扩展指南](../docs/Agent/开发扩展指南.md) | 改代码：模型、MCP、Skill、测试 |
 | [图谱求解方法](../docs/智能体知识图谱驱动求解架构.md) | Agent / Skill / 图谱 / MCP 职责（不是 HTTP 协议） |
 
 ## 能力边界
@@ -176,7 +176,7 @@ result = runtime.run_session(
 )
 ```
 
-`LLMBackend` 和 `ToolManager` 的契约见[开发扩展指南](docs/开发扩展指南.md)。
+`LLMBackend` 和 `ToolManager` 的契约见[开发扩展指南](../docs/Agent/开发扩展指南.md)。
 
 ## 常用配置
 
@@ -195,7 +195,7 @@ result = runtime.run_session(
 | `TASK_STORE_EVENT_MAXLEN` | `10000` | 每任务最大事件数 |
 | `COMPACT_TOKEN_THRESHOLD` | `100000` | 触发上下文压缩的估算 token 数 |
 
-完整配置和容器网络注意事项见[部署运维指南](docs/部署运维指南.md)。
+完整配置和容器网络注意事项见[部署运维指南](../docs/Agent/部署运维指南.md)。
 
 ## 测试
 

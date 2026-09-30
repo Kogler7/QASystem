@@ -1,6 +1,6 @@
 # 算法 API v1 迁移说明
 
-> 并发执行架构对现有业务 API 采用增量兼容：不发送 `Prefer` 时仍同步返回原 HTTP 状态和原业务 `data`，只新增顶层 `execution`。`Prefer: respond-async` 才立即返回 `202 + job_id`；`Prefer: wait=N` 提供最多 60 秒的显式有界等待。新增 `POST /api/v1/jobs` 默认返回 `202`。部署变化见[环境镜像与外置源码迁移指引](../docker/ENV_MIGRATION.md)。
+> 并发执行架构对现有业务 API 采用增量兼容：不发送 `Prefer` 时仍同步返回原 HTTP 状态和原业务 `data`，只新增顶层 `execution`。`Prefer: respond-async` 才立即返回 `202 + job_id`；`Prefer: wait=N` 提供最多 60 秒的显式有界等待。新增 `POST /api/v1/jobs` 默认返回 `202`。部署变化见[环境镜像与外置源码迁移指引](部署/环境变量迁移说明.md)。
 
 显式异步调用方应保存 `execution.result_url`，订阅 `execution.events_url`，并在收到 SSE `job.completed` 后通过 `GET /api/v1/jobs/{job_id}/result` 获取完整最终 envelope。最终响应的业务结果仍位于顶层 `data`，不是嵌套在任务句柄内部。
 

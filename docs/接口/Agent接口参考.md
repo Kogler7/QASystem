@@ -1,6 +1,6 @@
 # AgentCode 接口参考
 
-面向调用方的 HTTP / SSE 协议。启动、环境变量和容量见[部署运维指南](docs/部署运维指南.md)；运行时内部见[架构设计](docs/架构设计.md)。
+面向调用方的 HTTP / SSE 协议。启动、环境变量和容量见[部署运维指南](../Agent/部署运维指南.md)；运行时内部见[架构设计](../Agent/架构设计.md)。
 
 **生产入口**：`http://<host>:8006/agent/...`（Compose 不把 Agent `9180` 映射到宿主机）。下文路径省略 `/agent` 前缀。本地直连 Agent 时把主机换成 `127.0.0.1:9180`。
 
@@ -26,7 +26,7 @@
 
 HTTP 问答终稿固定为 `answer-v1` JSON，见[响应格式](#4-响应格式)。
 
-CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](docs/部署运维指南.md)为准。MCP 连接池在进程启动时建立，不支持按请求切换 `mcp_config_path`。
+CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](../Agent/部署运维指南.md)为准。MCP 连接池在进程启动时建立，不支持按请求切换 `mcp_config_path`。
 
 ---
 
@@ -378,4 +378,4 @@ def stream(message: str):
                     print(json.loads(line[6:]))
 ```
 
-运行时内部、连接池和 Redis 语义见[架构设计](docs/架构设计.md)。
+运行时内部、连接池和 Redis 语义见[架构设计](../Agent/架构设计.md)。

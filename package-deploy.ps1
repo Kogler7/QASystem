@@ -55,13 +55,13 @@ foreach ($item in @(
     @{ source = "build-remote-only-image.ps1"; destination = "build-remote-only-image.ps1" },
     @{ source = "download-models.ps1"; destination = "download-models.ps1" },
     @{ source = "run-offline-validation.ps1"; destination = "run-offline-validation.ps1" },
-    @{ source = "docker/ENV_MIGRATION.md"; destination = "ENV_MIGRATION.md" },
-    @{ source = "docker/DEPLOY_PACKAGE_README.md"; destination = "README.md" }
+    @{ source = "docs/部署/环境变量迁移说明.md"; destination = "ENV_MIGRATION.md" },
+    @{ source = "docs/部署/交付包说明.md"; destination = "README.md" }
 )) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $item.source) -Destination (Join-Path $deployDir $item.destination) -Force
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot "docker/docker-compose.offline-test.yml") -Destination (Join-Path $offlineDir "docker-compose.offline-test.yml") -Force
-Copy-Item -LiteralPath (Join-Path $repoRoot "docker/OFFLINE_VALIDATION.md") -Destination (Join-Path $offlineDir "README.md") -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot "docs/部署/离线验收说明.md") -Destination (Join-Path $offlineDir "README.md") -Force
 if (Test-Path -LiteralPath (Join-Path $offlineDir "parser")) { Remove-Item -LiteralPath (Join-Path $offlineDir "parser") -Recurse -Force }
 Copy-Item -LiteralPath (Join-Path $repoRoot "test_data/parse") -Destination (Join-Path $offlineDir "parser") -Recurse -Force
 $envTemplate = Get-Content -LiteralPath (Join-Path $repoRoot ".env.example") -Raw

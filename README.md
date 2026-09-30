@@ -55,7 +55,7 @@ QASystem 是一个**知识图谱驱动的问答/求解系统**：先把文档解
 | `backend/` | FastAPI 应用：v1 算法 HTTP 接口、知识沉淀接口、任务状态/取消/SSE，以及异步执行框架（manager/worker/queue/store/hub） | [backend/README.md](backend/README.md) |
 | `external_services/` | 对接应用团队的统一接口客户端：图谱 Cypher 查询、向量写入、文件上传，以及用户鉴权上下文透传 | [external_services/README.md](external_services/README.md) |
 | `docs/` | 架构说明、接口协议、部署与验收文档 | `docs/文档索引.md` |
-| `docker/` | 运行时校验与离线验收脚本/说明 | `docker/OFFLINE_VALIDATION.md` |
+| `docker/` | 运行时校验与离线验收脚本/说明 | `docs/部署/离线验收说明.md` |
 
 ---
 

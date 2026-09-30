@@ -2,7 +2,7 @@
 
 > 状态：单机多 GPU 架构已落地，RTX 3090 环境已完成阶段性验证，目标 A40 环境仍需容量调优与验收
 >
-> 范围：Backend HTTP API、统一 MCP、文档解析、知识沉淀、Embedding、Confidence 及其统一执行基础设施；Agent 服务的并发模型在第 7.3 节概述，完整细节见 `agent/docs/架构设计.md`
+> 范围：Backend HTTP API、统一 MCP、文档解析、知识沉淀、Embedding、Confidence 及其统一执行基础设施；Agent 服务的并发模型在第 7.3 节概述，完整细节见 `docs/Agent/架构设计.md`
 
 本文说明当前 `develop` 分支已经实现的服务并发、任务队列、GPU 调度、VLM PDF 分片、可观测性和部署架构。它描述的是现行实现，不再作为重构计划或未来组件选型清单。
 
@@ -269,7 +269,7 @@ MCP 生产默认使用 `MCP_EXECUTION_MODE=sync`：重工具进入同一执行�
 
 ### 7.3 Agent 服务的并发模型
 
-Agent 服务是与 Backend 并列的独立任务型入口，复用同一套"入队返回句柄"范式，但有自己独立的并发层次（完整细节、幂等与取消约束见 `agent/docs/架构设计.md`）：
+Agent 服务是与 Backend 并列的独立任务型入口，复用同一套"入队返回句柄"范式，但有自己独立的并发层次（完整细节、幂等与取消约束见 `docs/Agent/架构设计.md`）：
 
 - **总并发 = W × min(C, P)**：W 个 uvicorn 进程（`AGENT_API_WORKERS`；多进程必须由 Redis 承载共享队列，否则拒绝启动）× 每进程 C 个工作线程（`AGENT_WORKER_CONCURRENCY`，生产默认 4）× ToolManager 连接池大小 P（`AGENT_WORKER_POOL_SIZE`，默认等于 C）。每个 ToolManager 绑定专属的事件循环线程，通过 `run_coroutine_threadsafe` 调用 MCP。
 - **任务队列是"至少一次"语义**：Redis List 主队列 + processing 队列，Worker 每 30 秒续约租约，超过 `TASK_STORE_VISIBILITY_TIMEOUT`（默认 1500s）未完成的处理中任务由 requeue 线程自动重新入队。崩溃恢复路径简单，代价是有副作用的工具必须自身幂等。
