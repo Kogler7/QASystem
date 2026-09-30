@@ -196,17 +196,35 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract 
 
 ---
 
-**质量门禁**
+**质量门禁（发布前防回归）**
 
 ```bash
-./eval/run.sh --match-mode identity --min-f1 0.5
+./eval/run.sh --match-mode identity --fail-on-empty --min-f1 0.5 \
+  --max-case-seconds 1800 --max-stage-seconds parse=300,chunk=120,extract=900
 ```
 
-在接口都成功的前提下，检查已评分 case 的实体 F1（后台系统、后台抽取、插件三者取最低）。低于 `0.5` 则退出码 3。适合 CI 或发版前卡住明显回退；阈值按集子自己定。
+发版前建议跑全量并加三道门禁，任一不过即非零退出：
+
+- `--fail-on-empty`（默认开启，`--no-fail-on-empty` 关闭）：已评分 case 的抽取预测为 0 节点（golden 非空）时，该 case 记为失败，`error=empty_extraction`，退出码 2。extract 接口本身失败的 case 不受影响（本来就已失败）；切片为空按整篇降级继续跑的行为也不变（那是降级不是失败）。
+- `--min-f1 0.5`：已评分 case 的实体 F1（后台系统、后台抽取、插件三者取最低）低于阈值则门禁未过，退出码 4。
+- `--max-case-seconds 1800` / `--max-stage-seconds parse=300,chunk=120,extract=900`：单 case 墙钟 / 分阶段耗时预算（用 summary 里的 `elapsed_seconds` 与 `backend.modules.<stage>.elapsed_seconds` 判定，逗号分隔、容忍空格，未列出的阶段不检查）。超预算**不改** case 状态（接口成败是既成事实），记入 `gate.budget_violations`，退出码 4。
+
+门禁结果落在 `summary.json` 的 `gate` 块：
+
+```json
+"gate": {
+  "empty_failures": ["official/official_03"],
+  "budget_violations": [{"case": "standard/standard_01", "stage": "extract", "elapsed": 912.5, "budget": 900}],
+  "min_f1": {"threshold": 0.5, "below": [{"case": "official/official_05", "f1": 0.42}]},
+  "passed": false
+}
+```
+
+`passed` 只反映退出码 4 口径（耗时预算、min-f1）；`empty_failures` 是清单（空抽取走退出码 2）。全部 case 未评分时门禁不做判定，`passed=null`。
 
 ---
 
-退出码：`0` 全部成功，`1` 配置/发现失败，`2` 有 case 失败（含重试后跳过），`3` 质量门禁未过。
+退出码：`0` 全部成功，`1` 配置/发现失败，`2` 有 case 失败（含重试后跳过、空抽取判失败），`4` 无失败 case 但门禁未过（F1 低于 `--min-f1` 或耗时超预算）。优先级 `1 > 2 > 4 > 0`。旧退出码 `3`（min-f1 专用）已废弃，并入 `4`。
 
 ### 看结果
 
@@ -231,8 +249,8 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时。每跑完一个 case 就会更新，中途可看。`skipped` 是重试 3 次后仍失败并跳过的 case 数 |
-| `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
+| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时。每跑完一个 case 就会更新，中途可看。`skipped` 是重试 3 次后仍失败并跳过的 case 数。`gate` 是发布门禁块（见「质量门禁」）：`empty_failures` 空抽取清单、`budget_violations` 耗时超预算明细、`min_f1.below` 低于阈值的 case、`passed` 门禁是否通过（全部未评分时为 `null`） |
+| `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
 | `match_details.json` | 每个已评分块（`backend_extract` / `backend_system` / `plugin_extract`）的逐条明细：`entities` / `relations` 各自的 `matched`（golden+predicted 对照）、`missing`（漏抽）、`extra`（多抽）。LLM-judge 时另有 `judge_batches`（每批评分的预测区间、耗时、成功的 `response_mode`、失败尝试）和 `identity`（精确匹配口径的对上/漏抽/多抽清单） |
 | `document.md` | 解析结果，便于对照原文 |
 | `chunks.json` | 实际送进抽取的切片 |

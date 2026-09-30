@@ -2333,6 +2333,29 @@ def run_case_with_retries(
     return last_backend, last_plugin, markdown, MAX_ATTEMPTS, last_error
 
 
+STAGE_BUDGET_NAMES = ("parse", "chunk", "extract")
+
+
+def parse_stage_budgets(raw: str | None) -> dict[str, float]:
+    """解析 --max-stage-seconds（parse=60,chunk=30,extract=300，容忍空格）；格式或阶段名错误抛 ValueError。"""
+    budgets: dict[str, float] = {}
+    for part in str(raw or "").split(","):
+        item = part.strip()
+        if not item:
+            continue
+        name, sep, value = item.partition("=")
+        name = name.strip()
+        if not sep or not name:
+            raise ValueError(f"--max-stage-seconds 格式错误（应为 阶段=秒）: {item}")
+        if name not in STAGE_BUDGET_NAMES:
+            raise ValueError(f"--max-stage-seconds 未知阶段: {name}（支持: {', '.join(STAGE_BUDGET_NAMES)}）")
+        try:
+            budgets[name] = float(value.strip())
+        except ValueError:
+            raise ValueError(f"--max-stage-seconds 耗时不是数字: {item}") from None
+    return budgets
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="知识沉淀评测：默认只测后台切片+抽取（chunk-extract）。可直接传 case/类型目录。",
@@ -2382,7 +2405,32 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="抽取评分：llm=大模型判断是否抽对（params 默认）；identity=type+name 精确匹配。未配 judge 地址时自动改 identity",
     )
-    parser.add_argument("--min-f1", type=float, default=0.0, help="已评分 case 的最低实体 F1，低于则退出码 3")
+    parser.add_argument(
+        "--min-f1",
+        type=float,
+        default=0.0,
+        help="已评分 case 的最低实体 F1（后台系统、后台抽取、插件三者取最低），低于则门禁未过（退出码 4）",
+    )
+    parser.add_argument(
+        "--fail-on-empty",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="已评分 case 的抽取预测为 0 节点（golden 非空）时记为该 case 失败（error=empty_extraction，退出码 2）；"
+        "--no-fail-on-empty 只记录进 gate.empty_failures 不判失败",
+    )
+    parser.add_argument(
+        "--max-case-seconds",
+        type=float,
+        default=None,
+        metavar="秒",
+        help="单 case 墙钟预算（秒）；超预算不改 case 状态，记入 gate.budget_violations（退出码 4）",
+    )
+    parser.add_argument(
+        "--max-stage-seconds",
+        default=None,
+        metavar="阶段=秒,...",
+        help="分阶段耗时预算，逗号分隔、容忍空格，如 parse=60,chunk=30,extract=300；未列出的阶段不检查",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -2454,6 +2502,71 @@ def lowest_entity_f1(record: dict[str, Any]) -> float | None:
     return min(values) if values else None
 
 
+def scored_extract_blocks(record: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """已评分的抽取块（有 metrics 才算数）：后台模块抽取 / 沉淀 / 插件。"""
+    backend = record.get("backend") or {}
+    blocks: list[tuple[str, dict[str, Any]]] = []
+    for label, block in (
+        ("backend_extract", (backend.get("modules") or {}).get("extract")),
+        ("backend_system", backend.get("system")),
+        ("plugin_extract", record.get("plugin")),
+    ):
+        if isinstance(block, dict) and block.get("metrics"):
+            blocks.append((label, block))
+    return blocks
+
+
+def build_run_gate(
+    summary: dict[str, Any],
+    *,
+    min_f1: float,
+    max_case_seconds: float | None,
+    stage_budgets: dict[str, float] | None,
+) -> dict[str, Any]:
+    """发布门禁：空抽取清单 + 耗时预算违规 + min-f1，汇总成 gate 块写入 summary。
+
+    passed 只反映退出码 4 口径（耗时预算、min-f1）；空抽取有自己的退出码 2，empty_failures 仅作清单。
+    门禁只在有评分 case 时判定；全部未评分时 passed=None（不算过也不算不过）。
+    """
+    cases = list(summary.get("cases") or [])
+    empty_failures: list[str] = []
+    budget_violations: list[dict[str, Any]] = []
+    below: list[dict[str, Any]] = []
+    for item in cases:
+        label = f"{item.get('group')}/{item.get('case')}"
+        if item.get("empty_extraction"):
+            empty_failures.append(label)
+        elapsed = item.get("elapsed_seconds")
+        if max_case_seconds is not None and elapsed is not None and float(elapsed) > max_case_seconds:
+            budget_violations.append(
+                {"case": label, "stage": "case", "elapsed": float(elapsed), "budget": max_case_seconds}
+            )
+        modules = (item.get("backend") or {}).get("modules") or {}
+        for stage, budget in (stage_budgets or {}).items():
+            block = modules.get(stage)
+            stage_elapsed = block.get("elapsed_seconds") if isinstance(block, dict) else None
+            if stage_elapsed is not None and float(stage_elapsed) > budget:
+                budget_violations.append(
+                    {"case": label, "stage": stage, "elapsed": float(stage_elapsed), "budget": budget}
+                )
+        if min_f1 > 0 and item.get("scored"):
+            f1 = lowest_entity_f1(item)
+            if f1 is not None and f1 < min_f1:
+                below.append({"case": label, "f1": f1})
+    scored_cases = any(item.get("scored") for item in cases)
+    passed: bool | None
+    if not scored_cases:
+        passed = None
+    else:
+        passed = not budget_violations and not below
+    return {
+        "empty_failures": empty_failures,
+        "budget_violations": budget_violations,
+        "min_f1": {"threshold": min_f1, "below": below},
+        "passed": passed,
+    }
+
+
 def main() -> int:
     args = parse_args()
     workspace = Path(args.workspace).expanduser().resolve()
@@ -2462,6 +2575,11 @@ def main() -> int:
     case_filter = [item.strip() for item in str(args.cases or "").split(",") if item.strip()]
     if args.targets and (group_filter or case_filter):
         log("路径与 --groups/--cases 不能同时使用，请只保留一种筛选方式")
+        return 1
+    try:
+        stage_budgets = parse_stage_budgets(args.max_stage_seconds)
+    except ValueError as exc:
+        log(str(exc))
         return 1
     try:
         selection = selection_from_targets(workspace, list(args.targets)) if args.targets else None
@@ -2548,6 +2666,15 @@ def main() -> int:
         log(f"评分: LLM-judge model={judge.model} base_url={judge.base_url}")
     else:
         log("评分: identity（type+name 精确匹配）")
+    log(f"空抽取: 0 节点判失败（empty_extraction）" if args.fail_on_empty else "空抽取: 只记录不判失败（--no-fail-on-empty）")
+    budget_notes = []
+    if args.max_case_seconds is not None:
+        budget_notes.append(f"case≤{args.max_case_seconds:g}s")
+    budget_notes.extend(f"{name}≤{budget:g}s" for name, budget in stage_budgets.items())
+    if budget_notes:
+        log(f"耗时预算: {', '.join(budget_notes)}")
+    if args.min_f1 > 0:
+        log(f"最低实体 F1: {args.min_f1:g}")
 
     started = datetime.now()
     run_started = time.perf_counter()
@@ -2563,6 +2690,10 @@ def main() -> int:
     snapshot["match_mode"] = match_mode
     snapshot["targets"] = list(args.targets)
     snapshot["system"] = "pipeline" in modes
+    snapshot["fail_on_empty"] = args.fail_on_empty
+    snapshot["min_f1"] = args.min_f1
+    snapshot["max_case_seconds"] = args.max_case_seconds
+    snapshot["max_stage_seconds"] = dict(stage_budgets) if stage_budgets else None
     if match_mode == "llm":
         snapshot.setdefault("eval", {})
         snapshot["eval"] = dict(eval_cfg)
@@ -2733,6 +2864,20 @@ def main() -> int:
                     or stage_failed(record.get("plugin"))
                     or bool(record.get("error"))
                 )
+                record["empty_extraction"] = False
+                if not failed and golden is not None:
+                    gold_entities, gold_relations = normalize_graph(golden)
+                    if gold_entities or gold_relations:
+                        empty_blocks = [
+                            block_label
+                            for block_label, block in scored_extract_blocks(record)
+                            if int(block.get("nodes") or 0) == 0
+                        ]
+                        record["empty_extraction"] = bool(empty_blocks)
+                        if empty_blocks and args.fail_on_empty:
+                            failed = True
+                            record["error"] = "empty_extraction"
+                            log(f"{label} 抽取结果为空（0 节点）: {', '.join(empty_blocks)}，记为失败")
                 record["status"] = "failed" if failed else "succeeded"
                 if failed and attempts >= MAX_ATTEMPTS:
                     record["skipped_after_retries"] = True
@@ -2775,6 +2920,12 @@ def main() -> int:
         log("未发现任何 case（需要 <类型>/<case>/docs 与同级 extract/golden.json）")
         return 1
 
+    summary["gate"] = build_run_gate(
+        summary,
+        min_f1=args.min_f1,
+        max_case_seconds=args.max_case_seconds,
+        stage_budgets=stage_budgets,
+    )
     persist_run_summary(
         run_dir,
         summary,
@@ -2792,6 +2943,21 @@ def main() -> int:
         f"成功 {summary['succeeded']}  失败 {summary['failed']}  "
         f"跳过 {summary.get('skipped') or 0}  未评分 {summary['unscored']}"
     )
+    gate = summary.get("gate") or {}
+    if gate:
+        if gate.get("passed") is None:
+            gate_note = "未判定（无评分 case）"
+        elif gate.get("passed"):
+            gate_note = "通过"
+        else:
+            reasons = []
+            if gate.get("budget_violations"):
+                reasons.append(f"耗时预算违规 {len(gate['budget_violations'])}")
+            below = ((gate.get("min_f1") or {}).get("below")) or []
+            if below:
+                reasons.append(f"F1 低于阈值 {len(below)}")
+            gate_note = "未过（" + ("，".join(reasons) or "未知") + "）"
+        print(f"门禁: {gate_note}")
     if run_backend:
         version_note = f"  抽取版本: {', '.join(summary['extract_versions'])}" if summary["extract_versions"] else ""
         print(f"模式: {', '.join(modes)}{version_note}")
@@ -2815,15 +2981,16 @@ def main() -> int:
 
     if summary["failed"]:
         return 2
-    if args.min_f1 > 0:
-        below = [
-            f"{item['group']}/{item['case']}"
-            for item in summary["cases"]
-            if item.get("scored") and (lowest_entity_f1(item) is not None) and (lowest_entity_f1(item) or 0) < args.min_f1
-        ]
-        if below:
-            log(f"实体 F1 低于 {args.min_f1}: {', '.join(below)}")
-            return 3
+    if (summary.get("gate") or {}).get("passed") is False:
+        gate = summary["gate"]
+        for violation in gate.get("budget_violations") or []:
+            log(
+                f"耗时超预算: {violation['case']} {violation['stage']} "
+                f"{violation['elapsed']:.1f}s > {violation['budget']:.1f}s"
+            )
+        for item in ((gate.get("min_f1") or {}).get("below")) or []:
+            log(f"实体 F1 低于 {args.min_f1:g}: {item['case']}（{item['f1']:.3f}）")
+        return 4
     return 0
 
 
