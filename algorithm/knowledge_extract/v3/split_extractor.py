@@ -72,7 +72,13 @@ from .official_document_scope import annotate_official_roles, entity_in_official
 from .official_attachments import add_official_attachment_entities
 from .document_entities import enrich_document_entities
 from .entity_resolver import CandidatePool
-from .evidence import Evidence, evidence_coverage, locate_quote, verify_evidence
+from .evidence import (
+    EVIDENCE_STATUS_UNVERIFIED,
+    Evidence,
+    evidence_coverage,
+    locate_quote,
+    verify_evidence,
+)
 from .graph_assembler import GraphAssembler
 from .graph_utils import canonical_name
 from .hierarchy import (
@@ -690,7 +696,7 @@ def extract_split(
     repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
     identity_admission: str = "quarantine",
-    max_repair_rounds: int = 0,
+    max_repair_rounds: int = 2,
     max_attempts: int = 3,
     retry_base_seconds: float = 0.05,
 ) -> dict[str, Any]:
@@ -939,16 +945,20 @@ def extract_split(
     for _, entities in entity_results:
         for entity in entities:
             evidence = [item for item in [Evidence.from_dict(entity.get("evidence"))] if item is not None]
+            candidate = EntityCandidate(
+                candidate_id="",
+                proposed_type=entity.get("type", ""),
+                canonical_type=entity.get("type"),
+                name=entity.get("name", ""),
+                properties=entity.get("properties") or {},
+                evidence=evidence,
+                source="",
+            )
+            # fail-open 保留的未核验证据：实体入池并留 candidate 级标记。
+            if str(entity.get("evidence_status") or "") == EVIDENCE_STATUS_UNVERIFIED:
+                candidate.warnings.append("ENTITY_EVIDENCE_UNVERIFIED")
             pool.add_entity(
-                EntityCandidate(
-                    candidate_id="",
-                    proposed_type=entity.get("type", ""),
-                    canonical_type=entity.get("type"),
-                    name=entity.get("name", ""),
-                    properties=entity.get("properties") or {},
-                    evidence=evidence,
-                    source="",
-                ),
+                candidate,
                 warnings=warnings,
             )
 
@@ -1219,6 +1229,10 @@ def extract_split(
             rejected_warnings=current_pool.unresolved_relation_rejections(),
             # Identity and properties are frozen here.  Only an evidence-backed
             # relation between existing endpoints can still be added safely.
+            # v3 的 repair 落地路径（_apply_repair_proposal）只接受新增关系：
+            # 实体宇宙已冻结、属性不回流，因此 v2 的 required_property /
+            # dangling_relation_endpoint / uncovered_block 在本包无法真实执行，
+            # 不作为 repairable 类型接入（接了也只会空跑 repair 轮次）。
             repairable_types={"required_relation"},
         )
 
@@ -2064,6 +2078,8 @@ def extract_split(
         warning_counts.get(code, 0)
         for code in ("ENTITY_EVIDENCE_REJECTED", "EVIDENCE_L1_FAIL", "EVIDENCE_L2_FAIL")
     )
+    # fail-open（warn）下未核验证据不入拒绝数，单独计数便于观测。
+    evidence_unverified_count = warning_counts.get("ENTITY_EVIDENCE_UNVERIFIED", 0)
     candidate_denominator = len(all_entity_candidates) + warning_counts.get(
         "ENTITY_EVIDENCE_REJECTED", 0
     )
@@ -2080,6 +2096,7 @@ def extract_split(
             else 0.0
         ),
         "evidence_rejection_count": evidence_rejection_count,
+        "evidence_unverified_count": evidence_unverified_count,
         "identified_count": sum(
             1 for entity in all_entity_candidates if entity.lifecycle in {"IDENTIFIED", "RESOLVED"}
         ),

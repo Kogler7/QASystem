@@ -128,6 +128,19 @@ class StubLLM:
         self.calls: list[tuple[str, str]] = []
 
     def _ground(self, item: dict[str, Any], chunk: dict[str, Any]) -> dict[str, Any]:
+        if item.get("ungrounded"):
+            # P0 fail-open 测试用：构造 mention/quote 均不在原文的归纳型候选。
+            # 输出 schema 要求 offset 为整数，默认补 0（与原文不一致，走 fail-open）。
+            mention = str(item.get("mention") or "")
+            start = item.get("start_char")
+            end = item.get("end_char")
+            return {
+                "type": item["type"],
+                "mention": mention,
+                "start_char": start if isinstance(start, int) else 0,
+                "end_char": end if isinstance(end, int) else 0,
+                "evidence": {"quote": str((item.get("evidence") or {}).get("quote") or "")},
+            }
         text = str(chunk.get("text") or "")
         mention = str(item.get("mention") or "")
         start = text.find(mention) if mention else -1

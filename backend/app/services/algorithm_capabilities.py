@@ -27,7 +27,7 @@ from backend.app.schemas import (
     TextChunk,
     TextEmbeddingItem,
 )
-from backend.app.services.knowledge_extract_adapter import extract_chunks
+from backend.app.services.knowledge_extract_adapter import extract_chunks, publish_best_effort_graph
 
 
 class CapabilityError(Exception):
@@ -148,15 +148,19 @@ class GraphExtractionBatch:
     def graph_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {}
         publishable = bool((self.quality or {}).get("graph_publishable", True))
+        # 默认（KG_EXTRACT_PUBLISH_BEST_EFFORT=1）校验未过也发布 best-effort 图谱，
+        # graph_publishable=false 仅作"不可沉淀入库"的质量信号；置 0 恢复旧行为：
+        # graph/graphs 置空，图谱只出现在 isolated_graph/isolated_graphs。
+        quarantine_graph = not publishable and not publish_best_effort_graph()
         if self.graph is not None:
-            data["graph"] = self.graph if publishable else {"nodes": [], "relationships": []}
+            data["graph"] = {"nodes": [], "relationships": []} if quarantine_graph else self.graph
             quarantined_graph = self.isolated_graph if self.isolated_graph is not None else self.graph
             if not publishable and quarantined_graph is not None:
                 data["isolated_graph"] = quarantined_graph
             elif self.isolated_graph is not None:
                 data["isolated_graph"] = self.isolated_graph
         else:
-            data["graphs"] = (self.graphs or []) if publishable else []
+            data["graphs"] = [] if quarantine_graph else (self.graphs or [])
             quarantined_graphs = self.isolated_graphs if self.isolated_graphs is not None else self.graphs
             if not publishable and quarantined_graphs is not None:
                 data["isolated_graphs"] = quarantined_graphs
@@ -479,13 +483,17 @@ class GraphExtractionService:
         if merge:
             merged_graph = deduplicate_chunk_graphs(results)
             graph_publishable = bool(quality.get("graph_publishable", True))
+            # 校验未过时默认仍发布 best-effort 图谱（graph_publishable 照旧为
+            # False，供下游沉淀/入库判断）；KG_EXTRACT_PUBLISH_BEST_EFFORT=0
+            # 恢复旧的置空行为。isolated_graph 语义不变：未过校验即保留隔离副本。
+            publish_graph = graph_publishable or publish_best_effort_graph()
             return GraphExtractionBatch(
                 items=results,
                 attempts=attempts,
                 scheduler=scheduler,
                 graph=(
                     merged_graph
-                    if graph_publishable
+                    if publish_graph
                     else {"nodes": [], "relationships": []}
                 ),
                 quality=quality,
@@ -493,6 +501,7 @@ class GraphExtractionService:
                 empty_reason=empty_reason,
             )
         graph_publishable = bool(quality.get("graph_publishable", True))
+        publish_graph = graph_publishable or publish_best_effort_graph()
         extracted_graphs = [item["graph"] for item in results]
         return GraphExtractionBatch(
             items=results,
@@ -500,7 +509,7 @@ class GraphExtractionService:
             scheduler=scheduler,
             graphs=(
                 extracted_graphs
-                if graph_publishable
+                if publish_graph
                 else [{"nodes": [], "relationships": []} for _ in extracted_graphs]
             ),
             quality=quality,

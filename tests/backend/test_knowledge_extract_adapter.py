@@ -287,12 +287,67 @@ def test_degraded_chunk_failure_is_explicit_in_batch_quality(monkeypatch):
     assert batch.quality["failed_chunk_count"] == 1
 
 
-def test_terminal_verification_blocks_public_graph_but_keeps_isolated_graph(monkeypatch):
-    def invalid_runner(**_kwargs):
+def _invalid_verification_runner(**_kwargs):
+    """verification 有硬错误但 LLM 实际抽出了节点的聚合结果（best-effort 素材）。"""
+    return {
+        "status": "partial",
+        "error_code": "LLM_SCHEMA_INVALID",
+        "verification": {"valid": False, "hard_issue_count": 1},
+        "profile": {},
+        "graph": {"nodes": [{"uid": "Term::a"}], "relationships": []},
+        "raw": {"entities": [], "relations": []},
+        "intermediate_model": {"objects": [], "relations": []},
+        "attempts": [],
+        "warnings": [],
+    }
+
+
+def _extract_with_runner(monkeypatch, runner):
+    monkeypatch.setattr(
+        capabilities,
+        "extract_chunks",
+        lambda **kwargs: adapter.extract_chunks(
+            kwargs["ontology"], kwargs["chunks"], runner=runner
+        ),
+    )
+    return capabilities.GraphExtractionService().extract(
+        "class Term", [TextChunk(text="内容")]
+    )
+
+
+def test_terminal_verification_publishes_best_effort_graph_with_quality_gate(monkeypatch):
+    """新默认：verification 未过仍发布 best-effort 图谱，graph_publishable 如实为 False。"""
+    monkeypatch.delenv("KG_EXTRACT_PUBLISH_BEST_EFFORT", raising=False)
+    batch = _extract_with_runner(monkeypatch, _invalid_verification_runner)
+
+    payload = batch.graph_data()
+    assert payload["graph_publishable"] is False
+    assert [node["uid"] for node in payload["graph"]["nodes"]] == ["Term::a"]
+    # isolated_graph 契约保留：未过校验的图谱同步出现在隔离字段里
+    assert [node["uid"] for node in payload["isolated_graph"]["nodes"]] == ["Term::a"]
+    assert payload["quality"]["status"] == "partial"
+    assert payload["quality"]["error_code"] == "LLM_SCHEMA_INVALID"
+    assert payload["quality"]["verification"]["valid"] is False
+
+
+def test_terminal_verification_clears_graph_when_best_effort_disabled(monkeypatch):
+    """KG_EXTRACT_PUBLISH_BEST_EFFORT=0 恢复旧行为：graph 置空，图谱只在 isolated_graph。"""
+    monkeypatch.setenv("KG_EXTRACT_PUBLISH_BEST_EFFORT", "0")
+    batch = _extract_with_runner(monkeypatch, _invalid_verification_runner)
+
+    payload = batch.graph_data()
+    assert payload["graph_publishable"] is False
+    assert payload["graph"] == {"nodes": [], "relationships": []}
+    assert [node["uid"] for node in payload["isolated_graph"]["nodes"]] == ["Term::a"]
+    assert payload["quality"]["verification"]["valid"] is False
+
+
+def test_verified_graph_publishes_normally_regardless_of_best_effort_flag(monkeypatch):
+    """验证通过路径不受开关影响：graph 正常发布，不出现 isolated_graph。"""
+    def valid_runner(**_kwargs):
         return {
-            "status": "partial",
-            "error_code": "LLM_SCHEMA_INVALID",
-            "verification": {"valid": False, "hard_issue_count": 1},
+            "status": "succeeded",
+            "verification": {"valid": True},
             "profile": {},
             "graph": {"nodes": [{"uid": "Term::a"}], "relationships": []},
             "raw": {"entities": [], "relations": []},
@@ -301,22 +356,14 @@ def test_terminal_verification_blocks_public_graph_but_keeps_isolated_graph(monk
             "warnings": [],
         }
 
-    monkeypatch.setattr(
-        capabilities,
-        "extract_chunks",
-        lambda **kwargs: adapter.extract_chunks(
-            kwargs["ontology"], kwargs["chunks"], runner=invalid_runner
-        ),
-    )
-    batch = capabilities.GraphExtractionService().extract(
-        "class Term", [TextChunk(text="内容")]
-    )
+    for flag in ("0", "1"):
+        monkeypatch.setenv("KG_EXTRACT_PUBLISH_BEST_EFFORT", flag)
+        batch = _extract_with_runner(monkeypatch, valid_runner)
 
-    payload = batch.graph_data()
-    assert payload["graph_publishable"] is False
-    assert payload["graph"] == {"nodes": [], "relationships": []}
-    assert [node["uid"] for node in payload["isolated_graph"]["nodes"]] == ["Term::a"]
-    assert payload["quality"]["verification"]["valid"] is False
+        payload = batch.graph_data()
+        assert payload["graph_publishable"] is True
+        assert [node["uid"] for node in payload["graph"]["nodes"]] == ["Term::a"]
+        assert "isolated_graph" not in payload
 
 
 def test_run_single_document_exposes_quality_and_verification_on_failure(monkeypatch):
@@ -339,6 +386,58 @@ def test_run_single_document_exposes_quality_and_verification_on_failure(monkeyp
     assert result["quality"]["graph_publishable"] is False
     assert result["quality"]["verification"]["valid"] is False
     assert result["verification"] == result["quality"]["verification"]
+
+
+def test_run_single_document_publishes_best_effort_graph_on_verification_failure(monkeypatch):
+    """MCP 工具路径与 HTTP 一致：verification 未过返回 best-effort 图谱而非工具错误。"""
+    monkeypatch.delenv("KG_EXTRACT_PUBLISH_BEST_EFFORT", raising=False)
+    monkeypatch.setattr(
+        adapter,
+        "run_aggregate",
+        lambda *_args, **_kwargs: {
+            "status": "partial",
+            "error_code": "LLM_SCHEMA_INVALID",
+            "verification": {"valid": False, "hard_issue_count": 1},
+            "profile": {},
+            "graph": {"nodes": [{"uid": "Term::a"}], "relationships": []},
+            "attempts": [],
+            "warnings": [],
+        },
+    )
+
+    result = adapter.run_single_document("class Term", "内容")
+
+    assert "_error" not in result
+    assert [node["uid"] for node in result["graph"]["nodes"]] == ["Term::a"]
+    assert result["status"] == "partial"
+    assert result["error_code"] == "LLM_SCHEMA_INVALID"
+    assert result["quality"]["graph_publishable"] is False
+    assert result["quality"]["verification"]["valid"] is False
+
+
+def test_run_single_document_keeps_error_shape_when_best_effort_disabled(monkeypatch):
+    """KG_EXTRACT_PUBLISH_BEST_EFFORT=0 时 MCP 路径恢复旧的 _error 形态。"""
+    monkeypatch.setenv("KG_EXTRACT_PUBLISH_BEST_EFFORT", "0")
+    monkeypatch.setattr(
+        adapter,
+        "run_aggregate",
+        lambda *_args, **_kwargs: {
+            "status": "partial",
+            "error_code": "LLM_SCHEMA_INVALID",
+            "verification": {"valid": False, "hard_issue_count": 1},
+            "profile": {},
+            "graph": {"nodes": [{"uid": "Term::a"}], "relationships": []},
+            "attempts": [],
+            "warnings": [],
+        },
+    )
+
+    result = adapter.run_single_document("class Term", "内容")
+
+    assert result["_error"] == "知识抽取失败"
+    assert result["error_code"] == "LLM_SCHEMA_INVALID"
+    assert "graph" not in result
+    assert result["quality"]["graph_publishable"] is False
 
 
 def test_projected_cross_chunk_relationships_are_closed_and_keep_source_provenance():

@@ -4,9 +4,10 @@
 本目录是一份独立代码副本，不是 v2/v3 的软链或映射；后续对 v3 的实验性改动
 不会自动影响正在运行的 latest，需要显式把 latest 内容同步/替换后才会生效。
 
-本次同步：2026-09-30，来源为 ``v3``（sxm-dev 版完整流水线）的全量代码副本
-（含 ``tests/``）。旧版实验 harness（adapter/client/context/facts/harness/
-prompts/schema）已随本次同步移除。
+本次同步：2026-10-01 同步自 v3（含 P0 止血：证据闸 warn 化
+``KG_EXTRACT_EVIDENCE_ADMISSION``、修复循环默认 2 轮、实体/关系 LLM 主调用
+多重试恢复）；来源为 ``v3`` 的全量代码副本（含 ``tests/``）。旧版实验
+harness（adapter/client/context/facts/harness/prompts/schema）已随前次同步移除。
 
 包入口：暴露 backend 适配器需要的 aggregate / public 契约。
 """

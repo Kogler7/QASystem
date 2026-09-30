@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from copy import deepcopy
 from typing import Any, Callable, Iterable, Sequence
@@ -74,6 +75,18 @@ def _empty_graph() -> dict[str, list[dict[str, Any]]]:
     return {"nodes": [], "relationships": []}
 
 
+def publish_best_effort_graph() -> bool:
+    """verification 未通过时，抽取响应是否仍返回 best-effort 图谱。
+
+    默认开启（1）：``graph``/``graphs`` 保留已抽取的节点与关系，
+    ``graph_publishable=false`` 仅作为下游沉淀/入库环节的"不可信"信号；
+    设为 0 恢复旧行为（响应 ``graph`` 置空，图谱仅出现在 ``isolated_graph``）。
+    读取方式与 ``KG_EXTRACT_STRICT_CHUNK_FAILURES`` 一致：调用时读环境变量。
+    """
+    value = str(os.environ.get("KG_EXTRACT_PUBLISH_BEST_EFFORT", "1")).strip().lower()
+    return value not in {"0", "false", "no"}
+
+
 def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
     """Keep aggregate verification visible across the per-chunk adapter."""
     profile = result.get("profile") or {}
@@ -89,6 +102,9 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
     graph_publishable = verification.get("valid") is not False and status not in {
         "failed",
     }
+    if not graph_publishable and status == "succeeded":
+        # 校验未过的图谱不得标 succeeded：降级为 partial，与 best-effort 发布语义一致。
+        status = "partial"
     summary = {
         "status": status,
         "error_code": result.get("error_code") or None,
@@ -662,7 +678,10 @@ def run_single_document(
 
     Success returns the ``raw`` / ``graph`` / ``warnings`` / ``attempts`` /
     ``profile`` keys V1 exposed.  Failure returns ``_error`` so
-    ``normalize_tool_result`` still maps it onto ``KNOWLEDGE_FAILED``.
+    ``normalize_tool_result`` still maps it onto ``KNOWLEDGE_FAILED`` --
+    except a verification-failed (non-``failed``) run with
+    ``KG_EXTRACT_PUBLISH_BEST_EFFORT`` on, which publishes the best-effort
+    graph plus quality markers, matching the HTTP extraction contract.
     """
     result = run_aggregate(
         ontology,
@@ -674,6 +693,22 @@ def run_single_document(
     status = str(result.get("status") or "")
     quality = _quality_summary(result)
     if status != "succeeded" or result.get("error_code"):
+        verification_failed = quality["graph_publishable"] is False and status != "failed"
+        if verification_failed and publish_best_effort_graph():
+            # 与 HTTP 抽取响应一致的发布语义：verification 未过仍返回 best-effort
+            # 图谱 + 质量标记（graph_publishable=false 供调用方判断可信度），
+            # 而不是把整篇作废成工具错误；status=failed（无可用结果）维持 _error。
+            return {
+                "raw": result.get("raw") or {},
+                "graph": result.get("graph") or _empty_graph(),
+                "warnings": result.get("warnings") or [],
+                "attempts": _compressed_attempts(result.get("attempts")),
+                "profile": result.get("profile") or {},
+                "status": quality["status"],
+                "error_code": result.get("error_code") or None,
+                "quality": quality,
+                "verification": deepcopy(quality["verification"]),
+            }
         return {
             "_error": result.get("_error") or "知识抽取失败",
             "error_code": result.get("error_code") or "EXTRACTION_EXCEPTION",
@@ -699,6 +734,7 @@ __all__ = [
     "build_chunks",
     "extract_chunks",
     "project_items",
+    "publish_best_effort_graph",
     "run_aggregate",
     "run_single_document",
 ]

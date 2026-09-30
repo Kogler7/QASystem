@@ -6,9 +6,13 @@
 
 ## 同步状态
 
-- 本次同步日期：2026-09-30
+- 本次同步日期：2026-10-01
 - 同步来源：`algorithm/knowledge_extract/v3/`（sxm-dev 版完整流水线）全量 `.py` + `tests/`
-- 同步时移除了旧版实验 harness（`adapter/client/context/facts/harness/prompts/schema`）。
+- 本次同步包含 P0 止血修复：证据闸 fail-open（`KG_EXTRACT_EVIDENCE_ADMISSION=warn` 默认，
+  不可逐字定位/核验不一致的实体保留并标记 `evidence_status=unverified`，终验
+  `EVIDENCE_INVALID` 降为 warning）、修复循环默认 2 轮（`KG_EXTRACT_MAX_REPAIR_ROUNDS`）、
+  实体/关系 LLM 主调用多重试恢复（`KG_EXTRACT_LLM_MAX_ATTEMPTS`，默认 3）。
+- 前次同步已移除旧版实验 harness（`adapter/client/context/facts/harness/prompts/schema`）。
 
 ## 如何再同步
 
