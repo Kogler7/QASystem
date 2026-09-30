@@ -18,8 +18,8 @@ E, R = G["entities"], G["relations"]
 def clean(s): return re.sub(r"\s+", "", str(s or ""))
 
 def build_client():
-    from eval.legacy import v2_benchmark_eval as ev
-    return ev._build_judge_client(model=ev._DEFAULT_MODEL, base_url=ev._DEFAULT_BASE_URL, api_key=ev._DEFAULT_API_KEY, max_tokens=None)
+    from eval.run import build_judge_client
+    return build_judge_client({"eval": {}})
 
 SYSTEM = """你是标准条款命名器。为每条给定内容生成一个概括短标题（<=12个汉字），用于实体名字。
 要求：忠实概括，不引入新事实；不要照抄长句；只输出 JSON。"""

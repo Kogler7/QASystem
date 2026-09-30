@@ -2,7 +2,7 @@
 
 本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
 
-Benchmark 数据集（17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v2/`，评测脚本位于 `eval/legacy/`，均不属于本目录。
+Benchmark 数据集（17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v2/`，作为历史冻结集保留（单测 fixtures 与造 golden 工具的数据源）；在线链路的评测统一走 `eval/run.py`（设置 `KG_EXTRACT_ALGO_VERSION=v2` 即评测本包），均不属于本目录。
 
 ## 公共入口
 
@@ -45,9 +45,7 @@ V2 只消费上游已解析、已切分的 `ExtractionChunk`，不接收完整 M
 
 ```bash
 .venv/bin/python -m algorithm.knowledge_extract.v2.benchmark_lint
-.venv/bin/python eval/legacy/v2_benchmark_eval.py --datasets simple
-.venv/bin/python eval/legacy/v2_benchmark_eval.py --datasets official
-.venv/bin/python eval/legacy/v2_benchmark_eval.py --datasets standard
+KG_EXTRACT_ALGO_VERSION=v2 .venv/bin/python eval/run.py test_data/eval
 ```
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。

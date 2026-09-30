@@ -98,7 +98,7 @@
 | `result_contract.py` / `run_state.py` / `verification.py` | 对外结果契约、运行状态与最终校验 |
 | `structured_text.py` / `structured_output.py` / `table_semantics.py` | 结构化文本/表格处理与输出校验 |
 | `batch.py` / `scheduler.py` / `config.py` | 批处理、调度与配置 |
-| （已迁出） | 原 `benchmark/` / `golden_task/` / `scripts/` / `archive/` 已迁到 `test_data/eval-v2` / `eval/tools/` / `eval/legacy/` / `tests/fixtures`，版本目录只保留算法代码 |
+| （已迁出） | 原 `benchmark/` / `golden_task/` / `scripts/` / `archive/` 已迁到 `test_data/eval-v2` / `eval/tools/` / `tests/fixtures`，评测统一入口为 `eval/run.py`（旧版 legacy 脚本已清理），版本目录只保留算法代码 |
 | `tests/` / `archive/` | 测试与归档代码 |
 
 > 抽取的产物是**知识单元与关系**，最终由 `embedding_runtime` 向量化、经外部接口写入图谱。

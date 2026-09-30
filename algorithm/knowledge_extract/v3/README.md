@@ -8,7 +8,7 @@ tags: []
 
 本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
 
-Benchmark 数据集（official/standard/simple/rule 冻结 case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v3/`，评测脚本位于 `eval/legacy/`，均不属于本目录。
+Benchmark 数据集（official/standard/simple/rule 冻结 case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v3/`，作为历史冻结集保留（单测 fixtures 与对照数据源）；在线链路的评测统一走 `eval/run.py`（设置 `KG_EXTRACT_ALGO_VERSION=v3` 即评测本包），均不属于本目录。
 
 ## 公共入口
 
@@ -118,9 +118,9 @@ Excel/CSV 仍由上游解析：每个工作表渲染为 `## <sheet>` 加一个 J
 
 ```bash
 .venv/bin/python -m algorithm.knowledge_extract.v2.benchmark_lint
-.venv/bin/python eval/legacy/v2v3_benchmark.py --versions v3 --output-dir tmp/eval-v3
+KG_EXTRACT_ALGO_VERSION=v3 .venv/bin/python eval/run.py test_data/eval
 ```
 
-v3 的 benchmark 数据集在 `test_data/eval-v3/`（official/standard/simple/rule 四组）；评测输出写入 `./tmp/` 下按版本与时间隔离的目录。
+在线评测统一走 `eval/run.py`（设置 `KG_EXTRACT_ALGO_VERSION=v3` 选中本包，默认 `latest`）；做版本对比时先跑 `--mode chunk-extract` 冻结切片，再 `--mode extract --from-run <上次运行>` 只重跑抽取。评测输出写入 `tmp/eval/runs/<时间戳>/`。
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。

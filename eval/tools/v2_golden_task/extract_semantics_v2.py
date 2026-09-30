@@ -44,9 +44,8 @@ def own_body_of(quote):
 def clean(s): return re.sub(r"\s+", " ", str(s or "")).strip()
 
 def build_client():
-    from eval.legacy import v2_benchmark_eval as ev
-    return ev._build_judge_client(model=ev._DEFAULT_MODEL, base_url=ev._DEFAULT_BASE_URL,
-                                  api_key=ev._DEFAULT_API_KEY, max_tokens=None)
+    from eval.run import build_judge_client
+    return build_judge_client({"eval": {}})
 
 SYSTEM = """你是标准技术语义抽取器。只依据给定条款正文，输出 items 数组，每项 kind 为 "property" 或 "constraint"。
 property 字段：name(<=8汉字)、type(描述型/能力型/约束型)、value、quote(逐字原文)。
