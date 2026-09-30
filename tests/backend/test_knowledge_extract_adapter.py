@@ -109,6 +109,43 @@ def test_build_chunks_keeps_batch_spreadsheet_provenance_after_file_header_chunk
     assert chunk.metadata["source_file"] == "table.xlsx"
 
 
+def test_run_aggregate_feeds_field_dicts_to_v3_and_latest(monkeypatch):
+    """v3/latest 入口只认各自包内的 ExtractionChunk 或字段 dict，适配器给字段 dict。"""
+    from algorithm.knowledge_extract import latest as latest_pkg
+    from algorithm.knowledge_extract import v3 as v3_pkg
+
+    captured = {}
+
+    def fake_runner(**kwargs):
+        captured.update(kwargs)
+        return {"status": "succeeded"}
+
+    for label, pkg in (("v3", v3_pkg), ("latest", latest_pkg)):
+        monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", label)
+        captured.clear()
+        adapter.run_aggregate("class Term", ["第一段内容"], runner=fake_runner)
+        chunks = captured["chunks"]
+        assert chunks and all(isinstance(chunk, dict) for chunk in chunks)
+        for chunk in chunks:
+            resolved = pkg.ExtractionChunk.from_dict(chunk)
+            assert resolved.chunk_id == chunk["chunk_id"]
+            assert resolved.text == chunk["text"]
+
+
+def test_run_aggregate_feeds_v2_chunk_objects_to_v2(monkeypatch):
+    from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk as V2Chunk
+
+    captured = {}
+
+    def fake_runner(**kwargs):
+        captured.update(kwargs)
+        return {"status": "succeeded"}
+
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v2")
+    adapter.run_aggregate("class Term", ["第一段内容"], runner=fake_runner)
+    assert captured["chunks"] and all(isinstance(chunk, V2Chunk) for chunk in captured["chunks"])
+
+
 def test_graph_service_forwards_ranges_and_metadata(monkeypatch):
     captured = {}
 
@@ -480,7 +517,8 @@ def test_v3_result_is_converted_and_projected_onto_chunks(monkeypatch):
 
     def fake_extract_aggregate(ontology, *, chunks, **_kwargs):
         assert ontology == "class Term"
-        assert [chunk.chunk_id for chunk in chunks] == ["chunk-0000", "chunk-0001"]
+        # 适配器给 v3/latest 传字段 dict（版本包入口只认自家 ExtractionChunk 或 dict）
+        assert [chunk["chunk_id"] for chunk in chunks] == ["chunk-0000", "chunk-0001"]
         # 新契约：extract_aggregate 返回 harness 聚合契约（graph/raw/
         # intermediate_model/attempts/warnings/profile/verification）。
         return {

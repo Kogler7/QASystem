@@ -213,6 +213,32 @@ def _infer_table_metadata(text: str, metadata: dict[str, Any]) -> dict[str, Any]
     return metadata
 
 
+def _chunk_payloads(
+    texts: Sequence[str],
+    ranges: Sequence[Sequence[int] | None] | None = None,
+    metadata: Sequence[dict[str, Any] | None] | None = None,
+) -> list[dict[str, Any]]:
+    """Build the per-chunk field payloads shared by every extraction version."""
+    payloads = []
+    for position, text in enumerate(texts):
+        span = ranges[position] if ranges is not None and position < len(ranges) else None
+        supplied = metadata[position] if metadata is not None and position < len(metadata) else None
+        chunk_metadata = _infer_table_metadata(text or "", deepcopy(supplied or {}))
+        document_id = chunk_metadata.get("document_id") or chunk_metadata.get("source_file")
+        payloads.append(
+            {
+                "chunk_id": _chunk_id(position),
+                "text": text or "",
+                "document_id": str(document_id) if document_id else None,
+                "section_title": str(chunk_metadata.get("sheet_name")) if chunk_metadata.get("sheet_name") else None,
+                "start_offset": span[0] if span else None,
+                "end_offset": span[1] if span else None,
+                "metadata": chunk_metadata,
+            }
+        )
+    return payloads
+
+
 def build_chunks(
     texts: Sequence[str],
     ranges: Sequence[Sequence[int] | None] | None = None,
@@ -225,24 +251,7 @@ def build_chunks(
     """
     from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
 
-    chunks = []
-    for position, text in enumerate(texts):
-        span = ranges[position] if ranges is not None and position < len(ranges) else None
-        supplied = metadata[position] if metadata is not None and position < len(metadata) else None
-        chunk_metadata = _infer_table_metadata(text or "", deepcopy(supplied or {}))
-        document_id = chunk_metadata.get("document_id") or chunk_metadata.get("source_file")
-        chunks.append(
-            ExtractionChunk(
-                chunk_id=_chunk_id(position),
-                text=text or "",
-                document_id=str(document_id) if document_id else None,
-                section_title=str(chunk_metadata.get("sheet_name")) if chunk_metadata.get("sheet_name") else None,
-                start_offset=span[0] if span else None,
-                end_offset=span[1] if span else None,
-                metadata=chunk_metadata,
-            )
-        )
-    return chunks
+    return [ExtractionChunk(**payload) for payload in _chunk_payloads(texts, ranges, metadata)]
 
 
 def run_aggregate(
@@ -267,9 +276,16 @@ def run_aggregate(
             ke_version.V3: v3.extract_aggregate,
             ke_version.LATEST: latest.extract_aggregate,
         }[label]
+    # v2 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
+    # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
+    chunks = (
+        build_chunks(texts, ranges, metadata)
+        if label == ke_version.V2
+        else _chunk_payloads(texts, ranges, metadata)
+    )
     result = runner(
         ontology=ontology,
-        chunks=build_chunks(texts, ranges, metadata),
+        chunks=chunks,
         target_types=list(target_types) if target_types is not None else None,
         validation_mode="permissive",
         best_effort=True,
