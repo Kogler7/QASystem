@@ -17,6 +17,7 @@ from algorithm.knowledge_extract.v2.config import get_llm_config
 from algorithm.knowledge_pipeline import chunk_document_items, normalize_document_content
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 
+from backend.app import observability
 from backend.app.responses import ErrorCode
 from backend.app.schemas import (
     ChunkOptions,
@@ -38,6 +39,98 @@ class CapabilityError(Exception):
         self.details = details
 
 
+#: 告警/日志里提示"有提议但全被打掉"的 warning code 关键字。
+_REJECTION_WARNING_MARKERS = ("REJECTED", "OUT_OF_SCOPE", "UNKNOWN_ENTITY_TYPE", "INVALID_ENTITY")
+
+
+def _as_count(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def classify_empty_extraction(
+    items: list[dict[str, Any]] | None,
+    profile: dict[str, Any] | None,
+    warnings: list[dict[str, Any]] | None,
+) -> str:
+    """空抽取结果（0 实体 0 关系）的原因分类，写进响应 stats.extraction.empty_reason。
+
+    - ``all_chunks_failed``：全部 chunk 抽取失败（已有 PARTIAL_EXTRACTION_FAILED 路径，
+      此处兜底直接调用/异常形态）。
+    - ``filtered_by_validation``：有候选提议但全部被校验/映射拒绝（本体过严或
+      模型输出质量问题）。
+    - ``llm_no_proposal``：各 pass 都没产生候选（内容/本体不匹配）。
+    - ``unknown``：信息不足（例如没有 profile 统计）。
+    """
+    rows = [item for item in (items or []) if isinstance(item, dict)]
+    if rows and all(item.get("error") for item in rows):
+        return "all_chunks_failed"
+    stats = profile or {}
+    selection = stats.get("candidate_selection") if isinstance(stats.get("candidate_selection"), dict) else {}
+    return _classify_by_counts(
+        has_profile=bool(stats),
+        entity_candidates=_as_count(stats.get("entity_candidates")),
+        relation_candidates=_as_count(stats.get("relation_candidates")),
+        accepted=_as_count(stats.get("accepted_entities")) + _as_count(stats.get("accepted_relations")),
+        rejected=_as_count(selection.get("rejected_entities")) + _as_count(selection.get("rejected_relations")),
+        warnings=warnings,
+    )
+
+
+def _summarize_warning_codes(warnings: list[dict[str, Any]] | None) -> dict[str, int]:
+    counter: dict[str, int] = {}
+    for row in (warnings or []):
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get("code") or "UNKNOWN")
+        counter[code] = counter.get(code, 0) + 1
+    return counter
+
+
+def _classify_by_counts(
+    *,
+    has_profile: bool,
+    entity_candidates: int,
+    relation_candidates: int,
+    accepted: int,
+    rejected: int,
+    warnings: list[dict[str, Any]] | None,
+) -> str:
+    proposed = (entity_candidates > 0 or relation_candidates > 0 or rejected > 0)
+    if proposed:
+        if accepted == 0:
+            return "filtered_by_validation"
+        return "unknown"
+    warning_codes = _summarize_warning_codes(warnings)
+    if any(marker in code for code in warning_codes for marker in _REJECTION_WARNING_MARKERS):
+        # 有拒绝类告警但 profile 计数缺失：仍说明"提议过、被打掉"。
+        return "filtered_by_validation"
+    if has_profile:
+        return "llm_no_proposal"
+    return "unknown"
+
+
+def _empty_reason_for(results: list[dict[str, Any]]) -> str | None:
+    """结果图谱为空（0 节点 0 关系）时给出分类，否则返回 None。
+
+    空判定基于各切片图谱计数之和：合并只会去重减少实例，不会把非空变空。
+    """
+    node_total = 0
+    relationship_total = 0
+    for item in results:
+        graph = (item or {}).get("graph") or {}
+        node_total += len(graph.get("nodes") or [])
+        relationship_total += len(graph.get("relationships") or [])
+    if node_total or relationship_total:
+        return None
+    diagnostics = results[0] if results else {}
+    profile = dict(diagnostics.get("profile") or {})
+    warnings = list(diagnostics.get("warnings") or [])
+    return classify_empty_extraction(results, profile, warnings)
+
+
 @dataclass(slots=True)
 class GraphExtractionBatch:
     items: list[dict[str, Any]]
@@ -48,6 +141,9 @@ class GraphExtractionBatch:
     quality: dict[str, Any] | None = None
     isolated_graph: dict[str, Any] | None = None
     isolated_graphs: list[dict[str, Any]] | None = None
+    #: 空抽取结果分类（all_chunks_failed / filtered_by_validation / llm_no_proposal /
+    #: unknown）；非空结果时为 None，仅空结果时写入响应 stats.extraction.empty_reason。
+    empty_reason: str | None = None
 
     def graph_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {}
@@ -349,7 +445,11 @@ class GraphExtractionService:
                 )
             # 降级：单片失败不再作废整篇。失败片保留在 items 里（带 error 标记），
             # 其余片照常合并出图谱，并把失败明细落到日志，便于定位。
-            logger.error("[算法能力] 部分文本切片知识抽取失败，已降级继续: %s", failed_items)
+            logger.error(
+                "%s[算法能力] 部分文本切片知识抽取失败，已降级继续: %s",
+                observability.context_prefix(request_id=observability.get_request_id()),
+                failed_items,
+            )
             for item in failed:
                 item.setdefault("graph", {"nodes": [], "relationships": []})
                 item.setdefault("warning", f"chunk 抽取失败: {item.get('error_code') or item.get('error')}")
@@ -375,6 +475,7 @@ class GraphExtractionService:
             quality["status"] = "partial"
             quality["error_code"] = _extraction_error(failed, len(results)).name
             quality["failed_chunk_count"] = len(failed)
+        empty_reason = _empty_reason_for(results)
         if merge:
             merged_graph = deduplicate_chunk_graphs(results)
             graph_publishable = bool(quality.get("graph_publishable", True))
@@ -389,6 +490,7 @@ class GraphExtractionService:
                 ),
                 quality=quality,
                 isolated_graph=None if graph_publishable else merged_graph,
+                empty_reason=empty_reason,
             )
         graph_publishable = bool(quality.get("graph_publishable", True))
         extracted_graphs = [item["graph"] for item in results]
@@ -403,6 +505,7 @@ class GraphExtractionService:
             ),
             quality=quality,
             isolated_graphs=None if graph_publishable else extracted_graphs,
+            empty_reason=empty_reason,
         )
 
 

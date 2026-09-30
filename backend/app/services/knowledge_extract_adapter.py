@@ -40,6 +40,8 @@ from typing import Any, Callable, Iterable, Sequence
 
 from algorithm.knowledge_extract import latest, v2, v3, version as ke_version
 
+from backend.app import observability
+
 logger = logging.getLogger(__name__)
 
 CHUNK_ID_PREFIX = "chunk-"
@@ -544,7 +546,8 @@ def project_items(
             }
         )
     logger.info(
-        "knowledge extract %s run: status=%s error_code=%s chunks=%d failed_chunks=%d nodes=%d",
+        "%sknowledge extract %s run: status=%s error_code=%s chunks=%d failed_chunks=%d nodes=%d",
+        observability.context_prefix(request_id=observability.get_request_id()),
         result.get("extract_version") or "v2",
         result.get("status"),
         result.get("error_code"),
@@ -591,7 +594,12 @@ def extract_chunks(
             runner=runner,
         )
     except Exception as exc:  # noqa: BLE001 - mirror V1's per-call error containment
-        logger.warning("knowledge extract %s call failed: %s", version, exc)
+        logger.warning(
+            "%sknowledge extract %s call failed: %s",
+            observability.context_prefix(request_id=observability.get_request_id()),
+            version,
+            exc,
+        )
         # V2 的结构化错误（如 ONTOLOGY_EMPTY）带 error_code，原样透传避免被泛化。
         error_code = str(getattr(exc, "error_code", "") or "EXTRACTION_EXCEPTION")
         message = str(exc).strip() or "知识抽取调用异常"

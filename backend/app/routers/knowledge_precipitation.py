@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from backend.app import observability
 from backend.app.execution.api import ExecutionUnavailable, ManagedExecutionError, dispatch_operation, prefer_wait_seconds
 from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
 from backend.app.schemas import PipelineOptions
@@ -58,6 +59,18 @@ async def knowledge_ingestion(
     options: str = Form("{}"),
     file: UploadFile | None = File(None),
     files: list[UploadFile] | None = File(None),
+) -> JSONResponse:
+    # 无执行上下文（同步等待）的 HTTP 调用在这里生成 request_id，贯穿日志与告警。
+    with observability.request_id_scope():
+        return await _knowledge_ingestion(http_request, ontology, options, file, files)
+
+
+async def _knowledge_ingestion(
+    http_request: Request,
+    ontology: str,
+    options: str,
+    file: UploadFile | None,
+    files: list[UploadFile] | None,
 ) -> JSONResponse:
     deprecated = http_request.url.path != V1_PATH
     try:

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -18,6 +19,7 @@ from algorithm.logging_setup import ensure_logging
 from algorithm.preproc.preproc_src.main_processor import DocumentProcessor
 from external_services.application import get_application_service_url
 
+from backend.app import observability
 from backend.app.responses import ErrorCode
 from backend.app.schemas import PipelineOptions, TextChunk, TextEmbeddingItem
 from backend.app.services.algorithm_capabilities import (
@@ -42,6 +44,22 @@ _LAST_RUN_DIR: Path | None = None
 
 #: 日志里最多展开的本体行数；完整原文始终原样写进运行目录的 00-ontology.puml。
 ONTOLOGY_LOG_LINES = 200
+
+
+def _log_prefix(document: str | None = None) -> str:
+    """服务层日志前缀：已绑定 request_id 时附 ``request_id=<id>``，未绑定不附。
+
+    document 传文档指纹（file_name + 内容 sha256 前 8 位）时一并附加。
+    """
+    return observability.context_prefix(
+        request_id=observability.get_request_id(),
+        document=document,
+    )
+
+
+def _content_fingerprint(file_name: str, content: bytes) -> str:
+    """文档指纹：file_name + 内容 sha256 前 8 位，用于日志与告警串联同一文档。"""
+    return f"{Path(file_name or 'upload.bin').name}#{hashlib.sha256(content).hexdigest()[:8]}"
 
 
 def _ontology_log_text(text: str, limit: int = ONTOLOGY_LOG_LINES) -> str:
@@ -178,7 +196,7 @@ def _save_stage_artifact(label: str, stage: str, content: str) -> None:
         path = EXTRACTION_SNAPSHOT_DIR / f"{_snapshot_prefix(label)}_{stage}"
         path.write_text(content, encoding="utf-8")
     except Exception as exc:  # noqa: BLE001 - 落盘失败不应让流水线失败
-        logger.error("阶段产物写入失败: %s", exc)
+        logger.error("%s[知识沉淀] 阶段产物写入失败: %s", _log_prefix(), exc)
 
 
 def _save_error_log(label: str, exc: Exception) -> None:
@@ -204,7 +222,7 @@ def _save_error_log(label: str, exc: Exception) -> None:
             # 同一次运行的目录里也留一份，便于"整个流程"在一个目录里看全。
             (_LAST_RUN_DIR / "run-error.log").write_text(payload, encoding="utf-8")
     except Exception as write_exc:  # noqa: BLE001 - 写日志失败不能吞掉原始异常
-        logger.error("报错日志写入失败: %s", write_exc)
+        logger.error("%s[知识沉淀] 报错日志写入失败: %s", _log_prefix(), write_exc)
 
 
 def _log_pipeline_failure(method):
@@ -243,13 +261,52 @@ def _summarize_warnings(warnings: Any, *, limit: int = 30) -> dict[str, Any]:
     }
 
 
-class StageRecorder:
-    """把知识沉淀"抽取之前"的每一步输出落成独立文档，并在日志里回执。
+def _graph_summary(
+    final_graph: dict[str, Any] | None,
+    final_graphs: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """抽取产物的 nodes/relationships 摘要：总数 + 按 label/type 分布，供 03-extract.json。"""
+    graphs = [final_graph] if final_graph is not None else list(final_graphs or [])
+    nodes = [
+        node
+        for graph in graphs
+        for node in (graph.get("nodes") or [])
+        if isinstance(node, dict)
+    ]
+    relationships = [
+        relationship
+        for graph in graphs
+        for relationship in (graph.get("relationships") or [])
+        if isinstance(relationship, dict)
+    ]
+    by_label: dict[str, int] = {}
+    for node in nodes:
+        label = str(node.get("label") or "UNKNOWN")
+        by_label[label] = by_label.get(label, 0) + 1
+    by_type: dict[str, int] = {}
+    for relationship in relationships:
+        rel_type = str(relationship.get("type") or "UNKNOWN")
+        by_type[rel_type] = by_type.get(rel_type, 0) + 1
+    return {
+        "graph_count": len(graphs),
+        "nodes": {
+            "count": len(nodes),
+            "by_label": dict(sorted(by_label.items(), key=lambda item: (-item[1], item[0]))),
+        },
+        "relationships": {
+            "count": len(relationships),
+            "by_type": dict(sorted(by_type.items(), key=lambda item: (-item[1], item[0]))),
+        },
+    }
 
-    每次运行建一个目录 ``<run_id>_<文件名>/``，只放三份文档：
-    ``00-ontology.puml``（前端本体）、``01-parse.md``（解析输出）、
-    ``02-chunking.json``（切片输出）。抽取及其之后的阶段不再产生任何
-    日志与产物文件，结果只通过接口响应返回。
+
+class StageRecorder:
+    """把知识沉淀流水线的每一步输出落成独立文档，并在日志里回执。
+
+    每次运行建一个目录 ``<run_id>_<文件名>/``：``00-ontology.puml``（前端本体）、
+    ``01-parse.md``（解析输出）、``02-chunking.json``（切片输出）、
+    ``03-extract.json``（抽取的 nodes/relationships 摘要）、
+    ``04-quality.json``（stats 质量块）。向量与存储阶段的结果只通过接口响应返回。
 
     所有落盘都吞掉异常：阶段产物写不进去不能让整条流水线失败。
     """
@@ -270,7 +327,7 @@ class StageRecorder:
             self.directory.mkdir(parents=True, exist_ok=True)
             return True
         except Exception as exc:  # noqa: BLE001 - 产物目录创建失败不应中断流程
-            logger.error("[知识沉淀] 阶段产物目录创建失败: %s", exc)
+            logger.error("%s[知识沉淀] 阶段产物目录创建失败: %s", _log_prefix(), exc)
             return False
 
     def write(
@@ -293,9 +350,10 @@ class StageRecorder:
                 path.write_text(content, encoding="utf-8")
                 written = str(path)
             except Exception as exc:  # noqa: BLE001 - 单步落盘失败不影响流程
-                logger.error("[知识沉淀] 步骤产物写入失败 stage=%s: %s", stage, exc)
+                logger.error("%s[知识沉淀] 步骤产物写入失败 stage=%s: %s", _log_prefix(), stage, exc)
         logger.info(
-            "[知识沉淀] 步骤 %s 输出文档: %s（%d 字符, 耗时 %.2fs）→ %s%s",
+            "%s[知识沉淀] 步骤 %s 输出文档: %s（%d 字符, 耗时 %.2fs）→ %s%s",
+            _log_prefix(),
             stage,
             filename,
             len(content),
@@ -360,7 +418,9 @@ class KnowledgePrecipitationService:
         recorder: StageRecorder | None = None,
         source_metadata: dict[str, Any] | None = None,
         document_segments: list[dict[str, Any]] | None = None,
+        fingerprint: str | None = None,
     ) -> dict[str, Any]:
+        chunk_started = time.monotonic()
         threshold = options.chunking.chunk_threshold
         if document_segments:
             # Batch input is one artifact for storage, but remains a sequence of
@@ -400,10 +460,17 @@ class KnowledgePrecipitationService:
             item_metadata.update(dict(item.get("metadata") or {}))
             item["metadata"] = item_metadata
         logger.info(
-            "[知识沉淀] 切片完成: count=%d 总字符=%d threshold=%d",
+            "%s[知识沉淀] 切片完成: count=%d 总字符=%d threshold=%d",
+            _log_prefix(fingerprint),
             len(chunks),
             sum(len(item["text"]) for item in chunks),
             threshold,
+        )
+        observability.record_stage_duration(
+            "chunk",
+            time.monotonic() - chunk_started,
+            document=fingerprint,
+            extra={"chunk_count": len(chunks)},
         )
         _save_stage_artifact(
             upload_stem,
@@ -428,31 +495,79 @@ class KnowledgePrecipitationService:
             # 抽取前先把"前端传进来的本体长什么样"完整记下来：原文 + 抽取器的解析视图。
             ontology_catalog = _ontology_catalog(ontology)
             logger.info(
-                "[知识沉淀] 抽取输入本体（前端原样传入）: %d字符 sha256=%s",
+                "%s[知识沉淀] 抽取输入本体（前端原样传入）: %d字符 sha256=%s",
+                _log_prefix(fingerprint),
                 len(ontology),
                 hashlib.sha256(ontology.encode("utf-8")).hexdigest()[:16],
             )
             logger.info(
-                "[知识沉淀] 抽取输入本体原文（日志最多 %d 行）:\n%s",
+                "%s[知识沉淀] 抽取输入本体原文（日志最多 %d 行）:\n%s",
+                _log_prefix(fingerprint),
                 ONTOLOGY_LOG_LINES,
                 _ontology_log_text(ontology),
             )
             logger.info(
-                "[知识沉淀] 本体解析视图（type / identity / 属性）:\n%s",
+                "%s[知识沉淀] 本体解析视图（type / identity / 属性）:\n%s",
+                _log_prefix(fingerprint),
                 _ontology_log_text(
                     json.dumps(ontology_catalog["classes"], ensure_ascii=False, indent=2)
                 ),
             )
             logger.info(
-                "[知识沉淀] 本体解析视图（关系）: %s",
+                "%s[知识沉淀] 本体解析视图（关系）: %s",
+                _log_prefix(fingerprint),
                 _ontology_log_text(
                     json.dumps(ontology_catalog["relations"], ensure_ascii=False)
                 ),
             )
             if ontology_catalog["parse_error"]:
+                # 本体解析错误提前阻断：不再流到抽取阶段才爆 4006。
                 logger.error(
-                    "[知识沉淀] 本体解析失败: %s", ontology_catalog["parse_error"]
+                    "%s[知识沉淀] 本体解析失败，已阻断: %s",
+                    _log_prefix(fingerprint),
+                    ontology_catalog["parse_error"],
                 )
+                observability.increment_counter("ontology_invalid_total")
+                observability.send_alert(
+                    "ontology_invalid",
+                    {
+                        "request_id": observability.get_request_id(),
+                        "document": fingerprint,
+                        "stage": "ontology",
+                        "reason": ontology_catalog["parse_error"],
+                    },
+                )
+                raise CapabilityError(
+                    ErrorCode.ONTOLOGY_INVALID,
+                    f"本体解析失败: {ontology_catalog['parse_error']}",
+                    "ontology",
+                    {"parse_error": ontology_catalog["parse_error"]},
+                )
+            if not ontology_catalog["classes"]:
+                # 本体文本非空但一个类都解析不出来（流到抽取也只能 ONTOLOGY_EMPTY），
+                # 同样提前按 ONTOLOGY_INVALID(4006) 失败。
+                logger.error(
+                    "%s[知识沉淀] 本体未解析出任何类声明，已阻断: %d字符",
+                    _log_prefix(fingerprint),
+                    len(ontology),
+                )
+                observability.increment_counter("ontology_invalid_total")
+                observability.send_alert(
+                    "ontology_invalid",
+                    {
+                        "request_id": observability.get_request_id(),
+                        "document": fingerprint,
+                        "stage": "ontology",
+                        "reason": "本体未解析出任何类声明",
+                    },
+                )
+                raise CapabilityError(
+                    ErrorCode.ONTOLOGY_INVALID,
+                    "本体未解析出任何类声明",
+                    "ontology",
+                    {"characters": len(ontology)},
+                )
+            extract_started = time.monotonic()
             extracted_batch = self.extraction.extract(
                 ontology=ontology,
                 items=[
@@ -489,13 +604,30 @@ class KnowledgePrecipitationService:
                 "scheduler": extracted_batch.scheduler,
                 "quality": extracted_batch.quality or {},
             }
+            observability.record_stage_duration(
+                "extract",
+                time.monotonic() - extract_started,
+                document=fingerprint,
+                extra={
+                    "chunk_count": len(extracted_items),
+                    "node_count": node_count,
+                    "relationship_count": relationship_count,
+                },
+            )
+            empty_reason = extracted_batch.empty_reason
+            if empty_reason and node_count == 0 and relationship_count == 0:
+                # 空结果仅在此时给出分类：是"模型没提议"还是"提议了被校验打掉"。
+                stats["extraction"]["empty_reason"] = empty_reason
+                observability.increment_counter("empty_extraction_total")
             logger.info(
-                "[知识沉淀] 抽取完成: model=%s nodes=%d relationships=%d merge=%s attempts=%d",
+                "%s[知识沉淀] 抽取完成: model=%s nodes=%d relationships=%d merge=%s attempts=%d%s",
+                _log_prefix(fingerprint),
                 options.extraction.model or "env默认",
                 node_count,
                 relationship_count,
                 options.extraction.merge,
                 len(extracted_batch.attempts),
+                f" empty_reason={empty_reason}" if empty_reason else "",
             )
             # 图谱全文与 attempts 全量不再打日志：抽取结果通过接口响应的
             # data.extraction / data.stats.extraction 返回，算法层另有 [步骤][LLM] 明细。
@@ -507,18 +639,67 @@ class KnowledgePrecipitationService:
             extracted_profile = dict(diagnostics.get("profile") or {})
             warning_summary = _summarize_warnings(extracted_warnings)
             logger.info(
-                "[知识沉淀] 抽取诊断: warnings=%d by_code=%s",
+                "%s[知识沉淀] 抽取诊断: warnings=%d by_code=%s empty_reason=%s",
+                _log_prefix(fingerprint),
                 warning_summary["total"],
                 json.dumps(warning_summary["by_code"], ensure_ascii=False),
+                empty_reason or "-",
             )
             logger.info(
-                "[知识沉淀] 抽取诊断 profile: %s",
+                "%s[知识沉淀] 抽取诊断 profile: %s",
+                _log_prefix(fingerprint),
                 json.dumps(extracted_profile, ensure_ascii=False, default=str),
             )
             stats["extraction"]["warnings"] = warning_summary
             stats["extraction"]["profile"] = extracted_profile
-            # 抽取结果不再落盘 03-extraction.json：图谱与诊断直接进入接口响应的
-            # data.extraction / data.stats.extraction，需要时从调用方取。
+            if empty_reason and node_count == 0 and relationship_count == 0:
+                logger.warning(
+                    "%s[知识沉淀] 抽取结果为空 empty_reason=%s: nodes=0 relationships=0 "
+                    "chunks=%d warnings=%s",
+                    _log_prefix(fingerprint),
+                    empty_reason,
+                    len(extracted_items),
+                    json.dumps(warning_summary["by_code"], ensure_ascii=False),
+                )
+                observability.send_alert(
+                    "empty_extraction",
+                    {
+                        "request_id": observability.get_request_id(),
+                        "document": fingerprint,
+                        "stage": "extract",
+                        "empty_reason": empty_reason,
+                        "node_count": node_count,
+                        "relationship_count": relationship_count,
+                        "chunk_count": len(extracted_items),
+                        "warnings_by_code": warning_summary["by_code"],
+                    },
+                )
+            if recorder is not None:
+                # 03/04 只落摘要与质量块：完整图谱与诊断仍走接口响应，避免快照膨胀。
+                recorder.write(
+                    "03-extract",
+                    "03-extract.json",
+                    json.dumps(
+                        _graph_summary(final_graph, final_graphs),
+                        ensure_ascii=False,
+                        indent=2,
+                        default=str,
+                    ),
+                    title="抽取输出摘要（预测图 nodes/relationships 计数）",
+                    summary=f"nodes={node_count} relationships={relationship_count}",
+                )
+                recorder.write(
+                    "04-quality",
+                    "04-quality.json",
+                    json.dumps(
+                        extracted_batch.quality or {},
+                        ensure_ascii=False,
+                        indent=2,
+                        default=str,
+                    ),
+                    title="抽取质量块（stats.extraction.quality）",
+                    summary=str((extracted_batch.quality or {}).get("status") or "-"),
+                )
 
             if options.storage.persist_graph:
                 raise PipelineError(
@@ -537,7 +718,8 @@ class KnowledgePrecipitationService:
                 model=options.extraction.model,
             )
             logger.info(
-                "[知识沉淀] 摘要完成: chunks=%d model=%s",
+                "%s[知识沉淀] 摘要完成: chunks=%d model=%s",
+                _log_prefix(fingerprint),
                 len(summaries),
                 options.extraction.model or "env默认",
             )
@@ -606,7 +788,11 @@ class KnowledgePrecipitationService:
             inserted_count = None
             vector_dimension = embedded["dimension"]
             if not vector_result.get("success"):
-                logger.error("[知识沉淀] 向量存储失败，已降级返回抽取结果: %s", vector_result)
+                logger.error(
+                    "%s[知识沉淀] 向量存储失败，已降级返回抽取结果: %s",
+                    _log_prefix(fingerprint),
+                    vector_result,
+                )
                 stats["storage"]["vector_error"] = {
                     "code": "VECTOR_STORE_FAILED",
                     "detail": vector_result,
@@ -620,7 +806,8 @@ class KnowledgePrecipitationService:
                     or len(vector_ids) != len(vector_items)
                 ):
                     logger.error(
-                        "[知识沉淀] 向量存储返回 ids 数量不一致，已降级: input=%d inserted=%s ids=%s",
+                        "%s[知识沉淀] 向量存储返回 ids 数量不一致，已降级: input=%d inserted=%s ids=%s",
+                        _log_prefix(fingerprint),
                         len(vector_items),
                         inserted_count,
                         len(vector_ids) if isinstance(vector_ids, list) else None,
@@ -677,6 +864,7 @@ class KnowledgePrecipitationService:
         file_name = Path(request.file_name or "upload.bin").name
         stem = Path(file_name).stem
         suffix = Path(file_name).suffix.lower()
+        fingerprint = _content_fingerprint(file_name, request.content)
         # 本次运行的阶段产物目录：解析/切片/抽取/向量/存储/摘要 每步一份输出文档。
         recorder = StageRecorder(stem)
         stats: dict[str, Any] = {
@@ -686,14 +874,19 @@ class KnowledgePrecipitationService:
             "storage": {"enabled": bool(get_application_service_url())},
         }
         logger.info(
-            "[知识沉淀] 开始处理: file=%s bytes=%d ontology=%s model=%s",
+            "%s[知识沉淀] 开始处理: file=%s bytes=%d ontology=%s model=%s",
+            _log_prefix(fingerprint),
             file_name,
             len(request.content),
             f"{len(request.ontology or '')}字符" if (request.ontology or "").strip() else "未提供",
             request.options.extraction.model or "env默认",
         )
         # 本体原文只在抽取阶段打一次（见 _run_pipeline），这里不再重复。
-        logger.info("[知识沉淀] 本次运行阶段产物目录: %s", recorder.directory)
+        logger.info(
+            "%s[知识沉淀] 本次运行阶段产物目录: %s",
+            _log_prefix(fingerprint),
+            recorder.directory,
+        )
         if (request.ontology or "").strip():
             # 本体是本次抽取的输入，作为第 0 步产物原样留档。
             recorder.write(
@@ -704,10 +897,18 @@ class KnowledgePrecipitationService:
                 summary=f"{len(request.ontology)}字符 sha256={hashlib.sha256(request.ontology.encode('utf-8')).hexdigest()[:16]}",
             )
         try:
+            parse_started = time.monotonic()
             parsed = self.parsing.parse(file_name, request.content, request.options.parser)
+            observability.record_stage_duration(
+                "parse",
+                time.monotonic() - parse_started,
+                document=fingerprint,
+                extra={"markdown_chars": len(parsed.get("markdown") or "")},
+            )
             markdown = parsed["markdown"]
             logger.info(
-                "[知识沉淀] 解析完成: file=%s parser=%s markdown=%d字符 sha256=%s",
+                "%s[知识沉淀] 解析完成: file=%s parser=%s markdown=%d字符 sha256=%s",
+                _log_prefix(fingerprint),
                 file_name,
                 parsed["parser"],
                 len(markdown),
@@ -742,6 +943,7 @@ class KnowledgePrecipitationService:
                     "signal_source": "parser",
                     "source_sheets": (parsed.get("parser") or {}).get("sheets") or [],
                 },
+                fingerprint=fingerprint,
             )
         except CapabilityError as exc:
             partial = None
@@ -757,6 +959,7 @@ class KnowledgePrecipitationService:
         started = datetime.now()
         file_parsed: list[tuple[int, str, dict[str, Any]]] = []
 
+        parse_started = time.monotonic()
         max_workers = min(len(request.files), os.cpu_count() or 4)
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             future_to_file = {
@@ -822,17 +1025,29 @@ class KnowledgePrecipitationService:
                     },
                 }
             )
+        # 注意：combined_stem 必须先赋值再使用（此前先调用后赋值会在批量入口直接 NameError）。
+        combined_stem = Path(request.files[0].file_name).stem + f"_等{len(request.files)}个文件"
+        combined_fingerprint = _content_fingerprint(f"{combined_stem}.md", combined_markdown.encode("utf-8"))
         logger.info(
-            "[知识沉淀] 批量解析完成: files=%d combined=%d字符 sha256=%s",
+            "%s[知识沉淀] 批量解析完成: files=%d combined=%d字符 sha256=%s",
+            _log_prefix(combined_fingerprint),
             len(request.files),
             len(combined_markdown),
             hashlib.sha256(combined_markdown.encode("utf-8")).hexdigest()[:16],
         )
+        observability.record_stage_duration(
+            "parse",
+            time.monotonic() - parse_started,
+            document=combined_fingerprint,
+            extra={"file_count": len(request.files)},
+        )
         # 批量合并全文不打日志：完整内容见运行目录 01-parse.md。
-        # 注意：combined_stem 必须先赋值再使用（此前先调用后赋值会在批量入口直接 NameError）。
-        combined_stem = Path(request.files[0].file_name).stem + f"_等{len(request.files)}个文件"
         recorder = StageRecorder(combined_stem)
-        logger.info("[知识沉淀] 本次运行阶段产物目录: %s", recorder.directory)
+        logger.info(
+            "%s[知识沉淀] 本次运行阶段产物目录: %s",
+            _log_prefix(combined_fingerprint),
+            recorder.directory,
+        )
         if (request.ontology or "").strip():
             recorder.write(
                 "00-ontology",
@@ -883,6 +1098,7 @@ class KnowledgePrecipitationService:
                 "source_files": [item["file_name"] for item in file_stats],
             },
             document_segments=document_segments,
+            fingerprint=combined_fingerprint,
         )
         # Augment summary with file count
         fc = len(request.files)

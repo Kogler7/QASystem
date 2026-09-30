@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -20,6 +21,7 @@ from .routers.knowledge_precipitation import router as knowledge_router
 from .routers.execution import router as execution_router
 from mcp_services.server import mcp
 from external_services.application import capture_user_headers, reset_user_headers
+from . import observability
 from .responses import ErrorCode, error_response
 
 
@@ -145,6 +147,15 @@ async def health(
             return JSONResponse(status_code=503, content=result)
         return result
     return {"status": "ok"}
+
+
+@app.get("/api/v1/observability/metrics", include_in_schema=False, response_model=None)
+async def observability_metrics() -> dict[str, Any]:
+    """进程内指标：队列深度、job 状态计数、空抽取/慢阶段计数、阶段耗时分位数。
+
+    暴露方式与 /health 一致（不鉴权）；执行层不可用时对应字段降级为空值。
+    """
+    return observability.metrics_payload()
 
 
 app.mount("/", mcp_app)
