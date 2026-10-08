@@ -6,6 +6,7 @@
 - ``v2/``：V2 聚合流水线
 - ``v3/``：V3 聚合流水线
 - ``latest/``：当前默认版本（独立代码副本）
+- ``jev_extract/``：latest 的实验副本，仅 ``KG_EXTRACT_ALGO_VERSION=jev`` 时进入
 - ``version.py``：版本路由
 
 为兼容历史调用，顶层仍重导出 V1 的公开 API；新代码请直接
