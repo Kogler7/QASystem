@@ -15,7 +15,13 @@ from copy import deepcopy
 from typing import Any
 
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
-from .evidence import Evidence, bind_evidence, locate_quote, verify_evidence
+from .evidence import (
+    EVIDENCE_STATUS_UNVERIFIED,
+    Evidence,
+    bind_evidence,
+    locate_quote,
+    verify_evidence,
+)
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
 from .ontology_schema import OntologySchema
@@ -25,6 +31,7 @@ from .config import (
     KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS as ENTITY_SEGMENT_MIN_CHARS,
     KG_EXTRACT_ENTITY_SEGMENT_OVERLAP as ENTITY_SEGMENT_OVERLAP,
     KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS as ENTITY_SEGMENT_TARGET_CHARS,
+    get_evidence_admission,
 )
 from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table, build_chat_messages
 from .table_semantics import analyze_table_semantics, table_entity_types
@@ -1205,13 +1212,41 @@ def _normalize_span_entities(
                 name,
             )
         else:
+            if get_evidence_admission() == "reject":
+                _append_warning(
+                    warnings,
+                    "ENTITY_EVIDENCE_REJECTED",
+                    "mention 与 evidence.quote 均无法在当前 chunk 定位，候选已拒绝",
+                    path,
+                    name,
+                )
+                continue
+            # fail-open（warn）：与 v2 一致，实体不因证据未逐字定位而丢弃；
+            # 保留归纳型候选并以 evidence_status=unverified 标记，由终验降级留痕。
+            key = (ontology_class.identifier, name)
+            if deduplicate and key in seen:
+                _append_warning(warnings, "ENTITY_DUPLICATE_MENTION", "同一 type+mention 在 chunk 内重复，已去重", path)
+                continue
+            seen.add(key)
             _append_warning(
                 warnings,
-                "ENTITY_EVIDENCE_REJECTED",
-                "mention 与 evidence.quote 均无法在当前 chunk 定位，候选已拒绝",
+                "ENTITY_EVIDENCE_UNVERIFIED",
+                "mention 与 evidence.quote 均无法在当前 chunk 定位，按 fail-open 保留并标记 unverified",
                 path,
                 name,
             )
+            accepted.append({
+                "type": ontology_class.identifier,
+                "name": name,
+                "properties": {},
+                "evidence": {
+                    "quote": quote,
+                    "start_char": start if isinstance(start, int) else None,
+                    "end_char": end if isinstance(end, int) else None,
+                    "evidence_status": EVIDENCE_STATUS_UNVERIFIED,
+                },
+                "evidence_status": EVIDENCE_STATUS_UNVERIFIED,
+            })
             continue
 
         key = (ontology_class.identifier, name)
@@ -1461,21 +1496,54 @@ def entity_pass(
                         target.chunk_id, entity.get("name"),
                     )
                     continue
-                verdicts = verify_evidence({"entities": [entity], "relations": []}, manager)
-                if verdicts and all(verdict.status == "ok" for verdict in verdicts):
+                # warn 模式下核验自身异常（如核验服务抖动）同样放行，不能丢实体。
+                verification_crashed = False
+                try:
+                    verdicts = verify_evidence({"entities": [entity], "relations": []}, manager)
+                except Exception:  # noqa: BLE001 - 核验异常按 warn 放行并留痕
+                    if get_evidence_admission() == "reject":
+                        raise
+                    verdicts = None
+                    verification_crashed = True
+                verified_ok = bool(verdicts) and all(verdict.status == "ok" for verdict in verdicts)
+                if verified_ok:
+                    evidence = entity.get("evidence")
+                    if isinstance(evidence, dict):
+                        evidence.pop("evidence_status", None)
+                    entity.pop("evidence_status", None)
                     key = (entity["type"], entity["name"])
                     if key not in seen_entities:
                         grounded_entities.append(entity)
                         seen_entities.add(key)
                     continue
                 evidence = entity.get("evidence") or {}
+                if get_evidence_admission() == "reject":
+                    _append_warning(
+                        target_warnings,
+                        "ENTITY_EVIDENCE_REJECTED",
+                        "实体 evidence 未通过 source/span/quote 一致性校验，候选已拒绝",
+                        f"{target.chunk_id}.entities[{index}].evidence",
+                        evidence.get("quote"),
+                    )
+                    continue
+                if isinstance(entity.get("evidence"), dict):
+                    entity["evidence"]["evidence_status"] = EVIDENCE_STATUS_UNVERIFIED
+                entity["evidence_status"] = EVIDENCE_STATUS_UNVERIFIED
                 _append_warning(
                     target_warnings,
-                    "ENTITY_EVIDENCE_REJECTED",
-                    "实体 evidence 未通过 source/span/quote 一致性校验，候选已拒绝",
+                    "ENTITY_EVIDENCE_UNVERIFIED",
+                    (
+                        "证据核验执行异常，按 fail-open 保留并标记 unverified"
+                        if verification_crashed
+                        else "实体 evidence 未通过 source/span/quote 一致性校验，按 fail-open 保留并标记 unverified"
+                    ),
                     f"{target.chunk_id}.entities[{index}].evidence",
                     evidence.get("quote"),
                 )
+                key = (entity["type"], entity["name"])
+                if key not in seen_entities:
+                    grounded_entities.append(entity)
+                    seen_entities.add(key)
             return grounded_entities, True, target_attempts, target_warnings, target_metrics
 
         def segment_chunk(target: ExtractionChunk, start: int, end: int) -> ExtractionChunk:
@@ -1501,7 +1569,10 @@ def entity_pass(
         def run_focus(target: ExtractionChunk, depth: int, label: str) -> list[dict[str, Any]]:
             """先按 segment 调用；仍截断则二分下切，最后用前缀恢复兜底。"""
             entities, parsed_ok, atts, warns, mets = extract_once(
-                target, label=label, max_attempts=1 if depth > 0 else 2
+                target,
+                label=label,
+                # 分段比主调用少一次尝试以控制调用量，但保留瞬时失败重试。
+                max_attempts=max(2, max_attempts - 1) if depth > 0 else max_attempts,
             )
             local_attempts.extend(atts)
             local_warnings.extend(warns)
@@ -1532,7 +1603,7 @@ def entity_pass(
                     merged.extend(run_focus(child, depth + 1, f"{label}.s{index}"))
                 return merged
             recovered, _recovered_ok, atts2, warns2, mets2 = extract_once(
-                target, label=f"{label}.recover", max_attempts=1, return_recovered=True
+                target, label=f"{label}.recover", max_attempts=2, return_recovered=True
             )
             local_attempts.extend(atts2)
             local_warnings.extend(warns2)
@@ -1546,8 +1617,11 @@ def entity_pass(
                 )
             return recovered
 
+        # 主调用恢复 v2 的多重试：默认 3 次，deepseek 记录表空集合场景放宽到 4 次。
         full_entities, primary_ok, primary_attempts, primary_warnings, primary_metrics = extract_once(
-            chunk, label=chunk.chunk_id, max_attempts=1
+            chunk,
+            label=chunk.chunk_id,
+            max_attempts=max(max_attempts, 4) if retry_empty else max_attempts,
         )
         local_attempts.extend(primary_attempts)
         local_warnings.extend(primary_warnings)
@@ -1592,7 +1666,7 @@ def entity_pass(
                 full_entities = merged
             else:
                 recovered, _ok, atts2, warns2, mets2 = extract_once(
-                    chunk, label=f"{chunk.chunk_id}.recover", max_attempts=1, return_recovered=True
+                    chunk, label=f"{chunk.chunk_id}.recover", max_attempts=2, return_recovered=True
                 )
                 local_attempts.extend(atts2)
                 local_warnings.extend(warns2)
@@ -1826,6 +1900,7 @@ def relation_pass(
                 structure_hint=structure_hint,
             )
             attempt_start = len(local_attempts)
+            # 恢复 v2 的多重试（默认 3 次）；全部失败仍走二分/UNDECIDED 兜底。
             parsed = generate_structured(
                 llm,
                 messages,
@@ -1834,7 +1909,7 @@ def relation_pass(
                 attempts=local_attempts,
                 pass_name="relation",
                 chunk_id=f"{chunk.chunk_id}.batch-{batch_tag}",
-                max_attempts=1,
+                max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=local_call_metrics,
             )

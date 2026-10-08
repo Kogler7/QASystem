@@ -20,6 +20,9 @@ from .graph_utils import coerce_non_empty_name
 
 EVIDENCE_TYPES = ("explicit", "structural", "contextual")
 
+# fail-open 准入（KG_EXTRACT_EVIDENCE_ADMISSION=warn）下保留的未核验证据标记。
+EVIDENCE_STATUS_UNVERIFIED = "unverified"
+
 
 @dataclass(frozen=True)
 class Evidence:
@@ -29,6 +32,8 @@ class Evidence:
     start_char: int | None = None
     end_char: int | None = None
     evidence_type: str = "explicit"
+    # "" 表示正常；"unverified" 表示 L1/L2 未通过但按 warn 准入保留的证据。
+    evidence_status: str = ""
 
     def __post_init__(self) -> None:
         if self.evidence_type not in EVIDENCE_TYPES:
@@ -38,7 +43,7 @@ class Evidence:
         object.__setattr__(self, "source_block_ids", list(self.source_block_ids))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "span_id": self.span_id,
             "source_block_ids": list(self.source_block_ids),
             "quote": self.quote,
@@ -46,6 +51,9 @@ class Evidence:
             "end_char": self.end_char,
             "evidence_type": self.evidence_type,
         }
+        if self.evidence_status:
+            payload["evidence_status"] = self.evidence_status
+        return payload
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any] | None) -> "Evidence | None":
@@ -59,6 +67,7 @@ class Evidence:
             start_char=payload.get("start_char"),
             end_char=payload.get("end_char"),
             evidence_type=payload.get("evidence_type") or "explicit",
+            evidence_status=coerce_non_empty_name(payload.get("evidence_status")),
         )
 
 

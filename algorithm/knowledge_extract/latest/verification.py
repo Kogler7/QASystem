@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from .config import get_evidence_admission
 from .coverage import CoverageAuditor, CoverageGap
 from .evidence import verify_evidence
 from .graph_utils import canonical_name
@@ -191,7 +192,13 @@ class ExtractionVerifier:
                         code="EVIDENCE_INVALID",
                         message=verdict.message,
                         path=verdict.ref,
-                        severity="error",
+                        # fail-open（warn）：证据 L1/L2 不一致只留痕，不再整图扣押；
+                        # reject 恢复旧的硬错误行为。
+                        severity=(
+                            "error"
+                            if get_evidence_admission() == "reject"
+                            else "warning"
+                        ),
                     )
                 )
 

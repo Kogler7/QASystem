@@ -140,6 +140,8 @@ def protocol_module():
                 }
                 for index, text in enumerate(chunks)
             ],
+            # 与真实适配器的默认发布语义一致（KG_EXTRACT_PUBLISH_BEST_EFFORT=1）。
+            publish_best_effort_graph=lambda: True,
         ),
         "algorithm.knowledge_pipeline": _module(
             "algorithm.knowledge_pipeline",

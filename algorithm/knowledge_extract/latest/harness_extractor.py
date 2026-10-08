@@ -30,11 +30,16 @@ def extract_harness(
     repairer: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     entity_adjudicator: Callable[[dict[str, Any]], str | dict[str, Any]] | None = None,
     identity_admission: str | None = None,
-    max_repair_rounds: int = 0,
-    max_attempts: int = 3,
+    max_repair_rounds: int | None = None,
+    max_attempts: int | None = None,
     retry_base_seconds: float = 0.05,
 ) -> dict[str, Any]:
-    """Run the two-pass pipeline over caller-provided chunks."""
+    """Run the two-pass pipeline over caller-provided chunks.
+
+    ``max_repair_rounds`` / ``max_attempts`` 不传时读
+    ``KG_EXTRACT_MAX_REPAIR_ROUNDS``（默认 2）/ ``KG_EXTRACT_LLM_MAX_ATTEMPTS``
+    （默认 3）。
+    """
     ontology = (ontology or "").strip()
     if not ontology:
         raise ExtractionValidationError(
@@ -72,8 +77,16 @@ def extract_harness(
         repairer=repairer,
         entity_adjudicator=entity_adjudicator,
         identity_admission=identity_admission or config.get("identity_admission", "quarantine"),
-        max_repair_rounds=max_repair_rounds,
-        max_attempts=max_attempts,
+        max_repair_rounds=(
+            config.get("max_repair_rounds", 2)
+            if max_repair_rounds is None
+            else max_repair_rounds
+        ),
+        max_attempts=(
+            config.get("max_attempts", 3)
+            if max_attempts is None
+            else max_attempts
+        ),
         retry_base_seconds=retry_base_seconds,
     )
 

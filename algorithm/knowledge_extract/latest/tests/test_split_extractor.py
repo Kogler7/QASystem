@@ -1847,8 +1847,9 @@ class FailureAndEdgeTest(unittest.TestCase):
             llm=llm,
         )
         self.assertEqual(result["raw"], {"entities": [], "relations": []})
-        # v3 实体 pass：1 次 json 尝试 + 1 次 json 恢复尝试后终止；无实体 -> 不触发关系/属性 pass
-        self.assertEqual(len(result["attempts"]), 2)
+        # P0 后实体 pass 恢复多重试：3 次主调用 json 尝试 + 2 次前缀恢复尝试后终止；
+        # 无实体 -> 不触发关系/属性 pass
+        self.assertEqual(len(result["attempts"]), 5)
         self.assertTrue(all(attempt["type"] == "json" for attempt in result["attempts"]))
         self.assertEqual(result["error_code"], "LLM_JSON_PARSE_FAILED")
 
