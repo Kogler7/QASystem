@@ -7,6 +7,7 @@
 - ``v3/``：V3 聚合流水线
 - ``v3_1/``：主模型生成与 Clef 语义裁决的通用 harness（配置值为 ``v3.1``，契约同 V2）
 - ``latest/``：当前默认版本（独立代码副本）
+- ``jev_extract/``：latest 的实验副本，仅 ``KG_EXTRACT_ALGO_VERSION=jev`` 时进入
 - ``version.py``：版本路由
 
 为兼容历史调用，顶层仍重导出 V1 的公开 API；新代码请直接

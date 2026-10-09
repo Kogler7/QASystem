@@ -6,6 +6,7 @@
 ``KG_EXTRACT_ALGO_VERSION=latest``（默认）直接运行 ``latest`` 包，不做版本解析。
 做算法版本对比评测时再显式选择具体版本。
 对外版本号 ``v3.1`` 对应 Python 包 ``v3_1``（主模型生成 + Clef 语义裁决的通用 harness）。
+``jev`` 只在显式设置时运行 ``jev_extract``，不改变默认抽取。
 """
 from __future__ import annotations
 
@@ -15,12 +16,13 @@ LATEST = "latest"
 V2 = "v2"
 V3 = "v3"
 V31 = "v3.1"
-SUPPORTED_VERSIONS = (LATEST, V2, V3, V31)
+JEV = "jev"
+SUPPORTED_VERSIONS = (LATEST, V2, V3, V31, JEV)
 DEFAULT_VERSION = LATEST
 
 
 def get_extract_version_label() -> str:
-    """返回配置原值，不做 latest 解析。"""
+    """返回配置原值（可能是 latest / v2 / v3 / v3.1 / jev），不做 latest 解析。"""
     value = os.getenv("KG_EXTRACT_ALGO_VERSION", DEFAULT_VERSION).strip().lower()
     if value in SUPPORTED_VERSIONS:
         return value

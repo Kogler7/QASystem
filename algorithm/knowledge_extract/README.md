@@ -248,10 +248,11 @@ curl -X POST http://127.0.0.1:8006/api/knowledge/precipitation \
 }
 ```
 
-> 注意：`kg_extract_v2` 是共享入口，实际由 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3` / `v3.1`，
+> 注意：`kg_extract_v2` 是共享入口，实际由 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3` / `v3.1` / `jev`，
 > 默认 `latest`）经 `algorithm.knowledge_extract.version` 路由执行；`latest` 是现行 `v3`
 > 的同步副本（独立实体目录），直接运行 `knowledge_extract/latest` 包，也可显式指定
-> `knowledge_extract/v2` / `knowledge_extract/v3` / `knowledge_extract/v3_1`；本包仅在无本体时提供文本摘要能力。
+> `knowledge_extract/v2` / `knowledge_extract/v3` / `knowledge_extract/v3_1`。`jev` 是实验副本，不作为默认。
+> 本包仅在无本体时提供文本摘要能力。
 
 ### Python 调用
 

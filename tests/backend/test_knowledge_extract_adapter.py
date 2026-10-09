@@ -675,6 +675,26 @@ def test_extract_version_label_can_be_pinned(monkeypatch, label):
     assert get_extract_version() == label
 
 
+def test_jev_version_dispatches_to_jev_extract(monkeypatch):
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "jev")
+    assert get_extract_version_label() == "jev"
+    assert get_extract_version() == "jev"
+
+    def fake(**_kwargs):
+        return {
+            "status": "succeeded",
+            "graph": {"nodes": [], "relationships": []},
+            "intermediate_model": {"objects": []},
+            "attempts": [],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr("algorithm.knowledge_extract.jev_extract.extract_aggregate", fake)
+    result = adapter.run_aggregate("class Term", ["内容"])
+    assert result["extract_version"] == "jev"
+    assert result["status"] == "succeeded"
+
+
 def test_extract_version_rejects_unknown_value(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v9")
     with pytest.raises(ValueError, match="KG_EXTRACT_ALGO_VERSION"):
