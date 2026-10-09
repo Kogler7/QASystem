@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from .graph_utils import (
@@ -10,11 +11,40 @@ from .graph_utils import (
 )
 
 
+def _merge_relationship_provenance(existing: dict[str, Any], incoming: dict[str, Any]) -> None:
+    """Retain supplied provenance only; never infer a source from item presence."""
+    evidences: list[Any] = []
+    for relationship in (existing, incoming):
+        values = relationship.get("evidences")
+        values = list(values) if isinstance(values, list) else []
+        singular = relationship.get("evidence")
+        if isinstance(singular, dict):
+            values.append(singular)
+        for value in values:
+            if value not in evidences:
+                evidences.append(deepcopy(value))
+    if evidences:
+        existing["evidences"] = evidences
+    incoming_indices = incoming.get("chunk_indices")
+    if isinstance(incoming_indices, list):
+        existing_indices = existing.get("chunk_indices")
+        indices = list(existing_indices) if isinstance(existing_indices, list) else []
+        for index in incoming_indices:
+            if index not in indices:
+                indices.append(index)
+        existing["chunk_indices"] = indices
+    incoming_status = incoming.get("provenance_status")
+    if incoming_status and (
+        not existing.get("provenance_status") or incoming_status == "evidence"
+    ):
+        existing["provenance_status"] = incoming_status
+
+
 def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    """Merge nodes first, then recover valid cross-chunk raw relationships."""
+    """Merge graph provenance first, then recover valid raw-only relationships."""
     nodes_by_uid: dict[str, dict[str, Any]] = {}
     relationships: list[dict[str, Any]] = []
-    relationship_keys: set[tuple[str, str, str]] = set()
+    relationships_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     for position, item in enumerate(items):
         graph = item.get("graph") or {}
@@ -53,6 +83,9 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
     for item in items:
         graph = item.get("graph") or {}
         relationship_candidates.extend(graph.get("relationships", []))
+    # Each item may repeat document-level raw. Inspect every projected graph
+    # before raw fallback so a bare copy cannot mask a later graph's metadata.
+    for item in items:
         raw = item.get("raw") or {}
         for relation in raw.get("relations", []):
             if not isinstance(relation, dict):
@@ -69,6 +102,11 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                     "from_uid": entity_uid(from_type, from_name, None),
                     "to_uid": entity_uid(to_type, to_name, None),
                     "type": relation_type,
+                    **{
+                        field: deepcopy(relation[field])
+                        for field in ("evidence", "evidences", "chunk_indices", "provenance_status")
+                        if field in relation
+                    },
                 }
             )
 
@@ -81,9 +119,11 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
             str(relationship.get("to_uid") or ""),
             str(relationship.get("type") or ""),
         )
-        if key in relationship_keys:
+        if key in relationships_by_key:
+            _merge_relationship_provenance(relationships_by_key[key], relationship)
             continue
-        relationship_keys.add(key)
-        relationships.append(relationship)
+        merged_relationship = deepcopy(relationship)
+        relationships_by_key[key] = merged_relationship
+        relationships.append(merged_relationship)
 
     return {"nodes": list(nodes_by_uid.values()), "relationships": relationships}

@@ -21,7 +21,7 @@ SIDE_LABELS = (("entities", "实体"), ("relations", "关系"))
 EXIT_CODE_MEANINGS = {
     0: "全部通过",
     2: "有 case 失败（含重试后跳过、空抽取判失败）",
-    4: "无失败 case 但门禁未过（实体 F1 低于阈值或耗时超预算）",
+    4: "无失败 case 但门禁未过（评分不可信、覆盖不足、F1/耗时或基线回退）",
 }
 
 ERROR_TEXT_LIMIT = 200
@@ -34,6 +34,8 @@ def exit_code_for(summary: dict[str, Any]) -> int:
     """
     if int(summary.get("failed") or 0) > 0:
         return 2
+    if summary.get("interrupted"):
+        return 130
     if (summary.get("gate") or {}).get("passed") is False:
         return 4
     return 0
@@ -108,7 +110,7 @@ def _lowest_entity_f1(record: dict[str, Any]) -> float | None:
     for _label, block in _case_blocks(record):
         metrics = block.get("metrics") if isinstance(block, dict) else None
         entities = (metrics or {}).get("entities") if isinstance(metrics, dict) else None
-        if isinstance(entities, dict) and entities.get("f1") is not None:
+        if isinstance(entities, dict) and entities.get("f1") is not None and (entities.get("golden") or entities.get("predicted")):
             values.append(float(entities.get("f1")))
     return min(values) if values else None
 
@@ -243,11 +245,30 @@ def _render_gate(lines: list[str], summary: dict[str, Any]) -> None:
         lines.append(f"- 耗时预算：{'，'.join(budget_parts)}；违规 {len(violations)} 项")
     else:
         lines.append(f"- 耗时预算：未设置；违规 {len(violations)} 项")
+    timing_unknown = list(gate.get("timing_unknown") or [])
+    if timing_unknown:
+        labels = "、".join(f"`{label}`" for label in timing_unknown)
+        lines.append(f"- 原抽取耗时记录缺失：{labels}；无法验证耗时预算，门禁未过")
     for item in violations:
         lines.append(
             f"  - `{item.get('case')}` {item.get('stage')} "
             f"{_fmt_seconds(item.get('elapsed'))} > 预算 {_fmt_seconds(item.get('budget'))}"
         )
+    quality = gate.get("quality") or {}
+    relations = quality.get("min_relation_f1") or {}
+    if relations.get("threshold"):
+        lines.append(f"- 关系 F1 阈值：{relations['threshold']:g}；低于阈值 {len(relations.get('below') or [])} 项")
+        for item in relations.get("below") or []:
+            lines.append(f"  - `{item.get('case')}` {item.get('module')} F1={_fmt_metric(item.get('f1'))}")
+    reasons = {
+        "scorer_mismatch": "评分器口径不符（包括 judge 失败降级）",
+        "invalid_metrics": "评分数值无效", "no_cases": "没有评测样本",
+        "unscored_case": "样本未标注或 golden 无效", "missing_metrics": "目标模块缺少评分",
+        "reused_prediction_input_unverified": "复用抽取缺少同切片/同本体证据",
+    }
+    for item in quality.get("issues") or []:
+        reason = reasons.get(item.get("reason"), item.get("reason"))
+        lines.append(f"- 评分有效性：`{item.get('case') or '-'}` {item.get('module') or ''}：{reason}")
     lines.append("")
 
 
@@ -413,6 +434,69 @@ def _render_slow_cases(lines: list[str], summary: dict[str, Any], slow_top: int)
     lines.append("")
 
 
+def _render_quality(lines: list[str], summary: dict[str, Any]) -> None:
+    quality = summary.get("quality") or {}
+    if not quality:
+        return
+    lines.extend([
+        "## 评分覆盖率与分组统计", "",
+        "总览 micro 和以下均值仅统计同口径的有效评分；未评分/请求失败不会伪造为 0 分，必须结合覆盖率与门禁使用。失败与已评分可重叠，例如空抽取会同时计入两者。",
+        "case macro 按文档等权，group macro 按类型等权；实体/关系两侧皆为空的项不参与该侧均值（显示 -）。", "",
+        "| 模块 | 有效评分/预期 | 失败 | 缺评分 | judge 降级 | 实体 case macro F1 | 关系 case macro F1 | 实体 group macro F1 | 关系 group macro F1 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ])
+    for module, item in (quality.get("modules") or {}).items():
+        coverage = item.get("coverage") or {}
+        macro = item.get("case_macro") or {}
+        groups = item.get("group_macro") or {}
+        lines.append(
+            f"| {MODULE_LABELS.get(module, module)} | {coverage.get('scored', 0)}/{coverage.get('expected', 0)} | "
+            f"{coverage.get('failed', 0)} | {coverage.get('missing', 0)} | {coverage.get('fallback', 0)} | "
+            f"{_fmt_metric((macro.get('entities') or {}).get('f1'))} | {_fmt_metric((macro.get('relations') or {}).get('f1'))} | "
+            f"{_fmt_metric((groups.get('entities') or {}).get('f1'))} | {_fmt_metric((groups.get('relations') or {}).get('f1'))} |"
+        )
+    lines.extend(["", "| 模块 | 类型 | 有效评分/预期 | 实体 micro F1 | 关系 micro F1 | 实体 case macro F1 | 关系 case macro F1 |",
+                  "| --- | --- | ---: | ---: | ---: | ---: | ---: |"])
+    for module, item in (quality.get("modules") or {}).items():
+        for group, stats in (item.get("by_group") or {}).items():
+            coverage, micro, macro = (stats.get(name) or {} for name in ("coverage", "micro", "case_macro"))
+            lines.append(
+                f"| {MODULE_LABELS.get(module, module)} | {group} | {coverage.get('scored', 0)}/{coverage.get('expected', 0)} | "
+                f"{_fmt_metric((micro.get('entities') or {}).get('f1'))} | {_fmt_metric((micro.get('relations') or {}).get('f1'))} | "
+                f"{_fmt_metric((macro.get('entities') or {}).get('f1'))} | {_fmt_metric((macro.get('relations') or {}).get('f1'))} |"
+            )
+    lines.append("")
+    aligned = [(record, label, block["metrics"]["aligned_relations"])
+               for record in summary.get("cases") or [] for label, block in _case_blocks(record)
+               if isinstance(block, dict) and isinstance(block.get("metrics"), dict) and block["metrics"].get("aligned_relations")]
+    if aligned:
+        lines.extend(["**固定实体映射后的关系诊断（不替代主关系指标）**", "",
+                      "此值依赖选中的最大实体匹配；多解实体映射可能产生不同关系分数。", "",
+                      "| case | 模块 | 关系 P / R / F1 |", "| --- | --- | ---: |"])
+        for record, label, metrics in aligned:
+            lines.append(f"| `{_case_label(record)}` | {MODULE_LABELS.get(label, label)} | {_fmt_prf(metrics)} |")
+        lines.append("")
+
+
+def _render_baseline(lines: list[str], summary: dict[str, Any]) -> None:
+    comparison = summary.get("baseline_comparison")
+    if not isinstance(comparison, dict):
+        return
+    lines.extend(["## 基线对比", "", f"- 来源：`{comparison.get('source') or '-'}`",
+                  f"- 判定：{'通过' if comparison.get('passed') else '未过'}"])
+    for issue in comparison.get("issues") or []:
+        lines.append(f"- {_one_line(issue, 600)}")
+    lines.append("")
+    if comparison.get("comparisons"):
+        lines.extend(["| case | 模块 | 指标 | 基线 | 本次 | 判定 |",
+                      "| --- | --- | --- | ---: | ---: | --- |"])
+        for item in comparison["comparisons"]:
+            lines.append(f"| `{item.get('case')}` | {item.get('module')} | {item.get('metric')} | "
+                         f"{_fmt_metric(item.get('baseline'))} | {_fmt_metric(item.get('current'))} | "
+                         f"{'通过' if item.get('passed') else '未过'} |")
+        lines.append("")
+
+
 def render_report(summary: dict[str, Any], *, slow_top: int = 5) -> str:
     """summary.json 内容 → Markdown 报告。对缺字段/中断中的 summary 容错。"""
     if not isinstance(summary, dict):
@@ -421,6 +505,8 @@ def render_report(summary: dict[str, Any], *, slow_top: int = 5) -> str:
     _render_header(lines, summary)
     _render_gate(lines, summary)
     _render_overview(lines, summary)
+    _render_quality(lines, summary)
+    _render_baseline(lines, summary)
     _render_cases(lines, summary)
     _render_issues(lines, summary)
     _render_slow_cases(lines, summary, slow_top)

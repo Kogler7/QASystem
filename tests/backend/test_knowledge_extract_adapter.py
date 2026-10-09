@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -132,8 +133,12 @@ def test_run_aggregate_feeds_field_dicts_to_v3_and_latest(monkeypatch):
             assert resolved.text == chunk["text"]
 
 
-def test_run_aggregate_feeds_v2_chunk_objects_to_v2(monkeypatch):
+@pytest.mark.parametrize("label", ["v2", "v3.1"])
+def test_run_aggregate_feeds_v2_chunk_objects(monkeypatch, label):
+    """v2 与 v3.1 都复用 V2 的 ExtractionChunk 输入契约。"""
     from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk as V2Chunk
+
+    expected_type = V2Chunk
 
     captured = {}
 
@@ -141,9 +146,61 @@ def test_run_aggregate_feeds_v2_chunk_objects_to_v2(monkeypatch):
         captured.update(kwargs)
         return {"status": "succeeded"}
 
-    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v2")
-    adapter.run_aggregate("class Term", ["第一段内容"], runner=fake_runner)
-    assert captured["chunks"] and all(isinstance(chunk, V2Chunk) for chunk in captured["chunks"])
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", label)
+    adapter.run_aggregate(
+        "class Term", ["第一段内容"], ranges=[[10, 15]],
+        metadata=[{"document_id": "doc-1", "source_file": "source.md"}],
+        runner=fake_runner,
+    )
+    assert captured["chunks"] and all(type(chunk) is expected_type for chunk in captured["chunks"])
+    chunk = captured["chunks"][0]
+    assert chunk.start_offset == 10 and chunk.end_offset == 15
+    assert chunk.document_id == "doc-1"
+    assert chunk.metadata["source_file"] == "source.md"
+
+
+def test_v31_input_preserves_structural_fields_and_caller_metadata(monkeypatch):
+    from copy import deepcopy
+
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3.1")
+    text = "  # 第一章\n设备甲\n"
+    metadata = {
+        "document_id": "doc-1", "section_id": "section-1",
+        "section_title": "第一章", "sheet_name": "sheet fallback",
+        "clause_number": "1.2", "page_no": 3,
+        "start_offset": 100, "end_offset": 120,
+        "custom": {"labels": ["原始标记"]},
+    }
+    original = deepcopy(metadata)
+
+    def runner(**kwargs):
+        chunk = kwargs["chunks"][0]
+        assert chunk.text == text
+        assert chunk.document_id == "doc-1"
+        assert chunk.section_id == "section-1"
+        assert chunk.section_title == "第一章"
+        assert chunk.clause_number == "1.2"
+        assert chunk.page_no == 3
+        assert (chunk.start_offset, chunk.end_offset) == (100, 120)
+        chunk.metadata["custom"]["labels"].append("内部标记")
+        return {"status": "succeeded"}
+
+    adapter.run_aggregate("class Term", [text], metadata=[metadata], runner=runner)
+    assert metadata == original
+
+
+def test_v31_input_ranges_override_metadata_offsets(monkeypatch):
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3.1")
+
+    def runner(**kwargs):
+        chunk = kwargs["chunks"][0]
+        assert (chunk.start_offset, chunk.end_offset) == (0, 4)
+        return {"status": "succeeded"}
+
+    adapter.run_aggregate(
+        "class Term", ["设备甲。"], ranges=[[0, 4]],
+        metadata=[{"start_offset": 10, "end_offset": 14}], runner=runner,
+    )
 
 
 def test_graph_service_forwards_ranges_and_metadata(monkeypatch):
@@ -555,16 +612,67 @@ def test_relationship_evidence_controls_projection_and_closure_context():
     }
 
 
+def test_document_raw_repeated_per_chunk_does_not_mask_later_relation_provenance():
+    evidence = {"source_block_ids": ["chunk-0001"], "quote": "甲联系乙"}
+    result = {
+        "status": "succeeded",
+        "graph": {
+            "nodes": [
+                {"uid": "Term::甲", "label": "Term", "properties": {"name": "甲"}},
+                {"uid": "Term::乙", "label": "Term", "properties": {"name": "乙"}},
+            ],
+            "relationships": [{
+                "from_uid": "Term::甲", "to_uid": "Term::乙", "type": "RELATED",
+                "evidences": [evidence],
+            }],
+        },
+        "raw": {"entities": [], "relations": [{
+            "from_type": "Term", "from_name": "甲", "rel_type": "RELATED",
+            "to_type": "Term", "to_name": "乙", "evidence": evidence,
+        }]},
+        "intermediate_model": {"objects": [
+            {"id": "a", "type": "Term", "identity": "甲",
+             "evidence": [{"source_block_ids": ["chunk-0000"]}]},
+            {"id": "b", "type": "Term", "identity": "乙",
+             "evidence": [{"source_block_ids": ["chunk-0001"]}]},
+        ], "relations": []},
+        "verification": {"valid": True},
+    }
+    original_result = deepcopy(result)
+
+    items = adapter.project_items(result, texts=["甲", "甲联系乙"])
+
+    assert all(item["raw"] == result["raw"] for item in items)
+    assert [len(item["graph"]["relationships"]) for item in items] == [0, 1]
+    before_merge = deepcopy(items)
+    merged = capabilities.deduplicate_chunk_graphs(items)
+
+    assert len(merged["relationships"]) == 1
+    relation = merged["relationships"][0]
+    assert (relation["from_uid"], relation["type"], relation["to_uid"]) == (
+        "Term::甲", "RELATED", "Term::乙",
+    )
+    assert relation["evidences"] == [evidence]
+    assert relation["chunk_indices"] == [1]
+    assert relation["provenance_status"] == "evidence"
+    assert {node["uid"]: node["chunk_indices"] for node in merged["nodes"]} == {
+        "Term::甲": [0], "Term::乙": [1],
+    }
+    assert items == before_merge
+    assert result == original_result
+
+
 def test_extract_version_defaults_to_latest_and_keeps_latest_label(monkeypatch):
     monkeypatch.delenv("KG_EXTRACT_ALGO_VERSION", raising=False)
     assert get_extract_version_label() == "latest"
     assert get_extract_version() == "latest"
 
 
-def test_extract_version_label_can_be_pinned(monkeypatch):
-    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v2")
-    assert get_extract_version_label() == "v2"
-    assert get_extract_version() == "v2"
+@pytest.mark.parametrize("label", ["v2", "v3", "v3.1"])
+def test_extract_version_label_can_be_pinned(monkeypatch, label):
+    monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", label)
+    assert get_extract_version_label() == label
+    assert get_extract_version() == label
 
 
 def test_extract_version_rejects_unknown_value(monkeypatch):

@@ -36,6 +36,7 @@ ENDPOINTS: dict[str, Endpoint] = {
     "confidence.calculate": Endpoint("POST", None, "APPLICATION_API_CONFIDENCE_PATH"),
     "documents.evidence.search": Endpoint("POST", None, "APPLICATION_API_DOCUMENT_EVIDENCE_PATH"),
     "models.embeddings.create": Endpoint("POST", "/v1/embeddings", "EMBEDDING_SERVICE_PATH"),
+    "models.decisions.create": Endpoint("POST", "/v1/systemone", "CLEF_SERVICE_PATH"),
     "documents.parse": Endpoint("POST", "/v1/documents/parse", "DOCUMENT_PARSE_SERVICE_PATH"),
 }
 

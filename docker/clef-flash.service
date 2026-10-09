@@ -1,0 +1,22 @@
+[Unit]
+Description=QASystem Clef-flash external decision service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/qasystem/clef-flash.env
+Environment=PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+Environment=HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false
+ExecStart=/bin/sh -c 'cd "$CLEF_SOURCE_DIR" && exec "$CLEF_PYTHON" -m clef_service'
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillMode=mixed
+UMask=0027
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

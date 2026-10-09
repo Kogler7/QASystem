@@ -5,6 +5,7 @@
 - ``v1/``：旧 batch 契约（batch / extractor / ontology_schema / scheduler / uml）
 - ``v2/``：V2 聚合流水线
 - ``v3/``：V3 聚合流水线
+- ``v3_1/``：主模型生成与 Clef 语义裁决的通用 harness（配置值为 ``v3.1``，契约同 V2）
 - ``latest/``：当前默认版本（独立代码副本）
 - ``version.py``：版本路由
 
