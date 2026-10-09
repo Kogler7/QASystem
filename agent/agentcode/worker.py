@@ -381,20 +381,6 @@ def _process_one(
                             "content": content,
                             "error": r.get("error") if r.get("is_error") else None,
                         })
-                        if (
-                            not r.get("is_error")
-                            and "problem-resolve-path-display" in name
-                            and content
-                        ):
-                            try:
-                                import json as json_mod
-                                path_payload = json_mod.loads(content) if isinstance(content, str) else content
-                            except (TypeError, ValueError):
-                                path_payload = content
-                            broker.publish(task_id, {
-                                "type": "solution_path",
-                                "path": path_payload,
-                            })
 
                 history = request_data.get("history") or []
                 with pool.borrow(timeout=120.0) as tm:

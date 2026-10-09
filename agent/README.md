@@ -275,6 +275,6 @@ Shell 资源限制测试依赖 POSIX `resource`，在 Windows 上会自动跳过
 | `agentcode/delivery.py` | 终稿投递 schema 定义 |
 | `agentcode/stream_broker.py` | 面向 SSE 的游标事件读取封装 |
 | `agentcode/pool.py` | ToolManager 连接池 |
-| `agentcode/tools/mcp_tools/` | MCP 配置、连接、用户头注入（`mcp.py::apply_user_headers`）和工具调度 |
+| `agentcode/tools/mcp_tools/` | MCP 配置、连接、用户头注入（`mcp.py::bind_identity`）和工具调度 |
 | `agentcode/skillsets/` | Skill 发现与按需加载（Skill 文件位于 `agent/skills/`，当前为 `graph-qa`） |
 | `agentcode/trace.py` | JSONL 与任务事件 Trace |

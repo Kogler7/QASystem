@@ -23,12 +23,18 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-RUN apt-get -o Acquire::Retries=5 update && \
+# 底座是 Ubuntu 22.04（jammy），默认 apt 源走 http://archive.ubuntu.com。国内/代理
+# 网络下 80 端口会被中间设备回 502 Bad Gateway（同时 https 的 nvidia/launchpad 源
+# 正常），因此统一换成国内 HTTPS 镜像源；需要换源时用 --build-arg UBUNTU_MIRROR=... 覆盖。
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu
+RUN find /etc/apt -maxdepth 2 \( -name '*.list' -o -name '*.sources' \) -exec sed -i \
+        -e "s@http://archive.ubuntu.com/ubuntu@${UBUNTU_MIRROR}@g" \
+        -e "s@http://security.ubuntu.com/ubuntu@${UBUNTU_MIRROR}@g" {} + && \
+    apt-get -o Acquire::Retries=5 update && \
     apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libcairo2-dev \
-    default-libmysqlclient-dev \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
@@ -70,26 +76,43 @@ WORKDIR /app
 
 # Install the heavy Python layer before copying application code so normal
 # source changes continue to use Docker's dependency cache.
+#
+# 已知且被接受的依赖冲突（成因见 backend/requirements.mineru-extras.txt 的说明）：
+#   vllm 0.11.2 声明 transformers<5，而 MinerU 4.x 需要 transformers>=5；
+#   lmcache 声明 numpy<=2.2，而解析器统一到 numpy 2.2.x；
+#   vLLM 自带的 prometheus-fastapi-instrumentator 7.1.0 声明 starlette<1.0，
+#   而 MinerU 侧的 gradio 把 starlette 升到了 1.x。
+# 都是"基础镜像里的 vLLM 比我们后装的解析栈老"导致的声明级冲突，同一环境无法同时满足；
+# 下面三处 pip check 只放行这三条，其余任何冲突仍然让构建失败。
 COPY backend/requirements.txt /tmp/qasystem/requirements.txt
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/ https://pypi.doubanio.com/simple/" && \
-    pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com pypi.doubanio.com" && \
-    pip install --upgrade pip "setuptools>=77,<81" wheel pycairo && \
-    pip install -r /tmp/qasystem/requirements.txt && \
-    pip check
+    pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/" && \
+    pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com" && \
+    pip install --retries 8 --timeout 120 --upgrade pip "setuptools>=77,<81" wheel pycairo && \
+    pip install --retries 8 --timeout 120 -r /tmp/qasystem/requirements.txt && \
+    if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
+        echo "存在未预期的依赖冲突："; pip check; exit 1; \
+    fi
 
 # MinerU publishes its pipeline/VLM dependencies as optional extras. Keep this
 # layer separate so ordinary application changes reuse the heavy base layer.
+# 这一层要下上 GB 的 wheel，单独挂 BuildKit 的 pip 下载缓存（不进镜像）。全局
+# PIP_NO_CACHE_DIR=1 是关缓存的，所以这里用 env -u 取消它，重跑时不必重新下载。
 COPY backend/requirements.mineru-extras.txt /tmp/qasystem/requirements.mineru-extras.txt
-RUN pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    env -u PIP_NO_CACHE_DIR pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
     --retries 8 --timeout 120 -r /tmp/qasystem/requirements.mineru-extras.txt && \
-    pip check
+    if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
+        echo "存在未预期的依赖冲突："; pip check; exit 1; \
+    fi
 
 # Read Agent dependencies from their canonical pyproject without copying the
 # Agent package into the environment image. Runtime source is mounted later.
 COPY agent/pyproject.toml /tmp/qasystem/agent-pyproject.toml
 RUN python -c "import subprocess,sys,tomllib; p=tomllib.load(open('/tmp/qasystem/agent-pyproject.toml','rb'))['project']; subprocess.check_call([sys.executable,'-m','pip','install',*(p['dependencies']+p['optional-dependencies']['api'])])" && \
-    pip check
+    if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
+        echo "存在未预期的依赖冲突："; pip check; exit 1; \
+    fi
 
 COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
 
@@ -100,8 +123,10 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # Application-aware verification is performed by build-image.ps1 with the
-# repository source mounted read-only.
-RUN python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
+# repository source mounted read-only. starlette 与 prometheus-fastapi-instrumentator
+# 的组合只做非致命自检（不通过只告警），真正的服务可用性由部署后的 /health 与 /metrics 验收。
+RUN (python -c "from fastapi import FastAPI; from prometheus_fastapi_instrumentator import Instrumentator; Instrumentator().instrument(FastAPI()); print('instrumentator ok')" || echo "WARN: instrumentator 与 starlette 组合自检未通过，vLLM /metrics 可能受影响") && \
+    python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
     python -c "import mineru, docling, transformers; from importlib.metadata import version; \
     assert version('mineru').startswith('4.'), version('mineru'); \
     assert version('transformers').startswith('5.'), version('transformers'); \
@@ -111,3 +136,9 @@ RUN python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
     test -x /usr/bin/soffice && \
     test -f /opt/qasystem/ofdrw/ofd-to-pdf.jar && \
     command -v tini >/dev/null
+
+# 基础镜像 vllm/vllm-openai 自带 ENTRYPOINT（vllm.entrypoints.openai.api_server）。
+# Compose 只覆盖 command（= CMD），不会覆盖 ENTRYPOINT，若不显式复位，两个服务的
+# command 会被当成 vLLM 的参数追加，容器根本起不到 supervisor/agent。
+# tini 已在上面安装、并在 docker/verify_runtime.py 的程序清单中断言存在。
+ENTRYPOINT ["/usr/bin/tini", "--"]

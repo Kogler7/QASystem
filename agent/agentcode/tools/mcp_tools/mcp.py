@@ -449,10 +449,6 @@ class MCPToolWrapper:
         with self._lifecycle_lock:
             self._identity_bound = False
 
-    def apply_user_headers(self, headers: dict[str, str] | None) -> None:
-        """兼容旧调用点：等价于 bind_identity()。"""
-        self.bind_identity(headers)
-
     def _convert_schema(self, tool_name: str, mcp_tool: Any) -> dict:
         """将 MCP SDK 返回的 Tool 对象转换为 agent 内部使用的工具描述格式。
 
