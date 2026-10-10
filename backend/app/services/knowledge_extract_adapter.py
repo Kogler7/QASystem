@@ -10,15 +10,17 @@ This module bridges the two without touching the versioned packages.  The
 environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 ``algorithm.knowledge_extract.version``) selects the concrete algorithm:
 
-* ``latest`` (default): resolves to the newest version and runs it through the
+* ``latest`` (default): runs the independent ``latest`` package through the
   same per-chunk projection.
-* ``v2``: run ``v2.extract_aggregate`` once, then project the document-level
-  result back onto the individual chunks using each entity's evidence anchor,
-  so the caller keeps seeing one item per chunk and ``deduplicate_chunk_graphs``
-  can still rebuild the merged graph (and its ``chunk_indices``) exactly as before.
+* ``v2`` / ``v3.1``: build V2 ``ExtractionChunk`` objects, run the selected package's
+  ``extract_aggregate`` once, then project the document-level result back onto the
+  individual chunks using each entity's evidence anchor, so the caller keeps seeing
+  one item per chunk and ``deduplicate_chunk_graphs`` can still rebuild the merged
+  graph (and its ``chunk_indices``) exactly as before.
 * ``v3``: run ``v3.extract_aggregate`` with the V2-configured LLM client; it
   reshapes the flat ``entities``/``relations`` result into the V2 aggregate
-  contract, then shares the same projection.
+  contract, then shares the same projection. ``latest`` also accepts chunk field
+  dictionaries.
 * ``jev``: run the ``jev_extract`` copy. This label is opt-in and is not the
   default. The package is imported only when the label is selected.
 
@@ -41,7 +43,7 @@ import re
 from copy import deepcopy
 from typing import Any, Callable, Iterable, Sequence
 
-from algorithm.knowledge_extract import latest, v2, v3, version as ke_version
+from algorithm.knowledge_extract import latest, v2, v3, v3_1, version as ke_version
 
 from backend.app import observability
 
@@ -248,9 +250,14 @@ def _chunk_payloads(
                 "chunk_id": _chunk_id(position),
                 "text": text or "",
                 "document_id": str(document_id) if document_id else None,
-                "section_title": str(chunk_metadata.get("sheet_name")) if chunk_metadata.get("sheet_name") else None,
-                "start_offset": span[0] if span else None,
-                "end_offset": span[1] if span else None,
+                "section_id": chunk_metadata.get("section_id"),
+                "section_title": chunk_metadata.get("section_title") or chunk_metadata.get("sheet_name"),
+                "clause_number": chunk_metadata.get("clause_number"),
+                "page_no": chunk_metadata.get("page_no"),
+                # Explicit TextChunk ranges are authoritative; metadata offsets
+                # retain provenance when an upstream caller has no ranges field.
+                "start_offset": span[0] if span is not None else chunk_metadata.get("start_offset"),
+                "end_offset": span[1] if span is not None else chunk_metadata.get("end_offset"),
                 "metadata": chunk_metadata,
             }
         )
@@ -297,14 +304,15 @@ def run_aggregate(
             runner = {
                 ke_version.V2: v2.extract_aggregate,
                 ke_version.V3: v3.extract_aggregate,
+                ke_version.V31: v3_1.extract_aggregate,
                 ke_version.LATEST: latest.extract_aggregate,
             }[label]
-    # v2 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
+    # v2 / v3.1 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
     # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
     # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
     chunks = (
         build_chunks(texts, ranges, metadata)
-        if label in {ke_version.V2, ke_version.JEV}
+        if label in {ke_version.V2, ke_version.V31, ke_version.JEV}
         else _chunk_payloads(texts, ranges, metadata)
     )
     result = runner(

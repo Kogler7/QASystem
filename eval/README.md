@@ -10,7 +10,7 @@ tags: []
 
 默认连 `http://127.0.0.1:8006`。Backend 已在跑时，在仓库根目录执行即可；评测数据在 `test_data/eval/`，不要只拷 `eval/` 目录。
 
-抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3` / `v3.1` / `v3.2`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2`、`v3` 、`v3.1` 或 `v3.2`，再跑同一套评测即可对比。
+抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3` / `v3.1`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2`、`v3` 或 `v3.1`，再跑同一套评测即可对比。
 
 ## 做了什么
 
@@ -52,7 +52,7 @@ test_data/eval/
 | `chunk-extract`（默认） | 切片+抽取 | `POST /api/v1/documents/chunk` + extract | docs/ 现解析，或 `--from-run` 复用 document.md |
 | `pipeline` | 全流程知识沉淀 | `POST /api/v1/pipelines/knowledge-ingestion` | docs/ 原文件 |
 
-`extract` 模式只重跑抽取这一步，切片固定不变——这是对比抽取算法版本（v2/v3/v3.1/v3.2）的推荐方式：先跑一次 `chunk-extract` 冻结切片，再让待比较的两个版本都用 `--mode extract --from-run <冻结批次>` 运行，保证两边模式与输入一致。插件走 MCP `kg_extract_v2`，同样受版本开关控制。
+`extract` 模式只重跑抽取这一步，切片固定不变——这是对比抽取算法版本（v2/v3/v3.1）的推荐方式：先跑一次 `chunk-extract` 冻结切片，再让待比较的两个版本都用 `--mode extract --from-run <冻结批次>` 运行，保证两边模式与输入一致。插件走 MCP `kg_extract_v2`，同样受版本开关控制。
 
 **模块通过标准。** 解析 / 切片只验接口成功且输出非空，尚无完整语义质量标注；抽取对照 `golden.json` 打 P / R / F1 / Jaccard。Jaccard 为 `TP/(TP+FP+FN)`，旧 JSON 字段 `accuracy` 保留为兼容别名，不代表普通分类准确率。复用的中间产物在 scores.json 里记 `status: reused` 与来源路径。
 
@@ -69,14 +69,17 @@ test_data/eval/
 
 匹配是一对一，并按**最大基数**求解：`(g0,p0)/(g0,p1)/(g1,p0)` 判 2 对，而不是先到先得只判 1 对。
 
-批量判定分两步，候选边统一做全局一对一匹配：
+批量判定分三步，候选边统一做全局一对一匹配：
 
 1. 条目身份经过格式归一化后相同、满足本体类型硬约束且两侧共享属性值归一化相同的项，形成全部本地候选边。名称归一化只移除指定空白、括号和标点，不做字面相似度预筛；数字语义符号保留，属性值采用上面的保守规则。若本地最大匹配已达到 `min(golden数量, predicted数量)`，命中数不可能再增加，该集合无需调用 judge。
 2. 本地匹配未饱和时，按 **完整 golden 窗口 × predicted 窗口** 扫描，保留本地已匹配项，避免提前锁死顶点而漏掉全局最优匹配。`judge_golden_batch_size`（默认 40）条 golden × `judge_batch_size`（默认 20）条 predicted 组成一次 prompt，每对条目在本轮扫描中出现一次。judge 返回所有认可的候选边，不能在每个窗口内先做一对一裁剪；程序剔除违反本体类型约束的候选，再合并本地与 judge 候选统一求最大匹配。双侧窗口避免把数百条 golden 全塞进单次 prompt；`judge_max_concurrency`（默认 4）控制并发，每个 worker 使用独立客户端。
+3. **聚焦补判**：身份归一化一致、类型相容，只因属性或关系端点上下文冲突而无法本地确认的候选，单独组成小窗口再判一次。这些候选只能由 judge 决定指代，而整窗提示（一次数百对）下模型会整窗回空数组，空数组能通过 schema 校验，会把它们静默丢成漏抽。补判只增加候选边，最终仍由统一最大匹配决定，不放宽判对口径；本地匹配已饱和时不调用 judge，也不做补判。
+
+实测依据：88 机 `official_02` 关系窗口一次送审 40×8=320 对，judge 返回 HTTP 200 + 空数组，两条五元组与 golden 逐字一致的候选被判成漏抽、关系 F1 归零；同模型同数据换成 2×2 小窗口后立即判出这两对。补判后该 case 关系 TP 由 0 恢复为 2，实体侧另恢复 1 条。
 
 summary 里另附 identity（type+name 精确集合）对照。judge 失败仍保存 `identity_fallback` 分数和诊断，但剔除出正式 LLM `overall` / `quality` 汇总，并使质量门禁失败（无执行失败时退出码 4）。需要纯精确匹配时显式加 `--match-mode identity`。没有有效 golden 的 case 仍会保存预测，但不计分；默认 LLM 评测要求所选 case 和模块都有有效评分，详见「质量门禁」。
 
-两种口径的逐条结果（对上/漏抽/多抽清单、judge 每批耗时）落在 `match_details.json`。`judge_coverage` 记录 `golden` / `predicted` / `auto_matched` / `auto_candidate_pairs` / `pairs_total` / `pairs_presented` / `windows` / `empty_windows` / `llm_candidate_pairs` / `llm_matched` / `full_sweep` / `rejected_type_pairs`。`pairs_presented == pairs_total` 只说明所有计划候选出现在裁判输入中，不能证明模型没有遗漏或误判；本地已饱和时两者均为 0，`llm_matched` 也可以为 0。`empty_windows` 只作排查线索，窗口内本来没有匹配时也会为空。
+两种口径的逐条结果（对上/漏抽/多抽清单、judge 每批耗时）落在 `match_details.json`。`judge_coverage` 记录 `golden` / `predicted` / `auto_matched` / `auto_candidate_pairs` / `pairs_total` / `pairs_presented` / `windows` / `empty_windows` / `llm_candidate_pairs` / `llm_matched` / `full_sweep` / `rejected_type_pairs`，以及聚焦补判的 `deferred_candidates` / `focused_windows` / `focused_pairs_presented` / `focused_empty_windows` / `focused_candidate_pairs`。`pairs_presented == pairs_total` 只说明所有计划候选出现在裁判输入中，不能证明模型没有遗漏或误判；本地已饱和时两者均为 0，`llm_matched` 也可以为 0。`empty_windows` 只作排查线索，窗口内本来没有匹配时也会为空；`empty_windows` 与 `focused_candidate_pairs` 同时非零就说明整窗空数组确实吞掉过候选（补判已捞回）。`focused_empty_windows` 表示补判小窗口本身也返回空数组——此时是模型给出的有依据的“不匹配”，不再视为漏判。
 
 关系属性在图结构转换时保留。本地关系候选也验证端点上下文：相同五元组但端点共享属性冲突时必须交给 judge；多个上下文候选须全部兼容，缺失上下文沿用缺失属性不冲突规则。另有 `aligned_relations` 按选中的实体映射约束关系端点与方向，**只作诊断，不参与正式关系 F1 门禁**：多解实体映射可能产生不同关系分数，它不是完整图对齐最优值。当前共享属性不冲突不等于属性完备；原文证据支持性也未被主指标覆盖。详细依据及 88 机测试记录见 [评测方案审计与改进](../docs/算法/评测方案审计与改进.md)。
 
@@ -174,9 +177,9 @@ python3 eval/run.py test_data/eval/official/official_01
 
 ---
 
-**对比抽取算法版本（v2/v3/v3.1/v3.2）**
+**对比抽取算法版本（v2/v3/v3.1）**
 
-默认 `KG_EXTRACT_ALGO_VERSION=latest` 跑的是 `latest` 包（当前与 v3 一致）。要对比 v2/v3/v3.1/v3.2，先显式固定 Backend 环境并重启服务。下面以 v2 与 v3.1 对比为例；仅在评测脚本进程设置变量不会切换运行中的 Backend：
+默认 `KG_EXTRACT_ALGO_VERSION=latest` 跑的是 `latest` 包（当前与 v3 一致）。要对比 v2/v3/v3.1，先显式固定 Backend 环境并重启服务。下面以 v2 与 v3.1 对比为例；仅在评测脚本进程设置变量不会切换运行中的 Backend：
 
 ```bash
 # 1. 先生成冻结切片；本批次不是后续 extract 模式的可比基线
@@ -368,7 +371,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 | `summary.json` | 各 case 成败和 P/R/F1/Jaccard；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时，每个 case 完成后更新。`overall` 是有效同口径 micro，`quality` 包含覆盖率、case/group 均值与分组结果；`overall_identity` 单列精确对照。`gate` 记录空抽取、实体 F1、耗时和 `quality` 评分有效性/关系阈值检查；`baseline_comparison` 是同口径基线判定与逐项差异 |
 | `manifest.json` | 源文件、golden、本体，以及实际复用 Markdown/切片的 SHA256；`evaluator` 记录 `run.py`、`quality.py`、`provenance.py` 的内容哈希（包含未提交修改）；`settings` 与 `scoring_contract` 记录安全配置和评分契约，不记录 API key / Authorization。同一内容也嵌入 `summary.manifest` |
 | `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
-| `match_details.json` | 每个已评分块的 `entities` / `relations` 命中、漏抽、多抽明细。LLM-judge 另有 `aligned_relations` 诊断、`judge_batches`（窗口原索引、耗时、响应格式与失败尝试）、`judge_coverage` 和 `identity` 精确对照 |
+| `match_details.json` | 每个已评分块的 `entities` / `relations` 命中、漏抽、多抽明细。LLM-judge 另有 `aligned_relations` 诊断、`judge_batches`（窗口原索引、耗时、响应格式与失败尝试；聚焦补判的批次带 `focused: true`）、`judge_coverage` 和 `identity` 精确对照 |
 | `document.md` | 解析结果，便于对照原文；`--from-run` 且 `--mode chunk-extract` 时复用它跳过解析（同批重试也会复用），因此仍需保留 |
 | `chunks.json` | 实际送进抽取的切片 |
 | `backend_extract.json` | 生产接口原样回包，排抽取失败或图结构时用 |
@@ -400,6 +403,6 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 - 插件没有 parse/chunk 工具，抽取的是整篇 Markdown，和后台「先切片再抽取」路径不完全相同。
 - `中车RAG验证数据集/` 是造集源，不是评测入口。拷目录做评测时可以不带它。
 
-### V3.2 通用提示词 mini 对照
+### 已下线版本的对照说明
 
-在隔离 Backend 设 `KG_EXTRACT_ALGO_VERSION=v3.2`，分别以 `KG_EXTRACT_V32_PROMPT_VARIANT=baseline` 和 `distilled` 启动；两组用 `mini_eval.py --mode extract --from-run <同一冻结批次>`，保持模型与其他参数一致。提示词只在 Backend 环境设置；仅给评测客户端设置不会改变运行中的服务。详见 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。
+`v3.2`（单通用提示词联合抽取）与旧 `v3.1`（V2 副本 + prompt router）实现已从代码库移除，对应的提示词对照评测无法再运行；历史结论保留在 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。当前 `v3.1` 指语义 harness，评测方式见 [V3.1 语义 Harness 与评测](../docs/算法/知识抽取V3.1语义Harness与评测.md)。

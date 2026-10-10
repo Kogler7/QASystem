@@ -37,7 +37,7 @@ def test_default_first_selection_is_bounded_and_retains_type_order(workspace):
     chosen, strategy, seed = mini_eval.select_cases(
         workspace, {"cases_per_type": 1, "per_type": {"official": 2}, "selection": "first", "seed": 42},
     )
-    assert [str(path.relative_to(workspace)) for path in chosen] == [
+    assert [path.relative_to(workspace).as_posix() for path in chosen] == [
         "official/official_01", "official/official_02", "rule/rule_01", "simple/simple_01", "standard/standard_01",
     ]
     assert strategy == "first"

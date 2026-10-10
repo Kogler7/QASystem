@@ -210,7 +210,7 @@ _UNUSABLE_RESPONSE_CODES = frozenset(
 
 #: V2 terminal codes meaning "the ontology cannot support extraction" --
 #: empty ontology, zero class declarations, or requested types not in it.
-_ONTOLOGY_FAILURE_CODES = frozenset({"ONTOLOGY_EMPTY", "TARGET_SCOPE_EMPTY"})
+_ONTOLOGY_FAILURE_CODES = frozenset({"ONTOLOGY_EMPTY", "TARGET_SCOPE_EMPTY", "ONTOLOGY_INVALID"})
 
 
 def _strict_chunk_failures() -> bool:

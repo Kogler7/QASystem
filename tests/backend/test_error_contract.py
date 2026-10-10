@@ -146,7 +146,7 @@ def test_embedding_detects_vector_count_mismatch(monkeypatch):
     assert captured.value.code == ErrorCode.VECTOR_COUNT_MISMATCH
 
 
-@pytest.mark.parametrize("error_code", ["ONTOLOGY_EMPTY", "TARGET_SCOPE_EMPTY"])
+@pytest.mark.parametrize("error_code", ["ONTOLOGY_EMPTY", "TARGET_SCOPE_EMPTY", "ONTOLOGY_INVALID"])
 def test_graph_extraction_classifies_ontology_failure(monkeypatch, error_code):
     """空本体/零目标范围的整批失败映射为 4006（不可重试），而不是通用 502。"""
     monkeypatch.setenv("KG_EXTRACT_STRICT_CHUNK_FAILURES", "1")

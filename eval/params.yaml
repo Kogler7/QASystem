@@ -32,7 +32,7 @@ options:
     breakpoint_method: percentile
   extraction:
     # 抽取算法版本由 Backend 环境变量 KG_EXTRACT_ALGO_VERSION 控制：
-    # latest（默认，使用独立的 latest 包）或显式 v2 / v3 / v3.1 / v3.2；本文件不设置。
+    # latest（默认，使用独立的 latest 包）或显式 v2 / v3 / v3.1；本文件不设置。
     # 对比版本时先固定切片：先跑 --mode chunk-extract，
     # 再换版本跑 --mode extract --from-run <上次运行>，保证两次喂入的切片完全相同。
     # 本次评测用 chat 模型，避免 deepseek-v4-flash 思考耗尽 max_output_tokens。
@@ -52,14 +52,18 @@ eval:
   judge_model: null        # 无独立配置时兼容 KG_EXTRACT_LLM_MODEL，最后默认 deepseek-v4-flash
   judge_base_url: null     # 无独立配置时兼容 KG_EXTRACT_LLM_BASE_URL
   judge_timeout_seconds: 300
-  # B 方案：双侧窗口扫全图 + 候选边最大匹配。本地 Qwen 8192：小窗 + 超长自动拆窗。
-  judge_max_tokens: 1024
-  judge_batch_size: 8
-  # predicted / golden 窗口；本地匹配饱和时跳过 judge，否则每对恰好看一次。
-  judge_golden_batch_size: 12
+  judge_max_tokens: 8192
+  judge_batch_size: 20
+  # judge 单次 prompt 里放多少条：predicted 窗口 / golden 窗口。两侧都切窗口，
+  # 本地匹配饱和时跳过 judge；否则完整扫描 golden × predicted，每对出现一次，
+  # 收齐候选后统一最大匹配。窗口越大调用越少、单次 prompt 越长。
+  judge_golden_batch_size: 40
+  # judge 并发 worker 数（每个 worker 用独立客户端，诊断信息互不覆盖）。
   judge_max_concurrency: 4
+  # Chat 接口格式：auto 为官方 DeepSeek 使用 json_object，其他服务优先 json_schema。
+  # json_object / json_schema 可显式指定起始格式；结果均在本地校验结构。
   judge_response_format: auto
-  # DeepSeek thinking=disabled；SiliconFlow enable_thinking=false；其它（Qwen/vLLM）chat_template_kwargs。
+  # 官方 DeepSeek 使用 thinking=disabled；SiliconFlow 使用 enable_thinking=false。
   judge_disable_thinking: true
 
 # 小样本评测入口 python3 eval/mini_eval.py；不影响 run.py 的选择范围。

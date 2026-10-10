@@ -50,7 +50,10 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "INTENT_LLM_" not in compose
     assert "QA_LLM_" not in compose
     assert "AGENT_LLM_" not in compose
-    assert "CUDA_VISIBLE_DEVICES" not in template
+    env_keys = {line.split("=", 1)[0].strip() for line in template.splitlines()
+                if "=" in line and not line.lstrip().startswith("#")}
+    assert "CUDA_VISIBLE_DEVICES" not in env_keys
+    assert "CLEF_CUDA_VISIBLE_DEVICES" in env_keys
     assert "GPU_DEVICE_IDS=4,5,6,7" in template
     assert "QASYSTEM_ENV_IMAGE=qasystem-env-v1" in template
     assert "QASYSTEM_SOURCE_DIR=." in template

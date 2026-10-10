@@ -162,8 +162,13 @@ def test_same_label_endpoint_conflicts_require_relation_judging(monkeypatch, end
     client = run.JudgeClient(base_url="https://judge.example.test/v1", api_key="fixture", model="fixture", timeout=30, max_tokens=2048)
     metrics = run.llm_judge_score_case(golden_entities, [_relation()], predicted_entities, [_relation()], client)
 
-    assert requests.count("relation_matches") == 1
-    assert metrics["details"]["judge_coverage"]["relations"]["auto_candidate_pairs"] == 0
+    # 端点上下文冲突必须交给 judge：一次全图扫描 + 一次聚焦补判（整窗提示过大时
+    # judge 会回空数组，只有小窗口才能让这类候选得到有依据的答案）。
+    assert requests.count("relation_matches") == 2
+    coverage = metrics["details"]["judge_coverage"]["relations"]
+    assert coverage["auto_candidate_pairs"] == 0
+    assert coverage["deferred_candidates"] == 1
+    assert coverage["focused_windows"] == 1
     assert metrics["relations"]["tp"] == int(judge_accepts)
 
 
