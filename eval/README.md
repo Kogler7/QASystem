@@ -1,10 +1,16 @@
+---
+noteId: "c7cee6b0c2e911f1aea7cbe984ab9484"
+tags: []
+
+---
+
 # 知识沉淀评测
 
 改完解析、切片、抽取或沉淀流水线后，在仓库根目录对指定 case 跑一次脚本。默认只测后台 HTTP，不 `import algorithm` / `backend`。
 
 默认连 `http://127.0.0.1:8006`。Backend 已在跑时，在仓库根目录执行即可；评测数据在 `test_data/eval/`，不要只拷 `eval/` 目录。
 
-抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2` 或 `v3`，再跑同一套评测即可对比。
+抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3` / `v3.1` / `v3.2`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2`、`v3` 、`v3.1` 或 `v3.2`，再跑同一套评测即可对比。
 
 ## 做了什么
 
@@ -13,6 +19,7 @@
 ```text
 eval/
   run.sh / run.py / params.yaml
+  mini_eval.sh / mini_eval.py  # 每类 1–2 个 case 的小样本入口
 
 test_data/eval/
   评测数据
@@ -35,7 +42,7 @@ test_data/eval/
 
 不再使用中文类型目录名（`公文`/`标准`/`规则`）。`中车RAG验证数据集/` 若出现会被扫描跳过。
 
-参数文件默认是 [`eval/params.yaml`](params.yaml)。若 `test_data/eval/params.yaml` 存在则覆盖它。`run.sh` 只转调 `run.py`，工作区默认仍是 `test_data/eval`。
+`run.py` 的参数文件默认是 [`eval/params.yaml`](params.yaml)。若 `test_data/eval/params.yaml` 存在则覆盖它。`run.sh` 只转调 `run.py`，工作区默认仍是 `test_data/eval`。下文的 `mini_eval` 入口默认固定读取 `eval/params.yaml`。
 
 **评测模式。** 后台评测归一化成三类（`--mode`，可组合）：
 
@@ -45,13 +52,39 @@ test_data/eval/
 | `chunk-extract`（默认） | 切片+抽取 | `POST /api/v1/documents/chunk` + extract | docs/ 现解析，或 `--from-run` 复用 document.md |
 | `pipeline` | 全流程知识沉淀 | `POST /api/v1/pipelines/knowledge-ingestion` | docs/ 原文件 |
 
-`extract` 模式只重跑抽取这一步，切片固定不变——这是对比抽取算法版本（v2/v3）的推荐方式：先跑一次 `chunk-extract` 冻结切片，切换 Backend 的 `KG_EXTRACT_ALGO_VERSION` 后再 `--mode extract --from-run <上次运行>`，两次喂入完全相同。插件走 MCP `kg_extract_v2`，同样受版本开关控制。
+`extract` 模式只重跑抽取这一步，切片固定不变——这是对比抽取算法版本（v2/v3/v3.1/v3.2）的推荐方式：先跑一次 `chunk-extract` 冻结切片，再让待比较的两个版本都用 `--mode extract --from-run <冻结批次>` 运行，保证两边模式与输入一致。插件走 MCP `kg_extract_v2`，同样受版本开关控制。
 
-**模块通过标准。** 解析 / 切片只验接口成功且输出非空；抽取对照 `golden.json` 打 P / R / F1 / Acc。复用的中间产物在 scores.json 里记 `status: reused` 与来源路径。
+**模块通过标准。** 解析 / 切片只验接口成功且输出非空，尚无完整语义质量标注；抽取对照 `golden.json` 打 P / R / F1 / Jaccard。Jaccard 为 `TP/(TP+FP+FN)`，旧 JSON 字段 `accuracy` 保留为兼容别名，不代表普通分类准确率。复用的中间产物在 scores.json 里记 `status: reused` 与来源路径。
 
 插件侧没有独立的 parse / chunk 工具：插件阶段复用后台解析出的 Markdown；若只跑 `--stage plugin`，会先调一次解析接口再调 MCP。
 
-**打分。** 默认 LLM-judge（语义一对一匹配，允许同义、别名、格式差），summary 里附 identity（type+name 精确集合）对照。judge 失败则该 case 降级 identity。需要纯精确匹配时加 `--match-mode identity`。空 golden 仍会跑并落盘预测，但不计入分数。两种口径的逐条结果（对上/漏抽/多抽清单，LLM-judge 另有每批评分耗时）都落在该 case 的 `match_details.json`，scores.json 只留计数。
+**打分。** 默认 LLM-judge：在本体类型硬约束下判断语义一致。实体看 `type` / `name` / `properties`，关系看 `rel_type` / 两端点 / `properties`，并结合两侧端点实体属性判断指代：
+
+- 实体 `type` 以及关系 `rel_type`、`from_type`、`to_type` 分别要求经过 NFKC、casefold、去空白与下划线后完全一致。只容忍这些书写差异，不允许 judge 自由推断类型同义词或单复数等价。程序会硬过滤跨类型候选，并在 `rejected_type_pairs` 记录原集合索引。
+- `name` 指向同一现实对象即可：同义表达、别名、简称与全称、规范名、标点/空格/大小写/全半角/繁简差异，以及不改变指代的修饰（如"的通知""（试行）"）都算一致。
+- `properties` 只在**两侧都填写了**的属性键上比较，值语义一致即通过（数值 100 与 100.0、日期与单位的不同写法、全半角与空格差异都算一致）。只有一侧填写（缺失、空串、空数组）**不算冲突**；双方详略不同但内容不矛盾（一方是另一方的节选/摘要/更完整的抄录）**不算冲突**；只有互相排斥的取值（最大值 5% 与 10%、发布机构不同）才判为不匹配。
+- 本地自动匹配对属性值采用更保守的归一化：保留 `+`、`-`、`.`、`/`、`%` 等符号，不会把 `-5` 与 `5`、`1.0` 与 `10`、`5%` 与 `5` 合并为相同值；不同写法是否语义等价仍交给 judge 判断。
+- 关系 judge 同时接收 golden 与 predicted 各自的端点实体 `properties`。上下文按当前窗口的 `(type, name)` 去重，支持 golden 用“排查要求二”这类短标签、预测用正文表述的情况；同一实体键下的不同属性候选分别保留，不拼成新实体。上下文只辅助判断，不依据已选实体映射自动增加关系 TP。
+- `evidence` 从不参与匹配。
+
+匹配是一对一，并按**最大基数**求解：`(g0,p0)/(g0,p1)/(g1,p0)` 判 2 对，而不是先到先得只判 1 对。
+
+批量判定分两步，候选边统一做全局一对一匹配：
+
+1. 条目身份经过格式归一化后相同、满足本体类型硬约束且两侧共享属性值归一化相同的项，形成全部本地候选边。名称归一化只移除指定空白、括号和标点，不做字面相似度预筛；数字语义符号保留，属性值采用上面的保守规则。若本地最大匹配已达到 `min(golden数量, predicted数量)`，命中数不可能再增加，该集合无需调用 judge。
+2. 本地匹配未饱和时，按 **完整 golden 窗口 × predicted 窗口** 扫描，保留本地已匹配项，避免提前锁死顶点而漏掉全局最优匹配。`judge_golden_batch_size`（默认 40）条 golden × `judge_batch_size`（默认 20）条 predicted 组成一次 prompt，每对条目在本轮扫描中出现一次。judge 返回所有认可的候选边，不能在每个窗口内先做一对一裁剪；程序剔除违反本体类型约束的候选，再合并本地与 judge 候选统一求最大匹配。双侧窗口避免把数百条 golden 全塞进单次 prompt；`judge_max_concurrency`（默认 4）控制并发，每个 worker 使用独立客户端。
+
+summary 里另附 identity（type+name 精确集合）对照。judge 失败仍保存 `identity_fallback` 分数和诊断，但剔除出正式 LLM `overall` / `quality` 汇总，并使质量门禁失败（无执行失败时退出码 4）。需要纯精确匹配时显式加 `--match-mode identity`。没有有效 golden 的 case 仍会保存预测，但不计分；默认 LLM 评测要求所选 case 和模块都有有效评分，详见「质量门禁」。
+
+两种口径的逐条结果（对上/漏抽/多抽清单、judge 每批耗时）落在 `match_details.json`。`judge_coverage` 记录 `golden` / `predicted` / `auto_matched` / `auto_candidate_pairs` / `pairs_total` / `pairs_presented` / `windows` / `empty_windows` / `llm_candidate_pairs` / `llm_matched` / `full_sweep` / `rejected_type_pairs`。`pairs_presented == pairs_total` 只说明所有计划候选出现在裁判输入中，不能证明模型没有遗漏或误判；本地已饱和时两者均为 0，`llm_matched` 也可以为 0。`empty_windows` 只作排查线索，窗口内本来没有匹配时也会为空。
+
+关系属性在图结构转换时保留。本地关系候选也验证端点上下文：相同五元组但端点共享属性冲突时必须交给 judge；多个上下文候选须全部兼容，缺失上下文沿用缺失属性不冲突规则。另有 `aligned_relations` 按选中的实体映射约束关系端点与方向，**只作诊断，不参与正式关系 F1 门禁**：多解实体映射可能产生不同关系分数，它不是完整图对齐最优值。当前共享属性不冲突不等于属性完备；原文证据支持性也未被主指标覆盖。详细依据及 88 机测试记录见 [评测方案审计与改进](../docs/算法/评测方案审计与改进.md)。
+
+88 机 `official_01` 初评暴露了裁判把部门与活动/交互配对、缺少端点上下文时 8 个关系窗口全部返回空数组的问题。因此该次 F1 不能直接归因于抽取算法。类型硬约束、属性归一化和端点上下文均已改变评分口径，需要重新评分并建立新基线，不能沿用初评数值作版本优劣结论。
+
+评分客户端调用 Chat Completions 接口。`eval.judge_response_format: auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
+
+`eval.judge_disable_thinking: true` 向官方 DeepSeek 发送 `thinking: {type: disabled}`，向官方 SiliconFlow（`api.siliconflow.cn` / `api.siliconflow.com`）发送 `enable_thinking: false`，其他兼容服务不附加这些厂商参数。参见 [SiliconFlow Chat API](https://docs.siliconflow.cn/docs/api/chat-completions-post)。评分只解析最终 `content`，不会用 `reasoning_content` 代替答案；空内容或被截断的回答判为评分失败。提示词明确索引范围、候选边数量上限与输出结束条件。每条输入显式标注 `golden_index` / `predicted_index`，索引是**窗口内**下标；评分代码通过窗口保存的原索引列表回填全局下标，即使列表不连续也不使用起点加偏移代替映射。所有格式均检查数组结构、整数类型与索引边界；越界响应使评分失败。`judge_batches` 保留每次尝试的格式、状态、响应 ID、结束原因、token 用量及内容长度，不保存模型原始文本或鉴权信息；失败时保留已完成调用的诊断。
 
 预测只写 `tmp/eval/runs/<时间戳>/`，不会覆盖 `test_data/eval/<类型>/<case>/extract/golden.json`。
 
@@ -62,12 +95,44 @@ test_data/eval/
 ### 准备
 
 1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
-2. 默认 LLM-judge 需要 `KG_EXTRACT_LLM_BASE_URL`（可选 `KG_EXTRACT_LLM_MODEL` / `KG_EXTRACT_LLM_API_KEY`）。未配 base_url 时自动改 identity，不会假装用大模型评过。显式 `--match-mode llm` 且未配地址则退出。
+2. 默认 LLM-judge 需要有效的评分地址。地址和模型按 `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → `KG_EXTRACT_LLM_BASE_URL/MODEL` 读取；API key 按 `QASYSTEM_JUDGE_API_KEY` → `KG_EXTRACT_LLM_API_KEY` 读取。独立变量示例位于根 `.env.example`。未配地址时，实际 LLM 评测一律按配置错误退出 1；只检查链路时显式指定 `--match-mode identity`。`--dry-run` 不调用或要求 judge。
 3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
 地址也可用 `QASYSTEM_BACKEND_URL` / `QASYSTEM_MCP_URL`，或改 `params.yaml`。流水线选项在 `params.yaml` 的 `options`，与生产 `PipelineOptions` 对齐。不要把密钥写进 YAML。
 
 ### 命令
+
+**小样本评测（mini_eval，日常迭代先用这个）**
+
+```bash
+# 先查看本次选择，不调用 Backend 或 judge
+python3 eval/mini_eval.py --dry-run
+
+# 使用 params.yaml 中的评分和流水线配置，运行选中的 case
+python3 eval/mini_eval.py
+
+# 固定已有切片，仅重跑所选 case 的知识抽取
+python3 eval/mini_eval.py --mode extract --from-run <冻结切片批次> --match-mode llm
+```
+
+也可用 `bash eval/mini_eval.sh`，或 `python3 -m eval.mini_eval`。默认扫描 `test_data/eval/`，读取 `eval/params.yaml` 的 `mini_eval` 配置；可通过 `--workspace`、`--params` 显式指定其他位置。mini 入口固定使用这里的参数文件，不自动采用工作区内另一份 `params.yaml`。
+
+```yaml
+mini_eval:
+  cases_per_type: 1
+  per_type:
+    official: 2
+  selection: first
+  seed: 42
+```
+
+每类数量只能为 **1 或 2**；候选不足时取全部。`per_type` 可按类型目录名覆盖数量。默认 `first` 按 case 目录名排序选择，当前会选 `official_01`、`official_02`、`standard_01` 和 rule、simple 各自唯一的 case，共 **5 个**。标准类只选一例仍可能耗时较长。
+
+需要随机抽样时，将 `selection` 改为 `random`：固定整数 `seed` 可在评测集不变时复现选择；设为 `null` 则每次重新抽样。启动时打印策略和 case 列表，实际运行将配置与精确 case 路径保存到 `params.resolved.json` 的 `mini_eval`、`targets` 字段。
+
+mini 入口直接调用统一的 `run.py`，不复制评测数据，不另建评分链路；支持 `--mode`、`--from-run`、`--reuse-extract-from`、`--match-mode`、耗时/F1 门禁等现有参数。额外的位置路径及 `--groups`、`--cases` 不允许与自动抽样混用；配置错误或未选出任何 case 时直接报错，不会回退到全量。结果仍写入 `tmp/eval/runs/<时间戳>/`。mini 用于快速回归，不能替代发布前的全量评测门禁。
+
+---
 
 先给脚本执行权限（只需一次）：
 
@@ -85,7 +150,7 @@ chmod +x eval/run.sh
 ./eval/run.sh --dry-run
 ```
 
-确认能认出 `official` / `standard` / `rule` / `simple` 共 16 个 case。拷到部署机后先跑这一步。
+确认能认出 `official` / `standard` / `rule` / `simple` 共 16 个 case。拷到部署机后先跑这一步。`--dry-run` 只扫描选择与配置，不调用服务，也不清理历史批次。
 
 ---
 
@@ -109,20 +174,24 @@ python3 eval/run.py test_data/eval/official/official_01
 
 ---
 
-**对比抽取算法版本（v2/v3）**
+**对比抽取算法版本（v2/v3/v3.1/v3.2）**
 
-默认 `KG_EXTRACT_ALGO_VERSION=latest` 跑的是 `latest` 包（当前与 v3 一致）。要对比 v2/v3，先显式固定 Backend 环境：
+默认 `KG_EXTRACT_ALGO_VERSION=latest` 跑的是 `latest` 包（当前与 v3 一致）。要对比 v2/v3/v3.1/v3.2，先显式固定 Backend 环境并重启服务。下面以 v2 与 v3.1 对比为例；仅在评测脚本进程设置变量不会切换运行中的 Backend：
 
 ```bash
-# 1. 固定 Backend 环境为 v2，先冻结切片
-KG_EXTRACT_ALGO_VERSION=v2 ./eval/run.sh test_data/eval/standard --mode chunk-extract --match-mode identity
+# 1. 先生成冻结切片；本批次不是后续 extract 模式的可比基线
+./eval/run.sh test_data/eval/standard --mode chunk-extract --match-mode identity
 #    记下运行目录 tmp/eval/runs/<时间戳>
 
-# 2. 改 Backend 环境为 v3，然后只重跑抽取（喂入完全相同的切片）：
-KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract --from-run <时间戳> --match-mode identity
+# 2. 在 Backend 环境中设置 KG_EXTRACT_ALGO_VERSION=v2 并重启，建立 extract 基线
+./eval/run.sh test_data/eval/standard --mode extract --from-run <冻结批次> --match-mode identity
+
+# 3. 在 Backend 环境中设置 KG_EXTRACT_ALGO_VERSION=v3.1 并重启，使用同一冻结输入
+./eval/run.sh test_data/eval/standard --mode extract --from-run <冻结批次> --match-mode identity \
+  --baseline tmp/eval/runs/<步骤2的批次>
 ```
 
-两次切片完全相同，分数差只来自算法版本。每次运行的 `summary.json` 会记录服务端回报的 `extract_versions`。标准类 golden 很大，对比版本时建议先 `--match-mode identity`。
+步骤 2、3 保持输入、模式与评分配置一致，只切换待比较的抽取版本。`summary.json` 记录服务端回报的 `extract_versions`。标准类 golden 很大，可先用 identity 排查；正式结论应将步骤 2、3 都切为 `--match-mode llm` 重新评测。第一次 `chunk-extract` 不能直接作为 `extract` 的 `--baseline`，两者模式和耗时范围不同。
 
 ---
 
@@ -132,7 +201,24 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract 
 ./eval/run.sh
 ```
 
-扫 `official` / `standard` / `rule` / `simple` 下全部 case，默认只跑后台。抽取对照 golden：配了 judge 走 LLM-judge，否则 identity。正式开测建议先 `--match-mode identity` 跑通链路，再开 LLM-judge。
+扫 `official` / `standard` / `rule` / `simple` 下全部 case，默认只跑后台并使用 LLM-judge；缺少评分地址会退出 1。正式开测可先显式 `--match-mode identity` 跑通链路，再用 LLM-judge 正式评测。
+
+**修复评分后补评并继续未完成的 case**
+
+先停止原批次，确认它不再写入结果，再启动新批次：
+
+```bash
+python3 eval/run.py --stage backend --mode extract \
+  --from-run <原冻结切片批次> \
+  --reuse-extract-from <已保存抽取结果的批次> \
+  --match-mode llm --runs-retention-days 0
+```
+
+此参数仅适用于后台 `extract` 模式，并要求 `--from-run` 提供固定切片。新批次读取并保存旧 `backend_extract.json`，重新评分；尚未保存抽取结果的 case 正常调用 Backend。旧批次保持原样，损坏的旧产物明确报错。仅在本次抽取版本、输入和选项未变、需要修复评分或续跑时使用；对比不同抽取版本时不要复用预测。
+
+复用结果会保留已知的原抽取耗时，并记录来源；原批次尚未写出耗时的结果会标记为未知，不能用来证明性能门禁通过。补评 case 的耗时包含已知的原处理耗时与本次重新评分耗时，不能把仅补评的耗时当作重新抽取的耗时。
+
+严格评分与基线比较还要求来源批次保存 `chunks.json` 和有效的 `manifest.json`，证明旧预测使用了本次相同的切片和本体。缺少这些证据的旧结果可以用于诊断，但不能通过 `--require-scored`；应使用同一冻结输入重新抽取建立新基线。新批次会复制原始切片字节，并在抽取返回后立即保存 `backend_extract.timing.json`，避免评分异常或同批重试把 API 耗时清零。
 
 ---
 
@@ -192,22 +278,26 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract 
 ./eval/run.sh --match-mode identity
 ```
 
-不用 LLM-judge，实体按 type+name、关系按五元组做集合精确匹配。未配 `KG_EXTRACT_LLM_BASE_URL` 时即使 `params.yaml` 写了 `llm` 也会自动改 identity；显式 `--match-mode llm` 才会因缺地址退出。
+不用 LLM-judge，实体按 type+name、关系按五元组做集合精确匹配。identity 只在显式配置为该模式时使用；LLM 模式缺少评分地址会退出 1，不会自动切换口径。
 
 ---
 
 **质量门禁（发布前防回归）**
 
 ```bash
-./eval/run.sh --match-mode identity --fail-on-empty --min-f1 0.5 \
+./eval/run.sh --match-mode llm --require-scored --fail-on-empty --min-f1 0.5 \
   --max-case-seconds 1800 --max-stage-seconds parse=300,chunk=120,extract=900
 ```
 
-发版前建议跑全量并加三道门禁，任一不过即非零退出：
+发版前跑全量正式 LLM 评测，检查以下门禁；任一不过即非零退出：
 
 - `--fail-on-empty`（默认开启，`--no-fail-on-empty` 关闭）：已评分 case 的抽取预测为 0 节点（golden 非空）时，该 case 记为失败，`error=empty_extraction`，退出码 2。extract 接口本身失败的 case 不受影响（本来就已失败）；切片为空按整篇降级继续跑的行为也不变（那是降级不是失败）。
 - `--min-f1 0.5`：已评分 case 的实体 F1（后台系统、后台抽取、插件三者取最低）低于阈值则门禁未过，退出码 4。
+- `--min-relation-f1 <阈值>`：各抽取模块的主关系 F1 低于阈值则退出 4。默认 `0` 表示暂不启用，待新基线确定阈值后加入发布命令；golden 与预测均无关系的维度不参与，golden 无关系但预测出关系仍检查。
+- `--require-scored` / `--no-require-scored`：要求每个所选 case 有标注、每个应评模块都有有效评分。未显式指定时，LLM 模式、任一 F1 阈值大于 0 或指定 `--baseline` 都会启用。探索性无标注预测可以显式关闭，但不能据此证明完整发布评测通过。
+- LLM 模式中裁判失败、降级或产生无效指标始终挡住质量门禁；`--no-require-scored` 不会放行 `identity_fallback`。诊断与精确对照仍保存，正式 LLM 汇总只纳入有效 LLM 评分。
 - `--max-case-seconds 1800` / `--max-stage-seconds parse=300,chunk=120,extract=900`：单 case 墙钟 / 分阶段耗时预算（用 summary 里的 `elapsed_seconds` 与 `backend.modules.<stage>.elapsed_seconds` 判定，逗号分隔、容忍空格，未列出的阶段不检查）。超预算**不改** case 状态（接口成败是既成事实），记入 `gate.budget_violations`，退出码 4。
+- `--baseline <运行目录或summary.json>`：执行下文的同口径逐案比较，数据、评分口径或结果不可比时同样不能通过。
 
 门禁结果落在 `summary.json` 的 `gate` 块：
 
@@ -216,15 +306,38 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract 
   "empty_failures": ["official/official_03"],
   "budget_violations": [{"case": "standard/standard_01", "stage": "extract", "elapsed": 912.5, "budget": 900}],
   "min_f1": {"threshold": 0.5, "below": [{"case": "official/official_05", "f1": 0.42}]},
+  "quality": {
+    "issues": [],
+    "min_relation_f1": {"threshold": 0.0, "below": []},
+    "passed": true
+  },
   "passed": false
 }
 ```
 
-`passed` 只反映退出码 4 口径（耗时预算、min-f1）；`empty_failures` 是清单（空抽取走退出码 2）。全部 case 未评分时门禁不做判定，`passed=null`。
+以上仅为结构示例。`gate.passed` 汇总 F1、耗时、评分有效性和基线比较的质量判定；`empty_failures` 是执行失败清单，空抽取仍优先走退出码 2。全部未评分时，若启用 `require-scored` 则门禁失败；未启用且无其他违规时 `passed=null` 表示未判定，不是质量合格。
+
+**同口径基线比较**
+
+```bash
+# 与同样使用 chunk-extract、同一全量数据和 judge 配置的新基线比较
+./eval/run.sh --match-mode llm --require-scored --min-f1 0.5 \
+  --baseline tmp/eval/runs/<有效新基线> \
+  --max-f1-drop 0.02 --max-latency-increase 0.2 \
+  --max-case-seconds 1800 --max-stage-seconds parse=300,chunk=120,extract=900
+```
+
+`--baseline` 接受运行目录或 `summary.json` 的路径。比较前校验 case 集合、输入内容、golden、本体、复用输入、评测代码哈希、阶段/模式、匹配口径与 judge 配置。抽取模型和选项记录在 manifest，允许作为实验变量变化；它们不替代服务端回报的算法版本。
+
+- `--max-f1-drop` 默认 `0.02`，表示每个 case、每个应评模块的实体与关系 F1 最多下降 **2 个百分点**。
+- `--max-latency-increase` 默认 `0.2`，表示逐 case 的 API 阶段耗时最多相对增加 **20%**；比较不包含 judge 评分耗时。两边都复用的 parse/chunk 不比较耗时；复用预测必须保留已知原抽取耗时，不能用补评耗时替代。
+- 基线文件不存在或不是有效 summary 对象时退出 1；缺少 manifest、旧评分代码、数据/口径不一致、失败批次或评分/耗时记录缺失都会使基线门禁未过，退出 4（有执行失败时优先退出 2）。
+- 首次建立新基线不传 `--baseline`，先完成正式全量门禁，再选取合格批次。旧批次必须使用当前评分器重新评价；有可验证输入来源的可重评分，缺少 manifest/本体来源证据的须按相同冻结输入重新抽取。不能直接拿旧分数宣布提升或退化。
+- 比较抽取版本时，两边都跑 `extract --from-run <同一冻结批次>`；不要把生成切片的 `chunk-extract` 批次直接作为 `extract` 基线。
 
 ---
 
-退出码：`0` 全部成功，`1` 配置/发现失败，`2` 有 case 失败（含重试后跳过、空抽取判失败），`4` 无失败 case 但门禁未过（F1 低于 `--min-f1` 或耗时超预算）。优先级 `1 > 2 > 4 > 0`。旧退出码 `3`（min-f1 专用）已废弃，并入 `4`。
+退出码：`0` 所执行检查未失败（无评分探索批次不等于质量已验证），`1` 配置/发现失败，`2` 有 case 失败（含重试后跳过、空抽取判失败），`4` 无执行失败但质量门禁未过（实体/关系 F1、耗时、裁判失效、缺评分或基线问题）。优先级 `1 > 2 > 4 > 0`。旧退出码 `3`（min-f1 专用）已废弃，并入 `4`。
 
 ### 看结果
 
@@ -234,6 +347,7 @@ KG_EXTRACT_ALGO_VERSION=v3 ./eval/run.sh test_data/eval/standard --mode extract 
 tmp/eval/runs/<YYYYMMDD-HHMMSS>/
   params.yaml                 # 本次拷贝的评测参数
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
+  manifest.json               # 输入与评测代码 SHA256、评分契约、选项；不包含密钥
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
   report.md                   # 本次评测详细报告：运行信息 / 门禁与退出码 / 总览 / 逐 case / 问题清单 / 最慢 case Top5
   <类型>/<case>/
@@ -251,22 +365,25 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 | 文件 | 看什么 |
 | --- | --- |
 | `report.md` | 批次详细报告（每批结束自动生成，含 resume/复用与中断批次）：头部的运行信息（起止时间、backend、评分口径、judge 降级摘要、抽取版本）、门禁与退出码语义（empty_failures、F1/耗时阈值与实际值）、总览表（实体/关系的 golden/predicted/P/R/F1）、逐 case 明细（状态、P/R/F1、parse/chunk/extract 各阶段耗时、总耗时、抽取版本、失败原因）、问题清单（失败/空抽取/judge 降级/超预算）、最慢 case Top5 |
-| `summary.json` | 各 case 成败、后台抽取（以及可选沉淀/插件）的 P/R/F1/Acc；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时。每跑完一个 case 就会更新，中途可看。`skipped` 是重试 3 次后仍失败并跳过的 case 数。`gate` 是发布门禁块（见「质量门禁」）：`empty_failures` 空抽取清单、`budget_violations` 耗时超预算明细、`budgets` 配置的耗时预算、`min_f1.below` 低于阈值的 case、`passed` 门禁是否通过（全部未评分时为 `null`） |
+| `summary.json` | 各 case 成败和 P/R/F1/Jaccard；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时，每个 case 完成后更新。`overall` 是有效同口径 micro，`quality` 包含覆盖率、case/group 均值与分组结果；`overall_identity` 单列精确对照。`gate` 记录空抽取、实体 F1、耗时和 `quality` 评分有效性/关系阈值检查；`baseline_comparison` 是同口径基线判定与逐项差异 |
+| `manifest.json` | 源文件、golden、本体，以及实际复用 Markdown/切片的 SHA256；`evaluator` 记录 `run.py`、`quality.py`、`provenance.py` 的内容哈希（包含未提交修改）；`settings` 与 `scoring_contract` 记录安全配置和评分契约，不记录 API key / Authorization。同一内容也嵌入 `summary.manifest` |
 | `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
-| `match_details.json` | 每个已评分块（`backend_extract` / `backend_system` / `plugin_extract`）的逐条明细：`entities` / `relations` 各自的 `matched`（golden+predicted 对照）、`missing`（漏抽）、`extra`（多抽）。LLM-judge 时另有 `judge_batches`（每批评分的预测区间、耗时、成功的 `response_mode`、失败尝试）和 `identity`（精确匹配口径的对上/漏抽/多抽清单） |
+| `match_details.json` | 每个已评分块的 `entities` / `relations` 命中、漏抽、多抽明细。LLM-judge 另有 `aligned_relations` 诊断、`judge_batches`（窗口原索引、耗时、响应格式与失败尝试）、`judge_coverage` 和 `identity` 精确对照 |
 | `document.md` | 解析结果，便于对照原文；`--from-run` 且 `--mode chunk-extract` 时复用它跳过解析（同批重试也会复用），因此仍需保留 |
 | `chunks.json` | 实际送进抽取的切片 |
 | `backend_extract.json` | 生产接口原样回包，排抽取失败或图结构时用 |
 
-终端默认只打后台抽取：P/R/F1/Acc 与 标准/抽出/对上/多抽/漏抽（实体、关系分行）。未跑的插件、沉淀不出现在总览里；加 `--system` 或 `--stage plugin|all` 才打印对应块。case 日志同样按步输出耗时和抽取计数。
+终端默认只打后台抽取：P/R/F1/Jaccard 与 标准/抽出/对上/多抽/漏抽（实体、关系分行）。未跑的插件、沉淀不出现在总览里；加 `--system` 或 `--stage plugin|all` 才打印对应块。case 日志同样按步输出耗时和抽取计数。
+
+`quality.modules.<模块>` 同时提供 `coverage`、`micro`、`case_macro`、`by_group` 和 `group_macro`。micro 先累加计数；case_macro 对有效 case 等权；group_macro 先按组计算 case_macro 再对有信息的组等权。某维度 golden 与 predicted 都为空时不参加该维度宏平均，以 `empty_cases` 记录；汇总没有可评条目时为 `null`。覆盖率中的 `failed`、`unscored` 可以与其他状态重叠，不应相加当成样本总数。失败 case 若已有有效评分（如空抽取）保留其实际分数；缺失评分不伪造为 0，必须结合覆盖率和门禁解释，不能把条件均值当成全链路成功率。
 
 ### 历史批次清理
 
-每次启动 `run.py`（含 `--dry-run`）都会先清理 `tmp/eval/runs/` 下过期的历史批次，再开始评测：
+实际评测通过配置与输入检查后，清理 `tmp/eval/runs/` 下过期的历史批次；`--dry-run` 不清理历史：
 
 - 保留期默认 **30 天**，按批次目录名的时间戳（`<YYYYMMDD-HHMMSS>`）判定；命名不符合该格式的目录不动。
 - 配置走 `params.yaml` 的 `runs_retention_days`，命令行 `--runs-retention-days <天数>` 优先；`<=0` 表示不清理。
-- 被 `--from-run` 引用的批次即使过期也跳过，并在日志里提示。
+- 被 `--from-run`、`--reuse-extract-from` 或 `--baseline` 引用的批次即使过期也跳过。
 - 清理结束打印摘要：删除了几个批次、释放多少空间；单个目录删除失败只记日志，不影响评测。
 
 ### 加 case
@@ -282,3 +399,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 - parse / chunk 只验接口成功和输出非空，没有独立 golden；质量分只打在图抽取上。
 - 插件没有 parse/chunk 工具，抽取的是整篇 Markdown，和后台「先切片再抽取」路径不完全相同。
 - `中车RAG验证数据集/` 是造集源，不是评测入口。拷目录做评测时可以不带它。
+
+### V3.2 通用提示词 mini 对照
+
+在隔离 Backend 设 `KG_EXTRACT_ALGO_VERSION=v3.2`，分别以 `KG_EXTRACT_V32_PROMPT_VARIANT=baseline` 和 `distilled` 启动；两组用 `mini_eval.py --mode extract --from-run <同一冻结批次>`，保持模型与其他参数一致。提示词只在 Backend 环境设置；仅给评测客户端设置不会改变运行中的服务。详见 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。

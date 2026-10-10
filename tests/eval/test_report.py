@@ -11,6 +11,35 @@ from eval import run as eval_run
 from eval.report import exit_code_for, render_report
 
 
+def test_report_explains_unknown_reused_timing_gate():
+    summary = _summary()
+    summary["failed"] = 0
+    summary["gate"] = {"passed": False, "timing_unknown": ["g/unfinished"]}
+    report = render_report(summary)
+    assert "原抽取耗时记录缺失：`g/unfinished`" in report
+    assert "无法验证耗时预算，门禁未过" in report
+    assert exit_code_for(summary) == 4
+
+
+def test_report_exposes_coverage_macro_and_baseline_failure():
+    from eval.quality import build_quality_summary
+    summary = _summary()
+    summary["match_mode"] = "llm"
+    summary["quality"] = build_quality_summary(summary)
+    summary["baseline_comparison"] = {
+        "passed": False, "source": "/baseline/summary.json",
+        "issues": [{"reason": "evaluator_mismatch"}],
+        "comparisons": [{"case": "g/ok", "module": "backend_extract", "metric": "entities.f1",
+                         "baseline": 0.9, "current": 0.7, "passed": False}],
+    }
+    md = render_report(summary)
+    assert "评分覆盖率与分组统计" in md
+    assert "0/3" in md  # 两个 identity 加一个 fallback 均不能冒充 LLM 得分
+    assert "case macro" in md and "group macro" in md
+    assert "evaluator_mismatch" in md
+    assert "0.900 | 0.700 | 未过" in md
+
+
 @pytest.fixture(autouse=True)
 def _no_retry_sleep(monkeypatch):
     monkeypatch.setattr(eval_run, "RETRY_SLEEP_SECONDS", 0)

@@ -19,6 +19,8 @@ environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 * ``v3``: run ``v3.extract_aggregate`` with the V2-configured LLM client; it
   reshapes the flat ``entities``/``relations`` result into the V2 aggregate
   contract, then shares the same projection.
+* ``jev``: run the ``jev_extract`` copy. This label is opt-in and is not the
+  default. The package is imported only when the label is selected.
 
 Two deliberate choices worth knowing about for the V2 path:
 
@@ -287,16 +289,22 @@ def run_aggregate(
     label = ke_version.get_extract_version_label()
     concrete_version = ke_version.get_extract_version()
     if runner is None:
-        runner = {
-            ke_version.V2: v2.extract_aggregate,
-            ke_version.V3: v3.extract_aggregate,
-            ke_version.LATEST: latest.extract_aggregate,
-        }[label]
+        if label == ke_version.JEV:
+            from algorithm.knowledge_extract import jev_extract
+
+            runner = jev_extract.extract_aggregate
+        else:
+            runner = {
+                ke_version.V2: v2.extract_aggregate,
+                ke_version.V3: v3.extract_aggregate,
+                ke_version.LATEST: latest.extract_aggregate,
+            }[label]
     # v2 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
     # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
+    # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
     chunks = (
         build_chunks(texts, ranges, metadata)
-        if label == ke_version.V2
+        if label in {ke_version.V2, ke_version.JEV}
         else _chunk_payloads(texts, ranges, metadata)
     )
     result = runner(
