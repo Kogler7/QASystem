@@ -5,7 +5,7 @@ from agentcode.skillsets.loader import SkillLoader
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLSET_DIR = ROOT / "agent" / "skills"
-EXPECTED_SKILLS = {"problem-solve", "semantic-align", "plan-execute"}
+EXPECTED_SKILLS = {"graph-qa"}
 
 
 def test_graph_grounded_skills_are_discoverable():
@@ -25,8 +25,8 @@ def test_skills_use_atomic_graph_tools_without_removed_planning_tools():
 
     for tool_name in (
         "locate_knowledge_space",
-        "link_entities",
-        "query_entity_properties",
+        "search_entities",
+        "get_entity_details",
         "search_graph",
     ):
         assert tool_name in combined
@@ -37,22 +37,16 @@ def test_skills_use_atomic_graph_tools_without_removed_planning_tools():
         "get_plan_from_intent",
     ):
         assert removed_tool not in combined
-    assert "problem-resolve-path-display" in combined
+    assert "problem-resolve-path-display" not in combined
 
 
 def test_skills_require_graph_sourced_business_knowledge_and_solutions():
-    problem = (SKILLSET_DIR / "problem-solve" / "SKILL.md").read_text(encoding="utf-8")
-    align = (SKILLSET_DIR / "semantic-align" / "SKILL.md").read_text(encoding="utf-8")
-    execute = (SKILLSET_DIR / "plan-execute" / "SKILL.md").read_text(encoding="utf-8")
-
-    assert "禁止从模型记忆补充" in problem
-    assert "证据门" in problem
-    assert "evidence_ledger" in align
-    assert "solution_class" in align
-    assert "禁止自行创造一个替代方案" in problem
-    assert "不得自行设计一个业务方案" in execute
-    assert "禁止自行设计业务方案冒充图谱方案" in execute
-    assert "answer-v1" in problem
-    assert '"conclusion"' in problem
-    assert '"confidence"' in problem
-    assert "【结论】" in problem and "不要写【结论】" in problem
+    graph = (SKILLSET_DIR / "graph-qa" / "SKILL.md").read_text(encoding="utf-8")
+    assert "禁止用你自己的记忆、常识或训练知识补齐" in graph
+    assert "完整给出" in graph
+    assert "缺口报告" in graph
+    assert "禁止自行编造" in graph
+    assert "answer-v1" in graph
+    for field in ("conclusion", "confidence", "evidence", "gaps"):
+        assert f"`{field}`" in graph
+    assert "`solution_path`：预留字段，固定 `[]`" in graph

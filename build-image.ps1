@@ -17,7 +17,18 @@ function Write-ProgressLog([string]$Message) {
 }
 
 function Invoke-Docker([string[]]$Arguments, [string]$FailureMessage) {
-    & docker @Arguments
+    # 原生命令把进度/告警写到 stderr 是正常的（BuildKit 的 --progress=plain 就是全走
+    # stderr）。脚本顶层是 ErrorActionPreference=Stop，一旦输出被管道或 2>&1 捕获，
+    # 这些行会被包装成 NativeCommandError 并当成致命错误中断脚本。这里局部放宽，
+    # 真正的失败仍然由退出码判定。
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & docker @Arguments
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
     if ($LASTEXITCODE -ne 0) { throw "$FailureMessage (exit code $LASTEXITCODE)" }
 }
 
@@ -40,7 +51,7 @@ try {
 
     Write-ProgressLog "[2/4] Verifying dependencies with the repository source mounted read-only"
     $verifyArguments = @("run", "--rm", "--entrypoint", "python")
-    foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "docker")) {
+    foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services", "docker")) {
         $source = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $directory))
         $verifyArguments += @("--mount", "type=bind,source=$source,target=/app/$directory,readonly")
     }

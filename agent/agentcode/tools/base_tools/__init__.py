@@ -1,7 +1,6 @@
 from .shell_tool import ShellTool
-from .path_display import PathDisplayTool
 
-__all__ = ["ShellTool", "PathDisplayTool", "MemoryCompactor"]
+__all__ = ["ShellTool", "MemoryCompactor"]
 
 
 def __getattr__(name: str):

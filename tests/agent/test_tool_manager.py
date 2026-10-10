@@ -59,43 +59,45 @@ class TestToolManagerBaseTools:
         assert ToolManager.is_tool_allowed("base__execute_command", ["other__*"]) is False
         assert ToolManager.is_tool_allowed("base__execute_command", []) is True
 
-    def test_http_pool_registers_path_display_without_shell(self) -> None:
+    def test_http_pool_has_no_local_shell_or_removed_display_tool(self) -> None:
         tm = ToolManager(_make_config(), include_shell=False)
-        names = [t["name"] for t in tm.list_tools()]
-        assert "problem-resolve-path-display" in names
-        assert "base__execute_command" not in names
+        assert tm.list_tools() == []
+        result = tm.call_tool("problem-resolve-path-display", {}, timeout_s=5, retries=0)
+        assert result["ok"] is False
+        assert result["error_code"] is not None
 
-    def test_path_display_echoes_solution_path(self) -> None:
-        tm = ToolManager(_make_config(), include_shell=False)
-        result = tm.call_tool(
-            "problem-resolve-path-display",
-            {
-                "question": "指标趋势",
-                "solution_path": ["步骤1 查询", "步骤2 汇总"],
-                "reasoning_summary": "按方案执行",
-            },
-            timeout_s=5,
-            retries=0,
-        )
-        assert result["ok"] is True
-        import json
-        payload = json.loads(result["content"])
-        assert payload["question"] == "指标趋势"
-        assert payload["solution_path"] == ["步骤1 查询", "步骤2 汇总"]
-
-    def test_apply_user_headers_updates_and_clears_http_client(self) -> None:
+    def test_identity_rebind_reuse_and_end_task_isolation(self, monkeypatch) -> None:
         from agentcode.tools.mcp_tools.mcp import MCPToolWrapper
 
-        class DummyClient:
-            def __init__(self) -> None:
-                self.headers: dict[str, str] = {"Content-Type": "application/json"}
+        wrapper = MCPToolWrapper()
+        rebound = []
+
+        def rebind(headers):
+            rebound.append(dict(headers))
+            wrapper._dirty = False
+
+        monkeypatch.setattr(wrapper, "_rebind", rebind)
+        handler = wrapper._make_handler("test", "query")
+        assert "identity not bound" in handler()
+        wrapper.bind_identity({"authorization": "Bearer test-a", "x-user-id": "u1", "ignored": "x"})
+        assert rebound == [{"Authorization": "Bearer test-a", "X-User-Id": "u1"}]
+        wrapper.end_task()
+        assert "identity not bound" in handler()
+        wrapper.bind_identity({"Authorization": "Bearer test-a", "X-User-Id": "u1"})
+        assert len(rebound) == 1
+        wrapper.bind_identity({"Authorization": "Bearer test-b"})
+        assert rebound[-1] == {"Authorization": "Bearer test-b"}
+        wrapper.bind_identity({})
+        assert rebound[-1] == {}
+
+    def test_failed_identity_rebind_blocks_old_session(self, monkeypatch) -> None:
+        from agentcode.tools.mcp_tools.mcp import MCPToolWrapper
 
         wrapper = MCPToolWrapper()
-        client = DummyClient()
-        wrapper._http_clients = [client]
-        wrapper.apply_user_headers({"authorization": "Bearer abc", "x-user-id": "u1"})
-        assert client.headers["Authorization"] == "Bearer abc"
-        assert client.headers["X-User-Id"] == "u1"
-        wrapper.apply_user_headers({})
-        assert "Authorization" not in client.headers
-        assert client.headers["Content-Type"] == "application/json"
+        def fail(headers):
+            raise RuntimeError("connection failed")
+        monkeypatch.setattr(wrapper, "_rebind", fail)
+        with pytest.raises(RuntimeError, match="connection failed"):
+            wrapper.bind_identity({"Authorization": "Bearer test-b"})
+        handler = wrapper._make_handler("test", "query")
+        assert "being rebound" in handler()

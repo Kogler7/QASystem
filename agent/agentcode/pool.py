@@ -107,7 +107,9 @@ class ToolManagerPool:
             raise
         finally:
             try:
-                slot.tm.bind_user_headers({})
+                # 只失效"本任务已绑身份"标记：保留 _bound_headers 让下一个同身份
+                # 任务复用会话；而任何未绑身份就调工具的路径都会被 MCP 层拒绝。
+                slot.tm.end_task()
             except Exception:
                 pass
             with self._cond:

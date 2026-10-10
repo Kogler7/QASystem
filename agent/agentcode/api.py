@@ -55,6 +55,14 @@ from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
 
 logger = logging.getLogger("agentcode.api")
 
+# agentcode 各模块 logger 默认无 handler，INFO 级日志（worker 就绪、MCP 连接等）
+# 会整体丢失，docker logs 里只剩 WARNING 以上。服务入口统一配置 root logger；
+# uvicorn 只给自己的 logger 挂 handler，不冲突。
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
 # ═══════════════════════════════════════════════════════
 # Worker 内嵌 — 从 worker 模块导入核心函数
 # ═══════════════════════════════════════════════════════

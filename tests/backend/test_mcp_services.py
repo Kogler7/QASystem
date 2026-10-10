@@ -53,9 +53,9 @@ def test_agentcode_uses_single_mcp_server():
     config_path = root / "agent" / "agentcode" / "tools" / "mcp_tools" / "mcp_config.json"
     servers = json.loads(config_path.read_text(encoding="utf-8"))["mcpServers"]
     assert servers == {
-        "qasystem-tools": {
+        "agent-tools": {
             "transport": "streamable_http",
-            "url": "http://127.0.0.1:8000/mcp",
+            "url": "http://agent-mcp:9181/mcp",
         }
     }
 
