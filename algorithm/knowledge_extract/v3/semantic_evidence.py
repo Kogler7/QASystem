@@ -94,12 +94,13 @@ def build_verification_messages(
     items: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
     """构造 LLM 核验消息：判断候选实体属性或关系是否被 current chunk 支持。"""
-    scoped = all(str(item.get("entity_context") or "").strip() for item in items)
-    chunk_payload = {
-        "chunk_id": chunk.chunk_id,
-        "document_id": chunk.document_id,
-        "text": "（候选项已提供实体锚定上下文，不开放整个 chunk）" if scoped else chunk.text,
-    }
+    from algorithm.knowledge_extract.verification_scope import verification_scope
+
+    chunk_payload, scope_instruction = verification_scope(chunk, items)
+    system = VERIFICATION_SYSTEM_PROMPT
+    if scope_instruction:
+        system = system.replace("只依据给定的 current chunk 原文核验候选事实。", scope_instruction)
+        system = system.replace("yes 必须表示 current chunk 能支持", "yes 必须表示该候选的授权原文能支持")
     user = f"""## task
 evidence_verification
 
@@ -115,15 +116,18 @@ evidence_verification
 ## record schema
 {json.dumps(record_schema(VERIFICATION_SCHEMA), ensure_ascii=False, sort_keys=True)}
 
+## evidence scope
+{scope_instruction or "只依据 current chunk.text 原文，不引入外部知识。"}
+
 ## output constraints
 - 逐项核验 candidates，按 item_id 输出 verdicts，不得遗漏任何 item_id。
-- claim_kind=entity 时，按整个实体属性更新做语义核验；不要做属性值与 quote 的逐字一一对齐。
-- claim_kind=relation 时，必须核验 source、relation、target、方向和 evidence_quote 组成的完整关系断言。
+- kind=property 或 claim_kind=entity 时，按整个实体属性更新做语义核验；不要做属性值与 quote 的逐字一一对齐。
+- kind=relation 或 claim_kind=relation 时，必须核验 source、relation、target、方向和 evidence_quote 组成的完整关系断言。
 - candidate 含 entity_context 时，只能依据该实体锚定上下文判断，不得借用其他候选实体的事实。
 - yes=原文支持完整候选事实；no=与原文矛盾、关系不成立或属于其他实体；uncertain=无法判断。
 - 每条核验记录独占一行；不要解释。"""
     return [
-        {"role": "system", "content": VERIFICATION_SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
 
