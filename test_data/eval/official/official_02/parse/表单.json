@@ -1,0 +1,40 @@
+{
+  "code": 0,
+  "info": "文档解析完成",
+  "data": {
+    "file_name": "表单.pdf",
+    "file_size": 1759086,
+    "file_type": "pdf",
+    "markdown": "## 收⽂处理单\n\n收⽂号：\n\n信息公司收(2026)337号\n\n⽂件标题：*\n\n关于印发《轨道交通装备⾏业⾼质量数据集链主任务⼯作⽅案》的通知\n\n来⽂单位：\n\n中国中车股份有限公司\n\n来⽂字号：\n\n中车股份办科信(2026)4号\n\n联系电话：*\n\n62099\n\n密 级； 级：\n\n缓急；\n\n收⽂⽇期：\n\n2026-05-25\n\n收⽂部门：\n\n综合管理部(党群⼯作部、董事会办公室、企业⽂化部)\n\n主办部门：\n\n⽂件备注：\n\n主 送：\n\n抄 送： 送：\n\n请赵总阅批。\n\n办公室主任 拟办意见：\n\n⽩雪峰2026-05-2516:11\n\n请各位领导阅，请各部门经理阅。\n\n请技术中⼼阅办，请规划运营部协同，依据⼯作⽅案，按业务领域， 明确落实信息公司、数科公司相关⼯作承担部门与责任⼈，按期督\n\n领导批⽰：\n\n促，确保按期⾼质量完成相应⼯作。\n\n规划运营部要结合⼯作落实需要，协助做好资源配置与投⼊，确保按 计划实施。\n\n赵清宁2026-05-2608:51\n\n已阅。\n\n⽩雪峰2026-06-2609:45\n\n已阅。\n\n李震2026-05-2609:51\n\n已阅。\n\n刘炳志2026-05-2609:56\n\n已阅。\n\n杨⽟欣2026-05-2610:10\n\n<!-- image -->\n\n<!-- image -->\n\n## 承办处理 情况：\n\n## △附件/相关⽂件\n\n附件：\n\n关联⽂件：\n\n```json\n{\n  \"columns\": [\n    \"已阅。\",\n    \"⾦涛2026-06-0209:52\"\n  ],\n  \"rows\": [\n    {\n      \"已阅。\": \"已阅。\",\n      \"⾦涛2026-06-0209:52\": \"肖洋2026-06-0210:00\"\n    },\n    {\n      \"已阅。\": \"已阅。\",\n      \"⾦涛2026-06-0209:52\": \"王哦2026-06-0317:26\"\n    },\n    {\n      \"已阅。\": \"已阅。\",\n      \"⾦涛2026-06-0209:52\": \"刘光涛2026-06-1012:54\"\n    },\n    {\n      \"已阅。\": \"已阅\",\n      \"⾦涛2026-06-0209:52\": \"李平2026-06-2209:34\"\n    }\n  ]\n}\n```\n\n四 轨道交通装备⾏业⾼质量数据集链主任务⼯作⽅案.docx\n\n<!-- image -->\n",
+    "content_length": 1053,
+    "parser": {
+      "preferred_engine": "docling",
+      "final_engine": "docling"
+    }
+  },
+  "error": null,
+  "execution": {
+    "mode": "inline",
+    "job_id": "49c9accfc42b4b199b11bf3fd6ac2aa6",
+    "status": "succeeded",
+    "stage": "completed",
+    "cancel_requested": false,
+    "latest_event_id": "49c9accfc42b4b199b11bf3fd6ac2aa6:6",
+    "summary": {
+      "total_tasks": 1,
+      "completed_tasks": 1,
+      "failed_tasks": 0,
+      "retry_count": 0,
+      "queue_ms": 0,
+      "execution_ms": 32320,
+      "workers": [
+        "gateway-inline"
+      ],
+      "gpus": [],
+      "status": "succeeded"
+    },
+    "events_url": "/api/v1/jobs/49c9accfc42b4b199b11bf3fd6ac2aa6/events",
+    "executions_url": "/api/v1/jobs/49c9accfc42b4b199b11bf3fd6ac2aa6/executions",
+    "result_url": "/api/v1/jobs/49c9accfc42b4b199b11bf3fd6ac2aa6/result"
+  }
+}

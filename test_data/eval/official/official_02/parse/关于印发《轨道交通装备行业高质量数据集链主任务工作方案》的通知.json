@@ -1,0 +1,40 @@
+{
+  "code": 0,
+  "info": "文档解析完成",
+  "data": {
+    "file_name": "关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.pdf",
+    "file_size": 530393,
+    "file_type": "pdf",
+    "markdown": "中车股份办科信［2026］4号\n\n# 中国中车股份有限公司办公室\n\n中国中车核心商密3年\n\n# 关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知\n\n齐车集团、长客股份公司、大连公司、唐山公司、大同公司、永济电机公司、四方股份公司、浦镇公司、戚墅堰公司、长江集团、株机公司、株洲电机公司、大连所、四方所、戚墅堰所、株洲所行政、信息公司、中车研究院、重庆公司，科技质量与信息化部、铁路业务事业部、城市交通事业部：\n\n根据国家数据局行业高质量数据集建设链主任务要求，股份公司编制了《轨道交通装备行业高质量数据集链主任务工作方案》（见附件），请各承担单位按照任务分工进行分解落实，健全项目管理机制，加强资源投入，确保按计划完成项目实施，打造人工智能高质量数据集建设标杆示范。\n",
+    "content_length": 341,
+    "parser": {
+      "preferred_engine": "mineru",
+      "final_engine": "mineru"
+    }
+  },
+  "error": null,
+  "execution": {
+    "mode": "inline",
+    "job_id": "68ebc662757747f5bec9526e9e750783",
+    "status": "succeeded",
+    "stage": "completed",
+    "cancel_requested": false,
+    "latest_event_id": "68ebc662757747f5bec9526e9e750783:6",
+    "summary": {
+      "total_tasks": 1,
+      "completed_tasks": 1,
+      "failed_tasks": 0,
+      "retry_count": 0,
+      "queue_ms": 0,
+      "execution_ms": 2174,
+      "workers": [
+        "gateway-inline"
+      ],
+      "gpus": [],
+      "status": "succeeded"
+    },
+    "events_url": "/api/v1/jobs/68ebc662757747f5bec9526e9e750783/events",
+    "executions_url": "/api/v1/jobs/68ebc662757747f5bec9526e9e750783/executions",
+    "result_url": "/api/v1/jobs/68ebc662757747f5bec9526e9e750783/result"
+  }
+}

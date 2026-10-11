@@ -1,0 +1,40 @@
+{
+  "code": 0,
+  "info": "文档解析完成",
+  "data": {
+    "file_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.pdf",
+    "file_size": 382625,
+    "file_type": "pdf",
+    "markdown": "# 中国中车股份有限公司文件\n\n中车股份科信［2025]45号\n\n# 关于印发《中国中车股份有限公司产品研发管理办法》的通知\n\n中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。\n\n丨11\n\n中国中车股份有限公司办公室\n\n2025年8月13日印发\n",
+    "content_length": 183,
+    "parser": {
+      "preferred_engine": "mineru",
+      "final_engine": "mineru"
+    }
+  },
+  "error": null,
+  "execution": {
+    "mode": "inline",
+    "job_id": "c413d141d44b44edacb61b1b18227374",
+    "status": "succeeded",
+    "stage": "completed",
+    "cancel_requested": false,
+    "latest_event_id": "c413d141d44b44edacb61b1b18227374:6",
+    "summary": {
+      "total_tasks": 1,
+      "completed_tasks": 1,
+      "failed_tasks": 0,
+      "retry_count": 0,
+      "queue_ms": 0,
+      "execution_ms": 2163,
+      "workers": [
+        "gateway-inline"
+      ],
+      "gpus": [],
+      "status": "succeeded"
+    },
+    "events_url": "/api/v1/jobs/c413d141d44b44edacb61b1b18227374/events",
+    "executions_url": "/api/v1/jobs/c413d141d44b44edacb61b1b18227374/executions",
+    "result_url": "/api/v1/jobs/c413d141d44b44edacb61b1b18227374/result"
+  }
+}
