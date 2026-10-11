@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 
@@ -40,7 +41,12 @@ def decode_jsonl(text: Any, schema: dict) -> tuple[dict, list[str]]:
     name = collection_name(schema)
     if isinstance(text, dict):  # Internal adapters/tests and saved legacy results.
         return text, []
-    raw = str(getattr(text, "text", text) or "")
+    raw = str(getattr(text, "text", text) or "").lstrip("\ufeff").strip()
+    # Fence delimiters carry no data; tolerate a missing opening/closing
+    # delimiter independently, but never alter delimiters inside JSON strings.
+    raw = re.sub(r"\A```(?:jsonl|ndjson|json)?[^\S\n]*\n", "", raw,
+                 flags=re.IGNORECASE)
+    raw = re.sub(r"\n[^\S\n]*```\s*\Z", "", raw).strip()
     # Read compatibility for saved JSON outputs, without requesting JSON remotely.
     try:
         legacy = json.loads(raw)
@@ -48,15 +54,26 @@ def decode_jsonl(text: Any, schema: dict) -> tuple[dict, list[str]]:
         legacy = None
     if isinstance(legacy, dict) and (not name or name in legacy):
         return legacy, []
+    if name and isinstance(legacy, list):
+        return {name: legacy}, []
     records, errors, seen = [], [], set()
     empty_marker = False
-    for number, line in enumerate(raw.splitlines(), 1):
-        if not line.strip():
-            continue
+    decoder = json.JSONDecoder()
+    cursor = 0
+    while cursor < len(raw):
+        while cursor < len(raw) and raw[cursor].isspace():
+            cursor += 1
+        if cursor == len(raw):
+            break
+        number = raw.count("\n", 0, cursor) + 1
         try:
-            value = json.loads(line)
+            # Accept pretty-printed or adjacent complete objects without
+            # changing their contents. A damaged record is never completed.
+            value, cursor = decoder.raw_decode(raw, cursor)
         except ValueError:
             errors.append(f"JSONL line {number}: incomplete or invalid JSON")
+            newline = raw.find("\n", cursor)
+            cursor = newline + 1 if newline >= 0 else len(raw)
             continue
         if value is None:
             empty_marker = True
@@ -64,10 +81,15 @@ def decode_jsonl(text: Any, schema: dict) -> tuple[dict, list[str]]:
         if not isinstance(value, dict):
             errors.append(f"JSONL line {number}: expected object")
             continue
-        key = json.dumps(value, ensure_ascii=False, sort_keys=True)
-        if key not in seen:
-            seen.add(key)
-            records.append(value)
+        values = value[name] if name and set(value) == {name} and isinstance(value[name], list) else [value]
+        for record in values:
+            if not isinstance(record, dict):
+                errors.append(f"JSONL line {number}: expected record object")
+                continue
+            key = json.dumps(record, ensure_ascii=False, sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                records.append(record)
     if not raw.strip():
         errors.append("empty JSONL response")
     if empty_marker and records:

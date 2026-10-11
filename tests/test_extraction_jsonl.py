@@ -41,7 +41,33 @@ def test_explicit_empty_distinguished_from_invalid_and_blank():
     assert decode_jsonl("null", SCHEMA) == ({"entities": []}, [])
     assert decode_jsonl("", SCHEMA)[1]
     assert decode_jsonl('null\n{"name":"甲"}', SCHEMA)[1]
-    assert decode_jsonl('```jsonl\n{"name":"甲"}\n```', SCHEMA)[1]
+    assert not decode_jsonl('```jsonl\n{"name":"甲"}\n```', SCHEMA)[1]
+
+
+@pytest.mark.parametrize("text", [
+    '\ufeff```jsonl\n{"name":"甲"}\n{"name":"乙"}\n```',
+    '```json\n{"entities":[{"name":"甲"},{"name":"乙"}]}\n```',
+    '[{"name":"甲"},{"name":"乙"}]',
+    '{\n "name": "甲"\n}\n{\n "name": "乙"\n}',
+    '{"name":"甲"}{"name":"乙"}',
+    '{"entities":[{"name":"甲"}]}\n{"entities":[{"name":"乙"}]}',
+    '```json\n{"entities":[{"name":"甲"},{"name":"乙"}]}',
+    '{"name":"甲"}\n{"name":"乙"}\n```',
+])
+def test_unambiguous_format_variations(text):
+    assert decode_jsonl(text, SCHEMA) == ({"entities": [{"name":"甲"}, {"name":"乙"}]}, [])
+
+
+def test_pretty_printed_complete_prefix_survives_truncation():
+    data, errors = decode_jsonl('{\n"name":"甲"\n}\n{"name":"残缺', SCHEMA)
+    assert data == {"entities": [{"name":"甲"}]}
+    assert errors
+
+
+def test_no_guessing_quotes_brackets_or_extra_prose():
+    assert decode_jsonl('{"name":"残缺', SCHEMA)[0] == {"entities": []}
+    assert decode_jsonl('结果如下：\n{"name":"甲"}', SCHEMA)[1]
+    assert decode_jsonl('{"name":"甲"} garbage', SCHEMA)[1]
 
 
 def test_property_protocol_is_per_field_and_does_not_mutate_caller():
