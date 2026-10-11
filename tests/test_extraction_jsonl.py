@@ -16,6 +16,14 @@ SCHEMA = {
 }
 
 
+def test_effective_configuration_reports_wire_format_not_legacy_profile():
+    from backend.app.services.extraction_config import public_config
+    result = public_config({"version": "v3", "response_format": "json_object", "api_mode": "auto"})
+    assert result["response_format"] is None
+    assert result["output_format"] == "jsonl"
+    assert result["api_mode"] == "chat"
+
+
 def test_truncated_line_does_not_destroy_prior_records_or_later_valid_lines():
     data, errors = decode_jsonl('{"name":"甲"}\n{"name":"broken\n{"name":"乙"}', SCHEMA)
     assert data == {"entities": [{"name": "甲"}, {"name": "乙"}]}

@@ -108,11 +108,16 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
 
 
 def public_config(config: dict[str, Any]) -> dict[str, Any]:
-    return {key: config.get(key) for key in (
+    result = {key: config.get(key) for key in (
         "version", "provider", "model", "request_timeout", "document_timeout",
         "max_tokens", "max_input_tokens", "max_output_tokens", "disable_thinking",
         "api_mode", "thinking_parameter", "response_format",
     )}
+    if config.get("version") in {"v2", "v3", "latest", "v3.1"}:
+        # Provider profiles can retain legacy preferences, but extraction no
+        # longer sends a response_format parameter on the wire.
+        result.update(response_format=None, output_format="jsonl", api_mode="chat")
+    return result
 
 
 def snapshot_payload(operation: str, payload: Any) -> Any:
