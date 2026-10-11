@@ -49,6 +49,23 @@ def test_extract_only_run_keeps_original_chunk_bytes_for_next_rescore(tmp_path, 
     request.assert_called_once()
 
 
+@pytest.mark.parametrize('status', ['partial', 'failed'])
+def test_incomplete_extraction_is_called_again_but_success_is_cached(tmp_path, monkeypatch, status):
+    source = _chunks(tmp_path / 'source')
+    out = tmp_path / 'out'
+    incomplete = {'data': {'graph': GOLDEN, 'quality': {'status': status, 'error_code': 'LLM_RESPONSE_INCOMPLETE'}}}
+    request = Mock(side_effect=[incomplete, ENVELOPE])
+    monkeypatch.setattr(run, 'extract_graphs', request)
+    first = _backend(out, reuse_dir=source)
+    second = _backend(out)
+    third = _backend(out)
+    assert first['modules']['extract']['status'] == status
+    assert second['modules']['extract']['status'] == 'succeeded'
+    assert third['modules']['extract']['status'] == 'reused'
+    assert request.call_count == 2
+    assert (out / 'chunks.json').read_bytes() == CHUNKS
+
+
 def test_resume_preserves_api_duration_and_excludes_judge_time(tmp_path, monkeypatch):
     source = _chunks(tmp_path / "source")
     out = tmp_path / "out"

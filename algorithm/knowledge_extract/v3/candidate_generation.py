@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import Any
 
+from algorithm.output_batching import output_batch_size
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .evidence import (
     EVIDENCE_STATUS_UNVERIFIED,
@@ -50,11 +51,10 @@ MAX_LOCAL_RELATION_CATALOG = 160
 RELATION_PAIR_BATCH_SIZE = 80
 RELATION_MAX_BATCHES = 12
 RELATION_CONTEXT_CHARS = 12000
-# A failed batch may be too large for a model to complete, but recursively
-# splitting all the way to single pairs can amplify one permanent failure into
-# dozens of calls.  One split recovers the common length/complexity case while
-# keeping the worst case bounded at three generated batches per initial batch.
-RELATION_MAX_SPLIT_DEPTH = 1
+# Allow dense batches to shrink further, with an explicit per-chunk call cap
+# so permanent failures cannot expand into an unbounded binary tree.
+RELATION_MAX_SPLIT_DEPTH = 6
+RELATION_SPLIT_MAX_CALLS = 128
 RELATION_VERIFICATION_BATCH_SIZE = 16
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
@@ -663,6 +663,7 @@ def generate_structured(
     call_metrics: list[dict[str, Any]] | None = None,
     retry_empty_collection: bool = False,
     record_table: bool | None = None,
+    split_on_incomplete: bool = False,
     return_recovered_on_failure: bool = False,
 ) -> dict[str, Any] | None:
     """Call one required pass with bounded retry and conservative prefix recovery."""
@@ -843,7 +844,7 @@ def generate_structured(
             error_type=error_type,
             response_mode=response_mode,
         )
-        if not retryable or attempt_number >= resolved_max_attempts:
+        if (split_on_incomplete and error_type == "incomplete") or not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
         if error_type in {"json", "schema", "empty_collection"}:
@@ -1446,6 +1447,7 @@ def entity_pass(
                 max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=target_metrics,
+                split_on_incomplete=True,
                 retry_empty_collection=retry_empty,
                 return_recovered_on_failure=return_recovered,
             )
@@ -1865,13 +1867,14 @@ def relation_pass(
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
         all_relations: list[dict[str, Any]] = []
         chunk_route = (route_map or {}).get(chunk.chunk_id, route)
+        pair_batch_size = output_batch_size(llm, tokens_per_item=128, ceiling=RELATION_PAIR_BATCH_SIZE)
         pending_batches = [
             (
-                pairs[offset : offset + RELATION_PAIR_BATCH_SIZE],
-                f"{offset // RELATION_PAIR_BATCH_SIZE}",
+                pairs[offset : offset + pair_batch_size],
+                f"{offset // pair_batch_size}",
                 0,
             )
-            for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE)
+            for offset in range(0, len(pairs), pair_batch_size)
         ]
         if len(pending_batches) > RELATION_MAX_BATCHES:
             _append_warning(
@@ -1882,8 +1885,20 @@ def relation_pass(
                 {"total_batches": len(pending_batches), "pair_count": len(pairs)},
             )
             pending_batches = pending_batches[:RELATION_MAX_BATCHES]
+        batch_calls = 0
         while pending_batches:
+            if batch_calls >= RELATION_SPLIT_MAX_CALLS:
+                local_attempts.append({
+                    "attempt": 1, "type": "incomplete", "pass": "relation",
+                    "chunk": chunk.chunk_id, "terminal": True, "retryable": False,
+                    "message": "Relation split call budget exhausted",
+                })
+                _append_warning(local_warnings, "RELATION_BATCH_UNDECIDED",
+                                "关系拆分预算耗尽，剩余候选尚未裁决", chunk.chunk_id,
+                                {"pending_pairs": sum(len(row[0]) for row in pending_batches)})
+                break
             pair_batch, batch_tag, split_depth = pending_batches.pop(0)
+            batch_calls += 1
             output_schema = relation_pair_decision_schema(pair_batch)
             messages = build_chat_messages(
                 task="relation",
@@ -1900,7 +1915,7 @@ def relation_pass(
                 structure_hint=structure_hint,
             )
             attempt_start = len(local_attempts)
-            # 恢复 v2 的多重试（默认 3 次）；全部失败仍走二分/UNDECIDED 兜底。
+            # 截断立即二分；瞬时请求错误仍保留有限重试。
             parsed = generate_structured(
                 llm,
                 messages,
@@ -1910,6 +1925,7 @@ def relation_pass(
                 pass_name="relation",
                 chunk_id=f"{chunk.chunk_id}.batch-{batch_tag}",
                 max_attempts=max_attempts,
+                split_on_incomplete=True,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=local_call_metrics,
             )

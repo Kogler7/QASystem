@@ -2708,6 +2708,23 @@ def extract_version_from(envelope: dict[str, Any]) -> str | None:
     return None
 
 
+def _extract_cache_complete(envelope: dict[str, Any]) -> bool:
+    """Only successful inference may be reused by an automatic case retry.
+
+    Explicit --reuse-extract-from remains a read/rescore operation, including
+    partial graphs. A scoring failure must not cause successful inference to
+    run again. Legacy responses without quality still require a graph.
+    """
+    for layer in _payload_layers(envelope):
+        if layer.get("status") in {"failed", "partial", "error"} or layer.get("success") is False:
+            return False
+        quality = layer.get("quality")
+        if isinstance(quality, dict) and quality.get("status") not in {None, "succeeded"}:
+            return False
+    graph = extract_graph_from_envelope(envelope)
+    return bool(graph.get("nodes"))
+
+
 def _apply_extraction_quality(block: dict[str, Any], envelope: dict[str, Any]) -> None:
     """Keep Backend best-effort quality visible even when its graph can be scored."""
     for layer in _payload_layers(envelope):
@@ -3141,7 +3158,7 @@ def run_backend_case(
         existing_extract = _load_json_file(extract_path) if chunk_status in {"succeeded", "reused"} else None
         if reused_extract is not None:
             result["modules"]["extract"] = reused_extract
-        elif existing_extract and items:
+        elif existing_extract and items and _extract_cache_complete(existing_extract):
             timing = _load_json_file(out_dir / "backend_extract.timing.json") or {}
             result["modules"]["extract"] = _extract_block_from_envelope(
                 existing_extract,

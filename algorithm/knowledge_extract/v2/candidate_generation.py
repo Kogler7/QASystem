@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import Any
 
+from algorithm.output_batching import generate_batched, output_batch_size
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import canonical_name
@@ -33,7 +34,7 @@ GLOBAL_RELATION_CATALOG_THRESHOLD = 80
 MAX_LOCAL_RELATION_CATALOG = 160
 # 批大小受输出上限约束：每条 pair 决策（pair_id+label+evidence.quote）约 60~90
 # token，默认 max_tokens=16384 最多容纳约 150~250 条。超限会导致响应 JSON 截断、
-# generate_structured 解析失败后整批丢弃（批越大丢得越多），故取 150。
+# 初始批按输出预算缩小，截断后继续二分；200 仅作为候选分组上限。
 RELATION_PAIR_BATCH_SIZE = 200
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
@@ -491,6 +492,7 @@ def generate_structured(
     call_metrics: list[dict[str, Any]] | None = None,
     retry_empty_collection: bool = False,
     record_table: bool | None = None,
+    split_on_incomplete: bool = False,
 ) -> dict[str, Any] | None:
     """Call one required pass with bounded retry and conservative prefix recovery."""
     attempt_messages = messages
@@ -670,7 +672,7 @@ def generate_structured(
             error_type=error_type,
             response_mode=response_mode,
         )
-        if not retryable or attempt_number >= resolved_max_attempts:
+        if (split_on_incomplete and error_type == "incomplete") or not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
         if error_type in {"json", "schema", "empty_collection"}:
@@ -1232,21 +1234,22 @@ def relation_pass(
         all_relations: list[dict[str, Any]] = []
         for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE):
             pair_batch = pairs[offset : offset + RELATION_PAIR_BATCH_SIZE]
-            output_schema = relation_pair_decision_schema(pair_batch)
-            messages = build_chat_messages(
-                task="relation",
-                plan=plan,
-                route=route,
-                chunk=chunk,
-                local_context="\n".join(item.text for item in neighbors),
-                known_entities=local_catalog,
-                output_schema=output_schema,
-                relation_pairs=pair_batch,
-            )
-            parsed = generate_structured(
-                llm,
-                messages,
-                output_schema,
+            def build_request(subset):
+                output_schema = relation_pair_decision_schema(subset)
+                messages = build_chat_messages(
+                    task="relation",
+                    plan=plan,
+                    route=route,
+                    chunk=chunk,
+                    local_context="\n".join(item.text for item in neighbors),
+                    known_entities=local_catalog,
+                    output_schema=output_schema,
+                    relation_pairs=subset,
+                )
+                return messages, output_schema
+            parsed = generate_batched(
+                pair_batch, build_request, generate_structured, llm,
+                batch_size=output_batch_size(llm, tokens_per_item=128, ceiling=RELATION_PAIR_BATCH_SIZE),
                 use_scheduler=use_scheduler,
                 attempts=local_attempts,
                 pass_name="relation",

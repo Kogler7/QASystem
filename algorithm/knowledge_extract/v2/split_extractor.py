@@ -28,6 +28,7 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any
 
+from algorithm.output_batching import generate_batched, output_batch_size
 from .candidate_generation import (
     _normalize_span_entities,
     relation_catalog_for_context,
@@ -827,19 +828,20 @@ def extract_split(
                 "entity_candidates",
                 plan.relevant_types(repair_text),
             )
-            messages = build_chat_messages(
-                task="repair",
-                plan=plan,
-                route=route,
-                chunk=repair_chunk,
-                known_entities=repair_catalog,
-                output_schema=output_schema,
-                repair_issues=issue_rows,
-            )
-            parsed = _generate_structured(
-                llm,
-                messages,
-                output_schema,
+            def build_repair_request(issue_batch):
+                messages = build_chat_messages(
+                    task="repair",
+                    plan=plan,
+                    route=route,
+                    chunk=repair_chunk,
+                    known_entities=repair_catalog,
+                    output_schema=output_schema,
+                    repair_issues=issue_batch,
+                )
+                return messages, output_schema
+            parsed = generate_batched(
+                issue_rows, build_repair_request, _generate_structured, llm,
+                batch_size=output_batch_size(llm, tokens_per_item=2048, ceiling=4),
                 use_scheduler=use_scheduler,
                 attempts=attempts,
                 pass_name="repair_entity",
@@ -870,19 +872,20 @@ def extract_split(
             "relation_candidates",
             {str(entry.get("type") or "") for entry in repair_catalog},
         )
-        messages = build_chat_messages(
-            task="repair",
-            plan=plan,
-            route=route,
-            chunk=repair_chunk,
-            known_entities=repair_catalog,
-            output_schema=output_schema,
-            repair_issues=issue_rows,
-        )
-        parsed = _generate_structured(
-            llm,
-            messages,
-            output_schema,
+        def build_repair_request(issue_batch):
+            messages = build_chat_messages(
+                task="repair",
+                plan=plan,
+                route=route,
+                chunk=repair_chunk,
+                known_entities=repair_catalog,
+                output_schema=output_schema,
+                repair_issues=issue_batch,
+            )
+            return messages, output_schema
+        parsed = generate_batched(
+            issue_rows, build_repair_request, _generate_structured, llm,
+            batch_size=output_batch_size(llm, tokens_per_item=2048, ceiling=4),
             use_scheduler=use_scheduler,
             attempts=attempts,
             pass_name="repair_relation",

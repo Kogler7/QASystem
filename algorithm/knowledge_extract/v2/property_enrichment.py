@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ._logging import get_step_logger
+from algorithm.output_batching import generate_batched, output_batch_size
 from .candidate_generation import generate_structured, verify_items_with_llm
 from .chunk_context import ChunkContextManager, ExtractionChunk
 from .graph_utils import canonical_name
@@ -362,11 +363,11 @@ def enrich_entity_properties(
         batch_index: int,
         batch: list[Any],
         local_context: str,
-    ) -> tuple[int, int, int, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]] | None]:
+    ) -> tuple[int, int, int, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]] | None, int]:
         """单个属性补全批次：LLM 补全 + 证据核验 + 应用。
 
         批次间实体互不重叠（按 anchor 唯一分组），可安全并发；
-        返回 (applied, rejected, verifications, 本地 warnings/attempts/call_metrics)。
+        返回 (applied, rejected, verifications, 本地 warnings/attempts/call_metrics, 批次调用数)。
         """
         batch_allowed = {
             str(entity.candidate_id): allowed_by_id[str(entity.candidate_id)]
@@ -375,23 +376,27 @@ def enrich_entity_properties(
         local_warnings: list[dict[str, Any]] = []
         local_attempts: list[dict[str, Any]] = []
         local_call_metrics: list[dict[str, Any]] | None = [] if call_metrics is not None else None
-        output_schema = _schema(batch, batch_allowed)
-        messages = build_chat_messages(
-            task="property",
-            plan=plan,
-            route=route,
-            chunk=chunk,
-            local_context=local_context,
-            known_entities=[
-                _catalog_row(entity, batch_allowed[str(entity.candidate_id)])
-                for entity in batch
-            ],
-            output_schema=output_schema,
-        )
-        parsed = generate_structured(
-            llm,
-            messages,
-            output_schema,
+        def build_request(subset):
+            subset_allowed = {str(entity.candidate_id): batch_allowed[str(entity.candidate_id)] for entity in subset}
+            output_schema = _schema(subset, subset_allowed)
+            messages = build_chat_messages(
+                task="property",
+                plan=plan,
+                route=route,
+                chunk=chunk,
+                local_context=local_context,
+                known_entities=[
+                    _catalog_row(entity, subset_allowed[str(entity.candidate_id)])
+                    for entity in subset
+                ],
+                output_schema=output_schema,
+            )
+            return messages, output_schema
+        batch_stats: dict[str, int] = {}
+        parsed = generate_batched(
+            batch, build_request, generate_structured, llm,
+            stats=batch_stats,
+            batch_size=output_batch_size(llm, tokens_per_item=max(1024, max(len(props) for props in batch_allowed.values()) * 256), ceiling=batch_size),
             use_scheduler=use_scheduler,
             attempts=local_attempts,
             pass_name="property",
@@ -402,7 +407,7 @@ def enrich_entity_properties(
         )
         batch_applied = batch_rejected = batch_verifications = 0
         if parsed is None:
-            return 0, 0, 0, local_warnings, local_attempts, local_call_metrics
+            return 0, 0, 0, local_warnings, local_attempts, local_call_metrics, batch_stats.get("calls", 0)
         entities_by_id = {str(entity.candidate_id): entity for entity in batch}
         seen_ids: set[str] = set()
         planned: list[dict[str, Any]] = []
@@ -544,7 +549,7 @@ def enrich_entity_properties(
             if accepted_values:
                 entity.properties.update(accepted_values)
                 batch_applied += len(accepted_values)
-        return batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics
+        return batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics, batch_stats.get("calls", 0)
 
     jobs: list[tuple[ExtractionChunk, str, int, list[Any], str]] = []
     for chunk_id in manager.chunk_ids:
@@ -580,10 +585,10 @@ def enrich_entity_properties(
             job_results = list(executor.map(lambda job: _run_batch(*job), jobs))
 
     applied = rejected = calls = verifications = 0
-    for batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics in job_results:
+    for batch_applied, batch_rejected, batch_verifications, local_warnings, local_attempts, local_call_metrics, batch_calls in job_results:
         applied += batch_applied
         rejected += batch_rejected
-        calls += 1
+        calls += batch_calls
         verifications += batch_verifications
         warnings.extend(local_warnings)
         attempts.extend(local_attempts)
