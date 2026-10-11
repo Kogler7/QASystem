@@ -26,7 +26,7 @@ from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table
 
 
 logger = get_step_logger(__name__)
-from .relation_resolver import enumerate_relation_pairs
+from .relation_resolver import enumerate_relation_pairs, pair_relation_ids, withheld_relation_tokens
 from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages, semantic_support
 from .scheduler import get_llm_scheduler
 from .structured_output import validate_json_schema
@@ -322,7 +322,7 @@ def output_schema_for_types(
 def relation_pair_decision_schema(pairs: list[dict[str, Any]]) -> dict[str, Any]:
     """Strict provider schema for classifying a pre-enumerated pair batch."""
     pair_ids = [str(pair["pair_id"]) for pair in pairs]
-    labels = sorted({str(pair["relation_id"]) for pair in pairs} | {"NONE"})
+    labels = sorted({rel for pair in pairs for rel in pair_relation_ids(pair)} | {"NONE"})
     decision = {
         "type": "object",
         "properties": {
@@ -1226,7 +1226,11 @@ def relation_pass(
             entity for entity in entity_objects
             if entity.candidate_id in permitted_ids
         ]
-        pairs = enumerate_relation_pairs(plan, permitted_objects)
+        pairs = enumerate_relation_pairs(
+            plan,
+            permitted_objects,
+            skip_tokens=withheld_relation_tokens(route.kind),
+        )
         anchor_types = {
             canonical_name(entity.canonical_type)
             for entity in entity_objects
@@ -1363,7 +1367,8 @@ def relation_pass(
                 label = str(decision.get("label") or "")
                 if label == "NONE":
                     continue
-                if label != pair["relation_id"]:
+                allowed = pair_relation_ids(pair)
+                if label not in allowed:
                     _append_warning(batch_warnings, "RELATION_PAIR_SIGNATURE_MISMATCH", "关系标签不符合 pair 本体签名", f"decisions[{index}].label", label)
                     continue
                 evidence = bind_relation_evidence(decision, manager, chunk_ids=(chunk.chunk_id,))

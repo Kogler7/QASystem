@@ -13,6 +13,7 @@ from collections import OrderedDict
 from typing import Any
 
 from ._logging import get_step_logger
+from .relation_resolver import pair_relation_ids
 
 
 logger = get_step_logger(__name__)
@@ -212,14 +213,14 @@ class ClefGate:
             )
             grouped.setdefault(window, []).append(pair)
             visible[str(pair.get("pair_id") or "")] = both
-        status: dict[str, str] = {}
+        status: dict[str, tuple[str, str]] = {}
         for window, group in grouped.items():
             questions: dict[str, dict[str, Any]] = {}
             for pair in group:
                 question = _relation_question(pair)
                 pair_id = str(pair.get("pair_id") or "")
                 if question is None or not pair_id:
-                    status[pair_id] = "uncertain"
+                    status[pair_id] = ("uncertain", "")
                     continue
                 questions[pair_id] = question
             answers = self._complete(
@@ -231,7 +232,7 @@ class ClefGate:
                     continue
                 status[pair_id] = _relation_status(
                     answers.get(pair_id),
-                    relation_id=str(pair.get("relation_id") or ""),
+                    relation_ids=pair_relation_ids(pair),
                     accept=self.accept,
                     both_names_visible=visible.get(pair_id, False),
                     preserve=bool(pair.get("preserve_on_none")),
@@ -241,13 +242,14 @@ class ClefGate:
         dropped = positive = uncertain = 0
         for pair in pairs:
             pair_id = str(pair.get("pair_id") or "")
-            label = status.get(pair_id, "uncertain")
-            relation_id = str(pair.get("relation_id") or "")
+            label, chosen = status.get(pair_id, ("uncertain", ""))
+            relation_id = chosen or (pair_relation_ids(pair)[:1] or [""])[0]
             if label == "drop":
                 dropped += 1
                 continue
             if label == "positive":
                 positive += 1
+                pair = {**pair, "relation_id": relation_id}
                 # RELATED_TO 过于宽泛，Clef 正例直接落地易灌假阳；交给生成式写证据。
                 if _is_related_to(relation_id):
                     uncertain += 1
@@ -423,17 +425,25 @@ def resolve_clef(clef: Any) -> ClefGate:
 
 
 def _relation_question(pair: dict[str, Any]) -> dict[str, Any] | None:
-    relation = str(pair.get("relation_id") or "")
+    relations = pair_relation_ids(pair)
     source = str(pair.get("source_name") or "")
     target = str(pair.get("target_name") or "")
-    if not relation or relation == "NONE" or not source or not target:
+    if not relations or not source or not target:
         return None
+    if len(relations) == 1:
+        relation = relations[0]
+        instructions = f"只根据原文，{source}与{target}之间是否存在关系「{relation}」？"
+        none_text = "原文不支持这条关系"
+    else:
+        listed = "、".join(relations)
+        instructions = f"只根据原文，{source}与{target}之间应选择哪个关系：{listed}？"
+        none_text = "原文不支持这些关系中的任何一个"
     return {
         "type": "choice",
-        "instructions": f"只根据原文，{source}与{target}之间是否存在关系「{relation}」？",
+        "instructions": instructions,
         "criteria": {
-            relation: f"原文支持{source}与{target}的{relation}",
-            "NONE": "原文不支持这条关系",
+            **{relation: f"原文支持{source}与{target}的{relation}" for relation in relations},
+            "NONE": none_text,
         },
     }
 
@@ -445,31 +455,31 @@ def _is_related_to(relation_id: str) -> bool:
 def _relation_status(
     answer: Any,
     *,
-    relation_id: str,
+    relation_ids: list[str],
     accept: float,
     both_names_visible: bool,
     preserve: bool = False,
-) -> str:
+) -> tuple[str, str]:
     if not isinstance(answer, dict) or answer.get("type") != "choice":
-        return "uncertain"
+        return "uncertain", ""
     choice = answer.get("choice")
     if not isinstance(choice, str):
-        return "uncertain"
+        return "uncertain", ""
     confidence = answer.get("confidence")
     probabilities = answer.get("probabilities")
     if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
         if isinstance(probabilities, dict) and isinstance(probabilities.get(choice), (int, float)):
             confidence = probabilities[choice]
         else:
-            return "uncertain"
+            return "uncertain", ""
     if float(confidence) < accept:
-        return "uncertain"
-    if choice == relation_id:
-        return "positive"
+        return "uncertain", ""
+    if choice in relation_ids:
+        return "positive", choice
     # 文档锚点等保留 pair：Clef 高置信 NONE 仍回退生成式，避免误杀 APPLIES_TO 等公文关系。
     if choice == "NONE" and both_names_visible and not preserve:
-        return "drop"
-    return "uncertain"
+        return "drop", "NONE"
+    return "uncertain", ""
 
 
 def _support_instruction(item: dict[str, Any]) -> str:

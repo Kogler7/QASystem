@@ -10,6 +10,7 @@ from .chunk_context import ExtractionChunk
 from .structured_text import is_structured_payload
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
+from .relation_resolver import pair_relation_ids
 
 RouteKind = Literal["generic", "official_document", "standard"]
 RouteSource = Literal["ontology", "chunks", "fallback"]
@@ -538,6 +539,33 @@ def _looks_like_official_form(chunk: ExtractionChunk) -> bool:
 
 
 
+def _clip_pair_name(value: Any, limit: int = 80) -> str:
+    return " ".join(str(value or "").split())[:limit]
+
+
+def format_relation_pair_line(pair: dict[str, Any]) -> str:
+    """One ontology-screened entity pair, with the labels it may receive."""
+    relation_ids = pair_relation_ids(pair)
+    label = relation_ids[0] if len(relation_ids) == 1 else "|".join(relation_ids)
+    line = (
+        f"- `{pair['pair_id']}`: {pair['source_id']}({pair['source_type']}) "
+        f"-[{label}]-> {pair['target_id']}({pair['target_type']})"
+    )
+    source_name = _clip_pair_name(pair.get("source_name"))
+    target_name = _clip_pair_name(pair.get("target_name"))
+    if source_name or target_name:
+        line += f" 「{source_name}」→「{target_name}」"
+    comments = pair.get("relation_comments") if isinstance(pair.get("relation_comments"), dict) else {}
+    glosses = [
+        f"{relation_id}={comments[relation_id]}"
+        for relation_id in relation_ids
+        if comments.get(relation_id)
+    ]
+    if glosses:
+        line += " （" + "；".join(glosses) + "）"
+    return line
+
+
 def build_chat_messages(
     *,
     task: Literal["entity", "relation", "repair"] | str,
@@ -569,7 +597,7 @@ def build_chat_messages(
         )
         top_level = '{"updates": []}'
     elif task == "relation":
-        discipline = "只分类给定 relation pair；不得创建新端点、不得输出未列出的关系。"
+        discipline = "只判断本体已经允许的实体对；不得创建新端点，不得输出该对未列出的关系。"
         top_level = '{"decisions": []}' if relation_pairs is not None else '{"relations": []}'
     else:
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
@@ -633,19 +661,20 @@ def build_chat_messages(
             entity_rules += _RECORD_TABLE_PROPERTY_RULES
 
     if task == "relation" and relation_pairs is not None:
-        ontology_section = "候选 relation pair（只能选择这些 pair 的 relation_id 或 NONE）\n" + "\n".join(
-            f"- `{pair['pair_id']}`: {pair['source_id']}({pair['source_type']}) -[{pair['relation_id']}]-> {pair['target_id']}({pair['target_type']})"
-            for pair in relation_pairs
+        ontology_section = (
+            "候选实体对（已按本体签名筛过；label 只能是该对方括号中的关系，或 NONE）\n"
+            + "\n".join(format_relation_pair_line(pair) for pair in relation_pairs)
         )
         feature_section = "（关系 pair 分类不展示属性目录）"
         relation_section = "（关系 pair 分类不开放关系目录）"
-        known_section = "（关系端点已由候选 pair 固定）"
+        known_section = "（关系端点已由候选 pair 固定，名称写在「」中）"
         context_section = local_context or "（无）"
         entity_rules = """
-- 每项只能包含 pair_id、label、evidence.quote；label 只能是该 pair 的 relation_id 或 NONE。
-- NONE 表示当前 chunk 没有足够证据，NONE 不产生关系。
-- pair_id 必须来自候选 pair；禁止输出新端点、新 pair 或其他关系。
-- evidence.quote 必须是 current chunk.text 中逐字连续的关系证据；没有证据时选择 NONE。"""
+- 每项只能包含 pair_id、label、evidence.quote。
+- label 只能是该 pair 方括号里的关系标识；方括号中用 | 分隔时只能选其中一个。不能选其它 pair 的关系。
+- 先看「」中的两个名称：原文没有支持这对实体的对应关系时，label 必须是 NONE。
+- NONE 不产生关系。pair_id 必须来自候选 pair；禁止输出新端点、新 pair 或其他关系。
+- evidence.quote 必须是 current chunk.text 中逐字连续、能同时支撑两端名称的原文；没有这样的原文时选择 NONE。"""
 
     user = f"""## task
 {task}
