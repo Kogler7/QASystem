@@ -1,16 +1,4 @@
-"""V3.1 测试共享的 stub LLM（重构后两段式 + 属性补全 + pair 关系分类协议）。
-
-当前 extract_split 的 LLM 契约（见 prompt_router.build_chat_messages）：
-- entity   pass：响应 {"entities": [{type, mention, start_char, end_char, evidence:{quote}}]}，
-  mention/quote 必须逐字来自 current chunk；
-- property pass：响应 {"updates": [{entity_id, properties, evidence:{quote}}]}；
-- relation pass：prompt 列出候选 pair（``- `pair-x`: entity-0(T) -[rel]-> entity-1(T)``），
-  响应 {"decisions": [{pair_id, label, evidence:{quote}}]}，label 为 pair 的 relation_id 或 NONE；
-- repair   pass：按 prompt 内 output schema 的顶层 required 键返回空集合。
-
-StubLLM 接收 ChatMessages（list[dict]），按统一 JSON User 的 task.operation 路由；
-handler 拿不到/不需要的一律返回合法空响应，保证测试 hermetic（不访问真实 LLM）。
-"""
+"""Entity/property test runtime. Relationship calls are rejected."""
 from __future__ import annotations
 
 import json
@@ -18,10 +6,6 @@ import re
 from typing import Any, Callable
 
 _TASK = re.compile(r"## task\s*\n(\w+)")
-_PAIR_ROW = re.compile(
-    r"-\s*`(?P<pair_id>[^`]+)`:\s*(?P<source_id>\S+)\((?P<source_type>[^)]+)\)"
-    r"\s*-\[(?P<relation_id>[^\]]+)\]->\s*(?P<target_id>\S+)\((?P<target_type>[^)]+)\)"
-)
 _KNOWN_ROW = re.compile(
     r"\|\s*`(?P<id>[^`]+)`\s*\|\s*`(?P<type>[^`]+)`\s*\|\s*(?P<name>[^|]+?)\s*\|"
     r"\s*(?P<properties>[^|]*?)\s*\|\s*(?P<missing>[^|]*?)\s*\|"
@@ -86,12 +70,6 @@ def output_schema_required(prompt: str) -> list[str]:
     return []
 
 
-def parse_relation_pairs(prompt: str) -> list[dict[str, str]]:
-    """解析 relation pass prompt 中枚举的候选 pair。"""
-    payload = _user_payload(prompt)
-    if payload:
-        return payload["task"]["relation_pairs"]
-    return [match.groupdict() for match in _PAIR_ROW.finditer(prompt)]
 
 
 def parse_known_entities(prompt: str) -> list[dict[str, str]]:
@@ -99,7 +77,7 @@ def parse_known_entities(prompt: str) -> list[dict[str, str]]:
     payload = _user_payload(prompt)
     if payload:
         return [{
-            "id": item["id"], "type": item["type"], "name": item["name"],
+            "type": item["type"], "name": item["name"],
             "properties": ", ".join(f"{k}={v}" for k, v in item.get("properties", {}).items()),
             "missing": ", ".join(item.get("missing_properties", {})),
         } for item in payload["task"]["known_entities"]]
@@ -113,12 +91,10 @@ def parse_known_entities(prompt: str) -> list[dict[str, str]]:
 
 
 def span_item(type_id: str, mention: str, quote: str | None = None) -> dict[str, Any]:
-    """构造 entity pass 候选；start/end 由 StubLLM 按 current chunk 文本填充。"""
+    """构造 entity pass 候选；不包含模型字符偏移。"""
     return {"type": type_id, "mention": mention, "evidence": {"quote": quote or mention}}
 
 
-def decision(pair_id: str, label: str, quote: str) -> dict[str, Any]:
-    return {"pair_id": pair_id, "label": label, "evidence": {"quote": quote}}
 
 
 class StubLLM:
@@ -128,12 +104,10 @@ class StubLLM:
         self,
         entity_handler: Callable[[str, dict[str, Any]], list[dict[str, Any]]] | None = None,
         property_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
-        relation_handler: Callable[[str, list[dict[str, str]], dict[str, Any]], list[dict[str, Any]]] | None = None,
         repair_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
         self.entity_handler = entity_handler
         self.property_handler = property_handler
-        self.relation_handler = relation_handler
         self.repair_handler = repair_handler
         self.calls: list[tuple[str, str]] = []
 
@@ -145,8 +119,6 @@ class StubLLM:
         return {
             "type": item["type"],
             "mention": mention,
-            "start_char": start,
-            "end_char": start + len(mention),
             "evidence": {"quote": str((item.get("evidence") or {}).get("quote") or mention)},
         }
 
@@ -155,19 +127,18 @@ class StubLLM:
         task = task_of(prompt)
         chunk = current_chunk(prompt)
         self.calls.append((task, prompt))
-        if task == "entity":
+        if task in {"relation", "relation_verification"}:
+            raise AssertionError("V3.1 must not request relationship extraction")
+        elif task == "entity":
             items = self.entity_handler(prompt, chunk) if self.entity_handler else []
             payload: dict[str, Any] = {"entities": [self._ground(item, chunk) for item in items]}
         elif task == "property":
             payload = (
-                self.property_handler(prompt, chunk) if self.property_handler else {"updates": []}
+                self.property_handler(prompt, chunk) if self.property_handler else {
+                    "entities": [{"type": e["type"], "name": e["name"], "properties": e.get("properties", {}),
+                                  "evidence": {"quote": e["name"]}} for e in _user_payload(prompt)["task"]["known_entities"]]
+                }
             )
-        elif task == "relation":
-            pairs = parse_relation_pairs(prompt)
-            decisions = (
-                self.relation_handler(prompt, pairs, chunk) if self.relation_handler else []
-            )
-            payload = {"decisions": decisions}
         else:  # repair 或其他：按 output schema 顶层 required 键返回空集合
             if self.repair_handler is not None:
                 payload = self.repair_handler(prompt, chunk)

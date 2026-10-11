@@ -57,10 +57,9 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(scorer.low_confidence_threshold, 0.70)
 
     def test_custom_weights_normalized(self) -> None:
-        scorer = MS.MappingScorer(weights={"attribute": 2, "relation": 1})
+        scorer = MS.MappingScorer(weights={"attribute": 2, "context": 1})
         self.assertAlmostEqual(scorer.weights["attribute"], 2 / 3)
-        self.assertAlmostEqual(scorer.weights["relation"], 1 / 3)
-        self.assertAlmostEqual(scorer.weights["context"], 0.0)
+        self.assertAlmostEqual(scorer.weights["context"], 1 / 3)
 
     def test_invalid_thresholds_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -126,23 +125,6 @@ class "术语" as Terminology <<KnowledgeUnit>> {
         score = self.scorer.score_entity(partial, terminology_plan)
         self.assertEqual(score.breakdown["attribute"], round(0.6 * 0.5 + 0.4 * 0.5, 4))
 
-    def test_relation_participation(self) -> None:
-        entity = make_entity(
-            self.plan,
-            "CompositeRule",
-            "CR-001",
-            {"ruleId": "CR-001", "ruleText": "t", "combinationType": "AND"},
-        )
-        score = self.scorer.score_entity(entity, self.plan)
-        self.assertEqual(score.breakdown["relation"], 0.0)  # 无关系参与
-        # 模拟参与 hasSubRule
-        fake_relation = types.SimpleNamespace(
-            from_candidate_id="entity-0",
-            canonical_relation="hasSubRule",
-            proposed_relation="hasSubRule",
-        )
-        score_with = self.scorer.score_entity(entity, self.plan, [fake_relation])
-        self.assertEqual(score_with.breakdown["relation"], 1.0)
 
     def test_context_not_applicable_by_default(self) -> None:
         entity = make_entity(self.plan, "Object", "办公设备", {"objectName": "办公设备"})
@@ -197,56 +179,6 @@ class StatusAndWeightTest(unittest.TestCase):
         self.assertEqual(context_weighted.score, 0.0)
 
 
-class RelationScoreTest(unittest.TestCase):
-    def test_relation_score_evidence_legality_cardinality(self) -> None:
-        plan = OC.compile_plan(RULE_ONTOLOGY)
-        scorer = MS.MappingScorer()
-        full = SE.RelationCandidate(
-            candidate_id="relation-0",
-            from_candidate_id="entity-0",
-            to_candidate_id="entity-1",
-            proposed_relation="hasSubRule",
-            canonical_relation="hasSubRule",
-            evidence=["e"],
-            from_name="CR-001",
-            to_name="R-001",
-            from_type="CompositeRule",
-            to_type="SimpleRule",
-        )
-        score = scorer.score_relation(full, plan)
-        self.assertEqual(score.score, 1.0)
-        self.assertEqual(score.status, "accepted")
-
-        no_evidence = SE.RelationCandidate(
-            candidate_id="relation-1",
-            from_candidate_id="entity-0",
-            to_candidate_id="entity-1",
-            proposed_relation="hasSubRule",
-            canonical_relation="hasSubRule",
-            evidence=[],
-            from_name="CR-001",
-            to_name="R-001",
-            from_type="CompositeRule",
-            to_type="SimpleRule",
-        )
-        score = scorer.score_relation(no_evidence, plan)
-        self.assertAlmostEqual(score.score, 0.5 * 0 + 0.3 * 1.0 + 0.2 * 1.0)
-
-        cardinality_violation = SE.RelationCandidate(
-            candidate_id="relation-2",
-            from_candidate_id="entity-0",
-            to_candidate_id="entity-1",
-            proposed_relation="hasSubRule",
-            canonical_relation="hasSubRule",
-            evidence=["e"],
-            warnings=["RELATION_CARDINALITY_EXCEEDED"],
-            from_name="CR-001",
-            to_name="R-001",
-            from_type="CompositeRule",
-            to_type="SimpleRule",
-        )
-        score = scorer.score_relation(cardinality_violation, plan)
-        self.assertAlmostEqual(score.score, 0.5 * 1.0 + 0.3 * 1.0 + 0.2 * 0.5)
 
 
 class IntegrationTest(unittest.TestCase):
@@ -257,13 +189,11 @@ class IntegrationTest(unittest.TestCase):
             return [span_item("SimpleRule", self.TEXT)]
 
         def property_handler(prompt: str, chunk: dict) -> dict:
-            if not properties:
-                return {"updates": []}
             return {
-                "updates": [
+                "entities": [
                     {
-                        "entity_id": row["id"],
-                        "properties": dict(properties),
+                        "type": row["type"], "name": row["name"],
+                        "properties": dict(properties or {}),
                         "evidence": {"quote": self.TEXT},
                     }
                     for row in parse_known_entities(prompt)

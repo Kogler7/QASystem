@@ -104,69 +104,6 @@ class FeatureCoverageTest(unittest.TestCase):
         self.assertEqual(feature_gap.severity, "warning")
 
 
-class RelationCoverageTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.plan = OC.compile_plan(RULE_ONTOLOGY)
-        self.auditor = CV.CoverageAuditor()
-        self.manager = make_manager(COMPOSITE_TEXT)
-        self.request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)])
-
-    def test_source_min_one_relation_missing(self) -> None:
-        entities = [
-            {
-                "type": "CompositeRule",
-                "name": "CR-001",
-                "properties": {"ruleId": "CR-001", "ruleText": COMPOSITE_TEXT, "combinationType": "AND"},
-                "evidence": {"quote": COMPOSITE_TEXT},
-            }
-        ]
-        gaps = self.auditor.audit(self.plan, self.manager, self.request, entities, [])
-        relation_gaps = [gap for gap in gaps if gap.gap_type == "relation_coverage"]
-        self.assertTrue(any("hasSubRule" in gap.expected_relations for gap in relation_gaps))
-
-    def test_target_min_one_relation_missing(self) -> None:
-        entities = [
-            {
-                "type": "SimpleRule",
-                "name": "R-001",
-                "properties": {"ruleId": "R-001"},
-                "evidence": {"quote": COMPOSITE_TEXT},
-            }
-        ]
-        gaps = self.auditor.audit(self.plan, self.manager, self.request, entities, [])
-        relation_gaps = [gap for gap in gaps if gap.gap_type == "relation_coverage"]
-        self.assertTrue(any("hasSubRule" in gap.expected_relations for gap in relation_gaps))
-
-    def test_relation_present_no_gap(self) -> None:
-        entities = [
-            {
-                "type": "CompositeRule",
-                "name": "CR-001",
-                "properties": {"ruleId": "CR-001", "ruleText": COMPOSITE_TEXT, "combinationType": "AND"},
-                "evidence": {"quote": COMPOSITE_TEXT},
-            },
-            {
-                "type": "SimpleRule",
-                "name": "R-001",
-                "properties": {"ruleId": "R-001"},
-                "evidence": {"quote": COMPOSITE_TEXT},
-            },
-        ]
-        relations = [
-            {
-                "from_type": "CompositeRule",
-                "from_name": "CR-001",
-                "rel_type": "hasSubRule",
-                "to_type": "SimpleRule",
-                "to_name": "R-001",
-                "evidence": {"quote": COMPOSITE_TEXT},
-            }
-        ]
-        gaps = self.auditor.audit(self.plan, self.manager, self.request, entities, relations)
-        has_sub_rule_gaps = [
-            gap for gap in gaps if gap.gap_type == "relation_coverage" and "hasSubRule" in gap.expected_relations
-        ]
-        self.assertEqual(has_sub_rule_gaps, [])
 
 
 class EvidenceAndStructuralTest(unittest.TestCase):
@@ -181,7 +118,7 @@ class EvidenceAndStructuralTest(unittest.TestCase):
         relations = [{"from_name": "a", "to_name": "b", "rel_type": "hasSubRule"}]
         gaps = self.auditor.audit(self.plan, manager, request, entities, relations)
         evidence_gaps = [gap for gap in gaps if gap.gap_type == "evidence_missing"]
-        self.assertEqual(len(evidence_gaps), 2)
+        self.assertEqual(len(evidence_gaps), 1)
         self.assertTrue(all(gap.severity == "warning" for gap in evidence_gaps))
 
     def test_structural_gap_for_metadata_chunk(self) -> None:
@@ -202,25 +139,6 @@ class EvidenceAndStructuralTest(unittest.TestCase):
         self.assertFalse(any(gap.gap_type == "structural_coverage" for gap in gaps))
 
 
-class CompositeCoverageTest(unittest.TestCase):
-    def test_composite_membership_and_combination(self) -> None:
-        plan = OC.compile_plan(RULE_ONTOLOGY)
-        auditor = CV.CoverageAuditor()
-        manager = make_manager(COMPOSITE_TEXT)
-        request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)])
-        entities = [
-            {
-                "type": "CompositeRule",
-                "name": "CR-001",
-                "properties": {"ruleId": "CR-001", "ruleText": COMPOSITE_TEXT},
-                "evidence": {"quote": COMPOSITE_TEXT},
-            }
-        ]
-        gaps = auditor.audit(plan, manager, request, entities, [])
-        composite_gaps = [gap for gap in gaps if gap.gap_type == "composite_membership"]
-        self.assertEqual(len(composite_gaps), 1)
-        self.assertIn("combinationType", composite_gaps[0].reason)
-        self.assertEqual(composite_gaps[0].expected_relations, ("hasSubRule",))
 
 
 class IntegrationTest(unittest.TestCase):

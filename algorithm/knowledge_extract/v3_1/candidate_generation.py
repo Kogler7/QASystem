@@ -1,7 +1,7 @@
-"""Schema-bounded entity and relation candidate generation.
+"""Schema-bounded entity candidate generation.
 
 This module owns prompts, structured LLM retries, and per-chunk candidate
-passes.  It deliberately does not resolve identities or accept relations;
+calls. It deliberately does not resolve identities;
 those decisions belong to the global candidate pool and verifier.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionReque
 from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import append_warning as _append_warning, canonical_name
 from .ontology_compiler import ExtractionPlan
-from .output_contracts import output_schema_for_types, relation_pair_decision_schema
+from .output_contracts import output_schema_for_types
 from .ontology_schema import OntologySchema
 from ._logging import get_step_logger
 from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table, build_chat_messages
@@ -25,7 +25,6 @@ from .prompt_templates import user_with_retry_feedback
 
 
 logger = get_step_logger(__name__)
-from .relation_resolver import enumerate_relation_pairs
 from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages, semantic_support
 from .scheduler import get_llm_scheduler
 from .structured_output import validate_json_schema
@@ -35,7 +34,6 @@ MAX_LOCAL_RELATION_CATALOG = 160
 # 批大小受输出上限约束：每条 pair 决策（pair_id+label+evidence.quote）约 60~90
 # token，默认 max_tokens=16384 最多容纳约 150~250 条。超限会导致响应 JSON 截断、
 # generate_structured 解析失败后整批丢弃（批越大丢得越多），故取 150。
-RELATION_PAIR_BATCH_SIZE = 200
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
 # 同时按字符封顶，防止"行少但单元格极长"的表格把单次 prompt 撑爆。
@@ -192,15 +190,6 @@ def _collection_item_key(collection_name: str, item: dict[str, Any]) -> tuple[st
             json.dumps(item.get("properties") or {}, ensure_ascii=False, sort_keys=True, default=str),
             canonical_name((item.get("evidence") or {}).get("quote")),
         )
-    if collection_name == "relations":
-        return (
-            canonical_name(item.get("from_id") or item.get("from_type")),
-            canonical_name(item.get("from_name")),
-            canonical_name(item.get("rel_type")),
-            canonical_name(item.get("to_id") or item.get("to_type")),
-            canonical_name(item.get("to_name")),
-            canonical_name((item.get("evidence") or {}).get("quote")),
-        )
     return (json.dumps(item, ensure_ascii=False, sort_keys=True, default=str),)
 
 
@@ -243,42 +232,6 @@ def _recovery_summary(collection_name: str, items: list[dict[str, Any]]) -> str:
                 f"{item.get('from_id', '')}:{item.get('rel_type', '')}:{item.get('to_id', '')}"
             )
     return "; ".join(labels)
-
-
-def relation_catalog_for_context(
-    catalog: list[dict[str, Any]],
-    chunk: ExtractionChunk,
-    neighbors: Iterable[ExtractionChunk],
-    *,
-    global_threshold: int = GLOBAL_RELATION_CATALOG_THRESHOLD,
-    max_local_entities: int = MAX_LOCAL_RELATION_CATALOG,
-) -> list[dict[str, Any]]:
-    """Keep small catalogs intact; scope large catalogs to evidenced/local mentions."""
-    if len(catalog) <= max(0, global_threshold):
-        return list(catalog)
-
-    neighbor_list = list(neighbors)
-    local_chunk_ids = {chunk.chunk_id, *(item.chunk_id for item in neighbor_list)}
-    current_text = canonical_name(chunk.text)
-    context_text = canonical_name("\n".join([chunk.text, *(item.text for item in neighbor_list)]))
-
-    def mentioned(entry: dict[str, Any], text: str) -> bool:
-        values = [entry.get("name"), *dict(entry.get("properties") or {}).values()]
-        return any(
-            normalized and normalized in text
-            for value in values
-            if (normalized := canonical_name(value))
-        )
-
-    current: list[dict[str, Any]] = []
-    adjacent: list[dict[str, Any]] = []
-    for entry in catalog:
-        source_ids = set(entry.get("source_block_ids") or [])
-        if chunk.chunk_id in source_ids or mentioned(entry, current_text):
-            current.append(entry)
-        elif source_ids.intersection(local_chunk_ids) or mentioned(entry, context_text):
-            adjacent.append(entry)
-    return (current + adjacent)[: max(1, max_local_entities)]
 
 
 def _is_deepseek_llm(llm: Any) -> bool:
@@ -698,8 +651,7 @@ def _normalize_span_entities(
     The model never supplies canonical names or properties.  A name may be a
     faithful abstraction of the source (e.g. an inferred rule name), but every
     accepted fact must still carry an ``evidence.quote`` locatable in the chunk,
-    and all grounding decisions are made here so malformed offsets cannot create
-    a plausible-looking node.
+    with source positions computed by the evidence binder, never by the model.
     """
     raw_entities = parsed.get("entities", []) if isinstance(parsed, dict) else []
     if not isinstance(raw_entities, list):
@@ -708,7 +660,6 @@ def _normalize_span_entities(
     requested = [schema.resolve_class(item) for item in (target_types or [])]
     requested = [item for item in requested if item is not None]
     accepted: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
     text = chunk.text or ""
     for index, raw in enumerate(raw_entities):
         path = f"entities[{index}]"
@@ -742,66 +693,26 @@ def _normalize_span_entities(
         # 因此 name 或 evidence.quote 至少有一个能在当前 chunk 中逐字定位。
         name_in_text = name in text
         quote_in_text = bool(quote) and quote in text
-        start = raw.get("start_char")
-        end = raw.get("end_char")
-        offsets_match = (
-            isinstance(start, int)
-            and isinstance(end, int)
-            and 0 <= start <= end <= len(text)
-            and text[start:end] == name
-        )
-        if name_in_text:
-            starts = [match.start() for match in re.finditer(re.escape(name), text)]
-            if offsets_match:
-                pass
-            elif len(starts) == 1:
-                start = starts[0]
-                end = start + len(name)
-                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与 mention 不一致，已按唯一原文位置纠正", path)
-            elif quote_in_text and name in quote:
-                quote_start = text.find(quote)
-                start = quote_start + quote.index(name)
-                end = start + len(name)
-                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与 mention 不一致，已按证据 quote 定位纠正", path)
-            else:
-                start = starts[0]
-                end = start + len(name)
-                _append_warning(warnings, "ENTITY_SPAN_OFFSET_CORRECTED", "offset 与 mention 不一致，已按首个原文位置纠正", path)
-        elif quote_in_text:
-            # 归纳型实体名：用逐字 evidence.quote 承载证据 span。
-            quote_start = text.find(quote)
-            start = quote_start
-            end = quote_start + len(quote)
-            _append_warning(
-                warnings,
-                "ENTITY_NAME_UNGROUNDED",
-                "mention 无法逐字定位，已保留归纳型实体名并以 evidence.quote 作为证据 span",
-                path,
-                name,
-            )
-        else:
-            # 不再强制 span-first：实体名/证据都不是原文逐字片段时（例如由多条
-            # 记录归纳出的规则）同样保留，证据问题只作为告警。
-            _append_warning(
-                warnings,
-                "ENTITY_UNGROUNDED",
+        if not name_in_text and quote_in_text:
+            _append_warning(warnings, "ENTITY_NAME_UNGROUNDED",
+                "mention 无法逐字定位，已保留归纳型实体名并以 evidence.quote 作为证据",
+                path, name)
+        elif not name_in_text and not quote_in_text:
+            _append_warning(warnings, "ENTITY_UNGROUNDED",
                 "mention 与 evidence.quote 均非原文片段，按生成式实体保留",
-                path,
-                name,
-            )
-            start = start if isinstance(start, int) and start >= 0 else 0
-            end = end if isinstance(end, int) and end >= start else start
+                path, name)
+        # Offsets are exclusively computed by the evidence binder. Do not accept
+        # model offsets or manufacture 0:0 spans when no source can be located.
+        locator = quote if quote_in_text else name if name_in_text else ""
+        if locator and len(list(re.finditer(f"(?={re.escape(locator)})", text))) > 1:
+            _append_warning(warnings, "ENTITY_EVIDENCE_AMBIGUOUS",
+                "证据在当前切片重复出现，绑定首个匹配位置，无法唯一确定来源位置", path, locator)
 
-        key = (ontology_class.identifier, name)
-        if key in seen:
-            _append_warning(warnings, "ENTITY_DUPLICATE_MENTION", "同一 type+mention 在 chunk 内重复，已去重", path)
-            continue
-        seen.add(key)
         accepted.append({
             "type": ontology_class.identifier,
             "name": name,
             "properties": {},
-            "evidence": {"quote": quote, "start_char": start, "end_char": end},
+            "evidence": {"quote": quote},
         })
     return accepted
 
@@ -818,27 +729,6 @@ def bind_entity_evidence(
         chunk_ids=chunk_ids,
     )
     return bound.get("entities", [])
-
-
-def bind_relation_evidence(
-    raw_relation: dict[str, Any],
-    manager: ChunkContextManager,
-    *,
-    chunk_ids: Iterable[str] | None = None,
-) -> Evidence | None:
-    quote = (raw_relation.get("evidence") or {}).get("quote")
-    if quote:
-        evidence_chunk_ids = (raw_relation.get("evidence") or {}).get("source_block_ids")
-        located = locate_quote(
-            manager,
-            quote,
-            chunk_ids=(chunk_ids if chunk_ids is not None else evidence_chunk_ids or None),
-        )
-        if located is not None:
-            return located
-    # Endpoint mentions alone do not prove the relation semantics.  Leave the
-    # candidate without evidence so the verifier can reject/repair it.
-    return None
 
 
 def entity_pass(
@@ -1014,192 +904,6 @@ def entity_pass(
     return results
 
 
-def relation_pass(
-    plan: ExtractionPlan,
-    manager: ChunkContextManager,
-    request: ExtractionRequest,
-    llm: Any,
-    pool: Any,
-    *,
-    route: DocumentRoute,
-    assembly_planner: Any | None = None,
-    max_workers: int,
-    use_scheduler: bool,
-    attempts: list[dict[str, Any]],
-    warnings: list[dict[str, Any]],
-    local_previous: int,
-    local_next: int,
-    same_section: bool,
-    max_attempts: int = 3,
-    retry_base_seconds: float = 0.05,
-    call_metrics: list[dict[str, Any]] | None = None,
-) -> list[tuple[str, list[dict[str, Any]]]]:
-    """Generate raw relation candidates; acceptance stays globally ordered."""
-    chunks = list(request.chunks)
-    catalog = pool.entity_catalog()
-
-    def run(chunk: ExtractionChunk) -> tuple[
-        str,
-        list[dict[str, Any]],
-        list[dict[str, Any]],
-        list[dict[str, Any]],
-        list[dict[str, Any]],
-    ]:
-        local_attempts: list[dict[str, Any]] = []
-        local_warnings: list[dict[str, Any]] = []
-        local_call_metrics: list[dict[str, Any]] = []
-        neighbors = [
-            item
-            for item in manager.local_context(
-                chunk.chunk_id,
-                previous=local_previous,
-                next=local_next,
-                same_section=same_section,
-            )
-            if item.chunk_id != chunk.chunk_id
-        ]
-        entity_objects = pool.accepted_entities()
-        current_text = canonical_name(chunk.text)
-        current_ids = {
-            entity.candidate_id
-            for entity in entity_objects
-            if chunk.chunk_id
-            in {
-                block_id
-                for evidence in entity.evidence
-                for block_id in evidence.source_block_ids
-            }
-            or (
-                canonical_name(entity.name)
-                and canonical_name(entity.name) in current_text
-            )
-        }
-        anchor_ids = {
-            entity.candidate_id
-            for entity in entity_objects
-            if entity.source == "document_anchor"
-        }
-        permitted_ids = current_ids | anchor_ids
-        local_catalog = [
-            entry
-            for entry in catalog
-            if str(entry.get("id") or "") in permitted_ids
-        ]
-        if not local_catalog:
-            return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
-        # Enumerate only among entities permitted for this chunk; pairs outside
-        # this set are dropped by the filters below anyway.
-        permitted_objects = [
-            entity for entity in entity_objects
-            if entity.candidate_id in permitted_ids
-        ]
-        pairs = enumerate_relation_pairs(plan, permitted_objects)
-        anchor_types = {
-            canonical_name(entity.canonical_type)
-            for entity in entity_objects
-            if entity.candidate_id in anchor_ids
-        }
-        # Metadata visible on the current document belongs only to its primary
-        # anchor.  Normative-reference documents are targets of citations, not
-        # alternate owners of the current cover metadata.
-        pairs = [
-            pair
-            for pair in pairs
-            if canonical_name(pair["source_type"]) not in anchor_types
-            or pair["source_id"] in anchor_ids
-        ]
-        # Relation evidence is required to be literal in the current chunk.
-        # Therefore both endpoints must be evidenced/mentioned here, except
-        # for the primary document anchor which may be implicit ("this
-        # document") in metadata and cross-section statements.
-        pairs = [
-            pair for pair in pairs
-            if pair["source_id"] in permitted_ids
-            and pair["target_id"] in permitted_ids
-            and (
-                pair["source_id"] in current_ids
-                or pair["target_id"] in current_ids
-            )
-        ]
-        if not pairs:
-            return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
-        all_relations: list[dict[str, Any]] = []
-        for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE):
-            pair_batch = pairs[offset : offset + RELATION_PAIR_BATCH_SIZE]
-            output_schema = relation_pair_decision_schema(pair_batch)
-            messages = build_chat_messages(
-                assembly_planner=assembly_planner,
-                task="relation",
-                plan=plan,
-                route=route,
-                chunk=chunk,
-                local_context="\n".join(item.text for item in neighbors),
-                known_entities=local_catalog,
-                output_schema=output_schema,
-                relation_pairs=pair_batch,
-            )
-            parsed = generate_structured(
-                llm,
-                messages,
-                output_schema,
-                use_scheduler=use_scheduler,
-                attempts=local_attempts,
-                pass_name="relation",
-                chunk_id=f"{chunk.chunk_id}.batch-{offset // RELATION_PAIR_BATCH_SIZE}",
-                max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds,
-                call_metrics=local_call_metrics,
-            )
-            if parsed is None:
-                continue
-            by_id = {pair["pair_id"]: pair for pair in pair_batch}
-            seen_decisions: set[str] = set()
-            for index, decision in enumerate(parsed.get("decisions", [])):
-                if not isinstance(decision, dict):
-                    _append_warning(local_warnings, "INVALID_RELATION_DECISION", "关系决策必须是对象", f"decisions[{index}]")
-                    continue
-                pair_id = str(decision.get("pair_id") or "")
-                pair = by_id.get(pair_id)
-                if pair is None:
-                    _append_warning(local_warnings, "UNKNOWN_RELATION_PAIR_ID", "关系决策引用未知 pair_id", f"decisions[{index}].pair_id", pair_id)
-                    continue
-                if pair_id in seen_decisions:
-                    _append_warning(local_warnings, "DUPLICATE_RELATION_PAIR_DECISION", "同一 pair 重复决策", f"decisions[{index}].pair_id", pair_id)
-                    continue
-                seen_decisions.add(pair_id)
-                label = str(decision.get("label") or "")
-                if label == "NONE":
-                    continue
-                if label != pair["relation_id"]:
-                    _append_warning(local_warnings, "RELATION_PAIR_SIGNATURE_MISMATCH", "关系标签不符合 pair 本体签名", f"decisions[{index}].label", label)
-                    continue
-                evidence = bind_relation_evidence(decision, manager, chunk_ids=(chunk.chunk_id,))
-                if evidence is None:
-                    quote = str((decision.get("evidence") or {}).get("quote") or "")
-                    _append_warning(local_warnings, "RELATION_EVIDENCE_INVALID", "关系 evidence 无法在当前 chunk 定位", f"decisions[{index}].evidence", quote)
-                    continue
-                all_relations.append({
-                    "from_id": pair["source_id"], "to_id": pair["target_id"],
-                    "rel_type": label, "evidence": evidence.to_dict(),
-                })
-        return chunk.chunk_id, all_relations, local_attempts, local_warnings, local_call_metrics
-
-    worker_count = max(1, max_workers)
-    if worker_count == 1:
-        worker_results = [run(chunk) for chunk in chunks]
-    else:
-        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ke-relation") as executor:
-            worker_results = list(executor.map(run, chunks))
-    results: list[tuple[str, list[dict[str, Any]]]] = []
-    for chunk_id, relations, local_attempts, local_warnings, local_calls in worker_results:
-        attempts.extend(local_attempts)
-        warnings.extend(local_warnings)
-        if call_metrics is not None:
-            call_metrics.extend(local_calls)
-        results.append((chunk_id, relations))
-    return results
-
-
 def _record_call(
     call_metrics: list[dict[str, Any]] | None,
     *,
@@ -1243,10 +947,7 @@ def _record_call(
 
 __all__ = [
     "bind_entity_evidence",
-    "bind_relation_evidence",
     "decode_json_object",
     "entity_pass",
     "generate_structured",
-    "relation_catalog_for_context",
-    "relation_pass",
 ]

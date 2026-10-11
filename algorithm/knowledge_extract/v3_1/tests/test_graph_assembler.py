@@ -179,24 +179,17 @@ class IntegrationTest(unittest.TestCase):
                     }
                 updates.append(
                     {
-                        "entity_id": row["id"],
+                        "type": row["type"], "name": row["name"],
                         "properties": properties,
                         "evidence": {"quote": composite_mention},
                     }
                 )
-            return {"updates": updates}
+            return {"entities": updates}
 
-        def relation_handler(prompt: str, pairs: list[dict], chunk: dict) -> list[dict]:
-            return [
-                {"pair_id": pair["pair_id"], "label": pair["relation_id"], "evidence": {"quote": composite_mention}}
-                for pair in pairs
-                if pair["relation_id"] == "hassubrule"
-            ]
 
         llm = StubLLM(
             entity_handler=entity_handler,
             property_handler=property_handler,
-            relation_handler=relation_handler,
         )
         result = SE.extract_split(
             ontology,
@@ -222,8 +215,8 @@ class IntegrationTest(unittest.TestCase):
         pred_relation_keys = {
             (r["from_type"], r["rel_type"], r["to_type"]) for r in result["raw"]["relations"]
         }
-        self.assertEqual(pred_relation_keys, {("CompositeRule", "hasSubRule", "SimpleRule")})
-        self.assertEqual(len(result["raw"]["relations"]), 2)
+        self.assertEqual(pred_relation_keys, set())
+        self.assertEqual(result["raw"]["relations"], [])
         # graph 校验：无悬空、uid 可复算、triples 一致
         node_uids = {node["uid"] for node in result["graph"]["nodes"]}
         for entity in result["raw"]["entities"]:

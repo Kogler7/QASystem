@@ -9,13 +9,6 @@ from .evidence import verify_evidence
 from .graph_utils import canonical_name
 
 
-_REJECTED_RELATION_CANDIDATE_CODES = {
-    "UNKNOWN_RELATION_ENDPOINT_ID",
-    "UNKNOWN_RELATION_TYPE",
-    "RELATION_ENDPOINT_TYPE_MISMATCH",
-}
-
-
 @dataclass(frozen=True)
 class VerificationIssue:
     code: str
@@ -112,7 +105,7 @@ class ExtractionVerifier:
 
         entity_keys: set[tuple[str, str]] = set()
         for index, entity in enumerate(entities):
-            key = (str(entity.get("type") or ""), canonical_name(entity.get("name")))
+            key = (str(entity.get("type") or ""), str(entity.get("name") or ""))
             if key in entity_keys:
                 issues.append(
                     VerificationIssue(
@@ -122,36 +115,6 @@ class ExtractionVerifier:
                     )
                 )
             entity_keys.add(key)
-
-        relation_keys: set[tuple[tuple[str, str], str, tuple[str, str]]] = set()
-        for index, relation in enumerate(relations):
-            source = (
-                str(relation.get("from_type") or ""),
-                canonical_name(relation.get("from_name")),
-            )
-            target = (
-                str(relation.get("to_type") or ""),
-                canonical_name(relation.get("to_name")),
-            )
-            if source not in entity_keys or target not in entity_keys:
-                issues.append(
-                    VerificationIssue(
-                        code="DANGLING_RELATIONSHIP",
-                        message=f"relation endpoints are not in accepted entities: {source} -> {target}",
-                        path=f"relations[{index}]",
-                        repair_type="dangling_relation_endpoint",
-                    )
-                )
-            key = (source, canonical_name(relation.get("rel_type")), target)
-            if key in relation_keys:
-                issues.append(
-                    VerificationIssue(
-                        code="DUPLICATE_RELATION",
-                        message=f"duplicate final relation at relations[{index}]",
-                        path=f"relations[{index}]",
-                    )
-                )
-            relation_keys.add(key)
 
         for verdict in verify_evidence(raw, manager):
             if verdict.status == "fail":
@@ -172,8 +135,6 @@ class ExtractionVerifier:
 
         for warning in rejected_warnings:
             code = str(warning.get("code") or "")
-            if code in _REJECTED_RELATION_CANDIDATE_CODES:
-                continue
             repair_type = _repair_type_for_code(code)
             if repair_type is None:
                 continue
@@ -198,15 +159,6 @@ def _coverage_issue(gap: CoverageGap, plan: Any) -> VerificationIssue | None:
             path=gap.span_id,
             severity="warning",
         )
-    if gap.gap_type == "relation_coverage":
-        return VerificationIssue(
-            code="REQUIRED_RELATION_MISSING",
-            message=gap.reason,
-            path=gap.span_id,
-            severity="warning",
-            repair_type="required_relation",
-            context=gap.to_dict(),
-        )
     if gap.gap_type == "feature_coverage":
         specs = plan.feature_specs.get(gap.target_type or "", ())
         required = {
@@ -224,13 +176,13 @@ def _coverage_issue(gap: CoverageGap, plan: Any) -> VerificationIssue | None:
                 context={**gap.to_dict(), "required": sorted(missing_required)},
             )
         return None
-    if gap.gap_type in {"structural_coverage", "composite_membership"}:
+    if gap.gap_type == "structural_coverage":
         return VerificationIssue(
-            code="UNCOVERED_BLOCK" if gap.gap_type == "structural_coverage" else "REQUIRED_RELATION_MISSING",
+            code="UNCOVERED_BLOCK",
             message=gap.reason,
             path=gap.span_id,
             severity="warning",
-            repair_type="uncovered_block" if gap.gap_type == "structural_coverage" else "required_relation",
+            repair_type="uncovered_block",
             context=gap.to_dict(),
         )
     return None
@@ -238,12 +190,6 @@ def _coverage_issue(gap: CoverageGap, plan: Any) -> VerificationIssue | None:
 
 def _repair_type_for_code(code: str) -> str | None:
     return {
-        "UNKNOWN_RELATION_ENDPOINT_ID": "dangling_relation_endpoint",
-        "DANGLING_RELATIONSHIP": "dangling_relation_endpoint",
-        "RELATION_ENDPOINT_TYPE_MISMATCH": "relation_direction_or_signature",
-        "UNKNOWN_RELATION_TYPE": "relation_direction_or_signature",
-        "UNKNOWN_RELATION_ENDPOINT_TYPE": "relation_direction_or_signature",
-        "RELATION_ENDPOINT_NAME_MISSING": "dangling_relation_endpoint",
     }.get(code)
 
 

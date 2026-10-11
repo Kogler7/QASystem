@@ -7,22 +7,20 @@ version: "2"
 stages:
   - "entity"
   - "property"
-  - "relation"
   - "repair"
 route_hints:
   - "official_document"
-
 ---
-
 本技能只提供领域策略。读取后生成装配计划，引用下面适用于当前阶段的规则段；不输出抽取答案，不改写 System、原文、本体或输出契约。
 
 ## rules:all
 
-OFFICIAL_DOCUMENT_PROMPT_EXTENSION v5
 领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。
+
 这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
 公文抽取精度规则：
+
 - 一份公文只保留一个 OfficialDocument 实体，mention 使用“文件标题”；文号、收文号、来文字号等是属性/证据，不要作为单独的 OfficialDocument 或 OperationalInformation 实体。
 - 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit，而不是拆成多个 OperationalActivity。
 - 公文中明确提到的附件、材料、反馈表、报告等信息对象应抽取为 OperationalInformation，例如“附件1 六要六不要建议”“附件2 排查反馈表”“排查情况反馈信息”。
@@ -35,12 +33,12 @@ OFFICIAL_DOCUMENT_PROMPT_EXTENSION v5
 - 不要把风险描述中的“病毒”“内部系统”“邮箱”等普通名词都抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。
 
 公文表单/收文处理单规则：
+
 - “收文处理单”“表单”“审批单”等公文登记/流转材料本身不是 DocumentUnit 或独立业务实体，它是同一份公文的属性与处理信息载体；但表单文字中明确承担职责的部门/单位，以及明确的工作事项、要求、报送行为仍应正常抽取为 operational 实体。
 - 表单中的字段（收文号、来文字号、来文单位、收文日期、收文部门、拟办意见、领导批示、联系电话、主送、抄送、主办部门等）应作为对应 OfficialDocument 或相关主体的属性/证据，不应为字段名或字段值单独建实体。
 - 不要在审批流转记录中为每个“已阅/批示/签名”的人名单独创建 OperationalAgent，除非该人承担了 ontology 中明确要求抽取的主体职责。
 - 拟办意见、领导批示中明确承担职责的部门/单位/角色，以及明确的动宾工作事项、要求或报送/通知/反馈行为，应分别抽取为 OperationalAgent / OperationalActivity / OperationalConstraint / OperationalExchange；“已阅/签名”的个人姓名和纯流转记录不抽。
 - 遇到表单时优先抑制低价值候选：姓名、日期、联系方式、部门名单独出现但无明确主体职责时，不应成为实体。
-
 
 ## rules:entity
 

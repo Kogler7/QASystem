@@ -34,7 +34,6 @@ from .. import chunk_context as CC
 from .. import graph_assembler as GA
 from .. import graph_utils as GU
 from .. import prompt_router as PR
-from .. import relation_resolver as RR
 from .. import output_contracts as OUT
 
 from .stub_llm import StubLLM, parse_known_entities, span_item  # noqa: E402
@@ -100,20 +99,14 @@ def composite_property_handler(prompt: str, chunk: dict) -> dict:
             }
         updates.append(
             {
-                "entity_id": row["id"],
+                "type": row["type"], "name": row["name"],
                 "properties": properties,
                 "evidence": {"quote": COMPOSITE_TEXT},
             }
         )
-    return {"updates": updates}
+    return {"entities": updates}
 
 
-def composite_relation_handler(prompt: str, pairs: list[dict], chunk: dict) -> list[dict]:
-    return [
-        {"pair_id": pair["pair_id"], "label": pair["relation_id"], "evidence": {"quote": COMPOSITE_TEXT}}
-        for pair in pairs
-        if pair["relation_id"] == "hassubrule"
-    ]
 
 
 class PromptTest(unittest.TestCase):
@@ -126,34 +119,9 @@ class PromptTest(unittest.TestCase):
         self.assertIn("只提议实体候选，禁止输出关系", prompt)
         self.assertIn("`SimpleRule`", prompt)  # 父类子类展开进类型目录
         self.assertIn("`CompositeRule`", prompt)
-        self.assertIn("（实体任务不展示关系目录）", prompt)
+        self.assertNotIn("relation_signatures", prompt)
         self.assertNotIn("hasSubRule", prompt)  # 实体 pass 不提供关系
 
-    def test_relation_prompt_catalog_and_signatures(self) -> None:
-        plan = SE.compile_plan(RULE_ONTOLOGY)
-        chunk = CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)
-        route = PR.resolve_document_route(plan, [chunk])
-        entities = [
-            {"id": "entity-0", "type": "CompositeRule", "name": "CR-001"},
-            {"id": "entity-1", "type": "SimpleRule", "name": "R-001"},
-        ]
-        pairs = RR.enumerate_relation_pairs(plan, entities)
-        self.assertEqual(len(pairs), 1)
-        self.assertEqual(pairs[0]["relation_id"], "hassubrule")
-        messages = PR.build_chat_messages(
-            task="relation",
-            plan=plan,
-            route=route,
-            chunk=chunk,
-            known_entities=entities,
-            output_schema=OUT.relation_pair_decision_schema(pairs),
-            relation_pairs=pairs,
-        )
-        prompt = messages[1]["content"]
-        self.assertIn(pairs[0]["pair_id"], prompt)
-        self.assertIn("entity-0", prompt)
-        self.assertIn("hassubrule", prompt)
-        self.assertIn("只分类给定 relation pair；不得创建新端点、不得输出未列出的关系", prompt)
 
 
 class TwoPassPipelineTest(unittest.TestCase):
@@ -161,7 +129,6 @@ class TwoPassPipelineTest(unittest.TestCase):
         llm = StubLLM(
             entity_handler=composite_entity_handler,
             property_handler=composite_property_handler,
-            relation_handler=composite_relation_handler,
         )
         result = SE.extract_split(
             RULE_ONTOLOGY,
@@ -177,7 +144,7 @@ class TwoPassPipelineTest(unittest.TestCase):
             [entity["name"] for entity in raw["entities"]],
             [COMPOSITE_TEXT, *MEMBER_MENTIONS],
         )
-        self.assertEqual(len(raw["relations"]), 2)
+        self.assertEqual(raw["relations"], [])
         for relation in raw["relations"]:
             self.assertEqual(relation["rel_type"], "hasSubRule")
             self.assertEqual(relation["from_type"], "CompositeRule")
@@ -186,24 +153,24 @@ class TwoPassPipelineTest(unittest.TestCase):
             self.assertEqual(relation["evidence"]["source_block_ids"], ["chunk-0"])
         # AC-7：无悬空关系
         self.assertEqual(len(result["graph"]["nodes"]), 3)
-        self.assertEqual(len(result["graph"]["relationships"]), 2)
-        self.assertEqual(len(result["triples"]), 2)
+        self.assertEqual(result["graph"]["relationships"], [])
+        self.assertEqual(result["triples"], [])
         # O1
         model = result["intermediate_model"]
         self.assertEqual(len(model["objects"]), 3)
-        self.assertEqual(len(model["relations"]), 2)
+        self.assertEqual(model["relations"], [])
         self.assertEqual(model["objects"][0]["mapping"]["status"], "accepted")
         self.assertEqual(model["objects"][0]["identity"], COMPOSITE_TEXT)
         # 证据覆盖
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
         self.assertEqual(result["evidence_coverage"]["relations"]["rate"], 1.0)
-        # 三段式：实体 pass -> 属性补全 -> 关系 pass
-        self.assertEqual([task for task, _ in llm.calls], ["entity", "property", "relation"])
+        # 实体 -> 属性 -> 关系候选 -> 独立关系语义核验
+        self.assertEqual([task for task, _ in llm.calls], ["entity", "property", "property"])
         # 无 schema/证据告警
         self.assertEqual(result["warnings"], [])
         self.assertIsNone(result["error_code"])
 
-    def test_entity_dedup_merge_across_chunks(self) -> None:
+    def test_same_type_name_entities_completed_once_across_chunks(self) -> None:
         terminology_ontology = """@startuml terminology
 class "术语" as Terminology <<KnowledgeUnit>> {
   + 术语标准名称 (TermName): String // 术语的标准名称
@@ -225,9 +192,9 @@ class "术语" as Terminology <<KnowledgeUnit>> {
 
         def property_handler(prompt: str, chunk: dict) -> dict:
             return {
-                "updates": [
+                "entities": [
                     {
-                        "entity_id": row["id"],
+                        "type": row["type"], "name": row["name"],
                         "properties": {
                             "TermName": "主数据治理",
                             "TermDefinition": "对主数据的识别、采集、校验等治理活动",
@@ -243,141 +210,30 @@ class "术语" as Terminology <<KnowledgeUnit>> {
         result = SE.extract_split(terminology_ontology, chunks=chunks, llm=llm)
         entities = result["raw"]["entities"]
         self.assertEqual(len(entities), 1)
-        self.assertEqual(entities[0]["candidate_id"], "entity-0")
+        self.assertTrue(all("candidate_id" not in e for e in entities))
         properties = result["intermediate_model"]["objects"][0]["properties"]
         self.assertEqual(properties["TermDefinition"], "对主数据的识别、采集、校验等治理活动")
         self.assertEqual(properties["Synonyms"], ["主数据管理"])
         # 两条 evidence（不同 chunk span）都保留
-        self.assertEqual(len(result["intermediate_model"]["objects"][0]["evidence"]), 2)
+        self.assertEqual(len(result["intermediate_model"]["objects"][0]["evidence"]), 1)
+        self.assertEqual(len([t for t, _ in llm.calls if t == "property"]), 1)
+        import json
+        payload = json.loads(next(p for t, p in llm.calls if t == "property"))
+        self.assertEqual([d["current_chunk"]["chunk_id"] for d in payload["documents"]], ["c1", "c2"])
+        self.assertEqual(len(payload["task"]["known_entities"][0]["occurrences"]), 2)
 
     def test_out_of_scope_entity_rejected(self) -> None:
         # 重构后 entity pass 的 output schema enum 已限定在目标范围内，范围外类型
         # 在结构化校验阶段就会被拒；ENTITY_OUT_OF_SCOPE 的兜底防线在 CandidatePool。
         official = (ONTOLOGIES_DIR / "official_document_ontology.puml").read_text(encoding="utf-8")
-        schema = ontology_schema.OntologySchema.parse(official)
-        plan = SE.compile_plan(official, target_types=["OperationalActivity"])
-        pool = SE.CandidatePool(schema, allowed_types=plan.allowed_types)
-        accepted = pool.add_entity(
-            SE.EntityCandidate(
-                candidate_id="",
-                proposed_type="OperationalActivity",
-                canonical_type="OperationalActivity",
-                name="加强网络和数据安全监测",
-                properties={},
-                evidence=[],
-                source="test",
-            )
-        )
-        self.assertIsNotNone(accepted)
-        warnings: list[dict] = []
-        rejected = pool.add_entity(
-            SE.EntityCandidate(
-                candidate_id="",
-                proposed_type="OperationalAgent",
-                canonical_type="OperationalAgent",
-                name="集团",
-                properties={},
-                evidence=[],
-                source="test",
-            ),
-            warnings=warnings,
-        )
-        self.assertIsNone(rejected)
-        codes = [warning["code"] for warning in warnings]
-        self.assertIn("ENTITY_OUT_OF_SCOPE", codes)
-        self.assertEqual(
-            [entity.canonical_type for entity in pool.accepted_entities()],
-            ["OperationalActivity"],
-        )
+        llm = StubLLM(entity_handler=lambda p, c: [span_item("OperationalAgent", "集团")])
+        result = SE.extract_split(official, chunks=[CC.ExtractionChunk("c0", "集团")],
+                                  target_types=["OperationalActivity"], llm=llm, max_attempts=1)
+        self.assertEqual(result["raw"]["entities"], [])
+        self.assertEqual(result["error_code"], "LLM_SCHEMA_INVALID")
 
 
-class RelationValidationTest(unittest.TestCase):
-    """AC-7 关系校验：重构后 relation pass 只枚举合法 pair，非法关系在
 
-    CandidatePool/RelationResolver 边界被拒绝，这里直接对池做单元测试。"""
-
-    def _pool(self) -> "SE.CandidatePool":
-        schema = ontology_schema.OntologySchema.parse(RULE_ONTOLOGY)
-        plan = SE.compile_plan(RULE_ONTOLOGY)
-        pool = SE.CandidatePool(schema, allowed_types=plan.allowed_types)
-        pool.add_entity(
-            SE.EntityCandidate(
-                candidate_id="",
-                proposed_type="SimpleRule",
-                canonical_type="SimpleRule",
-                name="R-001",
-                properties={"ruleId": "R-001"},
-                evidence=[],
-                source="test",
-            )
-        )
-        pool.add_entity(
-            SE.EntityCandidate(
-                candidate_id="",
-                proposed_type="Object",
-                canonical_type="Object",
-                name="办公设备",
-                properties={"objectName": "办公设备"},
-                evidence=[],
-                source="test",
-            )
-        )
-        return pool
-
-    def _relation(self, from_id: str, rel_type: str, to_id: str) -> "SE.RelationCandidate":
-        return SE.RelationCandidate(
-            candidate_id="",
-            from_candidate_id=from_id,
-            to_candidate_id=to_id,
-            proposed_relation=rel_type,
-            canonical_relation=None,
-            evidence=[],
-        )
-
-    def test_unknown_endpoint_rejected(self) -> None:
-        pool = self._pool()
-        warnings: list[dict] = []
-        resolved = pool.add_relation(
-            self._relation("entity-99", "constrainsObject", "entity-1"),
-            warnings=warnings,
-        )
-        self.assertIsNone(resolved)
-        self.assertEqual(pool.accepted_relations(), [])
-        self.assertIn("UNKNOWN_RELATION_ENDPOINT_ID", {w["code"] for w in warnings})
-
-    def test_relation_type_mismatch_rejected(self) -> None:
-        pool = self._pool()
-        warnings: list[dict] = []
-        resolved = pool.add_relation(
-            self._relation("entity-0", "hasSubRule", "entity-1"),
-            warnings=warnings,
-        )
-        self.assertIsNone(resolved)
-        self.assertEqual(pool.accepted_relations(), [])
-        self.assertIn("RELATION_ENDPOINT_TYPE_MISMATCH", {w["code"] for w in warnings})
-
-    def test_unknown_relation_type_rejected(self) -> None:
-        pool = self._pool()
-        warnings: list[dict] = []
-        resolved = pool.add_relation(
-            self._relation("entity-0", "NOT_IN_ONTOLOGY", "entity-1"),
-            warnings=warnings,
-        )
-        self.assertIsNone(resolved)
-        self.assertEqual(pool.accepted_relations(), [])
-        self.assertIn("UNKNOWN_RELATION_TYPE", {w["code"] for w in warnings})
-
-    def test_valid_relation_accepted(self) -> None:
-        pool = self._pool()
-        warnings: list[dict] = []
-        resolved = pool.add_relation(
-            self._relation("entity-0", "constrainsObject", "entity-1"),
-            warnings=warnings,
-        )
-        self.assertIsNotNone(resolved)
-        self.assertEqual(resolved.canonical_relation, "constrainsObject")
-        self.assertEqual(resolved.from_name, "R-001")
-        self.assertEqual(resolved.to_name, "办公设备")
 
 
 class FailureAndEdgeTest(unittest.TestCase):
