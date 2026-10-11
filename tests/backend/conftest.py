@@ -30,8 +30,29 @@ def _module(name: str, **attributes: object) -> types.ModuleType:
     return module
 
 
+@pytest.fixture(autouse=True)
+def _protocol_stub_lifetime(request):
+    """Keep the session app stable but restore global stubs after each test."""
+    if "protocol_module" not in request.fixturenames:
+        yield
+        return
+    protocol = request.getfixturevalue("protocol_module")
+    sys.modules.update(protocol.stubs)
+    try:
+        yield
+    finally:
+        for name, previous in protocol.original_stubs.items():
+            if previous is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+
+
 @pytest.fixture(scope="session")
 def protocol_module():
+    # The app and registry share module/class references for the session.
+    # _protocol_stub_lifetime limits sys.modules overrides to each protocol
+    # test without rebuilding the app and invalidating monkeypatch targets.
     @asynccontextmanager
     async def _run():
         yield
@@ -223,7 +244,7 @@ def protocol_module():
         app.include_router(capabilities_router)
         app.include_router(knowledge_router)
         app.include_router(confidence_router)
-        yield types.SimpleNamespace(app=app)
+        yield types.SimpleNamespace(app=app, stubs=stubs, original_stubs=original)
     finally:
         for name, value in original_environment.items():
             if value is None:

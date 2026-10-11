@@ -3,6 +3,8 @@ import importlib
 import json
 import re
 from types import SimpleNamespace
+from types import ModuleType
+import sys
 
 import pytest
 
@@ -56,3 +58,14 @@ def test_other_versions_keep_existing_full_chunk_contract(version):
         chunk=SimpleNamespace(chunk_id="c", document_id="d", text="完整原文"),
         items=[{"item_id": "one", "entity_context": "范围"}])
     assert payload(messages)["text"] == "完整原文"
+
+
+@pytest.mark.parametrize("version", ["v3", "latest"])
+def test_loaded_verifier_does_not_lazily_reimport_under_temporary_parent_stub(version, monkeypatch):
+    module = importlib.import_module(f"algorithm.knowledge_extract.{version}.semantic_evidence")
+    monkeypatch.setitem(sys.modules, "algorithm.knowledge_extract", ModuleType("algorithm.knowledge_extract"))
+    messages = module.build_verification_messages(
+        chunk=SimpleNamespace(chunk_id="c", document_id="d", text="完整原文"),
+        items=[{"item_id": "one", "entity_context": "锚定原文"}])
+    assert payload(messages)["source_scope"] == "per_item_entity_context"
+    assert "不得借用其他 item" in messages[0]["content"]

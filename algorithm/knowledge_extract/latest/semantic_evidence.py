@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
+from algorithm.knowledge_extract.verification_scope import verification_scope
 import re
 from difflib import SequenceMatcher
 from typing import Any
@@ -94,8 +95,6 @@ def build_verification_messages(
     items: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
     """构造 LLM 核验消息：判断候选实体属性或关系是否被 current chunk 支持。"""
-    from algorithm.knowledge_extract.verification_scope import verification_scope
-
     chunk_payload, scope_instruction = verification_scope(chunk, items)
     system = VERIFICATION_SYSTEM_PROMPT
     if scope_instruction:
