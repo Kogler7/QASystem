@@ -666,13 +666,14 @@ def job_id_from(payload: dict[str, Any]) -> str:
 
 def wait_for_job(base_url: str, job_id: str, params: dict[str, Any]) -> dict[str, Any]:
     interval = max(0.5, float(params.get("poll_interval_seconds") or 2))
-    timeout = max(interval, float(params.get("poll_timeout_seconds") or 3600))
-    deadline = time.time() + timeout
+    configured = params.get("poll_timeout_seconds", 3600)
+    timeout = None if configured == 0 else max(interval, float(configured or 3600))
+    deadline = None if timeout is None else time.monotonic() + timeout
     status_url = urljoin(base_url.rstrip("/") + "/", f"api/v1/jobs/{job_id}")
     result_url = urljoin(base_url.rstrip("/") + "/", f"api/v1/jobs/{job_id}/result")
     headers = auth_headers()
     last: dict[str, Any] = {}
-    while time.time() < deadline:
+    while deadline is None or time.monotonic() < deadline:
         status_code, last = json_request(status_url, headers=headers)
         job = last.get("data") or {}
         job_status = str(job.get("status") or "")
@@ -701,7 +702,8 @@ def submit_and_wait(
     headers: dict[str, str],
     params: dict[str, Any],
 ) -> dict[str, Any]:
-    timeout = max(60.0, float(params.get("poll_timeout_seconds") or 3600))
+    configured = params.get("poll_timeout_seconds", 3600)
+    timeout = None if configured == 0 else max(60.0, float(configured or 3600))
     status_code, payload = json_request(url, method="POST", data=data, headers=headers, timeout=timeout)
     if status_code == 202 or str((payload.get("data") or {}).get("status") or "") in {"queued", "running"}:
         job_id = job_id_from(payload)
@@ -2441,7 +2443,8 @@ def plugin_extract(
     *,
     base_url: str,
 ) -> dict[str, Any]:
-    timeout = max(60.0, float(params.get("poll_timeout_seconds") or 3600))
+    configured = params.get("poll_timeout_seconds", 3600)
+    timeout = None if configured == 0 else max(60.0, float(configured or 3600))
     headers = auth_headers()
     log(f"MCP {MCP_TOOL_NAME} ← text_len={len(text)}")
     init_payload = {

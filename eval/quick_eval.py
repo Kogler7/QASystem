@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixed, wall-clock-bounded extraction comparison through eval/run.py."""
+"""Small fixed-input extraction comparison through eval/run.py."""
 from __future__ import annotations
 
 import argparse
@@ -27,10 +27,6 @@ def build_command(argv):
         raise ValueError('快速集只接受 quick_eval.cases 选择，不允许复用旧抽取结果')
     if parsed.stage != 'backend' or parsed.system or parsed.mode not in (None, ['extract']):
         raise ValueError('快速集只支持 Backend extract；切片必须预先准备')
-    if parsed.extract_document_timeout is not None and parsed.extract_document_timeout > 180:
-        raise ValueError('快速集文档预算不得超过 180 秒')
-    if parsed.extract_request_timeout is not None and parsed.extract_request_timeout > 60:
-        raise ValueError('快速集调用预算不得超过 60 秒')
     params_path = Path(args.params).resolve()
     params = run.load_params(params_path)
     quick = params.get('quick_eval', {})
@@ -39,9 +35,9 @@ def build_command(argv):
         raise ValueError('quick_eval.cases 必须指定 1–3 个完整用例')
     if len(set(cases)) != len(cases):
         raise ValueError('quick_eval.cases 不允许重复用例')
-    wall = args.wall_seconds if args.wall_seconds is not None else quick.get('wall_seconds', 900)
-    if type(wall) is not int or not 1 <= wall <= 900:
-        raise ValueError('wall_seconds 必须为 1–900 秒')
+    wall = args.wall_seconds if args.wall_seconds is not None else quick.get('wall_seconds')
+    if wall is not None and (type(wall) is not int or wall <= 0):
+        raise ValueError('wall_seconds 必须为正整数，省略则不限制整轮耗时')
     workspace = Path(parsed.workspace).resolve()
     chosen = []
     for case in cases:
@@ -56,9 +52,7 @@ def build_command(argv):
             raise ValueError(f'缺少固定切片: {case}/chunks.json；请指定 --from-run')
     command = [sys.executable, str(Path(run.__file__).resolve()), *chosen, *forwarded,
                '--params', str(params_path), '--mode', 'extract', '--stage', 'backend',
-               '--from-run', source, '--case-attempts', '1', '--runs-retention-days', '0',
-               '--extract-document-timeout', str(parsed.extract_document_timeout or 180),
-               '--extract-request-timeout', str(parsed.extract_request_timeout or 60)]
+               '--from-run', source, '--case-attempts', '1', '--runs-retention-days', '0']
     return command, wall
 
 
@@ -76,7 +70,8 @@ def main(argv=None):
     def save():
         status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding='utf-8')
     save()
-    run.log(f'快速评测：最多 {wall} 秒，整篇只抽一次；日志 {directory / "run.log"}')
+    limit = f'最多 {wall} 秒' if wall is not None else '不限制整轮耗时'
+    run.log(f'小规模评测：{limit}，整篇只抽一次；日志 {directory / "run.log"}')
     started = time.monotonic()
     try:
         with (directory / 'run.log').open('w', encoding='utf-8') as output:

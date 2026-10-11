@@ -405,7 +405,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 ### 已下线版本的对照说明
 
 `v3.2`（单通用提示词联合抽取）与旧 `v3.1`（V2 副本 + prompt router）实现已从代码库移除，对应的提示词对照评测无法再运行；历史结论保留在 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。当前 `v3.1` 指语义 harness，评测方式见 [V3.1 语义 Harness 与评测](../docs/算法/知识抽取V3.1语义Harness与评测.md)。
-# 15 分钟快速迭代集
+# 小规模诊断评测
 
 `python3 eval/quick_eval.py --extract-version v3` 使用 `eval/quick_params.yaml`，固定选择
 `official_01`、`official_03`、`official_04` 三个完整用例，覆盖普通公文、短公文和密集表格/截断压力。
@@ -429,14 +429,12 @@ python3 eval/quick_eval.py --dry-run
 可切换已登记的供应商；请求输入/输出 token 预算仍来自 Backend 供应商配置。
 
 - 外层 `--case-attempts 1`，partial 不再整篇重抽；算法内部拆批和必要重试保留。
-- 单次模型调用 60 秒，每文档 180 秒；三个文档模型调用预算合计 9 分钟，余量用于评分和处理。
-- `--wall-seconds` 默认 900 秒且不允许超过 900。15 分钟是评测客户端停止上限，
-  不是保证全部用例能成功完成；达到时限返回 124，标记 `timed_out`，不得算成功或完整基线。
-  客户端停止不主动取消已经提交的 Backend 请求，在途调用仍受其文档预算约束。
+- 默认不限制整轮、文档耗时；不覆盖供应商的网络请求超时。靠缩小评测集控制工作量，不承诺固定时间结束。
+- `poll_timeout_seconds: 0` 表示一直等待 Backend 完成，兼容 inline 与排队模式。
+- 可显式指定 `--wall-seconds`，但诊断评测不使用该硬时限。
 - 每轮独立保存 `tmp/eval/quick/<UTC时间-随机编号>/run.log` 与 `status.json`；
   `run.log` 中指向统一入口生成的 `tmp/eval/runs/<批次>/summary.json` 和报告。
-- 快速集用于局部回归比较，不能替代全量门禁。比较不同版本时必须保持相同的 180 秒预算，
-  不能直接对比旧的 900 秒预算全量结果。
+- 快速集用于局部回归比较，不能替代全量门禁。比较不同版本时必须保持相同的模型、超时配置和输入；不能直接对比之前被硬预算截断的结果。
 
 统一入口也支持直接传 `python3 eval/run.py ... --case-attempts 1`，默认仍为 3 次，
 该参数只影响外层整篇尝试，不改变传输重试。
