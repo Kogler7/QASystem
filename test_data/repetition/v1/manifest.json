@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "entity-loop",
+      "sha256": "9166a96579ae3d6788a1c97cd3f028a094a3e8d775f7cc79a80373e257baf2e8",
+      "stage": "entity",
+      "observed_metrics": {
+        "records": 268,
+        "unique_records": 108,
+        "duplicate_fraction": 0.5970149253731343,
+        "first_duplicate_record": 100,
+        "max_exact_multiplicity": 8,
+        "repeated_substring_chars": 0,
+        "identity_unique": 108,
+        "identity_duplicate_fraction": 0.5970149253731343,
+        "characters": 40351
+      }
+    },
+    {
+      "id": "entity-normal",
+      "sha256": "224eee67340a94ab9b607664775e128f0df6450d1419891a964a7ecda72448f1",
+      "stage": "entity",
+      "observed_metrics": {
+        "records": 4,
+        "unique_records": 4,
+        "duplicate_fraction": 0.0,
+        "first_duplicate_record": null,
+        "max_exact_multiplicity": 1,
+        "repeated_substring_chars": 0,
+        "identity_unique": 4,
+        "identity_duplicate_fraction": 0.0,
+        "characters": 421
+      }
+    },
+    {
+      "id": "property-loop",
+      "sha256": "4e3f57d3c0c513927626afe276a858babe953001748b010b5bc00311af34708b",
+      "stage": "property",
+      "observed_metrics": {
+        "records": 0,
+        "unique_records": 0,
+        "duplicate_fraction": 0,
+        "first_duplicate_record": null,
+        "max_exact_multiplicity": 0,
+        "repeated_substring_chars": 27150,
+        "identity_unique": 0,
+        "identity_duplicate_fraction": null,
+        "characters": 27392
+      }
+    },
+    {
+      "id": "property-normal",
+      "sha256": "adf6cd98f32496578beb786329051c279146f3a5ee4ccd5d6d8dfa16a5ed3b34",
+      "stage": "property",
+      "observed_metrics": {
+        "records": 4,
+        "unique_records": 4,
+        "duplicate_fraction": 0.0,
+        "first_duplicate_record": null,
+        "max_exact_multiplicity": 1,
+        "repeated_substring_chars": 0,
+        "identity_unique": 0,
+        "identity_duplicate_fraction": null,
+        "characters": 691
+      }
+    },
+    {
+      "id": "repair_relation-loop",
+      "sha256": "458362190f83c90417245e1bd71a344a539fc5cd8eaff90542d3a2c7c1aa5365",
+      "stage": "repair_relation",
+      "observed_metrics": {
+        "records": 369,
+        "unique_records": 51,
+        "duplicate_fraction": 0.8617886178861789,
+        "first_duplicate_record": 52,
+        "max_exact_multiplicity": 54,
+        "repeated_substring_chars": 0,
+        "identity_unique": 51,
+        "identity_duplicate_fraction": 0.8617886178861789,
+        "characters": 41170
+      }
+    },
+    {
+      "id": "repair_relation-normal",
+      "sha256": "814cd4ccc7c43c4eb418e4b5864f66f8a032caa8239c7663cfb01efffda33815",
+      "stage": "repair_relation",
+      "observed_metrics": {
+        "records": 2,
+        "unique_records": 2,
+        "duplicate_fraction": 0.0,
+        "first_duplicate_record": null,
+        "max_exact_multiplicity": 1,
+        "repeated_substring_chars": 0,
+        "identity_unique": 2,
+        "identity_duplicate_fraction": 0.0,
+        "characters": 329
+      }
+    },
+    {
+      "id": "entity-density-high",
+      "sha256": "120d6098a1006c57c6e7db4946ee3931400c60a043f65ebdf2742ff917422c2e",
+      "stage": "entity",
+      "synthetic": true
+    },
+    {
+      "id": "entity-density-low",
+      "sha256": "f6dbae14c33015e3f16f589d68c9f880a9978782a7f7255d87509bfb92418e29",
+      "stage": "entity",
+      "synthetic": true
+    }
+  ],
+  "provenance": "88 existing traces, frozen original prompts; no provider credentials",
+  "privacy": "Internal source document excerpts. Do not publish externally.",
+  "hash_encoding": "UTF-8 with LF line endings",
+  "provider_contract": {
+    "provider": "siliconflow",
+    "model": "deepseek-ai/DeepSeek-V4-Flash",
+    "thinking": {
+      "type": "disabled"
+    },
+    "baseline_temperature": 0,
+    "screen_max_tokens": 8192,
+    "confirm_max_tokens": 16384,
+    "timeout_seconds": 180,
+    "max_retries": 0,
+    "concurrency": 2
+  },
+  "annotation_contract": {
+    "reviewer": "agent",
+    "label_status": "agent-reviewed / provisional",
+    "independent_human_review": false,
+    "independent_human_gold": false
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "id": "repair_relation-normal",
+  "source": "/app/backend/tmp/extraction-traces/20261011/8e6d0c86305b48ac813ed224a7cebc9f/000049-call-response.json",
+  "source_call_sha256": "034aad12cb6de49c1ba95cd8f0e7cc61d63d999aad9cb4f70457128d0ce6931f",
+  "call": {
+    "recorded_at": "2026-10-11T08:21:31.862203+00:00",
+    "context": {
+      "pass_name": "repair_relation",
+      "chunk_id": "repair-2.part-0",
+      "attempt_number": 1,
+      "response_mode": "jsonl",
+      "record_table": false
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4\n你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。\n只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。\n\n[核心原则]\n- 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。\n- mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。\n- evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。\n- 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。\n\n[实体提取规则]\n- 优先提取显式命名的实体。\n- 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。\n- 同类型实体的 mention 长度应合理（避免截断或过度包含）。\n- 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。\n- 数值、单位、标量属性值、字段标签和修饰词不是独立实体。\n- 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。\n\n[关系提取规则]\n- 只提取原文明确表达的关系。\n- 避免推测性关系，不得虚构端点。\n- 关系必须符合 ontology 声明的签名。\n- 结构/证据类关系（如 HAS_PART、EVIDENCED_BY、sourceAgent、targetAgent）在 ontology 签名允许时应输出。\n\n[属性提取规则]\n- 字面属性（编号、名称、日期、数值、单位、原文引文等）必须逐字或按本体规范化值来自原文。\n- 描述、目的、职责、范围、类别、预期结果等语义属性可忠实归纳，但不得引入证据之外的新事实。\n- ICS/CCS 分类名称等公认标准编码值可依据规范编码表补全，但不得臆造编码或分类名。\n- 避免填充原文不支持的属性；原文确实为空/缺失时按本轮 schema 允许的空值表达，不要臆造。\n- 枚举属性多项时尽量全部提取。\n- 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。\n"
+      },
+      {
+        "role": "user",
+        "content": "## task\nrepair\n\n## task discipline\n只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。\n\n## resolved route\nkind=generic; source=fallback; reasons=route.chunks.standard.lexical, route.fallback.low_score\n\n## ontology catalog\n- `关注点` -> type `Concern`\n  - `关注点标识` -> `concernId` (String)\n  - `名称` -> `name` (String)\n  - `类型` -> `type` (String)\n  - `描述` -> `description` (String)\n  - `问题列表` -> `problems` (String)\n- `问题` -> type `Problem`\n  - `问题标识` -> `ProblemId` (String)\n  - `问题名称` -> `ProblemName` (String)\n  - `问题描述` -> `ProblemDescription` (String)\n  - `坐标系` -> `Coordinates` (Map<DimensionID.ScaleID>)\n  - `目标对象` -> `TargetObject` (TargetObject)\n  - `问题目标` -> `ProblemGoal` (String)\n  - `约束条件` -> `Constraints` (String)\n  - `干系人` -> `Stakeholder` (Stakeholder)\n  - `关注点` -> `Concern` (Concern)\n  - `问题类型` -> `ProblemType` (problemType)\n  - `子问题` -> `ChildernProblem` (Problem[])\n- `方案` -> type `Solution`\n  - `方案标识` -> `solutionId` (String)\n  - `方案名称` -> `solutionName` (String)\n  - `方案描述` -> `solutionDescription` (String)\n  - `方案类别` -> `SolutionCategory` (SolutionCategory)\n  - `解决方案目标` -> `SolutionGoal` (String)\n  - `输入` -> `Input` (String)\n  - `输出` -> `Output` (String)\n  - `约束` -> `Constraint` (String)\n  - `资源需求` -> `resourceRequirements` (KnowledgeResource)\n  - `覆盖的维度` -> `coverDimensions` (Map<DimensionID.ScaleID>)\n  - `方案模板` -> `SolutionTemple` (ActivityDiagram)\n  - `验证规则` -> `valaditionRule` (String)\n- `利益相关者` -> type `Stakeholder`\n  - `利益相关者标识` -> `stakeholderId` (String)\n  - `名称` -> `name` (String)\n  - `角色` -> `role` (String)\n  - `组织` -> `organization` (String)\n  - `利益诉求` -> `interest` (String)\n  - `责任域` -> `responsibilityDomain` (String)\n- `Term` -> type `Term`；identity: name\n  - `name` -> `name` (String)\n  - `definition` -> `definition` (String)\n  - `synonyms` -> `synonyms` (String[])\n  - `domain` -> `domain` (String)\n  - `tags` -> `tags` (String[])\n\n## ontology feature catalog\n- `Concern`\n  - `concernId` (String)\n  - `name` (String)\n  - `type` (String)\n  - `description` (String)\n  - `problems` (String)\n- `Problem`\n  - `ProblemId` (String)\n  - `ProblemName` (String)\n  - `ProblemDescription` (String)\n  - `Coordinates` (Map<DimensionID.ScaleID>)\n  - `TargetObject` (TargetObject)\n  - `ProblemGoal` (String)\n  - `Constraints` (String)\n  - `Stakeholder` (Stakeholder)\n  - `Concern` (Concern)\n  - `ProblemType` (problemType)\n  - `ChildernProblem` (Problem[])\n- `Solution`\n  - `solutionId` (String)\n  - `solutionName` (String)\n  - `solutionDescription` (String)\n  - `SolutionCategory` (SolutionCategory)\n  - `SolutionGoal` (String)\n  - `Input` (String)\n  - `Output` (String)\n  - `Constraint` (String)\n  - `resourceRequirements` (KnowledgeResource)\n  - `coverDimensions` (Map<DimensionID.ScaleID>)\n  - `SolutionTemple` (ActivityDiagram)\n  - `valaditionRule` (String)\n- `Stakeholder`\n  - `stakeholderId` (String)\n  - `name` (String)\n  - `role` (String)\n  - `organization` (String)\n  - `interest` (String)\n  - `responsibilityDomain` (String)\n- `Term`\n  - `name` (String)\n  - `definition` (String)\n  - `synonyms` (String[])\n  - `domain` (String)\n  - `tags` (String[])\n\n## ontology relation signatures\n`Concern` -[`is a matter of importance to`]-> `Stakeholder`\n`Problem` -[`需要方案`]-> `Solution`\n\n## output schema\n{\"additionalProperties\": false, \"properties\": {\"relations\": {\"items\": {\"additionalProperties\": false, \"properties\": {\"evidence\": {\"additionalProperties\": false, \"properties\": {\"quote\": {\"type\": \"string\"}}, \"required\": [\"quote\"], \"type\": \"object\"}, \"from_id\": {\"pattern\": \"^entity-\\\\d+$\", \"type\": \"string\"}, \"rel_type\": {\"enum\": [\"is a matter of importance to\", \"需要方案\"], \"type\": \"string\"}, \"to_id\": {\"pattern\": \"^entity-\\\\d+$\", \"type\": \"string\"}}, \"required\": [\"from_id\", \"rel_type\", \"to_id\", \"evidence\"], \"type\": \"object\"}, \"type\": \"array\"}}, \"required\": [\"relations\"], \"type\": \"object\"}\n\n## output constraints\n- 只输出 JSON object；没有结果时输出 按本轮 schema 输出 JSON object。\n- evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。\n - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。\n\n\n## known entities\n| id | type | name | properties | missing_properties |\n| --- | --- | --- | --- | --- |\n| `entity-0` | `Stakeholder` | 信号维修工程师 | stakeholderId=SH_DIAG_001, role=故障诊断与维修执行人员, organization=轨道交通装备维护部门, interest=根据故障现象快速定位故障原因，并获得可执行的维修建议, responsibilityDomain=系统故障诊断与处理 |\n| `entity-1` | `Concern` | 基于故障现象的故障原因定位 | concernId=CON_DIAG_001, type=故障诊断关注点, description=针对故障样例数据中的故障状况、所属系统、故障详细分类等信息，利用故障规则推理可能的故障原因。 |\n| `entity-2` | `Term` | 故障现象 | definition=故障发生时在现场被观察、记录或感知到的异常状态、异常行为或异常事件，是故障诊断过程中的主要输入信息。通常包括故障发生时间、地点、列车或设备对象、运行状态、异常表现及初步处置情况等内容，用于支持后续基于规则、知识图谱或专家经验的故障原因推理。, synonyms=['故障状况', '故障描述', '异常现象', '故障表现', '现场故障记录', '故障事件描述'], domain=轨道交通信号设备故障诊断, tags=['故障诊断', '输入信息', '异常状态'] |\n| `entity-3` | `Term` | 所属系统 | definition=故障现象或故障事件归属的设备系统或业务系统，用于明确故障诊断的对象范围和专业边界。在轨道交通信号设备故障诊断中，所属系统可包括 ATP/ATO、ATS、SICAS 等系统。, synonyms=['故障系统', '设备系统', '子系统', '系统类别', '故障所属专业'], domain=轨道交通信号设备故障诊断, tags=['故障诊断', '设备系统', '业务系统'] |\n| `entity-4` | `Term` | 故障原因 | definition=导致故障现象发生的直接原因或根本原因，是故障诊断推理的目标结果。故障原因可来源于设备部件失效、环境影响、通信异常、电源异常、控制逻辑异常或其他运行条件异常等。, synonyms=['原因', '故障成因', '失效原因', '根本原因', '直接原因', '诊断原因'], domain=轨道交通信号设备故障诊断, tags=['故障诊断', '目标结果', '推理'] |\n| `entity-5` | `Term` | 处理方法 | definition=针对已发生故障采取的维修、调整、复位、更换、重启或其他恢复措施，用于消除故障影响、恢复系统正常运行，并可作为后续维修方案生成和知识复用的依据。, synonyms=['处置方法', '维修措施', '处理措施', '恢复方法', '解决方案', '故障处理办法'], domain=轨道交通信号设备故障诊断, tags=['维修', '恢复措施', '故障处理'] |\n| `entity-6` | `Term` | 故障详细分类 | definition=根据故障现象、故障对象、故障部件或故障表现对故障事件进行细粒度划分的类别信息，用于故障统计、规则抽取、诊断匹配和知识图谱分类管理。, synonyms=['故障类型', '故障类别', '详细故障类别', '故障小类', '故障分类项'], domain=轨道交通信号设备故障诊断, tags=['故障分类', '故障统计', '规则抽取', '诊断匹配', '知识图谱'] |\n| `entity-7` | `Term` | 故障地点 | definition=故障事件发生或被发现的空间位置，通常包括车站、区间、线路、联锁区、轨道区段或设备安装位置等，用于支持故障定位、区域统计和现场维修派工。, synonyms=['发生地点', '故障位置', '故障发生位置', '站点', '区段', '设备位置'], domain=轨道交通信号设备故障诊断, tags=['故障定位', '区域统计', '维修派工', '空间位置'] |\n| `entity-8` | `Term` | 车次 | definition=发生故障或受故障影响的运营列车编号或运行车次，用于关联故障事件与具体列车运行任务，支持故障追踪、运行影响分析和维修记录管理。, synonyms=['列车号', '运营车次', '车辆编号', '列车编号', '故障车次'], domain=轨道交通信号设备故障诊断, tags=['列车编号', '运行任务', '故障追踪', '运行影响分析', '维修记录'] |\n| `entity-9` | `Term` | 是否晚点 | definition=用于标识故障事件是否对列车运行造成晚点或延误影响的状态信息，是评估故障运行影响程度和服务质量影响的重要指标。, synonyms=['晚点标识', '是否延误', '运行影响标识', '延误状态'], domain=轨道交通信号设备故障诊断, tags=['晚点', '延误', '运行影响', '服务质量'] |\n| `entity-10` | `Term` | 故障次数 | definition=在指定统计周期、指定系统、指定地点或指定故障类别下，故障事件发生的累计数量，用于故障频次分析、可靠性评估和重点故障识别。, synonyms=['发生次数', '故障发生次数', '故障数量', '故障频次', '事件次数'], domain=轨道交通信号设备故障诊断, tags=['故障频次', '可靠性评估', '重点故障识别', '统计'] |\n| `entity-11` | `Term` | 对标不准 | definition=列车在车站停车时，实际停车位置与规定停车标位置之间存在明显偏差，导致列车车门、站台门或屏蔽门联动条件异常，可能引起车门无法正常打开、屏蔽门无法联动或开门使能信号异常等问题。, synonyms=['停车对标不准', '停车位置偏差', '对位偏差', '列车停车偏差', '停车精度异常'], domain=轨道交通信号设备故障诊断, tags=['停车偏差', '屏蔽门联动', '开门使能', 'ATP/ATO'] |\n| `entity-12` | `Term` | 屏蔽门不能联动 | definition=列车到站停车并满足开关门条件后，屏蔽门未能按照联动控制逻辑随列车车门同步打开或关闭的异常现象。该类故障可能与对标偏差、开门使能信号异常、多路接收器工作不稳定或相关控制板卡异常有关。, synonyms=['屏蔽门联动失败', '屏蔽门未联动', '站台门不能联动', '屏蔽门不能联动打开', '屏蔽门不能联动关闭'], domain=轨道交通信号设备故障诊断, tags=['屏蔽门', '联动', '故障', '信号系统'] |\n| `entity-13` | `Term` | 轨道电路异常 | definition=轨道电路区段状态显示异常或占用状态异常的故障现象，可能表现为红光带、粉红光带、区段异常占用或逻辑空闲后恢复等情况。该类故障通常用于判断轨道区段检测、接收端设备、调谐单元或环境状态是否存在异常。, synonyms=['轨道电路故障', '红光带', '粉红光带', '轨道区段异常', '轨道区段占用异常'], domain=轨道交通信号设备故障诊断, tags=['轨道电路', '红光带', '粉红光带', '故障', '信号系统'] |\n| `entity-14` | `Term` | RTU报警 | definition=远程终端单元 RTU 在运行、巡检或监控过程中产生报警信息，表示现场设备采集、通信、状态监测或控制链路存在异常，需要通过重启、检查通信链路或进一步诊断确认故障原因。, synonyms=['RTU告警', 'RTU报警信息', '远程终端报警', '远程终端单元告警'], domain=轨道交通信号设备故障诊断, tags=['RTU', '远程终端单元', '报警', '故障', 'ATS系统'] |\n| `entity-15` | `Term` | 电源板异常 | definition=设备电源板或电源模块在供电过程中出现输出不稳定、电压异常或工作状态异常，可能导致信号屏黑屏、ATO灯不亮、设备复位或系统功能异常等故障现象。, synonyms=['电源板故障', '电源模块异常', '5V电源板异常', '电源板工作不稳定', '供电板卡异常'], domain=轨道交通信号设备故障诊断, tags=['电源板', '电源模块', '供电', '故障', 'ATP/ATO系统'] |\n| `entity-16` | `Term` | 运营停车点不能自动取消 | definition=列车运行过程中，系统设置的运营停车点在满足取消条件后未能自动取消，导致列车运行控制或调度组织受到影响，需要通过信号人员处理、系统检查或相关逻辑恢复操作使其恢复正常。, synonyms=['运营停车点未自动取消', '停车点不能取消', '停车点取消失败', '运营停车点异常'], domain=轨道交通信号设备故障诊断, tags=['运营停车点', '停车点', '取消', '故障', 'ATS系统'] |\n| `entity-17` | `Term` | 开门使能信号异常 | definition=列车到站后未能正常接收或输出开门使能信号，导致车门或屏蔽门无法按正常逻辑打开，需要通过人工强制开门按钮、信号复位或相关设备检查进行处理。, synonyms=['开门使能信号缺失', '未收到开门使能信号', '开门授权异常', '车门使能异常'], domain=轨道交通信号设备故障诊断, tags=['开门使能信号', '车门', '屏蔽门', '故障', '信号系统'] |\n| `entity-18` | `Term` | 同步环线检测板异常 | definition=同步环线检测板在列车定位、站台门联动或相关信号检测过程中出现工作异常，可能导致列车对标偏差、屏蔽门无法联动或站台门控制异常等故障现象。, synonyms=['同步环线检测板故障', '同步环线板卡异常', '检测板异常', '同步环线检测异常'], domain=轨道交通信号设备故障诊断, tags=['故障现象', '同步环线检测板', '信号检测', '站台门联动'] |\n| `entity-19` | `Term` | 同步环线报警板异常 | definition=同步环线报警板在监测或报警过程中出现异常，可能影响列车与站台设备之间的联动判断、报警反馈或开门控制逻辑，导致对标不准、开门使能异常或屏蔽门联动异常等现象。, synonyms=['同步环线报警板故障', '报警板异常', '同步环线报警异常', '同步环线板卡故障'], domain=轨道交通信号设备故障诊断, tags=['故障现象', '同步环线报警板', '报警', '开门控制'] |\n| `entity-20` | `Term` | 多路接收器CPU850工作不稳定 | definition=多路接收器中的 CPU850 模块在运行过程中出现工作状态不稳定，导致相关信号接收、处理或联动控制异常，可能引发屏蔽门不能联动打开或关闭等故障现象。, synonyms=['CPU850工作不稳定', '多路接收器异常', 'CPU850模块异常', '多路接收器CPU异常'], domain=轨道交通信号设备故障诊断, tags=['故障现象', '多路接收器', 'CPU850', '屏蔽门联动'] |\n| `entity-21` | `Term` | 接收端轨旁盒潮湿 | definition=轨道电路接收端轨旁盒内部存在潮湿、受潮或环境湿度异常情况，可能影响接收端调谐单元、转换单元或相关电气部件的正常工作，导致轨道电路区段状态异常。, synonyms=['轨旁盒潮湿', '接收端受潮', '轨旁设备受潮', '接收端环境潮湿'], domain=轨道交通信号设备故障诊断, tags=['故障现象', '接收端轨旁盒', '潮湿', '轨道电路'] |\n| `entity-22` | `Term` | ATP/ATO系统 | definition=列车自动防护系统与列车自动运行系统的组合，用于保障列车运行安全、速度控制、停车控制、自动驾驶以及与车门、屏蔽门等设备之间的联动控制。附件样例中，对标不准、屏蔽门不能联动、电源板异常等故障均归属于该系统。, synonyms=['ATP/ATO', '列车自动防护与自动运行系统', '自动防护自动运行系统', '列控系统'], domain=轨道交通信号设备故障诊断, tags=['系统', 'ATP/ATO', '列车自动防护', '列车自动运行', '联动控制'] |\n| `entity-23` | `Term` | ATS系统 | definition=列车自动监控系统，用于对列车运行状态、运营停车点、调度控制和现场设备状态进行监视与控制。附件样例中，RTU报警、运营停车点不能自动取消等故障归属于该系统。, synonyms=['ATS', '列车自动监控系统', '自动监控系统', '调度监控系统'], domain=轨道交通信号设备故障诊断, tags=['系统', 'ATS', '列车自动监控', '调度控制'] |\n| `entity-24` | `Term` | SICAS系统 | definition=计算机联锁系统，用于实现车站或线路区段内进路、信号机、道岔、轨道电路等设备之间的联锁控制与状态监测。附件样例中，轨道电路红光带、粉红光带等异常归属于该系统。, synonyms=['SICAS', '计算机联锁系统', '联锁系统', '信号联锁系统'], domain=轨道交通信号设备故障诊断, tags=['计算机联锁系统', '联锁控制', '状态监测', '轨道电路', '信号设备'] |\n（共 39 个实体，repair 仅展示前 25 个）\n\n## local context\n（无）\n\n## current chunk\n{\"chunk_id\": \"repair-2\", \"text\": \"// 术语名称: SICAS系统\\n\\n// 术语定义（术语标准定义）:\\n\\n计算机联锁系统，用于实现车站或线路区段内进路、信号机、道岔、轨道电路等设备之间的联锁控制与状态监测。附件样例中，轨道电路红光带、粉红光带等异常归属于该系统。\\n\\n// 同义词: SICAS、计算机联锁系统、联锁系统、信号联锁系统\\n\\n#### 问题类：\\n\\nobject 基于故障规则的故障诊断问题_01 <<Problem>> {\\n\\n问题标识 (ProblemId) = \\\"PROB_FAULT_DIAG_RULE_001\\\"\\n\\n问题名称 (ProblemName) = \\\"基于故障规则的故障原因诊断\\\"\\n\\n问题描述 (ProblemDescription) = \\\"面向轨道交通运维诊断场景，基于故障样例数据中抽取的故障规则，根据输入的故障现象、所属系统、故障详细分类、故障地点等信息，匹配相应诊断规则，推理可能的故障原因。\\\"\\n\\n坐标系 (Coordinates) = {\\n\\n时间.年月\\n\\n空间.子公司\\n\\n抽象层级.逻辑\\n\\n运营.运维诊断域\\n\\n约束方面.规则\\n\\n}\\n\\n目标对象 (TargetObject) = \\\"故障事件 / 故障现象 / 故障规则 / 故障原因\\\"\\n\\n问题目标 (ProblemGoal) = \\\"根据已知故障现象，利用故障规则推理并输出可能的故障原因，为维修人员提供可解释的诊断依据。\\\"\\n\\n约束条件 (Constraints) = \\\"诊断过程必须基于已抽取的故障规则；规则匹配需考虑所属系统、故障详细分类、故障地点、时间等条件；诊断结果应能够追溯到对应规则和原始故障样例；同一故障现象可输出一个或多个候选故障原因。\\\"\\n\\n干系人 (Stakeholder) = \\\"信号维修工程师_01\\\"\\n\\n关注点 (Concern) = \\\"故障原因定位_01\\\"\\n\\n问题类型 (ProblemType) = \\\"DIAGNOSTIC\\\"\\n\\n子问题 (ChildernProblem) = [\\n\\n\\\"故障现象识别问题_01\\\",\\n\\n\\\"故障规则匹配问题_01\\\",\\n\\n\\\"故障原因推理问题_01\\\",\\n\\n\\\"诊断结果解释问题_01\\\"\\n\\n]\\n\\n}\\n\\n#### 方案类：\\n\\nobject 基于故障规则的故障诊断方案_01 <<Solution>> {\\n\\n方案标识 (solutionId) = \\\"SOL_FAULT_DIAG_RULE_001\\\"\\n\\n方案名称 (solutionName) = \\\"基于故障规则的故障诊断方案\\\"\\n\\n方案描述 (solutionDescription) = \\\"面向轨道交通运维诊断场景，基于故障样例数据中抽取形成的故障规则，将输入的故障现象、所属系统、故障详细分类、故障地点等信息与规则库进行匹配，推理可能的故障原因，并输出对应的诊断依据和处理建议。\\\"\\n\\n方案类别 (SolutionCategory) = \\\"Diagnosis\\\"\\n\\n解决方案目标 (SolutionGoal) = \\\"根据已知故障现象快速定位可能故障原因，实现由故障现象到故障原因的规则化、可解释诊断。\\\"\\n\\n输入 (Input) = \\\"故障现象、所属系统、故障详细分类、故障地点、故障时间、车次、是否晚点等故障记录信息\\\"\\n\\n输出 (Output) = \\\"候选故障原因、匹配到的故障规则、诊断置信依据、建议处理方法\\\"\\n\\n约束 (Constraint) = \\\"诊断结果必须来源于已建立的故障规则；规则匹配应优先考虑所属系统、故障详细分类和故障现象；当多个规则同时匹配时，应输出多个候选原因并保留规则依据；诊断结果应能够追溯到原始故障样例数据。\\\"\\n\\n资源需求 (resourceRequirements) = \\\"故障术语、故障规则\\\"\\n\\n覆盖的维度 (coverDimensions) = {\\n\\n时间.年月\\n\\n空间.子公司\\n\\n抽象层级.逻辑\\n\\n运营.运维诊断域\\n\\n约束方面.规则\\n\\n}\\n\\n方案模板 (SolutionTemple) =\\n\\n“\\n\\n步骤1：故障规则匹配\\n\\n输入：故障规则匹配条件集、故障规则库\\n\\n处理：匹配规则前件\\n\\n输出：匹配到的故障规则集合\\n\\n约束：多条规则匹配时保留全部候选规则\\n\\n步骤2：故障原因推理\\n\\n输入：匹配到的故障规则集合\\n\\n处理：读取规则后件并推理候选原因\\n\\n输出：候选故障原因集合\\n\\n约束：故障原因必须来源于规则后件\\n\\n步骤3：诊断结果生成\\n\\n输入：候选故障原因、匹配规则\\n\\n处理：生成结构化诊断结果\\n\\n输出：故障诊断报告\\n\\n约束：结果必须可解释、可追溯\\n\\n”\\n\\n验证规则 (valaditionRule) = \\\"若输入故障现象能够匹配到至少一条有效故障规则，并输出与规则后件一致的故障原因，同时诊断结果能够追溯到对应规则和原始样例，则认为该方案有效。\\\"\\n\\n}\"}\n\n## repair issues\n[{\"code\": \"REQUIRED_RELATION_MISSING\", \"context\": {\"evidence\": \"基于故障规则的故障诊断方案\", \"expected_features\": [], \"expected_relations\": [\"需要方案\"], \"gap_id\": \"generic-relation_coverage-14\", \"gap_type\": \"relation_coverage\", \"reason\": \"Solution::基于故障规则的故障诊断方案 缺少入向必需关系 需要方案（源端基数 1）\", \"severity\": \"info\", \"span_id\": \"chunk-0001:993:1030\", \"target_type\": \"Solution\"}, \"message\": \"Solution::基于故障规则的故障诊断方案 缺少入向必需关系 需要方案（源端基数 1）\", \"path\": \"chunk-0001:993:1030\", \"repair_type\": \"required_relation\", \"severity\": \"warning\"}, {\"code\": \"REQUIRED_RELATION_MISSING\", \"context\": {\"evidence\": \"信号维修工程师_01\", \"expected_features\": [], \"expected_relations\": [\"is a matter of importance to\"], \"gap_id\": \"generic-relation_coverage-15\", \"gap_type\": \"relation_coverage\", \"reason\": \"Stakeholder::信号维修工程师_01 缺少入向必需关系 is a matter of importance to（源端基数 1）\", \"severity\": \"info\", \"span_id\": \"chunk-0001:701:733\", \"target_type\": \"Stakeholder\"}, \"message\": \"Stakeholder::信号维修工程师_01 缺少入向必需关系 is a matter of importance to（源端基数 1）\", \"path\": \"chunk-0001:701:733\", \"repair_type\": \"required_relation\", \"severity\": \"warning\"}]"
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "properties": {
+        "relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from_id": {
+                "type": "string",
+                "pattern": "^entity-\\d+$"
+              },
+              "rel_type": {
+                "type": "string",
+                "enum": [
+                  "is a matter of importance to",
+                  "需要方案"
+                ]
+              },
+              "to_id": {
+                "type": "string",
+                "pattern": "^entity-\\d+$"
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "quote": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "quote"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "from_id",
+              "rel_type",
+              "to_id",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "relations"
+      ],
+      "additionalProperties": false
+    },
+    "status": "pending"
+  },
+  "reference_policy": "observed unique records are candidates, not gold; agent-reviewed provisional anchors separate; no independent human gold",
+  "observed_metrics": {
+    "records": 2,
+    "unique_records": 2,
+    "duplicate_fraction": 0.0,
+    "first_duplicate_record": null,
+    "max_exact_multiplicity": 1,
+    "repeated_substring_chars": 0,
+    "identity_unique": 2,
+    "identity_duplicate_fraction": 0.0,
+    "characters": 329
+  },
+  "observed_finish": "stop",
+  "reference_anchors": [],
+  "quality_labels": {
+    "expected_behavior": "finite grounded records; no repeated records or repeated substrings",
+    "coverage_warning": "short_chunk changes scope; compare covered text only",
+    "agent_review_status": "anchors only; unique outputs are not gold",
+    "independent_human_review": false,
+    "label_status": "agent-reviewed / provisional"
+  },
+  "source_model_config": {
+    "version": "v2",
+    "provider": "siliconflow",
+    "model": "deepseek-ai/DeepSeek-V4-Flash",
+    "max_tokens": null
+  },
+  "observed_usage": {
+    "completion_tokens": 125,
+    "prompt_tokens": 6477,
+    "total_tokens": 6602,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": null,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cached_tokens": 512
+    },
+    "prompt_cache_hit_tokens": 512,
+    "prompt_cache_miss_tokens": 5965
+  }
+}
