@@ -178,6 +178,19 @@ flowchart TD
 
 每次 HTTP 请求都会创建独立的 `AgentState`。LLM 调用次数计入 `spent.turns`，实际发起的工具调用数量计入 `spent.tool_calls`。
 
+### 问题分解与并行子问题
+
+worker 领取任务后先经过 `decompose.run_orchestrated` 入口（`agentcode/decompose.py`）：
+
+1. **预调用**：一次轻量 LLM 调用判断问题是否包含 ≥2 个相互独立的信息需求，输出子问题 DAG（`sub_problems` + `depends_on`）与全局约束；
+2. **门控**：不分解 / 解析失败 / 子问题少于 2 个 / 没有可并行的层（纯串行链）→ 走与原先逐字节等价的直连路径，任务行为不变；
+3. **分层执行**：独立子问题在同任务内开线程并行求解（每个子会话独占一个 ToolManager，`search_terms` 直接进子问题提示词），依赖型子问题等前置子问题产出 answer-v1 后把其结论作为输入再求解；前置失败的后代级联跳过并记入 `gaps`；
+4. **合并**：evidence/charts/assumptions/gaps 由系统程序化去重合并（不依赖模型自觉），LLM 只撰写 conclusion 等叙述字段；合并输出两次不过 `answer-v1` 校验时程序化保守合并（低置信度交付）。
+
+SSE 事件为增量标注：新增 `decompose`（计划）、`subtask_status`（子问题状态）事件类型，并行子问题的 `token`/`reasoning`/`tool_result`/`trace` 事件额外携带 `subtask` 字段；`spent` 新增 `subtasks` 明细。关闭开关后事件流与原先逐字节等价。
+
+**要获得实际加速需让池大于并发**：并行子问题各需独占一个 ToolManager，`AGENT_WORKER_POOL_SIZE` 应大于 `AGENT_WORKER_CONCURRENCY`（建议 3）；池不足时自动降级为串行子问题，正确性不变、只是不提速。
+
 ## 任务状态
 
 ```text
@@ -230,7 +243,10 @@ result = runtime.run_session(
 | `AGENT_TEMPLATE_TIMEOUT_SECONDS` | `120` | 单次模型请求超时 |
 | `AGENT_API_WORKERS` | `1` | API 进程数 |
 | `AGENT_WORKER_CONCURRENCY` | `1` | 每个 API 进程的 Worker 线程数 |
-| `AGENT_WORKER_POOL_SIZE` | 等于 concurrency | 每进程 MCP 连接池大小 |
+| `AGENT_WORKER_POOL_SIZE` | 等于 concurrency | 每进程 MCP 连接池大小；启用问题分解时建议大于并发数（如 3） |
+| `AGENT_DECOMPOSITION_ENABLED` | `1` | 问题分解开关；`0` 时所有任务走直连路径 |
+| `AGENT_DECOMPOSE_MAX_SUBPROBLEMS` | `4`（钳 2..8） | 单次分解最多子问题数 |
+| `AGENT_DECOMPOSE_MAX_PARALLEL` | `3`（钳 1..8） | 子问题最大并行宽度 |
 | `TASK_STORE_REDIS_URL` | `redis://localhost:6379/0` | Redis 地址；多进程必需 |
 | `TASK_STORE_VISIBILITY_TIMEOUT` | `1500` | Worker 失联后的任务回收时间 |
 | `TASK_STORE_TASK_TTL` | `86400` | 任务和结果保留时间 |
@@ -270,6 +286,7 @@ Shell 资源限制测试依赖 POSIX `resource`，在 Windows 上会自动跳过
 | `agentcode/runtime.py` | Agent 主循环、预算、取消和 Delivery 校验 |
 | `agentcode/api.py` | FastAPI、请求入队、鉴权头捕获、查询、取消和 SSE 端点 |
 | `agentcode/worker.py` | Worker 消费循环、鉴权头恢复绑定和 LLM HTTP 适配 |
+| `agentcode/decompose.py` | 问题分解预调用、子问题并行编排与 answer-v1 合并 |
 | `agentcode/task_store.py` | Redis/内存任务队列、租约、结果、事件日志和 auth context 暂存 |
 | `agentcode/identity.py` | 任务归属指纹（租户/用户/token 指纹）与匹配 |
 | `agentcode/delivery.py` | 终稿投递 schema 定义 |
