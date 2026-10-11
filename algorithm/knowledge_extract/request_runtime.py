@@ -145,7 +145,7 @@ def create_request_llm(config: dict[str, Any]):
     version = config["version"]
     package = "v3_1" if version == "v3.1" else version
     module = importlib.import_module(f"algorithm.knowledge_extract.{package}.llm_client")
-    factory = module.create_client if version == "v3.1" else module.create_llm_client
+    factory = module.create_llm_client
     credential = os.getenv(config["api_key_env"], "")
     if config["provider"] != "default" and not credential.strip():
         raise ValueError("Extraction provider credential is not configured")

@@ -134,11 +134,12 @@ def test_run_aggregate_feeds_field_dicts_to_v3_and_latest(monkeypatch):
 
 
 @pytest.mark.parametrize("label", ["v2", "v3.1"])
-def test_run_aggregate_feeds_v2_chunk_objects(monkeypatch, label):
-    """v2 与 v3.1 都复用 V2 的 ExtractionChunk 输入契约。"""
+def test_run_aggregate_feeds_version_specific_chunk_objects(monkeypatch, label):
+    """v2 与 v3.1 分别接收各自包的 ExtractionChunk，保留来源元数据。"""
     from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk as V2Chunk
 
-    expected_type = V2Chunk
+    from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk as V31Chunk
+    expected_type = V31Chunk if label == "v3.1" else V2Chunk
 
     captured = {}
 

@@ -64,7 +64,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Unsupported extraction version")
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
-    package = "v2" if version in {"v3.1", "jev"} else version
+    package = {"v3.1": "v3_1", "jev": "v2"}.get(version, version)
     defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
     provider = options.get("provider") or "default"
     if provider == "default":
@@ -95,8 +95,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
     if version == "v3.1":
         if provider == "default":
             values["request_timeout"] = float(os.getenv("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
-            from algorithm.knowledge_extract.v3_1.llm_client import thinking_disabled
-            values["disable_thinking"] = thinking_disabled()
+            values["disable_thinking"] = defaults["disable_thinking"]
         document_timeout = float(os.getenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "900"))
     else:
         document_timeout = None
@@ -113,7 +112,7 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
         "max_tokens", "max_input_tokens", "max_output_tokens", "disable_thinking",
         "api_mode", "thinking_parameter", "response_format",
     )}
-    if config.get("version") in {"v2", "v3", "latest", "v3.1"}:
+    if config.get("version") in {"v2", "v3", "latest"}:
         # Provider profiles can retain legacy preferences, but extraction no
         # longer sends a response_format parameter on the wire.
         result.update(response_format=None, output_format="jsonl", api_mode="chat")

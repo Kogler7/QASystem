@@ -284,3 +284,18 @@ def test_pipeline_http_preserves_same_overrides(providers, protocol_module):
     effective = response.json()["data"]["extraction"]["quality"]["effective_config"]
     assert effective["version"] == "v3"
     assert effective["provider"] == "siliconflow" and effective["document_timeout"] == 60
+
+
+def test_refactored_v31_default_config_and_live_factory(monkeypatch):
+    from algorithm.knowledge_extract.v3_1 import llm_client
+    monkeypatch.setenv("KG_EXTRACT_TRACE_DIR", "")
+    chosen = config.resolve_config({"version": "v3.1"})
+    seen = {}
+    def factory(**kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(client=SimpleNamespace())
+    monkeypatch.setattr(llm_client, "create_llm_client", factory)
+    runtime.create_request_llm(chosen)
+    assert seen["model"] == chosen["model"]
+    assert seen["disable_thinking"] == chosen["disable_thinking"]
+    assert config.public_config(chosen).get("output_format") != "jsonl"

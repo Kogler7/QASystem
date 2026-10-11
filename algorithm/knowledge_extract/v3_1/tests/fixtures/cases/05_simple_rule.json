@@ -1,0 +1,26 @@
+{
+  "id": "simple-rule-01",
+  "category": "simple_rule",
+  "name": "简单规则：OpenClaw 通知中的规范性条款",
+  "source": "docs/抽取结果md/结构化抽取-关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知.md（人工检查）",
+  "description": "真实规范性条款映射为 SimpleRule：规则原文（ruleText）、触发条件、执行动作，以及约束对象关系。",
+  "ontology_file": "rule_ontology.puml",
+  "document_type": "general",
+  "target_types": [],
+  "include_subclasses": true,
+  "validation_mode": "strict",
+  "text": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。\n五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+  "expected": {
+    "entities": [
+      {"type": "SimpleRule", "name": "R-001", "properties": {"ruleId": "R-001", "ruleText": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。", "triggerCondition": "使用办公设备访问网络", "action": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用"}, "evidence": {"quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。"}},
+      {"type": "SimpleRule", "name": "R-002", "properties": {"ruleId": "R-002", "ruleText": "一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。", "triggerCondition": "发现或获知开源智能体引发的本企业安全事件", "action": "第一时间处置，并向集团报告"}, "evidence": {"quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。"}},
+      {"type": "Object", "name": "办公设备", "properties": {"objectName": "办公设备"}, "evidence": {"quote": "禁止计算机等办公设备内、外网混用"}},
+      {"type": "Object", "name": "开源智能体", "properties": {"objectName": "开源智能体"}, "evidence": {"quote": "开源智能体引发的本企业安全事件"}}
+    ],
+    "relations": [
+      {"from_type": "SimpleRule", "from_name": "R-001", "rel_type": "constrainsObject", "to_type": "Object", "to_name": "办公设备"},
+      {"from_type": "SimpleRule", "from_name": "R-002", "rel_type": "constrainsObject", "to_type": "Object", "to_name": "开源智能体"}
+    ]
+  },
+  "notes": "ruleId 为基准集分配的稳定编号；ruleText 取原文条款；triggerCondition/action 为条款语义拆解（按 SimpleRule 属性定义）。"
+}

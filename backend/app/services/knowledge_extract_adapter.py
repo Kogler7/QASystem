@@ -12,7 +12,7 @@ environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 
 * ``latest`` (default): runs the independent ``latest`` package through the
   same per-chunk projection.
-* ``v2`` / ``v3.1``: build V2 ``ExtractionChunk`` objects, run the selected package's
+* ``v2``: build V2 ``ExtractionChunk`` objects, run the selected package's
   ``extract_aggregate`` once, then project the document-level result back onto the
   individual chunks using each entity's evidence anchor, so the caller keeps seeing
   one item per chunk and ``deduplicate_chunk_graphs`` can still rebuild the merged
@@ -312,14 +312,17 @@ def run_aggregate(
                 ke_version.V31: v3_1.extract_aggregate,
                 ke_version.LATEST: latest.extract_aggregate,
             }[label]
-    # v2 / v3.1 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
+    # v2 入口要求 v2 的 ExtractionChunk 实例；v3/v3.1/latest 的入口只认各自包内的
     # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
     # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
     chunks = (
         build_chunks(texts, ranges, metadata)
-        if label in {ke_version.V2, ke_version.V31, ke_version.JEV}
+        if label in {ke_version.V2, ke_version.JEV}
         else _chunk_payloads(texts, ranges, metadata)
     )
+    if label == ke_version.V31:
+        from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
+        chunks = [ExtractionChunk(**payload) for payload in chunks]
     configured: dict[str, Any] = {}
     if extraction_config and label != ke_version.JEV:
         from algorithm.knowledge_extract.request_runtime import create_request_llm
