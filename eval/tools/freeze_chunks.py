@@ -313,8 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     log(f"参数: {params_path}")
     log(f"Backend: {base_url}")
     log(f"切片选项: strategy={chunking.get('strategy')} size={chunking.get('size')} {chunking.get('size_unit')} "
-        f"overlap={chunking.get('chunk_overlap')} breakpoint={chunking.get('breakpoint_method')} "
-        f"threshold={chunking.get('chunk_threshold')}")
+        f"overlap={chunking.get('chunk_overlap')} breakpoint={chunking.get('breakpoint_method')}")
     log(f"批次记录: {run_dir}")
     if args.dry_run:
         log("dry-run：只扫描，不调用 Backend")

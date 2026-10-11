@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "label_kind": "historical_extraction_proxy",
+  "not_human_ground_truth": true,
+  "matching": "original input.text must exactly equal decoded entity-call current chunk.text",
+  "identity": "distinct exact (type, stripped name or mention); aliases not semantically merged",
+  "success_contract": "single root chunk entity parsed event, response completed/returned, finish_reason stop/end_turn, incomplete_details absent; all counts are entity discovery stage only",
+  "excluded": {
+    "multiple_root_entity_calls": 8,
+    "repetitive_outputs": "raw > max(distinct+2, distinct*1.2)",
+    "ambiguous_text_families": 7
+  },
+  "split_policy": "exact text SHA256 family, sorted hash order first rounded 70% calibration; original document IDs unavailable, document clustering insufficient",
+  "selection_policy": "one deterministic lexical trace id per same-text same-bucket family; across-bucket families entirely excluded and sent to review_queue; no majority vote",
+  "counts": {
+    "successful_entity_stage_observations": 90,
+    "unique_text_families": 28,
+    "main_cases": 21,
+    "buckets": {
+      "le20": 18,
+      "21to40": 3
+    },
+    "splits": {
+      "calibration": 15,
+      "test": 6
+    },
+    "review_queue": 7,
+    "historical_versions": [
+      "v2",
+      "v3"
+    ]
+  },
+  "limitations": [
+    "No unambiguous gt40 case; cannot estimate high-density classification accuracy.",
+    "Same bucket across observations does not establish extraction completeness or semantic correctness.",
+    "One-observation families have no repeatability evidence.",
+    "Final graph run may be partial/failed: retained count only refers to independently completed entity discovery call; run_status is recorded.",
+    "Rows with identical text have no cross-split leakage; unknown shared original documents may still leak."
+  ],
+  "files_sha256": {
+    "cases.jsonl": "19cfcfb318924b8324b3c060c96c5494bdc8205a9bde0dc2e181efc97cb95cfe",
+    "calibration.jsonl": "bd0b721096eae49663fdb38e3c5f6eaf82af269593ff3b4f180e05008d278c7d",
+    "test.jsonl": "7fcff56c9762b2676d3a390492ae8f6fb3fb4197735a6d8221c085194fc51cdc",
+    "review_queue.jsonl": "726a60aa35467a1e83f65819f808d484c4871df9615a6ef6897144d85e77cdb5"
+  }
+}

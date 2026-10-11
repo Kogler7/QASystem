@@ -94,7 +94,6 @@ DEFAULT_PARAMS: dict[str, Any] = {
             "strategy": "recursive",
             "size": 4000,
             "chunk_overlap": 50,
-            "chunk_threshold": 12000,
             "similarity": 0.6,
             "separators": None,
             "size_unit": "char",

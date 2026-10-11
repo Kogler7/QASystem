@@ -383,6 +383,18 @@ class DocumentChunkingService:
                 options.chunk_overlap,
                 breakpoint_method=options.breakpoint_method,
             )
+            if options.adaptive_entity_count:
+                # Keep model-backed refinement opt-in and load its dependencies
+                # only when requested; it retains baseline chunks on estimator
+                # failure and records the reason through the refinement logger.
+                from algorithm.knowledge_pipeline.entity_count_chunking import refine_chunks
+                from algorithm.knowledge_pipeline.entity_count_estimator import estimate_entities
+
+                items = refine_chunks(
+                    markdown, items,
+                    lambda text: estimate_entities(text, model=options.entity_count_model),
+                    overlap=options.chunk_overlap, logger=logger,
+                )
         except ValueError as exc:
             code = ErrorCode.CHUNK_OFFSET_FAILED if "字符偏移" in str(exc) else ErrorCode.INVALID_CHUNK_CONFIG
             raise CapabilityError(code, str(exc), "chunking") from exc
