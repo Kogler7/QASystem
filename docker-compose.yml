@@ -80,7 +80,7 @@ services:
       - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
     working_dir: /app
-    command: ["/bin/sh", "-ec", "test -n \"$$CLEF_CUDA_VISIBLE_DEVICES\" || { echo 'Set CLEF_CUDA_VISIBLE_DEVICES to a dedicated GPU'; exit 1; }; exec /opt/qasystem/clef-venv/bin/python -m clef_service"]
+    command: ["/bin/sh", "-ec", "test -n \"$$CLEF_CUDA_VISIBLE_DEVICES\" || { echo 'Set CLEF_CUDA_VISIBLE_DEVICES to a dedicated GPU'; exit 1; }; exec python -m clef_service"]
     healthcheck:
       test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:$$CLEF_PORT/health"]
       interval: 30s
@@ -102,7 +102,7 @@ services:
       - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
     working_dir: /app
-    command: /opt/qasystem/clef-venv/bin/python -m nanojev_service
+    command: python -m nanojev_service
     healthcheck:
       test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:$$NANOJEV_PORT/health"]
       interval: 30s

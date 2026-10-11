@@ -45,12 +45,27 @@ def test_clef_deployment_uses_shared_image_and_read_only_external_assets():
     assert "${QASYSTEM_SOURCE_DIR:-.}:/app:ro" in service["volumes"]
     assert "${HOST_MODELS_DIR:-./deploy/models}:/models:ro" in service["volumes"]
     assert "ports" not in service
-    assert "/opt/qasystem/clef-venv/bin/python" in service["command"][-1]
+    assert "exec python -m clef_service" in service["command"][-1]
     assert "clef_service" in (ROOT / "package-deploy.ps1").read_text(encoding="utf-8")
     nano = compose["services"]["nanojev"]
     assert nano["image"] == service["image"]
     assert nano["volumes"] == service["volumes"]
-    assert "nanojev_service" in nano["command"]
+    assert nano["command"] == "python -m nanojev_service"
+
+
+def test_decision_runtime_reuses_backend_dependency_versions():
+    from packaging.requirements import Requirement
+    def requirements(path):
+        lines = (line.strip() for line in path.read_text(encoding="utf-8").splitlines())
+        return {r.name: r for line in lines if line and not line.startswith("#")
+                for r in [Requirement(line)]}
+    backend = requirements(ROOT / "backend/requirements.txt")
+    decisions = requirements(ROOT / "clef_service/requirements.txt")
+    for name in backend.keys() & decisions.keys():
+        assert decisions[name].specifier == backend[name].specifier, name
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "clef-venv" not in dockerfile
+    assert "python -m pip install" in dockerfile
 
 
 @pytest.mark.parametrize("missing_shard", [False, True])

@@ -2,8 +2,8 @@
 fastapi==0.135.1
 httpx==0.28.1
 jsonschema==4.26.0
-mcp==1.27.0
-pydantic==2.12.3
+mcp==2.0.0
+pydantic==2.14.0
 python-dotenv==1.2.2
 python-multipart==0.0.22
 requests==2.32.5
@@ -11,7 +11,7 @@ redis>=5.0,<8
 uvicorn==0.41.0
 
 # Knowledge extraction and graph access
-openai==2.24.0
+openai==2.25.0
 PyYAML==6.0.3
 
 # Documents and local models
@@ -25,8 +25,9 @@ Pillow>=10.0,<13.0
 pypdf>=5.0,<7.0
 sentence-transformers==6.1.0
 transformers==5.17.0
-torch==2.9.0
-torchvision==0.24.0
+torch==2.13.0
+torchvision==0.28.0
+vllm==0.31.0; sys_platform == "linux"
 
 # Agent and reasoning tools
 langchain-core==1.2.17

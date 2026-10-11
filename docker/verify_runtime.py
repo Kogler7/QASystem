@@ -49,8 +49,12 @@ MODULES = (
 )
 
 EXPECTED_DISTRIBUTIONS = {
-    "opencv-python": "4.11.0.86",
-    "opencv-python-headless": "4.11.0.86",
+    "opencv-python": "4.13.0.92",
+    "opencv-python-headless": "4.13.0.92",
+    "vllm": "0.31.0",
+    "torch": "2.13.0",
+    "torchvision": "0.28.0",
+    "mcp": "2.0.0",
 }
 
 PROGRAMS = (
@@ -112,7 +116,7 @@ def _check_programs() -> None:
 
 def _check_application() -> None:
     subprocess.run(
-        ["/opt/qasystem/clef-venv/bin/python", "-c",
+        [sys.executable, "-c",
          "from clef_service.app import app; "
          "from nanojev_service.app import app as nano_app; "
          "from transformers import Qwen3_5ForConditionalGeneration; "

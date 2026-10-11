@@ -1,6 +1,6 @@
 # Clef-flash 独立服务
 
-`qasystem-env-v1` 在 `/opt/qasystem/clef-venv` 安装本目录的依赖，不改 Backend 的 Python 环境。
+`qasystem-env-v1` 中与 Backend、NanoJev 共用 Python、Torch 与 Transformers，不重复安装 CUDA 依赖。
 通过 Compose 的 `decisions` profile 常驻并预热，详见 [决策模型部署](../docs/部署/决策模型部署.md)。
 也可在宿主机独立 venv 中运行。权重和官方 `joint_schema_model.py` 由 `CLEF_MODEL_DIR` 指向外置的本地
 模型目录；服务强制离线加载，不下载模型，不读取请求中的 URL，不写入模型目录。

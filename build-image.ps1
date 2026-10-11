@@ -3,7 +3,7 @@ param(
     [string]$OpenCodeVersion = "1.17.15",
     [string]$NodeImage = "node:20-bullseye-slim",
     [string]$MavenImage = "maven:3.9.9-eclipse-temurin-17",
-    [string]$VllmImage = "vllm/vllm-openai:v0.11.2",
+    [string]$VllmImage = "vllm/vllm-openai:v0.31.0",
     [string]$PipIndexUrl = "https://pypi.tuna.tsinghua.edu.cn/simple",
     [string]$PipExtraIndexUrl = "https://mirrors.aliyun.com/pypi/simple/",
     [switch]$NoCache,
