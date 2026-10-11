@@ -9,6 +9,8 @@ import logging
 import time
 from typing import Any, Callable
 
+from algorithm.extraction_trace import trace_event
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,6 +74,10 @@ def generate_batched(
                 row['terminal'] = False
                 row['recovered_by'] = 'output_batch_split'
             middle = len(batch) // 2
+            trace_event(llm, 'batch-split', pass_name=kwargs['pass_name'], parent=chunk_id,
+                        children=[f'{root}.part-{tag}a', f'{root}.part-{tag}b'],
+                        item_counts=[middle, len(batch) - middle], depth=depth + 1,
+                        reason=[row.get('type') for row in failures])
             safe_size = min(safe_size, middle)
             pending[0:0] = [(batch[:middle], depth + 1, tag + 'a'),
                             (batch[middle:], depth + 1, tag + 'b')]

@@ -95,19 +95,36 @@ class ScheduledClient:
         return getattr(self.client, name)
 
     def _call(self, method, **kwargs):
-        check_input_budget(kwargs, self.max_input_tokens)
-        call_deadline = time.monotonic() + self.timeout
-        if self.deadline is not None:
-            call_deadline = min(call_deadline, self.deadline)
-        with self.pool.request_slot(call_deadline):
-            remaining = call_deadline - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError("Extraction request budget exhausted")
-            kwargs["timeout"] = remaining
-            response = method(**kwargs)
-            if time.monotonic() >= call_deadline:
-                raise TimeoutError("Extraction response arrived after deadline")
-            return response
+        from algorithm.extraction_trace import ExtractionTrace
+        trace = self.__dict__.get("extraction_trace")
+        started = time.monotonic()
+        acquired = None
+        error_type = None
+        try:
+            check_input_budget(kwargs, self.max_input_tokens)
+            call_deadline = started + self.timeout
+            if self.deadline is not None:
+                call_deadline = min(call_deadline, self.deadline)
+            with self.pool.request_slot(call_deadline):
+                acquired = time.monotonic()
+                remaining = call_deadline - acquired
+                if remaining <= 0:
+                    raise TimeoutError("Extraction request budget exhausted")
+                kwargs["timeout"] = remaining
+                response = method(**kwargs)
+                if time.monotonic() >= call_deadline:
+                    raise TimeoutError("Extraction response arrived after deadline")
+                return response
+        except Exception as exc:
+            error_type = getattr(exc, "error_type", None) or type(exc).__name__
+            raise
+        finally:
+            if isinstance(trace, ExtractionTrace):
+                finished = time.monotonic()
+                trace.event("http", {"call_id": getattr(trace.local, "call_id", None),
+                            "error_type": error_type, "elapsed_seconds": finished - started,
+                            "queue_seconds": (acquired - started) if acquired is not None else None,
+                            "http_seconds": (finished - acquired) if acquired is not None else None})
 
     def _chat(self, **kwargs):
         if self.response_format == "json_object" and (kwargs.get("response_format") or {}).get("type") == "json_schema":
@@ -139,4 +156,9 @@ def create_request_llm(config: dict[str, Any]):
     llm.api_mode = config.get("api_mode", "auto")
     llm.max_input_tokens = int(config.get("max_input_tokens", 65536))
     llm.max_output_tokens = int(config.get("max_output_tokens") or config["max_tokens"])
+    from algorithm.extraction_trace import ExtractionTrace
+    trace_root = os.getenv("KG_EXTRACT_TRACE_DIR", "tmp/extraction-traces").strip()
+    if trace_root:
+        llm.extraction_trace = ExtractionTrace(trace_root, config=config, secrets=(credential,))
+        llm.client.extraction_trace = llm.extraction_trace
     return llm

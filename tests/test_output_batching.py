@@ -10,6 +10,36 @@ import pytest
 from algorithm.output_batching import generate_batched, output_batch_size
 
 
+def test_v3_evidence_verification_splits_input_limit_and_keeps_failed_items_unverified(monkeypatch):
+    name = '_verification_split_test'
+    package = ModuleType(name)
+    package.__path__ = [str(Path(__file__).resolve().parents[1] / 'algorithm' / 'knowledge_extract' / 'v3')]
+    sys.modules[name] = package
+    module = importlib.import_module(name + '.candidate_generation')
+    observed = []
+
+    def messages(*, chunk, items):
+        return items
+
+    def generate(llm, messages, schema, **kwargs):
+        ids = [item['item_id'] for item in messages]
+        observed.append(ids)
+        if len(ids) > 1 or ids == ['bad']:
+            kwargs['attempts'].append({'type': 'input_limit', 'terminal': True})
+            return None
+        return {'verdicts': [{'item_id': ids[0], 'supported': 'yes'}]}
+
+    monkeypatch.setattr(module, 'build_verification_messages', messages)
+    monkeypatch.setattr(module, 'generate_structured', generate)
+    attempts = []
+    verdicts = module.verify_items_with_llm(SimpleNamespace(max_output_tokens=16384),
+        chunk=SimpleNamespace(chunk_id='c'), items=[{'item_id': 'good'}, {'item_id': 'bad'}], attempts=attempts)
+    assert observed == [['good', 'bad'], ['good'], ['bad']]
+    assert verdicts == {'good': 'yes'}
+    assert attempts[0]['terminal'] is False
+    assert attempts[-1]['terminal'] is True
+
+
 @pytest.fixture(params=['v2', 'v3'])
 def cg(request):
     name = '_output_batch_test_' + request.param

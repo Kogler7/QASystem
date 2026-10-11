@@ -1131,6 +1131,8 @@ def split_by_characters(
     chunk_size: int = 500,
     separators: list[str] | None = None,
     chunk_overlap: int = 0,
+    *,
+    protect_json: bool = True,
 ) -> list[Document]:
     """按配置的所有分隔符逐级切分后打包。JSON 块（连同围栏）独立成片。
 
@@ -1156,7 +1158,8 @@ def split_by_characters(
         fragments: list[tuple[str, bool]] = []
         ranges: list[list[int]] = []
         source_cursor = 0
-        for part_text, is_json in _split_text_with_json_protection(text):
+        parts = _split_text_with_json_protection(text) if protect_json else [(text, False)]
+        for part_text, is_json in parts:
             part_start = text.find(part_text, source_cursor)
             if part_start < 0:
                 part_start = source_cursor
@@ -1228,6 +1231,7 @@ def split_by_characters(
             if buf_text:
                 buf_text += frag_text
                 buf_len += len(frag_text)
+                buf_range[1] = frag_range[1]
             else:
                 buf_text, buf_type, buf_range, buf_len = frag_text, frag_type, list(frag_range), len(frag_text)
         _flush_buf()
@@ -1256,6 +1260,8 @@ def split_by_characters(
                     and block_range[0] != prev_range[1]
                     and len(prev_text) == prev_range[1] - prev_range[0]
                 ):
+                    tail = ""
+                if tail and not prev_text.endswith(tail):
                     tail = ""
                 if tail and tail != prev_text:
                     new_text = tail + block_text

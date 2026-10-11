@@ -168,6 +168,15 @@ def chunk_document_items(
         text = doc.page_content
         if not text:
             continue
+        source_range = doc.metadata.get("__source_range")
+        if (isinstance(source_range, (list, tuple)) and len(source_range) == 2
+                and all(isinstance(v, int) for v in source_range)
+                and 0 <= source_range[0] <= source_range[1] <= len(content)
+                and content[source_range[0]:source_range[1]] == text):
+            start, end = source_range
+            items.append({"text": text, "range": [start, end]})
+            cursor = end
+            continue
         start = content.find(text, cursor)
         if start < 0:
             start = content.find(text)
@@ -184,3 +193,28 @@ def chunk_document_items(
         items[0]["range"] if items else None, items[-1]["range"] if items else None,
     )
     return items
+
+def extraction_segment_ranges(content: str, target: int, overlap: int = 50) -> list[tuple[int, int]]:
+    """Reuse upstream lossless delimiter splitting with a strict recovery size cap.
+
+    Oversized protected JSON is split as raw source text only as a last resort.
+    Never reserialize it: downstream quotes/ranges must still refer to the input.
+    """
+    if not content:
+        return []
+    size = max(1, int(target))
+    overlap = min(max(0, int(overlap)), size - 1)
+    def split(text, protect=True):
+        return split_by_characters([Document(page_content=text)], chunk_size=size,
+                                   chunk_overlap=overlap, separators=DEFAULT_SEPARATORS,
+                                   protect_json=protect)
+    ranges = []
+    for doc in split(content):
+        start, end = doc.metadata["__source_range"]
+        if end - start <= size:
+            ranges.append((start, end))
+        else:
+            for child in split(content[start:end], False):
+                left, right = child.metadata["__source_range"]
+                ranges.append((start + left, start + right))
+    return ranges

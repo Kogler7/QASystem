@@ -3339,13 +3339,17 @@ def run_case_with_retries(
     modes: list[str],
     reuse_dir: Path | None,
     reuse_extract_dir: Path | None = None,
+    max_attempts: int | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str, int, str | None]:
     """同一 case 最多试 3 次；未捕获异常不会冒出。返回 (backend, plugin, markdown, attempts, error)."""
+    max_attempts = MAX_ATTEMPTS if max_attempts is None else max_attempts
+    if type(max_attempts) is not int or not 1 <= max_attempts <= 3:
+        raise ValueError("case attempts must be between 1 and 3")
     last_backend: dict[str, Any] | None = None
     last_plugin: dict[str, Any] | None = None
     markdown = ""
     last_error: str | None = None
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    for attempt in range(1, max_attempts + 1):
         try:
             backend, plugin, markdown = run_case_stages(
                 run_backend=run_backend,
@@ -3372,7 +3376,7 @@ def run_case_with_retries(
                 last_error = str(backend.get("message"))
             elif isinstance(plugin, dict) and plugin.get("message"):
                 last_error = str(plugin.get("message"))
-            log(f"{label} 第 {attempt}/{MAX_ATTEMPTS} 次失败" + (f": {last_error}" if last_error else ""))
+            log(f"{label} 第 {attempt}/{max_attempts} 次失败" + (f": {last_error}" if last_error else ""))
         except KeyboardInterrupt:
             raise
         except Exception as exc:  # noqa: BLE001 - 单个 case 失败后继续后续 case
@@ -3381,13 +3385,25 @@ def run_case_with_retries(
                 last_backend = fail_payload(exc)
             if last_plugin is None and run_plugin:
                 last_plugin = fail_payload(exc)
-            log(f"{label} 第 {attempt}/{MAX_ATTEMPTS} 次未捕获异常: {exc}")
-        if attempt < MAX_ATTEMPTS:
+            log(f"{label} 第 {attempt}/{max_attempts} 次未捕获异常: {exc}")
+        finally:
+            archive = out_dir / "attempts" / f"{attempt:02d}"
+            if archive.exists():
+                archive = archive.with_name(f"{attempt:02d}-{time.time_ns()}")
+            try:
+                archive.mkdir(parents=True, exist_ok=False)
+                for artifact in out_dir.glob("*.json"):
+                    shutil.copy2(artifact, archive / artifact.name)
+                write_json(archive / "attempt.json", {"attempt": attempt,
+                           "backend": last_backend, "plugin": last_plugin, "error": last_error})
+            except OSError:
+                log(f"{label} 第 {attempt} 次中间结果归档失败，请检查磁盘与权限")
+        if attempt < max_attempts:
             delay = RETRY_SLEEP_SECONDS
             if delay > 0:
                 time.sleep(delay)
-    log(f"{label} 已重试 {MAX_ATTEMPTS} 次仍失败，跳过")
-    return last_backend, last_plugin, markdown, MAX_ATTEMPTS, last_error
+    log(f"{label} 已重试 {max_attempts} 次仍失败，跳过")
+    return last_backend, last_plugin, markdown, max_attempts, last_error
 
 
 STAGE_BUDGET_NAMES = ("parse", "chunk", "extract")
@@ -3470,6 +3486,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
     parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")
     parser.add_argument("--extract-document-timeout", type=float, help="文档抽取模型调用总预算（秒）")
+    parser.add_argument("--case-attempts", type=int, choices=(1, 2, 3), default=3, help="外层整篇抽取尝试次数，快速对比建议 1；不改变算法内部重试")
     parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
     parser.add_argument(
@@ -4067,6 +4084,7 @@ def main() -> int:
 
                 backend, plugin, _markdown, attempts, case_error = run_case_with_retries(
                     label=label,
+                    max_attempts=args.case_attempts,
                     run_backend=run_backend,
                     run_plugin=run_plugin,
                     base_url=base_url,
@@ -4140,7 +4158,7 @@ def main() -> int:
                             record["error"] = "empty_extraction"
                             log(f"{label} 抽取结果为空（0 节点）: {', '.join(empty_blocks)}，记为失败")
                 record["status"] = "failed" if failed else "succeeded"
-                if failed and attempts >= MAX_ATTEMPTS:
+                if failed and attempts >= args.case_attempts:
                     record["skipped_after_retries"] = True
                     summary["skipped"] += 1
                 apply_reused_case_timing(record, elapsed_seconds(case_started))
