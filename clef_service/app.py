@@ -37,16 +37,16 @@ class Settings:
     api_key: str = field(default="", repr=False)
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls, prefix: str = "CLEF_") -> "Settings":
         values: dict[str, Any] = {}
         for name in cls.__dataclass_fields__:
-            value = os.environ.get("CLEF_" + name.upper())
+            value = os.environ.get(prefix + name.upper())
             if value is not None:
                 if name.startswith("max_"):
                     try:
                         value = int(value)
                     except ValueError:
-                        raise ValueError(f"CLEF_{name.upper()} must be an integer") from None
+                        raise ValueError(f"{prefix}{name.upper()} must be an integer") from None
                 values[name] = value
         settings = cls(**values)
         if any(getattr(settings, name) < 1 for name in cls.__dataclass_fields__ if name.startswith("max_")):
@@ -87,7 +87,7 @@ class Question(StrictModel):
 
 
 class SystemOneRequest(StrictModel):
-    model: Literal["clef-flash"] = "clef-flash"
+    model: Literal["clef-flash", "nanojev"] = "clef-flash"
     state: JsonValue
     questions: dict[str, Question] = Field(min_length=1)
 
@@ -129,7 +129,7 @@ class Usage(StrictModel):
 
 
 class SystemOneResponse(StrictModel):
-    model: Literal["clef-flash"]
+    model: Literal["clef-flash", "nanojev"]
     answers: dict[str, Annotated[NoulAnswer | ChoiceAnswer | ScoreAnswer, Field(discriminator="type")]]
     usage: Usage
 
@@ -171,6 +171,9 @@ class LocalRuntime:
         self.model, self.processor = self.module.load_release_model(
             directory, device=self.settings.device, dtype=getattr(torch, self.settings.dtype), local_files_only=True
         )
+        self.infer({"model": "clef-flash", "state": "The sky is blue.", "questions": {
+            "color": {"type": "choice", "instructions": "What color is the sky?",
+                      "criteria": {"blue": "Blue", "red": "Red"}}}})
 
     def infer(self, payload: dict[str, Any]) -> dict[str, Any]:
         # Official encode_record silently truncates state. Encode once without a
@@ -253,7 +256,7 @@ class BoundedBodyMiddleware:
 
 def validate_response(result: Any, payload: dict[str, Any], max_length: int) -> dict[str, Any]:
     response = SystemOneResponse.model_validate(result)
-    if set(response.answers) != set(payload["questions"]) or response.usage.input_tokens > max_length:
+    if response.model != payload.get("model", "clef-flash") or set(response.answers) != set(payload["questions"]) or response.usage.input_tokens > max_length:
         raise ValueError("Invalid model response")
     for name, question in payload["questions"].items():
         answer = response.answers[name]
@@ -278,7 +281,8 @@ def validate_response(result: Any, payload: dict[str, Any], max_length: int) -> 
 
 
 def create_app(
-    settings: Settings | None = None, runtime_factory: Callable[[Settings], Any] = LocalRuntime
+    settings: Settings | None = None, runtime_factory: Callable[[Settings], Any] = LocalRuntime,
+    *, model_name: str = "clef-flash",
 ) -> FastAPI:
     settings = settings or Settings.from_env()
 
@@ -288,12 +292,12 @@ def create_app(
         app.state.ready = False
         app.state.queue = asyncio.Queue(maxsize=settings.max_queue_size)
         app.state.active = False
-        LOGGER.info("Loading local Clef model")
+        LOGGER.info("Loading local %s model", model_name)
         try:
             await asyncio.to_thread(runtime.load)
         except Exception:
-            LOGGER.error("Clef model initialization failed")
-            raise RuntimeError("Clef model initialization failed; verify the local release and environment") from None
+            LOGGER.error("%s model initialization failed", model_name)
+            raise RuntimeError(f"{model_name} model initialization failed; verify the local release and environment") from None
 
         async def consume() -> None:
             while True:
@@ -308,10 +312,10 @@ def create_app(
                     except InputTooLong:
                         result = HTTPException(422, "Complete input exceeds CLEF_MAX_LENGTH; shorten state or questions")
                     except ModelOutOfMemory:
-                        LOGGER.warning("Clef inference ran out of GPU memory")
+                        LOGGER.warning("%s inference ran out of GPU memory", model_name)
                         result = HTTPException(503, "Model memory capacity exceeded; shorten the request")
                     except Exception:
-                        LOGGER.error("Clef inference failed")
+                        LOGGER.error("%s inference failed", model_name)
                         result = HTTPException(503, "Model inference unavailable")
                     if not future.done():
                         future.set_result(result)
@@ -321,7 +325,7 @@ def create_app(
 
         worker = asyncio.create_task(consume())
         app.state.ready = True
-        LOGGER.info("Clef model ready")
+        LOGGER.info("%s model ready", model_name)
         try:
             yield
         finally:
@@ -334,7 +338,7 @@ def create_app(
                 pass
             await asyncio.to_thread(runtime.close)
 
-    app = FastAPI(title="Clef-flash local inference", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title=f"{model_name} local inference", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.ready = False
     app.add_middleware(BoundedBodyMiddleware, settings=settings)
 
@@ -346,15 +350,21 @@ def create_app(
     @app.get("/health")
     async def health() -> JSONResponse:
         ready = app.state.ready
-        return JSONResponse({"status": "ready" if ready else "unavailable", "model": "clef-flash"}, status_code=200 if ready else 503)
+        return JSONResponse({"status": "ready" if ready else "unavailable", "model": model_name}, status_code=200 if ready else 503)
 
     @app.post("/v1/systemone")
     async def systemone(request: SystemOneRequest) -> dict[str, Any]:
+        if request.model != model_name:
+            raise HTTPException(422, "Model does not match this service")
         if not app.state.ready:
             raise HTTPException(503, "Model not ready")
         if len(request.questions) > settings.max_questions:
             raise HTTPException(422, "Too many questions")
         counts = [question.option_count for question in request.questions.values()]
+        if model_name == "nanojev" and (min(counts) < 2 or any(
+            q.type == "score" and q.option_count > 10 for q in request.questions.values()
+        )):
+            raise HTTPException(422, "NanoJev requires at least two options and at most ten score levels")
         if max(counts) > settings.max_options or sum(counts) > settings.max_total_options:
             raise HTTPException(422, "Too many options")
         future = asyncio.get_running_loop().create_future()

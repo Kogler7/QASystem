@@ -9,6 +9,8 @@ import logging
 import time
 from typing import Any, Callable
 
+from algorithm.extraction_trace import trace_event
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,16 +68,20 @@ def generate_batched(
         if stats is not None:
             stats['calls'] = stats.get('calls', 0) + 1
         failures = attempts[start:]
-        truncated = any(row.get('type') == 'incomplete' for row in failures)
+        truncated = any(row.get('type') in {'incomplete', 'input_limit'} for row in failures)
         if parsed is None and truncated and len(batch) > 1 and depth < max_depth:
             for row in failures:
                 row['terminal'] = False
                 row['recovered_by'] = 'output_batch_split'
             middle = len(batch) // 2
+            trace_event(llm, 'batch-split', pass_name=kwargs['pass_name'], parent=chunk_id,
+                        children=[f'{root}.part-{tag}a', f'{root}.part-{tag}b'],
+                        item_counts=[middle, len(batch) - middle], depth=depth + 1,
+                        reason=[row.get('type') for row in failures])
             safe_size = min(safe_size, middle)
             pending[0:0] = [(batch[:middle], depth + 1, tag + 'a'),
                             (batch[middle:], depth + 1, tag + 'b')]
-            logger.warning('Output truncated: pass=%s chunk=%s items=%d split=%d+%d depth=%d',
+            logger.warning('Token budget split: pass=%s chunk=%s items=%d split=%d+%d depth=%d',
                            kwargs['pass_name'], chunk_id, len(batch), middle,
                            len(batch) - middle, depth + 1)
             continue
@@ -94,6 +100,8 @@ def generate_batched(
 
 def output_batch_size(llm: Any, *, tokens_per_item: int, ceiling: int) -> int:
     """Reserve 35% of the configured output budget for variance and framing."""
-    limit = getattr(llm, 'max_tokens', None)
+    limit = getattr(llm, 'max_output_tokens', None)
+    if not isinstance(limit, int) or limit <= 0:
+        limit = getattr(llm, 'max_tokens', None)
     limit = limit if isinstance(limit, int) and limit > 0 else 16384
     return max(1, min(ceiling, int(limit * 0.65) // tokens_per_item))

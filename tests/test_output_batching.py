@@ -10,6 +10,36 @@ import pytest
 from algorithm.output_batching import generate_batched, output_batch_size
 
 
+def test_v3_evidence_verification_splits_input_limit_and_keeps_failed_items_unverified(monkeypatch):
+    name = '_verification_split_test'
+    package = ModuleType(name)
+    package.__path__ = [str(Path(__file__).resolve().parents[1] / 'algorithm' / 'knowledge_extract' / 'v3')]
+    sys.modules[name] = package
+    module = importlib.import_module(name + '.candidate_generation')
+    observed = []
+
+    def messages(*, chunk, items):
+        return items
+
+    def generate(llm, messages, schema, **kwargs):
+        ids = [item['item_id'] for item in messages]
+        observed.append(ids)
+        if len(ids) > 1 or ids == ['bad']:
+            kwargs['attempts'].append({'type': 'input_limit', 'terminal': True})
+            return None
+        return {'verdicts': [{'item_id': ids[0], 'supported': 'yes'}]}
+
+    monkeypatch.setattr(module, 'build_verification_messages', messages)
+    monkeypatch.setattr(module, 'generate_structured', generate)
+    attempts = []
+    verdicts = module.verify_items_with_llm(SimpleNamespace(max_output_tokens=16384),
+        chunk=SimpleNamespace(chunk_id='c'), items=[{'item_id': 'good'}, {'item_id': 'bad'}], attempts=attempts)
+    assert observed == [['good', 'bad'], ['good'], ['bad']]
+    assert verdicts == {'good': 'yes'}
+    assert attempts[0]['terminal'] is False
+    assert attempts[-1]['terminal'] is True
+
+
 @pytest.fixture(params=['v2', 'v3'])
 def cg(request):
     name = '_output_batch_test_' + request.param
@@ -133,6 +163,36 @@ def test_expired_document_does_not_start_more_batches(cg):
     result, attempts, _ = run(cg, model)
     assert result is None and model.calls == []
     assert attempts[-1]['terminal'] and attempts[-1]['type'] == 'timeout'
+
+
+def test_input_limit_splits_without_identical_retries(cg):
+    from algorithm.token_budget import InputTokenLimitError
+
+    class InputModel(Model):
+        def generate_structured(self, schema, messages, context):
+            ids = schema['properties']['updates']['items']['properties']['id']['enum']
+            if len(ids) > 1:
+                self.calls.append(list(ids))
+                raise InputTokenLimitError('Estimated input exceeds budget')
+            return super().generate_structured(schema, messages, context)
+
+    model = InputModel()
+    result, attempts, _ = run(cg, model)
+    assert len(result['updates']) == 4
+    assert model.calls == [[1, 2, 3, 4], [1, 2], [1], [2], [3], [4]]
+    assert all(row['type'] == 'input_limit' and not row['terminal'] for row in attempts)
+
+
+def test_input_estimate_includes_schema_and_utf8_text():
+    from algorithm.token_budget import check_input_budget, estimate_input_tokens, InputTokenLimitError
+    payload = {'messages': [{'role': 'user', 'content': '设备'}]}
+    before = estimate_input_tokens(payload)
+    payload['response_format'] = {'type': 'json_schema', 'json_schema': {'description': '属性' * 100}}
+    after = estimate_input_tokens(payload)
+    assert after > before + 500
+    with pytest.raises(InputTokenLimitError):
+        check_input_budget(payload, before)
+    assert check_input_budget(payload, after) == after
 
 
 def test_property_stage_rebuilds_catalog_and_schema_after_truncation(cg, monkeypatch):

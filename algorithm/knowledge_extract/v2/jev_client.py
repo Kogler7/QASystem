@@ -30,6 +30,16 @@ def _binding_device() -> str:
     return "cpu"
 
 
+def _has_native_triton() -> bool:
+    """Released Torch versions may not include the predictor's optional API."""
+    try:
+        return importlib.util.find_spec("torch._native.triton_utils") is not None
+    except ModuleNotFoundError as exc:
+        if exc.name not in {"torch._native", "torch._native.triton_utils"}:
+            raise
+        return False
+
+
 @dataclass(frozen=True)
 class Judgment:
     """One normalized NanoJev answer."""
@@ -100,7 +110,7 @@ class NanoJevClient(JevClient):
                 str(root),
                 device_name="cuda:0",
                 precision=precision or config["precision"],
-                disable_native_triton=True,
+                disable_native_triton=_has_native_triton(),
             )
         except Exception as exc:  # noqa: BLE001 - surface checkpoint/CUDA failures as unavailable
             raise JevUnavailableError(f"NanoJev 加载失败: {exc}") from exc
@@ -120,6 +130,30 @@ class NanoJevClient(JevClient):
                 temperature=1.0,
             )
         return answers_from_nanojev(raw)
+
+
+class RemoteNanoJevClient(JevClient):
+    """Use one resident model shared by all queue workers."""
+
+    def __init__(self):
+        from external_services.nanojev import NanoJevServiceClient
+        self.client = NanoJevServiceClient()
+
+    def predict(self, states):
+        resolved = {}
+        for state in states:
+            questions = {key: {**question, "type": "noul" if question["type"] == "boolean" else question["type"]}
+                         for key, question in state["questions"].items()}
+            body = self.client.systemone({"state": state["state"], "questions": questions})
+            answers = {}
+            for key, answer in body["answers"].items():
+                if answer["type"] == "noul":
+                    probability = answer["noul"]
+                    answer = {"type": "boolean", "value": probability > .5,
+                              "probabilities": {"true": probability, "false": 1 - probability}}
+                answers[key] = _judgment_from_answer(answer)
+            resolved[str(state["id"])] = answers
+        return resolved
 
 
 def answers_from_nanojev(raw: Mapping[str, Any]) -> dict[str, dict[str, Judgment]]:
@@ -216,6 +250,8 @@ def create_jev_client(*, model_path: str | None = None) -> JevClient:
     """Load NanoJev.  Callers must only do this when Jev is enabled."""
     from algorithm.runtime_profile import is_remote_only
 
+    if model_path is None and os.getenv("NANOJEV_SERVICE_URL", "").strip():
+        return RemoteNanoJevClient()
     if is_remote_only():
         raise JevUnavailableError("remote-only 模式禁止加载本地 NanoJev")
     resolved_path = model_path or str(get_jev_config()["model_path"])

@@ -7,7 +7,9 @@ param(
     [switch]$SkipDocling,
     [switch]$SkipMineruPipeline,
     [switch]$SkipMineruVlm,
-    [switch]$SkipEmbedding
+    [switch]$SkipEmbedding,
+    [switch]$Jev,
+    [switch]$Clef
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,10 +51,13 @@ if ($SkipDocling) { $arguments += "--skip-docling" }
 if ($SkipMineruPipeline) { $arguments += "--skip-mineru-pipeline" }
 if ($SkipMineruVlm) { $arguments += "--skip-mineru-vlm" }
 if ($SkipEmbedding) { $arguments += "--skip-embedding" }
+if ($Jev) { $arguments += "--jev" }
+if ($Clef) { $arguments += "--clef" }
 
+Write-Host "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] Downloading external model files"
 & docker @arguments
 if ($LASTEXITCODE -ne 0) {
     throw "Model download failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "Models prepared in $resolvedModelsDir"
+Write-Host "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] Models prepared in $resolvedModelsDir"

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+from datetime import datetime
 from pathlib import Path
 
 
@@ -15,6 +17,8 @@ EMBEDDING_MODELS = {
 }
 JEV_MODEL = ("C-Tianyu/NanoJev", MODELS_DIR / "nanojev")
 JEV_REVISION = "unified-games-v1"
+CLEF_MODEL = ("Cloudflare/clef-flash", MODELS_DIR / "clef-flash")
+CLEF_REVISION = "17f0b0ad64efb65d273590632833508766b2aae6"
 JEV_ALLOW_PATTERNS = (
     "best.safetensors",
     "config.json",
@@ -33,6 +37,28 @@ MINERU_REPOSITORIES = {
         "vlm": "OpenDataLab/MinerU2.5-2509-1.2B",
     },
 }
+
+
+def progress(message: str) -> None:
+    print(f"[{datetime.now().astimezone().isoformat(timespec='seconds')}] {message}", flush=True)
+
+
+def _download_clef_model() -> None:
+    from huggingface_hub import snapshot_download
+
+    repository, destination = CLEF_MODEL
+    destination.mkdir(parents=True, exist_ok=True)
+    snapshot_download(repo_id=repository, revision=CLEF_REVISION, local_dir=destination)
+    required = ["config.json", "joint_schema_model.py", "joint_head.safetensors",
+                "joint_head_config.json", "tokenizer.json", "tokenizer_config.json",
+                "processor_config.json", "model.safetensors.index.json"]
+    missing = [name for name in required if not (destination / name).is_file()]
+    if missing:
+        raise RuntimeError(f"Clef download incomplete: {missing}")
+    index = json.loads((destination / "model.safetensors.index.json").read_text())
+    shards = set(index.get("weight_map", {}).values())
+    if not shards or any(not (destination / name).is_file() for name in shards):
+        raise RuntimeError("Clef download missing backbone shards")
 
 
 def _download_mineru(source: str, model_type: str, destination: Path) -> None:
@@ -67,10 +93,13 @@ def _download_jev_model() -> None:
         local_dir=destination,
         allow_patterns=list(JEV_ALLOW_PATTERNS),
     )
-    weights = destination / "best.safetensors"
-    predictor = destination / "source" / "scripts" / "predict_toy_decisions.py"
-    if not weights.is_file() or not predictor.is_file():
-        raise RuntimeError(f"NanoJev download missing weights or inference source: {destination}")
+    required_files = ("best.safetensors", "config.json", "source/scripts/predict_toy_decisions.py",
+                      "source/scripts/train_toy_decisions.py")
+    missing = [name for name in required_files if not (destination / name).is_file()]
+    missing.extend(name for name in ("backbone_config", "tokenizer")
+                   if not (destination / name).is_dir() or not any((destination / name).iterdir()))
+    if missing:
+        raise RuntimeError(f"NanoJev download incomplete: {missing}")
 
 
 def main() -> None:
@@ -85,21 +114,30 @@ def main() -> None:
         action="store_true",
         help="Download C-Tianyu/NanoJev into /models/nanojev",
     )
+    parser.add_argument("--clef", action="store_true", help="Download pinned Clef-flash into /models/clef-flash")
     args = parser.parse_args()
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     if not args.skip_docling:
+        progress("Downloading Docling")
         from docling.utils.model_downloader import download_models
 
         download_models(output_dir=DOCLING_DIR, progress=True)
     if not args.skip_mineru_pipeline:
+        progress("Downloading MinerU pipeline")
         _download_mineru(args.source, "pipeline", MINERU_PIPELINE_DIR)
     if not args.skip_mineru_vlm:
+        progress("Downloading MinerU VLM")
         _download_mineru(args.source, "vlm", MINERU_VLM_DIR)
     if not args.skip_embedding:
+        progress("Downloading embeddings")
         _download_embedding_models()
     if args.jev:
+        progress("Downloading NanoJev")
         _download_jev_model()
+    if args.clef:
+        progress("Downloading Clef-flash")
+        _download_clef_model()
 
     expected = {
         "Docling": DOCLING_DIR,
@@ -116,11 +154,14 @@ def main() -> None:
     if args.jev:
         expected["Jev"] = JEV_MODEL[1]
         skipped["Jev"] = False
+    if args.clef:
+        expected["Clef"] = CLEF_MODEL[1]
+        skipped["Clef"] = False
     for name, path in expected.items():
         if not skipped[name] and not any(path.iterdir()):
             raise RuntimeError(f"{name} model download produced no files: {path}")
         if not skipped[name]:
-            print(f"{name}: {path}", flush=True)
+            progress(f"{name}: {path}")
 
 
 if __name__ == "__main__":

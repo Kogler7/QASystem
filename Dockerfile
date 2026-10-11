@@ -19,6 +19,9 @@ RUN mvn --batch-mode --no-transfer-progress package -DskipTests
 
 FROM ${VLLM_IMAGE}
 
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_EXTRA_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1
@@ -70,6 +73,7 @@ RUN find /etc/apt -maxdepth 2 \( -name '*.list' -o -name '*.sources' \) -exec se
     tree \
     tini \
     python-is-python3 \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -85,8 +89,8 @@ WORKDIR /app
 # 都是"基础镜像里的 vLLM 比我们后装的解析栈老"导致的声明级冲突，同一环境无法同时满足；
 # 下面三处 pip check 只放行这三条，其余任何冲突仍然让构建失败。
 COPY backend/requirements.txt /tmp/qasystem/requirements.txt
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/" && \
+RUN pip config set global.index-url "$PIP_INDEX_URL" && \
+    pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL" && \
     pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com" && \
     pip install --retries 8 --timeout 120 --upgrade pip "setuptools>=77,<81" wheel pycairo && \
     pip install --retries 8 --timeout 120 -r /tmp/qasystem/requirements.txt && \
@@ -100,7 +104,7 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && 
 # PIP_NO_CACHE_DIR=1 是关缓存的，所以这里用 env -u 取消它，重跑时不必重新下载。
 COPY backend/requirements.mineru-extras.txt /tmp/qasystem/requirements.mineru-extras.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
-    env -u PIP_NO_CACHE_DIR pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
+    env -u PIP_NO_CACHE_DIR pip install \
     --retries 8 --timeout 120 -r /tmp/qasystem/requirements.mineru-extras.txt && \
     if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
         echo "存在未预期的依赖冲突："; pip check; exit 1; \
@@ -115,6 +119,15 @@ RUN python -c "import subprocess,sys,tomllib; p=tomllib.load(open('/tmp/qasystem
     fi
 
 COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
+
+# Clef uses the same delivery image with an isolated dependency contract.
+# Only requirements enter this layer; source and weights are mounted at runtime.
+COPY clef_service/requirements.txt /tmp/qasystem/clef-requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv /opt/qasystem/clef-venv && \
+    env -u PIP_NO_CACHE_DIR /opt/qasystem/clef-venv/bin/pip install --retries 8 --timeout 120 -r /tmp/qasystem/clef-requirements.txt && \
+    /opt/qasystem/clef-venv/bin/pip check && \
+    /opt/qasystem/clef-venv/bin/python -c "import torch, torchvision, transformers, accelerate, safetensors, fastapi, uvicorn; from transformers import Qwen3_5ForConditionalGeneration"
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=opencode-runtime /usr/local/bin/opencode /usr/local/bin/opencode

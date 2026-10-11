@@ -56,6 +56,7 @@ foreach ($item in @(
     @{ source = "download-models.ps1"; destination = "download-models.ps1" },
     @{ source = "run-offline-validation.ps1"; destination = "run-offline-validation.ps1" },
     @{ source = "docs/部署/环境变量迁移说明.md"; destination = "ENV_MIGRATION.md" },
+    @{ source = "docs/部署/决策模型部署.md"; destination = "DECISION_MODELS.md" },
     @{ source = "docs/部署/交付包说明.md"; destination = "README.md" }
 )) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $item.source) -Destination (Join-Path $deployDir $item.destination) -Force
@@ -72,7 +73,7 @@ Set-Content -LiteralPath (Join-Path $deployDir ".env.example") -Value $deliveryE
 
 Write-ProgressLog "[3/6] Creating the read-only runtime source directory"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services")) {
+foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services", "clef_service", "nanojev_service")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null

@@ -4,6 +4,8 @@ param(
     [string]$NodeImage = "node:20-bullseye-slim",
     [string]$MavenImage = "maven:3.9.9-eclipse-temurin-17",
     [string]$VllmImage = "vllm/vllm-openai:v0.11.2",
+    [string]$PipIndexUrl = "https://pypi.tuna.tsinghua.edu.cn/simple",
+    [string]$PipExtraIndexUrl = "https://mirrors.aliyun.com/pypi/simple/",
     [switch]$NoCache,
     [switch]$KeepCandidate
 )
@@ -41,7 +43,9 @@ try {
         "--build-arg", "OPENCODE_VERSION=$OpenCodeVersion",
         "--build-arg", "NODE_IMAGE=$NodeImage",
         "--build-arg", "MAVEN_IMAGE=$MavenImage",
-        "--build-arg", "VLLM_IMAGE=$VllmImage"
+        "--build-arg", "VLLM_IMAGE=$VllmImage",
+        "--build-arg", "PIP_INDEX_URL=$PipIndexUrl",
+        "--build-arg", "PIP_EXTRA_INDEX_URL=$PipExtraIndexUrl"
     )
     if ($NoCache) { $buildArguments += "--no-cache" }
     $buildArguments += "."
@@ -51,7 +55,7 @@ try {
 
     Write-ProgressLog "[2/4] Verifying dependencies with the repository source mounted read-only"
     $verifyArguments = @("run", "--rm", "--entrypoint", "python")
-    foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services", "docker")) {
+    foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services", "clef_service", "nanojev_service", "docker")) {
         $source = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $directory))
         $verifyArguments += @("--mount", "type=bind,source=$source,target=/app/$directory,readonly")
     }

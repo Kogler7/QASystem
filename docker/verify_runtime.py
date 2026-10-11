@@ -41,6 +41,9 @@ MODULES = (
     "tiktoken",
     "torch",
     "torchvision",
+    "transformers",
+    "accelerate",
+    "safetensors",
     "uvicorn",
     "yaml",
 )
@@ -108,6 +111,14 @@ def _check_programs() -> None:
 
 
 def _check_application() -> None:
+    subprocess.run(
+        ["/opt/qasystem/clef-venv/bin/python", "-c",
+         "from clef_service.app import app; "
+         "from nanojev_service.app import app as nano_app; "
+         "from transformers import Qwen3_5ForConditionalGeneration; "
+         "import torch, torchvision, accelerate, safetensors"],
+        check=True, timeout=120,
+    )
     from docling.datamodel.base_models import InputFormat
 
     assert hasattr(InputFormat, "PPTX")

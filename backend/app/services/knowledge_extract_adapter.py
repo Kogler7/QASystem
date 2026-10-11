@@ -123,6 +123,8 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
         summary["extract_version"] = result["extract_version"]
     if result.get("effective_config"):
         summary["effective_config"] = deepcopy(result["effective_config"])
+    if result.get("trace_id"):
+        summary["trace_id"] = result["trace_id"]
     return summary
 
 
@@ -328,24 +330,37 @@ def run_aggregate(
         if label == ke_version.V31:
             configured.update(request_timeout=extraction_config["request_timeout"],
                               document_timeout=extraction_config["document_timeout"])
-    result = runner(
-        ontology=ontology,
-        chunks=chunks,
-        target_types=list(target_types) if target_types is not None else None,
-        validation_mode="permissive",
-        best_effort=True,
-        model=model,
-        base_url=base_url,
-        api_key=api_key,
-        max_workers=max_workers,
-        **configured,
-    )
+    from algorithm.extraction_trace import ExtractionTrace
+    trace = getattr(configured.get("llm"), "extraction_trace", None)
+    if isinstance(trace, ExtractionTrace):
+        trace.write("input", {"request_id": observability.get_request_id(), "ontology": ontology,
+                              "texts": texts, "ranges": ranges, "metadata": metadata})
+    try:
+        result = runner(
+            ontology=ontology,
+            chunks=chunks,
+            target_types=list(target_types) if target_types is not None else None,
+            validation_mode="permissive",
+            best_effort=True,
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+            max_workers=max_workers,
+            **configured,
+        )
+    except Exception as exc:
+        if isinstance(trace, ExtractionTrace):
+            trace.write("failure", {"exception_type": type(exc).__name__})
+        raise
     # 盖戳供 _quality_summary 透传，评测侧据此区分结果出自哪版算法。
     result["extract_version"] = concrete_version
     if extraction_config:
         from backend.app.services.extraction_config import public_config
 
         result["effective_config"] = public_config(extraction_config)
+    if isinstance(trace, ExtractionTrace):
+        result["trace_id"] = trace.trace_id
+        trace.write("result", result)
     return result
 
 

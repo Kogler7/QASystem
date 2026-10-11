@@ -72,10 +72,11 @@ def parse_device_ids(value: str | None) -> list[str]:
 
 
 def configured_gpu_ids() -> list[str]:
+    reserved = set(parse_device_ids(os.getenv("EXECUTION_GPU_RESERVED_DEVICE_IDS")))
     for name in ("EXECUTION_GPU_DEVICE_IDS", "GPU_DEVICE_IDS", "CUDA_VISIBLE_DEVICES"):
         ids = parse_device_ids(os.getenv(name))
         if ids:
-            return ids
+            return [item for item in ids if item not in reserved]
     return []
 
 
@@ -117,7 +118,7 @@ def _query_nvidia_smi(device_ids: list[str]) -> list[GpuSnapshot]:
         if len(fields) < 5:
             continue
         physical_index = fields[0]
-        if device_ids and physical_index not in device_ids:
+        if device_ids and physical_index not in device_ids and fields[1] not in device_ids:
             continue
         snapshots.append(
             GpuSnapshot(
@@ -150,12 +151,19 @@ class GpuInventory:
             if not force and self._cached and now - self._cached_at < self.cache_seconds:
                 return list(self._cached)
             ids = configured_gpu_ids()
-            snapshots = _query_nvidia_smi(ids)
-            seen = {item.physical_index for item in snapshots}
+            has_config = any(parse_device_ids(os.getenv(name)) for name in (
+                "EXECUTION_GPU_DEVICE_IDS", "GPU_DEVICE_IDS", "CUDA_VISIBLE_DEVICES"))
+            snapshots = _query_nvidia_smi(ids) if ids or not has_config else []
+            seen = {value for item in snapshots for value in (item.physical_index, item.device_uuid)}
+            reserved = set(parse_device_ids(os.getenv("EXECUTION_GPU_RESERVED_DEVICE_IDS")))
             # A configured device list still produces a useful allocation record
             # in development containers without nvidia-smi or NVML.
             for physical_index in ids:
                 if physical_index in seen:
+                    continue
+                if any(item.startswith("GPU-") != physical_index.startswith("GPU-") for item in reserved):
+                    # Without a successful probe we cannot safely resolve a
+                    # UUID reservation against an index (or the reverse).
                     continue
                 snapshots.append(
                     GpuSnapshot(
@@ -167,6 +175,7 @@ class GpuInventory:
                         source="configuration",
                     )
                 )
+            snapshots = [item for item in snapshots if item.physical_index not in reserved and item.device_uuid not in reserved]
             self._cached = snapshots
             self._cached_at = now
             return list(snapshots)

@@ -25,6 +25,25 @@ def _chunks(directory):
     return directory
 
 
+def test_outer_retries_archive_each_result_including_success(tmp_path, monkeypatch):
+    counter = [0]
+
+    def stages(**kwargs):
+        counter[0] += 1
+        result = {'status': 'failed' if counter[0] == 1 else 'succeeded', 'round': counter[0]}
+        _save(tmp_path / 'backend_extract.json', result)
+        return result, None, ''
+
+    monkeypatch.setattr(run, 'run_case_stages', stages)
+    monkeypatch.setattr(run, 'RETRY_SLEEP_SECONDS', 0)
+    run.run_case_with_retries(label='case', run_backend=True, run_plugin=False,
+        base_url='', mcp_url='', ontology='', sources=[], options={}, params={},
+        golden=None, out_dir=tmp_path, score_ctx=None, modes=['extract'], reuse_dir=None)
+    assert counter[0] == 2
+    assert json.loads((tmp_path / 'attempts/01/backend_extract.json').read_text())['round'] == 1
+    assert json.loads((tmp_path / 'attempts/02/backend_extract.json').read_text())['round'] == 2
+
+
 def _backend(out_dir, *, reuse_dir=None, reuse_extract_dir=None):
     return run.run_backend_case(
         base_url="http://fixture.invalid", ontology="entity T", sources=[], options={}, params={},
