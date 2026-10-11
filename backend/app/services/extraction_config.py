@@ -27,6 +27,7 @@ class ProviderProfile(BaseModel):
     disable_thinking: bool = True
     api_mode: Literal["auto", "chat"] = "auto"
     thinking_parameter: Literal["thinking", "enable_thinking", "none"] = "thinking"
+    response_format: Literal["auto", "json_object"] = "auto"
 
 
 OVERRIDE_FIELDS = ("version", "provider", "request_timeout", "document_timeout")
@@ -94,7 +95,7 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
     return {key: config.get(key) for key in (
         "version", "provider", "model", "request_timeout", "document_timeout",
         "max_tokens", "disable_thinking",
-        "api_mode", "thinking_parameter",
+        "api_mode", "thinking_parameter", "response_format",
     )}
 
 

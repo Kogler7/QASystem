@@ -82,6 +82,7 @@ class ScheduledClient:
         self.timeout = float(config["request_timeout"])
         self.thinking_parameter = config.get("thinking_parameter", "thinking")
         self.disable_thinking = config["disable_thinking"]
+        self.response_format = config.get("response_format", "auto")
         budget = config.get("document_timeout")
         self.deadline = time.monotonic() + float(budget) if budget is not None else None
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._chat))
@@ -105,6 +106,8 @@ class ScheduledClient:
             return response
 
     def _chat(self, **kwargs):
+        if self.response_format == "json_object" and (kwargs.get("response_format") or {}).get("type") == "json_schema":
+            kwargs["response_format"] = {"type": "json_object"}
         if self.disable_thinking and self.thinking_parameter != "thinking":
             extra = dict(kwargs.get("extra_body") or {})
             extra.pop("thinking", None)

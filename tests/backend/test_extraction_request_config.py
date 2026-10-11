@@ -169,6 +169,19 @@ def test_http_deadline_and_provider_thinking_parameter(providers, monkeypatch):
     assert len(seen) == 1
 
 
+def test_provider_json_format_override_is_request_local(providers, monkeypatch):
+    monkeypatch.setattr(runtime, "_pools", {})
+    seen = []
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: seen.append(kw))))
+    chosen = config.resolve_config({"provider": "siliconflow"})
+    schema = {"type": "json_schema", "json_schema": {"name": "test", "schema": {"type": "object"}}}
+    runtime.ScheduledClient(client, {**chosen, "response_format": "json_object"}).chat.completions.create(response_format=schema)
+    runtime.ScheduledClient(client, chosen).chat.completions.create(response_format=schema)
+    assert seen[0]["response_format"] == {"type": "json_object"}
+    assert seen[1]["response_format"] == schema
+    assert schema["type"] == "json_schema"
+
+
 @pytest.mark.parametrize("version", ["v2", "v3", "latest", "v3.1"])
 def test_live_client_configuration_uses_chat_only_without_network(providers, monkeypatch, version):
     import openai
