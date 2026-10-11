@@ -49,15 +49,66 @@ DETERMINISTIC_RELATION_IDS = frozenset(
     }
 )
 
+# These edges are assembled from document structure on the standard route.
+# Other routes still have to classify them, because nothing else builds the edge.
+_STANDARD_ASSEMBLED_TOKENS = frozenset(
+    {
+        "issuedby",
+        "proposedby",
+        "administeredby",
+        "defines",
+        "classifiedunder",
+        "replaces",
+        "cites",
+        "standardizes",
+        "hasdevelopmentstage",
+    }
+)
 
-def enumerate_relation_pairs(plan: Any, entities: Iterable[Any]) -> list[dict[str, Any]]:
-    """Enumerate only ontology-assignable, non-hierarchical entity pairs.
 
-    The returned records are stable prompt contracts.  This function never
-    creates or merges endpoint candidates; it merely describes legal choices
-    for the relation classifier.
+def relation_token(value: Any) -> str:
+    """Compare relation ids ignoring case and underscores."""
+    return "".join(ch for ch in canonical_name(value) if ch.isalnum())
+
+
+def withheld_relation_tokens(route_kind: str = "") -> frozenset[str]:
+    """Relation tokens the classifier must not decide for this document route.
+
+    Structural edges are always assembled from spans. Cover and definition
+    edges are assembled only for standards; official and generic documents
+    still need the classifier to choose them.
     """
-    rows: list[dict[str, Any]] = []
+    if route_kind == "standard":
+        return DETERMINISTIC_RELATION_IDS
+    return DETERMINISTIC_RELATION_IDS - _STANDARD_ASSEMBLED_TOKENS
+
+
+def pair_relation_ids(pair: dict[str, Any]) -> list[str]:
+    """Ontology labels the classifier may assign to this entity pair."""
+    ids = [str(item) for item in (pair.get("relation_ids") or []) if str(item)]
+    if ids:
+        return ids
+    single = str(pair.get("relation_id") or "")
+    if not single or single == "NONE":
+        return []
+    if "|" in single:
+        return [part for part in single.split("|") if part]
+    return [single]
+
+
+def enumerate_relation_pairs(
+    plan: Any,
+    entities: Iterable[Any],
+    *,
+    skip_tokens: frozenset[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Screen entity pairs that the ontology can actually relate.
+
+    Each row is one ordered entity pair. ``relation_ids`` lists every
+    non-assembled ontology label between those two types; the classifier
+    picks one label or NONE. Endpoint candidates are never created here.
+    """
+    skip = DETERMINISTIC_RELATION_IDS if skip_tokens is None else skip_tokens
     entity_rows: list[dict[str, Any]] = []
     for entity in entities:
         if isinstance(entity, dict):
@@ -71,7 +122,6 @@ def enumerate_relation_pairs(plan: Any, entities: Iterable[Any]) -> list[dict[st
         if candidate_id and type_id:
             entity_rows.append({"id": candidate_id, "type": type_id, "name": name})
     entity_rows.sort(key=lambda row: (row["id"], row["type"], row["name"]))
-    seen: set[tuple[str, str, str, str]] = set()
 
     # The ontology already declares each relation's source/target class, so we
     # expand every entity type to itself + all ancestors once and bucket the
@@ -114,12 +164,13 @@ def enumerate_relation_pairs(plan: Any, entities: Iterable[Any]) -> list[dict[st
             class_rows_cache[class_key] = cached
         return cached
 
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for specs in plan.relation_specs.values():
         for spec in specs:
             # relation_specs is keyed by canonical relation ID; use the same
             # stable spelling in the pair contract.
             relation_id = canonical_name(spec.relation_id)
-            if canonical_name(relation_id) in DETERMINISTIC_RELATION_IDS:
+            if relation_token(relation_id) in skip:
                 continue
             sources = rows_assignable_to(spec.source)
             if not sources:
@@ -127,31 +178,60 @@ def enumerate_relation_pairs(plan: Any, entities: Iterable[Any]) -> list[dict[st
             targets = rows_assignable_to(spec.target)
             if not targets:
                 continue
-            signature = spec.signature
+            comment = " ".join((getattr(spec, "comment", "") or "").split())
             for source in sources:
                 for target in targets:
                     if source["id"] == target["id"]:
                         continue
-                    key = (source["id"], relation_id, target["id"], signature)
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    raw_key = "|".join(key)
-                    pair_id = "pair-" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:16]
-                    rows.append(
-                        {
-                            "pair_id": pair_id,
+                    key = (source["id"], target["id"])
+                    bucket = grouped.get(key)
+                    if bucket is None:
+                        bucket = {
                             "source_id": source["id"],
                             "target_id": target["id"],
                             "source_type": source["type"],
                             "target_type": target["type"],
                             "source_name": source["name"],
                             "target_name": target["name"],
-                            "relation_id": relation_id,
-                            "signature": signature,
+                            "relation_ids": [],
+                            "relation_comments": {},
+                            "signatures": [],
                         }
-                    )
-    rows.sort(key=lambda row: (row["source_id"], row["relation_id"], row["target_id"], row["pair_id"]))
+                        grouped[key] = bucket
+                    if relation_id not in bucket["relation_ids"]:
+                        bucket["relation_ids"].append(relation_id)
+                    if comment and relation_id not in bucket["relation_comments"]:
+                        bucket["relation_comments"][relation_id] = comment
+                    if spec.signature not in bucket["signatures"]:
+                        bucket["signatures"].append(spec.signature)
+    rows: list[dict[str, Any]] = []
+    for bucket in grouped.values():
+        relation_ids = tuple(sorted(bucket["relation_ids"]))
+        if not relation_ids:
+            continue
+        raw_key = "|".join((bucket["source_id"], bucket["target_id"], *relation_ids))
+        pair_id = "pair-" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:16]
+        comments = {
+            relation_id: bucket["relation_comments"][relation_id]
+            for relation_id in relation_ids
+            if relation_id in bucket["relation_comments"]
+        }
+        rows.append(
+            {
+                "pair_id": pair_id,
+                "source_id": bucket["source_id"],
+                "target_id": bucket["target_id"],
+                "source_type": bucket["source_type"],
+                "target_type": bucket["target_type"],
+                "source_name": bucket["source_name"],
+                "target_name": bucket["target_name"],
+                "relation_id": relation_ids[0] if len(relation_ids) == 1 else "",
+                "relation_ids": list(relation_ids),
+                "relation_comments": comments,
+                "signature": bucket["signatures"][0] if len(bucket["signatures"]) == 1 else "",
+            }
+        )
+    rows.sort(key=lambda row: (row["source_id"], row["target_id"], row["pair_id"]))
     return rows
 
 
@@ -380,4 +460,7 @@ __all__ = [
     "DETERMINISTIC_RELATION_IDS",
     "RelationResolver",
     "enumerate_relation_pairs",
+    "pair_relation_ids",
+    "relation_token",
+    "withheld_relation_tokens",
 ]

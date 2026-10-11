@@ -62,6 +62,12 @@ def _unquote(value: str) -> str:
     return value
 
 
+def _relation_label_and_comment(label: str) -> tuple[str, str]:
+    """Split ``ISSUED_BY // 发布主体`` into the identifier and its inline gloss."""
+    body, _, comment = (label or "").partition("//")
+    return body.strip().strip('"'), " ".join(comment.split())
+
+
 def _clean_relation_identifier(value: str) -> str:
     """Remove PlantUML stereotypes such as ``ACTS_ON <<ACTS_ON>>``.
 
@@ -319,7 +325,7 @@ class OntologySchema:
                         "line": stripped,
                         "source": _unquote(source_symbol),
                         "target": _unquote(target_symbol),
-                        "relation": _clean_relation_identifier(relation_match.group("label").split("//", 1)[0].strip().strip('"')),
+                        "relation": _clean_relation_identifier(_relation_label_and_comment(relation_match.group("label"))[0]),
                         "unresolved_endpoints": [
                             endpoint
                             for endpoint in (_unquote(source_symbol), _unquote(target_symbol))
@@ -328,7 +334,8 @@ class OntologySchema:
                     }
                 )
                 continue
-            relation_name = _clean_relation_identifier(relation_match.group("label").split("//", 1)[0].strip().strip('"'))
+            relation_body, relation_comment = _relation_label_and_comment(relation_match.group("label"))
+            relation_name = _clean_relation_identifier(relation_body)
             if not relation_name:
                 continue
             # `A rdfs:subClassOf B` 是继承而不是普通关系：不归一化会让继承链整条
@@ -354,6 +361,7 @@ class OntologySchema:
                     target=target_class.identifier,
                     source_cardinality=source_cardinality,
                     target_cardinality=target_cardinality,
+                    comment=relation_comment,
                 )
             )
             relation_line_numbers.append(line_number)
