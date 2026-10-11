@@ -1,0 +1,2389 @@
+[
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/evaluator-audit/20261008-161543/tmp/eval/runs/20261008-041741/official/official_01/backend_extract.json",
+    "prediction_sha256": "df48e5f9c35635dddbf514bceb01be05720326db15324050971b4fdda22f152e",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "eb4ae5f2c67907756824",
+    "entities": [
+      34,
+      53
+    ],
+    "relations": [
+      75,
+      62
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/evaluator-audit/20261008-161543/tmp/eval/runs/20261008-041741/simple/Simple_故障规则的诊断/backend_extract.json",
+    "prediction_sha256": "e745a919a9abf9a5fa6c97c779fc7bbe0c9c9f2189ead7a15dfd3ddc232d0664",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/simple/Simple_故障规则的诊断/extract/golden.json",
+    "golden_sha256": "6c0ea0f48949edfac8176a7560d043419859635223982ece0120c1b2b43649de",
+    "case": "simple/Simple_故障规则的诊断",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "simple/Simple_故障规则的诊断/docs/Simple_故障规则的诊断.docx",
+        "sha256": "baff4d7b77788b6a45e11291d33d4c76fd404e39121c3266908d196bbe976d74",
+        "missing": false
+      }
+    ],
+    "source_id": "f7f543f259d1bad96b07",
+    "entities": [
+      27,
+      39
+    ],
+    "relations": [
+      1,
+      2
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260929-113615/rule/故障记录test/backend_extract.json",
+    "prediction_sha256": "772ab349535f221d0c30a2f7cabd3759851c2bc9f860cd820abdf8c22a5127ef",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval/rule/故障记录test/extract/golden.json",
+    "golden_sha256": "e2128c608e36dfff63beb4bed7714d7a1f072847e8aee7d41c8b45e4b687a5ad",
+    "case": "rule/故障记录test",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "e46d12a60f4e6ee95d5f",
+    "entities": [
+      6,
+      3
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/official/official_03/backend_extract.json",
+    "prediction_sha256": "f81b834804a1cbc59af68ebe4f1d7afed2a7e191d7b68a4fd76122730fad3eb7",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_03/extract/golden.json",
+    "golden_sha256": "2f668a6109ae0a8086e45f91d1fc75dc3bdeaff41a849df47c2fa52161350ba5",
+    "case": "official/official_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "ed44d148078cf28afa95",
+    "entities": [
+      11,
+      14
+    ],
+    "relations": [
+      23,
+      12
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/official/official_06/backend_extract.json",
+    "prediction_sha256": "5cbf088e289a569a20d527f8eec40b9cfe8d4cf5061eac06881c23ac17424416",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_06/extract/golden.json",
+    "golden_sha256": "c7f9da0682b225f46f868eed85417d5c9ef0de25129b76057aeefa7c468d4134",
+    "case": "official/official_06",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "23d571f4b66667ea757f",
+    "entities": [
+      11,
+      27
+    ],
+    "relations": [
+      23,
+      26
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/official/official_08/backend_extract.json",
+    "prediction_sha256": "46bba80caf21941e58abbe65ad710faef93f25f62e980d8d346fdbadc2dbbb23",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_08/extract/golden.json",
+    "golden_sha256": "759e4f8b6505f3fa270ced19d8bebb2a25dd0acd676bb5e5d30584cbc9384894",
+    "case": "official/official_08",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "f7ab8aec052b19f46ec6",
+    "entities": [
+      15,
+      19
+    ],
+    "relations": [
+      36,
+      21
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/official/official_10/backend_extract.json",
+    "prediction_sha256": "55f4b284a3f4bffc709505cc171ebadfd382ca2722a4f8ff3ce449b7462486c9",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_10/extract/golden.json",
+    "golden_sha256": "af2c6acc20dd7272fd738807134f98e70d99fe2eb62a09716607c2d4de5aff14",
+    "case": "official/official_10",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "5cca2a73af6853a5fb0a",
+    "entities": [
+      16,
+      14
+    ],
+    "relations": [
+      40,
+      5
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/rule/故障记录test/backend_extract.json",
+    "prediction_sha256": "e6cde870ce3c36fb0e2a48d717c66900d542fe940c40a60e80fa12203ab3fe7a",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval/rule/故障记录test/extract/golden.json",
+    "golden_sha256": "e2128c608e36dfff63beb4bed7714d7a1f072847e8aee7d41c8b45e4b687a5ad",
+    "case": "rule/故障记录test",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "350765d47b27ff755952",
+    "entities": [
+      6,
+      3
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "00d1d0fc804cffcd05cf491e3dd129c0ed7a40cf2e28e7773f42b2770235ce0f",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_01/extract/golden.json",
+    "golden_sha256": "a02f9fba63e1ed94c7e45ad92f47f50612b85f8e65d02d565dd42717a74b3bbe",
+    "case": "standard/standard_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "3dd789c552c3732a8f49",
+    "entities": [
+      122,
+      226
+    ],
+    "relations": [
+      143,
+      128
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/standard/standard_02/backend_extract.json",
+    "prediction_sha256": "fd4d44662771711d722cbd79956f9700fa0cd34f3763b0b5e7be73b1c11eac2a",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_02/extract/golden.json",
+    "golden_sha256": "fe7495efe63a3ba16d28d430d40cbf3d6603b632ba1cedf50642b186e767402d",
+    "case": "standard/standard_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "d5b54c6f795161eeb9ea",
+    "entities": [
+      335,
+      243
+    ],
+    "relations": [
+      370,
+      138
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/standard/standard_03/backend_extract.json",
+    "prediction_sha256": "f5e12ac8523ae933032700fe2233c7772187c706cfed37847a20f45595564154",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_03/extract/golden.json",
+    "golden_sha256": "1ebb1e8888656e5bfdefd55ada6d1c9d7674edf8c2fb2a7da34b6448af1fc3cb",
+    "case": "standard/standard_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "de91d60acbef60eaa3c3",
+    "entities": [
+      403,
+      563
+    ],
+    "relations": [
+      434,
+      183
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-001729/standard/standard_04/backend_extract.json",
+    "prediction_sha256": "68e149c51ca2833fdbedec8f5133455c0dafed92a7968993b5b9fff4d4320ed3",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_04/extract/golden.json",
+    "golden_sha256": "758d87a3d7d14fd32857aed9dfa7f3d22d83fd62063e51b48a51b6cea9e22a7b",
+    "case": "standard/standard_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "bcf35478f5cfef8591f5",
+    "entities": [
+      322,
+      422
+    ],
+    "relations": [
+      342,
+      155
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_01/backend_extract.json",
+    "prediction_sha256": "625f585cf481a18685dcb0917973035e0f656f89edc2a28481ee13f59fbea219",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "09a3677b653afc8510cf",
+    "entities": [
+      34,
+      65
+    ],
+    "relations": [
+      75,
+      65
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_02/backend_extract.json",
+    "prediction_sha256": "ab80f351d144a8ae1aa9845ceb07de75d46ab51c06739ebbe5890f61bc8a5f32",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "dc0009b458879bf00acf",
+    "entities": [
+      23,
+      35
+    ],
+    "relations": [
+      42,
+      58
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_03/backend_extract.json",
+    "prediction_sha256": "bafff2d5ef9e23bfab968ff8c748b7f413958eca61c9d3628b9ebef004200528",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_03/extract/golden.json",
+    "golden_sha256": "2f668a6109ae0a8086e45f91d1fc75dc3bdeaff41a849df47c2fa52161350ba5",
+    "case": "official/official_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "4f5a52b6bb086b59307d",
+    "entities": [
+      11,
+      25
+    ],
+    "relations": [
+      23,
+      21
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_04/backend_extract.json",
+    "prediction_sha256": "8bb5ef9db0c223e15caf5936950b31357494ea5ab83c090ebefee969ccb488f5",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_04/extract/golden.json",
+    "golden_sha256": "9b36af270c4417ae50e9cb4dbc94141f3fc9caab0e2849a394fae25b1500468c",
+    "case": "official/official_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "4e1fb4c3db597527cc5d",
+    "entities": [
+      18,
+      95
+    ],
+    "relations": [
+      42,
+      80
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_06/backend_extract.json",
+    "prediction_sha256": "e94e60ead240d63345eeb29ee6f2fbaf916a30c4524194bdd63f80f94848470a",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_06/extract/golden.json",
+    "golden_sha256": "c7f9da0682b225f46f868eed85417d5c9ef0de25129b76057aeefa7c468d4134",
+    "case": "official/official_06",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "f5752ff63f1a6efeffcf",
+    "entities": [
+      11,
+      39
+    ],
+    "relations": [
+      23,
+      33
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_07/backend_extract.json",
+    "prediction_sha256": "cce7e86e26847be772680467b1b89e55858a91014f3419506626cf569423bce4",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_07/extract/golden.json",
+    "golden_sha256": "a8ebb0d5095c96ecc24238f27f4eb0b0ce6f1bf34ec185673d3b79b899eadf01",
+    "case": "official/official_07",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "e766e04219019fe3d7ee",
+    "entities": [
+      14,
+      11
+    ],
+    "relations": [
+      30,
+      21
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_08/backend_extract.json",
+    "prediction_sha256": "55ed0648a440d4ff5acfb058128eb149a5fde2e908aba3fc3cd85aea0e9d2d42",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_08/extract/golden.json",
+    "golden_sha256": "759e4f8b6505f3fa270ced19d8bebb2a25dd0acd676bb5e5d30584cbc9384894",
+    "case": "official/official_08",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "bba1204c8d363e49a211",
+    "entities": [
+      15,
+      210
+    ],
+    "relations": [
+      36,
+      205
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_09/backend_extract.json",
+    "prediction_sha256": "3b27613991abcf8baac2607060714f0fe2088732a798c2be91c28a6a1a2853ef",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_09/extract/golden.json",
+    "golden_sha256": "f15605cde7597615beb8e0530d7e56d9a6e9afaa71b6814b4326e4417d71937f",
+    "case": "official/official_09",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "63bb6cfd336b3fe5c63a",
+    "entities": [
+      25,
+      98
+    ],
+    "relations": [
+      55,
+      169
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-005904/official/official_10/backend_extract.json",
+    "prediction_sha256": "25d08c8d2cce8d3ee2b32a07f8755691d549ea0afa66c3390b181244062d1153",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_10/extract/golden.json",
+    "golden_sha256": "af2c6acc20dd7272fd738807134f98e70d99fe2eb62a09716607c2d4de5aff14",
+    "case": "official/official_10",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "de0a1845e3f3317cfaff",
+    "entities": [
+      16,
+      460
+    ],
+    "relations": [
+      40,
+      386
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_03/backend_extract.json",
+    "prediction_sha256": "c7dcd65d71e5d582f7340e865d44091244f949e95a93cb9605694d56c9b8e7aa",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_03/extract/golden.json",
+    "golden_sha256": "2f668a6109ae0a8086e45f91d1fc75dc3bdeaff41a849df47c2fa52161350ba5",
+    "case": "official/official_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "a00a9ed66a7d4c87eaaa",
+    "entities": [
+      11,
+      22
+    ],
+    "relations": [
+      23,
+      23
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_04/backend_extract.json",
+    "prediction_sha256": "7ce1ab589b152d9d480ed27dbca35916685cd92ad0fde24e13c102905cd9ad5e",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_04/extract/golden.json",
+    "golden_sha256": "9b36af270c4417ae50e9cb4dbc94141f3fc9caab0e2849a394fae25b1500468c",
+    "case": "official/official_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "e2d90f9e010686633b89",
+    "entities": [
+      18,
+      84
+    ],
+    "relations": [
+      42,
+      84
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_05/backend_extract.json",
+    "prediction_sha256": "ca7f163e7d9aa9c06ce76d23a79eea6d129c2ff178aae8466066c4721512b813",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_05/extract/golden.json",
+    "golden_sha256": "649114cabf671e0aa9183c76ebad016478bec045ca931d6d38d44a396b2fa2d8",
+    "case": "official/official_05",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "da1c40fe291f041af6f3",
+    "entities": [
+      9,
+      30
+    ],
+    "relations": [
+      23,
+      25
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_06/backend_extract.json",
+    "prediction_sha256": "c9fada9e35c2f6e9d47e2f013f71ef452b28ab0cf78f5327a6f468fc653b2b8e",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_06/extract/golden.json",
+    "golden_sha256": "c7f9da0682b225f46f868eed85417d5c9ef0de25129b76057aeefa7c468d4134",
+    "case": "official/official_06",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "f8552d892feedf052dde",
+    "entities": [
+      11,
+      36
+    ],
+    "relations": [
+      23,
+      32
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_07/backend_extract.json",
+    "prediction_sha256": "f75532f1ad4d3e3e1538c830813b7e7128fba7ac48fce3bdee3b27d331f1e2e4",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_07/extract/golden.json",
+    "golden_sha256": "a8ebb0d5095c96ecc24238f27f4eb0b0ce6f1bf34ec185673d3b79b899eadf01",
+    "case": "official/official_07",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "aeb5884a9ed5cd9aa395",
+    "entities": [
+      14,
+      19
+    ],
+    "relations": [
+      30,
+      22
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_08/backend_extract.json",
+    "prediction_sha256": "3ad1e8c5d456882b4e286d69eb75a2cd3d481efdf03596880c35c1cf52a2e0d8",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_08/extract/golden.json",
+    "golden_sha256": "759e4f8b6505f3fa270ced19d8bebb2a25dd0acd676bb5e5d30584cbc9384894",
+    "case": "official/official_08",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "bdc838129364de2223ca",
+    "entities": [
+      15,
+      274
+    ],
+    "relations": [
+      36,
+      320
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_09/backend_extract.json",
+    "prediction_sha256": "ee680befd1d6b85896e0432271cff166245f3364538448eb834357c9176c8791",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_09/extract/golden.json",
+    "golden_sha256": "f15605cde7597615beb8e0530d7e56d9a6e9afaa71b6814b4326e4417d71937f",
+    "case": "official/official_09",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "f602a769809330e8457d",
+    "entities": [
+      25,
+      89
+    ],
+    "relations": [
+      55,
+      89
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/official/official_10/backend_extract.json",
+    "prediction_sha256": "bd228214d9a40e9222806c9eca206f225634075bd9e259a4c02cf1548634bef1",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_10/extract/golden.json",
+    "golden_sha256": "af2c6acc20dd7272fd738807134f98e70d99fe2eb62a09716607c2d4de5aff14",
+    "case": "official/official_10",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "0ce0833e97f70bc096e7",
+    "entities": [
+      16,
+      257
+    ],
+    "relations": [
+      40,
+      238
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "fdc98a1843eb0fd5f51c8d158ee92ac128b02b345897faecbe3baf8f4ba3f6db",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_01/extract/golden.json",
+    "golden_sha256": "a02f9fba63e1ed94c7e45ad92f47f50612b85f8e65d02d565dd42717a74b3bbe",
+    "case": "standard/standard_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "c34fe85de7477022c2e0",
+    "entities": [
+      122,
+      227
+    ],
+    "relations": [
+      143,
+      194
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/standard/standard_02/backend_extract.json",
+    "prediction_sha256": "1dfc3cf50a1630ad2dddf910e4aef60bdd63433e47b9073177f846962cfc978e",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_02/extract/golden.json",
+    "golden_sha256": "fe7495efe63a3ba16d28d430d40cbf3d6603b632ba1cedf50642b186e767402d",
+    "case": "standard/standard_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "fccd3d6bce118884e152",
+    "entities": [
+      335,
+      397
+    ],
+    "relations": [
+      370,
+      131
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/standard/standard_03/backend_extract.json",
+    "prediction_sha256": "d3d6268d204f333e73e0821e84fdcfdeab78eaebf8934ddacc256d14922b6433",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_03/extract/golden.json",
+    "golden_sha256": "1ebb1e8888656e5bfdefd55ada6d1c9d7674edf8c2fb2a7da34b6448af1fc3cb",
+    "case": "standard/standard_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "579a2a2282c811b4af3b",
+    "entities": [
+      403,
+      600
+    ],
+    "relations": [
+      434,
+      131
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-030001/standard/standard_04/backend_extract.json",
+    "prediction_sha256": "37089dce9f8fbdc0708437deeff4584876f7522ad25480798691dc22b5ff7084",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_04/extract/golden.json",
+    "golden_sha256": "758d87a3d7d14fd32857aed9dfa7f3d22d83fd62063e51b48a51b6cea9e22a7b",
+    "case": "standard/standard_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "60124af9905dd4186e04",
+    "entities": [
+      322,
+      503
+    ],
+    "relations": [
+      342,
+      227
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-082952/official/official_04/backend_extract.json",
+    "prediction_sha256": "6bd470f4404449a3324567002549378c8e0621e314e3bec71bd0f3e7dfb8354c",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_04/extract/golden.json",
+    "golden_sha256": "9b36af270c4417ae50e9cb4dbc94141f3fc9caab0e2849a394fae25b1500468c",
+    "case": "official/official_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "9a46aa9881c103d602d0",
+    "entities": [
+      18,
+      42
+    ],
+    "relations": [
+      42,
+      74
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-082952/official/official_10/backend_extract.json",
+    "prediction_sha256": "a5914bf02a6a49480fe9ff8002f1d0ee8f62aafd2916b47adfe17c8a8b5bf9c2",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_10/extract/golden.json",
+    "golden_sha256": "af2c6acc20dd7272fd738807134f98e70d99fe2eb62a09716607c2d4de5aff14",
+    "case": "official/official_10",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "44638985d77096318e86",
+    "entities": [
+      16,
+      142
+    ],
+    "relations": [
+      40,
+      199
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_01/backend_extract.json",
+    "prediction_sha256": "ce9fa1e79098ee4c44221f0cbdc5a0ad3d13a8339edbc4c9a94c71d74f5554db",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "54a4842f5160a494057c",
+    "entities": [
+      34,
+      60
+    ],
+    "relations": [
+      75,
+      171
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_02/backend_extract.json",
+    "prediction_sha256": "b56e9c12daf08fb3f79d314be6116b0662bc88089801d6f463a117bef1c98716",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "e21824fe33bfb8885195",
+    "entities": [
+      23,
+      23
+    ],
+    "relations": [
+      42,
+      97
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_06/backend_extract.json",
+    "prediction_sha256": "08dc1b2ded802c275cb07396fab32a457c557f9c57eb99428b58737d20f0ed01",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_06/extract/golden.json",
+    "golden_sha256": "c7f9da0682b225f46f868eed85417d5c9ef0de25129b76057aeefa7c468d4134",
+    "case": "official/official_06",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "45c7f79f513e7018057e",
+    "entities": [
+      11,
+      15
+    ],
+    "relations": [
+      23,
+      60
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_07/backend_extract.json",
+    "prediction_sha256": "71b4161a6ab04120443defab64da41de4d52b575b2d474f28bb6c7be161e550c",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_07/extract/golden.json",
+    "golden_sha256": "a8ebb0d5095c96ecc24238f27f4eb0b0ce6f1bf34ec185673d3b79b899eadf01",
+    "case": "official/official_07",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "7be7838edb1a0ef84c1b",
+    "entities": [
+      14,
+      16
+    ],
+    "relations": [
+      30,
+      44
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_08/backend_extract.json",
+    "prediction_sha256": "9e5dc9109bb64713bbba9530a89eb4d42b8c69c0065a5066866456d7f555360d",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_08/extract/golden.json",
+    "golden_sha256": "759e4f8b6505f3fa270ced19d8bebb2a25dd0acd676bb5e5d30584cbc9384894",
+    "case": "official/official_08",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "dc1ba4110c36bcc6fca7",
+    "entities": [
+      15,
+      137
+    ],
+    "relations": [
+      36,
+      292
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_09/backend_extract.json",
+    "prediction_sha256": "a5ca776ff0c077dd32b152e32748f06a4a383928bd1fda87ff48a8a62c3d66fc",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_09/extract/golden.json",
+    "golden_sha256": "f15605cde7597615beb8e0530d7e56d9a6e9afaa71b6814b4326e4417d71937f",
+    "case": "official/official_09",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "c2b15bad18ad428c27e9",
+    "entities": [
+      25,
+      64
+    ],
+    "relations": [
+      55,
+      104
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/official/official_10/backend_extract.json",
+    "prediction_sha256": "0dd5370fd1438a75379ab50df164a01d8d26d3f39aa92682007261dc0d14b2da",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_10/extract/golden.json",
+    "golden_sha256": "af2c6acc20dd7272fd738807134f98e70d99fe2eb62a09716607c2d4de5aff14",
+    "case": "official/official_10",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "52ee99869749045c8369",
+    "entities": [
+      16,
+      233
+    ],
+    "relations": [
+      40,
+      488
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "ad3ad5edcfa8db45ae5e8fc12c63292abe533a70717078e4d479ff0b544e3457",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_01/extract/golden.json",
+    "golden_sha256": "a02f9fba63e1ed94c7e45ad92f47f50612b85f8e65d02d565dd42717a74b3bbe",
+    "case": "standard/standard_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "70a6629b52715611027a",
+    "entities": [
+      122,
+      117
+    ],
+    "relations": [
+      143,
+      58
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/standard/standard_02/backend_extract.json",
+    "prediction_sha256": "a5a92db252f6f594b8f92585be66f49e9e6345dd62b5a7bad41ba4df07c92f0d",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_02/extract/golden.json",
+    "golden_sha256": "fe7495efe63a3ba16d28d430d40cbf3d6603b632ba1cedf50642b186e767402d",
+    "case": "standard/standard_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "9532d5346b374c818566",
+    "entities": [
+      335,
+      115
+    ],
+    "relations": [
+      370,
+      29
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/standard/standard_03/backend_extract.json",
+    "prediction_sha256": "b5d866b594c0b8c87fe3ec4a157cc34bed3bd6736f059533b1b9e6b05246d962",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_03/extract/golden.json",
+    "golden_sha256": "1ebb1e8888656e5bfdefd55ada6d1c9d7674edf8c2fb2a7da34b6448af1fc3cb",
+    "case": "standard/standard_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "12bff0dcb2021623c3f3",
+    "entities": [
+      403,
+      253
+    ],
+    "relations": [
+      434,
+      67
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20260930-110025/standard/standard_04/backend_extract.json",
+    "prediction_sha256": "76202f330c1557a850789825e234fe22caf545662b9951963757f715176b990a",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_04/extract/golden.json",
+    "golden_sha256": "758d87a3d7d14fd32857aed9dfa7f3d22d83fd62063e51b48a51b6cea9e22a7b",
+    "case": "standard/standard_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "27868bd724ef06d333bb",
+    "entities": [
+      322,
+      246
+    ],
+    "relations": [
+      342,
+      42
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/official/official_06/backend_extract.json",
+    "prediction_sha256": "b9e9d6fd69ac374ff1fd5ab9c1cd1e16da8a1e71e1ee3160e5d93eac4cd99284",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_06/extract/golden.json",
+    "golden_sha256": "c7f9da0682b225f46f868eed85417d5c9ef0de25129b76057aeefa7c468d4134",
+    "case": "official/official_06",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "5cbb5d583fe6c13b83e5",
+    "entities": [
+      11,
+      16
+    ],
+    "relations": [
+      23,
+      9
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/official/official_07/backend_extract.json",
+    "prediction_sha256": "6ff1fb9fefc5084280f019e9c4899321b2c14a141e7cc7aa56c087e7743b1a6a",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_07/extract/golden.json",
+    "golden_sha256": "a8ebb0d5095c96ecc24238f27f4eb0b0ce6f1bf34ec185673d3b79b899eadf01",
+    "case": "official/official_07",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "a72ddc310c29c8d58af5",
+    "entities": [
+      14,
+      27
+    ],
+    "relations": [
+      30,
+      29
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/official/official_08/backend_extract.json",
+    "prediction_sha256": "f36c59b0d85d9521910fbd30412f30b2d2beb88f1976e66e18901b2c95c34065",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_08/extract/golden.json",
+    "golden_sha256": "759e4f8b6505f3fa270ced19d8bebb2a25dd0acd676bb5e5d30584cbc9384894",
+    "case": "official/official_08",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "d8d2c7177a398ca6635e",
+    "entities": [
+      15,
+      195
+    ],
+    "relations": [
+      36,
+      124
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/official/official_09/backend_extract.json",
+    "prediction_sha256": "fda4c280860c74a6b2f214180bdc367526c39576260200e37a72ce607e53f16f",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_09/extract/golden.json",
+    "golden_sha256": "f15605cde7597615beb8e0530d7e56d9a6e9afaa71b6814b4326e4417d71937f",
+    "case": "official/official_09",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "bc31f4a8a6dcb1d06667",
+    "entities": [
+      25,
+      74
+    ],
+    "relations": [
+      55,
+      63
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/official/official_10/backend_extract.json",
+    "prediction_sha256": "e3ad51895bf80c49b27ae624e045687124097bf72ff5f6bc06834cf594fce4a3",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_10/extract/golden.json",
+    "golden_sha256": "af2c6acc20dd7272fd738807134f98e70d99fe2eb62a09716607c2d4de5aff14",
+    "case": "official/official_10",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "2490f22818767e4f4cef",
+    "entities": [
+      16,
+      172
+    ],
+    "relations": [
+      40,
+      145
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/standard/standard_02/backend_extract.json",
+    "prediction_sha256": "1b41cd27bedbfa01e2bbacd87603a732701a67c2442ed9cce14e4a8389b726f7",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_02/extract/golden.json",
+    "golden_sha256": "fe7495efe63a3ba16d28d430d40cbf3d6603b632ba1cedf50642b186e767402d",
+    "case": "standard/standard_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "a77e5eeece8636553ea5",
+    "entities": [
+      335,
+      243
+    ],
+    "relations": [
+      370,
+      210
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/standard/standard_03/backend_extract.json",
+    "prediction_sha256": "8b673fcee43a9810bcdb1c463868a1c05d1c67a035fe2e6d829a4edbd6d6540b",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_03/extract/golden.json",
+    "golden_sha256": "1ebb1e8888656e5bfdefd55ada6d1c9d7674edf8c2fb2a7da34b6448af1fc3cb",
+    "case": "standard/standard_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "cc3ab98c3dc56b83714e",
+    "entities": [
+      403,
+      399
+    ],
+    "relations": [
+      434,
+      268
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261003-024912/standard/standard_04/backend_extract.json",
+    "prediction_sha256": "45d558d2b650f575a2e8b30e1ca98e1b5d25f8f1766f9b39e682b409a28c872b",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_04/extract/golden.json",
+    "golden_sha256": "758d87a3d7d14fd32857aed9dfa7f3d22d83fd62063e51b48a51b6cea9e22a7b",
+    "case": "standard/standard_04",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "0180ac1b15b45841e1bd",
+    "entities": [
+      322,
+      345
+    ],
+    "relations": [
+      342,
+      276
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217/official/official_01/backend_extract.json",
+    "prediction_sha256": "0df0bb5ecf5c4b59419c8dcf039506f3c12ed066741ab751fd02f529affcc365",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "b309a2f03df858b9a4cfc8ea7be00f15b034d865c1f74b98aa9dcf9316f5c6e7",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "823cf573c973763f365f",
+    "entities": [
+      34,
+      78
+    ],
+    "relations": [
+      80,
+      122
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217/official/official_03/backend_extract.json",
+    "prediction_sha256": "81f3506f3f42c102ec02b791d57b698b3c46db1bc9ffcb629d4a416cec142d39",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_03/extract/golden.json",
+    "golden_sha256": "55e94df34fb077d8fecf3ac4fe7d5d61d6997994d352a353a859db5907cb6d05",
+    "case": "official/official_03",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_03/docs/关于印发《中国中车股份有限公司产品研发管理办法》的通知.pdf",
+        "sha256": "f3225b2ff1481f5abb9646e3dadf50bac8e404e2deeb3471715f28ecfeb4ceef",
+        "missing": false
+      },
+      {
+        "path": "official/official_03/docs/表单.pdf",
+        "sha256": "b7e40fe98997719121afab3cb964816caedfa7b533bff453bd64d63984fe4a1e",
+        "missing": false
+      }
+    ],
+    "source_id": "44686a02770cdf778329",
+    "entities": [
+      9,
+      17
+    ],
+    "relations": [
+      22,
+      10
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217/official/official_04/backend_extract.json",
+    "prediction_sha256": "a9684652e6784ecc007721ad921ea3a1fd969b8d5e02cd607f7886e8e4ac34b8",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_04/extract/golden.json",
+    "golden_sha256": "199093f2c9e5a2e02a2d1fde83cd4f7a350428c63dd93f9b78f1d495a512c6f3",
+    "case": "official/official_04",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_04/docs/关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.pdf",
+        "sha256": "d6f49b194ab94c572016a4dcaba44d1f243ecef10522c88d1989242638d7b04e",
+        "missing": false
+      },
+      {
+        "path": "official/official_04/docs/表单.pdf",
+        "sha256": "7e550194c0dc0efd3ac8fd9356c25a66424e562b30547b709bdb2af17da8016b",
+        "missing": false
+      }
+    ],
+    "source_id": "fc376f0e8234ad5d3324",
+    "entities": [
+      24,
+      51
+    ],
+    "relations": [
+      50,
+      114
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217/official/official_05/backend_extract.json",
+    "prediction_sha256": "70c129aef7c9366f93962c8d7ba36ee0c22561bff3e67b7459e0d8699f260d8f",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_05/extract/golden.json",
+    "golden_sha256": "c000cd04e3b60a77fc8b6538dada1dee703b0685e31ac97aa16b458d3bb38cb2",
+    "case": "official/official_05",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_05/docs/关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.pdf",
+        "sha256": "48a4acc0b837c1fb6766cac1851bba7abb3d246136748da1313f2b49d77e16fc",
+        "missing": false
+      },
+      {
+        "path": "official/official_05/docs/表单.pdf",
+        "sha256": "6698ace69b811090feffb26f6c28f4b53a29286d75b7f8521e0e407a476392d2",
+        "missing": false
+      }
+    ],
+    "source_id": "d67737060a39ab80542e",
+    "entities": [
+      10,
+      20
+    ],
+    "relations": [
+      27,
+      48
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217/simple/Simple_故障规则的诊断/backend_extract.json",
+    "prediction_sha256": "37e29a30876e6dbfb26d9b2d295320ae120563742a670a82e42b6ef41ac3fb5f",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/simple/Simple_故障规则的诊断/extract/golden.json",
+    "golden_sha256": "34251b0c8e15737749f7dcf1f37b864cf014475d2ff72e3da4390fbf00c2d60a",
+    "case": "simple/Simple_故障规则的诊断",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "simple/Simple_故障规则的诊断/docs/Simple_故障规则的诊断.docx",
+        "sha256": "baff4d7b77788b6a45e11291d33d4c76fd404e39121c3266908d196bbe976d74",
+        "missing": false
+      }
+    ],
+    "source_id": "367aade605948d508673",
+    "entities": [
+      27,
+      134
+    ],
+    "relations": [
+      0,
+      5
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217-8e7c2f70691c/official/official_01/backend_extract.json",
+    "prediction_sha256": "b1fb03c2e9f0376a5001d84dc5dbc725ea7f36ca74895138eb66f9291451cafe",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "b309a2f03df858b9a4cfc8ea7be00f15b034d865c1f74b98aa9dcf9316f5c6e7",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "b162155574ba787d41d5",
+    "entities": [
+      34,
+      19
+    ],
+    "relations": [
+      80,
+      8
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217-8e7c2f70691c/official/official_05/backend_extract.json",
+    "prediction_sha256": "0942f97a3e28dbc694754b2baab59a3baa208b9c165a37f412f4a2db8f8e03a5",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_05/extract/golden.json",
+    "golden_sha256": "c000cd04e3b60a77fc8b6538dada1dee703b0685e31ac97aa16b458d3bb38cb2",
+    "case": "official/official_05",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_05/docs/关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.pdf",
+        "sha256": "48a4acc0b837c1fb6766cac1851bba7abb3d246136748da1313f2b49d77e16fc",
+        "missing": false
+      },
+      {
+        "path": "official/official_05/docs/表单.pdf",
+        "sha256": "6698ace69b811090feffb26f6c28f4b53a29286d75b7f8521e0e407a476392d2",
+        "missing": false
+      }
+    ],
+    "source_id": "9091aad7c301e8cf60cc",
+    "entities": [
+      10,
+      2
+    ],
+    "relations": [
+      27,
+      1
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217-8e7c2f70691c/rule/rule_01/backend_extract.json",
+    "prediction_sha256": "b6d8dd0dd42712891e404730d4247f90f35e3bd0a05aaaa81853c735deb3d361",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/rule/rule_01/extract/golden.json",
+    "golden_sha256": "e2a58a7b57f19347528a53f68120315636469dc768979725160b1076005489b4",
+    "case": "rule/rule_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "rule/rule_01/docs/规则测试数据.xlsx",
+        "sha256": "8353ccb9cc9873159fb8504b52d723e809d692ccd95fa1bf37574ab30f5a162a",
+        "missing": false
+      }
+    ],
+    "source_id": "6865ca59e77a015b5961",
+    "entities": [
+      40,
+      77
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261010-232217-8e7c2f70691c/simple/Simple_故障规则的诊断/backend_extract.json",
+    "prediction_sha256": "571905194710471bb17c246318fe32497781443ab3db636d98f3cfa67361578c",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/simple/Simple_故障规则的诊断/extract/golden.json",
+    "golden_sha256": "34251b0c8e15737749f7dcf1f37b864cf014475d2ff72e3da4390fbf00c2d60a",
+    "case": "simple/Simple_故障规则的诊断",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "simple/Simple_故障规则的诊断/docs/Simple_故障规则的诊断.docx",
+        "sha256": "baff4d7b77788b6a45e11291d33d4c76fd404e39121c3266908d196bbe976d74",
+        "missing": false
+      }
+    ],
+    "source_id": "d509710b54e83100a0f3",
+    "entities": [
+      27,
+      53
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-001950/official/official_01/backend_extract.json",
+    "prediction_sha256": "bf17e6cef5863714f23cdb8865bb84c5ae5a2dfb3a2aa702c2c6ba0317d2ddca",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "b309a2f03df858b9a4cfc8ea7be00f15b034d865c1f74b98aa9dcf9316f5c6e7",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "f6c85f7f4ff4d67fe26a",
+    "entities": [
+      34,
+      21
+    ],
+    "relations": [
+      80,
+      8
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-001950/official/official_04/backend_extract.json",
+    "prediction_sha256": "7322385bf80c18103392e2d4275b7db2ab1a87430bea59df87f331ab3c3302bd",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_04/extract/golden.json",
+    "golden_sha256": "199093f2c9e5a2e02a2d1fde83cd4f7a350428c63dd93f9b78f1d495a512c6f3",
+    "case": "official/official_04",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_04/docs/关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.pdf",
+        "sha256": "d6f49b194ab94c572016a4dcaba44d1f243ecef10522c88d1989242638d7b04e",
+        "missing": false
+      },
+      {
+        "path": "official/official_04/docs/表单.pdf",
+        "sha256": "7e550194c0dc0efd3ac8fd9356c25a66424e562b30547b709bdb2af17da8016b",
+        "missing": false
+      }
+    ],
+    "source_id": "d493381e6d0a82279525",
+    "entities": [
+      24,
+      43
+    ],
+    "relations": [
+      50,
+      39
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-023014/official/official_01/backend_extract.json",
+    "prediction_sha256": "19739ef81e0ba77743ae571b60acf29627687845ead362a7154adb497aa4c6cd",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "b309a2f03df858b9a4cfc8ea7be00f15b034d865c1f74b98aa9dcf9316f5c6e7",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "8aa5ae837479f5cfd9f4",
+    "entities": [
+      34,
+      22
+    ],
+    "relations": [
+      80,
+      11
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-023014/official/official_04/backend_extract.json",
+    "prediction_sha256": "62f34489ef142f04c87cd50caaf8e0927b3e33a0d94e03f32849670de632a3b7",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_04/extract/golden.json",
+    "golden_sha256": "199093f2c9e5a2e02a2d1fde83cd4f7a350428c63dd93f9b78f1d495a512c6f3",
+    "case": "official/official_04",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_04/docs/关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.pdf",
+        "sha256": "d6f49b194ab94c572016a4dcaba44d1f243ecef10522c88d1989242638d7b04e",
+        "missing": false
+      },
+      {
+        "path": "official/official_04/docs/表单.pdf",
+        "sha256": "7e550194c0dc0efd3ac8fd9356c25a66424e562b30547b709bdb2af17da8016b",
+        "missing": false
+      }
+    ],
+    "source_id": "ee92ec878c639c7fbffe",
+    "entities": [
+      24,
+      44
+    ],
+    "relations": [
+      50,
+      10
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-032940/official/official_01/backend_extract.json",
+    "prediction_sha256": "9fa9a857e30742e0a90df53702d4244de9635b3940274d3a16d461933cbbeb20",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "b309a2f03df858b9a4cfc8ea7be00f15b034d865c1f74b98aa9dcf9316f5c6e7",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "566fd5a5b2428e968f10",
+    "entities": [
+      34,
+      27
+    ],
+    "relations": [
+      80,
+      12
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-033451/official/official_04/backend_extract.json",
+    "prediction_sha256": "b3db2354cf3b877aace4181dc3dede3c75b8275e9fea4b454bbd56589790f0ee",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_04/extract/golden.json",
+    "golden_sha256": "199093f2c9e5a2e02a2d1fde83cd4f7a350428c63dd93f9b78f1d495a512c6f3",
+    "case": "official/official_04",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_04/docs/关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.pdf",
+        "sha256": "d6f49b194ab94c572016a4dcaba44d1f243ecef10522c88d1989242638d7b04e",
+        "missing": false
+      },
+      {
+        "path": "official/official_04/docs/表单.pdf",
+        "sha256": "7e550194c0dc0efd3ac8fd9356c25a66424e562b30547b709bdb2af17da8016b",
+        "missing": false
+      }
+    ],
+    "source_id": "2dcfe949ebbf74466fe4",
+    "entities": [
+      24,
+      39
+    ],
+    "relations": [
+      50,
+      35
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/20261011-034957/official/official_04/backend_extract.json",
+    "prediction_sha256": "aeef6edce0af380d994aba46ba901363e5354588b61e9c34370003c449954dd7",
+    "golden_path": "/mnt/data3/qasys/qasystem/test_data/eval/official/official_04/extract/golden.json",
+    "golden_sha256": "199093f2c9e5a2e02a2d1fde83cd4f7a350428c63dd93f9b78f1d495a512c6f3",
+    "case": "official/official_04",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_04/docs/关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知.pdf",
+        "sha256": "d6f49b194ab94c572016a4dcaba44d1f243ecef10522c88d1989242638d7b04e",
+        "missing": false
+      },
+      {
+        "path": "official/official_04/docs/表单.pdf",
+        "sha256": "7e550194c0dc0efd3ac8fd9356c25a66424e562b30547b709bdb2af17da8016b",
+        "missing": false
+      }
+    ],
+    "source_id": "78095f4bba5573a5eefc",
+    "entities": [
+      24,
+      47
+    ],
+    "relations": [
+      50,
+      109
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/rejudge-v2-opt-src/official/official_01/backend_extract.json",
+    "prediction_sha256": "2c6a3422883b143e8c5d30e4f73f74554564ea2f5e175e038f2927522bffaf8e",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "22753dc7f94df6bd05ea",
+    "entities": [
+      34,
+      116
+    ],
+    "relations": [
+      75,
+      306
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/rejudge-v2-opt-src/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "aa2beb85d3c326ee8182b758ba68f1d217491f797aac2ef67dc2e86c58007daa",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_01/extract/golden.json",
+    "golden_sha256": "a02f9fba63e1ed94c7e45ad92f47f50612b85f8e65d02d565dd42717a74b3bbe",
+    "case": "standard/standard_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "9b121de42ca22d1633b5",
+    "entities": [
+      122,
+      135
+    ],
+    "relations": [
+      143,
+      93
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/eval/runs/rejudge-v2-opt-src/standard/standard_02/backend_extract.json",
+    "prediction_sha256": "61a287a8de7581f26c0cf91f4c8c86df69aacceba99bed18bccfd72cb95d6f49",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_02/extract/golden.json",
+    "golden_sha256": "fe7495efe63a3ba16d28d430d40cbf3d6603b632ba1cedf50642b186e767402d",
+    "case": "standard/standard_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "74d2ea56f2ed5022deb4",
+    "entities": [
+      335,
+      121
+    ],
+    "relations": [
+      370,
+      30
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-111511/official/official_02/backend_extract.json",
+    "prediction_sha256": "0aa1f50b99a5c55aa2d7916bdeb71cfa1b8e36434d4fcb38c590ec7caf1697b5",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "439b4284aabaed5d48dd",
+    "entities": [
+      23,
+      22
+    ],
+    "relations": [
+      42,
+      82
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-110306/official/official_03/backend_extract.json",
+    "prediction_sha256": "5af5aa245621e42b1d387c1dc7c5ffceeead421a606eac489a0a38038081526f",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_03/extract/golden.json",
+    "golden_sha256": "2f668a6109ae0a8086e45f91d1fc75dc3bdeaff41a849df47c2fa52161350ba5",
+    "case": "official/official_03",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "171a7c97df964fc75f0b",
+    "entities": [
+      11,
+      13
+    ],
+    "relations": [
+      23,
+      28
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-110306/official/official_05/backend_extract.json",
+    "prediction_sha256": "04a1433576e866fde58129192458bbf052959fe74357eb9af0459903470d1f1a",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_05/extract/golden.json",
+    "golden_sha256": "649114cabf671e0aa9183c76ebad016478bec045ca931d6d38d44a396b2fa2d8",
+    "case": "official/official_05",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "7b2c81078006841054ff",
+    "entities": [
+      9,
+      19
+    ],
+    "relations": [
+      23,
+      75
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-110306/official/official_06/backend_extract.json",
+    "prediction_sha256": "60f3d472e729cac81b020539fd981802fb44ea552baabaed41239d3d93206446",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_06/extract/golden.json",
+    "golden_sha256": "c7f9da0682b225f46f868eed85417d5c9ef0de25129b76057aeefa7c468d4134",
+    "case": "official/official_06",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "ecbc997f56e3fe7111c9",
+    "entities": [
+      11,
+      20
+    ],
+    "relations": [
+      23,
+      87
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-110306/official/official_07/backend_extract.json",
+    "prediction_sha256": "02559a40293a54569658ffdc5e8335cf7609493826c242b5c02270c2134180da",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_07/extract/golden.json",
+    "golden_sha256": "a8ebb0d5095c96ecc24238f27f4eb0b0ce6f1bf34ec185673d3b79b899eadf01",
+    "case": "official/official_07",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "7e1616246ec4792f9cf7",
+    "entities": [
+      14,
+      16
+    ],
+    "relations": [
+      30,
+      45
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-110306/official/official_08/backend_extract.json",
+    "prediction_sha256": "15a6b813bb9f22e42ed551f8c661555a785eae419e3602bc108337ef9488c562",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_08/extract/golden.json",
+    "golden_sha256": "759e4f8b6505f3fa270ced19d8bebb2a25dd0acd676bb5e5d30584cbc9384894",
+    "case": "official/official_08",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "e8c0da43d066da99355b",
+    "entities": [
+      15,
+      122
+    ],
+    "relations": [
+      36,
+      184
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-110306/official/official_09/backend_extract.json",
+    "prediction_sha256": "a648b41b4469da0d901cce13af16bb9152f64c26c97e24e53c13215d5fcafe70",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/official/official_09/extract/golden.json",
+    "golden_sha256": "f15605cde7597615beb8e0530d7e56d9a6e9afaa71b6814b4326e4417d71937f",
+    "case": "official/official_09",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "1e3c79bfd7faea643a8c",
+    "entities": [
+      25,
+      55
+    ],
+    "relations": [
+      55,
+      165
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/tmp/eval/runs/20261007-111511/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "2c9ffbc07ac9fde260474a5c2cee54ab03dbd26e9410ef7809909398a610d4b2",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_01/extract/golden.json",
+    "golden_sha256": "a02f9fba63e1ed94c7e45ad92f47f50612b85f8e65d02d565dd42717a74b3bbe",
+    "case": "standard/standard_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "fc2b7d67a9ef0c355eaa",
+    "entities": [
+      122,
+      156
+    ],
+    "relations": [
+      143,
+      53
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v2/20261009-232037/official/official_01/backend_extract.json",
+    "prediction_sha256": "adf591afe67f7d3e31eb407f54d744a8b16c12bb505593530168d1fcb808bf0c",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "6d0d0e9c0b03f336b1d3",
+    "entities": [
+      34,
+      75
+    ],
+    "relations": [
+      75,
+      242
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v2/20261009-232037/rule/故障记录test/backend_extract.json",
+    "prediction_sha256": "d971b97cf29cb30330080fe321303bde8fcc7964f9161117eeba05419b447c3f",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/rule/故障记录test/extract/golden.json",
+    "golden_sha256": "e2128c608e36dfff63beb4bed7714d7a1f072847e8aee7d41c8b45e4b687a5ad",
+    "case": "rule/故障记录test",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "rule/故障记录test/docs/故障记录test.xlsx",
+        "sha256": "d33c239a64d7fec62f99bc77526ed7ab32cf57f6369339cae16a191daa7b464d",
+        "missing": false
+      }
+    ],
+    "source_id": "dbee14624760c8474296",
+    "entities": [
+      6,
+      6
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/_superseded/dt-v31-thinking-off-20261009-223928/official/official_01/backend_extract.json",
+    "prediction_sha256": "0992c5b9514589e5646cbd5a2c873724c527a561e3c4455c199595556072adb8",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "36959fcce5a4992aa53f",
+    "entities": [
+      34,
+      138
+    ],
+    "relations": [
+      75,
+      122
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/_superseded/sf-v3-interrupted-20261010-003021/official/official_01/backend_extract.json",
+    "prediction_sha256": "5680a01b84f4b0e73eb629858e6c36b79b2b23ae3967a97cfa9d38e98c310654",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "2169ec1acef86da7d684",
+    "entities": [
+      34,
+      22
+    ],
+    "relations": [
+      75,
+      7
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek/v2/20261009-134410/official/official_01/backend_extract.json",
+    "prediction_sha256": "62c1ecf8ea7b805c315592fb3f20ebf8fa9cb4819b4849ea5580282976c2e745",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "309ffcdf39ac40b020d1",
+    "entities": [
+      34,
+      76
+    ],
+    "relations": [
+      75,
+      279
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek/v2/20261009-141356/official/official_02/backend_extract.json",
+    "prediction_sha256": "aa14f7888768f785a20738935a15f2a8646e5e1cec600bce7c3e0d14cfb6b5fd",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_02/docs/关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.pdf",
+        "sha256": "0518da68439271db8c0dc50c0af09670957f6d01a8a8a5df5dcb2d0c11389855",
+        "missing": false
+      },
+      {
+        "path": "official/official_02/docs/表单.pdf",
+        "sha256": "55641f02e05e95cea591e6ba0dd19fae13fe1630a28786e3a60e98b7365ad8af",
+        "missing": false
+      }
+    ],
+    "source_id": "c65fb3a9197f7732e250",
+    "entities": [
+      23,
+      18
+    ],
+    "relations": [
+      42,
+      66
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek/v3/20261009-141401/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "2981004e9c6d52a8e945f6c344a415d2fb9e729c402034232c612c7c9ce9eafc",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/standard/standard_01/extract/golden.json",
+    "golden_sha256": "b33b3258d595295731815b0dea0c6cbc3d4d0acc8f4bddc199922243fad8b779",
+    "case": "standard/standard_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "standard/standard_01/docs/GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).pdf",
+        "sha256": "a4d518ad54fabffddbe6dfc112170229314a479a89ddcbd7e61ddc2c3f87632f",
+        "missing": false
+      }
+    ],
+    "source_id": "5adfa62222c0028994de",
+    "entities": [
+      366,
+      276
+    ],
+    "relations": [
+      399,
+      278
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek/v31/20261009-141406/official/official_01/backend_extract.json",
+    "prediction_sha256": "e0903c69d7ed99ebb17dad24531a40ad0cfd3ac57992f3ea0c3cd02ff79cfe9a",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "4621698b08aa270a161e",
+    "entities": [
+      34,
+      106
+    ],
+    "relations": [
+      75,
+      124
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek-think/v2/20261009-223919/official/official_01/backend_extract.json",
+    "prediction_sha256": "bf8c2803f6e01abf762ec969fa769e28ea029d095f8a01b08adb332f8978e9bb",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "34804f2cbd390b4c16d4",
+    "entities": [
+      34,
+      56
+    ],
+    "relations": [
+      75,
+      186
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek-think/v2/20261009-223919/official/official_02/backend_extract.json",
+    "prediction_sha256": "9276cb77761a67cc318ec2959de3bd19cd9f3b88c388e3a971b12e74e2ec80a0",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_02/docs/关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.pdf",
+        "sha256": "0518da68439271db8c0dc50c0af09670957f6d01a8a8a5df5dcb2d0c11389855",
+        "missing": false
+      },
+      {
+        "path": "official/official_02/docs/表单.pdf",
+        "sha256": "55641f02e05e95cea591e6ba0dd19fae13fe1630a28786e3a60e98b7365ad8af",
+        "missing": false
+      }
+    ],
+    "source_id": "92706813944f4349e7da",
+    "entities": [
+      23,
+      19
+    ],
+    "relations": [
+      42,
+      101
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek-think/v3/20261009-223923/rule/故障记录test/backend_extract.json",
+    "prediction_sha256": "6da187588c29fc0808189111f15b1f504f93196a4e434eb91f85e8d2c641a725",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/rule/故障记录test/extract/golden.json",
+    "golden_sha256": "e2128c608e36dfff63beb4bed7714d7a1f072847e8aee7d41c8b45e4b687a5ad",
+    "case": "rule/故障记录test",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "rule/故障记录test/docs/故障记录test.xlsx",
+        "sha256": "d33c239a64d7fec62f99bc77526ed7ab32cf57f6369339cae16a191daa7b464d",
+        "missing": false
+      }
+    ],
+    "source_id": "13516fae37025540d2de",
+    "entities": [
+      6,
+      10
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/deepseek-think/v3/20261009-223923/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "42ec7534db2ee9c00fc6c4e7233fe09202a9d379cabb38d28c75fd5716b0a464",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/standard/standard_01/extract/golden.json",
+    "golden_sha256": "b33b3258d595295731815b0dea0c6cbc3d4d0acc8f4bddc199922243fad8b779",
+    "case": "standard/standard_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "standard/standard_01/docs/GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).pdf",
+        "sha256": "a4d518ad54fabffddbe6dfc112170229314a479a89ddcbd7e61ddc2c3f87632f",
+        "missing": false
+      }
+    ],
+    "source_id": "df9f2f99f50ba02ae77e",
+    "entities": [
+      366,
+      261
+    ],
+    "relations": [
+      399,
+      258
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v2/20261010-005946/official/official_01/backend_extract.json",
+    "prediction_sha256": "991d8c1fc946aac5b2df8aca1380ee94c789460cabc4b025e07e010861fa411f",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "db1174790dadbaaf4450",
+    "entities": [
+      34,
+      69
+    ],
+    "relations": [
+      75,
+      254
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v2/20261010-005946/rule/故障记录test/backend_extract.json",
+    "prediction_sha256": "c64da051253fe2955051be7e6200cfbc4a5ea9d915a4f9f535075da982aed0bf",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/rule/故障记录test/extract/golden.json",
+    "golden_sha256": "e2128c608e36dfff63beb4bed7714d7a1f072847e8aee7d41c8b45e4b687a5ad",
+    "case": "rule/故障记录test",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "rule/故障记录test/docs/故障记录test.xlsx",
+        "sha256": "d33c239a64d7fec62f99bc77526ed7ab32cf57f6369339cae16a191daa7b464d",
+        "missing": false
+      }
+    ],
+    "source_id": "e44818893de9080de66f",
+    "entities": [
+      6,
+      6
+    ],
+    "relations": [
+      0,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v2/20261010-005946/simple/Simple_故障规则的诊断/backend_extract.json",
+    "prediction_sha256": "5cd81863b0ab7bd18400cbcb02459d91af69983949856767622464ce1c0de0e7",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/simple/Simple_故障规则的诊断/extract/golden.json",
+    "golden_sha256": "6c0ea0f48949edfac8176a7560d043419859635223982ece0120c1b2b43649de",
+    "case": "simple/Simple_故障规则的诊断",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "simple/Simple_故障规则的诊断/docs/Simple_故障规则的诊断.docx",
+        "sha256": "baff4d7b77788b6a45e11291d33d4c76fd404e39121c3266908d196bbe976d74",
+        "missing": false
+      }
+    ],
+    "source_id": "cc57350c1c238a4a7199",
+    "entities": [
+      27,
+      39
+    ],
+    "relations": [
+      1,
+      13
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v3/20261009-232148/official/official_01/backend_extract.json",
+    "prediction_sha256": "b6d1da07a4cb071c6ad5dc709a21f5b8b89766bcd04c5230e0b9b93715652187",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "9fe30f9d61b4e16c3f80",
+    "entities": [
+      34,
+      22
+    ],
+    "relations": [
+      75,
+      9
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v3/20261009-232148/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "af201688ece23caf776c0f13cd894d4b8a734418126cbfc530308b3181c9aaa0",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/standard/standard_01/extract/golden.json",
+    "golden_sha256": "b33b3258d595295731815b0dea0c6cbc3d4d0acc8f4bddc199922243fad8b779",
+    "case": "standard/standard_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "standard/standard_01/docs/GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).pdf",
+        "sha256": "a4d518ad54fabffddbe6dfc112170229314a479a89ddcbd7e61ddc2c3f87632f",
+        "missing": false
+      }
+    ],
+    "source_id": "90ffc0b3e6a5709411f0",
+    "entities": [
+      366,
+      320
+    ],
+    "relations": [
+      399,
+      209
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v3/20261010-005951/official/official_01/backend_extract.json",
+    "prediction_sha256": "8d1a4dd092e475db1a7e4df10c90d3c5fefc374b75cff596432ab8e325236c39",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "38d51e9d8480454c7602",
+    "entities": [
+      34,
+      21
+    ],
+    "relations": [
+      75,
+      11
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v3/20261010-005951/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "2c5c6f73d2692f8c973c7d54caff15c7ffb52c797fc69b74b2f267a7db3299cf",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/standard/standard_01/extract/golden.json",
+    "golden_sha256": "b33b3258d595295731815b0dea0c6cbc3d4d0acc8f4bddc199922243fad8b779",
+    "case": "standard/standard_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "standard/standard_01/docs/GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).pdf",
+        "sha256": "a4d518ad54fabffddbe6dfc112170229314a479a89ddcbd7e61ddc2c3f87632f",
+        "missing": false
+      }
+    ],
+    "source_id": "b24551200035637a3055",
+    "entities": [
+      366,
+      322
+    ],
+    "relations": [
+      399,
+      298
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261009-232156/official/official_01/backend_extract.json",
+    "prediction_sha256": "4ad89fe85763b193e6cc78726687efd9cc2808ae1e7a5b193e56e91655f9c18e",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "c8f43a980adce37175d3",
+    "entities": [
+      34,
+      155
+    ],
+    "relations": [
+      75,
+      97
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261009-232156/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "b568f0a25dc1df6d59324ec151363daade9d0be1be600198fcce6d523b181bd2",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/standard/standard_01/extract/golden.json",
+    "golden_sha256": "b33b3258d595295731815b0dea0c6cbc3d4d0acc8f4bddc199922243fad8b779",
+    "case": "standard/standard_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "standard/standard_01/docs/GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).pdf",
+        "sha256": "a4d518ad54fabffddbe6dfc112170229314a479a89ddcbd7e61ddc2c3f87632f",
+        "missing": false
+      }
+    ],
+    "source_id": "9b980d2dfda10ad0b662",
+    "entities": [
+      366,
+      145
+    ],
+    "relations": [
+      399,
+      3
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-004839/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "bb527595e11ea3e61ecaefe4acc6b8b4b3a938bd5256a278e4cb59a6f24a235b",
+    "golden_path": "/mnt/data3/qasys/mini-eval-deepseek/source/test_data/eval-v2/standard/standard_01/extract/golden.json",
+    "golden_sha256": "a02f9fba63e1ed94c7e45ad92f47f50612b85f8e65d02d565dd42717a74b3bbe",
+    "case": "standard/standard_01",
+    "reference_resolution": "explicit_case_reference_not_original_snapshot",
+    "document_sources": [],
+    "source_id": "7a43c1d02178a34429a2",
+    "entities": [
+      122,
+      212
+    ],
+    "relations": [
+      143,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-005956/official/official_01/backend_extract.json",
+    "prediction_sha256": "a307ede6187c538290d22b33298f1f220ea61309f9d326495a00d289623721b7",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "771124567134ed47e782",
+    "entities": [
+      34,
+      164
+    ],
+    "relations": [
+      75,
+      14
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-005956/official/official_02/backend_extract.json",
+    "prediction_sha256": "d0d9467c2c0d618dca2c2b74904825059b95af92535bbbf96b8625a5a12fea62",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_02/docs/关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.pdf",
+        "sha256": "0518da68439271db8c0dc50c0af09670957f6d01a8a8a5df5dcb2d0c11389855",
+        "missing": false
+      },
+      {
+        "path": "official/official_02/docs/表单.pdf",
+        "sha256": "55641f02e05e95cea591e6ba0dd19fae13fe1630a28786e3a60e98b7365ad8af",
+        "missing": false
+      }
+    ],
+    "source_id": "192befbda42485f3884a",
+    "entities": [
+      23,
+      37
+    ],
+    "relations": [
+      42,
+      24
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-033106/official/official_01/backend_extract.json",
+    "prediction_sha256": "f373b6b7e2f3d9bc0726e0f7e2badc76c2540e8f7b88469c012d49849fc20729",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "d251836f936a5df4b382",
+    "entities": [
+      34,
+      149
+    ],
+    "relations": [
+      75,
+      145
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-033106/official/official_02/backend_extract.json",
+    "prediction_sha256": "e97f6757c7562faf643ce6e63138509ec09b8ea4043811e9a827722eb98fd938",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_02/extract/golden.json",
+    "golden_sha256": "7c3dcc7c74b4446e846fa5e27bff21e7d01c47707b0fcc6a47cf851ad5f236a2",
+    "case": "official/official_02",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_02/docs/关于印发《轨道交通装备行业高质量数据集链主任务工作方案》的通知.pdf",
+        "sha256": "0518da68439271db8c0dc50c0af09670957f6d01a8a8a5df5dcb2d0c11389855",
+        "missing": false
+      },
+      {
+        "path": "official/official_02/docs/表单.pdf",
+        "sha256": "55641f02e05e95cea591e6ba0dd19fae13fe1630a28786e3a60e98b7365ad8af",
+        "missing": false
+      }
+    ],
+    "source_id": "24222e4b7fead9ce99e8",
+    "entities": [
+      23,
+      57
+    ],
+    "relations": [
+      42,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-050021/official/official_01/backend_extract.json",
+    "prediction_sha256": "a335f34e97d82b0b84da14ad0eab1b00cc29d3747e62bb19fdbf60f84f2b030e",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/official/official_01/extract/golden.json",
+    "golden_sha256": "66ff0455fcf7f219c07c8936d43f58f0ea272ff916c874e1f3548805e18ab3a3",
+    "case": "official/official_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+        "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+        "missing": false
+      },
+      {
+        "path": "official/official_01/docs/表单.pdf",
+        "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+        "missing": false
+      }
+    ],
+    "source_id": "64b399bd16b213fa4622",
+    "entities": [
+      34,
+      143
+    ],
+    "relations": [
+      75,
+      0
+    ]
+  },
+  {
+    "prediction_path": "/mnt/data3/qasys/mini-eval-deepseek/results/siliconflow/v31/20261010-050021/standard/standard_01/backend_extract.json",
+    "prediction_sha256": "bf80c187ba6e9c6f2ac136dd28cae3537bcc284e78d18c445546bb356d9dfb69",
+    "golden_path": "/mnt/data3/qasys/qasystem/tmp/v31-input-20261007-2149/qa/test_data/eval/standard/standard_01/extract/golden.json",
+    "golden_sha256": "b33b3258d595295731815b0dea0c6cbc3d4d0acc8f4bddc199922243fad8b779",
+    "case": "standard/standard_01",
+    "reference_resolution": "historical_manifest_hash",
+    "document_sources": [
+      {
+        "path": "standard/standard_01/docs/GBT+31486-2024 电动汽车用动力蓄电池电性能要求及试验方法(1).pdf",
+        "sha256": "a4d518ad54fabffddbe6dfc112170229314a479a89ddcbd7e61ddc2c3f87632f",
+        "missing": false
+      }
+    ],
+    "source_id": "b2d2adaf941d9025a9c8",
+    "entities": [
+      366,
+      151
+    ],
+    "relations": [
+      399,
+      160
+    ]
+  }
+]
