@@ -214,7 +214,8 @@ def test_render_report_header_and_gate():
 
 def test_render_report_overview_table():
     md = render_report(_summary())
-    assert "## 总览" in md
+    assert "## 指标结论" in md
+    assert "### 整体" in md
     lines = [line for line in md.splitlines() if line.startswith("| 后台抽取 |")]
     assert len(lines) == 2  # 实体 + 关系
     assert "| 后台抽取 | 实体 | 30 | 20 | 0.700 | 0.600 | 0.650 |" in lines
@@ -224,19 +225,47 @@ def test_render_report_overview_table():
     assert "插件 kg_extract_v2 |" not in md
 
 
+def test_render_report_conclusion_covers_type_and_file():
+    from eval.quality import build_quality_summary
+
+    summary = _summary()
+    summary["cases"][0]["group"] = "official"
+    summary["cases"][0]["case"] = "official_01"
+    summary["cases"][1]["group"] = "rule"
+    summary["cases"][1]["case"] = "rule_01"
+    summary["quality"] = build_quality_summary(summary)
+    md = render_report(summary)
+    assert "### 分类型" in md and "### 单个文件" in md
+    type_section = md.split("### 分类型", 1)[1].split("### 单个文件", 1)[0]
+    entities = summary["quality"]["modules"]["backend_extract"]["by_group"]["official"]["micro"]["entities"]
+    relations = summary["quality"]["modules"]["backend_extract"]["by_group"]["rule"]["micro"]["relations"]
+    assert (
+        f"| `official` | 后台抽取 | 实体 | {int(entities['golden'])} | {int(entities['predicted'])} | "
+        f"{entities['precision']:.3f} | {entities['recall']:.3f} | {entities['f1']:.3f} |"
+    ) in type_section
+    assert (
+        f"| `rule` | 后台抽取 | 关系 | {int(relations['golden'])} | {int(relations['predicted'])} | "
+        f"{relations['precision']:.3f} | {relations['recall']:.3f} | {relations['f1']:.3f} |"
+    ) in type_section
+    file_section = md.split("### 单个文件", 1)[1].split("## ", 1)[0]
+    assert "| `official/official_01` | 后台抽取 | 成功 | 0.800 | 0.700 | 0.750 | 0.800 | 0.700 | 0.750 |" in file_section
+    assert "| `rule/rule_01` | 后台抽取 | 失败 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |" in file_section
+
+
 def test_render_report_per_case_rows_and_notes():
     md = render_report(_summary())
     assert "## 逐 case 明细" in md
-    assert "| `g/ok` | 成功 | 0.800 / 0.700 / 0.750 |" in md
+    detail = md.split("## 逐 case 明细", 1)[1]
+    assert "| `g/ok` | 成功 | 0.800 / 0.700 / 0.750 |" in detail
     # 失败 case 标出原因
-    empty_row = next(line for line in md.splitlines() if line.startswith("| `g/empty` |"))
+    empty_row = next(line for line in detail.splitlines() if line.startswith("| `g/empty` |"))
     assert "| 失败 |" in empty_row
     assert "empty_extraction" in empty_row
     # 各阶段耗时与总耗时
-    ok_row = next(line for line in md.splitlines() if line.startswith("| `g/ok` |"))
+    ok_row = next(line for line in detail.splitlines() if line.startswith("| `g/ok` |"))
     assert "| 2.0s | 1.0s | 8.0s | 12.0s | latest |" in ok_row
     # judge 降级备注
-    slow_row = next(line for line in md.splitlines() if line.startswith("| `g/slow` |"))
+    slow_row = next(line for line in detail.splitlines() if line.startswith("| `g/slow` |"))
     assert "judge 失败降级 identity" in slow_row
 
 
@@ -348,7 +377,8 @@ def test_main_writes_report_md(monkeypatch, tmp_path):
     md = report.read_text(encoding="utf-8")
     assert md.startswith("# Benchmark 评测报告")
     assert "退出码：0（全部通过）" in md
-    assert "## 总览" in md and "## 逐 case 明细" in md and "## 问题清单" in md
+    assert "## 指标结论" in md and "### 整体" in md and "### 分类型" in md and "### 单个文件" in md
+    assert "## 逐 case 明细" in md and "## 问题清单" in md
     assert "`g/c1`" in md
     # summary.json 与报告同批落盘，且 gate 带配置的预算块
     summary = json.loads((run_dirs[0] / "summary.json").read_text(encoding="utf-8"))

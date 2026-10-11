@@ -12,6 +12,25 @@ tags: []
 
 抽取算法版本默认由 Backend 的 `KG_EXTRACT_ALGO_VERSION` 控制。现在也可在脚本中传 `--extract-version v2/v3/v3.1/latest`、`--extract-provider <服务端配置名>`、`--extract-model <模型>` 和超时覆盖项，在同一个 Backend 上逐次选择配置，无需重启。完整规则和供应商登记方式见 [抽取请求配置覆盖](../docs/接口/抽取请求配置覆盖.md)。MCP 工具仍使用服务端默认配置。
 
+## 两套评测
+
+正式评测有两个入口，评分、门禁和结论文档是同一套。每次运行结束都会在 `tmp/eval/runs/<时间戳>/report.md` 写下三层 P、R、F1，实体和关系分开：
+
+| 层次 | 含义 |
+| --- | --- |
+| 整体 | 本次全部有效评分按 TP/FP/FN 累加 |
+| 分类型 | `official`、`rule`、`simple` 等类型目录各自累加 |
+| 单个文件 | 每个 case（`类型/case`，一份文档，可含多个附件）对照自己的 golden |
+
+| | mini-eval | eval |
+| --- | --- | --- |
+| 用途 | 改完抽取或评分后先看一小批 | 发布前的全量门禁，也用于按路径或类型抽查 |
+| 入口 | `python3 eval/mini_eval.py`，或 `bash eval/mini_eval.sh` | `python3 eval/run.py`，或 `./eval/run.sh` |
+| 范围 | 每类 1–2 个 case，由 `eval/params.yaml` 的 `mini_eval` 决定。当前默认是 `official_01`、`official_02`，以及 rule、simple 各 1 个，共 4 个 | `test_data/eval/` 下全部 case。当前是 official 5 个、rule 1 个、simple 1 个，共 7 个 |
+| 结果 | `report.md` 里的整体、分类型、单个文件 | 同一份结论文档结构 |
+
+发布前的全量门禁用 eval。mini-eval 走同一个 `run.py`，只是先按类型抽样。下面「如何使用」分别给出命令。`quick_eval.py` 是另外的诊断入口，固定三个公文 case，不算这两套评测。
+
 ## 做了什么
 
 **评测集。** 按文档类型放 case，每个 case 有原文件和标准答案：
@@ -394,7 +413,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `report.md` | 批次详细报告（每批结束自动生成，含 resume/复用与中断批次）：头部的运行信息（起止时间、backend、评分口径、judge 降级摘要、抽取版本）、门禁与退出码语义（empty_failures、F1/耗时阈值与实际值）、总览表（实体/关系的 golden/predicted/P/R/F1）、逐 case 明细（状态、P/R/F1、parse/chunk/extract 各阶段耗时、总耗时、抽取版本、失败原因）、问题清单（失败/空抽取/judge 降级/超预算）、最慢 case Top5 |
+| `report.md` | 批次结论文档（每批结束自动生成，含 resume/复用与中断批次）。「指标结论」写三层 P、R、F1：整体、分类型（official、rule、simple 等）、单个文件；实体和关系分开，并带 golden/predicted。其余为运行信息、门禁与退出码、逐 case 耗时明细、问题清单、最慢 case Top5 |
 | `summary.json` | 各 case 成败和 P/R/F1/Jaccard；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时，每个 case 完成后更新。`overall` 是有效同口径 micro，`quality` 包含覆盖率、case/group 均值与分组结果；`overall_identity` 单列精确对照。`gate` 记录空抽取、实体 F1、耗时和 `quality` 评分有效性/关系阈值检查；`baseline_comparison` 是同口径基线判定与逐项差异 |
 | `manifest.json` | 源文件、golden、本体，以及实际复用 Markdown/切片的 SHA256；`evaluator` 记录 `run.py`、`quality.py`、`provenance.py` 的内容哈希（包含未提交修改）；`settings` 与 `scoring_contract` 记录安全配置和评分契约，不记录 API key / Authorization。同一内容也嵌入 `summary.manifest` |
 | `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
@@ -433,7 +452,10 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 ### 已下线版本的对照说明
 
 `v3.2`（单通用提示词联合抽取）与旧 `v3.1`（V2 副本 + prompt router）实现已从代码库移除，对应的提示词对照评测无法再运行；历史结论保留在 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。当前 `v3.1` 指语义 harness，评测方式见 [V3.1 语义 Harness 与评测](../docs/算法/知识抽取V3.1语义Harness与评测.md)。
-# 小规模诊断评测
+
+## 诊断评测（quick_eval）
+
+上面的 mini-eval 和 eval 是两套正式评测。本节是固定样本的诊断入口。
 
 `python3 eval/quick_eval.py --extract-version v3` 使用 `eval/quick_params.yaml`，固定选择
 `official_01`、`official_03`、`official_04` 三个完整用例，覆盖普通公文、短公文和密集表格/截断压力。
