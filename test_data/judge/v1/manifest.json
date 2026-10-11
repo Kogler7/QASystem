@@ -1,6 +1,6 @@
 {
   "schema_version": "judge-corpus-v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "created_date": "2026-10-11",
   "label_contract": "eval/run.py _build_judge_messages: reference-relative semantic matching",
   "adjudication": "agent-reviewed initial calibration labels + deterministic contract slice; no independent human verification yet; historical judge choices never become labels",
@@ -32,28 +32,27 @@
     "golden_snapshots": 30
   },
   "summary": {
-    "pairs": 131,
-    "windows": 4,
+    "pairs": 103,
+    "windows": 0,
     "pending": 32,
     "documents": 17,
     "document_families": 16,
     "source_snapshots": 109,
     "labels": {
-      "contract_rule": 51,
+      "contract_rule": 23,
       "agent_review": 80
     },
     "positive": 82,
-    "negative": 49,
+    "negative": 21,
     "by_split": {
-      "calibration": 34,
-      "test": 97
+      "calibration": 28,
+      "test": 75
     },
     "by_kind": {
-      "entity": 87,
-      "relation": 44
+      "entity": 73,
+      "relation": 30
     },
     "capabilities": {
-      "type_constraint": 28,
       "identity_format": 23,
       "property_missing": 55,
       "alias": 24,
@@ -68,9 +67,16 @@
     }
   },
   "files": {
-    "pairs.jsonl": "eaf73635e293222462587e98b96adbfd74b21515012b50ac73657632a57366cd",
-    "windows.jsonl": "fe6c41d196a378549ae562e2566f6dcf72f328eb7e190cb1ac5821fb9869bfaa",
+    "pairs.jsonl": "fb008eca205dc9d56c848cd26d046fbd58193f07bfb869716c49ef0a18a641c2",
+    "windows.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "review_queue.jsonl": "2b4e34a9d3654ef1289fbb22b556a7a6458ae8f20db3e7e1dcbd96bec748a5f8",
-    "sources.json": "d5f571263006d54bfcb1b6e7b9d7b1d2f7d94d585ec90310893003f79aa590d1"
+    "sources.json": "d5f571263006d54bfcb1b6e7b9d7b1d2f7d94d585ec90310893003f79aa590d1",
+    "excluded_samples.json": "02d899eb6a915d450109c2271a2c7fdb4c98b2972409923762dfd24ce327e52a"
+  },
+  "revision": {
+    "removed_pairs": 28,
+    "removed_windows": 4,
+    "contract_fixture": "test_data/eval/judge-type-contract",
+    "retained_pair_content_labels_order_split": "unchanged"
   }
 }

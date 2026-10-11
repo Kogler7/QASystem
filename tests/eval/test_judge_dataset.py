@@ -4,10 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from eval.judge_dataset import classification, fingerprint, read_jsonl, validate
+from eval.judge_dataset import classification, fingerprint, read_jsonl, validate, write_jsonl
+from eval.run import _compatible_types
+from eval.tools.build_judge_dataset import build
 from eval.tools.judge_benchmark import messages_for, runtime_metrics
 
 DATASET=Path(__file__).resolve().parents[2]/"test_data/judge/v1"
+TYPE_CONTRACT=DATASET.parents[1]/'eval/judge-type-contract'
 
 
 def test_frozen_corpus_integrity_and_real_provenance():
@@ -19,6 +22,12 @@ def test_frozen_corpus_integrity_and_real_provenance():
     assert all('proposal' not in r for r in rows)
     assert {'entity','relation'}=={r['kind'] for r in rows}
     assert {'numeric_conflict','different_identity','endpoint_context'}<={c for r in rows for c in r['capabilities']}
+    assert all(_compatible_types(r['golden'],r['predicted'],relation=r['kind']=='relation') for r in rows)
+    assert all('type_constraint' not in r['capabilities'] for r in rows)
+    assert not list(read_jsonl(DATASET/'windows.jsonl'))
+    manifest=json.loads((DATASET/'manifest.json').read_text())
+    assert manifest['version']=='1.1.0'
+    assert manifest['summary']['pairs']==len(rows)==103
 
 
 def test_hash_tampering_is_rejected(tmp_path):
@@ -66,12 +75,42 @@ def test_pending_labels_are_not_scored_or_claimed_human():
 
 
 def test_complete_window_labels_match_all_expected_edges():
-    windows=list(read_jsonl(DATASET/'windows.jsonl'))
-    assert windows
+    windows=list(read_jsonl(TYPE_CONTRACT/'windows.jsonl'))
+    assert len(windows)==4
     for row in windows:
         expected={(x['golden_index'],x['predicted_index']) for x in row['cell_labels'] if x['expected_match']}
         assert expected=={tuple(p) for p in row['expected_pairs']}
         assert len(row['cell_labels'])==len(row['golden_items'])*len(row['predicted_items'])
+
+
+def test_removed_type_contract_pairs_remain_program_regressions():
+    rows=list(read_jsonl(TYPE_CONTRACT/'pairs.jsonl'))
+    assert len(rows)==28
+    assert all(not r['expected_match'] for r in rows)
+    assert all(not _compatible_types(r['golden'],r['predicted'],relation=r['kind']=='relation') for r in rows)
+    retained=list(read_jsonl(DATASET/'pairs.jsonl'))
+    assert {r['id'] for r in rows}.isdisjoint(r['id'] for r in retained)
+    removal=json.loads((DATASET/'excluded_samples.json').read_text())
+    assert {r['id'] for r in removal['pairs']}=={r['id'] for r in rows}
+
+
+def test_builder_excludes_cross_types_even_when_annotated_and_builds_no_type_windows(tmp_path):
+    positives=[r for r in read_jsonl(DATASET/'pairs.jsonl') if r['expected_match'] and r['kind']=='entity']
+    a,b=next((a,b) for a in positives for b in positives if a['document_id']==b['document_id'] and a['golden']['type']!=b['golden']['type'])
+    excluded=next(read_jsonl(TYPE_CONTRACT/'pairs.jsonl'))
+    selected=[a,b,excluded]
+    write_jsonl(tmp_path/'selected.jsonl',selected)
+    write_jsonl(tmp_path/'pending.jsonl',[])
+    write_jsonl(tmp_path/'annotations.jsonl',[{'id':r['id'],'expected_match':True,
+                 'rationale':'Explicit test label','reviewer':'test','capabilities':['paraphrase']} for r in selected])
+    (tmp_path/'sources.json').write_bytes((DATASET/'sources.json').read_bytes())
+    (tmp_path/'harvest_summary.json').write_text('{}')
+    output=tmp_path/'output'
+    summary=build(tmp_path,[tmp_path/'annotations.jsonl'],output)
+    assert summary['pairs']==2
+    assert summary['windows']==0
+    assert {r['id'] for r in read_jsonl(output/'pairs.jsonl')}=={a['id'],b['id']}
+    assert json.loads((output/'excluded_samples.json').read_text())['pairs'][0]['id']==excluded['id']
 
 
 def test_runtime_counts_requests_and_case_totals_across_rounds():

@@ -133,13 +133,14 @@ def test_run_aggregate_feeds_field_dicts_to_v3_and_latest(monkeypatch):
             assert resolved.text == chunk["text"]
 
 
-@pytest.mark.parametrize("label", ["v2", "v3.1"])
+@pytest.mark.parametrize("label", ["v2", "v2.2", "v3.1"])
 def test_run_aggregate_feeds_version_specific_chunk_objects(monkeypatch, label):
-    """v2 与 v3.1 分别接收各自包的 ExtractionChunk，保留来源元数据。"""
+    """各版本接收各自包的 ExtractionChunk，保留来源元数据。"""
     from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk as V2Chunk
+    from algorithm.knowledge_extract.v2_2.chunk_context import ExtractionChunk as V22Chunk
 
     from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk as V31Chunk
-    expected_type = V31Chunk if label == "v3.1" else V2Chunk
+    expected_type = {"v2": V2Chunk, "v2.2": V22Chunk, "v3.1": V31Chunk}[label]
 
     captured = {}
 
@@ -669,7 +670,7 @@ def test_extract_version_defaults_to_latest_and_keeps_latest_label(monkeypatch):
     assert get_extract_version() == "latest"
 
 
-@pytest.mark.parametrize("label", ["v2", "v3", "v3.1"])
+@pytest.mark.parametrize("label", ["v2", "v2.2", "v3", "v3.1"])
 def test_extract_version_label_can_be_pinned(monkeypatch, label):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", label)
     assert get_extract_version_label() == label

@@ -1,0 +1,140 @@
+{
+  "from_version": "1.0.0",
+  "to_version": "1.1.0",
+  "reason": "本体类型不兼容题与仅验证程序类型过滤的窗口移至 test_data/eval/judge-type-contract；不纳入 judge 语义性能。",
+  "pairs": [
+    {
+      "id": "jp-0a955bcfa0c3b270adc9",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-00e42e957e8010a25704",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-85cc03f71546bd093f1b",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0771fb31be64b1df30ef",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-05965340080d9ca29a31",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-00d4bc995c804ccd47b3",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-16a5a03f2060a2e0c242",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-01aa7c16f8e4be0479e0",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-01582f447cbd26617e13",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0894ee866bfa5157364c",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-76747992aee7592d0910",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-00ff1dbaa14f2a95ae89",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-00433a208e5833859a1b",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-091995fcff4c6de446ad",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0cbb82b83682c6a6504d",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-04bee39dfb061fc09b78",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-09af01421ef9c7394c17",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-01ab019ae115d91dcdac",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-1602e116a03fd9734485",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0b31746089cd99a02fb5",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0293eaf184bf2dd65b4d",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0001c472f82acdfaf7ca",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-07f3db41669458d28a26",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-03bfb292cca9a3d37d74",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-0032e806e8b7df2759b1",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-090db01b5f4ffb4b0c8b",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-012a88dfdba56c9d95c5",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    },
+    {
+      "id": "jp-10225e8b5f0adb8bc1c2",
+      "reason": "程序 _compatible_types 确定性拒绝，无需 judge 语义判断。"
+    }
+  ],
+  "windows": [
+    {
+      "id": "jw-a284bc55c07aa22ce5cd",
+      "reason": "2x2 窗口的负例仅靠跨类型过滤，作为程序契约回归。"
+    },
+    {
+      "id": "jw-56d67a298982e27144eb",
+      "reason": "2x2 窗口的负例仅靠跨类型过滤，作为程序契约回归。"
+    },
+    {
+      "id": "jw-2bbcd44e5de2f5daf6b5",
+      "reason": "2x2 窗口的负例仅靠跨类型过滤，作为程序契约回归。"
+    },
+    {
+      "id": "jw-2b7d9c3077a50f767f9b",
+      "reason": "2x2 窗口的负例仅靠跨类型过滤，作为程序契约回归。"
+    }
+  ],
+  "retained_pairs_sha256": "fb008eca205dc9d56c848cd26d046fbd58193f07bfb869716c49ef0a18a641c2",
+  "retained_rows_unchanged": true,
+  "retained_order_split_labels_unchanged": true
+}

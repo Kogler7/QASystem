@@ -211,6 +211,17 @@ def test_real_workspace_inventory():
     assert (first / "extract" / "golden.json").is_file()
 
 
+def test_judge_type_contract_fixtures_are_not_document_eval_cases(tmp_path):
+    auxiliary = tmp_path / "judge-type-contract"
+    auxiliary.mkdir()
+    (auxiliary / "pairs.jsonl").write_text("{}\n", encoding="utf-8")
+    (auxiliary / "windows.jsonl").write_text("{}\n", encoding="utf-8")
+    document_case = tmp_path / "official" / "case-1" / "docs"
+    document_case.mkdir(parents=True)
+    assert [path.name for path in eval_run.discover_types(tmp_path)] == ["official"]
+    assert eval_run.discover_types(tmp_path, names=["judge-type-contract"]) == []
+
+
 def test_persist_summary_writes_before_finished(tmp_path: Path):
     summary = {"cases": [{"case": "a", "status": "succeeded"}], "succeeded": 1, "failed": 0}
     running = {

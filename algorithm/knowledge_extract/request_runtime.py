@@ -143,7 +143,12 @@ class ScheduledClient:
 
 def create_request_llm(config: dict[str, Any]):
     version = config["version"]
-    package = "v3_1" if version == "v3.1" else version
+    if version == "v3.1":
+        package = "v3_1"
+    elif version == "v2.2":
+        package = "v2_2"
+    else:
+        package = version
     module = importlib.import_module(f"algorithm.knowledge_extract.{package}.llm_client")
     factory = module.create_llm_client
     credential = os.getenv(config["api_key_env"], "")
