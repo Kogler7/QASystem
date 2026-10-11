@@ -292,6 +292,14 @@ python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批�
 
 组合实验先固定切片、golden、本体和预算，再更换抽取模型。测试不同裁判时可复用同一批预测重新评分，避免重复抽取消耗；更换抽取模型时不能复用旧预测。裁判改变后须分别建立基线，不能用不同裁判的分数直接证明抽取质量提升。manifest 保存抽取配置与裁判 model/base_url/adapter，不包含密钥。
 
+**固定切片的模型组合评测**
+
+`python -m eval.model_matrix --workspace test_data/eval --params eval/params.yaml --plan <方案.json> --output tmp/eval/matrix/<批次> --workers 4` 会先统一准备切片，再经 `eval/run.py` 比较多个抽取模型。`--prepare-only` 仅准备输入；之后用 `--prepared <准备批次>/inputs` 复用同一份切片。准备阶段遇到解析部分失败或切片兜底会停止，避免悄悄改变比较输入。
+
+方案 JSON 包含 `cases`、`extractors`、`judge` 与可选 `comparison`。每个 extractor 填 `id/provider/model/version`，本地模型可填 `health_url` 等待就绪；judge 填 `id/adapter/model/base_url`，API key 仅用 `key_env` 指定变量名。`comparison` 填 `extractor` ID 与另一套 `judge`，只重新评分已保存预测，缺失预测另存覆盖清单，不重新抽取。每个组合各有独立日志、manifest、summary 和退出码；某模型启动失败不作为正常抽取质量结果。
+
+评测驱动可在 `qasystem_backend` 内执行，模型与 Clef 使用同一 Docker 网络的服务名。本轮本地服务统一采用 `qasystem-env-v1`，模型目录只读挂载，记录真实上下文容量及输出预算；测试结果不纳入运行时源码包。
+
 **精确匹配打分**
 
 ```bash
