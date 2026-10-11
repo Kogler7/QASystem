@@ -22,13 +22,12 @@ from .adapter import (
     _mcp_tools_to_openai,
     _default_mcp_path,
 )
+from .decompose import run_orchestrated
 from .delivery import answer_v1_delivery
 from .models import BudgetConfig, SessionConfig, SkillRef, ToolPolicy
 from .pool import ToolManagerPool
-from .runtime import AgentRuntime
 from .skillsets.loader import SkillLoader
 from .tools.mcp_tools.mcp_loader import build_config_from_mcp_json
-from .trace import TaskEventTraceSink
 from .cancellation import AgentCancelled, CancellationToken
 
 logger = logging.getLogger("agentcode.worker")
@@ -134,6 +133,7 @@ class _StreamingWorkerLLM:
         self._url = _chat_completions_url(self._cfg["base_url"])
         self._broker = broker
         self._task_id: str | None = None
+        self._subtask: str | None = None
         self._client = httpx.Client(
             timeout=self._cfg["timeout_s"],
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=20),
@@ -141,6 +141,10 @@ class _StreamingWorkerLLM:
 
     def set_task_id(self, task_id: str) -> None:
         self._task_id = task_id
+
+    def set_subtask(self, subtask: str | None) -> None:
+        """分解子任务专用：给本实例发布的所有事件打上 subtask 标签。"""
+        self._subtask = subtask
 
     def complete(self, messages, tools, cancel_token=None):
         import json as json_mod
@@ -265,10 +269,21 @@ class _StreamingWorkerLLM:
 
     def _publish(self, event_type: str, data: dict) -> None:
         if self._broker and self._task_id:
-            self._broker.publish(self._task_id, {"type": event_type, **data})
+            event = {"type": event_type, **data}
+            if self._subtask is not None:
+                event["subtask"] = self._subtask
+            self._broker.publish(self._task_id, event)
 
     def close(self):
         self._client.close()
+
+
+def _make_tagged_llm(broker, task_id: str, subtask: str):
+    """为分解子任务新建已打标的流式 LLM 实例（由 decompose 模块负责关闭）。"""
+    llm = _StreamingWorkerLLM(broker=broker)
+    llm.set_task_id(task_id)
+    llm.set_subtask(subtask)
+    return llm
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -370,33 +385,23 @@ def _process_one(
                     request_data.get("auth_context_id"), task_id
                 )
 
-                def _on_tool_results(results, elapsed_ms):
-                    for r in results:
-                        name = r.get("name", "")
-                        content = r.get("content", "") if not r.get("is_error") else None
-                        broker.publish(task_id, {
-                            "type": "tool_result",
-                            "name": name,
-                            "is_error": r.get("is_error", False),
-                            "content": content,
-                            "error": r.get("error") if r.get("is_error") else None,
-                        })
-
                 history = request_data.get("history") or []
                 with pool.borrow(timeout=120.0) as tm:
                     with tm.bind_user_headers(user_headers):
-                        runtime = AgentRuntime(
-                            llm_backend=llm,
-                            tool_manager=tm,
-                            trace_sink=TaskEventTraceSink(task_id),
-                            skill_loader=sk_loader,
-                            on_tool_results=_on_tool_results,
-                        )
-                        result = runtime.run_session(
-                            config,
-                            request_data["user_message"],
-                            cancel_token=cancel_token,
+                        # 分解编排入口：门控不通过时内部走与原先等价的直连路径。
+                        result = run_orchestrated(
+                            task_id=task_id,
+                            broker=broker,
+                            pool=pool,
+                            parent_tm=tm,
+                            user_headers=user_headers,
+                            direct_llm=llm,
+                            llm_factory=lambda subtask: _make_tagged_llm(broker, task_id, subtask),
+                            config=config,
+                            user_message=request_data["user_message"],
                             history=history,
+                            cancel_token=cancel_token,
+                            skill_loader=sk_loader,
                         )
 
                 if result.status == "ok":
