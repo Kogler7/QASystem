@@ -35,6 +35,35 @@ def test_nonempty_does_not_equate_fields_with_truth():
     assert fields["counts"]["both"] == 1  # Existence, not semantic validation.
 
 
+def test_flat_layout_uses_explicit_input_variant_and_separate_source_commits(tmp_path):
+    golden(tmp_path)
+    write(tmp_path / "plan.json", {"cases": ["rule/case"], "extractors": [{"id": "api"}],
+        "judge": {"id": "judge"}, "backend_source_commit": "backend-new", "frozen_input_source_commit": "frozen-old"})
+    run = tmp_path / "api/judge/runs/001"
+    score_case(run / "rule/case", status="ok", tp=1)
+    write(run / "summary.json", {"cases": [{}]})
+    result = audit(tmp_path, variants=("json",), layout="flat")
+    assert result["frozen_source_commit"] == "frozen-old"
+    assert result["backend_source_commit"] == "backend-new"
+    assert result["groups"]["json/api"]["valid_scored"] == 1
+    assert result["groups"]["json/api"]["run_complete"]
+    assert "冻结输入源码：frozen-old；Backend源码：backend-new" in markdown(result)
+    with pytest.raises(ValueError, match="flat_layout_requires_one_variant"):
+        audit(tmp_path, layout="flat")
+
+
+def test_matrix_default_preserves_legacy_paths_and_frozen_source_fallback(tmp_path):
+    golden(tmp_path)
+    write(tmp_path / "plan.json", {"cases": ["rule/case"], "extractors": [{"id": "api"}],
+        "judge": {"id": "judge"}, "backend_source_commit": "legacy-source"})
+    score_case(tmp_path / "evaluation/json/api/judge/runs/001/rule/case")
+    result = audit(tmp_path, variants=("json",))
+    assert result["layout"] == "matrix" and result["frozen_source_commit"] == "legacy-source"
+    assert result["groups"]["json/api"]["valid_scored"] == 1
+    with pytest.raises(ValueError, match="unknown_layout"):
+        audit(tmp_path, variants=("json",), layout="guess")
+
+
 def test_malformed_rows_are_not_silently_discarded():
     with pytest.raises(ValueError, match="row_invalid"):
         rule_fields({"nodes": [None], "relationships": []})

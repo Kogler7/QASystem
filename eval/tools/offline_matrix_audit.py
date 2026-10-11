@@ -164,10 +164,14 @@ def aggregate(cases):
     return result
 
 
-def audit(root, variants=VARIANTS, *, combine_recovery=False, equivalence_note="", interrupted_groups=(), plan_path=None, inputs_root=None, evaluation_root=None):
+def audit(root, variants=VARIANTS, *, combine_recovery=False, equivalence_note="", interrupted_groups=(), plan_path=None, inputs_root=None, evaluation_root=None, layout="matrix"):
+    if layout not in {"matrix", "flat"}:
+        raise ValueError("unknown_layout")
+    if layout == "flat" and len(variants) != 1:
+        raise ValueError("flat_layout_requires_one_variant")
     plan_path = plan_path or root / "plan.json"
     inputs_root = inputs_root or root / "inputs"
-    evaluation_root = evaluation_root or root / "evaluation"
+    evaluation_root = evaluation_root or (root if layout == "flat" else root / "evaluation")
     plan = read(plan_path)
     expected = plan["cases"]
     if any(len(Path(c).parts) != 2 or Path(c).is_absolute() or ".." in Path(c).parts for c in expected):
@@ -176,7 +180,9 @@ def audit(root, variants=VARIANTS, *, combine_recovery=False, equivalence_note="
         raise ValueError("recovery_combination_requires_explicit_equivalence_note")
     result = {"timestamp_utc": datetime.now(timezone.utc).isoformat(), "source_text_reviewed": False,
               "models_called": False, "root": str(root), "inputs_root": str(inputs_root), "plan_path": str(plan_path),
-              "evaluation_root": str(evaluation_root), "frozen_source_commit": plan.get("backend_source_commit"), "groups": {}}
+              "evaluation_root": str(evaluation_root), "layout": layout,
+              "frozen_source_commit": plan.get("frozen_input_source_commit", plan.get("backend_source_commit")),
+              "backend_source_commit": plan.get("backend_source_commit"), "groups": {}}
     for variant in variants:
         if variant not in VARIANTS:
             raise ValueError("unknown_variant")
@@ -184,7 +190,8 @@ def audit(root, variants=VARIANTS, *, combine_recovery=False, equivalence_note="
             model_id = model["id"]
             if Path(model_id).name != model_id or model_id in (".", ".."):
                 raise ValueError("unsafe_model_id")
-            runs = sorted((evaluation_root / variant / model_id / plan["judge"]["id"] / "runs").glob("*"))
+            variant_root = evaluation_root if layout == "flat" else evaluation_root / variant
+            runs = sorted((variant_root / model_id / plan["judge"]["id"] / "runs").glob("*"))
             runs = [p for p in runs if p.is_dir()]
             selected = runs[-1] if runs else None
             cases = [audit_case(case, selected / case if selected else None,
@@ -250,6 +257,7 @@ def markdown(result):
     def pct(value):
         return "—" if value is None else f"{value * 100:.2f}%"
     lines = ["# 规则字段与评测分母离线快照", "", f"快照 UTC：{result['timestamp_utc']}", "",
+             f"冻结输入源码：{result.get('frozen_source_commit') or '未记录'}；Backend源码：{result.get('backend_source_commit') or '未记录'}。", "",
              "仅保存图与 golden；不看原文、不调用模型。字段非空不代表语义正确。", "",
              "中断说明：" + (result.get("censor_note") or "未提供人工中断说明；pending 不作零分。"), "",
              "## 原始批次条件指标", "", "|方案/模型|有效评分/计划|成功|部分/失败有图|无结果失败|中断|待完成|实体F1|关系F1|实体gold分母/计划|关系gold分母/计划|",
@@ -302,9 +310,11 @@ def main():
     parser.add_argument("--plan-path", type=Path)
     parser.add_argument("--inputs-root", type=Path)
     parser.add_argument("--evaluation-root", type=Path)
+    parser.add_argument("--layout", choices=("matrix", "flat"), default="matrix", help="Flat outputs omit the variant directory; requires one explicit variant")
+    parser.add_argument("--variants", default=",".join(VARIANTS), help="Comma-separated frozen input variants; default retains the three-variant matrix")
     parser.add_argument("--actual-source-commit", default="", help="Caller-recorded actual source; never infer it from a directory label")
     args = parser.parse_args()
-    result = audit(args.root, combine_recovery=args.combine_recovery, equivalence_note=args.recovery_equivalence_note,
+    result = audit(args.root, variants=tuple(x for x in args.variants.split(",") if x), layout=args.layout, combine_recovery=args.combine_recovery, equivalence_note=args.recovery_equivalence_note,
                    interrupted_groups=tuple(x for x in args.interrupted_groups.split(",") if x), plan_path=args.plan_path,
                    inputs_root=args.inputs_root, evaluation_root=args.evaluation_root)
     result["censor_note"] = args.censor_note
