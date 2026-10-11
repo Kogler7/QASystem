@@ -612,7 +612,7 @@ class DocumentProcessor:
                         process_path = file_path
                         process_suffix = ".ofd"
                         logger.warning(
-                            "OFD 转换为 PDF 失败（{}），改用 MinerU 4.x 原生 OFD 解析",
+                            "OFD 转换为 PDF 失败（%s），改用 MinerU 4.x 原生 OFD 解析",
                             converter.last_conversion_error,
                         )
                     else:

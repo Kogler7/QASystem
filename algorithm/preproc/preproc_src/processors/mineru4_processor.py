@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable
@@ -23,7 +24,7 @@ from ..table_json import convert_tables
 
 # 4.0 档位；默认 standard（4.0 自身默认），部署可用 MINERU4_TIER 覆盖。
 DEFAULT_TIER = "standard"
-# 镜像里 4.0 独立 venv 的解释器；本地评估可用 MINERU4_PYTHON 覆盖
+# 兼容独立 venv；主环境已装 4.x 时复用 sys.executable
 DEFAULT_VENV_PYTHON = "/opt/mineru4/venv/bin/python"
 # 子进程解析超时（秒），大文档可调
 DEFAULT_TIMEOUT_SECONDS = 1800
@@ -137,27 +138,14 @@ class Mineru4Processor(BaseProcessor):
     # ------------------------------------------------------------ 内部工具
 
     @staticmethod
-    def _load_mineru():
-        """导入并校验 MinerU 4.x，返回模块。"""
-        import importlib.metadata as metadata
-
-        import mineru  # noqa: F401  (导入失败由调用方转成 metadata['error'])
-
-        try:
-            version = metadata.version("mineru")
-        except Exception:  # pragma: no cover - 极端环境
-            version = getattr(mineru, "__version__", "")
-        major = str(version).split(".", 1)[0]
-        if not major.isdigit() or int(major) < 4:
-            raise RuntimeError(
-                f"engine=mineru4 需要 MinerU 4.x，当前安装的是 {version}；"
-                "4.0 与 2.x 依赖互斥，请使用独立环境（如 work/mineru4/venv）并设置 PYTHONPATH"
-            )
-        return mineru, version
-
-    @staticmethod
     def _venv_python() -> str:
-        return os.getenv("MINERU4_PYTHON") or DEFAULT_VENV_PYTHON
+        # Inspect distribution metadata without importing native model code in the API worker.
+        explicit = os.getenv("MINERU4_PYTHON")
+        if explicit:
+            return explicit
+        if (mineru_major_version() or 0) >= 4:
+            return sys.executable
+        return DEFAULT_VENV_PYTHON
 
     def _run_in_subprocess(
         self,
@@ -167,7 +155,7 @@ class Mineru4Processor(BaseProcessor):
         ocr_mode: str,
         page_range: str,
     ) -> tuple[str, dict, dict]:
-        """用独立 venv 的解释器解析，返回 (markdown, structured, info)。"""
+        """在隔离子进程解析，返回 (markdown, structured, info)。"""
         python = self._venv_python()
         if not os.path.exists(python):
             raise RuntimeError(
@@ -186,7 +174,7 @@ class Mineru4Processor(BaseProcessor):
                 "--pdf", str(file_path),
                 "--out-dir", workdir,
                 "--tier", tier,
-                "--ocr-mode", {v: k for k, v in OCR_MODE_MAP.items()}.get(ocr_mode, "auto"),
+                "--ocr-mode", OCR_MODE_MAP.get(ocr_mode, ocr_mode),
                 "--page-range", page_range,
             ]
             completed = subprocess.run(
@@ -300,30 +288,13 @@ class Mineru4Processor(BaseProcessor):
                 self._page_range(start_page_id, end_page_id)
                 if suffix in PAGE_RANGE_SUFFIXES else ""
             )
-            mode = "in-process"
-            version = ""
-            structured: Any = {}
-            try:
-                mineru, version = self._load_mineru()
-                result = mineru.parse(
-                    file_path,
-                    tier=tier,
-                    ocr_mode=OCR_MODE_MAP.get(ocr_mode, "auto"),
-                    page_range=page_range,
-                )
-                content = result.markdown() or ""
-                try:
-                    structured = result.structured_content() or {}
-                except Exception:
-                    structured = {}
-            except Exception as in_process_error:
-                # 当前环境没有 4.x（镜像默认是 2.x + docling）：改走独立 venv 子进程
-                logger.info("进程内不可用 MinerU 4.x（{}），改用子进程模式", in_process_error)
-                content, structured, info = self._run_in_subprocess(
-                    file_path, tier=tier, ocr_mode=ocr_mode, page_range=page_range
-                )
-                mode = "subprocess"
-                version = str(info.get("mineru_version") or "")
+            # Native model initialization can hold the GIL longer than Uvicorn's
+            # heartbeat timeout. Always isolate it, even when MinerU shares Python.
+            content, structured, info = self._run_in_subprocess(
+                file_path, tier=tier, ocr_mode=ocr_mode, page_range=page_range
+            )
+            mode = "subprocess"
+            version = str(info.get("mineru_version") or "")
 
             metadata["mineru4_options"] = {
                 "tier": tier,
