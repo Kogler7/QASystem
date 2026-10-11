@@ -1,3 +1,9 @@
+---
+noteId: "14976141c54011f192edfbc308186266"
+tags: []
+
+---
+
 # NanoJev 常驻推理服务
 
 与 Clef 共用 `qasystem-env-v1` 内的 `/opt/qasystem/clef-venv`，启动时加载一次模型并预热，
