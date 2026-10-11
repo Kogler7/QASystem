@@ -136,14 +136,19 @@ def test_source_observation_is_retained_without_false_partial_or_repair():
     {"kind": "unknown", "affects_completeness": False, "message": "提醒"},
     {"kind": "unresolved_fact", "affects_completeness": True, "message": "关键条件无法表达"},
 ])
-def test_unknown_or_blocking_issue_contract_remains_blocking(issue):
+def test_unknown_or_blocking_issue_contract_stays_visible_as_a_coverage_gap(issue):
     text = "甲存在。"
     llm = ScriptedLLM(lambda stage, _payload, _context: {"entities": [_entity("a", "A", "甲", text)], "issues": [issue]}
                       if stage == "entities" else _empty(stage))
     result = extract_aggregate("@startuml\nclass A\n@enduml", [ExtractionChunk("source-A", text)],
                                llm=llm, decider=SemanticDecider(), use_scheduler=False, max_repair_rounds=0)
-    assert result["status"] == "partial"
+    # 声明式缺口不改图谱可信度，但必须报出来且保持 error 级别告警。
     assert any(value.get("code") == "SEMANTIC_SCOPE_UNRESOLVED" for value in result["coverage_gaps"])
+    assert any(w.get("code") == "SEMANTIC_SCOPE_UNRESOLVED" and w.get("severity") == "error"
+               for w in result["warnings"])
+    assert result["verification"]["coverage_complete"] is False
+    assert result["verification"]["valid"] is True
+    assert result["status"] == "succeeded"
 
 
 def test_informational_note_does_not_clear_a_real_unresolved_task():
@@ -181,7 +186,10 @@ def test_resolve_reported_blocker_is_not_silently_ignored_after_supported_decisi
                                llm=ScriptedLLM(model), decider=SemanticDecider(lambda _: "insufficient"),
                                use_scheduler=False, max_repair_rounds=0)
     assert result["raw"]["entities"]
-    assert result["status"] == "partial"
+    # 支持判定不能掩盖模型声明的缺口：缺口留在覆盖里，实体图照常发布。
+    assert any(value.get("code") == "SEMANTIC_SCOPE_UNRESOLVED" for value in result["coverage_gaps"])
+    assert result["verification"]["coverage_complete"] is False
+    assert result["status"] == "succeeded"
 
 
 @pytest.mark.parametrize("repair,other_blocker", [(False, False), (True, False), (True, True)])
@@ -212,7 +220,10 @@ def test_nonidentity_bad_array_keeps_entity_and_relations_and_requires_real_fiel
     assert bad["status"] == ("resolved" if repair else "unresolved")
     entity = next(entity for entity in result["raw"]["entities"] if entity["name"] == "甲")
     assert entity["properties"] == ({"aliases": ["甲方", "首方"]} if repair else {})
-    assert result["status"] == ("succeeded" if repair and not other_blocker else "partial")
+    # 实体已发布；字段/作用域缺口只影响覆盖率，不否决整图。
+    assert result["verification"]["valid"] is True
+    assert result["verification"]["coverage_complete"] is (repair and not other_blocker)
+    assert result["status"] == "succeeded"
 
 
 def test_invalid_identity_array_remains_blocking_and_does_not_change_identity():
@@ -289,8 +300,11 @@ def test_empty_entity_rerun_does_not_clear_an_invalid_field_by_omission():
     result = extract_aggregate("@startuml\nclass A {\naliases: String[]\n}\n@enduml", [ExtractionChunk("source-A", text)],
                                llm=ScriptedLLM(model), decider=SemanticDecider(), use_scheduler=False)
     assert seen == 2
-    assert result["status"] == "partial"
-    assert any(issue["code"] == "INVALID_PROPERTY_SCHEMA" for issue in result["coverage_gaps"])
+    # 空重跑不能把无效字段标成已修复：字段问题仍在覆盖缺口里，实体本身照常发布。
+    assert any(issue["code"] == "INVALID_PROPERTY_SCHEMA" and issue["status"] == "unresolved"
+               for issue in result["coverage_gaps"])
+    assert result["verification"]["coverage_complete"] is False
+    assert result["status"] == "succeeded"
 
 
 @pytest.mark.parametrize("fix_field", [False, True])
@@ -316,9 +330,11 @@ def test_compact_repair_rename_preserves_hidden_properties_and_reconciles_field_
     entity = result["raw"]["entities"][0]
     assert entity["name"] == "甲组织"
     assert entity["properties"]["detail"] == "甲有详细说明"
-    assert result["status"] == ("succeeded" if fix_field else "partial")
     issue = next(issue for issue in result["run_trace"]["issues"] if issue["code"] == "INVALID_PROPERTY_SCHEMA")
     assert issue["status"] == ("resolved" if fix_field else "unresolved")
+    # 字段是否真被修复决定覆盖率，而不是已发布图谱的可信度。
+    assert result["verification"]["coverage_complete"] is fix_field
+    assert result["status"] == "succeeded"
 
 
 def test_semantic_property_selection_normalizes_labels_and_unknown_preserves_context():

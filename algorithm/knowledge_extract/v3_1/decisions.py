@@ -56,15 +56,17 @@ def _json(value: Any, *, sort_keys: bool = True) -> str:
 class ClefDecider:
     def __init__(
         self, client: Any = None, timeout: float = 10, max_calls: int = 128,
-        max_questions: int = 4,
+        max_questions: int = 16,
     ) -> None:
         if isinstance(timeout, bool) or not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("Clef timeout must be positive and finite")
         if isinstance(max_calls, bool) or not isinstance(max_calls, int) or max_calls < 0:
             raise ValueError("Clef max_calls must be a nonnegative integer")
+        # 上限跟服务端 CLEF_MAX_QUESTIONS（默认 16）一致：每次调用多带几个问题
+        # 不改变语义，但把串行调用数与墙钟时间按倍数压下来。
         if (isinstance(max_questions, bool) or not isinstance(max_questions, int)
-                or not 1 <= max_questions <= 4):
-            raise ValueError("Clef max_questions must be between 1 and 4")
+                or not 1 <= max_questions <= 16):
+            raise ValueError("Clef max_questions must be between 1 and 16")
         self.client = client if client is not None else ClefFlashClient(timeout=timeout)
         self.timeout = float(timeout)
         self.max_calls = max_calls

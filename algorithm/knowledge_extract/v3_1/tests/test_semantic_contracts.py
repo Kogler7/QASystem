@@ -176,8 +176,11 @@ def test_unrepresented_condition_does_not_become_an_unconditional_edge():
                                llm=ScriptedLLM(model), decider=SemanticDecider(), use_scheduler=False)
 
     assert result["raw"]["relations"] == []
-    assert result["status"] == "partial"
     assert len(result["raw"]["entities"]) == 2
+    # 条件无法表达 → 该关系不进图（召回缺口），实体图谱本身仍然可信。
+    assert result["status"] == "succeeded"
+    assert result["verification"]["valid"] is True
+    assert result["verification"]["coverage_complete"] is False
 
 
 def test_locatable_quote_is_not_enough_when_semantic_judge_contradicts_relation():

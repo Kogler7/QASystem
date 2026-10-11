@@ -41,8 +41,12 @@ def test_unconditional_with_condition_references_is_an_issue_not_a_crash(declare
         if stage == 'relations': return {'relations': [_relation(p, '甲', 'assists', '乙', text, condition_entity_ids=declared)]}
         return _empty(stage)
     result, _ = run(ontology, {'source-A': text}, model, max_repair_rounds=0)
-    assert result['status'] == 'partial' and not result['raw']['relations']
+    # 候选被拒不等于图谱不可信：关系不进图，问题留在覆盖缺口里，整图仍可发布。
+    assert not result['raw']['relations']
     assert any(x['code'] == 'INVALID_CONDITION_REFERENCES' for x in result['coverage_gaps'])
+    assert result['verification']['valid'] is True
+    assert result['verification']['coverage_complete'] is False
+    assert result['status'] == 'succeeded'
 
 
 def test_delayed_attribute_support_cannot_overwrite_an_accepted_conflicting_value():
