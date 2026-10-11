@@ -14,6 +14,8 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
+from algorithm.token_budget import check_input_budget
+
 
 class QuotaPool:
     def __init__(self, limits: dict[str, Any]):
@@ -83,6 +85,7 @@ class ScheduledClient:
         self.thinking_parameter = config.get("thinking_parameter", "thinking")
         self.disable_thinking = config["disable_thinking"]
         self.response_format = config.get("response_format", "auto")
+        self.max_input_tokens = int(config.get("max_input_tokens", 65536))
         budget = config.get("document_timeout")
         self.deadline = time.monotonic() + float(budget) if budget is not None else None
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._chat))
@@ -92,6 +95,7 @@ class ScheduledClient:
         return getattr(self.client, name)
 
     def _call(self, method, **kwargs):
+        check_input_budget(kwargs, self.max_input_tokens)
         call_deadline = time.monotonic() + self.timeout
         if self.deadline is not None:
             call_deadline = min(call_deadline, self.deadline)
@@ -129,8 +133,10 @@ def create_request_llm(config: dict[str, Any]):
     if config["provider"] != "default" and not credential.strip():
         raise ValueError("Extraction provider credential is not configured")
     llm = factory(base_url=config["base_url"], api_key=credential,
-                  model=config["model"], max_tokens=config["max_tokens"],
+                  model=config["model"], max_tokens=config.get("max_output_tokens") or config["max_tokens"],
                   request_timeout=config["request_timeout"], disable_thinking=config["disable_thinking"])
     llm.client = ScheduledClient(llm.client, config)
     llm.api_mode = config.get("api_mode", "auto")
+    llm.max_input_tokens = int(config.get("max_input_tokens", 65536))
+    llm.max_output_tokens = int(config.get("max_output_tokens") or config["max_tokens"])
     return llm

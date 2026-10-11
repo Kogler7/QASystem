@@ -619,11 +619,11 @@ def generate_structured(
                         )
                         return parsed
         except Exception as exc:  # noqa: BLE001 - recorded as typed run evidence
-            error_type = "timeout" if _is_timeout(exc) else "request"
+            error_type = getattr(exc, "error_type", None) or ("timeout" if _is_timeout(exc) else "request")
             message = str(exc) or type(exc).__name__
             retryable = _is_retryable_exception(exc)
 
-        if error_type == "incomplete":
+        if error_type in {"incomplete", "input_limit"}:
             retryable = False  # Repeating the same output budget cannot recover truncation.
         next_response_mode = _next_response_mode(response_mode, error_type)
         logger.warning(
@@ -673,7 +673,7 @@ def generate_structured(
             error_type=error_type,
             response_mode=response_mode,
         )
-        if error_type == "incomplete" or not retryable or attempt_number >= resolved_max_attempts:
+        if error_type in {"incomplete", "input_limit"} or not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
         if error_type in {"json", "schema", "empty_collection"}:
