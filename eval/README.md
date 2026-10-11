@@ -405,3 +405,36 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 ### 已下线版本的对照说明
 
 `v3.2`（单通用提示词联合抽取）与旧 `v3.1`（V2 副本 + prompt router）实现已从代码库移除，对应的提示词对照评测无法再运行；历史结论保留在 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。当前 `v3.1` 指语义 harness，评测方式见 [V3.1 语义 Harness 与评测](../docs/算法/知识抽取V3.1语义Harness与评测.md)。
+# 小规模诊断评测
+
+`python3 eval/quick_eval.py --extract-version v3` 使用 `eval/quick_params.yaml`，固定选择
+`official_01`、`official_03`、`official_04` 三个完整用例，覆盖普通公文、短公文和密集表格/截断压力。
+默认从 `test_data/eval` 读取已有 `chunks.json`；不会重新解析，也不会复用旧抽取结果。
+可在 `quick_eval.cases` 中更换 1–3 个用例，须保持各轮输入、golden、模型和预算相同。
+
+```bash
+# 88 上复用之前已冻结的输入；需要 Backend 已恢复 siliconflow 供应商配置。
+python3 eval/quick_eval.py \
+  --workspace /mnt/data3/qasys/qasystem/tmp/eval/comparisons/20261011T032213Z/workspace \
+  --extract-version v3
+
+# 同集测试另一版本，裁判仍独立配置为 DeepSeek 官方。
+python3 eval/quick_eval.py --extract-version v2
+# 只核验用例和固定切片，不调用 API。
+python3 eval/quick_eval.py --dry-run
+```
+
+凭据从现有 judge 环境变量读取，不写入配置。默认 LLM 评分；临时 `--match-mode identity`
+可去掉裁判调用，但不能将 identity 分数与 LLM 分数直接比较。配置项及 `--extract-provider`
+可切换已登记的供应商；请求输入/输出 token 预算仍来自 Backend 供应商配置。
+
+- 外层 `--case-attempts 1`，partial 不再整篇重抽；算法内部拆批和必要重试保留。
+- 默认不限制整轮、文档耗时；不覆盖供应商的网络请求超时。靠缩小评测集控制工作量，不承诺固定时间结束。
+- `poll_timeout_seconds: 0` 表示一直等待 Backend 完成，兼容 inline 与排队模式。
+- 可显式指定 `--wall-seconds`，但诊断评测不使用该硬时限。
+- 每轮独立保存 `tmp/eval/quick/<UTC时间-随机编号>/run.log` 与 `status.json`；
+  `run.log` 中指向统一入口生成的 `tmp/eval/runs/<批次>/summary.json` 和报告。
+- 快速集用于局部回归比较，不能替代全量门禁。比较不同版本时必须保持相同的模型、超时配置和输入；不能直接对比之前被硬预算截断的结果。
+
+统一入口也支持直接传 `python3 eval/run.py ... --case-attempts 1`，默认仍为 3 次，
+该参数只影响外层整篇尝试，不改变传输重试。

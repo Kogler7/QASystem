@@ -13,7 +13,7 @@ from pathlib import Path
 
 from algorithm.runtime_profile import is_remote_only
 
-from .resources import GpuInventory, configured_gpu_ids
+from .resources import GpuInventory
 
 
 LOGGER = logging.getLogger("qasystem.supervisor")
@@ -36,9 +36,6 @@ def _env_int(name: str, default: int, *, minimum: int = 0, maximum: int = 256) -
 def _gpu_ids() -> list[str]:
     if is_remote_only():
         return []
-    configured = configured_gpu_ids()
-    if configured:
-        return configured
     return [item.physical_index for item in GpuInventory(cache_seconds=0).snapshots(force=True)]
 
 

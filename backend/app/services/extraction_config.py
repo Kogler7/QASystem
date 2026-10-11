@@ -8,7 +8,7 @@ import os
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from algorithm.knowledge_extract.version import SUPPORTED_VERSIONS, get_extract_version
 
@@ -23,11 +23,22 @@ class ProviderProfile(BaseModel):
     qps: int = Field(default=0, ge=0)
     qpm: int = Field(default=0, ge=0)
     max_tokens: int = Field(default=16384, ge=1)
+    max_input_tokens: int = Field(default=65536, ge=1)
+    max_output_tokens: int | None = Field(default=None, ge=1)
     request_timeout: float = Field(default=300, gt=0, allow_inf_nan=False)
     disable_thinking: bool = True
     api_mode: Literal["auto", "chat"] = "auto"
     thinking_parameter: Literal["thinking", "enable_thinking", "none"] = "thinking"
     response_format: Literal["auto", "json_object"] = "auto"
+
+    @model_validator(mode="after")
+    def resolve_output_budget(self):
+        if self.max_output_tokens is not None:
+            if "max_tokens" in self.model_fields_set and self.max_tokens != self.max_output_tokens:
+                raise ValueError("Conflicting output token limits")
+            self.max_tokens = self.max_output_tokens
+        self.max_output_tokens = self.max_tokens
+        return self
 
 
 OVERRIDE_FIELDS = ("version", "provider", "request_timeout", "document_timeout")
@@ -53,7 +64,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Unsupported extraction version")
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
-    package = "v2" if version in {"v3.1", "jev"} else version
+    package = {"v3.1": "v3_1", "jev": "v2"}.get(version, version)
     defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
     provider = options.get("provider") or "default"
     if provider == "default":
@@ -64,6 +75,11 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
         values.update(api_key_env=_credential_env(),
                       quota_group=os.getenv("KG_EXTRACT_LLM_QUOTA_GROUP", "default"),
                       api_mode="auto", thinking_parameter="thinking")
+        values["max_input_tokens"] = int(os.getenv("KG_EXTRACT_LLM_MAX_INPUT_TOKENS", "65536"))
+        values["max_output_tokens"] = int(os.getenv("KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS") or values["max_tokens"])
+        values["max_tokens"] = values["max_output_tokens"]
+        if values["max_input_tokens"] < 1 or values["max_output_tokens"] < 1:
+            raise ValueError("Token limits must be positive")
     else:
         try:
             profiles = json.loads(os.getenv("KG_EXTRACT_PROVIDERS_JSON", "{}"))
@@ -79,8 +95,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
     if version == "v3.1":
         if provider == "default":
             values["request_timeout"] = float(os.getenv("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
-            from algorithm.knowledge_extract.v3_1.llm_client import thinking_disabled
-            values["disable_thinking"] = thinking_disabled()
+            values["disable_thinking"] = defaults["disable_thinking"]
         document_timeout = float(os.getenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "900"))
     else:
         document_timeout = None
@@ -92,11 +107,16 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
 
 
 def public_config(config: dict[str, Any]) -> dict[str, Any]:
-    return {key: config.get(key) for key in (
+    result = {key: config.get(key) for key in (
         "version", "provider", "model", "request_timeout", "document_timeout",
-        "max_tokens", "disable_thinking",
+        "max_tokens", "max_input_tokens", "max_output_tokens", "disable_thinking",
         "api_mode", "thinking_parameter", "response_format",
     )}
+    if config.get("version") in {"v2", "v3", "latest"}:
+        # Provider profiles can retain legacy preferences, but extraction no
+        # longer sends a response_format parameter on the wire.
+        result.update(response_format=None, output_format="jsonl", api_mode="chat")
+    return result
 
 
 def snapshot_payload(operation: str, payload: Any) -> Any:

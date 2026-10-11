@@ -7,9 +7,9 @@ import json
 import pytest
 
 from algorithm.knowledge_extract import v3_1
-from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
+from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
 from algorithm.knowledge_extract.v2.graph_assembler import GraphAssembler
-from algorithm.knowledge_extract.v3_1.decisions import ClefDecider
+from algorithm.knowledge_extract.v3_1.tests.stub_llm import StubLLM, span_item
 from backend.app.services import knowledge_extract_adapter as adapter
 
 
@@ -18,14 +18,13 @@ class Assignment
 @enduml"""
 
 
-class SupportingClef:
-    def systemone(self, request, *, timeout=None):
-        return {"answers": {
-            key: {"type": "choice", "choice": "supported", "probabilities": {
-                choice: 0.99 if choice == "supported" else 0.005
-                for choice in question["criteria"]
-            }} for key, question in request["questions"].items()
-        }}
+class FixedPlanner:
+    """Keep domain assembly deterministic while exercising the real pipeline."""
+    def assemble(self, payload, *, stage):
+        return payload
+
+    def audit(self):
+        return []
 
 
 def _result(*, status="succeeded", failed_chunk=None):
@@ -55,7 +54,7 @@ def _result(*, status="succeeded", failed_chunk=None):
 
 
 @pytest.mark.parametrize("entrypoint", ["chunks", "single_document"])
-def test_v31_backend_selects_own_aggregate_and_v2_input(monkeypatch, entrypoint):
+def test_v31_backend_selects_own_aggregate_and_portable_input(monkeypatch, entrypoint):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3.1")
     captured = []
 
@@ -137,30 +136,23 @@ def test_v31_real_harness_retains_healthy_chunk_when_another_source_cannot_compl
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3.1")
     texts = ["甲组每晚检查机房。", "乙组每早检查泵房。"]
 
-    class Generation:
-        def generate_structured(self, *, schema, messages, run_context=None):
-            task = json.loads(messages[-1]["content"])["task"]
-            assert run_context["response_mode"] == "plain"
-            if task == "entities":
-                if run_context["chunk_id"] == "chunk-0001":
-                    raise TimeoutError("second original source timed out")
-                return {"entities": [{
-                    "candidate_id": "duty", "type": "Assignment", "name": "夜间巡检职责",
-                    "properties": {}, "evidence": [{"chunk_id": "chunk-0000", "quote": texts[0]}],
-                }]}
-            return {"entities": [], "updates": [], "relations": [], "decisions": [],
-                    "alias_pairs": [], "issues": [], "resolved_issue_ids": [], "context_requests": []}
+    def entities(prompt, chunk):
+        if chunk["chunk_id"] == "chunk-0001":
+            raise TimeoutError("second original source timed out")
+        return [span_item("Assignment", "甲组每晚检查机房")]
+
+    generation = StubLLM(entity_handler=entities)
 
     real_runner = v3_1.extract_aggregate
     monkeypatch.setattr(v3_1, "extract_aggregate", lambda **kwargs: real_runner(
-        **kwargs, llm=Generation(), decider=ClefDecider(SupportingClef()), use_scheduler=False,
+        **kwargs, llm=generation, assembly_planner=FixedPlanner(), use_scheduler=False,
     ))
 
     items = adapter.extract_chunks(ONTOLOGY, texts)
 
     assert len(items) == 2
     assert items[0]["error"] is None
-    assert items[0]["graph"]["nodes"][0]["properties"]["name"] == "夜间巡检职责"
+    assert items[0]["graph"]["nodes"][0]["properties"]["name"] == "甲组每晚检查机房"
     assert items[0]["graph"]["nodes"][0]["chunk_indices"] == [0]
     assert items[1]["error"]
     assert items[1]["error_code"]
@@ -173,28 +165,18 @@ def test_v31_real_relation_projects_by_its_evidence_without_relabeling_endpoint_
     ontology = "@startuml\nclass Team\nclass Work\nTeam --> Work : performs\n@enduml"
     texts = ["甲组已经设立。", "甲组承担巡检。"]
 
-    class Generation:
-        def generate_structured(self, *, schema, messages, run_context=None):
-            request = json.loads(messages[-1]["content"])
-            stage, payload = request["task"], request["input"]
-            index = int(run_context["chunk_id"].split("-")[-1])
-            if stage == "entities":
-                kind, name = ("Team", "甲组") if index == 0 else ("Work", "巡检")
-                return {"entities": [{"candidate_id": "local", "type": kind, "name": name,
-                                      "properties": {}, "evidence": [{
-                                          "chunk_id": run_context["chunk_id"], "quote": texts[index],
-                                      }]}]}
-            if stage == "relations" and index == 1:
-                ids = {entity["type"]: entity["candidate_id"] for entity in payload["entities"]}
-                return {"relations": [{"from_id": ids["Team"], "rel_type": "performs",
-                                        "to_id": ids["Work"], "evidence": [{
-                                            "chunk_id": "chunk-0001", "quote": texts[1],
-                                        }]}]}
-            return {"entities": [], "updates": [], "relations": [], "issues": []}
+    def entities(prompt, chunk):
+        return [span_item("Team", "甲组")] if chunk["chunk_id"] == "chunk-0000" else [span_item("Work", "巡检")]
+
+    def relations(prompt, pairs, chunk):
+        return [{"pair_id": pair["pair_id"], "label": pair["relation_id"],
+                 "evidence": {"quote": texts[1]}} for pair in pairs]
+
+    generation = StubLLM(entity_handler=entities, relation_handler=relations)
 
     real_runner = v3_1.extract_aggregate
     monkeypatch.setattr(v3_1, "extract_aggregate", lambda **kwargs: real_runner(
-        **kwargs, llm=Generation(), decider=ClefDecider(SupportingClef()), use_scheduler=False,
+        **kwargs, llm=generation, assembly_planner=FixedPlanner(), use_scheduler=False,
     ))
 
     items = adapter.extract_chunks(ontology, texts)

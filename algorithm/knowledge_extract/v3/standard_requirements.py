@@ -1,5 +1,6 @@
 """General Property/Constrain semantics for standard requirement clauses."""
 from __future__ import annotations
+from algorithm.knowledge_extract.jsonl_protocol import load_jsonl_response
 import json, re, unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -19,7 +20,7 @@ SYSTEM = (
     GENERIC_SEMANTIC_RULES
     + "\n\n"
     + STANDARD_PROMPT_EXTENSION
-    + "\n\n任务：对给定条款正文输出 items 数组，元素为 property 或 constraint，字段按上规则；只输出 JSON object，顶层键为 items。"
+    + "\n\n任务：对给定条款正文提取 property 或 constraint 记录，字段按上规则；输出格式遵循共享 JSONL 协议。"
 )
 SCHEMA = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {
     "kind": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string"}, "value": {"type": "string"},
@@ -107,9 +108,9 @@ def _extract_one(llm: Any, clause: str, body: str) -> list:
     resp = llm.generate_structured(schema=SCHEMA, messages=[
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": json.dumps({"clause": clause, "text": body[:5000]}, ensure_ascii=False)}],
-        run_context={"schema_name": "standard_requirements", "response_mode": "json_schema"})
+        run_context={"schema_name": "standard_requirements", "response_mode": "jsonl"})
     raw = getattr(resp, "text", resp)
-    data = json.loads(raw) if isinstance(raw, str) else raw
+    data = load_jsonl_response(resp, SCHEMA)
     if isinstance(data, dict): return data.get("items") or []
     return data if isinstance(data, list) else []
 def enrich_standard_requirements(pool: Any, manager: Any, plan: Any, llm: Any, *, warnings: Any = None, max_workers: int = 4, max_clauses: int = 80) -> dict[str, int]:

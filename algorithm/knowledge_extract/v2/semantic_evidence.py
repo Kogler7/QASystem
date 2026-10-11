@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
 import re
 from difflib import SequenceMatcher
 from typing import Any
@@ -38,7 +39,7 @@ VERIFICATION_SCHEMA: dict[str, Any] = {
 VERIFICATION_SYSTEM_PROMPT = """你是抽取结果的证据核验器。
 只依据给定的 current chunk 原文判断候选实体/属性是否属于原文，不引入外部知识。
 supported 只能取 yes（原文能够支持）、no（与原文矛盾或明显不属于原文）、uncertain（无法判断）。
-只输出 JSON object，且只包含 output schema 允许的键。"""
+输出遵循共享 JSONL 协议，记录只包含 record schema 允许的字段。"""
 
 
 def normalize_for_match(value: Any) -> str:
@@ -99,13 +100,16 @@ evidence_verification
 ## candidates
 {json.dumps(items, ensure_ascii=False, sort_keys=True, default=str)}
 
-## output schema
-{json.dumps(VERIFICATION_SCHEMA, ensure_ascii=False, sort_keys=True)}
+## output protocol
+{jsonl_instruction(VERIFICATION_SCHEMA)}
+
+## record schema
+{json.dumps(record_schema(VERIFICATION_SCHEMA), ensure_ascii=False, sort_keys=True)}
 
 ## output constraints
 - 逐项核验 candidates，按 item_id 输出 verdicts，不得遗漏任何 item_id。
 - yes=原文支持；no=与原文矛盾或明显不属于原文；uncertain=无法判断。
-- 只输出 JSON object；不要解释。"""
+- 每条核验记录独占一行；不要解释。"""
     return [
         {"role": "system", "content": VERIFICATION_SYSTEM_PROMPT},
         {"role": "user", "content": user},

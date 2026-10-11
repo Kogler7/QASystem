@@ -3,7 +3,7 @@
 
 ARG NODE_IMAGE=node:20-bullseye-slim
 ARG MAVEN_IMAGE=maven:3.9.9-eclipse-temurin-17
-ARG VLLM_IMAGE=vllm/vllm-openai:v0.11.2
+ARG VLLM_IMAGE=vllm/vllm-openai:v0.31.0
 FROM ${NODE_IMAGE} AS opencode-runtime
 
 ARG OPENCODE_VERSION=1.17.15
@@ -18,6 +18,9 @@ COPY ofd_converter/src /build/src
 RUN mvn --batch-mode --no-transfer-progress package -DskipTests
 
 FROM ${VLLM_IMAGE}
+
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_EXTRA_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -70,29 +73,22 @@ RUN find /etc/apt -maxdepth 2 \( -name '*.list' -o -name '*.sources' \) -exec se
     tree \
     tini \
     python-is-python3 \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install the heavy Python layer before copying application code so normal
-# source changes continue to use Docker's dependency cache.
+# Install dependency contracts only; ordinary source changes continue to use
+# Docker's dependency cache without adding application source to the image.
 #
-# 已知且被接受的依赖冲突（成因见 backend/requirements.mineru-extras.txt 的说明）：
-#   vllm 0.11.2 声明 transformers<5，而 MinerU 4.x 需要 transformers>=5；
-#   lmcache 声明 numpy<=2.2，而解析器统一到 numpy 2.2.x；
-#   vLLM 自带的 prometheus-fastapi-instrumentator 7.1.0 声明 starlette<1.0，
-#   而 MinerU 侧的 gradio 把 starlette 升到了 1.x。
-# 都是"基础镜像里的 vLLM 比我们后装的解析栈老"导致的声明级冲突，同一环境无法同时满足；
-# 下面三处 pip check 只放行这三条，其余任何冲突仍然让构建失败。
+# All services share the same Python dependency graph; no conflicts are waived.
 COPY backend/requirements.txt /tmp/qasystem/requirements.txt
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/" && \
+RUN pip config set global.index-url "$PIP_INDEX_URL" && \
+    pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL" && \
     pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com" && \
     pip install --retries 8 --timeout 120 --upgrade pip "setuptools>=77,<81" wheel pycairo && \
     pip install --retries 8 --timeout 120 -r /tmp/qasystem/requirements.txt && \
-    if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
-        echo "存在未预期的依赖冲突："; pip check; exit 1; \
-    fi
+    pip check
 
 # MinerU publishes its pipeline/VLM dependencies as optional extras. Keep this
 # layer separate so ordinary application changes reuse the heavy base layer.
@@ -100,21 +96,26 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && 
 # PIP_NO_CACHE_DIR=1 是关缓存的，所以这里用 env -u 取消它，重跑时不必重新下载。
 COPY backend/requirements.mineru-extras.txt /tmp/qasystem/requirements.mineru-extras.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
-    env -u PIP_NO_CACHE_DIR pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
+    env -u PIP_NO_CACHE_DIR pip install \
     --retries 8 --timeout 120 -r /tmp/qasystem/requirements.mineru-extras.txt && \
-    if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
-        echo "存在未预期的依赖冲突："; pip check; exit 1; \
-    fi
+    pip check
 
 # Read Agent dependencies from their canonical pyproject without copying the
 # Agent package into the environment image. Runtime source is mounted later.
 COPY agent/pyproject.toml /tmp/qasystem/agent-pyproject.toml
 RUN python -c "import subprocess,sys,tomllib; p=tomllib.load(open('/tmp/qasystem/agent-pyproject.toml','rb'))['project']; subprocess.check_call([sys.executable,'-m','pip','install',*(p['dependencies']+p['optional-dependencies']['api'])])" && \
-    if pip check 2>&1 | grep -v -E '^(vllm|lmcache) .*(transformers|numpy)|^prometheus-fastapi-instrumentator .*starlette|^No broken requirements found' | grep -q .; then \
-        echo "存在未预期的依赖冲突："; pip check; exit 1; \
-    fi
+    pip check
 
 COPY --from=ofd-converter-builder /build/target/ofd-to-pdf-1.0.0.jar /opt/qasystem/ofdrw/ofd-to-pdf.jar
+
+# Clef and NanoJev reuse the verified Backend Torch/Transformers runtime.
+# Keep the dependency contract without installing a second CUDA/Torch stack.
+# Only requirements enter this layer; source and weights are mounted at runtime.
+COPY clef_service/requirements.txt /tmp/qasystem/clef-requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    env -u PIP_NO_CACHE_DIR python -m pip install --retries 8 --timeout 120 -r /tmp/qasystem/clef-requirements.txt && \
+    pip check && \
+    python -c "import torch, torchvision, transformers, accelerate, safetensors, fastapi, uvicorn; from transformers import Qwen3_5ForConditionalGeneration"
 
 COPY --from=opencode-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=opencode-runtime /usr/local/bin/opencode /usr/local/bin/opencode
@@ -123,9 +124,8 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # Application-aware verification is performed by build-image.ps1 with the
-# repository source mounted read-only. starlette 与 prometheus-fastapi-instrumentator
-# 的组合只做非致命自检（不通过只告警），真正的服务可用性由部署后的 /health 与 /metrics 验收。
-RUN (python -c "from fastapi import FastAPI; from prometheus_fastapi_instrumentator import Instrumentator; Instrumentator().instrument(FastAPI()); print('instrumentator ok')" || echo "WARN: instrumentator 与 starlette 组合自检未通过，vLLM /metrics 可能受影响") && \
+# repository source mounted read-only; metrics instrumentation must work.
+RUN python -c "from fastapi import FastAPI; from prometheus_fastapi_instrumentator import Instrumentator; Instrumentator().instrument(FastAPI()); print('instrumentator ok')" && \
     python -c "import fastapi, torch, vllm, cv2, redis, mcp, openai" && \
     python -c "import mineru, docling, transformers; from importlib.metadata import version; \
     assert version('mineru').startswith('4.'), version('mineru'); \

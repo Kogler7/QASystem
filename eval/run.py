@@ -666,13 +666,14 @@ def job_id_from(payload: dict[str, Any]) -> str:
 
 def wait_for_job(base_url: str, job_id: str, params: dict[str, Any]) -> dict[str, Any]:
     interval = max(0.5, float(params.get("poll_interval_seconds") or 2))
-    timeout = max(interval, float(params.get("poll_timeout_seconds") or 3600))
-    deadline = time.time() + timeout
+    configured = params.get("poll_timeout_seconds", 3600)
+    timeout = None if configured == 0 else max(interval, float(configured or 3600))
+    deadline = None if timeout is None else time.monotonic() + timeout
     status_url = urljoin(base_url.rstrip("/") + "/", f"api/v1/jobs/{job_id}")
     result_url = urljoin(base_url.rstrip("/") + "/", f"api/v1/jobs/{job_id}/result")
     headers = auth_headers()
     last: dict[str, Any] = {}
-    while time.time() < deadline:
+    while deadline is None or time.monotonic() < deadline:
         status_code, last = json_request(status_url, headers=headers)
         job = last.get("data") or {}
         job_status = str(job.get("status") or "")
@@ -701,7 +702,8 @@ def submit_and_wait(
     headers: dict[str, str],
     params: dict[str, Any],
 ) -> dict[str, Any]:
-    timeout = max(60.0, float(params.get("poll_timeout_seconds") or 3600))
+    configured = params.get("poll_timeout_seconds", 3600)
+    timeout = None if configured == 0 else max(60.0, float(configured or 3600))
     status_code, payload = json_request(url, method="POST", data=data, headers=headers, timeout=timeout)
     if status_code == 202 or str((payload.get("data") or {}).get("status") or "") in {"queued", "running"}:
         job_id = job_id_from(payload)
@@ -2441,7 +2443,8 @@ def plugin_extract(
     *,
     base_url: str,
 ) -> dict[str, Any]:
-    timeout = max(60.0, float(params.get("poll_timeout_seconds") or 3600))
+    configured = params.get("poll_timeout_seconds", 3600)
+    timeout = None if configured == 0 else max(60.0, float(configured or 3600))
     headers = auth_headers()
     log(f"MCP {MCP_TOOL_NAME} ← text_len={len(text)}")
     init_payload = {
@@ -2706,6 +2709,23 @@ def extract_version_from(envelope: dict[str, Any]) -> str | None:
         if isinstance(quality, dict) and quality.get("extract_version"):
             return str(quality["extract_version"])
     return None
+
+
+def _extract_cache_complete(envelope: dict[str, Any]) -> bool:
+    """Only successful inference may be reused by an automatic case retry.
+
+    Explicit --reuse-extract-from remains a read/rescore operation, including
+    partial graphs. A scoring failure must not cause successful inference to
+    run again. Legacy responses without quality still require a graph.
+    """
+    for layer in _payload_layers(envelope):
+        if layer.get("status") in {"failed", "partial", "error"} or layer.get("success") is False:
+            return False
+        quality = layer.get("quality")
+        if isinstance(quality, dict) and quality.get("status") not in {None, "succeeded"}:
+            return False
+    graph = extract_graph_from_envelope(envelope)
+    return bool(graph.get("nodes"))
 
 
 def _apply_extraction_quality(block: dict[str, Any], envelope: dict[str, Any]) -> None:
@@ -3141,7 +3161,7 @@ def run_backend_case(
         existing_extract = _load_json_file(extract_path) if chunk_status in {"succeeded", "reused"} else None
         if reused_extract is not None:
             result["modules"]["extract"] = reused_extract
-        elif existing_extract and items:
+        elif existing_extract and items and _extract_cache_complete(existing_extract):
             timing = _load_json_file(out_dir / "backend_extract.timing.json") or {}
             result["modules"]["extract"] = _extract_block_from_envelope(
                 existing_extract,
@@ -3322,13 +3342,17 @@ def run_case_with_retries(
     modes: list[str],
     reuse_dir: Path | None,
     reuse_extract_dir: Path | None = None,
+    max_attempts: int | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str, int, str | None]:
     """同一 case 最多试 3 次；未捕获异常不会冒出。返回 (backend, plugin, markdown, attempts, error)."""
+    max_attempts = MAX_ATTEMPTS if max_attempts is None else max_attempts
+    if type(max_attempts) is not int or not 1 <= max_attempts <= 3:
+        raise ValueError("case attempts must be between 1 and 3")
     last_backend: dict[str, Any] | None = None
     last_plugin: dict[str, Any] | None = None
     markdown = ""
     last_error: str | None = None
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    for attempt in range(1, max_attempts + 1):
         try:
             backend, plugin, markdown = run_case_stages(
                 run_backend=run_backend,
@@ -3355,7 +3379,7 @@ def run_case_with_retries(
                 last_error = str(backend.get("message"))
             elif isinstance(plugin, dict) and plugin.get("message"):
                 last_error = str(plugin.get("message"))
-            log(f"{label} 第 {attempt}/{MAX_ATTEMPTS} 次失败" + (f": {last_error}" if last_error else ""))
+            log(f"{label} 第 {attempt}/{max_attempts} 次失败" + (f": {last_error}" if last_error else ""))
         except KeyboardInterrupt:
             raise
         except Exception as exc:  # noqa: BLE001 - 单个 case 失败后继续后续 case
@@ -3364,13 +3388,25 @@ def run_case_with_retries(
                 last_backend = fail_payload(exc)
             if last_plugin is None and run_plugin:
                 last_plugin = fail_payload(exc)
-            log(f"{label} 第 {attempt}/{MAX_ATTEMPTS} 次未捕获异常: {exc}")
-        if attempt < MAX_ATTEMPTS:
+            log(f"{label} 第 {attempt}/{max_attempts} 次未捕获异常: {exc}")
+        finally:
+            archive = out_dir / "attempts" / f"{attempt:02d}"
+            if archive.exists():
+                archive = archive.with_name(f"{attempt:02d}-{time.time_ns()}")
+            try:
+                archive.mkdir(parents=True, exist_ok=False)
+                for artifact in out_dir.glob("*.json"):
+                    shutil.copy2(artifact, archive / artifact.name)
+                write_json(archive / "attempt.json", {"attempt": attempt,
+                           "backend": last_backend, "plugin": last_plugin, "error": last_error})
+            except OSError:
+                log(f"{label} 第 {attempt} 次中间结果归档失败，请检查磁盘与权限")
+        if attempt < max_attempts:
             delay = RETRY_SLEEP_SECONDS
             if delay > 0:
                 time.sleep(delay)
-    log(f"{label} 已重试 {MAX_ATTEMPTS} 次仍失败，跳过")
-    return last_backend, last_plugin, markdown, MAX_ATTEMPTS, last_error
+    log(f"{label} 已重试 {max_attempts} 次仍失败，跳过")
+    return last_backend, last_plugin, markdown, max_attempts, last_error
 
 
 STAGE_BUDGET_NAMES = ("parse", "chunk", "extract")
@@ -3453,6 +3489,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
     parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")
     parser.add_argument("--extract-document-timeout", type=float, help="文档抽取模型调用总预算（秒）")
+    parser.add_argument("--case-attempts", type=int, choices=(1, 2, 3), default=3, help="外层整篇抽取尝试次数，快速对比建议 1；不改变算法内部重试")
     parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
     parser.add_argument(
@@ -4050,6 +4087,7 @@ def main() -> int:
 
                 backend, plugin, _markdown, attempts, case_error = run_case_with_retries(
                     label=label,
+                    max_attempts=args.case_attempts,
                     run_backend=run_backend,
                     run_plugin=run_plugin,
                     base_url=base_url,
@@ -4123,7 +4161,7 @@ def main() -> int:
                             record["error"] = "empty_extraction"
                             log(f"{label} 抽取结果为空（0 节点）: {', '.join(empty_blocks)}，记为失败")
                 record["status"] = "failed" if failed else "succeeded"
-                if failed and attempts >= MAX_ATTEMPTS:
+                if failed and attempts >= args.case_attempts:
                     record["skipped_after_retries"] = True
                     summary["skipped"] += 1
                 apply_reused_case_timing(record, elapsed_seconds(case_started))

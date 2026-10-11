@@ -1,0 +1,24 @@
+# 固定三个完整用例：普通公文、短公文、密集表格/截断压力。
+# 只复用输入切片，不复用旧抽取；不剪裁 golden，避免评分口径失真。
+quick_eval:
+  cases: [official/official_01, official/official_03, official/official_04]
+
+backend_url: http://127.0.0.1:8006
+poll_timeout_seconds: 0  # 不限制等待 Backend 完成的时长
+runs_retention_days: 0
+options:
+  extraction:
+    version: v3
+    provider: siliconflow
+  storage:
+    persist_graph: false
+eval:
+  match_mode: llm
+  judge_base_url: https://api.deepseek.com/v1
+  judge_model: deepseek-flash
+  judge_timeout_seconds: 30
+  judge_max_tokens: 4096
+  judge_max_concurrency: 4
+  judge_batch_size: 20
+  judge_golden_batch_size: 40
+  judge_disable_thinking: true

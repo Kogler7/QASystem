@@ -90,7 +90,7 @@ class LLMCompatibilityTests(unittest.TestCase):
             with self.subTest(model=model):
                 self.assertFalse(_is_deepseek_v4_flash(model))
 
-    def test_official_endpoint_still_prefers_responses(self):
+    def test_official_endpoint_uses_jsonl_chat(self):
         """官方端点不受前缀修复影响：仍走 Responses。"""
         client = _Client()
         llm = self._llm(client, base_url="https://api.deepseek.com/v1",
@@ -98,8 +98,8 @@ class LLMCompatibilityTests(unittest.TestCase):
 
         llm.generate_structured(SCHEMA, [{"role": "user", "content": "Return JSON."}])
 
-        self.assertEqual(len(client.responses.calls), 1)
-        self.assertEqual(len(client.chat.completions.calls), 0)
+        self.assertEqual(len(client.responses.calls), 0)
+        self.assertEqual(len(client.chat.completions.calls), 1)
 
     def test_thinking_disabled_on_compatible_provider_still_uses_chat(self):
         """关思考的兼容服务模型同样优先 chat，避免 Responses 404。

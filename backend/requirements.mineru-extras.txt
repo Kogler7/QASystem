@@ -7,10 +7,8 @@
 # sentence-transformers 升到 6.1.0（见 requirements.txt），numpy 由解析器统一到 2.2.x。
 mineru[torch]==4.0.4
 # GPU 侧提速用镜像自带的 vLLM（base image vllm/vllm-openai）。
-# 注意：不要安装 mineru[full]，它要求 vllm>=0.19.1，与镜像里的 vllm 0.11.2 冲突；
-# 4.0 的 vLLM 引擎只需 vllm>=0.10.1，通过 MINERU_MODEL_VLM_ENGINE=vllm 启用。
-# OpenCV 5.0 bundles Qt with a Linux 3.17 ABI tag, while the target A40 host
-# runs a 3.10 kernel. Keep the GUI and headless distributions aligned because
-# MinerU/OCR requires the former and vLLM/albumentations require the latter.
-opencv-python==4.11.0.86
-opencv-python-headless==4.11.0.86
+# vLLM 由主 requirements 与基础镜像统一固定，通过 MINERU_MODEL_VLM_ENGINE=vllm 启用。
+# Keep GUI and headless versions aligned; vLLM 0.31 requires >=4.13.
+# The A40 production host still needs a kernel/driver smoke test before release.
+opencv-python==4.13.0.92
+opencv-python-headless==4.13.0.92

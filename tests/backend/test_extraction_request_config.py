@@ -42,6 +42,40 @@ def test_defaults_and_partial_override_do_not_change_environment(providers, monk
     assert "api_key_env" not in public and "base_url" not in public
 
 
+def test_separate_input_output_limits_and_legacy_alias(providers, monkeypatch):
+    providers['siliconflow'].update(max_input_tokens=32768, max_output_tokens=4096)
+    monkeypatch.setenv('KG_EXTRACT_PROVIDERS_JSON', json.dumps(providers))
+    chosen = config.resolve_config({'version': 'v3', 'provider': 'siliconflow'})
+    assert chosen['max_input_tokens'] == 32768
+    assert chosen['max_output_tokens'] == chosen['max_tokens'] == 4096
+    assert config.public_config(chosen)['max_input_tokens'] == 32768
+    providers['siliconflow']['max_tokens'] = 8192
+    monkeypatch.setenv('KG_EXTRACT_PROVIDERS_JSON', json.dumps(providers))
+    with pytest.raises(ValueError, match='invalid'):
+        config.resolve_config({'version': 'v3', 'provider': 'siliconflow'})
+
+
+def test_default_environment_separates_budgets(providers, monkeypatch):
+    monkeypatch.setenv('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '32000')
+    monkeypatch.setenv('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS', '8000')
+    chosen = config.resolve_config({'version': 'v3'})
+    assert chosen['max_input_tokens'] == 32000
+    assert chosen['max_tokens'] == chosen['max_output_tokens'] == 8000
+
+
+def test_oversized_input_never_consumes_quota_or_calls_provider(providers, monkeypatch):
+    from algorithm.token_budget import InputTokenLimitError
+    chosen = config.resolve_config({'version': 'v3', 'provider': 'siliconflow'})
+    chosen['max_input_tokens'] = 300
+    monkeypatch.setattr(runtime, '_pools', {})
+    calls = []
+    sdk = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: calls.append(kw))))
+    client = runtime.ScheduledClient(sdk, chosen)
+    with pytest.raises(InputTokenLimitError):
+        client.chat.completions.create(messages=[{'role': 'user', 'content': '密集表格' * 100}])
+    assert calls == [] and list(client.pool.starts) == []
+
+
 @pytest.mark.parametrize("options", [
     {"version": "v1"}, {"provider": "../private"}, {"base_url": "https://arbitrary"},
     {"api_key": "secret"}, {"request_timeout": 0}, {"document_timeout": float("inf")},
@@ -183,9 +217,13 @@ def test_provider_json_format_override_is_request_local(providers, monkeypatch):
 
 
 @pytest.mark.parametrize("version", ["v2", "v3", "latest", "v3.1"])
-def test_live_client_configuration_uses_chat_only_without_network(providers, monkeypatch, version):
+@pytest.mark.parametrize("max_tokens", [4096, 16384])
+def test_live_client_configuration_uses_chat_only_without_network(providers, monkeypatch, version, max_tokens):
     import openai
+    from algorithm.output_batching import output_batch_size
 
+    providers["siliconflow"]["max_tokens"] = max_tokens
+    monkeypatch.setenv("KG_EXTRACT_PROVIDERS_JSON", json.dumps(providers))
     seen = []
     def create(**kwargs):
         seen.append(kwargs)
@@ -199,6 +237,9 @@ def test_live_client_configuration_uses_chat_only_without_network(providers, mon
     llm = runtime.create_request_llm(config.resolve_config({"version": version, "provider": "siliconflow"}))
     result = llm.generate_structured({"type": "object"}, [{"role": "user", "content": "x"}])
     assert result.finish_reason == "stop"
+    assert seen[0]["max_tokens"] == max_tokens
+    assert llm.max_tokens == max_tokens
+    assert output_batch_size(llm, tokens_per_item=1024, ceiling=24) == int(max_tokens * 0.65) // 1024
     assert seen[0]["model"] == "provider-model"
     assert seen[0]["extra_body"] == {"enable_thinking": False}
 
@@ -243,3 +284,18 @@ def test_pipeline_http_preserves_same_overrides(providers, protocol_module):
     effective = response.json()["data"]["extraction"]["quality"]["effective_config"]
     assert effective["version"] == "v3"
     assert effective["provider"] == "siliconflow" and effective["document_timeout"] == 60
+
+
+def test_refactored_v31_default_config_and_live_factory(monkeypatch):
+    from algorithm.knowledge_extract.v3_1 import llm_client
+    monkeypatch.setenv("KG_EXTRACT_TRACE_DIR", "")
+    chosen = config.resolve_config({"version": "v3.1"})
+    seen = {}
+    def factory(**kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(client=SimpleNamespace())
+    monkeypatch.setattr(llm_client, "create_llm_client", factory)
+    runtime.create_request_llm(chosen)
+    assert seen["model"] == chosen["model"]
+    assert seen["disable_thinking"] == chosen["disable_thinking"]
+    assert config.public_config(chosen).get("output_format") != "jsonl"

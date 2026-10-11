@@ -66,6 +66,50 @@ services:
       retries: 5
       start_period: 60s
 
+  clef:
+    image: ${QASYSTEM_ENV_IMAGE:-qasystem-env-v1}
+    pull_policy: never
+    profiles: [decisions]
+    container_name: qasystem_clef
+    restart: unless-stopped
+    init: true
+    gpus: all
+    env_file:
+      - .env
+    volumes:
+      - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
+      - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
+    working_dir: /app
+    command: ["/bin/sh", "-ec", "test -n \"$$CLEF_CUDA_VISIBLE_DEVICES\" || { echo 'Set CLEF_CUDA_VISIBLE_DEVICES to a dedicated GPU'; exit 1; }; exec python -m clef_service"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:$$CLEF_PORT/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  nanojev:
+    image: ${QASYSTEM_ENV_IMAGE:-qasystem-env-v1}
+    pull_policy: never
+    profiles: [decisions]
+    container_name: qasystem_nanojev
+    restart: unless-stopped
+    init: true
+    gpus: all
+    env_file:
+      - .env
+    volumes:
+      - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
+      - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
+    working_dir: /app
+    command: python -m nanojev_service
+    healthcheck:
+      test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:$$NANOJEV_PORT/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
   redis:
     image: redis:7-alpine
     container_name: qasystem_agent_redis

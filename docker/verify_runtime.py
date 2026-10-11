@@ -41,13 +41,20 @@ MODULES = (
     "tiktoken",
     "torch",
     "torchvision",
+    "transformers",
+    "accelerate",
+    "safetensors",
     "uvicorn",
     "yaml",
 )
 
 EXPECTED_DISTRIBUTIONS = {
-    "opencv-python": "4.11.0.86",
-    "opencv-python-headless": "4.11.0.86",
+    "opencv-python": "4.13.0.92",
+    "opencv-python-headless": "4.13.0.92",
+    "vllm": "0.31.0",
+    "torch": "2.13.0",
+    "torchvision": "0.28.0",
+    "mcp": "2.0.0",
 }
 
 PROGRAMS = (
@@ -108,6 +115,14 @@ def _check_programs() -> None:
 
 
 def _check_application() -> None:
+    subprocess.run(
+        [sys.executable, "-c",
+         "from clef_service.app import app; "
+         "from nanojev_service.app import app as nano_app; "
+         "from transformers import Qwen3_5ForConditionalGeneration; "
+         "import torch, torchvision, accelerate, safetensors"],
+        check=True, timeout=120,
+    )
     from docling.datamodel.base_models import InputFormat
 
     assert hasattr(InputFormat, "PPTX")

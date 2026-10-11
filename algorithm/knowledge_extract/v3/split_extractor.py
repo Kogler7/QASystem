@@ -29,6 +29,7 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any
 
+from algorithm.output_batching import generate_batched, output_batch_size
 from .candidate_generation import (
     relation_catalog_for_context,
 )
@@ -1239,19 +1240,10 @@ def extract_split(
     active_repair_chunk_ids: tuple[str, ...] = ()
 
     def builtin_repair(payload: dict[str, Any]) -> dict[str, Any]:
-        max_issues = 12
         max_chunks = 3
         max_text_chars = 8000
         max_catalog = 80
         issue_rows = list(payload["issues"] or [])
-        if len(issue_rows) > max_issues:
-            _append_warning(
-                warnings,
-                "REPAIR_ISSUES_TRUNCATED",
-                f"repair issue 过多({len(issue_rows)})，本轮仅处理前 {max_issues} 条",
-                f"repair[{payload['round']}]",
-            )
-            issue_rows = issue_rows[:max_issues]
         chunk_ids = list(payload.get("repair_chunk_ids") or [])[:max_chunks]
         referenced_chunks = [
             body_manager.get_chunk(chunk_id)
@@ -1293,19 +1285,20 @@ def extract_split(
             "relation_candidates",
             {str(entry.get("type") or "") for entry in repair_catalog},
         )
-        messages = build_chat_messages(
-            task="repair",
-            plan=plan,
-            route=route,
-            chunk=repair_chunk,
-            known_entities=repair_catalog,
-            output_schema=output_schema,
-            repair_issues=issue_rows,
-        )
-        parsed = _generate_structured(
-            llm,
-            messages,
-            output_schema,
+        def build_repair_request(issue_batch):
+            messages = build_chat_messages(
+                task="repair",
+                plan=plan,
+                route=route,
+                chunk=repair_chunk,
+                known_entities=repair_catalog,
+                output_schema=output_schema,
+                repair_issues=issue_batch,
+            )
+            return messages, output_schema
+        parsed = generate_batched(
+            issue_rows, build_repair_request, _generate_structured, llm,
+            batch_size=output_batch_size(llm, tokens_per_item=2048, ceiling=4),
             use_scheduler=use_scheduler,
             attempts=attempts,
             pass_name="repair_relation",

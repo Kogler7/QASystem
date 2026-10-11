@@ -125,14 +125,14 @@ def test_best_effort_graph_fails_cli_gate_even_with_perfect_score(
     monkeypatch.setattr(sys, "argv", args)
 
     assert eval_run.main() == 2
-    assert backend_call.call_count == (0 if reuse_previous_run else 1)
+    assert backend_call.call_count == (0 if reuse_previous_run else eval_run.MAX_ATTEMPTS)
     run_dir = next(runs.iterdir())
     summary = json.loads((run_dir / "summary.json").read_text())
     record = summary["cases"][0]
     block = record["backend"]["modules"]["extract"]
     assert record["status"] == "failed"
     assert record["attempts"] == eval_run.MAX_ATTEMPTS
-    assert block["status"] == status  # Also survives same-run cache retries.
+    assert block["status"] == status  # Failed live inference is retried; explicit reuse preserves failure.
     assert block["quality"] == envelope["data"]["quality"]
     assert block["failed_chunks"] == ["chunk-0001"]
     assert block["metrics"]["entities"]["f1"] == 1

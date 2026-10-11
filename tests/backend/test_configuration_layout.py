@@ -107,9 +107,9 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert "verify_qasystem_runtime.py" not in dockerfile
     assert "COPY backend /app/backend" not in dockerfile
     assert "COPY algorithm /app/algorithm" not in dockerfile
-    assert "opencv-python==4.11.0.86" in mineru_requirements
-    assert "opencv-python-headless==4.11.0.86" in mineru_requirements
-    assert '"opencv-python": "4.11.0.86"' in verifier
+    assert "opencv-python==4.13.0.92" in mineru_requirements
+    assert "opencv-python-headless==4.13.0.92" in mineru_requirements
+    assert '"opencv-python": "4.13.0.92"' in verifier
     assert "/app/docker/verify_runtime.py" in build_script
     assert "download_qasystem_models.py" not in dockerfile
     assert "from backend.app.main import app as backend_app" in verifier

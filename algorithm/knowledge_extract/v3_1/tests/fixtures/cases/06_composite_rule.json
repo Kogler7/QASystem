@@ -1,0 +1,25 @@
+{
+  "id": "composite-rule-01",
+  "category": "composite_rule",
+  "name": "复合规则：未经论证测试且未经批准不得部署开源智能体（AND）",
+  "source": "docs/抽取结果md/结构化抽取-关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知.md（人工检查）",
+  "description": "真实条款的复合条件拆解：原文“未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体”为两个条件 AND 组合，映射为 CompositeRule + hasSubRule 成员。",
+  "ontology_file": "rule_ontology.puml",
+  "document_type": "general",
+  "target_types": [],
+  "include_subclasses": true,
+  "validation_mode": "strict",
+  "text": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+  "expected": {
+    "entities": [
+      {"type": "CompositeRule", "name": "CR-001", "properties": {"ruleId": "CR-001", "ruleText": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。", "combinationType": "AND"}, "evidence": {"quote": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"}},
+      {"type": "SimpleRule", "name": "R-001", "properties": {"ruleId": "R-001", "ruleText": "未经本企业充分论证和安全测试，不得部署安装各类开源智能体。", "triggerCondition": "未经本企业充分论证和安全测试", "action": "不得部署安装各类开源智能体"}, "evidence": {"quote": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"}},
+      {"type": "SimpleRule", "name": "R-002", "properties": {"ruleId": "R-002", "ruleText": "未经集团批准，不得部署安装各类开源智能体。", "triggerCondition": "未经集团批准", "action": "不得部署安装各类开源智能体"}, "evidence": {"quote": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"}}
+    ],
+    "relations": [
+      {"from_type": "CompositeRule", "from_name": "CR-001", "rel_type": "hasSubRule", "to_type": "SimpleRule", "to_name": "R-001"},
+      {"from_type": "CompositeRule", "from_name": "CR-001", "rel_type": "hasSubRule", "to_type": "SimpleRule", "to_name": "R-002"}
+    ]
+  },
+  "notes": "原文为复合条件条款，拆解为 AND 组合（两个“未经…”条件）；条款首句“三级及以上系统 或 存储重要数据系统”为管控对象范围条件，未纳入本次 gold 的子规则拆解。"
+}

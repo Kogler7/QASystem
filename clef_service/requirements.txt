@@ -1,13 +1,14 @@
-# Independent host virtualenv; do not install into Backend's Python environment.
-torch==2.10.0
-torchvision==0.25.0
-transformers==5.10.2
-huggingface-hub==1.7.2
-tokenizers==0.22.2
-accelerate==1.14.0
+# Shared qasystem-env-v1 runtime, validated with real Clef and NanoJev models.
+# Keep overlapping pins aligned with backend/requirements.txt.
+torch==2.13.0
+torchvision==0.28.0
+transformers==5.17.0
+huggingface-hub==1.33.0
+tokenizers==0.23.3
+accelerate==1.11.0
 safetensors==0.8.0
 fastapi==0.135.1
-pydantic==2.12.3
+pydantic==2.14.0
 uvicorn==0.41.0
 httpx==0.28.1
-Pillow==12.3.0
+Pillow>=10.0,<13.0

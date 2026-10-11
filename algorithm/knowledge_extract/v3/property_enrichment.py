@@ -14,6 +14,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from ._logging import get_step_logger
+from algorithm.output_batching import generate_batched, output_batch_size
 from .candidate_generation import generate_structured, verify_items_with_llm
 from .chunk_context import ChunkContextManager, ExtractionChunk
 from .evidence import Evidence, locate_quote
@@ -566,23 +567,27 @@ def enrich_entity_properties(
                 str(entity.candidate_id): allowed_by_id[str(entity.candidate_id)]
                 for entity in batch
             }
-            output_schema = _schema(batch, batch_allowed)
-            messages = build_chat_messages(
-                task=mode,
-                plan=plan,
-                route=(route_map or {}).get(chunk_id, route),
-                chunk=chunk,
-                local_context=local_context,
-                known_entities=[
-                    _catalog_row(entity, batch_allowed[str(entity.candidate_id)])
-                    for entity in batch
-                ],
-                output_schema=output_schema,
-            )
-            parsed = generate_structured(
-                llm,
-                messages,
-                output_schema,
+            def build_request(subset):
+                subset_allowed = {str(entity.candidate_id): batch_allowed[str(entity.candidate_id)] for entity in subset}
+                output_schema = _schema(subset, subset_allowed)
+                messages = build_chat_messages(
+                    task=mode,
+                    plan=plan,
+                    route=(route_map or {}).get(chunk_id, route),
+                    chunk=chunk,
+                    local_context=local_context,
+                    known_entities=[
+                        _catalog_row(entity, subset_allowed[str(entity.candidate_id)])
+                        for entity in subset
+                    ],
+                    output_schema=output_schema,
+                )
+                return messages, output_schema
+            batch_stats: dict[str, int] = {}
+            parsed = generate_batched(
+                batch, build_request, generate_structured, llm,
+                stats=batch_stats,
+                batch_size=output_batch_size(llm, tokens_per_item=max(1024, max(len(props) for props in batch_allowed.values()) * 256), ceiling=batch_size),
                 use_scheduler=use_scheduler,
                 attempts=attempts,
                 pass_name=mode,
@@ -591,7 +596,7 @@ def enrich_entity_properties(
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=call_metrics,
             )
-            calls += 1
+            calls += batch_stats.get("calls", 0)
             if parsed is None:
                 continue
             entities_by_id = {str(entity.candidate_id): entity for entity in batch}
@@ -599,18 +604,19 @@ def enrich_entity_properties(
                 entity_id: _entity_context_windows(entity, chunk)
                 for entity_id, entity in entities_by_id.items()
             }
-            seen_ids: set[str] = set()
+            seen_ids: set[tuple[str, str]] = set()
             planned: list[dict[str, Any]] = []
             pending: list[dict[str, Any]] = []
             for update_index, update in enumerate(parsed.get("updates") or []):
                 entity_id = str(update.get("entity_id") or "")
                 entity = entities_by_id.get(entity_id)
                 path = f"property.{chunk_id}.batch-{batch_index}.updates[{update_index}]"
-                if entity is None or entity_id in seen_ids:
+                property_keys = {(entity_id, key) for key in (update.get("properties") or {})}
+                if entity is None or bool(property_keys & seen_ids):
                     rejected += 1
                     _warn(warnings, "PROPERTY_UPDATE_ENTITY_INVALID", "属性更新实体不在固定批次中或重复", path, entity_id)
                     continue
-                seen_ids.add(entity_id)
+                seen_ids.update(property_keys)
                 quote = str((update.get("evidence") or {}).get("quote") or "")
                 context_windows = context_windows_by_id.get(entity_id) or []
                 if not context_windows:

@@ -25,6 +25,25 @@ def _chunks(directory):
     return directory
 
 
+def test_outer_retries_archive_each_result_including_success(tmp_path, monkeypatch):
+    counter = [0]
+
+    def stages(**kwargs):
+        counter[0] += 1
+        result = {'status': 'failed' if counter[0] == 1 else 'succeeded', 'round': counter[0]}
+        _save(tmp_path / 'backend_extract.json', result)
+        return result, None, ''
+
+    monkeypatch.setattr(run, 'run_case_stages', stages)
+    monkeypatch.setattr(run, 'RETRY_SLEEP_SECONDS', 0)
+    run.run_case_with_retries(label='case', run_backend=True, run_plugin=False,
+        base_url='', mcp_url='', ontology='', sources=[], options={}, params={},
+        golden=None, out_dir=tmp_path, score_ctx=None, modes=['extract'], reuse_dir=None)
+    assert counter[0] == 2
+    assert json.loads((tmp_path / 'attempts/01/backend_extract.json').read_text())['round'] == 1
+    assert json.loads((tmp_path / 'attempts/02/backend_extract.json').read_text())['round'] == 2
+
+
 def _backend(out_dir, *, reuse_dir=None, reuse_extract_dir=None):
     return run.run_backend_case(
         base_url="http://fixture.invalid", ontology="entity T", sources=[], options={}, params={},
@@ -47,6 +66,23 @@ def test_extract_only_run_keeps_original_chunk_bytes_for_next_rescore(tmp_path, 
     assert first["modules"]["extract"]["status"] == "succeeded"
     assert second["modules"]["extract"]["status"] == "reused"
     request.assert_called_once()
+
+
+@pytest.mark.parametrize('status', ['partial', 'failed'])
+def test_incomplete_extraction_is_called_again_but_success_is_cached(tmp_path, monkeypatch, status):
+    source = _chunks(tmp_path / 'source')
+    out = tmp_path / 'out'
+    incomplete = {'data': {'graph': GOLDEN, 'quality': {'status': status, 'error_code': 'LLM_RESPONSE_INCOMPLETE'}}}
+    request = Mock(side_effect=[incomplete, ENVELOPE])
+    monkeypatch.setattr(run, 'extract_graphs', request)
+    first = _backend(out, reuse_dir=source)
+    second = _backend(out)
+    third = _backend(out)
+    assert first['modules']['extract']['status'] == status
+    assert second['modules']['extract']['status'] == 'succeeded'
+    assert third['modules']['extract']['status'] == 'reused'
+    assert request.call_count == 2
+    assert (out / 'chunks.json').read_bytes() == CHUNKS
 
 
 def test_resume_preserves_api_duration_and_excludes_judge_time(tmp_path, monkeypatch):

@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import Any
 
+from algorithm.output_batching import output_batch_size
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .evidence import (
     EVIDENCE_STATUS_UNVERIFIED,
@@ -43,6 +44,7 @@ logger = get_step_logger(__name__)
 from .relation_resolver import enumerate_relation_pairs
 from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages
 from .scheduler import get_llm_scheduler
+from algorithm.knowledge_extract.jsonl_protocol import decode_jsonl, jsonl_instruction
 from .structured_output import validate_json_schema
 
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
@@ -50,11 +52,10 @@ MAX_LOCAL_RELATION_CATALOG = 160
 RELATION_PAIR_BATCH_SIZE = 80
 RELATION_MAX_BATCHES = 12
 RELATION_CONTEXT_CHARS = 12000
-# A failed batch may be too large for a model to complete, but recursively
-# splitting all the way to single pairs can amplify one permanent failure into
-# dozens of calls.  One split recovers the common length/complexity case while
-# keeping the worst case bounded at three generated batches per initial batch.
-RELATION_MAX_SPLIT_DEPTH = 1
+# Allow dense batches to shrink further, with an explicit per-chunk call cap
+# so permanent failures cannot expand into an unbounded binary tree.
+RELATION_MAX_SPLIT_DEPTH = 6
+RELATION_SPLIT_MAX_CALLS = 128
 RELATION_VERIFICATION_BATCH_SIZE = 16
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
@@ -355,63 +356,9 @@ def _recovery_summary(collection_name: str, items: list[dict[str, Any]]) -> str:
 
 
 def _entity_segment_ranges(text: str, target: int, min_chars: int, overlap: int) -> list[tuple[int, int]]:
-    """按行/markdown 标题边界把长文本切成带重叠的 segment 区间（左闭右开）。
-
-    只在整块实体调用因 finish_reason=length 失败后使用；重叠用于避免跨边界的
-    mention/quote 在两个片段都定位不到。返回区间保证按原文顺序排列。
-    """
-    if not text:
-        return []
-    if len(text) <= max(1, target):
-        return [(0, len(text))]
-    lines = text.splitlines(keepends=True)
-    if not lines:
-        return [(0, len(text))]
-    ranges: list[tuple[int, int]] = []
-    cur: list[tuple[int, int]] = []
-
-    def flush(keep_overlap: bool) -> None:
-        if not cur:
-            return
-        ranges.append((cur[0][0], cur[-1][1]))
-        if not keep_overlap:
-            cur.clear()
-            return
-        tail: list[tuple[int, int]] = []
-        tail_len = 0
-        for item_start, item_end in reversed(cur):
-            line_len = item_end - item_start
-            if tail and tail_len + line_len > max(0, overlap):
-                break
-            tail.insert(0, (item_start, item_end))
-            tail_len += line_len
-        cur.clear()
-        cur.extend(tail)
-
-    pos = 0
-    for line in lines:
-        start, end = pos, pos + len(line)
-        pos = end
-        cur_len = (cur[-1][1] - cur[0][0]) if cur else 0
-        heading = bool(_MARKDOWN_HEADING.match(line.rstrip("\r\n")))
-        if cur and cur_len + len(line) > target and cur_len >= min_chars:
-            flush(True)
-        elif heading and cur and cur_len >= max(min_chars, int(target * 0.6)):
-            flush(False)
-        cur.append((start, end))
-    if cur:
-        ranges.append((cur[0][0], cur[-1][1]))
-    # 过短片段并入相邻片段（保持区间递增、不重排）
-    merged: list[tuple[int, int]] = []
-    for start, end in ranges:
-        if merged and (end - start) < min_chars:
-            merged[-1] = (merged[-1][0], end)
-        else:
-            merged.append((start, end))
-    if len(merged) > 1 and (merged[-1][1] - merged[-1][0]) < min_chars:
-        merged[-2] = (merged[-2][0], merged[-1][1])
-        merged.pop()
-    return merged
+    # Compatibility signature; small tails are retained rather than merged over budget.
+    from algorithm.knowledge_pipeline.chunking import extraction_segment_ranges
+    return extraction_segment_ranges(text, target, overlap)
 
 
 def relation_catalog_for_context(
@@ -621,6 +568,10 @@ def _pre_parse_response_error(response: Any) -> tuple[str, str] | None:
     return None
 
 
+from algorithm.extraction_trace import traced_generation, trace_event
+
+
+@traced_generation
 def _invoke_generation(
     llm: Any,
     schema: dict[str, Any],
@@ -668,7 +619,7 @@ def generate_structured(
     """Call one required pass with bounded retry and conservative prefix recovery."""
     attempt_messages = messages
     resolved_max_attempts = max(1, int(max_attempts))
-    response_mode = "json_schema"
+    response_mode = "jsonl"
     collection_name = _array_collection_name(schema)
     recovered_items: list[dict[str, Any]] = []
     largest_invalid_response = 0
@@ -720,7 +671,7 @@ def generate_structured(
                 largest_invalid_response = max(largest_invalid_response, response_characters)
                 if error_type == "incomplete" and collection_name:
                     recovered = _valid_recovered_items(
-                        _recover_array_prefix(_response_text(response), collection_name),
+                        (decode_jsonl(response, schema)[0].get(collection_name, []) or _recover_array_prefix(_response_text(response), collection_name)),
                         collection_name=collection_name,
                         schema=schema,
                     )
@@ -730,7 +681,8 @@ def generate_structured(
                         recovered,
                     )
             else:
-                parsed, parse_error = decode_json_object(response)
+                parsed, jsonl_errors = decode_jsonl(response, schema)
+                parse_error = "; ".join(jsonl_errors[:5]) or None
                 if parse_error is not None:
                     error_type = "json"
                     message = parse_error
@@ -738,7 +690,7 @@ def generate_structured(
                     largest_invalid_response = max(largest_invalid_response, response_characters)
                     if collection_name:
                         recovered = _valid_recovered_items(
-                            _recover_array_prefix(_response_text(response), collection_name),
+                            (decode_jsonl(response, schema)[0].get(collection_name, []) or _recover_array_prefix(_response_text(response), collection_name)),
                             collection_name=collection_name,
                             schema=schema,
                         )
@@ -789,12 +741,22 @@ def generate_structured(
                             len(parsed.get(collection_name) or []) if collection_name else len(parsed),
                             time.monotonic() - started,
                         )
+                        trace_event(llm, 'parsed', pass_name=pass_name, chunk_id=chunk_id,
+                                    attempt=attempt_number, parsed=parsed)
                         return parsed
         except Exception as exc:  # noqa: BLE001 - recorded as typed run evidence
-            error_type = "timeout" if _is_timeout(exc) else "request"
+            error_type = getattr(exc, "error_type", None) or ("timeout" if _is_timeout(exc) else "request")
             message = str(exc) or type(exc).__name__
             retryable = _is_retryable_exception(exc)
 
+        if error_type in {"incomplete", "input_limit"}:
+            retryable = False  # Repeating the same output budget cannot recover truncation.
+        if collection_name and getattr(response, "response_mode", None) == "jsonl":
+            complete = decode_jsonl(response, schema)[0].get(collection_name, [])
+            recovered_items = _merge_collection_items(
+                collection_name, recovered_items,
+                _valid_recovered_items(complete, collection_name=collection_name, schema=schema),
+            )
         next_response_mode = _next_response_mode(response_mode, error_type)
         logger.warning(
             "[步骤][LLM] 输出: pass=%s chunk=%s attempt=%d status=%s response=%d字符 恢复片段=%d 下一模式=%s message=%s",
@@ -808,6 +770,8 @@ def generate_structured(
             message,
         )
 
+        trace_event(llm, 'validation', pass_name=pass_name, chunk_id=chunk_id,
+                    attempt=attempt_number, error_type=error_type, recovered_items=recovered_items)
         response_metadata = _response_metadata(response)
         attempts.append(
             {
@@ -843,7 +807,7 @@ def generate_structured(
             error_type=error_type,
             response_mode=response_mode,
         )
-        if not retryable or attempt_number >= resolved_max_attempts:
+        if error_type in {"incomplete", "input_limit"} or not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
         if error_type in {"json", "schema", "empty_collection"}:
@@ -853,7 +817,7 @@ def generate_structured(
                 recovery_instruction = (
                     f"\n上一次前缀中检测到 {len(recovered_items)} 条完整候选（仅作诊断）："
                     f"{_recovery_summary(collection_name, recovered_items)}\n"
-                    "本次必须重新输出该批次的完整 JSON；不要依赖前缀恢复。"
+                    "本次必须重新输出该批次的完整 JSONL；不要依赖前缀恢复。"
                 )
             empty_instruction = ""
             if error_type == "empty_collection":
@@ -866,19 +830,19 @@ def generate_structured(
                 {
                     "role": "user",
                     "content": (
-                        f"{messages[1]['content']}\n\n## 上一次输出校验失败，请纠正后重新输出完整 JSON\n"
+                        f"{messages[1]['content']}\n\n## 上一次输出校验失败，请纠正后重新输出完整 JSONL\n"
                         f"错误类型：{error_type}\n错误：{message}\n"
                         f"上一次输出摘要：已省略原文，字符数 {response_size}\n"
                         f"{recovery_instruction}"
                         f"{empty_instruction}"
-                        "不得解释错误，只输出符合 schema 的 JSON 对象。"
+                        f"不得解释错误。{jsonl_instruction(schema)}"
                     ),
                 },
             ]
         response_mode = next_response_mode
         if retry_base_seconds > 0:
             time.sleep(retry_base_seconds * (2 ** (attempt_number - 1)))
-    if return_recovered_on_failure and collection_name and recovered_items:
+    if (return_recovered_on_failure or getattr(response, "response_mode", None) == "jsonl") and collection_name and recovered_items:
         attempts.append({
             "attempt": resolved_max_attempts + 1,
             "type": "recovered_prefix",
@@ -921,12 +885,14 @@ def verify_items_with_llm(
     """
     if not items:
         return {}
-    messages = build_verification_messages(chunk=chunk, items=items)
     try:
-        parsed = generate_structured(
+        from algorithm.output_batching import generate_batched, output_batch_size
+        parsed = generate_batched(
+            items,
+            lambda batch: (build_verification_messages(chunk=chunk, items=batch), VERIFICATION_SCHEMA),
+            generate_structured,
             llm,
-            messages,
-            VERIFICATION_SCHEMA,
+            batch_size=output_batch_size(llm, tokens_per_item=512, ceiling=len(items)),
             use_scheduler=use_scheduler,
             attempts=attempts if attempts is not None else [],
             pass_name=pass_name,
@@ -1548,8 +1514,9 @@ def entity_pass(
 
         def segment_chunk(target: ExtractionChunk, start: int, end: int) -> ExtractionChunk:
             metadata = dict(target.metadata or {})
-            metadata["entity_segment_start"] = start
-            metadata["entity_segment_end"] = end
+            origin = int(metadata.get("entity_segment_start", 0))
+            metadata["entity_segment_start"] = origin + start
+            metadata["entity_segment_end"] = origin + end
             return ExtractionChunk(
                 chunk_id=target.chunk_id,
                 text=target.text[start:end],
@@ -1581,14 +1548,11 @@ def entity_pass(
                 return entities
             text = target.text or ""
             if depth < ENTITY_SEGMENT_MAX_DEPTH and len(text) > ENTITY_SEGMENT_MIN_CHARS:
-                split_at = text.rfind("\n", 0, max(1, len(text) // 2))
-                if split_at <= 0:
-                    split_at = max(1, len(text) // 2)
-                overlap = min(ENTITY_SEGMENT_OVERLAP, max(0, split_at // 4))
-                second_start = max(0, split_at + 1 - overlap)
-                ranges = [(0, min(len(text), split_at + 1))]
-                if second_start < len(text):
-                    ranges.append((second_start, len(text)))
+                ranges = _entity_segment_ranges(
+                    text, max(1, len(text) // 2), 0, ENTITY_SEGMENT_OVERLAP,
+                )
+                trace_event(llm, 'text-split', parent=label, ranges=ranges, depth=depth + 1,
+                            strategy='split_by_characters', overlap=ENTITY_SEGMENT_OVERLAP)
                 _append_warning(
                     local_warnings,
                     "ENTITY_SEGMENT_RETRY",
@@ -1597,8 +1561,6 @@ def entity_pass(
                 )
                 merged: list[dict[str, Any]] = []
                 for index, (start, end) in enumerate(ranges):
-                    if end - start < 40:
-                        continue
                     child = segment_chunk(target, start, end)
                     merged.extend(run_focus(child, depth + 1, f"{label}.s{index}"))
                 return merged
@@ -1639,6 +1601,8 @@ def entity_pass(
                 ENTITY_SEGMENT_OVERLAP,
             )
             if len(segment_ranges) > 1:
+                trace_event(llm, 'text-split', parent=chunk.chunk_id, ranges=segment_ranges,
+                            strategy='split_by_characters', overlap=ENTITY_SEGMENT_OVERLAP, depth=1)
                 _append_warning(
                     local_warnings,
                     "ENTITY_SEGMENTED",
@@ -1865,13 +1829,14 @@ def relation_pass(
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
         all_relations: list[dict[str, Any]] = []
         chunk_route = (route_map or {}).get(chunk.chunk_id, route)
+        pair_batch_size = output_batch_size(llm, tokens_per_item=128, ceiling=RELATION_PAIR_BATCH_SIZE)
         pending_batches = [
             (
-                pairs[offset : offset + RELATION_PAIR_BATCH_SIZE],
-                f"{offset // RELATION_PAIR_BATCH_SIZE}",
+                pairs[offset : offset + pair_batch_size],
+                f"{offset // pair_batch_size}",
                 0,
             )
-            for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE)
+            for offset in range(0, len(pairs), pair_batch_size)
         ]
         if len(pending_batches) > RELATION_MAX_BATCHES:
             _append_warning(
@@ -1882,8 +1847,20 @@ def relation_pass(
                 {"total_batches": len(pending_batches), "pair_count": len(pairs)},
             )
             pending_batches = pending_batches[:RELATION_MAX_BATCHES]
+        batch_calls = 0
         while pending_batches:
+            if batch_calls >= RELATION_SPLIT_MAX_CALLS:
+                local_attempts.append({
+                    "attempt": 1, "type": "incomplete", "pass": "relation",
+                    "chunk": chunk.chunk_id, "terminal": True, "retryable": False,
+                    "message": "Relation split call budget exhausted",
+                })
+                _append_warning(local_warnings, "RELATION_BATCH_UNDECIDED",
+                                "关系拆分预算耗尽，剩余候选尚未裁决", chunk.chunk_id,
+                                {"pending_pairs": sum(len(row[0]) for row in pending_batches)})
+                break
             pair_batch, batch_tag, split_depth = pending_batches.pop(0)
+            batch_calls += 1
             output_schema = relation_pair_decision_schema(pair_batch)
             messages = build_chat_messages(
                 task="relation",
@@ -1900,7 +1877,7 @@ def relation_pass(
                 structure_hint=structure_hint,
             )
             attempt_start = len(local_attempts)
-            # 恢复 v2 的多重试（默认 3 次）；全部失败仍走二分/UNDECIDED 兜底。
+            # 截断立即二分；瞬时请求错误仍保留有限重试。
             parsed = generate_structured(
                 llm,
                 messages,
@@ -1916,7 +1893,7 @@ def relation_pass(
             if parsed is None:
                 batch_attempts = local_attempts[attempt_start:]
                 terminal_type = str((batch_attempts[-1] if batch_attempts else {}).get("type") or "")
-                split_eligible = terminal_type in {"empty", "incomplete", "json", "schema"}
+                split_eligible = terminal_type in {"empty", "incomplete", "input_limit", "json", "schema"}
                 if (
                     len(pair_batch) > 1
                     and split_depth < RELATION_MAX_SPLIT_DEPTH
@@ -1929,6 +1906,8 @@ def relation_pass(
                         attempt["terminal"] = False
                         attempt["recovered_by"] = "relation_batch_split"
                     midpoint = len(pair_batch) // 2
+                    trace_event(llm, 'relation-split', parent=f'{chunk.chunk_id}.{batch_tag}',
+                                item_counts=[midpoint, len(pair_batch) - midpoint], depth=split_depth + 1)
                     pending_batches[0:0] = [
                         (pair_batch[:midpoint], f"{batch_tag}a", split_depth + 1),
                         (pair_batch[midpoint:], f"{batch_tag}b", split_depth + 1),

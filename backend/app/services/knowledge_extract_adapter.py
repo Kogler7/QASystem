@@ -12,7 +12,7 @@ environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 
 * ``latest`` (default): runs the independent ``latest`` package through the
   same per-chunk projection.
-* ``v2`` / ``v3.1``: build V2 ``ExtractionChunk`` objects, run the selected package's
+* ``v2``: build V2 ``ExtractionChunk`` objects, run the selected package's
   ``extract_aggregate`` once, then project the document-level result back onto the
   individual chunks using each entity's evidence anchor, so the caller keeps seeing
   one item per chunk and ``deduplicate_chunk_graphs`` can still rebuild the merged
@@ -123,6 +123,8 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
         summary["extract_version"] = result["extract_version"]
     if result.get("effective_config"):
         summary["effective_config"] = deepcopy(result["effective_config"])
+    if result.get("trace_id"):
+        summary["trace_id"] = result["trace_id"]
     return summary
 
 
@@ -310,14 +312,17 @@ def run_aggregate(
                 ke_version.V31: v3_1.extract_aggregate,
                 ke_version.LATEST: latest.extract_aggregate,
             }[label]
-    # v2 / v3.1 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
+    # v2 入口要求 v2 的 ExtractionChunk 实例；v3/v3.1/latest 的入口只认各自包内的
     # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
     # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
     chunks = (
         build_chunks(texts, ranges, metadata)
-        if label in {ke_version.V2, ke_version.V31, ke_version.JEV}
+        if label in {ke_version.V2, ke_version.JEV}
         else _chunk_payloads(texts, ranges, metadata)
     )
+    if label == ke_version.V31:
+        from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
+        chunks = [ExtractionChunk(**payload) for payload in chunks]
     configured: dict[str, Any] = {}
     if extraction_config and label != ke_version.JEV:
         from algorithm.knowledge_extract.request_runtime import create_request_llm
@@ -328,24 +333,37 @@ def run_aggregate(
         if label == ke_version.V31:
             configured.update(request_timeout=extraction_config["request_timeout"],
                               document_timeout=extraction_config["document_timeout"])
-    result = runner(
-        ontology=ontology,
-        chunks=chunks,
-        target_types=list(target_types) if target_types is not None else None,
-        validation_mode="permissive",
-        best_effort=True,
-        model=model,
-        base_url=base_url,
-        api_key=api_key,
-        max_workers=max_workers,
-        **configured,
-    )
+    from algorithm.extraction_trace import ExtractionTrace
+    trace = getattr(configured.get("llm"), "extraction_trace", None)
+    if isinstance(trace, ExtractionTrace):
+        trace.write("input", {"request_id": observability.get_request_id(), "ontology": ontology,
+                              "texts": texts, "ranges": ranges, "metadata": metadata})
+    try:
+        result = runner(
+            ontology=ontology,
+            chunks=chunks,
+            target_types=list(target_types) if target_types is not None else None,
+            validation_mode="permissive",
+            best_effort=True,
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+            max_workers=max_workers,
+            **configured,
+        )
+    except Exception as exc:
+        if isinstance(trace, ExtractionTrace):
+            trace.write("failure", {"exception_type": type(exc).__name__})
+        raise
     # 盖戳供 _quality_summary 透传，评测侧据此区分结果出自哪版算法。
     result["extract_version"] = concrete_version
     if extraction_config:
         from backend.app.services.extraction_config import public_config
 
         result["effective_config"] = public_config(extraction_config)
+    if isinstance(trace, ExtractionTrace):
+        result["trace_id"] = trace.trace_id
+        trace.write("result", result)
     return result
 
 

@@ -8,9 +8,18 @@ import sys
 import threading
 import time
 import concurrent.futures
+from importlib.metadata import version
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _transport_httpx():
+    if int(version("mcp").split(".")[0]) >= 2:
+        import httpx2
+        return httpx2
+    import httpx
+    return httpx
 
 
 def _normalize_windows_stdio_command(
@@ -98,7 +107,7 @@ async def connect_single_server(
             read, write = await stack.enter_async_context(stdio_client(params))
 
         elif transport == "sse":
-            import httpx
+            httpx = _transport_httpx()
             from mcp.client.sse import sse_client
 
             url = (cfg.get("url") or "").strip()
@@ -131,7 +140,7 @@ async def connect_single_server(
             )
 
         elif transport in ("streamable_http", "http"):
-            import httpx
+            httpx = _transport_httpx()
             from mcp.client.streamable_http import streamable_http_client
 
             url = (cfg.get("url") or "").strip()
@@ -147,9 +156,10 @@ async def connect_single_server(
                     timeout=httpx.Timeout(http_timeout, read=None),
                 )
             )
-            read, write, _ = await stack.enter_async_context(
+            streams = await stack.enter_async_context(
                 streamable_http_client(url, http_client=http_client)
             )
+            read, write = streams[:2]
 
         else:
             logger.warning(
@@ -460,13 +470,13 @@ class MCPToolWrapper:
             ``{"name": ..., "description": ..., "input_schema": ...}`` 字典。
             ``input_schema`` 来自 Tool 的 ``inputSchema`` 属性。
         """
-        schema = {}
-        if hasattr(mcp_tool, "inputSchema") and mcp_tool.inputSchema:
-            schema = mcp_tool.inputSchema
+        schema = getattr(mcp_tool, "input_schema", None)
+        if schema is None:
+            schema = getattr(mcp_tool, "inputSchema", None)
         return {
             "name": tool_name,
             "description": mcp_tool.description or mcp_tool.name,
-            "input_schema": schema,
+            "input_schema": schema or {},
         }
 
     def _make_handler(self, server_name: str, tool_name: str):
@@ -662,7 +672,7 @@ def _format_mcp_result(result: Any) -> str:
                 parts.append(
                     json_module.dumps(item.data, ensure_ascii=False)
                 )
-            elif hasattr(item, "mimeType"):
-                parts.append(f"[{item.mimeType}]")
+            elif hasattr(item, "mime_type") or hasattr(item, "mimeType"):
+                parts.append(f"[{getattr(item, 'mime_type', getattr(item, 'mimeType', ''))}]")
         return "\n".join(parts) if parts else str(result)
     return str(result)

@@ -1,0 +1,76 @@
+{
+  "schema_version": "judge-corpus-v1",
+  "version": "1.0.0",
+  "created_date": "2026-10-11",
+  "label_contract": "eval/run.py _build_judge_messages: reference-relative semantic matching",
+  "adjudication": "agent-reviewed initial calibration labels + deterministic contract slice; no independent human verification yet; historical judge choices never become labels",
+  "harvest": {
+    "scanned_prediction_files": 253,
+    "paired_prediction_files": 251,
+    "unique_prediction_golden_pairs": 221,
+    "unresolved_prediction_files": 2,
+    "unique_candidates": 78632,
+    "documents": [
+      "official/official_01",
+      "official/official_02",
+      "official/official_03",
+      "official/official_04",
+      "official/official_05",
+      "official/official_06",
+      "official/official_07",
+      "official/official_08",
+      "official/official_09",
+      "official/official_10",
+      "rule/rule_01",
+      "rule/故障记录test",
+      "simple/Simple_故障规则的诊断",
+      "standard/standard_01",
+      "standard/standard_02",
+      "standard/standard_03",
+      "standard/standard_04"
+    ],
+    "golden_snapshots": 30
+  },
+  "summary": {
+    "pairs": 131,
+    "windows": 4,
+    "pending": 32,
+    "documents": 17,
+    "document_families": 16,
+    "source_snapshots": 109,
+    "labels": {
+      "contract_rule": 51,
+      "agent_review": 80
+    },
+    "positive": 82,
+    "negative": 49,
+    "by_split": {
+      "calibration": 34,
+      "test": 97
+    },
+    "by_kind": {
+      "entity": 87,
+      "relation": 44
+    },
+    "capabilities": {
+      "type_constraint": 28,
+      "identity_format": 23,
+      "property_missing": 55,
+      "alias": 24,
+      "paraphrase": 42,
+      "endpoint_context": 24,
+      "different_identity": 18,
+      "property_conflict": 5,
+      "scope_difference": 10,
+      "long_context": 1,
+      "direction": 1,
+      "numeric_conflict": 1
+    }
+  },
+  "files": {
+    "pairs.jsonl": "eaf73635e293222462587e98b96adbfd74b21515012b50ac73657632a57366cd",
+    "windows.jsonl": "fe6c41d196a378549ae562e2566f6dcf72f328eb7e190cb1ac5821fb9869bfaa",
+    "review_queue.jsonl": "2b4e34a9d3654ef1289fbb22b556a7a6458ae8f20db3e7e1dcbd96bec748a5f8",
+    "sources.json": "afd20a1a7223ba562af41400d88ee8c2fe008000192bb48b423426d46e0e9485"
+  }
+}
