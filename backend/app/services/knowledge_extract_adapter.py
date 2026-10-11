@@ -12,7 +12,7 @@ environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 
 * ``latest`` (default): runs the independent ``latest`` package through the
   same per-chunk projection.
-* ``v2``: build V2 ``ExtractionChunk`` objects, run the selected package's
+* ``v2`` / ``v2.2``: build that package's ``ExtractionChunk`` objects, run
   ``extract_aggregate`` once, then project the document-level result back onto the
   individual chunks using each entity's evidence anchor, so the caller keeps seeing
   one item per chunk and ``deduplicate_chunk_graphs`` can still rebuild the merged
@@ -43,7 +43,7 @@ import re
 from copy import deepcopy
 from typing import Any, Callable, Iterable, Sequence
 
-from algorithm.knowledge_extract import latest, v2, v3, v3_1, version as ke_version
+from algorithm.knowledge_extract import latest, v2, v2_2, v3, v3_1, version as ke_version
 
 from backend.app import observability
 
@@ -272,13 +272,18 @@ def build_chunks(
     texts: Sequence[str],
     ranges: Sequence[Sequence[int] | None] | None = None,
     metadata: Sequence[dict[str, Any] | None] | None = None,
+    *,
+    package: str = "v2",
 ) -> list[Any]:
-    """Wrap plain chunk texts as the ``ExtractionChunk`` objects V2 requires.
+    """Wrap plain chunk texts as the ``ExtractionChunk`` objects the package requires.
 
     Chunk text is passed through untouched.  Callers must not pre-strip Markdown
     headings: V2's structural extractors rely on the ``#`` markers.
     """
-    from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
+    if package == "v2_2":
+        from algorithm.knowledge_extract.v2_2.chunk_context import ExtractionChunk
+    else:
+        from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
 
     return [ExtractionChunk(**payload) for payload in _chunk_payloads(texts, ranges, metadata)]
 
@@ -308,18 +313,20 @@ def run_aggregate(
         else:
             runner = {
                 ke_version.V2: v2.extract_aggregate,
+                ke_version.V22: v2_2.extract_aggregate,
                 ke_version.V3: v3.extract_aggregate,
                 ke_version.V31: v3_1.extract_aggregate,
                 ke_version.LATEST: latest.extract_aggregate,
             }[label]
-    # v2 入口要求 v2 的 ExtractionChunk 实例；v3/v3.1/latest 的入口只认各自包内的
-    # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
+    # v2 入口要求 v2 的 ExtractionChunk 实例；v2.2 用 v2_2 包内的实例。
+    # v3/v3.1/latest 的入口只认各自包内的 ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
     # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
-    chunks = (
-        build_chunks(texts, ranges, metadata)
-        if label in {ke_version.V2, ke_version.JEV}
-        else _chunk_payloads(texts, ranges, metadata)
-    )
+    if label == ke_version.V22:
+        chunks = build_chunks(texts, ranges, metadata, package="v2_2")
+    elif label in {ke_version.V2, ke_version.JEV}:
+        chunks = build_chunks(texts, ranges, metadata)
+    else:
+        chunks = _chunk_payloads(texts, ranges, metadata)
     if label == ke_version.V31:
         from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
         chunks = [ExtractionChunk(**payload) for payload in chunks]

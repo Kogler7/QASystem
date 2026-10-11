@@ -64,7 +64,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Unsupported extraction version")
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
-    package = {"v3.1": "v3_1", "jev": "v2"}.get(version, version)
+    package = {"v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
     defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
     provider = options.get("provider") or "default"
     if provider == "default":
