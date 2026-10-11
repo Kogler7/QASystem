@@ -58,20 +58,22 @@ class ClefFlashClient:
         *,
         model: str | None = None,
         timeout: float | None = None,
+        env_prefix: str = "CLEF",
+        capability: str = "models.decisions.create",
     ) -> None:
         self.base_url = (
-            base_url if base_url is not None else os.getenv("CLEF_SERVICE_URL", "")
+            base_url if base_url is not None else os.getenv(f"{env_prefix}_SERVICE_URL", "")
         ).strip().rstrip("/")
-        endpoint = endpoint_for("models.decisions.create")
+        endpoint = endpoint_for(capability)
         self.path = endpoint.path
         self.method = endpoint.method
         if not self.path or not self.path.startswith("/") or self.path.startswith("//"):
             raise ModelServiceError("CLEF_SERVICE_PATH 必须是服务内的绝对路径")
         self.model = model or os.getenv("CLEF_MODEL", "").strip() or "clef-flash"
-        self.api_key = os.getenv("CLEF_SERVICE_API_KEY", "").strip()
+        self.api_key = os.getenv(f"{env_prefix}_SERVICE_API_KEY", "").strip()
         try:
             self.timeout = float(
-                timeout if timeout is not None else os.getenv("CLEF_SERVICE_TIMEOUT_SECONDS", "120")
+                timeout if timeout is not None else os.getenv(f"{env_prefix}_SERVICE_TIMEOUT_SECONDS", "120")
             )
         except (TypeError, ValueError):
             raise ModelServiceError("CLEF_SERVICE_TIMEOUT_SECONDS 必须为正数") from None

@@ -304,7 +304,11 @@ def test_loader_is_local_only_and_applies_cuda_before_torch(tmp_path, monkeypatc
     monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(bfloat16="bf16"))
     monkeypatch.setitem(sys.modules, "_clef_release_model", None)
     runtime = LocalRuntime(Settings(model_dir=str(tmp_path)))
+    warmups = []
+    monkeypatch.setattr(runtime, "infer", lambda request: warmups.append(request))
     runtime.load()
+    assert len(warmups) == 1
+    assert warmups[0]["model"] == "clef-flash"
     assert runtime.model == "loaded-model"
     assert runtime.processor == "loaded-processor"
     assert not (tmp_path / "__pycache__").exists()

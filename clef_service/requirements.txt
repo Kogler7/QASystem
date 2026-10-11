@@ -1,4 +1,5 @@
-# Independent host virtualenv; do not install into Backend's Python environment.
+# Isolated venv in qasystem-env-v1 (also usable on the host).
+# Do not install into Backend's Python environment.
 torch==2.10.0
 torchvision==0.25.0
 transformers==5.10.2
