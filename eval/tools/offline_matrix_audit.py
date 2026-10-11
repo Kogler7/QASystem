@@ -216,13 +216,17 @@ def audit(root, variants=VARIANTS, *, combine_recovery=False, equivalence_note="
     recovery_roots = sorted(p for p in root.glob("restart-recovery-*") if p.is_dir())
     for recovery in recovery_roots:
         provenance_path = recovery / "provenance.json"
-        provenance = read(provenance_path) if provenance_path.exists() else {}
+        recovery_plan_path = recovery / "plan.json"
+        recovery_plan = read(recovery_plan_path) if recovery_plan_path.exists() else {}
+        provenance = {**recovery_plan, **(read(provenance_path) if provenance_path.exists() else {})}
         safe_provenance = {k: provenance[k] for k in ("backend_source_commit", "frozen_source_commit", "restart_at", "second_restart_at",
+                            "frozen_input_source_commit", "original_attempt_source", "interruption_at", "comparison_limit",
                             "extractor_code_unchanged", "extraction_algorithm_unchanged", "transport_trace_capture_added", "original_attempts_preserved") if k in provenance}
         for variant in variants:
             for model in plan["extractors"]:
                 model_id = model["id"]
-                runs = sorted(p for p in (recovery / variant / model_id / plan["judge"]["id"] / "runs").glob("*") if p.is_dir())
+                recovery_variant_root = recovery if layout == "flat" else recovery / variant
+                runs = sorted(p for p in (recovery_variant_root / model_id / plan["judge"]["id"] / "runs").glob("*") if p.is_dir())
                 if not runs:
                     continue
                 for selected in runs:
@@ -244,7 +248,14 @@ def audit(root, variants=VARIANTS, *, combine_recovery=False, equivalence_note="
                             if value["variant"] == variant and value["model"] == model_id]
                 valid = [(name, value) for name, value in options if value["valid_score"]]
                 selected_name, selected_case = valid[-1] if valid else options[-1]
+                selected_is_recovery = selected_name in result["recovery_attempts"]
+                selected_provenance = (result["recovery_attempts"][selected_name]["provenance"]
+                                       if selected_is_recovery else {})
                 combined.append({**selected_case, "selected_attempt": selected_name,
+                    "selected_backend_source_commit": (selected_provenance.get("backend_source_commit")
+                                                       if selected_is_recovery else result["backend_source_commit"]),
+                    "selected_frozen_source_commit": (selected_provenance.get("frozen_input_source_commit", selected_provenance.get("frozen_source_commit"))
+                                                      if selected_is_recovery else result["frozen_source_commit"]),
                     "attempt_statuses": [{"attempt": name, "classification": value["classification"], "valid_score": value["valid_score"]}
                                          for name, value in options]})
             result["combined_groups"][key] = {"cases": combined, **aggregate(combined),

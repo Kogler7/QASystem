@@ -64,6 +64,31 @@ def test_matrix_default_preserves_legacy_paths_and_frozen_source_fallback(tmp_pa
         audit(tmp_path, variants=("json",), layout="guess")
 
 
+def test_flat_recovery_preserves_interruption_and_per_case_source_from_safe_plan(tmp_path):
+    golden(tmp_path)
+    write(tmp_path / "inputs/json/rule/other/extract/golden.json",
+          {"entities": [{"type": "RuleType", "name": "A", "properties": {}}], "relations": []})
+    write(tmp_path / "plan.json", {"cases": ["rule/case", "rule/other"], "extractors": [{"id": "api"}],
+          "judge": {"id": "judge"}, "backend_source_commit": "old-backend", "frozen_input_source_commit": "frozen"})
+    score_case(tmp_path / "api/judge/runs/001/rule/case", status="ok", tp=1)
+    recovery = tmp_path / "restart-recovery-new"
+    write(recovery / "plan.json", {"backend_source_commit": "new-backend", "frozen_input_source_commit": "frozen",
+          "comparison_limit": "different execution source", "secret": "do not copy", "judge": {"key": "private"}})
+    score_case(recovery / "api/judge/runs/002/rule/other", status="ok", tp=1)
+    result = audit(tmp_path, variants=("json",), layout="flat", combine_recovery=True,
+                   equivalence_note="explicit cross-source comparison", interrupted_groups=("json/api",))
+    cases = result["combined_groups"]["json/api"]["cases"]
+    assert result["combined_groups"]["json/api"]["valid_scored"] == 2
+    assert cases[0]["selected_backend_source_commit"] == "old-backend"
+    assert cases[1]["selected_backend_source_commit"] == "new-backend"
+    assert cases[1]["selected_frozen_source_commit"] == "frozen"
+    assert cases[1]["attempt_statuses"][0]["classification"] == "interrupted"
+    assert cases[0]["attempt_statuses"][1]["classification"] == "pending"
+    safe = next(iter(result["recovery_attempts"].values()))["provenance"]
+    assert "secret" not in safe and "judge" not in safe
+    assert safe["comparison_limit"] == "different execution source"
+
+
 def test_malformed_rows_are_not_silently_discarded():
     with pytest.raises(ValueError, match="row_invalid"):
         rule_fields({"nodes": [None], "relationships": []})
@@ -128,6 +153,7 @@ def test_recovery_requires_explicit_note_and_preserves_failed_attempt(tmp_path):
     case = combined["combined_groups"]["json/api"]["cases"][0]
     assert case["valid_score"] and case["classification"] == "success"
     assert case["attempt_statuses"][0]["classification"] == "infrastructure_or_no_result"
+    assert case["selected_backend_source_commit"] is None  # Missing provenance is unknown, never inherited from primary.
 
 
 def test_summary_dropped_failed_case_denominator_is_visible(tmp_path):
