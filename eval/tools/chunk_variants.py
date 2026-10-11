@@ -42,6 +42,7 @@ def validate_ranges(markdown: str, items: list[dict]) -> None:
     if not items:
         raise ValueError('no chunk items')
     previous = -1
+    covered_end = 0
     for item in items:
         span = item.get('range')
         if (not isinstance(span, list) or len(span) != 2 or any(type(v) is not int for v in span)
@@ -49,6 +50,11 @@ def validate_ranges(markdown: str, items: list[dict]) -> None:
                 or span[0] < previous or markdown[span[0]:span[1]] != item.get('text')):
             raise ValueError('chunk text/source range mismatch')
         previous = span[0]
+        if span[0] > covered_end:
+            raise ValueError('chunk source range coverage gap')
+        covered_end = max(covered_end, span[1])
+    if covered_end != len(markdown):
+        raise ValueError('chunk source range coverage gap')
 
 
 def prepare(source: Path, destination: Path, cases: list[str], params: dict,

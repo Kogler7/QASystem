@@ -47,6 +47,16 @@ def test_freeze_uses_real_backend_options_and_rejects_bad_ranges(tmp_path, monke
         validate_ranges('正文', [{'text': '错误', 'range': [0, 2]}])
 
 
+def test_frozen_ranges_require_full_coverage_and_allow_overlap():
+    validate_ranges('abcdef', [{'text': 'abcd', 'range': [0, 4]},
+                               {'text': 'cdef', 'range': [2, 6]}])
+    for items in ([{'text': 'bcdef', 'range': [1, 6]}],
+                  [{'text': 'abcd', 'range': [0, 4]}],
+                  [{'text': 'ab', 'range': [0, 2]}, {'text': 'def', 'range': [3, 6]}]):
+        with pytest.raises(ValueError, match='coverage gap'):
+            validate_ranges('abcdef', items)
+
+
 @pytest.mark.parametrize('mode', ['extract', 'chunk-extract'])
 def test_reused_chunks_pass_provenance_through_runner(tmp_path, monkeypatch, mode):
     source = tmp_path / 'frozen'
