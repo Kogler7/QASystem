@@ -399,6 +399,7 @@ class GraphExtractionService:
         model: str | None = None,
         base_url: str | None = None,
         merge: bool = True,
+        extraction_config: dict[str, Any] | None = None,
     ) -> GraphExtractionBatch:
         chunk_metadata: list[dict[str, Any]] = []
         for item in items:
@@ -416,6 +417,7 @@ class GraphExtractionService:
             chunks=[item.text for item in items],
             model=model,
             base_url=base_url,
+            **({"extraction_config": extraction_config} if extraction_config else {}),
             ranges=[getattr(item, "ranges", None) for item in items],
             metadata=chunk_metadata,
         )
@@ -468,6 +470,8 @@ class GraphExtractionService:
             "qps": config["qps"],
             "qpm": config["qpm"],
         }
+        if extraction_config:
+            scheduler = {key: extraction_config[key] for key in scheduler}
         quality = dict(results[0].get("quality") or {}) if results else {
             "status": "succeeded",
             "error_code": None,
@@ -479,6 +483,10 @@ class GraphExtractionService:
             quality["status"] = "partial"
             quality["error_code"] = _extraction_error(failed, len(results)).name
             quality["failed_chunk_count"] = len(failed)
+        if extraction_config:
+            from backend.app.services.extraction_config import public_config
+
+            quality["effective_config"] = public_config(extraction_config)
         empty_reason = _empty_reason_for(results)
         if merge:
             merged_graph = deduplicate_chunk_graphs(results)

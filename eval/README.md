@@ -10,7 +10,7 @@ tags: []
 
 默认连 `http://127.0.0.1:8006`。Backend 已在跑时，在仓库根目录执行即可；评测数据在 `test_data/eval/`，不要只拷 `eval/` 目录。
 
-抽取算法版本由 Backend 环境变量 **KG_EXTRACT_ALGO_VERSION** 控制（`latest` 默认 / `v2` / `v3` / `v3.1`）：默认 `latest` 使用 `algorithm/knowledge_extract/latest/` 这一独立代码包（当前与 v3 一致，但未来会独立演进）。后台 `/api/v1/graphs/extract`、沉淀流水线和插件 MCP 工具 `kg_extract_v2` 都走同一个开关。本脚本不直接 import 算法包，测的是线上这条链路；做版本对比评测时显式设 `KG_EXTRACT_ALGO_VERSION=v2`、`v3` 或 `v3.1`，再跑同一套评测即可对比。
+抽取算法版本默认由 Backend 的 `KG_EXTRACT_ALGO_VERSION` 控制。现在也可在脚本中传 `--extract-version v2/v3/v3.1/latest`、`--extract-provider <服务端配置名>`、`--extract-model <模型>` 和超时覆盖项，在同一个 Backend 上逐次选择配置，无需重启。完整规则和供应商登记方式见 [抽取请求配置覆盖](../docs/接口/抽取请求配置覆盖.md)。MCP 工具仍使用服务端默认配置。
 
 ## 做了什么
 

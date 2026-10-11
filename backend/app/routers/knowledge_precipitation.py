@@ -1,4 +1,5 @@
 from __future__ import annotations
+from backend.app.services.extraction_config import ExtractionConfigurationError
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -130,6 +131,8 @@ async def _knowledge_ingestion(
             content=payload(result.data, _info("知识沉淀完成", deprecated), execution=result.execution),
             status_code=result.status_code,
         )
+    except ExtractionConfigurationError as exc:
+        return error_response(ErrorCode.INVALID_REQUEST, str(exc), stage="configuration", status_code=422)
     except ExecutionUnavailable as exc:
         return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, _info("执行队列不可用", deprecated), stage="execution", details=str(exc), status_code=503)
     except ManagedExecutionError as exc:

@@ -361,6 +361,18 @@ class OpenAICompatibleLLM:
         run_context: dict[str, Any] | None = None,
     ) -> StructuredLLMResponse:
         """Generate JSON matching ``schema``, falling back for older providers."""
+        if getattr(self, "api_mode", "auto") == "chat":
+            # Explicit server profile: never probe an unsupported Responses API.
+            mode = str((run_context or {}).get("response_mode") or "json_schema")
+            if mode not in {"json_schema", "json_object", "plain"}:
+                raise ValueError("Invalid structured response mode")
+            fmt = None
+            if mode == "json_schema":
+                fmt = {"type": "json_schema", "json_schema": {
+                    "name": "extraction", "strict": True, "schema": schema}}
+            elif mode == "json_object":
+                fmt = {"type": "json_object"}
+            return self._chat_structured(messages, response_mode=mode, response_format=fmt)
         context = run_context or {}
         response_mode = str(context.get("response_mode") or "json_schema")
         if response_mode not in {"json_schema", "json_object", "plain"}:

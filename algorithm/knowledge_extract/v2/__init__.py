@@ -30,6 +30,7 @@ def extract_aggregate(
     api_key: str | None = None,
     max_workers: int | None = None,
     llm: Any | None = None,
+    use_scheduler: bool = True,
     **_: Any,
 ) -> dict[str, Any]:
     """Run the pipeline over ``chunks`` and return the aggregate contract."""
@@ -44,6 +45,7 @@ def extract_aggregate(
         api_key=api_key,
         max_workers=max_workers,
         llm=llm,
+        use_scheduler=use_scheduler,
     )
 
 

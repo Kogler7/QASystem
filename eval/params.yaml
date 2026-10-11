@@ -31,13 +31,16 @@ options:
     size_unit: char
     breakpoint_method: percentile
   extraction:
-    # 抽取算法版本由 Backend 环境变量 KG_EXTRACT_ALGO_VERSION 控制：
-    # latest（默认，使用独立的 latest 包）或显式 v2 / v3 / v3.1；本文件不设置。
+    # 命令行 --extract-* > 本节非 null 值 > Backend 默认值。
+    # provider 是服务端 KG_EXTRACT_PROVIDERS_JSON 中的配置名，不填写 URL/密钥。
+    version: null
+    provider: null
+    request_timeout: null
+    document_timeout: null
     # 对比版本时先固定切片：先跑 --mode chunk-extract，
     # 再换版本跑 --mode extract --from-run <上次运行>，保证两次喂入的切片完全相同。
-    # 本次评测用 chat 模型，避免 deepseek-v4-flash 思考耗尽 max_output_tokens。
-    # 只覆盖本脚本发出的抽取请求，不改 Backend 环境默认模型。
-    model: deepseek-chat
+    # 留空使用供应商配置的模型；默认供应商再沿用 Backend 环境默认值。
+    model: null
     merge: true
   storage:
     persist_graph: false

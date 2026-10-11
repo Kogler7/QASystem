@@ -3383,6 +3383,29 @@ def parse_stage_budgets(raw: str | None) -> dict[str, float]:
     return budgets
 
 
+def extraction_overrides(args: argparse.Namespace, params: dict[str, Any]) -> dict[str, Any]:
+    """CLI > YAML; absent values remain absent so Backend supplies defaults."""
+    options = deepcopy(params.get("options") or {})
+    extraction = dict(options.get("extraction") or {})
+    for key in ("version", "provider", "model", "request_timeout", "document_timeout"):
+        value = getattr(args, "extract_" + key, None)
+        if value is not None:
+            extraction[key] = value
+    for key in ("request_timeout", "document_timeout"):
+        value = extraction.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value) or value <= 0):
+            raise ValueError(f"extraction.{key} 必须是有限正数")
+    if any(extraction.get(key) is not None for key in ("version", "provider", "request_timeout", "document_timeout")):
+        if args.stage != "backend":
+            raise ValueError("抽取配置覆盖目前仅支持 --stage backend，不能静默忽略插件配置")
+    if args.reuse_extract_from and (getattr(args, "extract_model", None) is not None or any(
+        extraction.get(key) is not None for key in ("version", "provider", "request_timeout", "document_timeout")
+    )):
+        raise ValueError("覆盖抽取配置时不能复用旧预测；请仅使用 --from-run 复用切片")
+    options["extraction"] = extraction
+    return options
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="知识沉淀评测：默认只测后台切片+抽取（chunk-extract）。可直接传 case/类型目录。",
@@ -3397,6 +3420,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE), help="工作区根目录，默认 test_data/eval")
     parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml")
+    parser.add_argument("--extract-version", choices=("v2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
+    parser.add_argument("--extract-provider", help="Backend 预配置供应商名称，不接受密钥或 URL")
+    parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
+    parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")
+    parser.add_argument("--extract-document-timeout", type=float, help="文档抽取模型调用总预算（秒）")
     parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
     parser.add_argument(
@@ -3455,7 +3483,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--baseline", default=None, help="同口径基线的运行目录或 summary.json")
     parser.add_argument("--max-f1-drop", type=float, default=0.02, help="相对基线允许的 F1 绝对下降，默认 0.02")
-    parser.add_argument("--max-latency-increase", type=float, default=0.2, help="相对基线允许的 API 耗时增幅，默认 0.2（20%）")
+    parser.add_argument("--max-latency-increase", type=float, default=0.2, help="相对基线允许的 API 耗时增幅，默认 0.2（20%%）")
     parser.add_argument(
         "--fail-on-empty",
         action=argparse.BooleanOptionalAction,
@@ -3735,7 +3763,12 @@ def main() -> int:
         or params.get("mcp_url")
         or urljoin(base_url + "/", "mcp")
     )
-    options = params.get("options") or {}
+    try:
+        options = extraction_overrides(args, params)
+    except ValueError as exc:
+        log(str(exc))
+        return 1
+    params["options"] = options
     group_cfg = params.get("groups") or {}
     eval_cfg = params.get("eval") or {}
     match_mode = str(args.match_mode or eval_cfg.get("match_mode") or "llm").strip().lower()

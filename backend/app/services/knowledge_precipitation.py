@@ -104,6 +104,7 @@ class KnowledgeIngestionRequest:
     #: execution 层 job_id（operations._knowledge_ingestion 传入）：解析阶段边界的
     #: 协作式取消检查与页分片编排的父任务关联都靠它；直接调用 service 时为 None。
     job_id: str | None = None
+    extraction_config: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -117,6 +118,7 @@ class BatchKnowledgeIngestionRequest:
     files: list[FileItem]
     ontology: str
     options: PipelineOptions = field(default_factory=PipelineOptions)
+    extraction_config: dict[str, Any] | None = None
 
 
 class PipelineError(Exception):
@@ -545,6 +547,7 @@ class KnowledgePrecipitationService:
         source_metadata: dict[str, Any] | None = None,
         document_segments: list[dict[str, Any]] | None = None,
         fingerprint: str | None = None,
+        extraction_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         chunk_started = time.monotonic()
         threshold = options.chunking.chunk_threshold
@@ -707,6 +710,7 @@ class KnowledgePrecipitationService:
                 ],
                 model=options.extraction.model,
                 merge=options.extraction.merge,
+                **({"extraction_config": extraction_config} if extraction_config else {}),
             )
             extracted_items = extracted_batch.items
             extracted_result = extracted_batch.pipeline_data()
@@ -1082,6 +1086,7 @@ class KnowledgePrecipitationService:
                     "source_sheets": (parsed.get("parser") or {}).get("sheets") or [],
                 },
                 fingerprint=fingerprint,
+                extraction_config=request.extraction_config,
             )
         except CapabilityError as exc:
             partial = None
@@ -1243,6 +1248,7 @@ class KnowledgePrecipitationService:
             },
             document_segments=document_segments,
             fingerprint=combined_fingerprint,
+            extraction_config=request.extraction_config,
         )
         # Augment summary with file count
         fc = len(request.files)

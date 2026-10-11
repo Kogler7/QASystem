@@ -198,3 +198,16 @@ def test_entrypoints_dry_run_only_selected_cases(workspace, tmp_path, entry):
     assert "类型 standard: 1 个 case" in result.stdout
     assert "official_03" not in result.stdout
     assert "standard_02" not in result.stdout
+
+
+def test_mini_forwards_extraction_overrides(workspace, tmp_path, monkeypatch):
+    params = _params(tmp_path)
+    child = Mock(return_value=subprocess.CompletedProcess([], 0))
+    monkeypatch.setattr(mini_eval.subprocess, "run", child)
+    assert mini_eval.main(["--workspace", str(workspace), "--params", str(params),
+                          "--extract-version", "v3.1", "--extract-provider", "siliconflow",
+                          "--extract-request-timeout", "300"]) == 0
+    command = child.call_args.args[0]
+    for flag, value in [("--extract-version", "v3.1"), ("--extract-provider", "siliconflow"),
+                        ("--extract-request-timeout", "300")]:
+        assert command[command.index(flag) + 1] == value

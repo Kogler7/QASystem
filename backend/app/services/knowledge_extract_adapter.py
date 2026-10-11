@@ -121,6 +121,8 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
     # 评测侧需要知道本次结果出自哪版算法；由 run_aggregate 盖戳。
     if result.get("extract_version"):
         summary["extract_version"] = result["extract_version"]
+    if result.get("effective_config"):
+        summary["effective_config"] = deepcopy(result["effective_config"])
     return summary
 
 
@@ -291,10 +293,11 @@ def run_aggregate(
     ranges: Sequence[Sequence[int] | None] | None = None,
     metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
+    extraction_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run the configured extraction version once over every chunk and return its raw result."""
-    label = ke_version.get_extract_version_label()
-    concrete_version = ke_version.get_extract_version()
+    label = extraction_config["version"] if extraction_config else ke_version.get_extract_version_label()
+    concrete_version = label
     if runner is None:
         if label == ke_version.JEV:
             from algorithm.knowledge_extract import jev_extract
@@ -315,6 +318,16 @@ def run_aggregate(
         if label in {ke_version.V2, ke_version.V31, ke_version.JEV}
         else _chunk_payloads(texts, ranges, metadata)
     )
+    configured: dict[str, Any] = {}
+    if extraction_config and label != ke_version.JEV:
+        from algorithm.knowledge_extract.request_runtime import create_request_llm
+
+        configured = {"llm": create_request_llm(extraction_config), "use_scheduler": False}
+        model = extraction_config["model"]
+        max_workers = extraction_config["max_concurrency"]
+        if label == ke_version.V31:
+            configured.update(request_timeout=extraction_config["request_timeout"],
+                              document_timeout=extraction_config["document_timeout"])
     result = runner(
         ontology=ontology,
         chunks=chunks,
@@ -325,9 +338,14 @@ def run_aggregate(
         base_url=base_url,
         api_key=api_key,
         max_workers=max_workers,
+        **configured,
     )
     # 盖戳供 _quality_summary 透传，评测侧据此区分结果出自哪版算法。
     result["extract_version"] = concrete_version
+    if extraction_config:
+        from backend.app.services.extraction_config import public_config
+
+        result["effective_config"] = public_config(extraction_config)
     return result
 
 
@@ -618,6 +636,7 @@ def extract_chunks(
     ranges: Sequence[Sequence[int] | None] | None = None,
     metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
+    extraction_config: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Version-switched replacement for V1's ``extract_chunks``.
 
@@ -627,7 +646,7 @@ def extract_chunks(
     """
     if not chunks:
         return []
-    version = ke_version.get_extract_version()
+    version = extraction_config["version"] if extraction_config else ke_version.get_extract_version()
     try:
         result = run_aggregate(
             ontology,
@@ -640,6 +659,7 @@ def extract_chunks(
             ranges=ranges,
             metadata=metadata,
             runner=runner,
+            extraction_config=extraction_config,
         )
     except Exception as exc:  # noqa: BLE001 - mirror V1's per-call error containment
         logger.warning(
