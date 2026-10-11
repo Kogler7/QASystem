@@ -122,7 +122,7 @@ evidence_verification
 - 逐项核验 candidates，按 item_id 输出 verdicts，不得遗漏任何 item_id。
 - kind=property 或 claim_kind=entity 时，按整个实体属性更新做语义核验；不要做属性值与 quote 的逐字一一对齐。
 - kind=relation 或 claim_kind=relation 时，必须核验 source、relation、target、方向和 evidence_quote 组成的完整关系断言。
-- candidate 含 entity_context 时，只能依据该实体锚定上下文判断，不得借用其他候选实体的事实。
+- candidate 含非空 entity_context 时，只能依据该实体锚定上下文判断，不得借用其他候选实体的事实。
 - yes=原文支持完整候选事实；no=与原文矛盾、关系不成立或属于其他实体；uncertain=无法判断。
 - 每条核验记录独占一行；不要解释。"""
     return [

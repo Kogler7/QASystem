@@ -51,6 +51,17 @@ def test_mixed_context_authority_is_per_item_and_fallback_is_explicit():
     assert "不得借用其他 item" in instruction
 
 
+@pytest.mark.parametrize("version", ["v3", "latest"])
+def test_blank_context_message_keeps_full_chunk_fallback_consistent(version):
+    module = importlib.import_module(f"algorithm.knowledge_extract.{version}.semantic_evidence")
+    messages = module.build_verification_messages(
+        chunk=SimpleNamespace(chunk_id="c", document_id="d", text="完整原文"),
+        items=[{"item_id": "one", "entity_context": " "}])
+    assert payload(messages)["text"] == "完整原文"
+    assert "candidate 含非空 entity_context" in messages[1]["content"]
+    assert "candidate 含 entity_context 时" not in messages[1]["content"]
+
+
 @pytest.mark.parametrize("version", ["v2", "v2_2", "v3_1"])
 def test_other_versions_keep_existing_full_chunk_contract(version):
     module = importlib.import_module(f"algorithm.knowledge_extract.{version}.semantic_evidence")
