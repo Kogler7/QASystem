@@ -1,3 +1,9 @@
+---
+noteId: "338dfad0c30d11f1aea7cbe984ab9484"
+tags: []
+
+---
+
 # Knowledge Extract V2
 
 本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。

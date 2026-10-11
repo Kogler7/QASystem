@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from backend.app import api_recording, observability
+from backend.app.services.extraction_config import ExtractionConfigurationError
 from backend.app.responses import ErrorCode, deprecated_info, error_response, payload
 from backend.app.execution.api import ExecutionUnavailable, ManagedExecutionError, dispatch_operation, prefer_wait_seconds
 from backend.app.schemas import (
@@ -153,6 +154,8 @@ async def _extract_graphs(http_request: Request, body: GraphExtractionRequest) -
         if isinstance(result.data, dict):
             recorder.write_json("stage_extract/result.json", result.data)
         return JSONResponse(content=payload(result.data, "分片图谱抽取完成", execution=result.execution), status_code=result.status_code)
+    except ExtractionConfigurationError as exc:
+        return error_response(ErrorCode.INVALID_REQUEST, str(exc), stage="configuration", status_code=422)
     except ExecutionUnavailable as exc:
         return error_response(ErrorCode.DEPENDENCY_UNAVAILABLE, "执行队列不可用", stage="execution", details=str(exc), status_code=503)
     except ManagedExecutionError as exc:

@@ -98,6 +98,7 @@ def _extract_graphs(payload: dict[str, Any]) -> dict[str, Any]:
         items,
         model=(payload.get("options") or {}).get("model"),
         merge=(payload.get("options") or {}).get("merge", True),
+        **({"extraction_config": payload["__extraction_config"]} if "__extraction_config" in payload else {}),
     )
     return result.graph_data()
 
@@ -179,6 +180,7 @@ def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
                 ontology=ontology,
                 options=options,
                 job_id=execution_meta.get("job_id"),
+                extraction_config=payload.get("__extraction_config"),
             )
         )
     return service.process_batch(
@@ -186,6 +188,7 @@ def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
             files=[FileItem(file_name=item["file_name"], content=_decode_content(item["content"])) for item in files],
             ontology=ontology,
             options=options,
+            extraction_config=payload.get("__extraction_config"),
         )
     )
 

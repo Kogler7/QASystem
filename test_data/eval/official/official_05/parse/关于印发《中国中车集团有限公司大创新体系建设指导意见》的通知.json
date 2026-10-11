@@ -1,0 +1,40 @@
+{
+  "code": 0,
+  "info": "文档解析完成",
+  "data": {
+    "file_name": "关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知.pdf",
+    "file_size": 448940,
+    "file_type": "pdf",
+    "markdown": "# 中国中车集团有限公司文件\n\n中车集团科信［2025］120号\n\n# 关于印发《中国中车集团有限公司大创新体系建设指导意见》的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\n\n《中国中车集团有限公司大创新体系建设指导意见》已经集团公司2025年第27次党委常委会、第24次总经理办公会审议通过，现予印发，请各单位贯彻执行。\n\n121\n\n抄送：公司领导，总师级领导。\n\n2025年8月11日印发\n",
+    "content_length": 219,
+    "parser": {
+      "preferred_engine": "mineru",
+      "final_engine": "mineru"
+    }
+  },
+  "error": null,
+  "execution": {
+    "mode": "inline",
+    "job_id": "94906969d6ec457eb72e46b380077df8",
+    "status": "succeeded",
+    "stage": "completed",
+    "cancel_requested": false,
+    "latest_event_id": "94906969d6ec457eb72e46b380077df8:6",
+    "summary": {
+      "total_tasks": 1,
+      "completed_tasks": 1,
+      "failed_tasks": 0,
+      "retry_count": 0,
+      "queue_ms": 0,
+      "execution_ms": 2173,
+      "workers": [
+        "gateway-inline"
+      ],
+      "gpus": [],
+      "status": "succeeded"
+    },
+    "events_url": "/api/v1/jobs/94906969d6ec457eb72e46b380077df8/events",
+    "executions_url": "/api/v1/jobs/94906969d6ec457eb72e46b380077df8/executions",
+    "result_url": "/api/v1/jobs/94906969d6ec457eb72e46b380077df8/result"
+  }
+}

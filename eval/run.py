@@ -32,6 +32,7 @@ import uuid
 from collections import deque
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
@@ -53,7 +54,7 @@ DEFAULT_WORKSPACE = KIT_DIR.parent / "test_data" / "eval"
 # judge 单次 prompt 里 golden 一侧的默认窗口：golden 是参照列表，窗口开大一些可以少发几次请求。
 JUDGE_GOLDEN_WINDOW_DEFAULT = 40
 RUNS_DIR = KIT_DIR.parent / "tmp" / "eval" / "runs"
-RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}$")
+RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}(?:-[0-9a-f]{12})?$")
 DEFAULT_RUNS_RETENTION_DAYS = 30
 ONTOLOGY_SUFFIXES = {".puml", ".uml"}
 SKIP_DOC_PREFIXES = (".", "~$", ".~")
@@ -92,7 +93,7 @@ DEFAULT_PARAMS: dict[str, Any] = {
         "chunking": {
             "strategy": "recursive",
             "size": 4000,
-            "chunk_overlap": 0,
+            "chunk_overlap": 50,
             "chunk_threshold": 12000,
             "similarity": 0.6,
             "separators": None,
@@ -107,9 +108,9 @@ DEFAULT_PARAMS: dict[str, Any] = {
         "judge_model": None,
         "judge_base_url": None,
         "judge_timeout_seconds": 300,
-        "judge_max_tokens": 1024,
-        "judge_batch_size": 8,
-        "judge_golden_batch_size": 12,
+        "judge_max_tokens": 8192,
+        "judge_batch_size": 20,
+        "judge_golden_batch_size": 40,
         "judge_max_concurrency": 4,
         "judge_response_format": "auto",
         "judge_disable_thinking": True,
@@ -235,9 +236,24 @@ def write_text(path: Path, text: str) -> None:
 def _run_dir_started_at(path: Path) -> datetime:
     """批次时间：优先目录名时间戳，解析不了退回 mtime。"""
     try:
-        return datetime.strptime(path.name, "%Y%m%d-%H%M%S")
+        return datetime.strptime(path.name[:15], "%Y%m%d-%H%M%S")
     except ValueError:
         return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def create_run_directory(runs_dir: Path, started: datetime, protected: set[Path]) -> Path:
+    """Atomically allocate a batch directory, including simultaneous processes."""
+    prefix = started.strftime("%Y%m%d-%H%M%S")
+    protected = {path.resolve() for path in protected}
+    candidate = runs_dir / prefix
+    while True:
+        if candidate.resolve() not in protected:
+            try:
+                candidate.mkdir(parents=True, exist_ok=False)
+                return candidate
+            except FileExistsError:
+                pass
+        candidate = runs_dir / f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
 def _dir_size_bytes(path: Path) -> int:
@@ -1343,6 +1359,39 @@ def _auto_candidate_pairs(
     return pairs
 
 
+def _deferred_identity_pairs(
+    golden_items: list[dict[str, Any]],
+    predicted_items: list[dict[str, Any]],
+    *,
+    relation: bool,
+) -> list[tuple[int, int]]:
+    """身份归一化一致、类型相容，但本地无法确认、只能交给 judge 的候选对。
+
+    与 ``_auto_candidate_pairs`` 的差别只在属性（关系还包括端点上下文）冲突：冲突必须由
+    judge 判断指代，本地不能判对。问题在于这些对和大窗口里其余条目一起送审时，模型可能
+    对整窗直接返回空数组——空数组能通过 schema 校验，于是候选被静默丢成漏抽。因此它们
+    需要单独的小窗口补判一次。
+    """
+    buckets: dict[tuple[str, ...], list[int]] = {}
+    for index, item in enumerate(golden_items):
+        key = _item_identity(item, relation=relation)
+        if key and all(key):
+            buckets.setdefault(key, []).append(index)
+    deferred: list[tuple[int, int]] = []
+    for predicted_index, item in enumerate(predicted_items):
+        key = _item_identity(item, relation=relation)
+        if not (key and all(key)):
+            continue
+        for golden_index in buckets.get(key, ()):
+            golden = golden_items[golden_index]
+            if not _compatible_types(golden, item, relation=relation):
+                continue
+            if _properties_agree(golden, item) and (not relation or _relation_contexts_agree(golden, item)):
+                continue  # 本地自动匹配已经覆盖，不需要补判
+            deferred.append((golden_index, predicted_index))
+    return deferred
+
+
 def _auto_match_collection(
     golden_items: list[dict[str, Any]],
     predicted_items: list[dict[str, Any]],
@@ -1362,10 +1411,7 @@ def _chat_completions_url(base_url: str) -> str:
     base = base_url.rstrip("/")
     if base.endswith("/chat/completions"):
         return base
-    # OpenAI 兼容常见根为 http://host:port 或 .../v1；缺 /v1 时补上（本地 vLLM 等）。
-    if base.endswith("/v1"):
-        return f"{base}/chat/completions"
-    return f"{base}/v1/chat/completions"
+    return f"{base}/chat/completions"
 
 
 class JudgeBatchError(RuntimeError):
@@ -1378,10 +1424,6 @@ class JudgeBatchError(RuntimeError):
 
 class JudgeFormatUnsupportedError(RuntimeError):
     """The provider explicitly rejected the requested response format."""
-
-
-class JudgeInputTooLongError(RuntimeError):
-    """Provider rejected the prompt because input tokens exceed context."""
 
 
 def _validate_judge_result(data: dict[str, Any], schema: dict[str, Any]) -> None:
@@ -1492,132 +1534,82 @@ class JudgeClient:
         )
         return bool(names_format and explicit_rejection)
 
-    @staticmethod
-    def _shrink_max_tokens(message: str, current: int) -> int | None:
-        """vLLM 等会回报剩余上下文；按剩余预算收缩，避免整窗判分被 400 打掉。"""
-        text = str(message or "")
-        if "max_tokens" not in text and "max_completion_tokens" not in text:
-            return None
-        room = None
-        # e.g. maximum context length is 8192 ... has 6462 input tokens (2048 > 8192 - 6462)
-        matched = re.search(
-            r"maximum context length is\s+(\d+).*?has\s+(\d+)\s+input tokens",
-            text,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        if matched:
-            room = max(0, int(matched.group(1)) - int(matched.group(2)) - 8)
-        else:
-            matched = re.search(r"\((\d+)\s*>\s*(\d+)\s*-\s*(\d+)\)", text)
-            if matched:
-                room = max(0, int(matched.group(2)) - int(matched.group(3)) - 8)
-        if room is not None:
-            if room < 64:
-                return None
-            nxt = min(current - 1, room)
-            return nxt if nxt < current else None
-        if current <= 64:
-            return None
-        return max(64, current // 4)
-
     def _post_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | None = None) -> str:
-        max_tokens = int(self.max_tokens)
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": self.max_tokens,
+        }
+        if response_format is not None:
+            payload["response_format"] = response_format
+        if self.is_deepseek and self.disable_thinking:
+            payload["thinking"] = {"type": "disabled"}
+        elif self.is_siliconflow and self.disable_thinking:
+            payload["enable_thinking"] = False
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        last_error: Exception | None = None
-        for _attempt in range(6):
-            payload: dict[str, Any] = {
-                "model": self.model,
-                "messages": messages,
-                "temperature": 0,
-                "max_tokens": max_tokens,
-            }
-            if response_format is not None:
-                payload["response_format"] = response_format
-            if self.is_deepseek and self.disable_thinking:
-                payload["thinking"] = {"type": "disabled"}
-            elif self.is_siliconflow and self.disable_thinking:
-                payload["enable_thinking"] = False
-            elif self.disable_thinking:
-                # Qwen3 / vLLM 等：关闭 thinking，避免挤占输出窗口。
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
-            status, _headers, body = http_request(
-                _chat_completions_url(self.base_url),
-                method="POST",
-                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                headers=headers,
-                timeout=self.timeout,
+        status, _headers, body = http_request(
+            _chat_completions_url(self.base_url),
+            method="POST",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+            timeout=self.timeout,
+        )
+        self.last_diagnostics["http_status"] = status
+        try:
+            data = json.loads(body.decode("utf-8") or "{}")
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"judge 响应不是 JSON HTTP {status}（body_length={len(body)}）") from exc
+        if status >= 400:
+            error = data.get("error") if isinstance(data, dict) else None
+            if response_format is not None and self._format_is_unsupported(status, error):
+                self.last_diagnostics["error_reason"] = "response_format_unsupported"
+                raise JudgeFormatUnsupportedError(f"judge HTTP {status}: response_format_unsupported")
+            reason = (
+                "authentication_failed" if status in {401, 403}
+                else "rate_limited" if status == 429
+                else "server_error" if status >= 500
+                else "request_rejected"
             )
-            self.last_diagnostics["http_status"] = status
-            self.last_diagnostics["max_tokens"] = max_tokens
-            try:
-                data = json.loads(body.decode("utf-8") or "{}")
-            except json.JSONDecodeError as exc:
-                raise RuntimeError(f"judge 响应不是 JSON HTTP {status}（body_length={len(body)}）") from exc
-            if status >= 400:
-                error = data.get("error") if isinstance(data, dict) else None
-                if response_format is not None and self._format_is_unsupported(status, error):
-                    self.last_diagnostics["error_reason"] = "response_format_unsupported"
-                    raise JudgeFormatUnsupportedError(f"judge HTTP {status}: response_format_unsupported")
-                message = error.get("message") if isinstance(error, dict) else str(error or "")
-                shrunk = self._shrink_max_tokens(message, max_tokens) if status == 400 else None
-                if shrunk is not None:
-                    max_tokens = shrunk
-                    self.last_diagnostics["max_tokens_retried"] = max_tokens
-                    last_error = RuntimeError(f"judge HTTP {status}: max_tokens_too_large")
-                    continue
-                text = str(message or "")
-                if status == 400 and re.search(
-                    r"reduce the length of the input|input tokens|context length",
-                    text,
-                    flags=re.IGNORECASE,
-                ):
-                    self.last_diagnostics["error_reason"] = "input_too_long"
-                    raise JudgeInputTooLongError(f"judge HTTP {status}: input_too_long")
-                reason = (
-                    "authentication_failed" if status in {401, 403}
-                    else "rate_limited" if status == 429
-                    else "server_error" if status >= 500
-                    else "request_rejected"
-                )
-                self.last_diagnostics["error_reason"] = reason
-                raise RuntimeError(f"judge HTTP {status}: {reason}")
-            if not isinstance(data, dict):
-                raise ValueError("judge HTTP 响应必须是 JSON object")
-            response_id = data.get("id")
-            self.last_diagnostics.update({
-                "response_id": response_id if isinstance(response_id, str) and re.fullmatch(r"[\w.:-]{1,200}", response_id) else None,
-                "usage": _judge_usage_diagnostics(data.get("usage")),
-            })
-            choices = data.get("choices")
-            if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-                raise ValueError("judge HTTP 响应缺少有效 choices")
-            choice = choices[0]
-            finish_reason = choice.get("finish_reason")
-            known_reasons = {"stop", "length", "content_filter", "tool_calls", "function_call"}
-            self.last_diagnostics["finish_reason"] = (
-                finish_reason if isinstance(finish_reason, str) and finish_reason in known_reasons
-                else None if finish_reason is None else "unknown"
+            self.last_diagnostics["error_reason"] = reason
+            raise RuntimeError(f"judge HTTP {status}: {reason}")
+        if not isinstance(data, dict):
+            raise ValueError("judge HTTP 响应必须是 JSON object")
+        response_id = data.get("id")
+        self.last_diagnostics.update({
+            "response_id": response_id if isinstance(response_id, str) and re.fullmatch(r"[\w.:-]{1,200}", response_id) else None,
+            "usage": _judge_usage_diagnostics(data.get("usage")),
+        })
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            raise ValueError("judge HTTP 响应缺少有效 choices")
+        choice = choices[0]
+        finish_reason = choice.get("finish_reason")
+        known_reasons = {"stop", "length", "content_filter", "tool_calls", "function_call"}
+        self.last_diagnostics["finish_reason"] = (
+            finish_reason if isinstance(finish_reason, str) and finish_reason in known_reasons
+            else None if finish_reason is None else "unknown"
+        )
+        message = choice.get("message")
+        if not isinstance(message, dict):
+            raise ValueError("judge HTTP 响应缺少有效 message")
+        content = message.get("content")
+        reasoning = message.get("reasoning_content")
+        self.last_diagnostics["reasoning_content_length"] = len(reasoning) if isinstance(reasoning, str) else 0
+        if isinstance(content, list):
+            if any(not isinstance(part, dict) or not isinstance(part.get("text"), str) for part in content):
+                raise ValueError("judge message.content 必须是文本或文本数组")
+            content = "".join(
+                part["text"] for part in content
             )
-            message_obj = choice.get("message")
-            if not isinstance(message_obj, dict):
-                raise ValueError("judge HTTP 响应缺少有效 message")
-            content = message_obj.get("content")
-            reasoning = message_obj.get("reasoning_content")
-            self.last_diagnostics["reasoning_content_length"] = len(reasoning) if isinstance(reasoning, str) else 0
-            if isinstance(content, list):
-                if any(not isinstance(part, dict) or not isinstance(part.get("text"), str) for part in content):
-                    raise ValueError("judge message.content 必须是文本或文本数组")
-                content = "".join(part["text"] for part in content)
-            self.last_diagnostics["content_length"] = len(content) if isinstance(content, str) else 0
-            if finish_reason is not None and finish_reason != "stop":
-                raise ValueError(f"judge 未正常完成：finish_reason={self.last_diagnostics['finish_reason']}")
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError("judge message.content 为空或不是文本；reasoning_content 不能作为评分结果")
-            return content
-        assert last_error is not None
-        raise last_error
+        self.last_diagnostics["content_length"] = len(content) if isinstance(content, str) else 0
+        if finish_reason is not None and finish_reason != "stop":
+            raise ValueError(f"judge 未正常完成：finish_reason={self.last_diagnostics['finish_reason']}")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("judge message.content 为空或不是文本；reasoning_content 不能作为评分结果")
+        return content
 
     def generate_structured(
         self,
@@ -1652,7 +1644,7 @@ def _judge_one_batch(
 ) -> tuple[list[tuple[int, int]], dict[str, Any]]:
     """判一个 (golden 窗口 × predicted 窗口) 单元格，返回全局下标的匹配对。
 
-    返回全部候选边，最终统一做一对一分配。本地小上下文下输入超长时递归拆窗。
+    返回全部候选边，最终统一做一对一分配；越界响应必须使评分失败，不能伪装成正常漏抽。
     """
     info: dict[str, Any] = {
         "collection": collection_name,
@@ -1679,17 +1671,8 @@ def _judge_one_batch(
             _validate_judge_result(data, schema)
             raw_matches = data[collection_name]
             batch_pairs = sorted(set(_coerce_matches(raw_matches)))
-            in_range = [
-                (g, p)
-                for g, p in batch_pairs
-                if 0 <= g < len(golden_items) and 0 <= p < len(batch_predicted_items)
-            ]
-            rejected_oob = len(batch_pairs) - len(in_range)
-            if rejected_oob:
-                # 本地小模型偶发越界索引：丢弃非法边并记诊断，不把整窗打成失败。
-                info["rejected_oob_pairs"] = rejected_oob
-                judge_client.last_diagnostics["rejected_oob_pairs"] = rejected_oob
-            batch_pairs = in_range
+            if any(g >= len(golden_items) or p >= len(batch_predicted_items) for g, p in batch_pairs):
+                raise ValueError("judge JSON 的 pair 索引超出当前窗口范围")
             info["attempts"].append({**judge_client.last_diagnostics, "status": "succeeded"})
             info["response_mode"] = response_mode
             info["elapsed_seconds"] = elapsed_seconds(started)
@@ -1698,46 +1681,6 @@ def _judge_one_batch(
                 (golden_start + g, predicted_start + p)
                 for g, p in batch_pairs
             ], info
-        except JudgeInputTooLongError as exc:
-            error = f"{type(exc).__name__}: {judge_client._safe_error(exc)}"
-            info["errors"].append(f"{response_mode}: {error}")
-            info["attempts"].append({**judge_client.last_diagnostics, "status": "failed", "error": error})
-            if len(golden_items) <= 1 and len(batch_predicted_items) <= 1:
-                break
-            # 输入超长：优先切 golden，其次切 predicted，递归合并候选边。
-            info["split_on_input_too_long"] = True
-            pairs: list[tuple[int, int]] = []
-            child_infos: list[dict[str, Any]] = []
-            if len(golden_items) > 1:
-                mid = max(1, len(golden_items) // 2)
-                slices = [
-                    (golden_items[:mid], golden_start),
-                    (golden_items[mid:], golden_start + mid),
-                ]
-                for items, g_start in slices:
-                    child_pairs, child_info = _judge_one_batch(
-                        judge_client, collection_name, items, batch_predicted_items,
-                        predicted_start, g_start,
-                    )
-                    pairs.extend(child_pairs)
-                    child_infos.append(child_info)
-            else:
-                mid = max(1, len(batch_predicted_items) // 2)
-                for offset, items in (
-                    (0, batch_predicted_items[:mid]),
-                    (mid, batch_predicted_items[mid:]),
-                ):
-                    child_pairs, child_info = _judge_one_batch(
-                        judge_client, collection_name, golden_items, items,
-                        predicted_start + offset, golden_start,
-                    )
-                    pairs.extend(child_pairs)
-                    child_infos.append(child_info)
-            info["child_batches"] = child_infos
-            info["response_mode"] = child_infos[0].get("response_mode") if child_infos else response_mode
-            info["elapsed_seconds"] = elapsed_seconds(started)
-            info["empty_response"] = not pairs
-            return sorted(set(pairs)), info
         except Exception as exc:  # noqa: BLE001 - 只有明确的格式不支持才切换兼容格式
             error = f"{type(exc).__name__}: {judge_client._safe_error(exc)}"
             info["errors"].append(f"{response_mode}: {error}")
@@ -1834,6 +1777,51 @@ def _judge_windows(
     return all_pairs, batch_infos, coverage
 
 
+def _judge_deferred_candidates(
+    judge_client: JudgeClient,
+    collection_name: str,
+    golden_items: list[dict[str, Any]],
+    predicted_items: list[dict[str, Any]],
+    deferred_pairs: list[tuple[int, int]],
+    *,
+    golden_window: int,
+    predicted_window: int,
+    max_concurrency: int,
+) -> tuple[list[tuple[int, int]], list[dict[str, Any]], dict[str, int]]:
+    """把本地无法确认的候选对单独放进小窗口补判。
+
+    全图扫描的窗口一次要模型在数百对里找匹配，实测会整窗回空数组（HTTP 200、能过 schema
+    校验），把这些候选静默判成漏抽。这里只把相关条目组成小窗口再问一次，模型才能给出
+    有依据的答案；补判只增加候选边，最终仍由统一最大匹配决定，不会放宽判对口径。
+    """
+    coverage = {
+        "focused_windows": 0,
+        "focused_pairs_presented": 0,
+        "focused_empty_windows": 0,
+    }
+    if not deferred_pairs:
+        return [], [], coverage
+    golden_indices = sorted({golden for golden, _ in deferred_pairs})
+    predicted_indices = sorted({predicted for _, predicted in deferred_pairs})
+    pairs, batch_infos, window_coverage = _judge_windows(
+        judge_client,
+        collection_name,
+        golden_items,
+        predicted_items,
+        golden_indices,
+        predicted_indices,
+        golden_window=golden_window,
+        predicted_window=predicted_window,
+        max_concurrency=max_concurrency,
+    )
+    for info in batch_infos:
+        info["focused"] = True
+    coverage["focused_windows"] = int(window_coverage["windows"])
+    coverage["focused_pairs_presented"] = int(window_coverage["pairs_presented"])
+    coverage["focused_empty_windows"] = int(window_coverage["empty_windows"])
+    return pairs, batch_infos, coverage
+
+
 def _judge_collection(
     judge_client: JudgeClient,
     collection_name: str,
@@ -1872,6 +1860,11 @@ def _judge_collection(
         "rejected_type_pairs": [],
         "full_sweep": not saturated,
         "matched": len(auto_pairs),
+        "deferred_candidates": 0,
+        "focused_windows": 0,
+        "focused_pairs_presented": 0,
+        "focused_empty_windows": 0,
+        "focused_candidate_pairs": 0,
     }
     if saturated:
         if candidate_pairs_out is not None:
@@ -1889,6 +1882,21 @@ def _judge_collection(
         predicted_window=max(1, int(batch_size or 20)),
         max_concurrency=max(1, int(max_concurrency or 1)),
     )
+    # 全图扫描的窗口可能整窗回空数组：与数百对候选一起送审时模型会放弃作答。凡是身份
+    # 归一化一致、类型相容、只因属性/端点上下文冲突而无法本地确认的候选，单独补判一次。
+    deferred_pairs = _deferred_identity_pairs(golden_items, predicted_items, relation=relation)
+    focused_pairs, focused_infos, focused_coverage = _judge_deferred_candidates(
+        judge_client,
+        collection_name,
+        golden_items,
+        predicted_items,
+        deferred_pairs,
+        golden_window=max(1, int(golden_batch_size or 0) or max(int(batch_size or 20), JUDGE_GOLDEN_WINDOW_DEFAULT)),
+        predicted_window=max(1, int(batch_size or 20)),
+        max_concurrency=max(1, int(max_concurrency or 1)),
+    )
+    pairs = [*pairs, *focused_pairs]
+    batch_infos = [*batch_infos, *focused_infos]
     # The judge may confuse an actor with its activity. Ontology identifiers
     # are machine-checkable and must not depend on this semantic judgment.
     rejected = sorted({(g, p) for g, p in pairs
@@ -1903,6 +1911,9 @@ def _judge_collection(
         candidate_pairs_out.extend(sorted(set(confirmed)))
     matched = _maximum_matching(confirmed)
     coverage.update(window_coverage)
+    coverage.update(focused_coverage)
+    coverage["deferred_candidates"] = len(deferred_pairs)
+    coverage["focused_candidate_pairs"] = len({pair for pair in focused_pairs if pair not in rejected_set})
     coverage["llm_candidate_pairs"] = len(set(pairs))
     auto_candidate_set = set(auto_candidates)
     coverage["llm_matched"] = sum(pair not in auto_candidate_set for pair in matched)
@@ -2108,23 +2119,15 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
             "抽取评测默认走大模型匹配，不能只靠 HTTP 沉淀接口。"
         )
     timeout = float(eval_cfg.get("judge_timeout_seconds") or os.environ.get("KG_EXTRACT_LLM_TIMEOUT_SECONDS") or 300)
-    # 窗口扫图需要足够输出；勿被抽取侧超大 max_tokens 顶死本地小上下文。
-    max_tokens = int(
-        eval_cfg.get("judge_max_tokens")
-        or os.environ.get("QASYSTEM_JUDGE_MAX_TOKENS")
-        or 2048
-    )
-    disable_thinking = eval_cfg.get("judge_disable_thinking", True)
-    if isinstance(disable_thinking, str):
-        disable_thinking = disable_thinking.strip() not in {"0", "false", "False", "no"}
+    max_tokens = int(eval_cfg.get("judge_max_tokens") or os.environ.get("KG_EXTRACT_LLM_MAX_TOKENS") or 8192)
     return JudgeClient(
         base_url=base_url,
         api_key=api_key,
         model=str(model),
         timeout=max(30.0, timeout),
-        max_tokens=max(256, min(int(max_tokens), 4096)),
+        max_tokens=max(256, max_tokens),
         response_format=str(eval_cfg.get("judge_response_format") or "auto"),
-        disable_thinking=bool(disable_thinking),
+        disable_thinking=eval_cfg.get("judge_disable_thinking", True),
     )
 
 
@@ -2705,6 +2708,26 @@ def extract_version_from(envelope: dict[str, Any]) -> str | None:
     return None
 
 
+def _apply_extraction_quality(block: dict[str, Any], envelope: dict[str, Any]) -> None:
+    """Keep Backend best-effort quality visible even when its graph can be scored."""
+    for layer in _payload_layers(envelope):
+        quality = layer.get("quality")
+        if not isinstance(quality, dict) or not quality:
+            continue
+        block["quality"] = deepcopy(quality)
+        block["quality_status"] = quality.get("status")
+        verification = quality.get("verification")
+        verification = verification if isinstance(verification, dict) else {}
+        block["failed_chunks"] = deepcopy(
+            quality.get("failed_chunks", verification.get("failed_chunks", []))
+        )
+        if quality.get("status") in {"partial", "failed"}:
+            # Neither a successful HTTP response nor reuse makes incomplete
+            # inference successful. Preserve its observed graph metrics.
+            block["status"] = quality["status"]
+        return
+
+
 def _extract_items(
     base_url: str,
     ontology: str,
@@ -2741,6 +2764,7 @@ def _extract_items(
         version = extract_version_from(envelope)
         if version:
             block["extract_version"] = version
+        _apply_extraction_quality(block, envelope)
         emit_metrics(
             f"模块 extract {format_duration(extract_elapsed)} "
             f"评分 {format_duration(block['score_elapsed_seconds'])}",
@@ -2927,6 +2951,7 @@ def _extract_block_from_envelope(
     version = extract_version_from(envelope)
     if version:
         block["extract_version"] = version
+    _apply_extraction_quality(block, envelope)
     return block
 
 
@@ -3373,6 +3398,40 @@ def parse_stage_budgets(raw: str | None) -> dict[str, float]:
     return budgets
 
 
+def extraction_overrides(args: argparse.Namespace, params: dict[str, Any]) -> dict[str, Any]:
+    """CLI > YAML; absent values remain absent so Backend supplies defaults."""
+    options = deepcopy(params.get("options") or {})
+    extraction = dict(options.get("extraction") or {})
+    for key in ("version", "provider", "model", "request_timeout", "document_timeout"):
+        value = getattr(args, "extract_" + key, None)
+        if value is not None:
+            extraction[key] = value
+    for key in ("request_timeout", "document_timeout"):
+        value = extraction.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value) or value <= 0):
+            raise ValueError(f"extraction.{key} 必须是有限正数")
+    if any(extraction.get(key) is not None for key in ("version", "provider", "request_timeout", "document_timeout")):
+        if args.stage != "backend":
+            raise ValueError("抽取配置覆盖目前仅支持 --stage backend，不能静默忽略插件配置")
+    if args.reuse_extract_from and (getattr(args, "extract_model", None) is not None or any(
+        extraction.get(key) is not None for key in ("version", "provider", "request_timeout", "document_timeout")
+    )):
+        raise ValueError("覆盖抽取配置时不能复用旧预测；请仅使用 --from-run 复用切片")
+    options["extraction"] = extraction
+    chunk_overrides = {key: getattr(args, arg, None) for key, arg in (
+        ("chunk_overlap", "chunk_overlap"), ("size", "chunk_size"))}
+    if any(value is not None for value in chunk_overrides.values()):
+        if args.stage != "backend" or args.reuse_extract_from or (args.mode and "extract" in args.mode):
+            raise ValueError("切片参数覆盖需要 backend 的 chunk-extract 或 pipeline 模式，不能复用旧切片或预测")
+        chunking = dict(options.get("chunking") or {})
+        chunking.update({key: value for key, value in chunk_overrides.items() if value is not None})
+        size, overlap = chunking.get("size", 4000), chunking.get("chunk_overlap", 50)
+        if type(size) is not int or type(overlap) is not int or size <= 0 or not 0 <= overlap < size:
+            raise ValueError("切片参数必须满足 size > 0 且 0 <= chunk_overlap < size")
+        options["chunking"] = chunking
+    return options
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="知识沉淀评测：默认只测后台切片+抽取（chunk-extract）。可直接传 case/类型目录。",
@@ -3387,6 +3446,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE), help="工作区根目录，默认 test_data/eval")
     parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml")
+    parser.add_argument("--chunk-overlap", type=int, help="本次切片重叠长度，覆盖 YAML；0 关闭，默认 50")
+    parser.add_argument("--chunk-size", type=int, help="本次切片大小，覆盖 YAML；必须大于 overlap")
+    parser.add_argument("--extract-version", choices=("v2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
+    parser.add_argument("--extract-provider", help="Backend 预配置供应商名称，不接受密钥或 URL")
+    parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
+    parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")
+    parser.add_argument("--extract-document-timeout", type=float, help="文档抽取模型调用总预算（秒）")
     parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
     parser.add_argument(
@@ -3445,7 +3511,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--baseline", default=None, help="同口径基线的运行目录或 summary.json")
     parser.add_argument("--max-f1-drop", type=float, default=0.02, help="相对基线允许的 F1 绝对下降，默认 0.02")
-    parser.add_argument("--max-latency-increase", type=float, default=0.2, help="相对基线允许的 API 耗时增幅，默认 0.2（20%）")
+    parser.add_argument("--max-latency-increase", type=float, default=0.2, help="相对基线允许的 API 耗时增幅，默认 0.2（20%%）")
     parser.add_argument(
         "--fail-on-empty",
         action=argparse.BooleanOptionalAction,
@@ -3725,7 +3791,12 @@ def main() -> int:
         or params.get("mcp_url")
         or urljoin(base_url + "/", "mcp")
     )
-    options = params.get("options") or {}
+    try:
+        options = extraction_overrides(args, params)
+    except ValueError as exc:
+        log(str(exc))
+        return 1
+    params["options"] = options
     group_cfg = params.get("groups") or {}
     eval_cfg = params.get("eval") or {}
     match_mode = str(args.match_mode or eval_cfg.get("match_mode") or "llm").strip().lower()
@@ -3835,16 +3906,8 @@ def main() -> int:
 
     started = datetime.now()
     run_started = time.perf_counter()
-    run_id = started.strftime("%Y%m%d-%H%M%S")
-    run_dir = RUNS_DIR / run_id
-    if run_dir.resolve() in {path.resolve() for path in protected_dirs}:
-        log("新批次与复用来源目录重合，请下一秒重试以保留来源只读")
-        return 1
-    try:
-        run_dir.mkdir(parents=True, exist_ok=False)
-    except FileExistsError:
-        log(f"运行目录已存在，请下一秒重试以避免混用历史产物: {run_dir}")
-        return 1
+    run_dir = create_run_directory(RUNS_DIR, started, protected_dirs)
+    run_id = run_dir.name
     write_json(run_dir / "manifest.json", manifest)
     snapshot = dict(params)
     snapshot["backend_url"] = base_url

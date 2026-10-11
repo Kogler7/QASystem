@@ -126,9 +126,9 @@ def test_system_prompt_does_not_inline_skill_bodies() -> None:
     loader = SkillLoader()
     refs = loader.discover_skills()
     text = build_domain_knowledge(loader, refs)
-    assert "problem-solve" in text
+    assert "graph-qa" in text
     assert "Skill bodies are not inlined" in text
-    assert "证据门是最后一道闸" not in text
+    assert "第 4 步 C 分支：图外工具的通用判断标准" not in text
 
 
 def _valid_answer(**overrides) -> dict:

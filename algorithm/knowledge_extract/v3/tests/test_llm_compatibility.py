@@ -119,5 +119,55 @@ class LLMCompatibilityTests(unittest.TestCase):
         self.assertNotIn("extra_body", completions.calls[1])
 
 
+    def test_organization_prefixed_v4_flash_uses_chat(self):
+        """带组织前缀的 V4-Flash（如硅基流动）也必须走 chat.completions。
+
+        兼容服务没有 /v1/responses，整串前缀匹配会让请求打到那里拿 404。
+        """
+        client = _Client()
+        llm = self._llm(client, base_url="https://api.siliconflow.cn/v1",
+                        model="deepseek-ai/DeepSeek-V4-Flash")
+        schema = {
+            "type": "object",
+            "properties": {"items": {"type": "array", "items": {"type": "string"}}},
+            "required": ["items"],
+            "additionalProperties": False,
+        }
+
+        result = llm.generate_structured(schema, [{"role": "user", "content": "Return JSON."}],
+                                         {"schema_name": "extraction"})
+
+        self.assertEqual(result.api, "chat.completions")
+        self.assertEqual(len(client.chat.completions.calls), 1)
+        self.assertEqual(len(client.responses.calls), 0)
+
+    def test_v4_flash_matching_ignores_organization_prefix(self):
+        from algorithm.knowledge_extract.v3.llm_client import _is_deepseek_v4_flash
+
+        for model in ("deepseek-v4-flash", "deepseek-v4-flash-0731",
+                      "DeepSeek-V4-Flash", "deepseek-ai/DeepSeek-V4-Flash",
+                      "Pro/deepseek-ai/DeepSeek-V4-Flash"):
+            with self.subTest(model=model):
+                self.assertTrue(_is_deepseek_v4_flash(model))
+        for model in ("deepseek-flash", "deepseek-v4-pro", "deepseek-ai/DeepSeek-V4-Pro",
+                      "deepseek-v3.2", "Qwen/Qwen3-8B", ""):
+            with self.subTest(model=model):
+                self.assertFalse(_is_deepseek_v4_flash(model))
+
+    def test_official_endpoint_still_prefers_responses(self):
+        """官方端点不受前缀修复影响：仍走 Responses。"""
+        client = _Client()
+        llm = self._llm(client, base_url="https://api.deepseek.com/v1",
+                        model="deepseek-ai/DeepSeek-V4-Flash")
+
+        llm.generate_structured(
+            {"type": "object", "properties": {"ok": {"type": "boolean"}},
+             "required": ["ok"], "additionalProperties": False},
+            [{"role": "user", "content": "Return JSON."}],
+        )
+
+        self.assertEqual(len(client.responses.calls), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

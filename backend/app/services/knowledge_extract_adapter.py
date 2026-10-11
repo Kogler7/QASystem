@@ -10,15 +10,17 @@ This module bridges the two without touching the versioned packages.  The
 environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 ``algorithm.knowledge_extract.version``) selects the concrete algorithm:
 
-* ``latest`` (default): resolves to the newest version and runs it through the
+* ``latest`` (default): runs the independent ``latest`` package through the
   same per-chunk projection.
-* ``v2``: run ``v2.extract_aggregate`` once, then project the document-level
-  result back onto the individual chunks using each entity's evidence anchor,
-  so the caller keeps seeing one item per chunk and ``deduplicate_chunk_graphs``
-  can still rebuild the merged graph (and its ``chunk_indices``) exactly as before.
+* ``v2`` / ``v3.1``: build V2 ``ExtractionChunk`` objects, run the selected package's
+  ``extract_aggregate`` once, then project the document-level result back onto the
+  individual chunks using each entity's evidence anchor, so the caller keeps seeing
+  one item per chunk and ``deduplicate_chunk_graphs`` can still rebuild the merged
+  graph (and its ``chunk_indices``) exactly as before.
 * ``v3``: run ``v3.extract_aggregate`` with the V2-configured LLM client; it
   reshapes the flat ``entities``/``relations`` result into the V2 aggregate
-  contract, then shares the same projection.
+  contract, then shares the same projection. ``latest`` also accepts chunk field
+  dictionaries.
 * ``jev``: run the ``jev_extract`` copy. This label is opt-in and is not the
   default. The package is imported only when the label is selected.
 
@@ -41,7 +43,7 @@ import re
 from copy import deepcopy
 from typing import Any, Callable, Iterable, Sequence
 
-from algorithm.knowledge_extract import latest, v2, v3, version as ke_version
+from algorithm.knowledge_extract import latest, v2, v3, v3_1, version as ke_version
 
 from backend.app import observability
 
@@ -119,6 +121,8 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
     # 评测侧需要知道本次结果出自哪版算法；由 run_aggregate 盖戳。
     if result.get("extract_version"):
         summary["extract_version"] = result["extract_version"]
+    if result.get("effective_config"):
+        summary["effective_config"] = deepcopy(result["effective_config"])
     return summary
 
 
@@ -248,9 +252,14 @@ def _chunk_payloads(
                 "chunk_id": _chunk_id(position),
                 "text": text or "",
                 "document_id": str(document_id) if document_id else None,
-                "section_title": str(chunk_metadata.get("sheet_name")) if chunk_metadata.get("sheet_name") else None,
-                "start_offset": span[0] if span else None,
-                "end_offset": span[1] if span else None,
+                "section_id": chunk_metadata.get("section_id"),
+                "section_title": chunk_metadata.get("section_title") or chunk_metadata.get("sheet_name"),
+                "clause_number": chunk_metadata.get("clause_number"),
+                "page_no": chunk_metadata.get("page_no"),
+                # Explicit TextChunk ranges are authoritative; metadata offsets
+                # retain provenance when an upstream caller has no ranges field.
+                "start_offset": span[0] if span is not None else chunk_metadata.get("start_offset"),
+                "end_offset": span[1] if span is not None else chunk_metadata.get("end_offset"),
                 "metadata": chunk_metadata,
             }
         )
@@ -284,10 +293,11 @@ def run_aggregate(
     ranges: Sequence[Sequence[int] | None] | None = None,
     metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
+    extraction_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run the configured extraction version once over every chunk and return its raw result."""
-    label = ke_version.get_extract_version_label()
-    concrete_version = ke_version.get_extract_version()
+    label = extraction_config["version"] if extraction_config else ke_version.get_extract_version_label()
+    concrete_version = label
     if runner is None:
         if label == ke_version.JEV:
             from algorithm.knowledge_extract import jev_extract
@@ -297,16 +307,27 @@ def run_aggregate(
             runner = {
                 ke_version.V2: v2.extract_aggregate,
                 ke_version.V3: v3.extract_aggregate,
+                ke_version.V31: v3_1.extract_aggregate,
                 ke_version.LATEST: latest.extract_aggregate,
             }[label]
-    # v2 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
+    # v2 / v3.1 入口要求 v2 的 ExtractionChunk 实例；v3/latest 的入口只认各自包内的
     # ExtractionChunk 或字段 dict，这里给它们字段 dict，由版本包自行 from_dict。
     # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
     chunks = (
         build_chunks(texts, ranges, metadata)
-        if label in {ke_version.V2, ke_version.JEV}
+        if label in {ke_version.V2, ke_version.V31, ke_version.JEV}
         else _chunk_payloads(texts, ranges, metadata)
     )
+    configured: dict[str, Any] = {}
+    if extraction_config and label != ke_version.JEV:
+        from algorithm.knowledge_extract.request_runtime import create_request_llm
+
+        configured = {"llm": create_request_llm(extraction_config), "use_scheduler": False}
+        model = extraction_config["model"]
+        max_workers = extraction_config["max_concurrency"]
+        if label == ke_version.V31:
+            configured.update(request_timeout=extraction_config["request_timeout"],
+                              document_timeout=extraction_config["document_timeout"])
     result = runner(
         ontology=ontology,
         chunks=chunks,
@@ -317,9 +338,14 @@ def run_aggregate(
         base_url=base_url,
         api_key=api_key,
         max_workers=max_workers,
+        **configured,
     )
     # 盖戳供 _quality_summary 透传，评测侧据此区分结果出自哪版算法。
     result["extract_version"] = concrete_version
+    if extraction_config:
+        from backend.app.services.extraction_config import public_config
+
+        result["effective_config"] = public_config(extraction_config)
     return result
 
 
@@ -610,6 +636,7 @@ def extract_chunks(
     ranges: Sequence[Sequence[int] | None] | None = None,
     metadata: Sequence[dict[str, Any] | None] | None = None,
     runner: Callable[..., dict[str, Any]] | None = None,
+    extraction_config: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Version-switched replacement for V1's ``extract_chunks``.
 
@@ -619,7 +646,7 @@ def extract_chunks(
     """
     if not chunks:
         return []
-    version = ke_version.get_extract_version()
+    version = extraction_config["version"] if extraction_config else ke_version.get_extract_version()
     try:
         result = run_aggregate(
             ontology,
@@ -632,6 +659,7 @@ def extract_chunks(
             ranges=ranges,
             metadata=metadata,
             runner=runner,
+            extraction_config=extraction_config,
         )
     except Exception as exc:  # noqa: BLE001 - mirror V1's per-call error containment
         logger.warning(

@@ -1,11 +1,9 @@
-"""进程内可观测性支撑：request/job 上下文、告警 webhook 与阶段耗时指标。
+"""进程内可观测性支撑：request/job 上下文、本地告警日志 与阶段耗时指标。
 
 - request/job 上下文用 contextvars 承载：HTTP 入口为无执行上下文的同步调用
   生成 request_id；执行层提交/运行时可改绑 job_id。日志通过
   ``context_prefix(request_id=get_request_id())`` 在记录时附带，未绑定时不输出。
-- 告警走 ``QASYSTEM_ALERT_WEBHOOK``（钉钉/企业微信 text 格式）。未配置则静默
-  跳过（DEBUG 日志）；同 event+request_id 1 分钟内去重；发送失败只记 ERROR
-  日志，绝不影响主流程。
+- 告警只写本地 WARNING 日志，不发起网络请求；同 event+request_id 1 分钟内去重。
 - 阶段耗时保存在进程内环形缓冲（每阶段最近 512 次），供指标端点输出分位数；
   超过环境变量预算时发送 slow_stage 告警（只告警，不中断任务）。
 """
@@ -78,7 +76,7 @@ def context_prefix(**fields: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 告警 webhook
+# 本地告警日志
 # ---------------------------------------------------------------------------
 
 #: 同 event+request_id 的告警去重窗口（秒）。
@@ -101,27 +99,8 @@ def _format_alert_content(event: str, request_id: str, payload: dict[str, Any]) 
     return "\n".join(lines)
 
 
-def _post_webhook(webhook_url: str, content: str) -> None:
-    """POST 钉钉/企业微信兼容的 text 消息；5 秒超时。失败由调用方捕获记录。"""
-    import urllib.request
-
-    body = json.dumps({"msgtype": "text", "text": {"content": content}}, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(
-        webhook_url,
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=5):
-        pass
-
-
 def send_alert(event: str, payload: dict[str, Any] | None = None) -> bool:
-    """发送告警；同 event+request_id 在 60 秒内去重。返回是否真正发送。
-
-    未配置 ``QASYSTEM_ALERT_WEBHOOK`` 时静默跳过（DEBUG 日志记录 skipped）；
-    发送失败只记 ERROR 日志后返回 False，绝不影响主流程。
-    """
+    """记录本地 WARNING 告警；同 event+request_id 60 秒内去重，不访问网络。"""
     fields = dict(payload or {})
     request_id = str(fields.get("request_id") or get_request_id() or "")
     key = (event, request_id)
@@ -132,21 +111,7 @@ def send_alert(event: str, payload: dict[str, Any] | None = None) -> bool:
             logger.debug("告警去重跳过: event=%s request_id=%s", event, request_id)
             return False
         _alert_last_sent[key] = now
-    webhook = os.environ.get("QASYSTEM_ALERT_WEBHOOK", "").strip()
-    if not webhook:
-        logger.debug(
-            "告警 skipped（未配置 QASYSTEM_ALERT_WEBHOOK）: event=%s request_id=%s",
-            event,
-            request_id,
-        )
-        return False
-    content = _format_alert_content(event, request_id, fields)
-    try:
-        _post_webhook(webhook, content)
-    except Exception as exc:  # noqa: BLE001 - 告警失败绝不影响主流程
-        logger.error("告警发送失败: event=%s request_id=%s error=%s", event, request_id, exc)
-        return False
-    logger.info("告警已发送: event=%s request_id=%s", event, request_id)
+    logger.warning("%s", _format_alert_content(event, request_id, fields))
     return True
 
 

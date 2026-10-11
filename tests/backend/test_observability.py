@@ -344,82 +344,50 @@ def test_stage_recorder_still_writes_error_log_on_failure(protocol_module, monke
 
 
 # ---------------------------------------------------------------------------
-# 告警 webhook
+# 本地告警日志
 # ---------------------------------------------------------------------------
 
 
-def test_send_alert_skipped_without_webhook(monkeypatch, clean_observability_state):
-    monkeypatch.delenv("QASYSTEM_ALERT_WEBHOOK", raising=False)
-    posted = []
-    monkeypatch.setattr(observability, "_post_webhook", lambda url, content: posted.append((url, content)))
-    assert observability.send_alert("empty_extraction", {"request_id": "r1"}) is False
-    assert posted == []
+def test_alert_logs_without_network_even_with_legacy_env(monkeypatch, caplog, clean_observability_state):
+    import urllib.request
+    monkeypatch.setenv("QASYSTEM_ALERT_WEBHOOK", "https://unused.invalid/retired")
+    def forbidden(*args, **kwargs):
+        raise AssertionError("告警禁止访问外网")
+    monkeypatch.setattr(urllib.request, "urlopen", forbidden)
+    with caplog.at_level("WARNING"):
+        assert observability.send_alert("empty_extraction", {"request_id": "r1", "node_count": 0}) is True
+    assert "empty_extraction" in caplog.text
+    assert "request_id: r1" in caplog.text
+    assert "node_count: 0" in caplog.text
+    assert "unused.invalid" not in caplog.text
 
 
-def test_send_alert_posts_multiline_text_and_dedupes(monkeypatch, clean_observability_state):
-    monkeypatch.setenv("QASYSTEM_ALERT_WEBHOOK", "https://oapi.dingtalk.com/robot/send?access_token=x")
-    posted = []
-    monkeypatch.setattr(observability, "_post_webhook", lambda url, content: posted.append((url, content)))
-
-    payload = {
-        "request_id": "rid-1",
-        "document": "a.md#c0ffee12",
-        "stage": "extract",
-        "duration_seconds": 12.5,
-        "node_count": 0,
-        "relationship_count": 0,
-    }
-    assert observability.send_alert("empty_extraction", payload) is True
-    assert observability.send_alert("empty_extraction", payload) is False  # 60s 内去重
-    assert len(posted) == 1
-
-    url, content = posted[0]
-    assert url.startswith("https://oapi.dingtalk.com/")
-    lines = content.splitlines()
-    assert lines[0] == "【QASystem】empty_extraction"
-    assert "request_id: rid-1" in lines
-    assert "document: a.md#c0ffee12" in lines
-    assert "stage: extract" in lines
-    assert "duration_seconds: 12.5" in lines
-    assert "node_count: 0" in lines
-
-    # 不同 request_id 不去重
-    assert observability.send_alert("empty_extraction", {**payload, "request_id": "rid-2"}) is True
-    assert len(posted) == 2
+def test_alert_log_dedup_and_context(monkeypatch, caplog, clean_observability_state):
+    now = [100.0]
+    monkeypatch.setattr(observability.time, "monotonic", lambda: now[0])
+    with caplog.at_level("WARNING"), observability.request_id_scope("rid-1"):
+        assert observability.send_alert("empty_extraction", {"stage": "extract"}) is True
+        assert observability.send_alert("empty_extraction") is False
+        assert observability.send_alert("empty_extraction", {"request_id": "rid-2"}) is True
+        now[0] += 61
+        assert observability.send_alert("empty_extraction") is True
+    assert len(caplog.records) == 3
+    assert "request_id: rid-1" in caplog.text
+    assert "stage: extract" in caplog.text
 
 
-def test_send_alert_failure_only_logs(monkeypatch, clean_observability_state):
-    monkeypatch.setenv("QASYSTEM_ALERT_WEBHOOK", "https://webhook.example/send")
-
-    def boom(_url, _content):
-        raise OSError("connection refused")
-
-    monkeypatch.setattr(observability, "_post_webhook", boom)
-    # 发送失败返回 False 且不抛异常，主流程不受影响
-    assert observability.send_alert("slow_stage", {"request_id": "r9"}) is False
-
-
-def test_slow_stage_alert_only_fires_over_budget(monkeypatch, clean_observability_state):
+def test_slow_stage_alert_only_fires_over_budget(monkeypatch, caplog, clean_observability_state):
     monkeypatch.delenv("QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS", raising=False)
-    posted = []
-    monkeypatch.setattr(observability, "_post_webhook", lambda url, content: posted.append(content))
-    monkeypatch.setenv("QASYSTEM_ALERT_WEBHOOK", "https://webhook.example/send")
-
-    # 未配置预算：只记录样本，不告警
-    observability.record_stage_duration("parse", 999.0, document="a.md#abc")
-    assert posted == []
-    assert observability.stage_duration_summary()["parse"]["count"] == 1
-
-    # 配置预算后：超预算告警并计数，任务本身不受影响（无异常）
-    monkeypatch.setenv("QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS", "0.001")
-    observability.record_stage_duration("parse", 1.0, document="a.md#abc", extra={"chunk_count": 4})
-    assert len(posted) == 1
-    assert "【QASystem】slow_stage" in posted[0]
-    assert "stage: parse" in posted[0]
-    assert "duration_seconds: 1.0" in posted[0]
-    assert "budget_seconds: 0.001" in posted[0]
-    counters = dict(observability._counters)
-    assert counters["slow_stage_total"] == 1
+    with caplog.at_level("WARNING"):
+        observability.record_stage_duration("parse", 999.0, document="a.md#abc")
+        assert not caplog.records
+        assert observability.stage_duration_summary()["parse"]["count"] == 1
+        monkeypatch.setenv("QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS", "0.001")
+        observability.record_stage_duration("parse", 1.0, document="a.md#abc", extra={"chunk_count": 4})
+    assert len(caplog.records) == 1
+    assert "slow_stage" in caplog.text
+    assert "budget_seconds: 0.001" in caplog.text
+    assert dict(observability._counters)["slow_stage_total"] == 1
 
 
 # ---------------------------------------------------------------------------

@@ -325,6 +325,14 @@ class OntologySchema:
             relation_name = _clean_relation_identifier(relation_match.group("label").split("//", 1)[0].strip().strip('"'))
             if not relation_name:
                 continue
+            # `A rdfs:subClassOf B` 是继承而不是普通关系：不归一化会让继承链整条
+            # 丢失（include_subclasses 退化为空操作、is_assignable 退化为类型全等、
+            # 子类拿不到父类属性），且完全静默。写法变体（下划线/冒号/大小写）都要认。
+            if relation_name.casefold().replace("_", "").replace(":", "") == "rdfssubclassof":
+                parent_ids = parents.setdefault(source_class.identifier, [])
+                if target_class.identifier not in parent_ids:
+                    parent_ids.append(target_class.identifier)
+                continue
             reverse = relation_match.group("arrow").startswith("<")
             if reverse:
                 source_class, target_class = target_class, source_class

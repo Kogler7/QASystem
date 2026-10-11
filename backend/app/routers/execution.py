@@ -1,4 +1,5 @@
 from __future__ import annotations
+from backend.app.services.extraction_config import ExtractionConfigurationError
 
 import json
 from collections.abc import AsyncIterator
@@ -7,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from backend.app.responses import payload
+from backend.app.responses import ErrorCode, error_response, payload
 from backend.app.execution.hub import get_event_hub
 from backend.app.execution.manager import ExecutionNotFound, get_execution_manager
 from backend.app.execution.models import LEVEL_ORDER
@@ -45,6 +46,8 @@ async def submit_job(request: Request, body: dict[str, Any]):
             total_units=max(int(body.get("total_units", 1)), 1),
             wait_seconds=0.0 if requested_wait is None else requested_wait,
         )
+    except ExtractionConfigurationError as exc:
+        return error_response(ErrorCode.INVALID_REQUEST, str(exc), stage="configuration", status_code=422)
     except ExecutionUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return JSONResponse(

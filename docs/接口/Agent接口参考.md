@@ -28,9 +28,27 @@ HTTP 问答终稿固定为 `answer-v1` JSON，见[响应格式](#4-响应格式)
 
 CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](../Agent/部署运维指南.md)为准。MCP 连接池在进程启动时建立，不支持按请求切换 `mcp_config_path`。
 
+### MCP 连接配置
+
+默认路径为 `agent/agentcode/tools/mcp_tools/mcp_config.json`，可通过 `AGENT_MCP_CONFIG` 在服务启动时覆盖。配置文件格式：
+
+```json
+{
+  "mcpServers": {
+    "agent-tools": {
+      "transport": "streamable_http",
+      "url": "http://agent-mcp:9181/mcp"
+    }
+  }
+}
+```
+
+配置了单个 MCP 服务器时，环境变量 `AGENT_MCP_URL` 会覆盖其 URL（容器内默认 `http://agent-mcp:9181/mcp`；本地开发时用 `AGENT_MCP_URL=http://127.0.0.1:9181/mcp` 指向本地 agent-mcp）。
+
 ---
 
 ## 2. API 端点一览
+
 
 | 方法 | 路径 | Content-Type | 说明 |
 |------|------|-------------|------|
@@ -61,7 +79,7 @@ CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](../Agen
   "max_turns": "int (可选，默认 50)",
   "max_tool_calls": "int (可选，默认 70)",
   "max_time_s": "int (可选，默认 1200)",
-  "history": [{"role": "user", "content": "上一轮问题"}]
+  "history": [{"role": "user|assistant", "content": "string (可选)"}]
 }
 ```
 
@@ -77,12 +95,26 @@ CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](../Agen
 | `max_turns` | `int` | 否 | `50` | 最大 LLM 对话轮数 |
 | `max_tool_calls` | `int` | 否 | `70` | 最大工具调用次数 |
 | `max_time_s` | `int` | 否 | `1200` | 最大墙钟时间（秒） |
+| `history` | `list[{role, content}]` | 否 | `[]` | 前置对话上下文（最多 40 条）；`role` 只接受 `user`/`assistant`，`content` 为非空字符串，作为本轮提问之前的消息注入 |
+
+### 鉴权与用户上下文头
+
+提交任务时可携带以下请求头，Agent 会把它们沿任务链路透传到工具服务，图谱查询按该身份做权限过滤：
+
+| 请求头 | 说明 |
+|--------|------|
+| `Authorization: Bearer <token>` | 应用方 token，最低限度带它即可通过下游网关鉴权 |
+| `X-User-Id` / `X-User-Name` / `X-Tenant-Id` / `X-User-Roles` | 用户上下文（可选） |
+
+- 白名单之外的请求头不会被透传；
+- 入队时带了鉴权头的任务归属该身份：之后 `GET /v1/task/{id}`、`/stream`、`/cancel` 需带同样的头，否则返回 404；
+- token 只在框架层流转，不进入 LLM 上下文、日志、SSE 事件和结果 payload。
 
 ### tool_allowlist 示例
 
 ```json
-// 只允许统一 MCP 中的图谱检索工具
-{"tool_allowlist": ["qasystem-tools__locate_knowledge_space", "qasystem-tools__search_graph"]}
+// 只允许 agent-tools 中的图谱检索工具
+{"tool_allowlist": ["agent-tools__locate_knowledge_space", "agent-tools__search_graph"]}
 
 // 全部允许（默认）
 {"tool_allowlist": ["*"]}
@@ -205,18 +237,7 @@ curl -N -X POST 'http://127.0.0.1:8006/agent/v1/query/wait?stream=true' \
   "created_at": "2026-05-23T10:00:00",
   "updated_at": "2026-05-23T10:00:45",
   "result": {
-    "payload": {
-      "conclusion": "根据查询结果，最近一周故障率为 2.3%。",
-      "evidence": [
-        {"name": "故障率", "id": "ku-fault-rate", "detail": "近 7 日均值为 2.3%"}
-      ],
-      "assumptions": [],
-      "gaps": [],
-      "confidence": "high",
-      "confidence_reason": "知识空间✓ 实体✓ 方案类✓ 工具✓",
-      "charts": [],
-      "solution_path": ["步骤1 查询近一周故障记录"]
-    },
+    "payload": { /* answer-v1 结构，见下 */ },
     "spent": {"turns": 5, "tool_calls": 8}
   },
   "error": null,
@@ -224,18 +245,31 @@ curl -N -X POST 'http://127.0.0.1:8006/agent/v1/query/wait?stream=true' \
 }
 ```
 
-HTTP 问答的 `result.payload` 固定为 `answer-v1`（Worker 写入 `DeliveryConfig`，不合格则重试，预算内仍失败返回 `DELIVERY_NOT_SATISFIED`）。请求体不能改 schema。
+**`result.payload` — answer-v1 终稿结构**（HTTP 任务固定按此 JSON Schema 校验，8 个键必须齐全）：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `conclusion` | string | 对用户问题的直接回答 |
-| `evidence` | object[] | 图谱/数据依据，项含 `name`、`detail`，可选 `id` |
-| `assumptions` | string[] | 实际使用的假设，没有则为 `[]` |
-| `gaps` | string[] | 知识缺口或工具失败 |
-| `confidence` | `high` \| `medium` \| `low` | 证据门结论 |
-| `confidence_reason` | string | 判定理由 |
-| `charts` | object[] | `draw_*` 产物，项含 `path`，可选 `title` |
-| `solution_path` | string[] | 方案类模板步骤；未展示路径则为 `[]` |
+```json
+{
+  "conclusion": "直接回答用户问题的结论",
+  "evidence": [
+    {"name": "实体或指标名称", "id": "图谱节点ID，没有则空字符串", "detail": "数据结果或关系说明"}
+  ],
+  "assumptions": ["仅列出确实使用的假设"],
+  "gaps": ["图谱缺失、工具失败或证据不足之处"],
+  "confidence": "high",
+  "confidence_reason": "选择该置信度的理由",
+  "charts": [{"title": "可选标题", "path": "draw_* 工具返回的路径"}],
+  "solution_path": []
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `conclusion` | 非空字符串，直接回答用户问题 |
+| `evidence` | 证据列表；每条含 `name`、`detail`，`id` 可省略 |
+| `assumptions` / `gaps` | 没有则为空数组 `[]` |
+| `confidence` | 只能是 `high` / `medium` / `low`（中文"高/中/低"会被归一化为对应英文） |
+| `charts` | `draw_*` 工具返回的图片路径；没出图为 `[]` |
+| `solution_path` | 前端契约预留字段，Agent 侧固定输出 `[]` |
 
 **响应 200 — 执行失败：**
 

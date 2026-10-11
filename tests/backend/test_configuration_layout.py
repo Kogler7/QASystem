@@ -50,7 +50,10 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "INTENT_LLM_" not in compose
     assert "QA_LLM_" not in compose
     assert "AGENT_LLM_" not in compose
-    assert "CUDA_VISIBLE_DEVICES" not in template
+    env_keys = {line.split("=", 1)[0].strip() for line in template.splitlines()
+                if "=" in line and not line.lstrip().startswith("#")}
+    assert "CUDA_VISIBLE_DEVICES" not in env_keys
+    assert "CLEF_CUDA_VISIBLE_DEVICES" in env_keys
     assert "GPU_DEVICE_IDS=4,5,6,7" in template
     assert "QASYSTEM_ENV_IMAGE=qasystem-env-v1" in template
     assert "QASYSTEM_SOURCE_DIR=." in template
@@ -62,11 +65,12 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "execution-gpu-worker" not in compose
     assert "execution-vlm-worker" not in compose
     assert "vllm-0:" not in compose
-    assert "AGENT_MCP_URL=http://backend:8000/mcp" in template
+    assert "AGENT_MCP_URL=http://agent-mcp:9181/mcp" in template
     assert "environment:" not in compose
     assert "${QASYSTEM_SOURCE_DIR:-.}:/app:ro" in compose
     assert "${AGENT_HOST_PORT:-9180}:9180" in compose
-    assert "MCP_PORT" not in template
+    assert "MCP_PORT" not in env_keys
+    assert "AGENT_MCP_PORT" in env_keys
 
 
 def test_backend_proxies_agent_under_its_public_route():

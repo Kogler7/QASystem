@@ -5,12 +5,6 @@ class "规则" <<RuleType>> {
   - RuleName (RuleName) //对规则语义的简要描述
   - RuleTypeBody (RuleTypeBody) //指定规则所属类型，如ConstraintRuleType | ImplicationRuleType | CompositeRuleType
   - RuleTemplate (RuleTemplate) //规则表达模板说明，规则模版如下：
-
-
-
-
-
-
   - antecedent (antecedent) //规则成立所依赖的前提条件
   - connectionSymbol(connectionSymbol) //描述前件与后件之间的语义关系
   - consequent (consequent) //当前件成立时得到的结果或结论
@@ -18,7 +12,7 @@ class "规则" <<RuleType>> {
 ' @identity RuleType: RuleID
 
 note right of 规则
-  类定义：描述当某一故障状态、运行条件、参数异常或事件成立时，将引起另一故障现象、状态变化或结果的条件性知识规则。其基本语义形式为： IF Antecedent THEN Consequent 其中可进一步通过 ConnectionSymbol 表达前件与后件之间的语义关系，例如“导致”“引起”“造成”“触发”等。
+  类定义：描述当某一故障状态、运行条件、参数异常或事件成立时，将引起另一故障现象、状态变化或结果的条件性知识规则。其基本语义形式为： IF Antecedent THEN Consequent 其中可进一步通过 ConnectionSymbol 表达前件与后件之间的语义关系，例如“导致”“引起”“造成”“触发”“恢复”“指示”等。
   规则模板示例：
   - ConstraintRuleType： [对象] 必须或应当 满足 [约束条件]
   - ConstraintRuleType： [对象] 的 [属性] 应当或必须 为 [允许取值或范围]

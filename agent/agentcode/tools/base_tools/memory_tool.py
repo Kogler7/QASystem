@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -12,8 +13,12 @@ from openai import OpenAI
 SYNTHETIC_PREFIXES = ("<background-results>", "<inbox>", "<agent-injected>")
 
 DEFAULT_THRESHOLD = 8000
+# 兜底模型名；实际优先取 AGENT_LLM_MODEL（摘要走与主模型同一网关，避免网关里
+# 没有该模型名时压缩静默失败、上下文被清空）。
 DEFAULT_MODEL = "deepseek-chat"
 DEFAULT_TRANSCRIPT_DIR = ""
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryCompactor:
@@ -58,7 +63,7 @@ class MemoryCompactor:
         self._client: OpenAI | None = None
         if api_key:
             self._client = OpenAI(base_url=base_url, api_key=api_key)
-        self._model = model
+        self._model = model or os.environ.get("AGENT_LLM_MODEL", "") or DEFAULT_MODEL
 
         self._transcript_dir = Path(transcript_dir) if transcript_dir else None
 
@@ -213,6 +218,13 @@ class MemoryCompactor:
         conversation_text = json.dumps(trimmed, ensure_ascii=False)
 
         summary = self._generate_summary(conversation_text)
+        if summary is None:
+            # 摘要失败（模型不可用/网关报错）时保留裁剪后的原文，宁长勿失：
+            # 丢掉上下文会让任务在半途失去全部记忆，比多占 token 严重得多。
+            summary = (
+                "Summary unavailable. Preserved trimmed transcript below.\n\n"
+                + conversation_text
+            )
 
         compressed_msgs: list[dict[str, Any]] = [
             {
@@ -222,17 +234,17 @@ class MemoryCompactor:
         ]
         return system_msgs + compressed_msgs + recent_msgs
 
-    def _generate_summary(self, conversation_text: str) -> str:
+    def _generate_summary(self, conversation_text: str) -> str | None:
         """调用 LLM 将对话历史压缩为摘要。
 
         Args:
             conversation_text: 待压缩的对话 JSON 字符串。
 
         Returns:
-            生成的摘要字符串。
+            生成的摘要字符串；失败时返回 ``None``（由调用方保留原文兜底）。
         """
         if self._client is None:
-            return "Summary unavailable (no API client configured)"
+            return None
 
         prompt = (
             "Summarize this conversation for continuity. Include: "
@@ -246,5 +258,8 @@ class MemoryCompactor:
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.choices[0].message.content or "No summary generated."
-        except Exception:
-            return "Summary unavailable (API error)"
+        except Exception as exc:
+            logger.warning(
+                "上下文压缩摘要失败（model=%s），保留裁剪原文兜底: %s", self._model, exc
+            )
+            return None

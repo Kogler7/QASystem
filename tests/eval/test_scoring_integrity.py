@@ -62,77 +62,23 @@ def test_all_candidate_edges_survive_until_global_assignment(monkeypatch):
     ]
 
 
-def test_input_too_long_splits_window_and_merges_pairs(monkeypatch):
-    def request(_url, **kwargs):
-        payload = json.loads(kwargs["data"])
-        prompt = payload["messages"][1]["content"]
-        golden = json.loads(prompt.split("## golden items\n", 1)[1].split("\n\n## predicted items", 1)[0])
-        if len(golden) > 1:
-            body = {
-                "error": {
-                    "message": (
-                        "This model's maximum context length is 8192 tokens. "
-                        "However, your request has 9000 input tokens. "
-                        "Please reduce the length of the input messages."
-                    )
-                }
-            }
-            return 400, {}, json.dumps(body).encode()
-        content = json.dumps({"entity_matches": [{"golden_index": 0, "predicted_index": 0}]})
-        return 200, {}, json.dumps({
-            "choices": [{"finish_reason": "stop", "message": {"content": content}}],
-        }).encode()
-
-    monkeypatch.setattr(run, "http_request", request)
-    client = run.JudgeClient(
-        base_url="https://example.test/v1", api_key="k", model="m",
-        timeout=30, max_tokens=256, response_format="json_object", disable_thinking=False,
-    )
-    pairs, info = run._judge_one_batch(
-        client, "entity_matches", [_entity("a"), _entity("b")], [_entity("p")], 0, 0,
-    )
-    assert pairs == [(0, 0), (1, 0)]
-    assert info.get("split_on_input_too_long") is True
-
-
 @pytest.mark.parametrize("pair", [(1, 0), (0, 1), (4, 8)])
-def test_out_of_bounds_judge_reply_drops_illegal_edges(monkeypatch, pair):
-    client = _client(monkeypatch, lambda _g, _p: [pair, (0, 0)])
-    pairs, info = run._judge_one_batch(
-        client, "entity_matches", [_entity("g")], [_entity("p")], 7, 3,
-    )
-    assert pairs == [(3, 7)]
-    assert info["rejected_oob_pairs"] == 1
-    assert info["attempts"][0]["status"] == "succeeded"
+def test_out_of_bounds_judge_reply_is_a_protocol_failure(monkeypatch, pair):
+    client = _client(monkeypatch, lambda _g, _p: [pair])
+    with pytest.raises(run.JudgeBatchError, match="超出当前窗口范围") as caught:
+        run._judge_one_batch(client, "entity_matches", [_entity("g")], [_entity("p")], 7, 3)
+    assert caught.value.judge_batches[0]["attempts"][0]["status"] == "failed"
 
 
 def test_window_failure_keeps_diagnostics_from_other_completed_calls(monkeypatch):
-    def _request(_url, **kwargs):
-        payload = json.loads(kwargs["data"])
-        prompt = payload["messages"][1]["content"]
-        predicted = json.loads(prompt.split("## predicted items\n", 1)[1].split("\n\n请只输出", 1)[0])
-        if predicted[0]["name"] == "p0":
-            return 500, {}, json.dumps({"error": {"message": "boom"}}).encode()
-        body = {
-            "id": "chatcmpl-test",
-            "choices": [{"finish_reason": "stop", "message": {"content": '{"entity_matches": []}'}}],
-            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-        }
-        return 200, {}, json.dumps(body).encode()
-
-    monkeypatch.setattr(run, "http_request", _request)
-    client = run.JudgeClient(
-        base_url="https://example.test/v1", api_key="k", model="m",
-        timeout=30, max_tokens=256, response_format="json_object", disable_thinking=False,
-    )
+    client = _client(monkeypatch, lambda _g, predicted: [(9, 0)] if predicted[0]["name"] == "p0" else [])
     with pytest.raises(run.JudgeBatchError) as caught:
         run._judge_windows(
             client, "entity_matches", [_entity("g")], [_entity("p0"), _entity("p1")],
             [0], [0, 1], golden_window=1, predicted_window=1, max_concurrency=2,
         )
     assert len(caught.value.judge_batches) == 2
-    statuses = sorted(batch["attempts"][0]["status"] for batch in caught.value.judge_batches)
-    assert statuses == ["failed", "succeeded"]
+    assert [batch["attempts"][0]["status"] for batch in caught.value.judge_batches] == ["failed", "succeeded"]
 
 
 def test_graph_relationship_properties_reach_judge(monkeypatch):
@@ -155,7 +101,9 @@ def test_graph_relationship_properties_reach_judge(monkeypatch):
 
     assert metrics["match_mode"] == "llm"
     assert metrics["relations"]["tp"] == 0
-    assert seen == [({"limit": "5%"}, {"limit": "10%"})]
+    # 属性冲突的候选不能被本地判对，也不能在送审前被抹掉：全图扫描与聚焦补判
+    # 两次看到的都必须是两侧原始属性值。
+    assert seen and all(item == ({"limit": "5%"}, {"limit": "10%"}) for item in seen)
     assert predicted == before
     assert metrics["predicted_graph"]["relationships"][0]["properties"] == {"limit": "10%"}
 
@@ -309,7 +257,8 @@ def test_numeric_punctuation_cannot_be_erased_by_local_auto_matching(monkeypatch
         _client(monkeypatch, responder),
     )
     assert metrics["entities"]["tp"] == 0
-    assert seen == [({"value": left}, {"value": right})]
+    # 数值符号差异既不能本地判对，也不能在送审前被归一化掉。
+    assert seen and all(item == ({"value": left}, {"value": right}) for item in seen)
 
 
 @pytest.mark.parametrize("collection", ["entity_matches", "relation_matches"])

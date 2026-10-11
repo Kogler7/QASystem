@@ -42,7 +42,7 @@ class ChunkOptions(StrictModel):
     size: int = Field(default=4000, gt=0)
     separators: list[str] | None = None
     similarity: float = Field(default=0.6, ge=0, le=1)
-    chunk_overlap: int = Field(default=0, ge=0)
+    chunk_overlap: int = Field(default=50, ge=0)
     size_unit: Literal["char", "token"] = "char"
     breakpoint_method: Literal["percentile", "stddev", "none"] = "percentile"
     chunk_threshold: int = Field(default=12000, ge=0)
@@ -59,6 +59,10 @@ class ChunkOptions(StrictModel):
 
 class ExtractionOptions(StrictModel):
     model: str | None = None
+    version: Literal["v2", "v3", "v3.1", "latest"] | None = None
+    provider: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
+    request_timeout: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    document_timeout: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     merge: bool = True
 
 

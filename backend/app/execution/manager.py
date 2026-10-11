@@ -206,6 +206,9 @@ class ExecutionManager:
         reserved_allocation: dict[str, Any] | None = None,
     ) -> JobSubmission:
         self._ensure_queue_available()
+        from backend.app.services.extraction_config import snapshot_payload
+
+        payload = snapshot_payload(operation, payload)
         job_id = uuid.uuid4().hex
         auth_context_id = None
         from external_services.application import get_user_headers

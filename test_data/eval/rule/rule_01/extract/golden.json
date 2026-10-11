@@ -1,0 +1,525 @@
+{
+  "entities": [
+    {
+      "type": "RuleType",
+      "name": "ATP B通道5V电源板不稳定引发车载显示与ATO异常",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "ATP B通道5V电源板不稳定引发车载显示与ATO异常",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "ATP的B通道5V电源板块工作不稳定",
+        "consequent": "信号屏出现黑屏、ATO灯不亮，并出现车门自动关闭等异常",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换ATP B通道5V电源板后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换ATP B通道5V电源板后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "更换工作不稳定的ATP B通道5V电源板块",
+        "consequent": "故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "重启RTU后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "重启RTU后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "RTU出现异常并执行重启RTU操作",
+        "consequent": "RTU故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "接收端轨旁盒潮湿引发轨道电路异常",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "接收端轨旁盒潮湿引发轨道电路异常",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "接收端轨旁盒内较为潮湿",
+        "consequent": "轨道电路区段出现红光带或粉红光带异常",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "CPU850工作不稳定导致屏蔽门不能联动",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "CPU850工作不稳定导致屏蔽门不能联动",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "多路接收器CPU850工作不稳定",
+        "consequent": "屏蔽门不能与列车车门正常联动打开或关闭",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "紧制代码39指示ATO超速紧制",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "紧制代码39指示ATO超速紧制",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现紧制代码39",
+        "consequent": "判定为ATO超速紧制",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "紧制后降级RM导致折返线无法动车",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "紧制后降级RM导致折返线无法动车",
+        "RuleTypeBody": "CompositeRuleType",
+        "RuleTemplate": "CompositeRuleType： 当先发生 [条件1]，并且随后出现 [条件2] 时，那么 [综合结论]",
+        "antecedent": "先发生列车紧制，并且随后列车自动降级为RM模式",
+        "consequent": "列车在折返线无法动车",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "故障代码45指示计算机通道中断与ATP安全关机",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "故障代码45指示计算机通道中断与ATP安全关机",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现故障代码45",
+        "consequent": "计算机通道中断并触发ATP安全关机",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "故障代码45指示车载ATP测速溢出安全关断",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "故障代码45指示车载ATP测速溢出安全关断",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现故障代码45",
+        "consequent": "车载ATP检测测速溢出并触发安全关断",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "复位ATP后安全关断故障恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "复位ATP后安全关断故障恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "ATP发生安全关断后执行ATP复位",
+        "consequent": "ATP恢复正常工作",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "LITR模块故障导致UPS供电故障",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "LITR模块故障导致UPS供电故障",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "整流逆变器模块LITR发生故障",
+        "consequent": "UPS供电发生故障",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "接收1板不稳定导致轨道区段粉红光带",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "接收1板不稳定导致轨道区段粉红光带",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "轨道电路接收1板工作不稳定",
+        "consequent": "相关轨道区段出现粉红光带",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "代码186对应ATP STELA通道及接点故障",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "代码186对应ATP STELA通道及接点故障",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现代码186",
+        "consequent": "ATP STELA板A、B、C通道故障并出现ATP接点故障",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "RTU程序错误导致RTU异常",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "RTU程序错误导致RTU异常",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "RTU程序出现错误",
+        "consequent": "RTU设备出现异常",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "重启SICAS ATP后故障恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "重启SICAS ATP后故障恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "SICAS ATP出现STELA板或相关ATP故障并执行重启SICAS ATP操作",
+        "consequent": "故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "代码161指示24号电磁锁故障",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "代码161指示24号电磁锁故障",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现代码161",
+        "consequent": "指向24号电磁锁故障",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "代码70指示DTRO锁头故障",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "代码70指示DTRO锁头故障",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现代码70",
+        "consequent": "指向DTRO锁头故障",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "PTI报文不齐全用于判断列车对标不准",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "PTI报文不齐全用于判断列车对标不准",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "读取PTI报文时发现列车报文不齐全",
+        "consequent": "判断列车存在对标不准",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "对标超出联动范围导致车门屏蔽门不能联动",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "对标超出联动范围导致车门屏蔽门不能联动",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "列车对标位置超出信号联动范围",
+        "consequent": "车门与屏蔽门不能正常联动",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "TC2830复示继电器板故障导致STEKOP板死机",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "TC2830复示继电器板故障导致STEKOP板死机",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "TC2830轨道区段复示继电器板发生故障",
+        "consequent": "STEKOP板死机",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "STEKOP板死机导致轨道区段红光带",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "STEKOP板死机导致轨道区段红光带",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "STEKOP板死机",
+        "consequent": "TC2823和TC2830轨道区段出现红光带",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "TC1414继电器板不稳定导致反复粉红光带",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "TC1414继电器板不稳定导致反复粉红光带",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "TC1414继电器板工作不稳定",
+        "consequent": "相关轨道区段反复出现粉红光带",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "紧制代码32指示人工驾驶超速紧制",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "紧制代码32指示人工驾驶超速紧制",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现紧制代码32",
+        "consequent": "判定为司机人工驾驶产生的超速紧制，属于非设备类故障",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "紧制代码30指向站台屏蔽门非信号故障",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "紧制代码30指向站台屏蔽门非信号故障",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现紧制代码30",
+        "consequent": "故障指向站台屏蔽门，属于非信号故障",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "机电屏蔽门故障触发ATP STELA板报警",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "机电屏蔽门故障触发ATP STELA板报警",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "机电屏蔽门发生故障",
+        "consequent": "信号设备ATP STELA板产生报警，且该事件判定为非信号故障",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "代码121指示两车头内部传输超时",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "代码121指示两车头内部传输超时",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现故障代码121",
+        "consequent": "两车头内部传输时间超时",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "MMI执行列车换向后折返信号故障恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "MMI执行列车换向后折返信号故障恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "列车停稳后没有收到折返信号，并在MMI执行列车换向",
+        "consequent": "折返信号相关故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "UPS维修旁路下市电故障导致相关信号设备失电受影响",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "UPS维修旁路下市电故障导致相关信号设备失电受影响",
+        "RuleTypeBody": "CompositeRuleType",
+        "RuleTemplate": "CompositeRuleType： 如果同时满足 [条件1] 和 [条件2]，那么 [综合结论]",
+        "antecedent": "UPS处于维修旁路模式并由市电直接供电，同时市电供电发生故障",
+        "consequent": "白云公园PTI、同步环线，以及飞翔公园S2201、X2202、X2204和白云公园X2302、S2301、S2303等信号设备受到供电影响",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "屏蔽门故障引起列车紧制并判为非信号故障",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "屏蔽门故障引起列车紧制并判为非信号故障",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "屏蔽门发生故障",
+        "consequent": "列车产生紧制，并判定为非信号故障",
+        "connectionSymbol": "导致"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "紧制代码35指示ATO超速紧制",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "紧制代码35指示ATO超速紧制",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "出现紧制代码35",
+        "consequent": "判定为ATO超速紧制",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "轨道区段粉红光带执行逻空后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "轨道区段粉红光带执行逻空后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "轨道区段出现粉红光带，车站确认安全并执行逻空操作",
+        "consequent": "轨道区段显示恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "无折返信号时换端后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "无折返信号时换端后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "列车下行收不到折返信号并执行换端操作",
+        "consequent": "折返信号相关故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "紧制代码161指示运行中屏蔽门打开触发紧制",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "紧制代码161指示运行中屏蔽门打开触发紧制",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "列车运行、进站或出站过程中检测到屏蔽门打开，并出现紧制代码161",
+        "consequent": "列车产生紧制，且判定为非信号设备故障",
+        "connectionSymbol": "指示"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换TC2830复示继电器板后轨道电路恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换TC2830复示继电器板后轨道电路恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "TC2830轨道区段复示继电器板故障，更换复示继电器板",
+        "consequent": "TC2823、TC2830轨道区段红光带恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换TC1414区段继电器板后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换TC1414区段继电器板后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "TC1414区段继电器板工作不稳定，更换该区段继电器板",
+        "consequent": "TC1412、TC1414、TC1508轨道区段反复粉红光带恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换发送端、接收端转换单元及调谐单元后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换发送端、接收端转换单元及调谐单元后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "轨道区段出现粉红光带（车过后粉红），更换发送端、接收端转换单元和发送端调谐单元",
+        "consequent": "轨道电路故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换接收端调谐单元、转换单元后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换接收端调谐单元、转换单元后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "轨道区段出现红光带转粉红光带，接收端轨旁盒内潮湿，更换接收端调谐单元、转换单元",
+        "consequent": "轨道电路故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换同步环线检测板后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换同步环线检测板后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "列车以ATO模式对标偏差（+50cm/-40cm），车门正常打开但屏蔽门没有联动打开，更换同步环线检测板",
+        "consequent": "故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "更换同步环线报警板后恢复",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "更换同步环线报警板后恢复",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "列车以ATO模式下行对标-40cm，没有收到开门使能信号，更换同步环线报警板",
+        "consequent": "故障恢复正常",
+        "connectionSymbol": "处置后恢复"
+      }
+    },
+    {
+      "type": "RuleType",
+      "name": "UPS主机故障后改用维修旁路模式替代供电",
+      "properties": {
+        "RuleID": "",
+        "RuleName": "UPS主机故障后改用维修旁路模式替代供电",
+        "RuleTypeBody": "ImplicationRuleType",
+        "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+        "antecedent": "UPS发生故障，初步判断为UPS主机故障",
+        "consequent": "改用维修旁路模式，由市电直接供电，替代UPS原有功能（设备使用不受影响）",
+        "connectionSymbol": "处置后恢复"
+      }
+    }
+  ],
+  "relations": []
+}

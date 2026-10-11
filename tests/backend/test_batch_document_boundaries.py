@@ -70,7 +70,7 @@ def test_batch_chunks_keep_boundaries_ranges_and_duplicate_names(monkeypatch, tm
     )
     # Exercise both actual splitting and the short-document threshold bypass.
     options = PipelineOptions(
-        chunking=ChunkOptions(size=10, chunk_threshold=threshold),
+        chunking=ChunkOptions(size=10, chunk_overlap=0, chunk_threshold=threshold),
     )
     request = BatchKnowledgeIngestionRequest(
         files=[

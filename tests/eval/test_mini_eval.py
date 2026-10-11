@@ -37,7 +37,7 @@ def test_default_first_selection_is_bounded_and_retains_type_order(workspace):
     chosen, strategy, seed = mini_eval.select_cases(
         workspace, {"cases_per_type": 1, "per_type": {"official": 2}, "selection": "first", "seed": 42},
     )
-    assert [str(path.relative_to(workspace)) for path in chosen] == [
+    assert [path.relative_to(workspace).as_posix() for path in chosen] == [
         "official/official_01", "official/official_02", "rule/rule_01", "simple/simple_01", "standard/standard_01",
     ]
     assert strategy == "first"
@@ -198,3 +198,16 @@ def test_entrypoints_dry_run_only_selected_cases(workspace, tmp_path, entry):
     assert "类型 standard: 1 个 case" in result.stdout
     assert "official_03" not in result.stdout
     assert "standard_02" not in result.stdout
+
+
+def test_mini_forwards_extraction_overrides(workspace, tmp_path, monkeypatch):
+    params = _params(tmp_path)
+    child = Mock(return_value=subprocess.CompletedProcess([], 0))
+    monkeypatch.setattr(mini_eval.subprocess, "run", child)
+    assert mini_eval.main(["--workspace", str(workspace), "--params", str(params),
+                          "--extract-version", "v3.1", "--extract-provider", "siliconflow",
+                          "--extract-request-timeout", "300", "--chunk-overlap", "80"]) == 0
+    command = child.call_args.args[0]
+    for flag, value in [("--extract-version", "v3.1"), ("--extract-provider", "siliconflow"),
+                        ("--extract-request-timeout", "300"), ("--chunk-overlap", "80")]:
+        assert command[command.index(flag) + 1] == value

@@ -81,8 +81,7 @@ def test_deepseek_auto_uses_json_object_and_disables_thinking(monkeypatch):
     assert requests[0]["payload"]["response_format"] == {"type": "json_object"}
     assert requests[0]["payload"]["thinking"] == {"type": "disabled"}
     assert info["attempts"] == [{
-        "response_mode": "json_object", "http_status": 200, "max_tokens": 8192,
-        "response_id": "chatcmpl-test",
+        "response_mode": "json_object", "http_status": 200, "response_id": "chatcmpl-test",
         "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
         "finish_reason": "stop", "reasoning_content_length": 0,
         "content_length": 63, "status": "succeeded",
@@ -121,24 +120,6 @@ def test_siliconflow_judge_does_not_leak_vendor_switch(monkeypatch, base_url, di
     requests = _stub_http(monkeypatch, [_reply()])
     _judge(_client(base_url=base_url, disable_thinking=disabled))
     assert "enable_thinking" not in requests[0]["payload"]
-
-
-def test_max_tokens_too_large_retries_with_remaining_context(monkeypatch):
-    too_large = {
-        "error": {
-            "message": (
-                "'max_tokens' or 'max_completion_tokens' is too large: 2048. "
-                "This model's maximum context length is 8192 tokens and your request has 6462 "
-                "input tokens (2048 > 8192 - 6462). None"
-            )
-        }
-    }
-    requests = _stub_http(monkeypatch, [(400, too_large), _reply('{"entity_matches": []}')])
-    pairs, info = _judge(_client(max_tokens=2048, base_url="https://example.test/v1"))
-    assert pairs == []
-    assert [req["payload"]["max_tokens"] for req in requests] == [2048, 1722]
-    assert info["attempts"][0]["status"] == "succeeded"
-    assert info["attempts"][0]["max_tokens"] == 1722
 
 
 def test_generic_schema_rejection_falls_back_with_attempt_diagnostics(monkeypatch):
@@ -497,15 +478,22 @@ def test_agreeing_properties_keep_auto_match_and_extra_keys_are_ignored(monkeypa
 
 
 def test_shared_property_conflict_is_not_auto_matched(monkeypatch):
-    requests = _stub_http(monkeypatch, [_reply('{"entity_matches": []}')])
+    empty = _reply('{"entity_matches": []}')
+    requests = _stub_http(monkeypatch, [empty, empty])
     metrics = run.llm_judge_score_case(
         [{"type": "Constrain", "name": "初始容量极差约束", "properties": {"最大值": "5%"}}], [],
         [{"type": "Constrain", "name": "初始容量极差约束", "properties": {"最大值": "10%"}}], [],
         judge_client=_client(),
     )
-    assert len(requests) == 1
+    # 属性冲突不能本地判对：一次全图扫描 + 一次针对该候选的聚焦补判
+    # （整窗提示过大时 judge 会回空数组，把候选静默丢成漏抽）。
+    assert len(requests) == 2
     assert metrics["entities"]["tp"] == 0
-    assert metrics["details"]["judge_coverage"]["entities"]["auto_matched"] == 0
+    coverage = metrics["details"]["judge_coverage"]["entities"]
+    assert coverage["auto_matched"] == 0
+    assert coverage["deferred_candidates"] == 1
+    assert coverage["focused_windows"] == 1
+    assert coverage["focused_empty_windows"] == 1
 
 
 def test_semantically_equal_alias_without_lexical_overlap_is_accepted(monkeypatch):

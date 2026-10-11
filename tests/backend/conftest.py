@@ -118,7 +118,12 @@ def protocol_module():
         ),
         "algorithm.knowledge_extract.v2.config": _module(
             "algorithm.knowledge_extract.v2.config",
-            get_llm_config=lambda: {"max_concurrency": 4, "qps": 0.0, "qpm": 0},
+            get_llm_config=lambda: {
+                "max_concurrency": 4, "qps": 0, "qpm": 0,
+                "base_url": "http://test-llm/v1", "model": "test-model",
+                "max_tokens": 16384, "request_timeout": 300.0,
+                "disable_thinking": True, "api_key": "",
+            },
         ),
         # Production extraction runs Knowledge Extract V2 through this adapter,
         # which would reach the LLM.  Protocol tests stay hermetic by stubbing

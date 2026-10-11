@@ -37,3 +37,6 @@ tiktoken==0.12.0
 
 # SQL MCP drivers
 PyMySQL==1.1.2
+
+# Vector store client (Milvus 2.5 server)
+pymilvus==2.5.16
