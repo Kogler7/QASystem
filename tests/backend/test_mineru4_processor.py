@@ -200,8 +200,8 @@ def test_tables_become_json_blocks(pdf_file, monkeypatch, fake_mineru):
     result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
     assert "<table" not in result["content"]
     assert result["metadata"]["tables_json"] == {"count": 1, "forms": 0}
-    block = result["content"].split("```json")[1].split("```")[0]
-    assert json.loads(block)["rows"] == [{"角色": "甲", "权限": "查看、编辑"}]
+    block = result["content"].split("```jsonl\n")[1].split("```")[0]
+    assert [json.loads(line) for line in block.splitlines() if line.strip()] == [{"角色": "甲", "权限": "查看、编辑"}]
 
 
 def test_sparse_table_is_rendered_as_key_value_json(pdf_file, monkeypatch, fake_mineru):

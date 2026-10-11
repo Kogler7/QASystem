@@ -35,11 +35,16 @@ def _json_blocks(markdown: str) -> list[dict]:
     current: list[str] = []
     inside = False
     for line in markdown.splitlines():
-        if line.strip() == "```json":
+        if line.strip() in {"```json", "```jsonl"}:
+            lang = line.strip()
             inside, current = True, []
             continue
         if inside and line.strip() == "```":
-            blocks.append(json.loads("\n".join(current)))
+            if lang == "```jsonl":
+                rows = [json.loads(line) for line in current if line.strip()]
+                blocks.append({"columns": list(rows[0]) if rows else [], "rows": rows})
+            else:
+                blocks.append(json.loads("\n".join(current)))
             inside = False
             continue
         if inside:
@@ -61,10 +66,21 @@ def test_table_from_columns_and_rows_builds_records_with_dedup():
     ]
 
 
-def test_render_json_block_is_valid_json_code_fence():
-    block = render_json_block({"columns": ["a"], "rows": [{"a": "值"}]})
-    assert block.startswith("```json\n") and block.endswith("\n```")
-    assert json.loads(block[len("```json\n"):-len("\n```")])["rows"] == [{"a": "值"}]
+def test_render_json_block_emits_one_complete_record_per_line():
+    rows = [{"a": "值\n第二行", "b": '引号"和\\反斜线'}, {"a": "乙", "b": ""}]
+    block = render_json_block({"columns": ["a", "b"], "rows": rows})
+    assert block.startswith("```jsonl\n") and block.endswith("\n```")
+    lines = block.splitlines()[1:-1]
+    assert len(lines) == 2
+    assert [json.loads(line) for line in lines] == rows
+
+
+def test_render_non_record_document_and_empty_table_keep_json():
+    for table in ({"document_type": "form", "fields": {"标题": "通知"}},
+                  {"columns": ["名称"], "rows": []}):
+        block = render_json_block(table)
+        assert block.startswith("```json\n")
+        assert json.loads("\n".join(block.splitlines()[1:-1])) == table
 
 
 def test_grouped_header_is_flattened_to_single_level():

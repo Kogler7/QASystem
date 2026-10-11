@@ -2,11 +2,9 @@
 
 表格按**形状**分两类，一张表一张表地判：
 
-* **行列式数据表**（表头 + 记录行，例如 GB/T 附录的权限表）输出为一个
-  ```` ```json ```` 代码块，结构固定为::
-
-      {"columns": ["相关方角色", "提案登记", ...],
-       "rows": [{"相关方角色": "建议方", "提案登记": "查看", ...}, ...]}
+* **行列式数据表**（表头 + 记录行）输出为 ``jsonl`` 代码块，
+  每行一个完整对象，列名直接作为键。内部构造仍使用 columns/rows，旧调用名
+  render_json_block 保留以兼容各解析路线。
 
 * **稀疏表**（收文处理单、审批单、传阅签字栏这类"标签—值/区域"版式：合并单元格多、
   填充率低、首列大量 `标签:`、或首行根本不是表头）不套行列模型，输出为键值对 JSON::
@@ -522,8 +520,19 @@ def table_from_columns_and_rows(columns: Sequence[Any], rows: Iterable[Sequence[
     return {"columns": names, "rows": records}
 
 
+def render_jsonl_block(table: dict[str, Any]) -> str:
+    """渲染非空记录表：每行完整对象，列名为键，字段内换行由 JSON 转义。"""
+    rows = table.get("rows")
+    if not isinstance(rows, list) or not rows or not all(isinstance(row, dict) for row in rows):
+        raise ValueError("JSONL table requires nonempty object records")
+    body = "\n".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) for row in rows)
+    return f"```jsonl\n{body}\n```"
+
+
 def render_json_block(table: dict[str, Any]) -> str:
-    """把表对象渲染成 ```json 代码块。"""
+    """兼容各解析路线的公共入口：记录表用 JSONL，表单/网格/空表用 JSON。"""
+    if isinstance(table.get("columns"), list) and isinstance(table.get("rows"), list) and table["rows"]:
+        return render_jsonl_block(table)
     body = json.dumps(table, ensure_ascii=False, indent=2)
     return f"```json\n{body}\n```"
 

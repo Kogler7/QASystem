@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 import re
 from typing import Callable
+from algorithm.table_jsonl import row_boundaries
 
 _LOGGER = logging.getLogger(__name__)
 _PARTS = {'le20': 1, '21to40': 2, 'gt40': 3}
@@ -118,6 +119,20 @@ def refine_chunks(
                 record['confidence'] = confidence
             if planned == 1:
                 record['status'] = 'kept'
+            elif (bounds := row_boundaries(text)) is not None and len(bounds) > 2:
+                parts = min(planned, len(bounds) - 1)
+                cuts = [bounds[(len(bounds) - 1) * i // parts] for i in range(parts + 1)]
+                ranges = []
+                for i, (a, b) in enumerate(zip(cuts, cuts[1:])):
+                    # Only repeat whole rows within the configured overlap budget.
+                    if i:
+                        preceding = [value for value in bounds if cuts[i-1] < value < a and a-value <= overlap]
+                        a = min(preceding, default=a)
+                    ranges.append([start+a, start+b])
+                actual = [max(0, left[1]-right[0]) for left, right in zip(ranges, ranges[1:])]
+                record.update(status='refined_jsonl', actual_parts=parts,
+                              effective_overlap=max(actual, default=0), effective_overlaps=actual,
+                              ranges=ranges, child_sizes=[b-a for a,b in ranges])
             elif _structured(text):
                 record['status'] = 'preserved_structured'
             elif len(text) < 2:
@@ -138,6 +153,11 @@ def refine_chunks(
             child = {**item, 'text': content[a:b], 'range': [a,b]}
             if isinstance(item.get('metadata'), dict):
                 child['metadata'] = dict(item['metadata'])
+                bounds = row_boundaries(text) if record.get('status') == 'refined_jsonl' else None
+                if bounds is not None and item['metadata'].get('table_format') == 'jsonl':
+                    row_offset = int(item['metadata'].get('table_data_row_start', 1))
+                    child['metadata']['table_data_row_start'] = row_offset + bounds.index(a-start)
+                    child['metadata']['table_data_row_end'] = row_offset + bounds.index(b-start) - 1
             refined.append(child)
         _audit(record)
         log.info('entity_count_chunking %s', json.dumps(record, ensure_ascii=False))
