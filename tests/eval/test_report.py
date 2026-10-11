@@ -11,17 +11,17 @@ from eval import run as eval_run
 from eval.report import exit_code_for, render_report
 
 
-def test_report_explains_unknown_reused_timing_gate():
+def test_report_keeps_gate_out_of_markdown():
     summary = _summary()
     summary["failed"] = 0
     summary["gate"] = {"passed": False, "timing_unknown": ["g/unfinished"]}
     report = render_report(summary)
-    assert "原抽取耗时记录缺失：`g/unfinished`" in report
-    assert "无法验证耗时预算，门禁未过" in report
+    assert "## 门禁" not in report
+    assert "原抽取耗时记录缺失" not in report
     assert exit_code_for(summary) == 4
 
 
-def test_report_exposes_coverage_macro_and_baseline_failure():
+def test_report_omits_coverage_and_baseline_sections():
     from eval.quality import build_quality_summary
     summary = _summary()
     summary["match_mode"] = "llm"
@@ -33,11 +33,10 @@ def test_report_exposes_coverage_macro_and_baseline_failure():
                          "baseline": 0.9, "current": 0.7, "passed": False}],
     }
     md = render_report(summary)
-    assert "评分覆盖率与分组统计" in md
-    assert "0/3" in md  # 两个 identity 加一个 fallback 均不能冒充 LLM 得分
-    assert "case macro" in md and "group macro" in md
-    assert "evaluator_mismatch" in md
-    assert "0.900 | 0.700 | 未过" in md
+    assert "评分覆盖率与分组统计" not in md
+    assert "基线对比" not in md
+    assert "evaluator_mismatch" not in md
+    assert "### 分类型：LLM-as-Judge" in md
 
 
 @pytest.fixture(autouse=True)
@@ -194,28 +193,27 @@ def _summary() -> dict:
     }
 
 
-def test_render_report_header_and_gate():
+def test_render_report_header():
     md = render_report(_summary())
     assert md.startswith("# Benchmark 评测报告 20260930-101010")
+    assert "## 运行信息" in md
     assert "开始：2026-09-30T10:10:10" in md
     assert "结束：2026-09-30T10:12:05" in md
     assert "Backend：http://127.0.0.1:8006" in md
     assert "评分口径：identity" in md
     assert "1 个 case judge 失败降级 identity_fallback" in md
     assert "抽取版本：latest" in md
-    # 有失败 case → 退出码 2 优先于门禁 4
-    assert "退出码：2（有 case 失败" in md
-    assert "门禁判定：未过" in md
-    assert "`g/empty`" in md
-    assert "实体 F1 阈值：0.7（已评分 case 实际最低 0.000）" in md
-    assert "case≤60s" in md and "extract≤60s" in md
-    assert "违规 2 项" in md
+    assert "## 门禁" not in md
+    assert "## 指标结论" in md
+    headings = [line for line in md.splitlines() if line.startswith("## ")]
+    assert headings == ["## 运行信息", "## 指标结论"]
 
 
 def test_render_report_overview_table():
     md = render_report(_summary())
     assert "## 指标结论" in md
-    assert "### 整体" in md
+    assert "### Average：LLM-as-Judge" in md
+    assert "identity 精确匹配对照" not in md
     lines = [line for line in md.splitlines() if line.startswith("| 后台抽取 |")]
     assert len(lines) == 2  # 实体 + 关系
     assert "| 后台抽取 | 实体 | 30 | 20 | 0.700 | 0.600 | 0.650 |" in lines
@@ -235,8 +233,8 @@ def test_render_report_conclusion_covers_type_and_file():
     summary["cases"][1]["case"] = "rule_01"
     summary["quality"] = build_quality_summary(summary)
     md = render_report(summary)
-    assert "### 分类型" in md and "### 单个文件" in md
-    type_section = md.split("### 分类型", 1)[1].split("### 单个文件", 1)[0]
+    assert "### 分类型：LLM-as-Judge" in md and "### 单个文件：LLM-as-Judge" in md
+    type_section = md.split("### 分类型：LLM-as-Judge", 1)[1].split("### 单个文件：LLM-as-Judge", 1)[0]
     entities = summary["quality"]["modules"]["backend_extract"]["by_group"]["official"]["micro"]["entities"]
     relations = summary["quality"]["modules"]["backend_extract"]["by_group"]["rule"]["micro"]["relations"]
     assert (
@@ -247,50 +245,33 @@ def test_render_report_conclusion_covers_type_and_file():
         f"| `rule` | 后台抽取 | 关系 | {int(relations['golden'])} | {int(relations['predicted'])} | "
         f"{relations['precision']:.3f} | {relations['recall']:.3f} | {relations['f1']:.3f} |"
     ) in type_section
-    file_section = md.split("### 单个文件", 1)[1].split("## ", 1)[0]
+    file_section = md.split("### 单个文件：LLM-as-Judge", 1)[1]
     assert "| `official/official_01` | 后台抽取 | 成功 | 0.800 | 0.700 | 0.750 | 0.800 | 0.700 | 0.750 |" in file_section
     assert "| `rule/rule_01` | 后台抽取 | 失败 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |" in file_section
 
 
-def test_render_report_per_case_rows_and_notes():
+def test_render_report_file_rows_keep_status():
     md = render_report(_summary())
-    assert "## 逐 case 明细" in md
-    detail = md.split("## 逐 case 明细", 1)[1]
-    assert "| `g/ok` | 成功 | 0.800 / 0.700 / 0.750 |" in detail
-    # 失败 case 标出原因
-    empty_row = next(line for line in detail.splitlines() if line.startswith("| `g/empty` |"))
+    assert "## 逐 case 明细" not in md
+    detail = md.split("### 单个文件：LLM-as-Judge", 1)[1]
+    assert "| `g/ok` | 后台抽取 | 成功 | 0.800 | 0.700 | 0.750 | 0.800 | 0.700 | 0.750 |" in detail
+    empty_row = next(line for line in detail.splitlines() if "`g/empty`" in line)
     assert "| 失败 |" in empty_row
-    assert "empty_extraction" in empty_row
-    # 各阶段耗时与总耗时
-    ok_row = next(line for line in detail.splitlines() if line.startswith("| `g/ok` |"))
-    assert "| 2.0s | 1.0s | 8.0s | 12.0s | latest |" in ok_row
-    # judge 降级备注
-    slow_row = next(line for line in detail.splitlines() if line.startswith("| `g/slow` |"))
-    assert "judge 失败降级 identity" in slow_row
 
 
-def test_render_report_issues_and_slow_top():
+def test_render_report_omits_issue_and_timing_sections():
     md = render_report(_summary())
-    assert "## 问题清单" in md
-    assert "**失败 case（1）**" in md
-    assert "**空抽取（1）**" in md
-    assert "**judge 降级 / 错误（1）**" in md
-    assert "judge HTTP 500: boom" in md
-    assert "**耗时超预算（2）**" in md
-    assert "`g/slow` extract 1m30.0s > 预算 1m00.0s" in md
-    assert "**实体 F1 低于阈值 0.7（2）**" in md
-    # 慢 case 排序：g/slow 第一
-    slow_section = md.split("## 最慢 case Top 5", 1)[1]
-    first_row = next(line for line in slow_section.splitlines() if line.startswith("| 1 |"))
-    assert "`g/slow`" in first_row
-    assert "1m35.0s" in first_row
+    assert "## 问题清单" not in md
+    assert "## 最慢 case" not in md
+    assert "judge HTTP 500: boom" not in md
+    assert "耗时超预算" not in md
 
 
 def test_render_report_interrupted_and_empty_summary():
     md = render_report({"run_id": "20260930-120000", "interrupted": True, "cases": []})
-    assert "130（用户中断" in md
-    assert "（无 case）" in md
-    assert "门禁：未配置" in md
+    assert "本批次被 Ctrl+C 中断" in md
+    assert "（无文件）" in md
+    assert "## 门禁" not in md
 
 
 def test_exit_code_for_semantics():
@@ -376,9 +357,11 @@ def test_main_writes_report_md(monkeypatch, tmp_path):
     assert report.is_file()
     md = report.read_text(encoding="utf-8")
     assert md.startswith("# Benchmark 评测报告")
-    assert "退出码：0（全部通过）" in md
-    assert "## 指标结论" in md and "### 整体" in md and "### 分类型" in md and "### 单个文件" in md
-    assert "## 逐 case 明细" in md and "## 问题清单" in md
+    assert "## 运行信息" in md and "## 指标结论" in md
+    assert "### Average：LLM-as-Judge" in md
+    assert "### 分类型：LLM-as-Judge" in md
+    assert "### 单个文件：LLM-as-Judge" in md
+    assert "## 门禁" not in md and "## 逐 case 明细" not in md and "## 问题清单" not in md
     assert "`g/c1`" in md
     # summary.json 与报告同批落盘，且 gate 带配置的预算块
     summary = json.loads((run_dirs[0] / "summary.json").read_text(encoding="utf-8"))

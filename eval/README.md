@@ -370,7 +370,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
   manifest.json               # 输入与评测代码 SHA256、评分契约、选项；不包含密钥
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
-  report.md                   # 本次评测详细报告：运行信息 / 门禁与退出码 / 总览 / 逐 case / 问题清单 / 最慢 case Top5
+  report.md                   # 本次评测报告：运行信息，以及 LLM-as-Judge 的 Average / 分类型 / 单个文件指标
   <类型>/<case>/
     parse_<文件名>.json       # 后台解析接口回包
     document.md               # 拼好的 Markdown（--from-run 的 chunk-extract 模式复用它跳过解析）
@@ -385,7 +385,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `report.md` | 批次结论文档（每批结束自动生成，含 resume/复用与中断批次）。「指标结论」写三层 P、R、F1：整体、分类型（official、rule、simple 等）、单个文件；实体和关系分开，并带 golden/predicted。其余为运行信息、门禁与退出码、逐 case 耗时明细、问题清单、最慢 case Top5 |
+| `report.md` | 批次结论文档（每批结束自动生成，含 resume/复用与中断批次）。只含运行信息和指标结论。指标结论三个二级标题为 Average、分类型（official、rule、simple 等）、单个文件，均标注 LLM-as-Judge；实体和关系分开，并带 golden/predicted。门禁、覆盖率、基线、逐 case 耗时和问题清单在 `summary.json` |
 | `summary.json` | 各 case 成败和 P/R/F1/Jaccard；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时，每个 case 完成后更新。`overall` 是有效同口径 micro，`quality` 包含覆盖率、case/group 均值与分组结果；`overall_identity` 单列精确对照。`gate` 记录空抽取、实体 F1、耗时和 `quality` 评分有效性/关系阈值检查；`baseline_comparison` 是同口径基线判定与逐项差异 |
 | `manifest.json` | 源文件、golden、本体，以及实际复用 Markdown/切片的 SHA256；`evaluator` 记录 `run.py`、`quality.py`、`provenance.py` 的内容哈希（包含未提交修改）；`settings` 与 `scoring_contract` 记录安全配置和评分契约，不记录 API key / Authorization。同一内容也嵌入 `summary.manifest` |
 | `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
