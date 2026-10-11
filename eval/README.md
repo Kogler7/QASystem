@@ -84,7 +84,7 @@ summary 里另附 identity（type+name 精确集合）对照。judge 失败仍�
 
 88 机 `official_01` 初评暴露了裁判把部门与活动/交互配对、缺少端点上下文时 8 个关系窗口全部返回空数组的问题。因此该次 F1 不能直接归因于抽取算法。类型硬约束、属性归一化和端点上下文均已改变评分口径，需要重新评分并建立新基线，不能沿用初评数值作版本优劣结论。
 
-评分客户端调用 Chat Completions 接口。`eval.judge_response_format: auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
+Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 yes/no 选择，缺失或异常选择使评分失败。`eval.judge_response_format: auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
 
 `eval.judge_disable_thinking: true` 向官方 DeepSeek 发送 `thinking: {type: disabled}`，向官方 SiliconFlow（`api.siliconflow.cn` / `api.siliconflow.com`）发送 `enable_thinking: false`，其他兼容服务不附加这些厂商参数。参见 [SiliconFlow Chat API](https://docs.siliconflow.cn/docs/api/chat-completions-post)。评分只解析最终 `content`，不会用 `reasoning_content` 代替答案；空内容或被截断的回答判为评分失败。提示词明确索引范围、候选边数量上限与输出结束条件。每条输入显式标注 `golden_index` / `predicted_index`，索引是**窗口内**下标；评分代码通过窗口保存的原索引列表回填全局下标，即使列表不连续也不使用起点加偏移代替映射。所有格式均检查数组结构、整数类型与索引边界；越界响应使评分失败。`judge_batches` 保留每次尝试的格式、状态、响应 ID、结束原因、token 用量及内容长度，不保存模型原始文本或鉴权信息；失败时保留已完成调用的诊断。
 
@@ -97,7 +97,7 @@ summary 里另附 identity（type+name 精确集合）对照。judge 失败仍�
 ### 准备
 
 1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
-2. 默认 LLM-judge 需要有效的评分地址。地址和模型按 `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → `KG_EXTRACT_LLM_BASE_URL/MODEL` 读取；API key 按 `QASYSTEM_JUDGE_API_KEY` → `KG_EXTRACT_LLM_API_KEY` 读取。独立变量示例位于根 `.env.example`。未配地址时，实际 LLM 评测一律按配置错误退出 1；只检查链路时显式指定 `--match-mode identity`。`--dry-run` 不调用或要求 judge。
+2. 默认 LLM-judge 使用 Clef，需要能访问其服务。地址和模型按命令行 → `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → Clef 默认值读取，不再随抽取供应商变化。Chat API key 可兼容 `KG_EXTRACT_LLM_API_KEY`；不把抽取 API key 发给默认 Clef。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
 3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
 地址也可用 `QASYSTEM_BACKEND_URL` / `QASYSTEM_MCP_URL`，或改 `params.yaml`。流水线选项在 `params.yaml` 的 `options`，与生产 `PipelineOptions` 对齐。不要把密钥写进 YAML。
@@ -273,6 +273,24 @@ python3 eval/run.py --stage backend --mode extract \
 ```
 
 ---
+
+**替换抽取模型和裁判模型**
+
+普通评测与快速评测默认裁判为 `clef-flash`，使用 `/v1/systemone` 逐候选对选择判断；语义规则、关系端点上下文、最终一对一匹配和裁判失败门禁继续由统一评分器维护。
+默认地址取 `CLEF_SERVICE_URL`，未设置则为 `http://127.0.0.1:8188`。88 的 Clef 当前位于 Compose 内部网络：在同网络容器中用 `http://clef:8188`；宿主机或开发机运行评测时，须指定实际可达的服务地址，不要将未开放的宿主端口当成可用地址。
+
+抽取模型和裁判独立配置。例如使用已在 Backend 注册的供应商与模型，并切换到 API 裁判：
+
+```bash
+python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批次> \
+  --extract-version v3 --extract-provider siliconflow --extract-model deepseek-ai/DeepSeek-V4-Flash \
+  --judge-adapter chat --judge-model deepseek-flash --judge-base-url https://api.deepseek.com/v1 \
+  --judge-key-env QASYSTEM_JUDGE_API_KEY --case-attempts 1
+```
+
+换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > `QASYSTEM_JUDGE_*` > YAML > Clef 默认值；密钥仅从环境变量读取，默认 `QASYSTEM_JUDGE_API_KEY`，Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。
+
+组合实验先固定切片、golden、本体和预算，再更换抽取模型。测试不同裁判时可复用同一批预测重新评分，避免重复抽取消耗；更换抽取模型时不能复用旧预测。裁判改变后须分别建立基线，不能用不同裁判的分数直接证明抽取质量提升。manifest 保存抽取配置与裁判 model/base_url/adapter，不包含密钥。
 
 **精确匹配打分**
 

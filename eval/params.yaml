@@ -47,13 +47,14 @@ options:
     knowledge_space_id: null
 
 # 抽取结果评分：默认 LLM-judge（语义一对一匹配），identity 仅作对照。
-# judge 地址/模型：QASYSTEM_JUDGE_* > 本节配置 > KG_EXTRACT_LLM_*。
-# key：QASYSTEM_JUDGE_API_KEY > KG_EXTRACT_LLM_API_KEY；不要把密钥写进本文件。
-# LLM 模式缺地址退出 1；judge 失败保留 identity_fallback 诊断并使质量门禁失败。
+# judge 地址/模型：命令行 > QASYSTEM_JUDGE_* > 本节配置 > 本机 Clef。
+# key：默认 QASYSTEM_JUDGE_API_KEY，chat 兼容 KG_EXTRACT_LLM_API_KEY；不要把密钥写进本文件。
+# Chat 模式缺地址退出 1；judge 失败保留 identity_fallback 诊断并使质量门禁失败。
 eval:
   match_mode: llm          # llm | identity
-  judge_model: null        # 无独立配置时兼容 KG_EXTRACT_LLM_MODEL，最后默认 deepseek-v4-flash
-  judge_base_url: null     # 无独立配置时兼容 KG_EXTRACT_LLM_BASE_URL
+  judge_model: clef-flash
+  judge_adapter: auto      # clef-flash/nanojev 用 systemone，其他模型用 chat
+  judge_base_url: null     # Clef 默认 CLEF_SERVICE_URL 或 http://127.0.0.1:8188
   judge_timeout_seconds: 300
   judge_max_tokens: 8192
   judge_batch_size: 20
