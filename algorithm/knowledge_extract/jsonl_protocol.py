@@ -12,21 +12,29 @@ def collection_name(schema: dict) -> str | None:
     return arrays[0] if len(fields) == 1 and len(arrays) == 1 else None
 
 
-def messages_for_jsonl(messages: list, schema: dict) -> list:
+def record_schema(schema: dict) -> dict:
+    """Describe a wire record, without exposing an internal collection wrapper."""
     name = collection_name(schema)
-    item_schema = schema["properties"][name]["items"] if name else schema
+    return schema["properties"][name]["items"] if name else schema
+
+
+def jsonl_instruction(schema: dict) -> str:
+    name = collection_name(schema)
     instruction = (
-        "\n\n输出协议更新：使用 JSONL，覆盖此前要求的外层 JSON 对象/数组格式。"
-        "每条记录独占一行，不要 Markdown、解释、外层数组或集合键。"
-        "字符串中的换行必须转义为 \\n。每行必须独立完整，禁止重复记录。"
-        "没有记录时只输出一行 null。"
-        "每行记录的字段约束（仅供本地校验，不使用服务端结构化输出）："
-        + json.dumps(item_schema, ensure_ascii=False)
+        "输出协议：JSONL。每行必须是独立完整的 JSON 对象，不要 Markdown 或解释。"
+        "字符串中的换行必须转义为 \\n；禁止重复记录。"
     )
+    if name:
+        instruction += "每条记录独占一行，不要外层数组或集合键。没有记录时只输出一行 null。"
+    else:
+        instruction += "当前任务输出一个完整对象：保留记录 schema 的全部字段，整个对象独占一行。空结果也必须遵守该对象的字段约束。"
     if name == "updates":
         instruction += "每行只更新一个属性：properties 中只能有一个键；每行携带 entity_id 和该属性的 evidence。"
-    if not name:
-        instruction += "当前任务没有单一记录集合：保留原输出对象的全部字段，在一行内输出完整对象。"
+    return instruction
+
+
+def messages_for_jsonl(messages: list, schema: dict) -> list:
+    instruction = "\n\n" + jsonl_instruction(schema) + "\n每行记录的字段约束：" + json.dumps(record_schema(schema), ensure_ascii=False)
     result = [dict(message) for message in messages]
     # Put the protocol in the system message so source content cannot override it.
     if result and result[0].get("role") == "system":

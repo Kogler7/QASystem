@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
 import re
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
@@ -25,7 +26,7 @@ ChatMessages = list[ChatMessage]
 
 BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。
-只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。
+只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出遵循本轮 JSONL 协议，记录只能包含记录 schema 允许的字段。
 
 [核心原则]
 - 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。
@@ -485,10 +486,10 @@ _RECORD_TABLE_PROPERTY_RULES = """
 
 _RECORD_TABLE_ENTITY_RULES = """
 ### 当前 chunk 是结构化记录表（JSON/表格形式的键值记录列表），必须执行以下特殊约束
-- 结构化记录/表格不是「没有实体」的理由：应按记录行归纳出 ontology 允许的实体（如规则、事件、对象、条款），不得因为「内容都是字段标签和标量值」就直接输出空数组。
+- 结构化记录/表格不是「没有实体」的理由：应按记录行归纳出 ontology 允许的实体（如规则、事件、对象、条款），不得因为「内容都是字段标签和标量值」就直接报告没有记录。
 - 若记录表有分类/类型/类别字段（如「故障详细分类」「类别」「类型」），实体 mention 直接使用该字段的值本身（如「RTU」「对标不准」），不要添加「故障」「规则」等后缀，也不要改写成描述性名称。
 - 同一语义的规则/对象（同一分类或同一规则下的多条记录）只输出一个实体；按 ontology 的 identity/名称语义归并，不要为同一条规则的每条原始记录重复创建实体。
-- 抽全优先：只要 current chunk 中存在可承载 ontology 类型的业务对象，必须逐条或按语义归纳给出候选；只有整个 chunk 与 ontology 完全无关时，才允许输出空数组。"""
+- 抽全优先：只要 current chunk 中存在可承载 ontology 类型的业务对象，必须逐条或按语义归纳给出候选；只有整个 chunk 与 ontology 完全无关时，才允许报告没有记录。"""
 
 
 def _looks_like_record_table(chunk: ExtractionChunk) -> bool:
@@ -548,28 +549,24 @@ def build_chat_messages(
     )
     if span_entity_task:
         discipline = "只提议实体候选，禁止输出关系。"
-        top_level = '{"entities": []}'
     elif task == "property":
         discipline = (
             "只为给定的已接受实体补全缺失属性；实体集合、实体类型和关系集合均已冻结，"
             "不得创建、删除或重命名实体，不得输出关系。"
         )
-        top_level = '{"updates": []}'
     elif task == "relation":
         discipline = "只分类给定 relation pair；不得创建新端点、不得输出未列出的关系。"
-        top_level = '{"decisions": []}' if relation_pairs is not None else '{"relations": []}'
     else:
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
-        top_level = "按本轮 schema 输出 JSON object"
 
     record_table = _looks_like_record_table(chunk)
-    if record_table:
+    if record_table and span_entity_task:
         output_constraint = (
-            "- 只输出 JSON object。不要用空数组敷衍：结构化记录/表格中每一行或每一条可归纳对象都应输出；"
-            '只有确认 current chunk 中不存在任何符合 ontology 的对象时，才允许输出 {"entities": []}。'
+            "- 不要遗漏可抽取对象：结构化记录/表格中每一行或每一条可归纳对象都应输出；"
+            '只有确认 current chunk 中不存在任何符合 ontology 的对象时，才允许报告没有记录。'
         )
     else:
-        output_constraint = f"- 只输出 JSON object；没有结果时输出 {top_level}。"
+        output_constraint = ""
 
     issue_text = (
         json.dumps(repair_issues, ensure_ascii=False, sort_keys=True, default=str)
@@ -614,7 +611,7 @@ def build_chat_messages(
 - 描述、定义、范围、类别等语义属性可以忠实归纳，但不得加入证据之外的新事实。
 - 如果某个字符串属性确实在原文中为空/缺失/无法确定，允许保留该属性并输出空字符串 ""，不要删除该属性。
 - 不要用 null 代替字符串属性；空字符串 "" 是允许的空值表达。
-- 同一个实体的 updates 中，一个属性只能出现一次；如果属性已有值，不要重复输出。
+- 同一个实体的所有记录中，一个属性只能出现一次；如果属性已有值，不要重复输出。
 - evidence.quote 必须是 current chunk.text 中逐字连续、足以支撑本次全部属性更新的原文。"""
         if record_table:
             entity_rules += _RECORD_TABLE_PROPERTY_RULES
@@ -652,8 +649,11 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
 ## ontology relation signatures
 {relation_section}
 
-## output schema
-{json.dumps(output_schema or {}, ensure_ascii=False, sort_keys=True, default=str)}
+## output protocol
+{jsonl_instruction(output_schema or {})}
+
+## record schema
+{json.dumps(record_schema(output_schema or {}), ensure_ascii=False, sort_keys=True, default=str)}
 
 ## output constraints
 {output_constraint}

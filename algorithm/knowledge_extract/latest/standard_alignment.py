@@ -61,7 +61,7 @@ REBUILT_RELATIONS = {
 }
 
 _SUMMARY_SYSTEM = """你是标准条款命名器。为每条给定内容生成一个概括短标题（<=12个汉字），用于实体名字。
-要求：忠实概括，不引入新事实；不要照抄长句；只输出 JSON。"""
+要求：忠实概括，不引入新事实；不要照抄长句；输出格式遵循共享 JSONL 协议。"""
 _SUMMARY_SCHEMA = {
     "type": "object",
     "properties": {

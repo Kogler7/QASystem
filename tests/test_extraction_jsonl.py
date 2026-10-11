@@ -114,3 +114,63 @@ def test_recovery_validates_each_line_and_keeps_failure_visible(version, finish_
     assert data == {"entities": [{"name": "甲"}]}
     assert any(row.get("terminal") and row["type"] in {"incomplete", "json"} for row in attempts)
     assert any(row["type"] == "recovered_prefix" for row in attempts)
+
+@pytest.mark.parametrize("version", ["v2", "v3", "latest"])
+@pytest.mark.parametrize("task,collection", [("entity", "entities"), ("property", "updates"), ("identity", "updates"), ("relation", "relations"), ("repair", "entities")])
+@pytest.mark.parametrize("table", [False, True])
+def test_router_exposes_only_wire_record_schema(version, task, collection, table):
+    from algorithm.knowledge_extract.jsonl_protocol import record_schema, jsonl_instruction
+    router = importlib.import_module(f"algorithm.knowledge_extract.{version}.prompt_router")
+    compiler = importlib.import_module(f"algorithm.knowledge_extract.{version}.ontology_compiler")
+    context = importlib.import_module(f"algorithm.knowledge_extract.{version}.chunk_context")
+    plan = compiler.compile_plan('@startuml\nclass "设备" as Equipment {\n + 名称 (name): String\n}\n@enduml')
+    route = router.DocumentRoute(kind="generic", source="fallback", scores=(), reasons=())
+    chunk = context.ExtractionChunk("c1", '[{"设备":"甲"}]' if table else "设备甲。")
+    schema = {"type": "object", "properties": {collection: {"type": "array", "items": {"type": "object", "properties": {"test_record": {"type": "string"}}}}}}
+    messages = router.build_chat_messages(task=task, plan=plan, route=route, chunk=chunk, output_schema=schema)
+    user = messages[1]["content"]
+    all_text = "\n".join(m["content"] for m in messages_for_jsonl(messages, schema))
+    shown = json.loads(user.split("## record schema\n", 1)[1].split("\n", 1)[0])
+    assert shown == record_schema(schema)
+    assert jsonl_instruction(schema) in user
+    for obsolete in ('JSON object', '{"entities": []}', '{"updates": []}', '## output schema', '禁止输出 null'):
+        assert obsolete not in all_text
+    assert "没有记录时只输出一行 null" in all_text
+
+
+def test_object_protocol_does_not_forbid_its_required_wrapper_or_request_null():
+    from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
+    schema = {"type": "object", "properties": {"decisions": {"type": "object"}}, "required": ["decisions"]}
+    instruction = jsonl_instruction(schema)
+    assert "整个对象独占一行" in instruction
+    assert "不要外层数组或集合键" not in instruction
+    assert "只输出一行 null" not in instruction
+    assert record_schema(schema) == schema
+    assert decode_jsonl('{"decisions":{}}', schema) == ({"decisions": {}}, [])
+
+@pytest.mark.parametrize("version", ["v2", "v3", "latest"])
+def test_verification_prompt_uses_shared_record_protocol(version):
+    from algorithm.knowledge_extract.jsonl_protocol import record_schema, jsonl_instruction
+    module = importlib.import_module(f"algorithm.knowledge_extract.{version}.semantic_evidence")
+    context = importlib.import_module(f"algorithm.knowledge_extract.{version}.chunk_context")
+    messages = module.build_verification_messages(chunk=context.ExtractionChunk("c1", "设备甲"), items=[])
+    user = messages[1]["content"]
+    assert jsonl_instruction(module.VERIFICATION_SCHEMA) in user
+    shown = json.loads(user.split("## record schema\n", 1)[1].split("\n", 1)[0])
+    assert shown == record_schema(module.VERIFICATION_SCHEMA)
+    assert "verdicts" not in shown["properties"]
+    assert "JSON object" not in "\n".join(m["content"] for m in messages)
+
+
+@pytest.mark.parametrize("version", ["v3", "latest"])
+def test_relation_map_router_and_client_agree_on_single_object_record(version):
+    from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction
+    router = importlib.import_module(f"algorithm.knowledge_extract.{version}.prompt_router")
+    compiler = importlib.import_module(f"algorithm.knowledge_extract.{version}.ontology_compiler")
+    context = importlib.import_module(f"algorithm.knowledge_extract.{version}.chunk_context")
+    schema = {"type": "object", "properties": {"decisions": {"type": "object"}}}
+    messages = router.build_chat_messages(task="relation", plan=compiler.compile_plan('@startuml\nclass Equipment\n@enduml'), route=router.DocumentRoute(kind="generic", source="fallback"), chunk=context.ExtractionChunk("c1", "设备甲"), relation_pairs=[], output_schema=schema)
+    assert jsonl_instruction(schema) in messages[1]["content"]
+    combined = "\n".join(m["content"] for m in messages_for_jsonl(messages, schema))
+    assert "不要外层数组或集合键" not in combined
+    assert "只输出一行 null" not in combined

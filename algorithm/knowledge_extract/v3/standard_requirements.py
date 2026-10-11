@@ -20,7 +20,7 @@ SYSTEM = (
     GENERIC_SEMANTIC_RULES
     + "\n\n"
     + STANDARD_PROMPT_EXTENSION
-    + "\n\n任务：对给定条款正文输出 items 数组，元素为 property 或 constraint，字段按上规则；只输出 JSON object，顶层键为 items。"
+    + "\n\n任务：对给定条款正文提取 property 或 constraint 记录，字段按上规则；输出格式遵循共享 JSONL 协议。"
 )
 SCHEMA = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {
     "kind": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string"}, "value": {"type": "string"},

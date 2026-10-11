@@ -43,7 +43,7 @@ logger = get_step_logger(__name__)
 from .relation_resolver import enumerate_relation_pairs
 from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages
 from .scheduler import get_llm_scheduler
-from algorithm.knowledge_extract.jsonl_protocol import decode_jsonl
+from algorithm.knowledge_extract.jsonl_protocol import decode_jsonl, jsonl_instruction
 from .structured_output import validate_json_schema
 
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
@@ -879,7 +879,7 @@ def generate_structured(
                         f"上一次输出摘要：已省略原文，字符数 {response_size}\n"
                         f"{recovery_instruction}"
                         f"{empty_instruction}"
-                        "不得解释错误，只输出 JSONL，每行一条记录，不要外层数组或集合键。"
+                        f"不得解释错误。{jsonl_instruction(schema)}"
                     ),
                 },
             ]

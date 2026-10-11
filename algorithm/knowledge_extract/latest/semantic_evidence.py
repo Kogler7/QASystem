@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
 import re
 from difflib import SequenceMatcher
 from typing import Any
@@ -41,7 +42,7 @@ VERIFICATION_SYSTEM_PROMPT = """你是抽取结果的证据核验器。
 关系候选必须由原文支持指定方向、指定关系和两个指定端点；只同时出现两个实体、主题相关或依赖常识推断都不能判为 yes。
 yes 必须表示 current chunk 能支持候选的完整事实，不得引入外部知识、混淆实体、颠倒关系方向或把邻近事实错误拼接。
 supported 只能取 yes（原文能够支持）、no（与原文矛盾或明显不属于原文）、uncertain（无法判断）。
-只输出 JSON object，且只包含 output schema 允许的键。"""
+输出遵循共享 JSONL 协议，记录只包含 record schema 允许的字段。"""
 
 
 def normalize_for_match(value: Any) -> str:
@@ -108,8 +109,11 @@ evidence_verification
 ## candidates
 {json.dumps(items, ensure_ascii=False, sort_keys=True, default=str)}
 
-## output schema
-{json.dumps(VERIFICATION_SCHEMA, ensure_ascii=False, sort_keys=True)}
+## output protocol
+{jsonl_instruction(VERIFICATION_SCHEMA)}
+
+## record schema
+{json.dumps(record_schema(VERIFICATION_SCHEMA), ensure_ascii=False, sort_keys=True)}
 
 ## output constraints
 - 逐项核验 candidates，按 item_id 输出 verdicts，不得遗漏任何 item_id。
@@ -117,7 +121,7 @@ evidence_verification
 - claim_kind=relation 时，必须核验 source、relation、target、方向和 evidence_quote 组成的完整关系断言。
 - candidate 含 entity_context 时，只能依据该实体锚定上下文判断，不得借用其他候选实体的事实。
 - yes=原文支持完整候选事实；no=与原文矛盾、关系不成立或属于其他实体；uncertain=无法判断。
-- 只输出 JSON object；不要解释。"""
+- 每条核验记录独占一行；不要解释。"""
     return [
         {"role": "system", "content": VERIFICATION_SYSTEM_PROMPT},
         {"role": "user", "content": user},
