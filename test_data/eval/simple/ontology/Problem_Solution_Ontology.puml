@@ -31,4 +31,7 @@
 
   ' 问题-方案内部关系
   问题 "1" --> "0..*" 方案 : 需要方案
+
+' @identity Problem: ProblemId
+' @identity Solution: solutionId
 @enduml

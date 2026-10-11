@@ -77,10 +77,56 @@ class EntityResolver:
         """Return the first ontology-declared identity value, falling back to display name."""
         type_id = str(candidate.canonical_type or candidate.proposed_type)
         for property_id in self.schema.identity_properties_for(type_id):
-            value = candidate.properties.get(property_id)
+            value = self.property_value(candidate, property_id)
             if canonical_name(value):
                 return type_id, property_id, coerce_non_empty_name(value)
         return type_id, "name", coerce_non_empty_name(candidate.name)
+
+    def property_value(self, candidate: Any, property_id: str) -> Any:
+        """Read a property by ontology id, accepting display-name keys as well."""
+        properties = getattr(candidate, "properties", None) or {}
+        if not isinstance(properties, dict):
+            return None
+        if property_id in properties:
+            return properties.get(property_id)
+        type_id = str(
+            getattr(candidate, "canonical_type", None)
+            or getattr(candidate, "proposed_type", None)
+            or ""
+        )
+        for key, value in properties.items():
+            if key == "name":
+                continue
+            prop = self.schema.resolve_property(type_id, key)
+            if prop is not None and prop.identifier == property_id:
+                return value
+            if prop is None and canonical_name(key) == canonical_name(property_id):
+                return value
+        return None
+
+    def canonicalize_properties(self, candidate: Any) -> dict[str, Any]:
+        """Rewrite property keys to ontology identifiers when resolvable."""
+        properties = getattr(candidate, "properties", None) or {}
+        if not isinstance(properties, dict):
+            return {}
+        type_id = str(candidate.canonical_type or candidate.proposed_type or "")
+        normalized: dict[str, Any] = {}
+        for key, value in properties.items():
+            if key == "name":
+                if coerce_non_empty_name(value):
+                    normalized["name"] = value
+                continue
+            prop = self.schema.resolve_property(type_id, key)
+            target = prop.identifier if prop is not None else coerce_non_empty_name(key) or str(key)
+            current = normalized.get(target)
+            if current in (None, "", []):
+                normalized[target] = value
+            elif value in (None, "", []) or current == value:
+                continue
+            elif isinstance(current, list) and isinstance(value, list):
+                normalized[target] = list(dict.fromkeys([*current, *value]))
+        candidate.properties = normalized
+        return normalized
 
     def decide(
         self,
@@ -134,6 +180,11 @@ class EntityResolver:
 
     def aliases(self, candidate: Any) -> set[str]:
         aliases = {alias_key(candidate.name)}
+        # Ontology ``name`` (or its display-name key) is a stable surface form,
+        # independent of whatever mention string Pass 1 used.
+        name_property = self.property_value(candidate, "name")
+        if name_property not in (None, "", []):
+            aliases.add(alias_key(name_property))
         for property_id, value in candidate.properties.items():
             marker = canonical_name(property_id)
             if not any(item in marker for item in _ALIAS_PROPERTY_MARKERS):
@@ -327,6 +378,7 @@ class CandidatePool:
             return None
 
         candidate.canonical_type = ontology_class.identifier
+        self._resolver.canonicalize_properties(candidate)
         name_key = (ontology_class.identifier, canonical_name(candidate.name))
         decision = self._resolver.decide(
             candidate,
@@ -352,25 +404,113 @@ class CandidatePool:
             self._resolver.register(candidate, identity_key=decision.identity_key)
             return candidate
 
-        candidate.resolution_method = decision.method
+        self._absorb_entity(existing, candidate, method=decision.method)
+        self._entity_index[name_key] = existing
+        return existing
+
+    def reconcile_identities(
+        self,
+        *,
+        warnings: list[dict[str, Any]] | None = None,
+    ) -> int:
+        """Re-merge entities after properties change using ontology identity only.
+
+        Pass 1 often freezes candidates under mention names before identity
+        attributes are filled. Once property enrichment (or repair) supplies the
+        ontology-declared identity values, group by exact identity key and absorb
+        duplicates so relation enumeration does not fan out across surface forms.
+        """
+        for entity in self._entities:
+            self._resolver.canonicalize_properties(entity)
+            _, entity.identity_property, entity.identity_value = self._resolver.identity_value(
+                entity
+            )
+
+        merged = 0
+        groups: dict[tuple[str, str, str], list[EntityCandidate]] = {}
+        for entity in self.accepted_entities():
+            key = self._resolver.identity_key(entity)
+            if key[1] == "name":
+                # Mention-only identity is already handled at add time; do not
+                # invent fuzzy merges for distinct surface forms.
+                continue
+            groups.setdefault(key, []).append(entity)
+
+        for members in groups.values():
+            if len(members) < 2:
+                continue
+            members.sort(key=lambda item: item.candidate_id)
+            survivor = members[0]
+            for other in members[1:]:
+                if other.candidate_id not in self._entity_by_id:
+                    continue
+                self._absorb_entity(survivor, other, method="exact_identity_reconcile")
+                self._retire_entity(other)
+                merged += 1
+                _append_warning(
+                    warnings,
+                    "ENTITY_IDENTITY_RECONCILED",
+                    (
+                        f"属性补全后按 identity {survivor.identity_property}="
+                        f"{survivor.identity_value!r} 合并表面名 "
+                        f"{other.name!r} -> {survivor.name!r}"
+                    ),
+                    "entities",
+                    {
+                        "survivor": survivor.candidate_id,
+                        "absorbed": other.candidate_id,
+                        "identity_property": survivor.identity_property,
+                        "identity_value": survivor.identity_value,
+                    },
+                )
+
+        if merged:
+            self._reindex_entities()
+        return merged
+
+    def _absorb_entity(self, existing: EntityCandidate, incoming: EntityCandidate, *, method: str) -> None:
         _, incoming_identity_property, incoming_identity_value = self._resolver.identity_value(
-            candidate
+            incoming
         )
-        if _SOURCE_PRIORITY.get(candidate.source, 0) > _SOURCE_PRIORITY.get(existing.source, 0):
-            existing.name = candidate.name
+        if _SOURCE_PRIORITY.get(incoming.source, 0) > _SOURCE_PRIORITY.get(existing.source, 0):
+            existing.name = incoming.name
             existing.identity_property = incoming_identity_property
             existing.identity_value = incoming_identity_value
         if existing.identity_property == "name" and incoming_identity_property != "name":
             existing.identity_property = incoming_identity_property
             existing.identity_value = incoming_identity_value
-        existing.resolution_method = decision.method
-        if decision.method not in existing.resolution_methods:
-            existing.resolution_methods.append(decision.method)
-        merge_candidate(existing, candidate)
-        self._entity_index[name_key] = existing
+        existing.resolution_method = method
+        if method not in existing.resolution_methods:
+            existing.resolution_methods.append(method)
+        merge_candidate(existing, incoming)
+        self._resolver.canonicalize_properties(existing)
+        _, existing.identity_property, existing.identity_value = self._resolver.identity_value(
+            existing
+        )
         self._resolver.register(existing)
-        self._resolver.register_merged_aliases(candidate, existing)
-        return existing
+        self._resolver.register_merged_aliases(incoming, existing)
+        if incoming.candidate_id and incoming.candidate_id != existing.candidate_id:
+            self._relation_resolver.rewire_endpoint(incoming.candidate_id, existing.candidate_id)
+
+    def _retire_entity(self, entity: EntityCandidate) -> None:
+        entity.mapping_status = "rejected"
+        entity.warnings.append("MERGED_BY_IDENTITY_RECONCILE")
+        self._entity_by_id.pop(entity.candidate_id, None)
+        self._entities = [
+            item for item in self._entities if item.candidate_id != entity.candidate_id
+        ]
+
+    def _reindex_entities(self) -> None:
+        self._entity_index = {}
+        self._resolver = EntityResolver(
+            self.schema,
+            self._resolver.manager,
+            self._resolver.adjudicator,
+        )
+        for entity in self._entities:
+            type_id = str(entity.canonical_type or entity.proposed_type or "")
+            self._entity_index[(type_id, canonical_name(entity.name))] = entity
+            self._resolver.register(entity)
 
     def find_entity(self, type_id: str, name: str) -> EntityCandidate | None:
         ontology_class = self.schema.resolve_class(type_id)
