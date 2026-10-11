@@ -19,7 +19,4 @@
 
   ' 认知属性包内部关系（基于ISO 42010）
   关注点 "1" --> "0..*" 利益相关者 : is a matter of importance to
-
-' @identity Stakeholder: stakeholderId
-' @identity Concern: concernId
 @enduml

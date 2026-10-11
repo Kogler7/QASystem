@@ -280,37 +280,6 @@ class RelationResolver:
         """Return a snapshot of all resolved candidates, including rejections."""
         return list(self._relations)
 
-    def rewire_endpoint(self, old_id: str, new_id: str) -> None:
-        """Point relations at ``new_id`` after an entity identity merge."""
-        if not old_id or not new_id or old_id == new_id:
-            return
-        rebuilt: dict[tuple[str, str, str], RelationCandidate] = {}
-        kept: list[RelationCandidate] = []
-        for relation in self._relations:
-            if relation.from_candidate_id == old_id:
-                relation.from_candidate_id = new_id
-            if relation.to_candidate_id == old_id:
-                relation.to_candidate_id = new_id
-            if relation.mapping_status != "accepted" or not relation.canonical_relation:
-                kept.append(relation)
-                continue
-            key = (
-                relation.from_candidate_id,
-                relation.canonical_relation,
-                relation.to_candidate_id,
-            )
-            existing = rebuilt.get(key)
-            if existing is None:
-                rebuilt[key] = relation
-                kept.append(relation)
-                continue
-            for evidence in relation.evidence:
-                if not any(evidence.span_id == item.span_id for item in existing.evidence):
-                    existing.evidence.append(evidence)
-            relation.mapping_status = "rejected"
-        self._relations = kept
-        self._relation_by_key = rebuilt
-
     def unresolved_rejections(self) -> list[dict[str, Any]]:
         accepted = self.accepted()
         accepted_endpoint_pairs = {

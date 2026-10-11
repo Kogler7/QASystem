@@ -6,9 +6,9 @@ tags: []
 
 # Knowledge Extract V2.2
 
-本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、可选 Clef 预判、属性补全后按 `@identity` 再合并、解析、验证和图结果组装。
+本目录只包含算法源码：ontology 驱动的两阶段实体/关系抽取、解析、验证和图结果组装。
 
-Benchmark 数据集（17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v2/`，作为历史冻结集保留（单测 fixtures 与造 golden 工具的数据源）；在线链路的评测统一走 `eval/run.py`（设置 `KG_EXTRACT_ALGO_VERSION=v2.2` 即评测本包），均不属于本目录。实体去重依赖本体 `' @identity Class: propId` 声明，详见下方设计文档 §C。
+Benchmark 数据集（17 个冻结的 dev case，以及对应的 Markdown、PlantUML ontology、golden 和 manifest hash）位于 `test_data/eval-v2/`，作为历史冻结集保留（单测 fixtures 与造 golden 工具的数据源）；在线链路的评测统一走 `eval/run.py`（设置 `KG_EXTRACT_ALGO_VERSION=v2.2` 即评测本包），均不属于本目录。
 
 ## 公共入口
 

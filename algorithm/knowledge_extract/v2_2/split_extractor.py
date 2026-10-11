@@ -691,12 +691,6 @@ def extract_split(
         preview(property_enrichment, 240),
     )
 
-    # Property pass may fill ontology identity attributes that were absent at
-    # Pass 1. Reconcile only by exact identity keys so relation pairs do not
-    # fan out across dual surface forms of the same business object.
-    reconciled = pool.reconcile_identities(warnings=warnings)
-    logger.info("[步骤][抽取] 属性后身份再合并: merged=%d", reconciled)
-
     # Pass 2：关系候选（LLM，基于 accepted/resolved 实体目录）
     relation_results = _relation_pass(
         plan,
@@ -942,7 +936,6 @@ def extract_split(
     )
     repair_rounds = [item.to_dict() for item in repair_result.rounds]
     repair_stop_reason = repair_result.stop_reason
-    pool.reconcile_identities(warnings=warnings)
 
     # Repair proposals pass through the same acceptance boundary.  This also
     # cascades any repaired relation whose endpoint was previously rejected.
