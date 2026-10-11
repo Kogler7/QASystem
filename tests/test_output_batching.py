@@ -77,6 +77,20 @@ def test_first_truncation_splits_without_repeating_parent(cg):
     assert len(metrics) == 6  # Every actual model call stays observable.
 
 
+def test_truncation_never_retries_identical_work_without_split_caller(cg):
+    model = Model()
+    messages, schema = build_request([1, 2])
+    attempts = []
+    result = cg.generate_structured(
+        model, messages, schema, use_scheduler=False, attempts=attempts,
+        pass_name='entity', chunk_id='c1', max_attempts=3, retry_base_seconds=0,
+    )
+    assert result is None
+    assert model.calls == [[1, 2]]
+    assert attempts[-1]['type'] == 'incomplete' and attempts[-1]['terminal']
+    assert attempts[-1]['retryable'] is False
+
+
 def test_failed_singleton_preserves_successful_siblings_and_failure(cg):
     model = Model(fail_id=2)
     result, attempts, _ = run(cg, model)

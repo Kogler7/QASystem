@@ -183,9 +183,13 @@ def test_provider_json_format_override_is_request_local(providers, monkeypatch):
 
 
 @pytest.mark.parametrize("version", ["v2", "v3", "latest", "v3.1"])
-def test_live_client_configuration_uses_chat_only_without_network(providers, monkeypatch, version):
+@pytest.mark.parametrize("max_tokens", [4096, 16384])
+def test_live_client_configuration_uses_chat_only_without_network(providers, monkeypatch, version, max_tokens):
     import openai
+    from algorithm.output_batching import output_batch_size
 
+    providers["siliconflow"]["max_tokens"] = max_tokens
+    monkeypatch.setenv("KG_EXTRACT_PROVIDERS_JSON", json.dumps(providers))
     seen = []
     def create(**kwargs):
         seen.append(kwargs)
@@ -199,6 +203,9 @@ def test_live_client_configuration_uses_chat_only_without_network(providers, mon
     llm = runtime.create_request_llm(config.resolve_config({"version": version, "provider": "siliconflow"}))
     result = llm.generate_structured({"type": "object"}, [{"role": "user", "content": "x"}])
     assert result.finish_reason == "stop"
+    assert seen[0]["max_tokens"] == max_tokens
+    assert llm.max_tokens == max_tokens
+    assert output_batch_size(llm, tokens_per_item=1024, ceiling=24) == int(max_tokens * 0.65) // 1024
     assert seen[0]["model"] == "provider-model"
     assert seen[0]["extra_body"] == {"enable_thinking": False}
 

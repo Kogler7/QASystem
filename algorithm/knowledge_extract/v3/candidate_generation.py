@@ -663,7 +663,6 @@ def generate_structured(
     call_metrics: list[dict[str, Any]] | None = None,
     retry_empty_collection: bool = False,
     record_table: bool | None = None,
-    split_on_incomplete: bool = False,
     return_recovered_on_failure: bool = False,
 ) -> dict[str, Any] | None:
     """Call one required pass with bounded retry and conservative prefix recovery."""
@@ -796,6 +795,8 @@ def generate_structured(
             message = str(exc) or type(exc).__name__
             retryable = _is_retryable_exception(exc)
 
+        if error_type == "incomplete":
+            retryable = False  # Repeating the same output budget cannot recover truncation.
         next_response_mode = _next_response_mode(response_mode, error_type)
         logger.warning(
             "[步骤][LLM] 输出: pass=%s chunk=%s attempt=%d status=%s response=%d字符 恢复片段=%d 下一模式=%s message=%s",
@@ -844,7 +845,7 @@ def generate_structured(
             error_type=error_type,
             response_mode=response_mode,
         )
-        if (split_on_incomplete and error_type == "incomplete") or not retryable or attempt_number >= resolved_max_attempts:
+        if error_type == "incomplete" or not retryable or attempt_number >= resolved_max_attempts:
             attempts[-1]["terminal"] = True
             break
         if error_type in {"json", "schema", "empty_collection"}:
@@ -1447,7 +1448,6 @@ def entity_pass(
                 max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=target_metrics,
-                split_on_incomplete=True,
                 retry_empty_collection=retry_empty,
                 return_recovered_on_failure=return_recovered,
             )
@@ -1925,7 +1925,6 @@ def relation_pass(
                 pass_name="relation",
                 chunk_id=f"{chunk.chunk_id}.batch-{batch_tag}",
                 max_attempts=max_attempts,
-                split_on_incomplete=True,
                 retry_base_seconds=retry_base_seconds,
                 call_metrics=local_call_metrics,
             )

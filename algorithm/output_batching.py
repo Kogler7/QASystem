@@ -60,7 +60,7 @@ def generate_batched(
         messages, schema = build_request(batch)
         start = len(attempts)
         parsed = generate(llm, messages, schema, **{
-            **kwargs, 'chunk_id': chunk_id, 'split_on_incomplete': True,
+            **kwargs, 'chunk_id': chunk_id,
         })
         calls += 1
         if stats is not None:
