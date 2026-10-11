@@ -23,6 +23,33 @@ def test_absent_overrides_leave_backend_defaults():
     assert run.extraction_overrides(args, {}) == {"extraction": {}}
 
 
+def test_chunk_cli_overrides_yaml_and_reaches_http(monkeypatch):
+    params = {"options": {"chunking": {"chunk_overlap": 0, "size": 4000}}}
+    options = run.extraction_overrides(run.parse_args(["--chunk-overlap", "80", "--chunk-size", "1000"]), params)
+    submit = Mock(return_value={})
+    monkeypatch.setattr(run, "submit_and_wait", submit)
+    run.chunk_document("http://backend", "text", "test.md", options, {})
+    assert json.loads(submit.call_args.kwargs["data"])["options"] == {"chunk_overlap": 80, "size": 1000}
+    assert params["options"]["chunking"]["chunk_overlap"] == 0
+
+
+@pytest.mark.parametrize("extra", [["--chunk-overlap", "-1"], ["--chunk-size", "50"],
+    ["--chunk-overlap", "100", "--chunk-size", "100"],
+    ["--chunk-overlap", "50", "--mode", "extract"],
+    ["--chunk-overlap", "50", "--reuse-extract-from", "old"]])
+def test_chunk_invalid_or_ineffective_overrides_rejected(extra):
+    with pytest.raises(ValueError):
+        run.extraction_overrides(run.parse_args(extra), {})
+
+
+def test_chunk_overlap_default_and_explicit_disable():
+    from backend.app.schemas import ChunkOptions
+    assert ChunkOptions().chunk_overlap == 50
+    assert ChunkOptions(chunk_overlap=0).chunk_overlap == 0
+    assert run.load_params(run.KIT_DIR / "params.yaml")["options"]["chunking"]["chunk_overlap"] == 50
+    assert run.extraction_overrides(run.parse_args(["--chunk-overlap", "0"]), {})["chunking"]["chunk_overlap"] == 0
+
+
 @pytest.mark.parametrize("value", ["0", "-1", "nan", "inf"])
 def test_invalid_timeout_fails_before_http(value):
     args = run.parse_args(["--extract-request-timeout", value])

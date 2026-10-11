@@ -93,7 +93,7 @@ DEFAULT_PARAMS: dict[str, Any] = {
         "chunking": {
             "strategy": "recursive",
             "size": 4000,
-            "chunk_overlap": 0,
+            "chunk_overlap": 50,
             "chunk_threshold": 12000,
             "similarity": 0.6,
             "separators": None,
@@ -3403,6 +3403,17 @@ def extraction_overrides(args: argparse.Namespace, params: dict[str, Any]) -> di
     )):
         raise ValueError("覆盖抽取配置时不能复用旧预测；请仅使用 --from-run 复用切片")
     options["extraction"] = extraction
+    chunk_overrides = {key: getattr(args, arg, None) for key, arg in (
+        ("chunk_overlap", "chunk_overlap"), ("size", "chunk_size"))}
+    if any(value is not None for value in chunk_overrides.values()):
+        if args.stage != "backend" or args.reuse_extract_from or (args.mode and "extract" in args.mode):
+            raise ValueError("切片参数覆盖需要 backend 的 chunk-extract 或 pipeline 模式，不能复用旧切片或预测")
+        chunking = dict(options.get("chunking") or {})
+        chunking.update({key: value for key, value in chunk_overrides.items() if value is not None})
+        size, overlap = chunking.get("size", 4000), chunking.get("chunk_overlap", 50)
+        if type(size) is not int or type(overlap) is not int or size <= 0 or not 0 <= overlap < size:
+            raise ValueError("切片参数必须满足 size > 0 且 0 <= chunk_overlap < size")
+        options["chunking"] = chunking
     return options
 
 
@@ -3420,6 +3431,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE), help="工作区根目录，默认 test_data/eval")
     parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml")
+    parser.add_argument("--chunk-overlap", type=int, help="本次切片重叠长度，覆盖 YAML；0 关闭，默认 50")
+    parser.add_argument("--chunk-size", type=int, help="本次切片大小，覆盖 YAML；必须大于 overlap")
     parser.add_argument("--extract-version", choices=("v2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
     parser.add_argument("--extract-provider", help="Backend 预配置供应商名称，不接受密钥或 URL")
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")

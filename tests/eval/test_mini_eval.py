@@ -206,8 +206,8 @@ def test_mini_forwards_extraction_overrides(workspace, tmp_path, monkeypatch):
     monkeypatch.setattr(mini_eval.subprocess, "run", child)
     assert mini_eval.main(["--workspace", str(workspace), "--params", str(params),
                           "--extract-version", "v3.1", "--extract-provider", "siliconflow",
-                          "--extract-request-timeout", "300"]) == 0
+                          "--extract-request-timeout", "300", "--chunk-overlap", "80"]) == 0
     command = child.call_args.args[0]
     for flag, value in [("--extract-version", "v3.1"), ("--extract-provider", "siliconflow"),
-                        ("--extract-request-timeout", "300")]:
+                        ("--extract-request-timeout", "300"), ("--chunk-overlap", "80")]:
         assert command[command.index(flag) + 1] == value
