@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
+from jsonschema import Draft202012Validator
+from algorithm.knowledge_extract.jsonl_protocol import decode_jsonl, collection_name
 
 from eval.tools.repetition_causal import expansion_trajectory
 from eval.tools.repetition_study import metrics
@@ -37,6 +40,71 @@ def http_category(http):
     return "local_timeout" if "timeout" in error.lower() else "local_other_failure"
 
 
+def output_format(text, schema, *, response_present=True, local_failure=False):
+    """Classify shape separately from finish_reason and tolerant parsing.
+
+    A single flat object is indistinguishable from one-record JSONL. Incomplete
+    JSON is a syntax heuristic, never inferred from a missing response alone.
+    """
+    if not response_present or local_failure:
+        return {"format": "unknown", "inner_format": "unknown", "parse_valid": None,
+                "schema_valid": None, "parse_errors": None}
+    raw = str(text or "").lstrip("\ufeff").strip()
+    fenced = bool(re.match(r"```(?:jsonl|ndjson|json)?[^\S\n]*\n", raw, re.I) or raw.endswith("```"))
+    content = re.sub(r"\A```(?:jsonl|ndjson|json)?[^\S\n]*\n", "", raw, flags=re.I)
+    content = re.sub(r"```\s*\Z", "", content).strip() if fenced else content
+    shape = "empty_output" if not content else "plain_text"
+    try:
+        whole = json.loads(content)
+    except ValueError:
+        whole = ...
+    if whole is None:
+        shape = "empty_marker"
+    elif isinstance(whole, list):
+        shape = "wrapped_json_array"
+    elif isinstance(whole, dict):
+        name = collection_name(schema)
+        shape = "wrapped_json" if name and name in whole else "jsonl"
+    elif whole is ... and content:
+        decoder = json.JSONDecoder()
+        cursor = 0
+        complete = 0
+        malformed = []
+        while cursor < len(content):
+            while cursor < len(content) and content[cursor].isspace():
+                cursor += 1
+            if cursor == len(content):
+                break
+            try:
+                value, end = decoder.raw_decode(content, cursor)
+                complete += int(isinstance(value, dict) or value is None)
+                cursor = end
+            except ValueError:
+                end = content.find("\n", cursor)
+                end = len(content) if end < 0 else end
+                malformed.append(content[cursor:end].strip())
+                cursor = end + 1
+        if not malformed and complete:
+            lines = [line for line in content.splitlines() if line.strip()]
+            strict_lines = True
+            for line in lines:
+                try:
+                    item = json.loads(line)
+                    strict_lines &= isinstance(item, dict) or item is None
+                except ValueError:
+                    strict_lines = False
+            shape = "jsonl" if strict_lines else "json_objects_non_line"
+        elif malformed:
+            tail = malformed[-1]
+            incomplete = tail.startswith(("{", "[")) and not tail.endswith(("}", "]"))
+            only_json_damage = all(line.startswith(("{", "[", '"', "}", "]")) for line in malformed)
+            shape = "incomplete_json" if incomplete and only_json_damage else ("mixed_text" if complete else "plain_text")
+    decoded, errors = decode_jsonl(raw, schema)
+    return {"format": "fenced" if fenced else shape, "inner_format": shape,
+            "parse_valid": not errors, "schema_valid": not list(Draft202012Validator(schema).iter_errors(decoded)),
+            "parse_errors": len(errors)}
+
+
 def audit_trace(directory):
     directory = Path(directory)
     manifest = read(directory / "manifest.json")
@@ -59,6 +127,14 @@ def audit_trace(directory):
             counts["finish_" + finish] += 1
         text = response.get("text") or ""
         m, trajectory = metrics(text), expansion_trajectory(text)
+        unavailable = category.startswith("local_") or response.get("status") == "failed"
+        fmt = output_format(text, call.get("schema") or {}, local_failure=unavailable)
+        counts["format_" + fmt["format"]] += 1
+        counts["inner_format_" + fmt["inner_format"]] += 1
+        counts["parse_valid"] += int(fmt["parse_valid"] is True)
+        counts["schema_valid"] += int(fmt["schema_valid"] is True)
+        counts["parsed_schema_valid"] += int(fmt["parse_valid"] is True and fmt["schema_valid"] is True)
+        counts["parse_unknown"] += int(fmt["parse_valid"] is None)
         counts["complete_records"] += m["records"]
         counts["exact_duplicate_records"] += m["records"] - m["unique_records"]
         severe = trajectory["sustained_zero_novel_stop_record"] is not None
@@ -74,7 +150,7 @@ def audit_trace(directory):
                           "complete_records": m["records"], "unique_records": m["unique_records"],
                           "max_exact_multiplicity": m["max_exact_multiplicity"],
                           "zero_novel_tail_records": trajectory["zero_novel_tail_records"],
-                          "severe_repeat": severe})
+                          "severe_repeat": severe, "output_format": fmt})
     returned_ids = {r["call_id"] for r in responses}
     for file in sorted(directory.glob("*-call.json")):
         call_id = file.stem
@@ -84,11 +160,14 @@ def audit_trace(directory):
         stage = str(call.get("context", {}).get("pass_name") or "unknown")
         stages[stage]["generation_entries"] += 1
         stages[stage]["response_artifact_missing"] += 1
+        stages[stage]["format_unknown"] += 1
+        stages[stage]["parse_unknown"] += 1
         category = http_category(http[call_id]) if call_id in http else "http_record_missing"
         stages[stage][category] += 1
         stages[stage]["actual_http"] += int(category in {"http_returned", "http_timeout", "http_error"})
         responses.append({"call_id": call_id, "stage": stage, "http_category": category,
-                          "response_artifact_missing": True, "finish_reason": None})
+                          "response_artifact_missing": True, "finish_reason": None,
+                          "output_format": output_format("", {}, response_present=False)})
     terminals = []
     for attempt in result.get("attempts", []):
         if attempt.get("terminal"):

@@ -1,6 +1,7 @@
 import json
 
-from eval.tools.trace_failure_audit import audit_trace, audit_evaluation, http_category
+from eval.tools.trace_failure_audit import audit_trace, audit_evaluation, http_category, output_format
+import pytest
 
 
 def test_local_failure_artifacts_are_not_http_requests():
@@ -52,3 +53,31 @@ def test_interrupted_generation_is_counted_without_inventing_http_timeout(tmp_pa
     assert result["totals"]["response_artifact_missing"] == 1
     assert result["totals"].get("actual_http", 0) == 0
     assert result["totals"].get("http_timeout", 0) == 0
+
+
+SCHEMA = {"type": "object", "properties": {"updates": {"type": "array", "items": {
+    "type": "object", "properties": {"x": {"type": "integer"}}, "required": ["x"]}}}, "required": ["updates"]}
+
+
+@pytest.mark.parametrize("text,shape,inner,valid", [
+    ('{"x":1}\n{"x":2}', 'jsonl', 'jsonl', True),
+    ('```jsonl\n{"x":1}\n```', 'fenced', 'jsonl', True),
+    ('{"updates":[{"x":1}]}', 'wrapped_json', 'wrapped_json', True),
+    ('[{"x":1}]', 'wrapped_json_array', 'wrapped_json_array', True),
+    ('{"x":1}\n{"x":', 'incomplete_json', 'incomplete_json', False),
+    ('结果如下：\n{"x":1}', 'mixed_text', 'mixed_text', False),
+    ('{"x":1}{"x":2}', 'json_objects_non_line', 'json_objects_non_line', True),
+    ('null', 'empty_marker', 'empty_marker', True),
+])
+def test_output_shapes_are_separate_from_finish_and_tolerant_parser(text, shape, inner, valid):
+    result = output_format(text, SCHEMA)
+    assert result["format"] == shape
+    assert result["inner_format"] == inner
+    assert result["parse_valid"] == valid
+
+
+def test_local_budget_and_missing_response_stay_unknown_not_truncated_output():
+    assert output_format("", SCHEMA, local_failure=True)["format"] == "unknown"
+    assert output_format("", SCHEMA, response_present=False)["parse_valid"] is None
+    assert output_format('{"x":"wrong type"}', SCHEMA)["parse_valid"] is True
+    assert output_format('{"x":"wrong type"}', SCHEMA)["schema_valid"] is False
