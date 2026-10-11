@@ -75,16 +75,16 @@ def quality_metrics(text,messages,anchors):
     hits=sum(any(r.get('type')==a['type'] and a['mention_contains'] in r.get('mention','') for r in rows) for a in supported)
     return {'input_text_chars':len(source),'literal_mention_fraction':literal/len(entities) if entities else None,'anchor_hits':hits,'anchor_count':len(supported),'anchor_scope_excluded':len(anchors)-len(supported),'type_counts':dict(collections.Counter(r.get('type') for r in entities))}
 
-def replay(dataset,out,plan,workers=2,max_tokens=8192):
+def replay(dataset,out,plan,workers=2,max_tokens=8192,timeout=180):
     from openai import OpenAI
     # Docker environment values are read in memory; credentials never enter artifacts.
     import os
     profiles=json.loads(os.environ['KG_EXTRACT_PROVIDERS_JSON']);profile=profiles['siliconflow']
-    client=OpenAI(base_url=profile['base_url'],api_key=os.environ[profile['api_key_env']],timeout=180,max_retries=0)
+    client=OpenAI(base_url=profile['base_url'],api_key=os.environ[profile['api_key_env']],timeout=timeout,max_retries=0)
     out.mkdir(parents=True,exist_ok=True)
     def one(spec):
         cid,method,repeat=spec;case=json.loads((dataset/(cid+'.json')).read_text(encoding='utf8'));messages,temp,extra=variant(case,method)
-        safe={'case':cid,'method':method,'repeat':repeat,'model':profile['model'],'temperature':temp,'max_tokens':max_tokens,'thinking':{'type':'disabled'},**extra,'messages':messages}
+        safe={'case':cid,'method':method,'repeat':repeat,'model':profile['model'],'temperature':temp,'max_tokens':max_tokens,'timeout_seconds':timeout,'thinking':{'type':'disabled'},**extra,'messages':messages}
         target=out/(cid+'--'+method+'--'+str(repeat)+'.json')
         if target.exists():return json.loads(target.read_text(encoding='utf8'))['summary']
         start=time.monotonic();text='';finish=None;usage=None;stopped=False;error=None;metadata={}
@@ -113,5 +113,5 @@ def replay(dataset,out,plan,workers=2,max_tokens=8192):
     (out/'summary.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf8',newline='\n');return results
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--dataset',type=Path,required=True);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--max-tokens',type=int,default=8192);args=parser.parse_args()
-    replay(args.dataset,args.out,json.loads(args.plan.read_text(encoding='utf8')),max_tokens=args.max_tokens)
+    parser=argparse.ArgumentParser();parser.add_argument('--dataset',type=Path,required=True);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--max-tokens',type=int,default=8192);parser.add_argument('--timeout',type=float,default=180);args=parser.parse_args()
+    replay(args.dataset,args.out,json.loads(args.plan.read_text(encoding='utf8')),max_tokens=args.max_tokens,timeout=args.timeout)

@@ -1,0 +1,46 @@
+{
+  "cases": [
+    {
+      "id": "repair-legacy-conflict",
+      "sha256": "060bcdde051eb44a5440f421de73723fe12ead15a54a3afde103c93bcf8a69d6"
+    },
+    {
+      "id": "repair-legacy-scope",
+      "sha256": "e0c0d5e524217386b24c9e6f78115da6c594b4548b2d7866b667c9bdd7c52e73"
+    },
+    {
+      "id": "repair-clean-conflict",
+      "sha256": "4595fb8f3a9fd62162be4aa2bb2d85a268aac08a0792aeab902f17c4b8656efb"
+    },
+    {
+      "id": "repair-clean-scope",
+      "sha256": "30f946c240a8d2ccfc59b2598eb46d69790fb5a20ade67f33b1184cddc403417"
+    },
+    {
+      "id": "repair-legacy-enum_only",
+      "sha256": "16525e025d406c94bef3226a5c8275ab8ab3d9a73ade70ce5ed4a872930445ac"
+    },
+    {
+      "id": "entity-whole",
+      "sha256": "64004bebeff7f36195f51b5a66cefed3d6f40086989547dec4b45564e6595af9"
+    },
+    {
+      "id": "entity-segment-a",
+      "sha256": "31c177f1e20a891a1f58e1faf4e6cb0ed4ec7ce686745507da4da20288ff23aa"
+    },
+    {
+      "id": "entity-segment-b",
+      "sha256": "4a5aa51f29b0ea1ef9b06c122de2cf6e79ab717891d91b4525f7df48bc2b86ca"
+    }
+  ],
+  "model": "deepseek-ai/DeepSeek-V4-Flash",
+  "temperature": 0,
+  "max_tokens": 16384,
+  "thinking": {
+    "type": "disabled"
+  },
+  "max_retries": 0,
+  "timeout_seconds": 300,
+  "historical_relation_source_commit": "65ee14f20199f52ec6ee9546c577a3027f5511a1 (a5e1555 merged)",
+  "label_status": "agent-reviewed / provisional; no independent human truth"
+}
