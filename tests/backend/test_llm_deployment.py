@@ -15,6 +15,8 @@ def test_llm_uses_shared_image_readonly_models_and_explicit_gpu():
     assert service["image"] == backend["image"]
     assert service["volumes"] == ["${HOST_MODELS_DIR:-./deploy/models}:/models:ro"]
     assert ":?" in service["environment"]["CUDA_VISIBLE_DEVICES"]
+    assert service["environment"]["VLLM_NO_USAGE_STATS"] == "1"
+    assert service["environment"]["DO_NOT_TRACK"] == "1"
     assert "exec vllm serve" in service["command"][-1]
     assert "venv" not in service["command"][-1]
 

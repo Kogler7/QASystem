@@ -28,6 +28,10 @@ transformers==5.17.0
 torch==2.13.0
 torchvision==0.28.0
 vllm==0.31.0; sys_platform == "linux"
+# Keep vLLM's telemetry packages on one compatible release line.
+opentelemetry-api==1.45.1
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp==1.45.1
 
 # Agent and reasoning tools
 langchain-core==1.2.17

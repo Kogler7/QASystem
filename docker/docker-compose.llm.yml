@@ -12,6 +12,8 @@ services:
       CUDA_VISIBLE_DEVICES: ${LLM_GPU_DEVICE_IDS:?Set LLM_GPU_DEVICE_IDS for the llm profile}
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
     volumes:
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
     command:
