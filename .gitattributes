@@ -1,0 +1,2 @@
+# Judge corpus hashes are over exact bytes on every platform.
+test_data/judge/** text eol=lf
