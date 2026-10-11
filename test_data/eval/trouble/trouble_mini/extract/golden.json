@@ -1,0 +1,1914 @@
+{
+  "entities": [
+    {
+      "type": "FaultComponent",
+      "name": "A节大闸",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "A节大闸"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "93阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "93阀"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "283KP压力开关",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "283KP压力开关"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "A节大闸不缓解",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "A节大闸不缓解",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "换端后A节大闸不能正常缓解。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "重新转动93阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "重新转动93阀",
+        "MethodType": "调整",
+        "MethodStrategy": "纠正性",
+        "MethodDescription": "重新转93阀，但故障未消除。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "大复位",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "大复位",
+        "MethodType": "复位",
+        "MethodStrategy": "纠正性",
+        "MethodDescription": "执行大复位后状态恢复正常。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换283KP压力开关",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换283KP压力开关",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换283KP压力开关。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "283KP状态数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "283KP状态数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据并分析283KP压力开关状态。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "283KP压力开关断开检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "283KP压力开关断开",
+        "ResultStatus": "异常",
+        "ResultDescription": "下载数据分析发现283KP压力开关处于断开状态。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "大闸缓解功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "大闸缓解功能验证试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "大复位后观察大闸缓解状态，并进行库内试验。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "大闸缓解功能验证结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "大闸缓解功能恢复",
+        "ResultStatus": "正常",
+        "ResultDescription": "大复位后状态正常，库内试验正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "LTE-A网",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "LTE-A网"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "A网通信模块",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "A网通信模块"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "OCE",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "OCE"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "LTE-A网间歇性脱网",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "LTE-A网间歇性脱网",
+        "FaultCategory": "通信故障",
+        "FaultDescription": "4:58分运行至541KM+800M处LTE-A网脱网5:00恢复；5:50运行至482KM+900M处A网闪红5:51恢复；6:11分运行至457KM+890M处，A网脱网6:14恢复。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换A网通信模块",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换A网通信模块",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换A网通信模块。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "LTE与OCE通信数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "LTE与OCE通信数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载主车7002的LTE、OCE数据，并在神池入库后下载从车7079数据进行分析。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "列车管",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "列车管"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "A节中继阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "A节中继阀"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "181遮断阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "181遮断阀"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "列车管不缓解",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "列车管不缓解",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "A节操纵，大闸运转位均缸缓解正常，列车管不缓解。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换A节中继阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换A节中继阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换A节中继阀。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换181遮断阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换181遮断阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换181遮断阀。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "列车管缓解数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "列车管缓解数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据分析列车管缓解异常。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "列车管缓解功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "列车管缓解功能验证试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "更换相关阀件后进行多次列车管缓解试验。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "列车管缓解功能验证结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "列车管缓解功能恢复",
+        "ResultStatus": "正常",
+        "ResultDescription": "多次试验均正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "BCU",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "BCU"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "流量计",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "流量计"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "253YV",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "253YV"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "制动机",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "制动机"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "列车管充风异常",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "列车管充风异常",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "列车管压力上升缓慢，且故障时未正常充风。"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "列车管减压异常",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "列车管减压异常",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "主车制动时从车列车管减压缓慢。"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "流量计无显示",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "流量计无显示",
+        "FaultCategory": "其他",
+        "FaultDescription": "从车流量计无显示。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "主从控BCU数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "主从控BCU数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "均缸缓解状态检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "均缸缓解正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "故障时刻均缸缓解正常。"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "总风压力变化检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "总风压力无下降",
+        "ResultStatus": "正常",
+        "ResultDescription": "故障时刻总风压力无下降。"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "流量计显示检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "流量计无显示",
+        "ResultStatus": "异常",
+        "ResultDescription": "BCU数据分析显示流量计无显示。"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "列车管充风状态检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "列车管未充风",
+        "ResultStatus": "异常",
+        "ResultDescription": "BCU数据分析判断故障时刻列车管未充风。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换253YV",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换253YV",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换7002A节253YV，181遮断阀。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "制动机功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "制动机功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "更换相关阀件后试验制动机功能。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "制动机功能试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "制动机正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "试验制动机功能正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节TCU1M2A相下管",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节TCU1M2A相下管"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "IGBT",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "IGBT"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "门极驱动板",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "门极驱动板"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节TCU1M2A相下管故障",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节TCU1M2A相下管故障",
+        "FaultCategory": "电气故障",
+        "FaultDescription": "B节TCU1的M2单元A相下管发生故障。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "TCU故障数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "TCU故障数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据，分析B节TCU1M2A相下管故障记录。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "A相下管故障诊断结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "B节TCU1M2A相下管故障",
+        "ResultStatus": "异常",
+        "ResultDescription": "数据分析确认B节TCU1M2A相下管故障。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "IGBT阻值测量",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "IGBT阻值测量",
+        "ExperimentType": "电气测量",
+        "ExperimentProcedure": "上车测量IGBT阻值。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "IGBT阻值测量结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "IGBT阻值正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "IGBT阻值测量结果正常。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换门极驱动板",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换门极驱动板",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换门极驱动板。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "TCU功率单元库内功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "TCU功率单元库内功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "更换门极驱动板后进行库内功能试验。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "TCU功率单元库内试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "未复现A相下管故障",
+        "ResultStatus": "正常",
+        "ResultDescription": "库内试验正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "压缩机",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "压缩机"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "287KP",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "287KP"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "压缩机未自动打风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "压缩机未自动打风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "总风压力低于750kPa时，压缩机未按预期自动打风。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "压缩机自动打风功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "压缩机自动打风功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "在总风压力低于750kPa时，多次试验AB节压缩机自动打风情况。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "压缩机自动打风试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "总风低于750kPa时AB节压缩机自动打风",
+        "ResultStatus": "正常",
+        "ResultDescription": "上车多次试验时，AB节压缩机均能自动打风。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换287KP",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换287KP",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换287KP。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节压缩机",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节压缩机"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节压缩机滤清筒",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节压缩机滤清筒"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节干燥塔进出气止回阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节干燥塔进出气止回阀"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节进气阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节进气阀"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节最小压力维持阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节最小压力维持阀"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节压缩机不打风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节压缩机不打风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "B节压缩机不能正常打风。"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节压缩机滤清筒异常排风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节压缩机滤清筒异常排风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "B节压缩机滤清筒向外异常排风。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "压缩机故障数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "压缩机故障数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据，分析B节压缩机不打风及滤清筒异常排风。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "干燥塔止回阀拆解检查",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "干燥塔止回阀拆解检查",
+        "ExperimentType": "拆解检查",
+        "ExperimentProcedure": "拆解检查B节干燥塔进出气止回阀。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "干燥塔止回阀拆解检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "进出气止回阀正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "拆解检查表明B节干燥塔进出气止回阀正常。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换B节进气阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换B节进气阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换B节进气阀。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换B节最小压力维持阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换B节最小压力维持阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换B节最小压力维持阀。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "压缩机库内反复功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "压缩机库内反复功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "在库内对B节压缩机及滤清筒状态进行试验，并在更换阀件后反复验证。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "压缩机库内反复试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "未复现不打风及异常排风",
+        "ResultStatus": "正常",
+        "ResultDescription": "库内试验及更换后的反复试验均正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节空调",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节空调"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节空调蒸发器",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节空调蒸发器"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节EM231模块",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节EM231模块"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节CPU模块",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节CPU模块"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "AB节空调制冷不佳",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "AB节空调制冷不佳",
+        "FaultCategory": "热故障",
+        "FaultDescription": "A、B节空调制冷效果不佳。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "AB节空调状态检查",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "AB节空调状态检查",
+        "ExperimentType": "其他",
+        "ExperimentProcedure": "检查AB节空调蒸发器以及EM231、CPU模块的工作状态。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "空调蒸发器检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "AB节空调蒸发器未结冰",
+        "ResultStatus": "未判定",
+        "ResultDescription": "上车检查发现AB节空调蒸发器未结冰。"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "空调控制模块检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "EM231及CPU模块工作正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "检查时EM231及CPU模块工作正常。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换AB节EM231模块",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换AB节EM231模块",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换A、B节EM231模块。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "AB节空调制冷性能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "AB节空调制冷性能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "测量环境温度和出风口温度，并长时间试验AB节空调制冷情况。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "环境温度测量结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "32℃",
+        "ResultStatus": "未判定",
+        "ResultDescription": "试验时环境温度为32度。"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "出风口温度测量结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "14℃",
+        "ResultStatus": "未判定",
+        "ResultDescription": "试验时出风口温度为14度。"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "空调长时间制冷试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "AB节空调制冷正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "长时间试验后AB节空调制冷正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节制动显示屏",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节制动显示屏"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节紧急阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节紧急阀"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节制动显示屏A7故障报警",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节制动显示屏A7故障报警",
+        "FaultCategory": "其他",
+        "FaultDescription": "B节制动显示屏显示A7故障报警。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换B节紧急阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换B节紧急阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换B节紧急阀。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "制动系统功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "制动系统功能验证试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "进行上车试验，并在更换B节紧急阀后进行库内试验。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "制动系统功能试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "未复现A7故障报警",
+        "ResultStatus": "正常",
+        "ResultDescription": "上车试验正常，更换B节紧急阀后库内试验正常。"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "LTE-B网",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "LTE-B网"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节OCE",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节OCE"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "OCE到交换机的线路",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "OCE到交换机的线路"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节CPU板卡",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节CPU板卡"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "LTE-B网间歇性脱网",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "LTE-B网间歇性脱网",
+        "FaultCategory": "通信故障",
+        "FaultDescription": "主车8016B节 从车7005A节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢复；2.192km21:24又脱网，21:34 204km 300m恢复；3.207km 600m又脱网，21：41 208km 300m恢复\n4.231km 160m22：15又脱网，运行至西柏坡站分解"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "AB节OCE通信中断",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "AB节OCE通信中断",
+        "FaultCategory": "通信故障",
+        "FaultDescription": "下载数据分析发现A、B节OCE通信中断。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "OCE通信数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "OCE通信数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据，分析LTE-B网脱网及AB节OCE通信状态。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "OCE通信中断诊断结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "AB节OCE通讯中断",
+        "ResultStatus": "异常",
+        "ResultDescription": "数据分析发现AB节OCE通讯中断。"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "OCE到交换机线路检查",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "OCE到交换机线路检查",
+        "ExperimentType": "线路检查",
+        "ExperimentProcedure": "检查OCE到交换机的线路状态。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "OCE到交换机线路检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "OCE到交换机的线路良好",
+        "ResultStatus": "正常",
+        "ResultDescription": "检查确认OCE到交换机的线路良好。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换AB节CPU板卡",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换AB节CPU板卡",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换AB节CPU板卡。"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "刷新AB节OCE底层程序",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "刷新底层程序",
+        "MethodType": "软件处理",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "刷新底层程序后试验正常"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "OCE通信功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "OCE通信功能验证试验",
+        "ExperimentType": "通信测试",
+        "ExperimentProcedure": "更换CPU板卡并刷新底层程序后进行通信功能试验。",
+        "ExpectedResult": null
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "OCE通信功能验证结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "OCE通信功能恢复",
+        "ResultStatus": "正常",
+        "ResultDescription": "刷新底层程序后试验正常。"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "A节大闸"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "重新转动93阀"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "重新转动93阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "93阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "大复位"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换283KP压力开关"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换283KP压力开关",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "283KP压力开关"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "283KP状态数据分析"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "283KP状态数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "283KP压力开关"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "283KP状态数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "283KP压力开关断开检测结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "大闸缓解功能验证试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "大闸缓解功能验证试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "A节大闸"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "大闸缓解功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "大闸缓解功能验证结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-A网间歇性脱网",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "LTE-A网"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-A网间歇性脱网",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换A网通信模块"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换A网通信模块",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "A网通信模块"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-A网间歇性脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "LTE与OCE通信数据分析"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "LTE与OCE通信数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "LTE-A网"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "LTE与OCE通信数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "OCE"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "列车管"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换A节中继阀"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换A节中继阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "A节中继阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换181遮断阀"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换181遮断阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "181遮断阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "列车管缓解数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "列车管缓解功能验证试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "列车管缓解功能验证试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "列车管"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "列车管缓解功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "列车管缓解功能验证结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管充风异常",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "主从控BCU数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管减压异常",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "主从控BCU数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "流量计无显示",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "主从控BCU数据分析"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "BCU"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "均缸缓解状态检测结果"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "总风压力变化检测结果"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "流量计显示检测结果"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "列车管充风状态检测结果"
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "流量计显示检测结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "流量计无显示"
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "列车管充风状态检测结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "列车管充风异常"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管充风异常",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "列车管"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管减压异常",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "列车管"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "流量计无显示",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "流量计"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管充风异常",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换253YV"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换253YV",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "253YV"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管充风异常",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换181遮断阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管充风异常",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "制动机功能试验"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管减压异常",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "制动机功能试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "制动机功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "制动机"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "制动机功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "制动机功能试验结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节TCU1M2A相下管"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "TCU故障数据分析"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU故障数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节TCU1M2A相下管"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU故障数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "A相下管故障诊断结果"
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "A相下管故障诊断结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "B节TCU1M2A相下管故障"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "IGBT阻值测量"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "IGBT阻值测量",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "IGBT"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "IGBT阻值测量",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "IGBT阻值测量结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换门极驱动板"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换门极驱动板",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "门极驱动板"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "TCU功率单元库内功能试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU功率单元库内功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节TCU1M2A相下管"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU功率单元库内功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "TCU功率单元库内试验结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "压缩机未自动打风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "压缩机"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "压缩机未自动打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机自动打风功能试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机自动打风功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "压缩机"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机自动打风功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "压缩机自动打风试验结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "压缩机未自动打风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换287KP"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换287KP",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "287KP"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机故障数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "干燥塔止回阀拆解检查"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机库内反复功能试验"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节进气阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节最小压力维持阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒异常排风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机故障数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒异常排风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "干燥塔止回阀拆解检查"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒异常排风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机库内反复功能试验"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒异常排风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节进气阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒异常排风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节最小压力维持阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒异常排风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机滤清筒"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机故障数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机故障数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机滤清筒"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "干燥塔止回阀拆解检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节干燥塔进出气止回阀"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "干燥塔止回阀拆解检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "干燥塔止回阀拆解检查结果"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换B节进气阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节进气阀"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换B节最小压力维持阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节最小压力维持阀"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机库内反复功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机库内反复功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机滤清筒"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机库内反复功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "压缩机库内反复试验结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节空调"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "AB节空调状态检查"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节空调蒸发器"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节EM231模块"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节CPU模块"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "空调蒸发器检查结果"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "空调控制模块检查结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换AB节EM231模块"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换AB节EM231模块",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节EM231模块"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "AB节空调制冷性能试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节空调"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "环境温度测量结果"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "出风口温度测量结果"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "空调长时间制冷试验结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节制动显示屏A7故障报警",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节制动显示屏"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节制动显示屏A7故障报警",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节紧急阀"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换B节紧急阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节紧急阀"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节制动显示屏A7故障报警",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "制动系统功能验证试验"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "制动系统功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "制动系统功能试验结果"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网间歇性脱网",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "LTE-B网"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通信中断",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网间歇性脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网间歇性脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE到交换机线路检查"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网间歇性脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信功能验证试验"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网间歇性脱网",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换AB节CPU板卡"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网间歇性脱网",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "刷新AB节OCE底层程序"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通信中断",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信数据分析"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通信中断",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE到交换机线路检查"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通信中断",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信功能验证试验"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通信中断",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换AB节CPU板卡"
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通信中断",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "刷新AB节OCE底层程序"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "OCE通信中断诊断结果"
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "OCE通信中断诊断结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "AB节OCE通信中断"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE到交换机线路检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "OCE到交换机的线路"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE到交换机线路检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "OCE到交换机线路检查结果"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换AB节CPU板卡",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节CPU板卡"
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "刷新AB节OCE底层程序",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信功能验证试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE"
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "OCE通信功能验证结果"
+    }
+  ]
+}

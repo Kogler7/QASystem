@@ -1,0 +1,123 @@
+@startuml 故障检修本体
+
+class "故障部件" <<FaultComponent>> {
+  - 部件标识 (ComponentId) //故障部件唯一标识；原则上由结构化系统生成或维护，不要求原始故障文本中显式出现
+  - 部件名称 (ComponentName) //故障部件的规范名称；表示发生故障、被检测或被维修的设备、组件、部件或元件，例如：IGBT模块、门极驱动板、压力开关、中继阀
+}
+note right of "故障部件"
+类定义：故障部件是指在设备故障发生、诊断、排查或维修过程中，被明确作为故障承载对象、检测对象或维修作用对象的设备、子系统、组件、部件或元件。该类描述"故障发生或维修操作所涉及的对象"，不表示故障状态、检测行为、检测结果或维修行为本身。
+约束：
+- ComponentId唯一性约束：同一知识图谱范围内 ComponentId 必须唯一；ID原则上由系统生成，不要求从原始文本抽取。
+- ComponentName非空约束：ComponentName 必须为非空字符串，且应表示设备、组件、部件或元件，不得填写故障状态或维修动作。
+end note
+
+class "故障类型" <<FaultType>> {
+  - 故障类型标识 (FaultTypeId) //故障类型唯一标识；原则上由结构化系统生成或维护，不要求原始文本中存在
+  - 故障类型名称 (FaultTypeName) //故障类型的规范名称；应描述明确的异常状态、故障模式、功能失效或报警现象，例如：IGBT过温、TCU通信故障、列车管不缓解、母线过压
+  - 故障类别 (FaultCategory) //故障所属的上位类别；用于对具体故障类型进行归类，例如：电气故障、机械故障、控制故障、通信故障、气路故障、热故障等，无法明确分类时允许为空或"其他"
+  - 故障描述 (FaultDescription) //对故障状态、主要异常表现及其语义的简要说明；描述"发生了什么异常"，原则上不混入排查过程和处理措施
+}
+note right of "故障类型"
+类定义：故障类型是指设备、系统或部件偏离正常工作状态所表现出的故障模式、异常状态、功能失效、报警状态或可识别的故障现象。该类既可以表示现场直接观察到的异常，也可以表示经过诊断后确认的故障状态，但不包含正常检测结果、故障排查动作或维修处理动作。
+约束：
+- FaultTypeId唯一性约束：同一知识图谱范围内 FaultTypeId 必须唯一，原则上由系统生成。
+- FaultTypeName异常语义约束：FaultTypeName 必须表示异常、失效、故障、报警或功能异常状态；"正常、良好、未见异常"等不得作为故障类型。
+- FaultCategory值域约束：FaultCategory 建议限定于预定义故障分类词表，例如电气故障、机械故障、控制故障、通信故障、气路故障、热故障、其他；无法明确分类时允许为空或"其他"。
+- FaultDescription内容约束：FaultDescription 描述故障本身，不应混入"检查、测量、更换、复位"等诊断或维修过程。
+end note
+
+class "故障处理方法" <<FaultHandlingMethod>> {
+  - 方法标识 (MethodId) //故障处理方法唯一标识；原则上由结构化系统生成或维护
+  - 方法名称 (MethodName) //实际实施的故障处理操作名称；应包含核心动作及必要的作用对象，例如：更换门极驱动板、紧固接插件、重启控制器、清理散热通道
+  - 方法类型 (MethodType) //处理动作所属类别
+  - 处理策略 (MethodStrategy) //处理策略，用于描述该处理属于何种维修策略
+  - 方法描述 (MethodDescription) //对处理操作过程、处理对象或必要步骤的简要说明
+}
+note right of "故障处理方法"
+类定义：故障处理方法是指为消除、缓解、隔离、修复故障，恢复设备功能或降低故障再次发生风险而实际实施的预防、维修、调整、更换、复位、隔离或其他处置行为。该类描述"对故障采取了什么处置"，不包括仅用于发现、检查、测量或验证故障的诊断活动。
+约束：
+- MethodName动作语义约束：MethodName 必须包含明确的维修或处置动作；"检查、测量、分析、试验"等纯诊断行为不得作为处理方法。
+- MethodType值域约束：MethodType 建议限定为预防、更换、维修、调整、紧固、清洁、复位、重启、隔离、软件处理、恢复、其他。
+- MethodStrategy值域约束：MethodStrategy ∈ {预防性, 纠正性, 应急性, 未明确}；为可选属性，原文未体现处理策略时允许缺省。
+end note
+
+class "故障排查实验" <<TroubleshootingExperiment>> {
+  - 实验标识 (ExperimentId) //故障排查实验唯一标识；原则上由结构化系统生成或维护
+  - 实验名称 (ExperimentName) //故障排查、检测或验证活动的规范名称；名称应表示一个动作，例如：IGBT阻值测量、线路检查、运行数据分析、库内功能试验
+  - 实验类型 (ExperimentType) //实验采用的技术方式类别
+  - 实验过程 (ExperimentProcedure) //实验、检测或检查过程的简要描述；描述执行对象、操作方式或主要步骤
+  - 预期结果 (ExpectedResult) //正常情况下的预期结果、参考范围或判定标准
+}
+note right of "故障排查实验"
+类定义：故障排查实验是指为发现、定位、确认、排除故障，或验证故障处理效果而实施的检查、测量、数据分析、功能测试、通信测试、拆检及其他诊断验证活动。该类表示"进行了什么检查或试验"，不表示试验得到的数值、状态或诊断结果。
+约束：
+- ExperimentName动作约束：ExperimentName 必须表示检查、测量、分析、试验或检测活动，而不是该活动获得的结果。
+- ExperimentType值域约束：ExperimentType 建议限定为外观检查、线路检查、数据分析、电气测量、机械检查、功能测试、通信测试、拆解检查、其他。
+- ExperimentProcedure内容约束：ExperimentProcedure 描述执行对象、操作方式或主要步骤。
+- ExpectedResult证据约束：只有原文明确提供或已有标准知识明确给出正常范围或预期结果时才赋值，原始文本或已有标准知识未明确给出时，ExpectedResult 必须为空，不允许大模型凭常识补全。
+end note
+
+class "实验结果" <<ExperimentResult>> {
+  - 结果标识 (ResultId) //实验结果唯一标识；原则上由结构化系统生成或维护
+  - 结果值 (ResultValue) //实验直接得到的实际结果；可以是数值、数值+单位、状态或文本结果，例如：76N、750kPa、阻值正常、无漏风、通信中断
+  - 结果状态 (ResultStatus) //对实验结果进行规范化后的状态判断
+  - 结果描述 (ResultDescription) //对实验结果的补充说明，用于保留不能完全由ResultValue和ResultStatus表达的信息
+}
+note right of "实验结果"
+类定义：实验结果是指故障排查实验、检查、测量、数据分析或功能测试完成后直接获得的观测值、测量值、设备状态、异常发现或判定结论。该类表示"实验得到了什么结果"，必须能够追溯到相应的故障排查实验，不表示实验动作本身，也不直接等同于故障类型。
+约束：
+- ResultValue来源约束：ResultValue 必须是检查、测量、分析或试验后实际得到的结果，不得填写实验动作。
+- ResultStatus值域约束：ResultStatus ∈ {正常, 异常, 通过, 未通过, 不确定, 未判定}。
+- ResultStatus映射约束："正常、良好、无异常、未发现异常"等归一为正常/通过；存在明确异常时归一为异常/未通过；无法判断时使用未判定，不得强行分类。
+end note
+
+"故障类型" "1" --> "0..*" "故障部件" : OCCURS_ON <<OCCURS_ON>>
+note on link
+OCCURS_ON发生于：某类故障发生在哪个部件。
+OCCURS_ON类型约束：OCCURS_ON 的主体必须为 FaultType，客体必须为 FaultComponent。
+OCCURS_ON语义约束：只有文本明确表示某故障发生、表现或作用于某部件时才能建立关系；不得因为两个实体出现在同一段文本中就自动关联。
+end note
+
+"故障类型" "1" --> "0..*" "故障排查实验" : DIAGNOSED_BY <<DIAGNOSED_BY>>
+note on link
+DIAGNOSED_BY通过…排查：某故障可通过什么实验进行诊断。
+DIAGNOSED_BY类型约束：DIAGNOSED_BY 的主体必须为 FaultType，客体必须为 TroubleshootingExperiment。
+DIAGNOSED_BY用途约束：只有实验用于排查、确认、排除或验证相应故障状态时才能建立关系；与该故障无关的检查不得关联。
+end note
+
+"故障排查实验" "1" --> "0..*" "故障部件" : TARGETS <<TARGETS>>
+note on link
+TARGETS检测：排查实验针对哪个部件。
+TARGETS类型约束：TARGETS 的主体必须为 TroubleshootingExperiment，客体必须为 FaultComponent。
+TARGETS对象约束：实验必须明确以该部件、设备或其相关回路为检测对象，例如"测量IGBT阻值"可建立 阻值测量 TARGETS IGBT。
+end note
+
+"故障排查实验" "1" --> "0..*" "实验结果" : PRODUCES <<PRODUCES>>
+note on link
+PRODUCES产生：排查实验得到什么结果。
+PRODUCES类型约束：PRODUCES 的主体必须为 TroubleshootingExperiment，客体必须为 ExperimentResult。
+PRODUCES来源唯一性约束：一个具体实验结果必须能够追溯到产生该结果的实验；不得将其他检查步骤的结果错误绑定到当前实验。
+end note
+
+"实验结果" "1" --> "0..*" "故障类型" : INDICATES <<INDICATES>>
+note on link
+INDICATES指示：实验结果说明或支持什么故障。
+INDICATES类型约束：INDICATES 的主体必须为 ExperimentResult，客体必须为 FaultType。
+INDICATES正向证据约束：只有实验结果明确支持、确认或指示某故障时建立 INDICATES；"正常、未见异常、无漏风、线路正常"等用于排除故障的结果，不得自动建立该关系。
+end note
+
+"故障类型" "1" --> "0..*" "故障处理方法" : HANDLED_BY <<HANDLED_BY>>
+note on link
+HANDLED_BY处理方式：某类故障采用什么方法处理。
+HANDLED_BY类型约束：HANDLED_BY 的主体必须为 FaultType，客体必须为 FaultHandlingMethod。
+HANDLED_BY实施约束：原文应明确表示该措施被实际执行或明确用于处理该故障。纯检查、诊断、建议但未实施的动作原则上不建立该关系。
+end note
+
+"故障处理方法" "1" --> "0..*" "故障部件" : ACTS_ON <<ACTS_ON>>
+note on link
+ACTS_ON作用于：维修方法实际操作哪个部件。
+ACTS_ON类型约束：ACTS_ON 的主体必须为 FaultHandlingMethod，客体必须为 FaultComponent。
+ACTS_ON作用对象约束：维修动作必须实际作用于对应部件，例如"更换门极驱动板"建立 更换门极驱动板 ACTS_ON 门极驱动板。
+end note
+
+@enduml
