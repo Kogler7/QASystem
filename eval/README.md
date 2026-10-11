@@ -466,3 +466,27 @@ python3 eval/quick_eval.py --dry-run
 
 统一入口也支持直接传 `python3 eval/run.py ... --case-attempts 1`，默认仍为 3 次，
 该参数只影响外层整篇尝试，不改变传输重试。
+
+
+### 冻结 JSON / JSONL / 自适应切片对照
+
+`eval/tools/chunk_variants.py` 读取既有冻结批次的 `document.md`，只将合法的
+`columns/rows` 非空记录表序列化成一行一个对象的 JSONL；正文、表单、空表保留。
+含额外表级字段时明确失败，避免静默丢失信息。三个方案都调用现有 Backend 的
+公共切片接口，切片失败则中止冻结，不按整篇兜底冒充成功。输出只写 `tmp/`，
+保存原始/新 Markdown 哈希、切片哈希、片数/长度/范围、配置和源码提交。
+
+```bash
+python3 -m eval.tools.chunk_variants --source <冻结inputs目录> --output tmp/chunk-compare/jsonl-adaptive \
+  --params <评测参数文件> --variant jsonl-adaptive --source-commit <Backend源码提交> \
+  --cases official/official_01 official/official_02 rule/rule_01 simple/Simple_故障规则的诊断 trouble/trouble_mini
+```
+
+`--variant json` 保留旧 JSON 表；`jsonl` 转换格式并关闭自适应；`jsonl-adaptive`
+转换格式并显式开启 Clef 实体计数。`size/strategy/chunk_overlap` 沿用参数文件，
+不传已删除的 `chunk_threshold`。随后用 `eval/model_matrix.py --prepared <该inputs>`
+为每个抽取模型复用同一批次、同一本体和 golden，单独指定 judge。
+这是格式/切片对照，复用原解析产物；不能宣称重新验证了解析器或PDF语义质量。
+
+直接抽取和 `--from-run` 复用路径保留切片 `metadata`，将 `range` 映射为公共抽取
+接口的 `ranges`；不再只发送文本，JSONL 工作表标题、数据行号和字符偏移可到达抽取层。

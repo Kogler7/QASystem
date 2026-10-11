@@ -74,6 +74,20 @@ def test_extract_http_payload_carries_overrides(monkeypatch):
     assert body["options"] == {"version": "v3", "model": "test-model"}
 
 
+def test_extract_http_keeps_frozen_source_ranges_and_table_metadata(monkeypatch):
+    submit = Mock(return_value={})
+    monkeypatch.setattr(run, "submit_and_wait", submit)
+    metadata = {"table_format": "jsonl", "section_title": "Sheet-2", "table_data_row_start": 21}
+    source = [{"text": '{"设备":"泵"}', "range": [120, 130], "metadata": metadata,
+               "unused": "not an extraction contract field"}]
+    frozen = run.extraction_item_payloads(source)
+    run.extract_graphs("http://backend", "ontology", frozen, {}, {})
+    items = json.loads(submit.call_args.kwargs["data"])["items"]
+    assert items == [{"text": '{"设备":"泵"}', "ranges": [120, 130], "metadata": metadata}]
+    frozen[0]["metadata"]["section_title"] = "changed"
+    assert source[0]["metadata"]["section_title"] == "Sheet-2"
+
+
 def test_help_lists_new_options(capsys):
     with pytest.raises(SystemExit) as exit_info:
         run.parse_args(["--help"])

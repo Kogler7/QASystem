@@ -2417,11 +2417,25 @@ def chunk_document(base_url: str, markdown: str, file_name: str, options: dict[s
     )
 
 
+def extraction_item_payloads(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep frozen chunk provenance when using the public extraction endpoint."""
+    payloads = []
+    for item in items:
+        payload = {"text": str(item.get("text") or "")}
+        span = item.get("ranges", item.get("range"))
+        if span is not None:
+            payload["ranges"] = deepcopy(span)
+        if isinstance(item.get("metadata"), dict):
+            payload["metadata"] = deepcopy(item["metadata"])
+        payloads.append(payload)
+    return payloads
+
+
 def extract_graphs(base_url: str, ontology: str, items: list[dict[str, Any]], options: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
     url = urljoin(base_url.rstrip("/") + "/", EXTRACT_PATH.lstrip("/"))
     payload = {
         "ontology": ontology,
-        "items": [{"text": item.get("text") or ""} for item in items],
+        "items": extraction_item_payloads(items),
         "options": options.get("extraction") or {},
     }
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -3200,7 +3214,7 @@ def run_backend_case(
                     # Copy the exact bytes, including whitespace/metadata, so
                     # the next rescore can verify the original input hash.
                     shutil.copyfile(chunks_path, local_chunks_path)
-                items = [{"text": str(item.get("text") or "")} for item in reused]
+                items = extraction_item_payloads(reused)
                 result["modules"]["chunk"] = {
                     "status": "reused",
                     "chunk_count": len(items),
@@ -3237,7 +3251,7 @@ def run_backend_case(
             if markdown.strip():
                 local_chunks, local_chunks_path = _reused_chunks(out_dir)
                 if local_chunks:
-                    items = [{"text": str(item.get("text") or "")} for item in local_chunks]
+                    items = extraction_item_payloads(local_chunks)
                     result["modules"]["chunk"] = {
                         "status": "reused",
                         "chunk_count": len(items),
