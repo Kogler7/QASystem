@@ -19,7 +19,7 @@ result = extract(
 ## 提示词与上下文
 
 - `prompt_templates.py`：固定 System、统一 JSON User 外壳和结构化重试反馈。
-- `prompt_router.py`：本体及文本确定性路由、阶段上下文裁剪、消息装配。
+- `prompt_router.py`：首个 chunk 正文确定性路由、阶段上下文裁剪、消息装配。
 - `skills/*/SKILL.md`：用户维护的领域规则；`skill_registry.py` 和 `skill_planner.py` 负责发现、读取与模型装配计划。
 - `domain_skills.py`：无模型的低层兼容预览，只从 Markdown 读取策略正文。
 - `output_contracts.py`：所有阶段的输出约束及动态 schema 构造。
@@ -57,7 +57,9 @@ tags: []
 ```text
 用户维护若干 SKILL.md
         ↓ 每个抽取请求读取一份固定内容快照
-模型看到技能目录、本体、阶段、当前文档和原有路由提示
+首个 chunk 正文确定类型（本体、元数据和后续 chunk 不参与）
+        ↓ 按类型过滤技能目录
+模型看到对应类型的技能目录、本体、阶段和当前文档
         ↓ read_skills(skill_ids)
 程序按注册 ID 返回所选文件正文、版本和 SHA256
         ↓ 模型输出 assemble 计划
@@ -68,7 +70,7 @@ tags: []
 实体候选 → 属性补全 → 关系分类 → 校验与后处理
 ```
 
-模型通过结构化 `read_skills` 操作请求读取技能，应用执行受控的 `read_skill()` 并回传正文。这是有限的应用工具协议，不依赖服务商原生 `tool_calls`。最多包含两轮规划请求：选择读取、生成计划；没有适用技能时可以直接使用空策略。计划不是抽取答案，也不是完整 User。
+模型通过结构化 `read_skills` 操作请求读取技能，应用执行受控的 `read_skill()` 并回传正文。这是有限的应用工具协议，不依赖服务商原生 `tool_calls`。每个待装配输入最多包含两轮规划请求：选择读取、生成计划；没有适用技能时可以直接使用空策略。计划不是抽取答案，也不是完整 User。
 
 抽取 System 仍只有固定的一份；规划器是单独的准备任务，有自己的固定规划 System，不混入抽取模型的最终两条消息。程序原样保留以下四段，只替换 `domain_policy`：
 
@@ -86,16 +88,15 @@ tags: []
 ```text
 algorithm/knowledge_extract/v3_1/skills/
   official_document/SKILL.md
-  standard/SKILL.md
-  record_table/SKILL.md
-  official_form/SKILL.md
+  rule/SKILL.md
+  trouble/SKILL.md
 ```
 
-这四份文件迁自当前 v3.1 的原有提示词，保留公文、标准、记录表与表单规则。它们是应用运行资产，不是 Codex 个人技能，不需要安装到 Codex。
+三份文件分别对应公文、规则和故障检修 benchmark；公文技能包含表单的条件规则。simple 明确不使用 skill，标准暂不提供 skill。它们是应用运行资产，不是 Codex 个人技能，不需要安装到 Codex。
 
 默认使用本包的 `skills/`。调用公共入口时可传 `skills_dir="/path/to/skills"` 替换目录；它必须是进程实际可读路径。没有新增环境变量或修改根配置。容器源码只读时，在宿主机维护对应源码目录。技能随外部源码交付，不需要重建环境镜像；同一路径文件更新后，新请求读取新内容，已开始请求继续使用已加载内容。
 
-新增一个领域只需新增子目录及 `SKILL.md`（也接受 `skill.md`）。不需要增加 Python 的领域 ID 枚举：模型会从目录描述发现它。
+新增技能文件使用 `SKILL.md`（也接受 `skill.md`），以名称或 `route_hints` 绑定已支持的文档类型。新增文档类型需要同步扩展首个 chunk 正文分类器与测试，模型不能跨类型选技能。
 
 ### 3. 文件格式
 
@@ -105,6 +106,7 @@ name: equipment_record
 description: 设备维护记录，按设备、工作事项与责任主体识别候选。
 version: "1"
 stages: [entity, property]
+route_hints: [trouble]
 ---
 
 说明：只生成装配计划，不改写 System、本体、原文或输出契约。
@@ -130,9 +132,9 @@ stages: [entity, property]
 | `stages` | 支持的阶段，从 `entity / property / relation / repair` 选择。实体修复沿用 entity 的领域规则。 |
 | `## rules:all` | 跨该技能所声明阶段适用的规则段。 |
 | `## rules:entity` 等 | 对应阶段规则段；模型只能引用 `all` 或当前策略阶段的段。 |
-| `route_hints` | 可选字符串数组。给模型提供选用线索，并用于无模型的低层兼容预览；公共入口不以其强制限定选择。 |
+| `route_hints` | 可选字符串数组。声明绑定的文档类型；名称或该字段匹配才进入规划候选目录。simple/generic 始终禁用技能。 |
 
-二级 `rules:` 标题是规则段边界。其它说明文字只供规划模型阅读；只有计划引用的规则段正文会进入抽取 User。空规则段、重复段、无效元数据、重复 ID、空目录或跨目录符号链接均明确报配置错误，不能伪装成空抽取结果。
+二级 `rules:` 标题是规则段边界。其它说明文字只供规划模型阅读；只有计划引用的规则段正文会进入抽取 User。技能目录不存在、为空、缺少对应类型/阶段时返回空策略，不调用规划模型；原文、本体和输出契约继续传给抽取模型。空规则段、重复段、无效元数据、重复 ID 或跨目录符号链接仍明确报配置错误，不能伪装成空抽取结果。
 
 ### 4. 模型产生什么计划
 
@@ -156,7 +158,7 @@ stages: [entity, property]
 
 程序根据引用读取原始规则段，将其放入 `domain_policy.profiles.official_document.extraction_rules`，不采用模型自由改写的策略文本。还记录 `skill_version`、`skill_sha256`、选中的 `sections`。
 
-模型不能引用未读取的技能，不能更换 chunk 或任务，不能将完整 User、原文、本体或输出契约塞入计划。技能可以组合，但不能借此增加输出字段或扩大实体阶段的输入范围。旧的确定性文档路由仍为算法后处理提供信号，作为规划提示也一并提供；本次没有把标准结构处理等业务规则迁移为技能。
+模型不能引用未读取的技能，不能更换 chunk 或任务，不能将完整 User、原文、本体或输出契约塞入计划。技能可以组合，但不能借此增加输出字段或扩大实体阶段的输入范围。文档路由只根据传入的第一个 chunk 正文确定，并复用于所有阶段；当前 chunk 不能改变候选技能类型。无法识别或信号冲突时使用 generic。没有技能只表示不附加领域规则，仍保留必要的 User 数据。
 
 ### 5. 如何调用
 
@@ -201,9 +203,17 @@ result = extract_harness(
 
 当前 v3.1 公共入口将回调接到已有 `generate_structured()` 调用路径，规划请求与抽取请求使用同一个注入模型对象和现有调度设置。因此本轮没有新增绕开调度的直连通道。
 
-**本次完成的是技能装配层，不等于已经完成全系统调度解耦。**版本目录下原有 scheduler/client、共享 `request_runtime` 对版本客户端的反向依赖，以及 Backend 与当前工作区 v3.1 的旧接口不一致问题，仍需另行迁移。不能把 Python 包测试通过解读为 Backend 线上接线已修复。
+**技能装配层不等于全系统调度解耦。**版本目录下原有 scheduler/client 和共享 `request_runtime` 对版本客户端的依赖仍然存在。合并后的 Backend 适配器已将输入转换为 v3.1 自身的 `ExtractionChunk`；算法与 Backend 接口回归测试通过，但不代表运行中服务已部署或通过完整发布门禁。
 
 ### 7. 验证与成本
+
+本次首片路由与 benchmark 分类调整在本地 `.venv/bin/python -m pytest -q algorithm/knowledge_extract/v3_1/tests` 验证：188 passed、1 skipped（缺少标准本体）。覆盖五份公文 benchmark 首片、JSON 表单、类型隔离、空目录、simple 空技能与跨 chunk 不改路由。
+
+上述本地验证时，全仓测试收集曾因缺少 `docling` 和旧 `algorithm.knowledge_extract.v3_1.decisions` 引用失败；合并后的受版本控制 Python 源码已无该旧模块引用。尚未执行本次改动的运行中 Backend 全量评测、基线对比和部署，不能视为已通过发布门禁。
+
+2026-10-11 冲突修复后，在 88 的现有 `qasystem_backend` 中使用独立源码快照验证 v3.1 全部单测，以及 Backend 的 `test_knowledge_extract_v31.py`、`test_knowledge_extract_adapter.py`、`test_extraction_request_config.py`、`test_extraction_quality.py`：267 passed、1 skipped（仓库缺少标准本体）。保留了换行符/BOM 与原始文件哈希测试、文档类型隔离测试和公文实体阶段规则。日志归档于 `tmp/v31-conflict-fix-20261011/`，未替换运行服务源码。
+
+以下为此前装配层在 88 上的历史验证记录，不代表本次修改已在服务器验证：
 
 测试统一在 88 的现有 `qasystem_backend` 内，独立快照 `/app/tmp/v3_1-skills-local-20261011-miuTD2`。相关命令：
 
@@ -216,7 +226,7 @@ python -m pytest -q -p no:cacheprovider \
 
 真实模型初测发现服务商可能退回 `json_object` 模式：规划提示词必须显式携带自己的 `response_schema`，不能只通过 SDK 参数传入。本次已补齐并加入回归断言。规划契约与后续抽取契约明确区分。
 
-采用模型规划会增加推理成本：有相关技能时通常新增两轮请求（选读和计划），通用空策略通常新增一轮。请求内仅对完全相同输入复用计划，不声称整体提速。尚未执行全量效果评测或实际服务发布。
+采用模型规划会增加推理成本：有相关技能时通常新增两轮请求（选读和计划），类型无技能时不增加规划调用；有候选技能但模型选空时新增一轮。请求内仅对完全相同输入复用计划，不声称整体提速。尚未执行全量效果评测或实际服务发布。
 
 
 真实模型 `deepseek-ai/DeepSeek-V4-Flash` 已完成选读公文技能、生成计划和实体抽取三轮调用，本次耗时 4.562 秒。输入为“关于开展设备巡检的通知\n设备部负责开展设备巡检。”，选用 `official_document` 的 `all` 规则段，返回公文标题、设备部、开展设备巡检三个实体，流程状态 succeeded。输入与第一步契约保留原样，三个实体的模型原始 offset 均触发既有纠正逻辑；简化本体还产生三条缺少 identity 的告警。此样例只验证单段算法包链路，不代表 Backend HTTP 整链或全量效果门禁通过。

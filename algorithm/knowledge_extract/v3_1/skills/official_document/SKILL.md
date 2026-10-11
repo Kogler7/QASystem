@@ -3,7 +3,7 @@ noteId: "7b0d14f0c54b11f192edfbc308186266"
 tags: []
 name: "official_document"
 description: "公文、通知、意见、办法、方案；识别文件身份、责任主体、工作事项与交换行为。"
-version: "1"
+version: "2"
 stages:
   - "entity"
   - "property"
@@ -40,3 +40,8 @@ OFFICIAL_DOCUMENT_PROMPT_EXTENSION v5
 - 不要在审批流转记录中为每个“已阅/批示/签名”的人名单独创建 OperationalAgent，除非该人承担了 ontology 中明确要求抽取的主体职责。
 - 拟办意见、领导批示中明确承担职责的部门/单位/角色，以及明确的动宾工作事项、要求或报送/通知/反馈行为，应分别抽取为 OperationalAgent / OperationalActivity / OperationalConstraint / OperationalExchange；“已阅/签名”的个人姓名和纯流转记录不抽。
 - 遇到表单时优先抑制低价值候选：姓名、日期、联系方式、部门名单独出现但无明确主体职责时，不应成为实体。
+
+
+## rules:entity
+
+当当前 chunk 是收文处理单/审批单时，不把表单本身抽为 DocumentUnit；有可靠公文标题时可提议 OfficialDocument。只提议实体及原文位置，职责属性留给 property 阶段。明确承担职责的部门及工作事项仍应正常抽取。
