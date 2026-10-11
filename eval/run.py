@@ -54,7 +54,7 @@ DEFAULT_WORKSPACE = KIT_DIR.parent / "test_data" / "eval"
 # judge 单次 prompt 里 golden 一侧的默认窗口：golden 是参照列表，窗口开大一些可以少发几次请求。
 JUDGE_GOLDEN_WINDOW_DEFAULT = 40
 RUNS_DIR = KIT_DIR.parent / "tmp" / "eval" / "runs"
-RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}$")
+RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}(?:-[0-9a-f]{12})?$")
 DEFAULT_RUNS_RETENTION_DAYS = 30
 ONTOLOGY_SUFFIXES = {".puml", ".uml"}
 SKIP_DOC_PREFIXES = (".", "~$", ".~")
@@ -236,9 +236,24 @@ def write_text(path: Path, text: str) -> None:
 def _run_dir_started_at(path: Path) -> datetime:
     """批次时间：优先目录名时间戳，解析不了退回 mtime。"""
     try:
-        return datetime.strptime(path.name, "%Y%m%d-%H%M%S")
+        return datetime.strptime(path.name[:15], "%Y%m%d-%H%M%S")
     except ValueError:
         return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def create_run_directory(runs_dir: Path, started: datetime, protected: set[Path]) -> Path:
+    """Atomically allocate a batch directory, including simultaneous processes."""
+    prefix = started.strftime("%Y%m%d-%H%M%S")
+    protected = {path.resolve() for path in protected}
+    candidate = runs_dir / prefix
+    while True:
+        if candidate.resolve() not in protected:
+            try:
+                candidate.mkdir(parents=True, exist_ok=False)
+                return candidate
+            except FileExistsError:
+                pass
+        candidate = runs_dir / f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
 def _dir_size_bytes(path: Path) -> int:
@@ -3891,16 +3906,8 @@ def main() -> int:
 
     started = datetime.now()
     run_started = time.perf_counter()
-    run_id = started.strftime("%Y%m%d-%H%M%S")
-    run_dir = RUNS_DIR / run_id
-    if run_dir.resolve() in {path.resolve() for path in protected_dirs}:
-        log("新批次与复用来源目录重合，请下一秒重试以保留来源只读")
-        return 1
-    try:
-        run_dir.mkdir(parents=True, exist_ok=False)
-    except FileExistsError:
-        log(f"运行目录已存在，请下一秒重试以避免混用历史产物: {run_dir}")
-        return 1
+    run_dir = create_run_directory(RUNS_DIR, started, protected_dirs)
+    run_id = run_dir.name
     write_json(run_dir / "manifest.json", manifest)
     snapshot = dict(params)
     snapshot["backend_url"] = base_url
