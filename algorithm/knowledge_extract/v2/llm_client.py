@@ -9,6 +9,7 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
+from algorithm.knowledge_extract.jsonl_protocol import messages_for_jsonl
 from ._logging import get_step_logger
 from .config import get_llm_config
 from .prompt_router import ChatMessages
@@ -366,98 +367,10 @@ class OpenAICompatibleLLM:
         messages: ChatMessages,
         run_context: dict[str, Any] | None = None,
     ) -> StructuredLLMResponse:
-        """Generate JSON matching ``schema``, falling back for older providers."""
-        if getattr(self, "api_mode", "auto") == "chat":
-            # Explicit server profile: never probe an unsupported Responses API.
-            mode = str((run_context or {}).get("response_mode") or "json_schema")
-            if mode not in {"json_schema", "json_object", "plain"}:
-                raise ValueError("Invalid structured response mode")
-            fmt = None
-            if mode == "json_schema":
-                fmt = {"type": "json_schema", "json_schema": {
-                    "name": "extraction", "strict": True, "schema": schema}}
-            elif mode == "json_object":
-                fmt = {"type": "json_object"}
-            return self._chat_structured(messages, response_mode=mode, response_format=fmt)
-        context = run_context or {}
-        response_mode = str(context.get("response_mode") or "json_schema")
-        if response_mode not in {"json_schema", "json_object", "plain"}:
-            raise ValueError(f"response_mode 仅支持 json_schema/json_object/plain，收到 {response_mode!r}")
-        schema_name = str(context.get("schema_name") or context.get("pass_name") or "extraction")
-        schema_name = "".join(char if char.isalnum() or char in "_-" else "_" for char in schema_name)[:64]
-        response_format = {
-            "type": "json_schema",
-            "name": schema_name or "extraction",
-            "strict": True,
-            "schema": schema,
-        }
-        if response_mode == "plain":
-            return self._chat_structured(messages, response_mode="plain")
-        if response_mode == "json_object":
-            try:
-                return self._chat_structured(
-                    messages,
-                    response_mode="json_object",
-                    response_format={"type": "json_object"},
-                )
-            except Exception as exc:  # noqa: BLE001 - older providers may reject all JSON modes
-                if not _unsupported_parameter(exc):
-                    raise
-            return self._chat_structured(messages, response_mode="plain")
-        if _is_deepseek_model(self.model) and not _deepseek_strict_schema_compatible(schema):
-            return self._chat_structured(
-                messages,
-                response_mode="json_object",
-                response_format={"type": "json_object"},
-            )
-        official_deepseek = _is_official_deepseek_endpoint(self.base_url)
-        # 该模型在 MaaS 的 Responses 路径上会超时/返回空数组/截断 JSON；
-        # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
-        # 对所有 pass（实体/属性/关系/修复/核验）统一生效；官方 DeepSeek 端点除外。
-        # v4-flash Responses 默认开思考且无法带 extra_body，关/开思考都必须走 chat；
-        # json_schema 不被支持时降到 json_object，不再回落 Responses。
-        skip_responses = _is_deepseek_v4_flash(self.model) and not official_deepseek
-        prefer_chat_json_schema = (
-            skip_responses
-            or (not official_deepseek and bool(context.get("record_table")))
-            or bool(context.get("prefer_chat_json_schema"))
-            or not self.disable_thinking
+        """Generate JSONL without a provider response_format constraint."""
+        return self._chat_structured(
+            messages_for_jsonl(messages, schema), response_mode="jsonl"
         )
-        if prefer_chat_json_schema:
-            # 该模型在 MaaS 的 Responses 路径上高频返回空数组/截断 JSON；
-            # chat.completions 标准 json_schema + thinking disabled 实测稳定且更快。
-            try:
-                return self._chat_structured(
-                    messages,
-                    response_mode="json_schema",
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": schema_name or "extraction",
-                            "strict": True,
-                            "schema": schema,
-                        },
-                    },
-                )
-            except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
-                if not _unsupported_parameter(exc):
-                    raise
-        if not skip_responses:
-            try:
-                return self._responses_structured(messages, response_format=response_format)
-            except Exception as exc:  # noqa: BLE001 - only capability mismatch falls back
-                if not _unsupported_parameter(exc):
-                    raise
-        try:
-            return self._chat_structured(
-                messages,
-                response_mode="json_object",
-                response_format={"type": "json_object"},
-            )
-        except Exception as exc:  # noqa: BLE001 - older providers may reject all JSON modes
-            if not _unsupported_parameter(exc):
-                raise
-        return self._chat_structured(messages, response_mode="plain")
 
 
 def create_llm_client(

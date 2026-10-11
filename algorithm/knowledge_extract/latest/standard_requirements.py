@@ -1,5 +1,6 @@
 """General Property/Constrain semantics for standard requirement clauses."""
 from __future__ import annotations
+from algorithm.knowledge_extract.jsonl_protocol import load_jsonl_response
 import json, re, unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -107,9 +108,9 @@ def _extract_one(llm: Any, clause: str, body: str) -> list:
     resp = llm.generate_structured(schema=SCHEMA, messages=[
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": json.dumps({"clause": clause, "text": body[:5000]}, ensure_ascii=False)}],
-        run_context={"schema_name": "standard_requirements", "response_mode": "json_schema"})
+        run_context={"schema_name": "standard_requirements", "response_mode": "jsonl"})
     raw = getattr(resp, "text", resp)
-    data = json.loads(raw) if isinstance(raw, str) else raw
+    data = load_jsonl_response(resp, SCHEMA)
     if isinstance(data, dict): return data.get("items") or []
     return data if isinstance(data, list) else []
 def enrich_standard_requirements(pool: Any, manager: Any, plan: Any, llm: Any, *, warnings: Any = None, max_workers: int = 4, max_clauses: int = 80) -> dict[str, int]:

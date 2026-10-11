@@ -409,18 +409,19 @@ def enrich_entity_properties(
         if parsed is None:
             return 0, 0, 0, local_warnings, local_attempts, local_call_metrics, batch_stats.get("calls", 0)
         entities_by_id = {str(entity.candidate_id): entity for entity in batch}
-        seen_ids: set[str] = set()
+        seen_ids: set[tuple[str, str]] = set()
         planned: list[dict[str, Any]] = []
         pending: list[dict[str, Any]] = []
         for update_index, update in enumerate(parsed.get("updates") or []):
             entity_id = str(update.get("entity_id") or "")
             entity = entities_by_id.get(entity_id)
             path = f"property.{chunk_id}.batch-{batch_index}.updates[{update_index}]"
-            if entity is None or entity_id in seen_ids:
+            property_keys = {(entity_id, key) for key in (update.get("properties") or {})}
+            if entity is None or bool(property_keys & seen_ids):
                 batch_rejected += 1
                 _warn(local_warnings, "PROPERTY_UPDATE_ENTITY_INVALID", "属性更新实体不在固定批次中或重复", path, entity_id)
                 continue
-            seen_ids.add(entity_id)
+            seen_ids.update(property_keys)
             quote = str((update.get("evidence") or {}).get("quote") or "")
             evidence_mode = ""
             if quote and manager.find_span(chunk_id, quote) is not None:

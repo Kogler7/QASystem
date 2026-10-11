@@ -44,6 +44,7 @@ logger = get_step_logger(__name__)
 from .relation_resolver import enumerate_relation_pairs
 from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages
 from .scheduler import get_llm_scheduler
+from algorithm.knowledge_extract.jsonl_protocol import decode_jsonl
 from .structured_output import validate_json_schema
 
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
@@ -618,7 +619,7 @@ def generate_structured(
     """Call one required pass with bounded retry and conservative prefix recovery."""
     attempt_messages = messages
     resolved_max_attempts = max(1, int(max_attempts))
-    response_mode = "json_schema"
+    response_mode = "jsonl"
     collection_name = _array_collection_name(schema)
     recovered_items: list[dict[str, Any]] = []
     largest_invalid_response = 0
@@ -670,7 +671,7 @@ def generate_structured(
                 largest_invalid_response = max(largest_invalid_response, response_characters)
                 if error_type == "incomplete" and collection_name:
                     recovered = _valid_recovered_items(
-                        _recover_array_prefix(_response_text(response), collection_name),
+                        (decode_jsonl(response, schema)[0].get(collection_name, []) or _recover_array_prefix(_response_text(response), collection_name)),
                         collection_name=collection_name,
                         schema=schema,
                     )
@@ -680,7 +681,8 @@ def generate_structured(
                         recovered,
                     )
             else:
-                parsed, parse_error = decode_json_object(response)
+                parsed, jsonl_errors = decode_jsonl(response, schema)
+                parse_error = "; ".join(jsonl_errors[:5]) or None
                 if parse_error is not None:
                     error_type = "json"
                     message = parse_error
@@ -688,7 +690,7 @@ def generate_structured(
                     largest_invalid_response = max(largest_invalid_response, response_characters)
                     if collection_name:
                         recovered = _valid_recovered_items(
-                            _recover_array_prefix(_response_text(response), collection_name),
+                            (decode_jsonl(response, schema)[0].get(collection_name, []) or _recover_array_prefix(_response_text(response), collection_name)),
                             collection_name=collection_name,
                             schema=schema,
                         )
@@ -749,6 +751,12 @@ def generate_structured(
 
         if error_type in {"incomplete", "input_limit"}:
             retryable = False  # Repeating the same output budget cannot recover truncation.
+        if collection_name and getattr(response, "response_mode", None) == "jsonl":
+            complete = decode_jsonl(response, schema)[0].get(collection_name, [])
+            recovered_items = _merge_collection_items(
+                collection_name, recovered_items,
+                _valid_recovered_items(complete, collection_name=collection_name, schema=schema),
+            )
         next_response_mode = _next_response_mode(response_mode, error_type)
         logger.warning(
             "[步骤][LLM] 输出: pass=%s chunk=%s attempt=%d status=%s response=%d字符 恢复片段=%d 下一模式=%s message=%s",
@@ -809,7 +817,7 @@ def generate_structured(
                 recovery_instruction = (
                     f"\n上一次前缀中检测到 {len(recovered_items)} 条完整候选（仅作诊断）："
                     f"{_recovery_summary(collection_name, recovered_items)}\n"
-                    "本次必须重新输出该批次的完整 JSON；不要依赖前缀恢复。"
+                    "本次必须重新输出该批次的完整 JSONL；不要依赖前缀恢复。"
                 )
             empty_instruction = ""
             if error_type == "empty_collection":
@@ -822,19 +830,19 @@ def generate_structured(
                 {
                     "role": "user",
                     "content": (
-                        f"{messages[1]['content']}\n\n## 上一次输出校验失败，请纠正后重新输出完整 JSON\n"
+                        f"{messages[1]['content']}\n\n## 上一次输出校验失败，请纠正后重新输出完整 JSONL\n"
                         f"错误类型：{error_type}\n错误：{message}\n"
                         f"上一次输出摘要：已省略原文，字符数 {response_size}\n"
                         f"{recovery_instruction}"
                         f"{empty_instruction}"
-                        "不得解释错误，只输出符合 schema 的 JSON 对象。"
+                        "不得解释错误，只输出 JSONL，每行一条记录，不要外层数组或集合键。"
                     ),
                 },
             ]
         response_mode = next_response_mode
         if retry_base_seconds > 0:
             time.sleep(retry_base_seconds * (2 ** (attempt_number - 1)))
-    if return_recovered_on_failure and collection_name and recovered_items:
+    if (return_recovered_on_failure or getattr(response, "response_mode", None) == "jsonl") and collection_name and recovered_items:
         attempts.append({
             "attempt": resolved_max_attempts + 1,
             "type": "recovered_prefix",

@@ -17,6 +17,7 @@ the LLM passes (Activity/Terminology/Property/Constrain/Subject/Equation/...)
 are kept and linked into the rebuilt skeleton.
 """
 from __future__ import annotations
+from algorithm.knowledge_extract.jsonl_protocol import load_jsonl_response
 
 import json
 import re
@@ -320,10 +321,10 @@ def summarize_titles(llm: Any, items: list[dict[str, str]]) -> dict[str, str]:
                     {"role": "system", "content": _SUMMARY_SYSTEM},
                     {"role": "user", "content": json.dumps({"items": batch}, ensure_ascii=False)},
                 ],
-                run_context={"schema_name": "derived_titles", "response_mode": "json_schema"},
+                run_context={"schema_name": "derived_titles", "response_mode": "jsonl"},
             )
             raw = getattr(response, "text", response)
-            data = json.loads(raw) if isinstance(raw, str) else raw
+            data = load_jsonl_response(response, _SUMMARY_SCHEMA)
             out: dict[str, str] = {}
             values = data.get("items") if isinstance(data, dict) else data
             for value in values or []:
