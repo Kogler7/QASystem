@@ -6,7 +6,7 @@
 - property pass：响应 {"updates": [{entity_id, properties, evidence:{quote}}]}；
 - relation pass：prompt 列出候选 pair（``- `pair-x`: entity-0(T) -[rel]-> entity-1(T)``），
   响应 {"decisions": {pair_id: {label, evidence:{quote}}}}，每个 pair 必须明确输出 relation_id 或 NONE；
-- repair   pass：按 prompt 内 output schema 的顶层 required 键返回空集合。
+- repair   pass：无自定义处理器时返回 JSONL 空记录标记 null。
 
 StubLLM 接收 ChatMessages（list[dict]），按 "## task" 段落路由到对应 handler；
 handler 拿不到/不需要的一律返回合法空响应，保证测试 hermetic（不访问真实 LLM）。
@@ -207,10 +207,9 @@ class StubLLM:
                     {"label": "NONE", "evidence": {"quote": ""}},
                 )
             payload = {"decisions": decisions}
-        else:  # repair 或其他：按 output schema 顶层 required 键返回空集合
+        else:  # repair 或其他：默认返回 JSONL 空记录标记
             if self.repair_handler is not None:
                 payload = self.repair_handler(prompt, chunk)
             else:
-                required = output_schema_required(prompt) or ["entities"]
-                payload = {key: [] for key in required}
+                return "null"
         return json.dumps(payload, ensure_ascii=False)

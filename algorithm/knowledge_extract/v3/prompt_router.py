@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
 import math
 import re
 import unicodedata
@@ -47,7 +48,7 @@ GENERIC_SEMANTIC_RULES = """[通用语义归类规则]
 
 _BASE_SYSTEM_PROMPT_HEAD = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v5
 你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。
-只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出必须是 JSON object，且只能包含本轮 schema 允许的顶层键。
+只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出遵循本轮 JSONL 协议，记录只能包含记录 schema 允许的字段。
 
 [核心原则]
 - 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。
@@ -710,7 +711,7 @@ _RULE_TABLE_PROPERTY_RULES = """
 _RULE_TABLE_ENTITY_RULES = """
 ### 自动判定允许的规则类型与记录，实体抽取遵守以下约束
 - 以下归纳仅适用于 rule_types 和 rule_rows；其他记录、设备、人员、参数、表单事项仍遵守通用表格实体约束。
-- 有规则语义的记录应归纳出 ontology 允许的规则，不得因为「内容都是字段标签和标量值」就直接输出空数组。
+- 有规则语义的记录应归纳出 ontology 允许的规则，不得因为「内容都是字段标签和标量值」就直接报告没有记录。
 - 规则记录有分类字段（如「故障详细分类」）且未给出独立规则名称时，规则 mention 可用该分类值（如「RTU」「对标不准」），不要添加「故障」「规则」后缀。此规则不适用于普通对象。
 - 同一规则下的多条记录按 ontology 的 identity/名称语义归并；不同规则编号须分别保留，分类相同本身不能覆盖不同身份。
 - 缺少 RuleID 不阻止抽取有原文支持的规则；保持该身份属性缺失，禁止编造编号。"""
@@ -763,25 +764,20 @@ def build_chat_messages(
     )
     if span_entity_task:
         discipline = "只提议实体候选，禁止输出关系。"
-        top_level = '{"entities": []}'
     elif task == "identity":
         discipline = (
             "只为给定的候选实体补全 ontology 声明的缺失身份属性；"
             "不得改变实体类型、名称或候选集合，不得输出关系。"
         )
-        top_level = '{"updates": []}'
     elif task == "property":
         discipline = (
             "只为给定的已接受实体补全缺失属性；实体集合、实体类型和关系集合均已冻结，"
             "不得创建、删除或重命名实体，不得输出关系。"
         )
-        top_level = '{"updates": []}'
     elif task == "relation":
         discipline = "只分类给定 relation pair；不得创建新端点、不得输出未列出的关系。"
-        top_level = '{"decisions": {}}' if relation_pairs is not None else '{"relations": []}'
     else:
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
-        top_level = "按本轮 schema 输出 JSON object"
 
     record_table = _looks_like_record_table(chunk)
     table_semantics = analyze_table_semantics(plan, chunk)
@@ -796,16 +792,16 @@ def build_chat_messages(
     ) if has_table else ""
     if record_table and span_entity_task:
         output_constraint = (
-            "- 只输出 JSON object。不要用空数组敷衍：结构化记录/表格中每一行或每一条可归纳对象都应输出；"
-            '只有确认 current chunk 中不存在任何符合 ontology 的对象时，才允许输出 {"entities": []}。'
+            "- 不要遗漏可抽取对象：结构化记录/表格中每一行或每一条可归纳对象都应输出；"
+            '只有确认 current chunk 中不存在任何符合 ontology 的对象时，才允许报告没有记录。'
         )
     elif task == "relation" and relation_pairs is not None:
         output_constraint = (
-            "- 只输出 JSON object；必须为候选目录中的每个 pair_id 输出一项决策。"
+            "- 必须为候选目录中的每个 pair_id 输出一项决策。"
             "确认没有关系时输出 NONE；证据不足或无法消除歧义时输出 ABSTAIN；禁止输出空 decisions。"
         )
     else:
-        output_constraint = f"- 只输出 JSON object；没有结果时输出 {top_level}。"
+        output_constraint = ""
 
     issue_text = (
         json.dumps(repair_issues, ensure_ascii=False, sort_keys=True, default=str)
@@ -855,7 +851,7 @@ def build_chat_messages(
 - 同一条 evidence.quote 可以同时支持本次的多个属性，但实体、属性集合和证据的整体语义必须一致。
 - 禁止引入 current chunk 之外的新事实、默认值或外部知识。
 - 原文中缺失或无法确定的属性必须省略；禁止用 null、空字符串或占位符表示已补全。
-- 同一个实体的 updates 中，一个属性只能出现一次；如果属性已有值，不要重复输出。
+- 同一个实体的所有记录中，一个属性只能出现一次；如果属性已有值，不要重复输出。
 - evidence.quote 必须是 current chunk.text 中最能支撑本次整体更新的原文片段。"""
         if has_table:
             entity_rules += _RECORD_TABLE_PROPERTY_RULES + rule_scope
@@ -872,7 +868,7 @@ def build_chat_messages(
 - 不得输出或修改 name/type/relation，不得创建新实体。
 - 身份值必须由 current chunk 支持；允许格式归一化，禁止使用外部知识或臆造编号。
 - 同一条 evidence.quote 可以支持多个组合身份字段，但整体语义必须一致。
-- 原文无法确定身份时省略该更新；禁止输出 null、空字符串或占位符。
+- 原文无法确定身份时省略该更新；禁止将身份属性值填为 null、空字符串或占位符；没有任何更新时遵循空结果协议。
 - evidence.quote 必须是 current chunk.text 中最能支持本次身份更新的原文片段。"""
 
     if task == "relation" and relation_pairs is not None:
@@ -914,8 +910,11 @@ kind={route.kind}; labels={', '.join(route.labels) or 'none'}; source={route.sou
 ## ontology relation signatures
 {relation_section}
 
-## output schema
-{json.dumps(output_schema or {}, ensure_ascii=False, sort_keys=True, default=str)}
+## output protocol
+{jsonl_instruction(output_schema or {})}
+
+## record schema
+{json.dumps(record_schema(output_schema or {}), ensure_ascii=False, sort_keys=True, default=str)}
 
 ## output constraints
 {output_constraint}

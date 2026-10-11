@@ -76,7 +76,7 @@ class LLMCompatibilityTests(unittest.TestCase):
 
         self.assertNotIn("reasoning", client.responses.calls[0])
 
-    def test_official_v4_record_table_goes_directly_to_responses(self):
+    def test_official_v4_record_table_uses_jsonl_chat(self):
         client = _Client()
         llm = self._llm(client, base_url="https://api.deepseek.com/v1")
         schema = {
@@ -92,9 +92,11 @@ class LLMCompatibilityTests(unittest.TestCase):
             {"record_table": True, "schema_name": "record_table"},
         )
 
-        self.assertEqual(result.api, "responses")
-        self.assertEqual(len(client.responses.calls), 1)
-        self.assertEqual(len(client.chat.completions.calls), 0)
+        self.assertEqual(result.api, "chat.completions")
+        self.assertEqual(result.response_mode, "jsonl")
+        self.assertNotIn("response_format", client.chat.completions.calls[0])
+        self.assertEqual(len(client.responses.calls), 0)
+        self.assertEqual(len(client.chat.completions.calls), 1)
 
     def test_response_format_error_does_not_retry_without_thinking(self):
         error = RuntimeError("response_format json_schema is unsupported")
@@ -154,7 +156,7 @@ class LLMCompatibilityTests(unittest.TestCase):
             with self.subTest(model=model):
                 self.assertFalse(_is_deepseek_v4_flash(model))
 
-    def test_official_endpoint_still_prefers_responses(self):
+    def test_official_endpoint_uses_jsonl_chat(self):
         """官方端点不受前缀修复影响：仍走 Responses。"""
         client = _Client()
         llm = self._llm(client, base_url="https://api.deepseek.com/v1",
@@ -166,7 +168,7 @@ class LLMCompatibilityTests(unittest.TestCase):
             [{"role": "user", "content": "Return JSON."}],
         )
 
-        self.assertEqual(len(client.responses.calls), 1)
+        self.assertEqual(len(client.responses.calls), 0)
 
 
 if __name__ == "__main__":
