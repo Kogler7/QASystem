@@ -42,6 +42,8 @@ def test_global_offsets_overlap_metadata_and_full_source_coverage(bucket,parts):
                                 'prose {"rows":[1,2]} tail',
                                 '[1,2,3]',
                                 '|a|b|\n|---|---|\n|1|2|',
+                                '|设备|\n|---|\n|制动控制器|',
+                                '|设备|\n|:---:|\n|制动控制器|',
                                 '~~~\nunfinished'])
 def test_structures_preserved_and_actual_log_is_one(text,caplog):
     with caplog.at_level(logging.INFO):

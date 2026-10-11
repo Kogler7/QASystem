@@ -12,7 +12,7 @@ from typing import Callable
 _LOGGER = logging.getLogger(__name__)
 _PARTS = {'le20': 1, '21to40': 2, 'gt40': 3}
 _FENCE = re.compile(r'(?m)^\s*(?:`{3,}|~{3,})')
-_TABLE_SEPARATOR = re.compile(r'^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$')
+_TABLE_SEPARATOR = re.compile(r'^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$')
 
 
 def _audit(record: dict) -> None:
