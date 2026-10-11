@@ -1,36 +1,3 @@
-"""MinerU 4.x 解析处理器（本地推理）。
-
-与 2.x 的 ``OCRProcessor`` 保持**同样的入参与返回契约**，因此可以直接挂在
-``DocumentProcessor`` 上作为一个新引擎使用，不改变上层任何调用方式与输出格式：
-
-* 入参：``process(file_path, **kwargs)``，识别 ``output_dir`` / ``lang`` /
-  ``ocr_mode`` / ``table_enable`` / ``formula_enable`` / ``start_page_id`` /
-  ``end_page_id`` / ``keep_page_edges`` / ``page_edge_min_chars``；
-* 返回：``{"content": markdown, "metadata": {...}}``，失败时把原因放进 ``metadata["error"]``；
-* 内容格式与其它引擎一致：正文 Markdown，**表格输出为 ```json 代码块**（复用
-  ``table_json``），``keep_page_edges`` 命中时用**同一套页边规则**（复用 ``page_edges``，
-  文本层取行 + 只补缺失行）补回页眉/页脚。
-
-4.0 与 2.x 的差异（本模块负责抹平）：
-
-* 4.0 是公开 API ``mineru.parse(...)`` + ``ParseResult``，2.x 的内部模块已全部移除；
-* 4.0 用 ``tier``（flash/basic/standard/advanced）而不是 pipeline/vlm 后端，
-  默认取 ``standard``，可用环境变量 ``MINERU4_TIER`` 覆盖；
-* 4.0 没有 ``table_enable`` / ``formula_enable`` 开关，也没有语言参数：这些入参被接受但忽略，
-  并在元数据 ``mineru4_options.ignored_options`` 中如实记录；
-* 4.0 的页范围是 1 基闭区间字符串，本模块把 ``start_page_id`` / ``end_page_id``（0 基闭区间）
-  换算过去，语义与其它引擎一致。
-
-注意：4.0 内部 API 与 2.x 不兼容（``pypdfium2`` 等依赖互斥），也和 docling 需要的
-transformers 4.x 互斥。因此本处理器支持两种运行方式，对外契约完全一致：
-
-* **进程内**：当前解释器里能 import 到 MinerU 4.x 时直接调用（本地评估/独立环境）；
-* **子进程**：当前解释器里是 2.x（镜像默认布局）时，改用 ``MINERU4_PYTHON``
-  （默认 ``/opt/mineru4/venv/bin/python``）执行 ``mineru4_worker.py``，把 4.0 关在独立 venv 里。
-  这样镜像无需升级 docling/transformers，也不会影响 ``mineru``(2.x) 与 ``docling`` 现有行为。
-
-两种方式的差异只体现在元数据 ``mineru4_options.mode`` 上（``in-process`` / ``subprocess``）。
-"""
 from __future__ import annotations
 
 import json
@@ -52,7 +19,7 @@ from ..page_edges import (
     normalize_keep_page_edges,
     page_is_kept,
 )
-from ..table_json import convert_tables_to_json
+from ..table_json import convert_tables
 
 # 4.0 档位；默认 standard（4.0 自身默认），部署可用 MINERU4_TIER 覆盖。
 DEFAULT_TIER = "standard"
@@ -370,9 +337,15 @@ class Mineru4Processor(BaseProcessor):
                 "ignored_options": ignored,
             }
 
-            # 表格统一转 JSON（与其它引擎同一套规则、同一形态）
-            content, table_count = convert_tables_to_json(content)
-            metadata["tables_json"] = {"count": table_count}
+            # 表格分流：普通文件出 columns/rows JSON，表单类文件（文件名含"表单"）
+            # 里的表按阅读顺序还原为文本，避免伪造 columns/rows。
+            content, table_stats = convert_tables(content, source_name=file_path)
+            metadata["tables_json"] = {
+                "count": table_stats["tables"],
+                "forms": table_stats["forms"],
+            }
+            if table_stats["forms"]:
+                logger.info("表单类文件按阅读顺序还原为文本: {} 张", table_stats["forms"])
 
             # 页眉/页脚按需补回（同一套 page_edges 规则）；关闭时也记录，便于确认是有意不补回
             injected: list[dict] = []

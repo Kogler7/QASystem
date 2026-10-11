@@ -107,7 +107,7 @@ class RuntimeSupervisor:
 
         核心 worker 的 VLM 端点注入必须以这里为准——引擎不启动时绝不能
         注入指向空地址的 URL，否则解析选中 vlm-http-client 后必然连接失败，
-        且会因「URL 已配置」跳过本地 MinerU pipeline 的自动回退。
+        且会因「URL 已配置」跳过本地 MinerU 4.x 的自动回退。
         """
         if is_remote_only():
             return []
@@ -202,7 +202,7 @@ class RuntimeSupervisor:
         api_workers = _env_int("API_WORKERS", 1 if is_remote_only() else 2, minimum=1, maximum=16)
         # 仅当 vLLM 引擎计划启动时才注入 VLM 端点（与 _start_engines 同一判定）；
         # 引擎不启动时不得注入指向空地址的 URL，否则解析选中 vlm-http-client
-        # 后必然连接失败，且会因「URL 已配置」跳过本地 MinerU pipeline 自动回退。
+        # 后必然连接失败，且会因「URL 已配置」跳过本地 MinerU 4.x 自动回退。
         vlm_endpoints = [
             f"http://127.0.0.1:{port}" for port in self._planned_engine_ports()
         ]

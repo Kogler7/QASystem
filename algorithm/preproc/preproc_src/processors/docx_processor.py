@@ -18,7 +18,7 @@ from ..page_edges import (
     normalize_keep_page_edges,
     page_is_kept,
 )
-from ..table_json import convert_tables_to_json
+from ..table_json import convert_tables
 from ..text_layer import (
     merge_split_headings,
     page_text_lines,
@@ -209,6 +209,7 @@ class DocxProcessor(BaseProcessor):
             reconciled_lines = 0
             merged_lines = 0
             table_count = 0
+            form_count = 0
             for index, page_no in enumerate(pages):
                 chunk = document.export_to_markdown(
                     page_no=page_no, escape_html=False, escape_underscores=False
@@ -218,10 +219,11 @@ class DocxProcessor(BaseProcessor):
                 chunk, merged = merge_split_headings(chunk, page_lines)
                 chunk, replaced = reconcile_markdown(chunk, page_lines)
                 chunk = tighten_number_artifacts(chunk)
-                chunk, converted = convert_tables_to_json(chunk)
+                chunk, stats = convert_tables(chunk, source_name=file_path)
                 merged_lines += merged
                 reconciled_lines += replaced
-                table_count += converted
+                table_count += stats["tables"]
+                form_count += stats["forms"]
                 if selection is not None and page_is_kept(selection, index + 1, 1):
                     edges = extract_edge_lines(file_path, page_no, min_chars=min_chars)
                     top = missing_lines(edges["top"], chunk)
@@ -239,7 +241,7 @@ class DocxProcessor(BaseProcessor):
                 },
                 # 关闭时也记录，便于从元数据确认页边内容是有意不补回的。
                 "page_edges": {"mode": str(keep_page_edges), "injected": injected},
-                "tables_json": {"count": table_count},
+                "tables_json": {"count": table_count, "forms": form_count},
             }
             return (content + "\n" if content else ""), metadata
         except Exception as e:
@@ -247,25 +249,25 @@ class DocxProcessor(BaseProcessor):
             return f"处理失败：{str(e)}", {}
 
     @staticmethod
-    def _tables_to_json(markdown: str) -> str:
-        """把导出 Markdown 里的表格统一替换成 JSON 代码块，其余结构保持不变。"""
-        converted, _ = convert_tables_to_json(markdown)
+    def _tables_to_json(markdown: str, source_name: str | None = None) -> str:
+        """替换表格：普通文件出 JSON，表单类文件按阅读顺序还原为文本。"""
+        converted, _stats = convert_tables(markdown, source_name=source_name)
         return converted
 
-    def _process_docx(self, file_path: str) -> str:
+    def _process_docx(self, file_path: str, source_name: str | None = None) -> str:
         """处理DOCX文件"""
         try:
             result = self._get_converter().convert(file_path)
-            return self._tables_to_json(self._export_markdown(result))
+            return self._tables_to_json(self._export_markdown(result), source_name or file_path)
         except Exception as e:
             print(f"使用docling处理DOCX失败: {e}")
             return f"处理失败：{str(e)}"
 
-    def _process_with_converter(self, file_path: str, label: str) -> str:
+    def _process_with_converter(self, file_path: str, label: str, source_name: str | None = None) -> str:
         """使用 Docling 原生转换器处理 PPTX 或图片。"""
         try:
             result = self._get_converter().convert(file_path)
-            return self._tables_to_json(self._export_markdown(result))
+            return self._tables_to_json(self._export_markdown(result), source_name or file_path)
         except Exception as e:
             print(f"使用docling处理{label}失败: {e}")
             return f"处理失败：{str(e)}"
@@ -283,7 +285,7 @@ class DocxProcessor(BaseProcessor):
         if not pptx_path:
             return f"错误：{self.last_conversion_error or '无法将 PPT 转换为 PPTX'}"
         try:
-            return self._process_with_converter(pptx_path, 'PPT')
+            return self._process_with_converter(pptx_path, 'PPT', source_name=file_path)
         finally:
             try:
                 os.remove(pptx_path)
@@ -300,8 +302,8 @@ class DocxProcessor(BaseProcessor):
             return f"错误：{self.last_conversion_error or '无法将 DOC 转换为 DOCX'}"
 
         try:
-            # 处理转换后的DOCX文件
-            result = self._process_docx(docx_path)
+            # 处理转换后的DOCX文件（沿用原始文件名做表单判定）
+            result = self._process_docx(docx_path, source_name=file_path)
 
             # 清理临时文件
             try:
