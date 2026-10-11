@@ -1,6 +1,8 @@
 """Canonical chat prompt builder and deterministic document routing."""
 from __future__ import annotations
 
+from algorithm.knowledge_extract.repair_scope import relation_repair_scope
+
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -144,11 +146,10 @@ def _signature_text(plan: ExtractionPlan) -> str:
 def _known_entities_payload(
     known_entities: list[dict[str, Any]] | None, *, task: str,
 ) -> list[dict[str, Any]]:
-    """Preserve the old catalog fields and repair budget in structured form."""
+    """Preserve caller-budgeted catalog fields without hidden endpoint truncation."""
     entries = known_entities or []
     fields = ("id", "type", "name", "properties", "missing_properties")
     if task == "repair":
-        entries = entries[:25]
         fields = fields[:-1]
     return [{key: entry[key] for key in fields if key in entry} for entry in entries]
 
@@ -209,10 +210,18 @@ def build_chat_messages(
     else:
         raise ValueError(f"Unsupported extraction task: {task}")
 
+    repair_scope = None
+    if task == "repair" and "relations" in (output_schema or {}).get("properties", {}):
+        repair_scope = relation_repair_scope(plan, known_entities, repair_issues, output_schema)
+        output_schema = repair_scope.schema
+        repair_issues = repair_scope.issues
+
     record_table = _looks_like_record_table(chunk)
     ontology_section = _type_catalog_text(plan) if entity_task else _catalog_text(plan, include_comments=record_table)
     feature_section = "（实体任务不展示属性目录）" if entity_task else _feature_text(plan)
     relation_section = "（实体任务不展示关系目录）" if entity_task else _signature_text(plan)
+    if repair_scope is not None:
+        relation_section = repair_scope.signatures
     known = [] if entity_task else _known_entities_payload(known_entities, task=task)
     if task == "property":
         relation_section = "（属性补全不开放关系目录）"

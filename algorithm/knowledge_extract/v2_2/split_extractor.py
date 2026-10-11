@@ -19,6 +19,8 @@ LLM 通过标准 chat messages 调用，本模块不依赖 openai；live 环境�
 """
 from __future__ import annotations
 
+from algorithm.knowledge_extract.repair_scope import relation_repair_scope
+
 import json
 import re
 import time
@@ -885,6 +887,20 @@ def extract_split(
             "relation_candidates",
             {str(entry.get("type") or "") for entry in repair_catalog},
         )
+        repair_scope = relation_repair_scope(plan, repair_catalog, issue_rows, output_schema)
+        for skipped in repair_scope.skipped:
+            _append_warning(
+                warnings,
+                "REPAIR_ISSUE_OUT_OF_SCOPE",
+                "关系修复问题缺少当前目录中的合法端点/签名，保留未修复状态并跳过模型调用",
+                f"repair[{payload['round']}]",
+                skipped,
+            )
+        issue_rows = repair_scope.issues
+        output_schema = repair_scope.schema
+        if not issue_rows:
+            return {"entities": [], "relations": []}
+
         def build_repair_request(issue_batch):
             messages = build_chat_messages(
                 task="repair",

@@ -157,7 +157,8 @@ def test_repair_keeps_issue_scope_and_budget():
               "missing_properties": {"body": {}}, "unrelated_metadata": "不传入"} for i in range(30)]
     _, _, relation_repair = build(task="repair", output_schema=plan.output_schemas["relation_candidates"],
                                   known_entities=known, repair_issues=issues)
-    assert len(relation_repair["task"]["known_entities"]) == 25
+    # Caller owns the endpoint budget; hidden truncation disagrees with schema.
+    assert len(relation_repair["task"]["known_entities"]) == 30
     assert set(relation_repair["task"]["known_entities"][0]) == {"id", "type", "name", "properties"}
 
 

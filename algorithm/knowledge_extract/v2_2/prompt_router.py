@@ -1,6 +1,8 @@
 """Canonical chat prompt builder and deterministic document routing."""
 from __future__ import annotations
 
+from algorithm.knowledge_extract.repair_scope import relation_repair_scope
+
 import json
 import re
 from dataclasses import dataclass
@@ -424,10 +426,10 @@ def _known_entities_text(
 ) -> str:
     if not known_entities:
         return "（无）"
-    # repair 只把实体目录当端点参照用：截断到前 25 个，且不展示
-    # missing_properties（属性补全另有专 pass），避免撑爆 repair prompt。
+    # repair 目录预算由调用方控制；渲染不得再次截断，避免与 schema/issue 作用域不一致。
+    # missing_properties 由独立属性补全 pass 处理。
     repair = task == "repair"
-    entries = known_entities[:25] if repair else known_entities
+    entries = known_entities
     lines = [
         "| id | type | name | properties | missing_properties |",
         "| --- | --- | --- | --- | --- |",
@@ -575,6 +577,12 @@ def build_chat_messages(
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
         top_level = "按本轮 schema 输出 JSON object"
 
+    repair_scope = None
+    if task == "repair" and "relations" in (output_schema or {}).get("properties", {}):
+        repair_scope = relation_repair_scope(plan, known_entities, repair_issues, output_schema)
+        output_schema = repair_scope.schema
+        repair_issues = repair_scope.issues
+
     record_table = _looks_like_record_table(chunk)
     if record_table:
         output_constraint = (
@@ -613,6 +621,8 @@ def build_chat_messages(
         ontology_section = _catalog_text(plan, include_comments=record_table)
         feature_section = _feature_text(plan)
         relation_section = _signature_text(plan)
+        if repair_scope is not None:
+            relation_section = repair_scope.signatures
         known_section = _known_entities_text(known_entities, task=task)
         context_section = local_context or "（无）"
         entity_rules = ""
