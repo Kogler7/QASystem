@@ -335,7 +335,7 @@ job.completed / job.failed / job.cancelled
 
 - **request_id 上下文**：HTTP 入口与执行层通过 contextvars 绑定 request/job id，服务层日志经 `context_prefix(request_id=...)` 附加，未绑定时不输出；用户可凭 `request_id` 与 `stats.extraction.empty_reason` 定位空结果问题。
 - **指标端点**：`GET /api/v1/observability/metrics`（不鉴权，暴露方式与 `/health` 一致）输出 `queue_depth`（Redis 队列按各资源流未确认消息数估算）、`job_status_counts`、告警与空抽取计数 `counters`、各阶段近期耗时分位数 `stage_duration_samples`（进程内环形缓冲，每阶段最近 512 次）。执行层不可用时对应字段降级为空值。
-- **告警 webhook**：`QASYSTEM_ALERT_WEBHOOK` 配置钉钉/企业微信机器人（text 消息格式），留空则静默跳过；同 event+request_id 60 秒内去重，发送失败只记 ERROR 日志，绝不影响主流程。
+- 告警仅写入本地 WARNING 日志，不访问外网；同 event+request_id 60 秒内去重。
 - **慢阶段预算**：`QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS` / `_CHUNK_` / `_EXTRACT_` 配置知识沉淀流水线各阶段耗时预算（秒），超出即发 `slow_stage` 告警——只告警、不中断任务；留空或 0 表示不告警。
 - **空抽取告警**：抽取结果 0 实体 0 关系且分类出原因时，写入 `stats.extraction.empty_reason`、计数 `empty_extraction_total` 并发送 `empty_extraction` 告警。
 
@@ -369,7 +369,6 @@ GPU_DEVICE_IDS=4,5,6,7
 | `EXECUTION_REAPER_MIN_IDLE_SECONDS` | `600` | 消息滞留多久后收回重投 |
 | `EXECUTION_REAPER_INTERVAL_SECONDS` | `60` | 重投扫描间隔 |
 | `KNOWLEDGE_PIPELINE_PARSE_SHARDING` | `false` | 知识沉淀流水线内 PDF 解析页分片开关 |
-| `QASYSTEM_ALERT_WEBHOOK` | 空 | 告警 webhook；留空不发送任何告警 |
 | `QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS` / `_CHUNK_` / `_EXTRACT_` | 空 | 各阶段慢预算（秒）；留空或 0 不告警 |
 | `EXECUTION_GPU_MAX_LEASES_PER_WORKER` | `1` | 单 Worker 同时执行的 GPU 原子任务数 |
 | `EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_VLM` | `2048` | VLM 原子任务调度预算，不是模型常驻显存 |

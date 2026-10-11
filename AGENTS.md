@@ -44,7 +44,7 @@
    `python3 eval/run.py --match-mode llm --fail-on-empty --min-f1 0.5 --max-case-seconds 1800 --max-stage-seconds parse=300,chunk=120,extract=900`
    退出码 `0` 才过；`2`=有空抽取或失败 case（必须排查 `summary.json` 的 `gate.empty_failures`）；`4`=F1 或耗时预算未过；`1`=配置错误。阈值以最新基线为准（见 `tmp/eval/runs/` 历次全量记录）。
 3. **基线对比**：与上一次全量基线比，实体 F1 不得明显下降、单 case 耗时不得明显上升；回退即挡。
-4. **生产观测**：确认 `QASYSTEM_ALERT_WEBHOOK` 已配置（空抽取/慢阶段/本体无效告警），`/api/v1/observability/metrics` 可访问；用户反馈的空结果问题凭 `request_id` 与 `stats.extraction.empty_reason` 定位到阶段。
+4. **生产观测**：确认空抽取/慢阶段/本体无效告警写入本地日志（不访问外网），`/api/v1/observability/metrics` 可访问；用户反馈的空结果问题凭 `request_id` 与 `stats.extraction.empty_reason` 定位到阶段。
 
 部署沿用 git 同步 + `docker compose restart backend agent`；评测失败 case 必须沉淀为 `test_data/eval/` 回归 case 或对应层单测后再关闭。
 
@@ -53,3 +53,7 @@
 - [Plugin and database environment](docs/部署/插件与数据库环境索引.md): local VSIX, Attu/Milvus, Neo4j browser, and data-access boundaries.
 - [Application-service API](docs/接口/应用服务API索引.md): live knowledge-map service endpoint directory and ingestion contract; see [Swagger UI](https://zhongche.zhouhao.work/docs) for current schemas.
 - [QASystem documentation index](docs/文档索引.md): all local architecture, API, deployment, and test documents.
+
+# Test Server
+
+88 是测试服务器，统一使用 `qasystem_backend`，不另建评测 Backend。测试部署执行本次改动相关测试与小规模链路验证；上述完整发布门禁适用于实际线上发布。实际线上环境不能访问外网，告警仅保留本地日志和指标。
