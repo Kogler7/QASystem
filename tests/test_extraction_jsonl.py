@@ -53,6 +53,7 @@ def test_explicit_empty_distinguished_from_invalid_and_blank():
     '{"entities":[{"name":"甲"}]}\n{"entities":[{"name":"乙"}]}',
     '```json\n{"entities":[{"name":"甲"},{"name":"乙"}]}',
     '{"name":"甲"}\n{"name":"乙"}\n```',
+    '```json\n{"entities":[{"name":"甲"},{"name":"乙"}]}```',
 ])
 def test_unambiguous_format_variations(text):
     assert decode_jsonl(text, SCHEMA) == ({"entities": [{"name":"甲"}, {"name":"乙"}]}, [])

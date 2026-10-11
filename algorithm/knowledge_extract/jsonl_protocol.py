@@ -44,9 +44,11 @@ def decode_jsonl(text: Any, schema: dict) -> tuple[dict, list[str]]:
     raw = str(getattr(text, "text", text) or "").lstrip("\ufeff").strip()
     # Fence delimiters carry no data; tolerate a missing opening/closing
     # delimiter independently, but never alter delimiters inside JSON strings.
-    raw = re.sub(r"\A```(?:jsonl|ndjson|json)?[^\S\n]*\n", "", raw,
-                 flags=re.IGNORECASE)
-    raw = re.sub(r"\n[^\S\n]*```\s*\Z", "", raw).strip()
+    raw, opened = re.subn(r"\A```(?:jsonl|ndjson|json)?[^\S\n]*\n", "", raw,
+                         flags=re.IGNORECASE)
+    # Some providers put the closing fence immediately after the last brace.
+    closing = r"```\s*\Z" if opened else r"\n[^\S\n]*```\s*\Z"
+    raw = re.sub(closing, "", raw).strip()
     # Read compatibility for saved JSON outputs, without requesting JSON remotely.
     try:
         legacy = json.loads(raw)
