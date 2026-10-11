@@ -1428,6 +1428,10 @@ class JudgeFormatUnsupportedError(RuntimeError):
     """The provider explicitly rejected the requested response format."""
 
 
+class JudgeInputLimitError(RuntimeError):
+    """SystemOne rejected request size; smaller complete windows may fit."""
+
+
 def _validate_judge_result(data: dict[str, Any], schema: dict[str, Any]) -> None:
     collection_name = next(iter(schema["properties"]))
     if set(data) != {collection_name}:
@@ -1667,6 +1671,17 @@ class JudgeClient:
             timeout=self.timeout)
         self.last_diagnostics.update(http_status=status, question_count=len(questions))
         if status >= 400:
+            detail = ""
+            if status == 422:
+                try:
+                    detail = str(json.loads(body.decode("utf-8")).get("detail", ""))
+                except (ValueError, AttributeError):
+                    pass
+            if status == 413 or (status == 422 and (
+                detail.startswith("Too many questions") or detail.startswith("Complete input exceeds")
+            )):
+                self.last_diagnostics["input_limit"] = True
+                raise JudgeInputLimitError(f"judge HTTP {status}: systemone_input_limit")
             raise RuntimeError(f"judge HTTP {status}: systemone_request_failed")
         data = json.loads(body.decode("utf-8"))
         answers = data.get("answers") if isinstance(data, dict) else None
@@ -1765,6 +1780,9 @@ def _judge_windows(
     prompt 涨到数万 token，模型直接回空数组，而且空数组能通过 schema 校验。
     这里两侧都切窗口，保证每一对 (golden, predicted) 恰好被 judge 看过一次。
     """
+    if getattr(judge_client, "adapter", None) == "systemone":
+        golden_window = min(golden_window, 4)
+        predicted_window = min(predicted_window, 4)
     jobs: list[tuple[list[int], list[int]]] = []
     for golden_start in range(0, len(golden_indices), golden_window):
         golden_slice = golden_indices[golden_start : golden_start + golden_window]
@@ -1801,6 +1819,24 @@ def _judge_windows(
                     "golden_indices": golden_slice,
                     "predicted_indices": predicted_slice,
                 })
+            input_limit = any(attempt.get("input_limit") for info in exc.judge_batches
+                              for attempt in info.get("attempts", []))
+            if input_limit and (len(golden_slice) > 1 or len(predicted_slice) > 1):
+                for info in exc.judge_batches:
+                    info["split_retry"] = True
+                if len(golden_slice) >= len(predicted_slice) and len(golden_slice) > 1:
+                    midpoint = len(golden_slice) // 2
+                    children = [(golden_slice[:midpoint], predicted_slice),
+                                (golden_slice[midpoint:], predicted_slice)]
+                else:
+                    midpoint = len(predicted_slice) // 2
+                    children = [(golden_slice, predicted_slice[:midpoint]),
+                                (golden_slice, predicted_slice[midpoint:])]
+                child_outcomes = [run_job(child) for child in children]
+                pairs = [pair for result, _, _ in child_outcomes for pair in result or []]
+                infos = list(exc.judge_batches) + [info for _, rows, _ in child_outcomes for info in rows]
+                error = next((error for _, _, error in child_outcomes if error is not None), None)
+                return pairs, infos, error
             return None, list(exc.judge_batches), exc
 
     if max_concurrency > 1 and len(jobs) > 1:
@@ -1817,15 +1853,18 @@ def _judge_windows(
         # diagnostics for every paid call even if an earlier window failed.
         raise JudgeBatchError(str(errors[0]), batch_infos)
     coverage = {
-        "windows": len(jobs),
+        "windows": 0,
         "pairs_presented": 0,
         "empty_windows": 0,
     }
     for pairs, infos, error in outcomes:
         all_pairs.extend(pairs or [])
-        if infos:
-            coverage["pairs_presented"] += int(infos[0]["golden_count"]) * int(infos[0]["predicted_count"])
-            if infos[0].get("empty_response") and infos[0]["golden_count"] and infos[0]["predicted_count"]:
+        for info in infos:
+            if info.get("split_retry"):
+                continue
+            coverage["windows"] += 1
+            coverage["pairs_presented"] += int(info["golden_count"]) * int(info["predicted_count"])
+            if info.get("empty_response") and info["golden_count"] and info["predicted_count"]:
                 coverage["empty_windows"] += 1
     return all_pairs, batch_infos, coverage
 
