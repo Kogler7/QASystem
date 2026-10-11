@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
@@ -10,11 +11,10 @@ from .domain_skills import select_domain_policy
 from .output_contracts import build_output_contract
 from .chunk_context import ExtractionChunk
 from .structured_text import is_structured_payload
-from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
 
-RouteKind = Literal["generic", "official_document", "standard"]
-RouteSource = Literal["ontology", "chunks", "fallback"]
+RouteKind = Literal["generic", "official_document", "standard", "simple", "rule", "trouble"]
+RouteSource = Literal["chunks", "fallback"]
 
 
 class ChatMessage(TypedDict):
@@ -23,22 +23,14 @@ class ChatMessage(TypedDict):
 
 
 ChatMessages = list[ChatMessage]
-
-
-_DOMAIN_ORDER: tuple[RouteKind, RouteKind] = ("official_document", "standard")
-_DOMAIN_THRESHOLD = 6
-_DOMAIN_MARGIN = 3
-_CHUNK_TEXT_LIMIT = 1200
-_MAX_ROUTE_CHUNKS = 12
-
+_DOMAIN_ORDER = ("official_document", "standard", "simple", "rule", "trouble")
 _STANDARD_NUMBER = re.compile(
     r"\b(?:GB\s*/\s*T|GB|GJB|JB\s*/\s*T|ISO|IEC|EN|Q\s*/\s*CR)\s*[—–-]?\s*\d+(?:[./—–-]\d+)*",
     re.IGNORECASE,
 )
-_CLAUSE_NUMBER = re.compile(r"^\s*\d+(?:\.\d+){0,3}\s+\S+")
 _OFFICIAL_TITLE = re.compile(
-    r"(?:^|\n)\s*(?:关于|关于印发|关于开展|关于同意|关于做好|关于进一步|关于切实|关于全面|关于组织)"
-    r"[^\n]{2,100}?(?:的通知|的公告|的决定|的意见|的办法|的规定|的批复|的请示|的报告|的函)"
+    r'(?:^|\n|["“])\s*(?:[#*]\s*)*(?:关于)[^\n]{2,100}?'
+    r"(?:的通知|的公告|的决定|的意见|的办法|的规定|的批复|的请示|的报告|的函)"
 )
 _OFFICIAL_NUMBER = re.compile(r"〔\d{4}〕\d+号")
 
@@ -47,231 +39,53 @@ _OFFICIAL_NUMBER = re.compile(r"〔\d{4}〕\d+号")
 class DocumentRoute:
     kind: RouteKind
     source: RouteSource
-    scores: tuple[tuple[str, int], tuple[str, int]]
+    scores: tuple[tuple[str, int], ...]
     reasons: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "kind": self.kind,
-            "source": self.source,
-            "scores": [list(item) for item in self.scores],
-            "reasons": list(self.reasons),
-        }
-
-
-def _score_rows(scores: dict[str, int]) -> tuple[tuple[str, int], tuple[str, int]]:
-    return tuple((kind, int(scores.get(kind, 0))) for kind in _DOMAIN_ORDER)  # type: ignore[return-value]
-
-
-def _ontology_tokens(plan: ExtractionPlan) -> set[str]:
-    tokens: set[str] = set()
-    for class_id, class_spec in plan.class_specs.items():
-        tokens.add(canonical_name(class_id))
-        tokens.add(canonical_name(class_spec.display_name))
-        for prop in class_spec.properties:
-            tokens.add(canonical_name(prop.identifier))
-            tokens.add(canonical_name(prop.display_name))
-    for rel_id, specs in plan.relation_specs.items():
-        tokens.add(canonical_name(rel_id))
-        for spec in specs:
-            tokens.add(canonical_name(spec.relation_id))
-            tokens.add(canonical_name(spec.display_label))
-            tokens.add(canonical_name(spec.signature))
-    return {item for item in tokens if item}
-
-
-def _score_ontology(plan: ExtractionPlan) -> tuple[dict[str, int], set[str]]:
-    tokens = _ontology_tokens(plan)
-    scores = {"official_document": 0, "standard": 0}
-    reasons: set[str] = set()
-
-    official_hits = {
-        "officialdocument": "route.ontology.official.class",
-        "documentunit": "route.ontology.official.unit",
-        "operationalactivity": "route.ontology.official.operation",
-        "operationalexchange": "route.ontology.official.exchange",
-        "issuedby": "route.ontology.official.issue_relation",
-        "文件标题": "route.ontology.official.title_property",
-        "文号": "route.ontology.official.number_property",
-        "来文字号": "route.ontology.official.number_property",
-        "收文号": "route.ontology.official.receipt_property",
-    }
-    standard_hits = {
-        "standarddocument": "route.ontology.standard.class",
-        "standard": "route.ontology.standard.class",
-        "requirementclause": "route.ontology.standard.requirement",
-        "clause": "route.ontology.standard.clause",
-        "subclause": "route.ontology.standard.clause",
-        "section": "route.ontology.standard.section",
-        "definesrequirement": "route.ontology.standard.requirement_relation",
-        "hassubclause": "route.ontology.standard.structure_relation",
-        "标准号": "route.ontology.standard.number_property",
-        "standardno": "route.ontology.standard.number_property",
-        "standardnumber": "route.ontology.standard.number_property",
-        "文件编号": "route.ontology.standard.number_property",
-        "clauseno": "route.ontology.standard.clause_property",
-        "条编号": "route.ontology.standard.clause_property",
-        "章编号": "route.ontology.standard.section_property",
-    }
-    for token, reason in official_hits.items():
-        if token in tokens:
-            scores["official_document"] += 5
-            reasons.add(reason)
-    for token, reason in standard_hits.items():
-        if token in tokens:
-            scores["standard"] += 5
-            reasons.add(reason)
-    return scores, reasons
-
-
-def _chunk_signal_text(chunk: ExtractionChunk) -> str:
-    metadata = chunk.metadata or {}
-    selected_metadata = []
-    for key in (
-        "title",
-        "heading",
-        "section_title",
-        "unit",
-        "block_kind",
-        "document_number",
-        "standard_number",
-    ):
-        value = metadata.get(key)
-        if value is not None:
-            selected_metadata.append(str(value))
-    return "\n".join(
-        item
-        for item in (
-            chunk.section_title or "",
-            chunk.clause_number or "",
-            "\n".join(selected_metadata),
-            (chunk.text or "")[:_CHUNK_TEXT_LIMIT],
-        )
-        if item
-    )
-
-
-def _score_chunks(chunks: list[ExtractionChunk]) -> tuple[dict[str, int], set[str]]:
-    scores = {"official_document": 0, "standard": 0}
-    reasons: set[str] = set()
-    seen_categories: set[str] = set()
-    for chunk in chunks[:_MAX_ROUTE_CHUNKS]:
-        text = _chunk_signal_text(chunk)
-        if _STANDARD_NUMBER.search(text) and "standard.number" not in seen_categories:
-            seen_categories.add("standard.number")
-            scores["standard"] += 4
-            reasons.add("route.chunks.standard.number")
-        if (
-            "standard.clause_structure" not in seen_categories
-            and (
-                chunk.clause_number
-                or _CLAUSE_NUMBER.search(chunk.section_title or "")
-                or _CLAUSE_NUMBER.search(text)
-            )
-        ):
-            seen_categories.add("standard.clause_structure")
-            scores["standard"] += 2
-            reasons.add("route.chunks.standard.clause_structure")
-        if (
-            "standard.lexical" not in seen_categories
-            and any(marker in text for marker in ("标准", "规范", "试验方法", "检验方法", "要求"))
-        ):
-            seen_categories.add("standard.lexical")
-            scores["standard"] += 1
-            reasons.add("route.chunks.standard.lexical")
-        if _OFFICIAL_TITLE.search(text) and "official.title" not in seen_categories:
-            seen_categories.add("official.title")
-            scores["official_document"] += 4
-            reasons.add("route.chunks.official.title")
-        if (
-            "official.number" not in seen_categories
-            and (
-                _OFFICIAL_NUMBER.search(text)
-                or any(marker in text for marker in ("文号", "来文字号", "收文号"))
-            )
-        ):
-            seen_categories.add("official.number")
-            scores["official_document"] += 3
-            reasons.add("route.chunks.official.number")
-        if (
-            "official.lexical" not in seen_categories
-            and any(marker in text for marker in ("通知", "发文机关", "主送", "抄送", "附件：", "请各单位"))
-        ):
-            seen_categories.add("official.lexical")
-            scores["official_document"] += 1
-            reasons.add("route.chunks.official.lexical")
-    return scores, reasons
-
-
-def _select(scores: dict[str, int]) -> tuple[RouteKind, str]:
-    official = scores["official_document"]
-    standard = scores["standard"]
-    if official >= standard:
-        top_kind: RouteKind = "official_document"
-        top_score = official
-        other_score = standard
-    else:
-        top_kind = "standard"
-        top_score = standard
-        other_score = official
-    if top_score < _DOMAIN_THRESHOLD:
-        return "generic", "route.fallback.low_score"
-    if top_score - other_score < _DOMAIN_MARGIN:
-        return "generic", "route.fallback.margin_conflict"
-    return top_kind, ""
+        return {"kind": self.kind, "source": self.source,
+                "scores": [list(item) for item in self.scores], "reasons": list(self.reasons)}
 
 
 def resolve_document_route(plan: ExtractionPlan, chunks: list[ExtractionChunk]) -> DocumentRoute:
+    """Classify once from the first supplied chunk text, never ontology or later chunks.
+
+    Conservative content signatures mirror benchmark document families. Ambiguous
+    or unrecognised text stays generic; filenames and metadata are not evidence.
+    """
     if isinstance(chunks, (str, bytes, dict)):
         raise TypeError("route requires a typed ExtractionChunk sequence")
     resolved_chunks = list(chunks)
     if any(not isinstance(chunk, ExtractionChunk) for chunk in resolved_chunks):
         raise TypeError("route requires a typed ExtractionChunk sequence")
-
-    ontology_scores, ontology_reasons = _score_ontology(plan)
-    ontology_kind, ontology_fallback = _select(ontology_scores)
-    chunk_scores, chunk_reasons = _score_chunks(resolved_chunks)
-    dual_strong_ontology = all(
-        ontology_scores[domain] >= _DOMAIN_THRESHOLD for domain in _DOMAIN_ORDER
-    )
-
-    reasons = set(ontology_reasons)
-    if ontology_kind != "generic" and not dual_strong_ontology:
-        scores = ontology_scores
-        source: RouteSource = "ontology"
-        kind = ontology_kind
-    else:
-        scores = {
-            domain: ontology_scores[domain] + chunk_scores[domain]
-            for domain in _DOMAIN_ORDER
-        }
-        reasons.update(chunk_reasons)
-        kind, fallback_reason = _select(scores)
-        source = "chunks" if kind != "generic" else "fallback"
-        if dual_strong_ontology:
-            reasons.add("route.ontology.dual_strong")
-        if fallback_reason:
-            reasons.add(fallback_reason)
-        elif ontology_fallback or dual_strong_ontology:
-            reasons.add("route.chunks.domain_selected")
-
-    if kind == "generic":
-        if scores["official_document"] > 0 and scores["standard"] > 0:
-            reasons.add("route.fallback.weak_conflict")
-        if ontology_fallback:
-            reasons.add(ontology_fallback)
-        if not reasons:
-            reasons.add("route.fallback.no_domain_signal")
-        source = "fallback"
-    else:
-        reasons.add(f"route.selected.{kind}")
-
-    return DocumentRoute(
-        kind=kind,
-        source=source,
-        scores=_score_rows(scores),
-        reasons=tuple(sorted(reasons)),
-    )
+    text = (resolved_chunks[0].text or "") if resolved_chunks else ""
+    text = unicodedata.normalize("NFKC", text)
+    scores = dict.fromkeys(_DOMAIN_ORDER, 0)
+    # Structured concept/example documents may discuss faults and rules. Their
+    # explicit semantic headings distinguish them from maintenance row records.
+    if (re.search(r"<<\s*(?:Stakeholder|Concern|Term|Problem|Solution)\s*>>", text, re.I)
+            or sum(marker in text for marker in ("术语名称", "术语定义", "干系人:", "关注点:")) >= 2):
+        scores["simple"] = 10
+    if (_OFFICIAL_TITLE.search(text) or "收文处理单" in text
+            or ("来文字号" in text and any(word in text for word in ("收文日期", "拟办意见", "领导批示")))):
+        scores["official_document"] = 8
+    elif _OFFICIAL_NUMBER.search(text) and any(word in text for word in ("通知", "主送", "来文单位")):
+        scores["official_document"] = 6
+    if _STANDARD_NUMBER.search(text) and any(word in text for word in ("标准", "规范", "试验方法", "技术要求", "范围")):
+        scores["standard"] = 6
+    if ("故障详细分类" in text and any(word in text for word in ("故障状况", "故障原因"))
+            or ("前件" in text and "后件" in text)
+            or ("antecedent" in text and "consequent" in text)):
+        scores["rule"] = 6
+    if ("故障内容" in text and "处理方法" in text
+            or any(word in text for word in ("行修更换", "互换记录", "故障检修记录"))
+            or ("故障" in text and "部件名称" in text and "故障标签" in text)):
+        scores["trouble"] = 6
+    ranked = sorted(scores, key=scores.get, reverse=True)
+    kind = ranked[0] if scores[ranked[0]] and scores[ranked[0]] - scores[ranked[1]] >= 2 else "generic"
+    reason = f"route.first_chunk.{kind}" if kind != "generic" else "route.fallback.unknown_or_ambiguous"
+    return DocumentRoute(kind=kind, source="chunks" if kind != "generic" else "fallback",
+                         scores=tuple(scores.items()), reasons=(reason,))
 
 
 def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> str:
@@ -361,23 +175,6 @@ def _looks_like_record_table(chunk: ExtractionChunk) -> bool:
     return is_structured_payload(chunk.text or "")
 
 
-def _looks_like_official_form(chunk: ExtractionChunk) -> bool:
-    """识别公文收文处理单/表单 chunk，抑制审批流转记录造成的实体爆炸。"""
-    text_head = (chunk.text or "")[:600]
-    name_source = " ".join(
-        item
-        for item in (
-            chunk.document_id or "",
-            str((chunk.metadata or {}).get("source_file") or ""),
-        )
-        if item
-    )
-    if "表单" not in name_source and "表单" not in text_head and "收文处理单" not in text_head:
-        return False
-    form_markers = ("收文处理单", "拟办意见", "领导批示", "已阅", "来文单位", "来文字号")
-    return any(marker in text_head for marker in form_markers)
-
-
 def build_chat_messages(
     *,
     task: Literal["entity", "property", "relation", "repair"] | str,
@@ -441,7 +238,6 @@ def build_chat_messages(
         domain_policy={"route": route.to_dict()} if assembly_planner is not None else select_domain_policy(
             kind=route.kind, route=route.to_dict(),
             task="entity" if entity_task else task,
-            record_table=record_table, official_form=_looks_like_official_form(chunk),
         ),
         ontology={
             "format": "compiled_task_catalog",

@@ -41,9 +41,11 @@ class SkillRegistry:
     def __init__(self, directory: str | Path | None = None):
         self.directory = Path(directory) if directory is not None else Path(__file__).with_name("skills")
         root = self.directory.resolve()
-        if not root.is_dir():
-            raise SkillConfigurationError(f"Skill directory does not exist: {root}")
         self._skills: dict[str, Skill] = {}
+        if not root.exists():
+            return  # An absent skill library is the system-only path.
+        if not root.is_dir():
+            raise SkillConfigurationError(f"Skill directory is not a directory: {root}")
         for path in sorted(root.glob("*/[Ss][Kk][Ii][Ll][Ll].[Mm][Dd]")):
             if path.parent.name.startswith("."):
                 continue
@@ -90,13 +92,18 @@ class SkillRegistry:
                                            content, hashlib.sha256(raw).hexdigest(), tuple(sections))
             except (OSError, UnicodeError, ValueError, TypeError, yaml.YAMLError) as exc:
                 raise SkillConfigurationError(f"Invalid skill {path}: {exc}") from exc
-        if not self._skills:
-            raise SkillConfigurationError(f"No skill.md files found in {root}")
 
     def catalog(self, stage: str) -> list[dict[str, Any]]:
         return [{"skill_id": s.name, "description": s.description, "version": s.version,
                  "sections": list(s.available_sections(stage)), "route_hints": list(s.route_hints)}
                 for s in self._skills.values() if s.available_sections(stage)]
+
+    def matching_catalog(self, stage: str, kind: str) -> list[dict[str, Any]]:
+        """Only the first-chunk document family is eligible, including custom IDs."""
+        if kind in {"generic", "simple"}:
+            return []
+        return [entry for entry in self.catalog(stage)
+                if kind == entry["skill_id"] or kind in entry["route_hints"]]
 
     def read_skill(self, skill_id: str, stage: str) -> dict[str, Any]:
         skill = self._skills.get(skill_id)

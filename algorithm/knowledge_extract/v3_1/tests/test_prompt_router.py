@@ -40,16 +40,20 @@ def build(ontology=GENERIC, text="有效原文", task="entity", **kwargs):
     return plan, messages, json.loads(messages[1]["content"])
 
 
-@pytest.mark.parametrize("ontology,kind", [(GENERIC, "generic"), (OFFICIAL, "official_document"), (STANDARD, "standard")])
-def test_fixed_system_and_route_selected_skills(ontology, kind):
-    _, messages, user = build(ontology)
+@pytest.mark.parametrize("ontology,text,kind", [
+    (GENERIC, "有效原文", "generic"),
+    (OFFICIAL, "关于开展排查的通知", "official_document"),
+    (STANDARD, "GB/T 1234-2026\n1 试验方法", "standard"),
+])
+def test_fixed_system_and_route_selected_skills(ontology, text, kind):
+    _, messages, user = build(ontology, text=text)
     assert [message["role"] for message in messages] == ["system", "user"]
     assert messages[0]["content"] == PR.BASE_SYSTEM_PROMPT
     assert "PROMPT_EXTENSION" not in messages[0]["content"]
     assert set(user) == {"task", "output_contract", "domain_policy", "ontology", "documents"}
     policy = user["domain_policy"]
     assert policy["route"]["kind"] == kind
-    assert policy["default_profiles"] == ([] if kind == "generic" else [kind])
+    assert policy["default_profiles"] == ([] if kind in {"generic", "standard"} else [kind])
     assert user["task"]["input_scope"] == "provided_segments"
 
 
@@ -78,41 +82,53 @@ def test_entity_scope_and_source_instruction_boundary():
     assert "body" not in user["ontology"]["catalog"]
 
 
-def test_route_threshold_margin_and_chunk_fallback():
-    plan = OC.compile_plan(GENERIC)
-    route = PR.resolve_document_route(plan, [CC.ExtractionChunk("x", "关于开展排查的通知\n〔2026〕1号")])
-    assert (route.kind, route.source) == ("official_document", "chunks")
-    assert PR._select({"official_document": 5, "standard": 0})[0] == "generic"
-    assert PR._select({"official_document": 6, "standard": 4})[0] == "generic"
-    assert PR._select({"official_document": 6, "standard": 3})[0] == "official_document"
-    official_plan = OC.compile_plan(OFFICIAL)
-    route = PR.resolve_document_route(official_plan, [CC.ExtractionChunk("x", "GB/T 1234-2026\n1 试验方法")])
-    assert (route.kind, route.source) == ("official_document", "ontology")
+@pytest.mark.parametrize('text,kind', [
+    ('关于开展排查的通知\n〔2026〕1号', 'official_document'),
+    ('GB/T 1234-2026\n1 试验方法', 'standard'),
+    ('[{"故障详细分类":"RTU","故障状况":"报警"}]', 'rule'),
+    ('故障内容：压力异常；处理方法：更换压力开关；部件名称：压力开关', 'trouble'),
+    ('object 用户 <<Stakeholder>> { 名称=工程师 }', 'simple'),
+    ('没有类型标志的正文', 'generic'),
+    ('', 'generic'),
+    ('干系人：工程师；关注点：设备可靠性', 'simple'),
+    ('{"来文字号":"某办(2026)18号","收文日期":"2026-03-27"}', 'official_document'),
+    ('{"⽂件标题":"关于印发《行动方案》的通知"}', 'official_document'),
+    ('GB/T 1234 标准；前件异常，后件报警', 'generic'),
+])
+def test_first_chunk_text_is_the_only_route_input(text, kind):
+    plan = OC.compile_plan(OFFICIAL)
+    first = CC.ExtractionChunk('first', text, section_title='GB/T 9999 标准',
+                               metadata={'title': '关于开展工作的通知'})
+    route = PR.resolve_document_route(plan, [first, CC.ExtractionChunk('later', '关于开展检查的通知')])
+    assert route.kind == kind
+    assert route == PR.resolve_document_route(OC.compile_plan(STANDARD), [first])
 
 
-def test_dual_strong_ontology_uses_chunk_scores():
-    plan = OC.compile_plan(OFFICIAL.replace("@enduml", 'class "标准" as Standard {\n}\nclass "条款" as Clause {\n}\n@enduml'))
-    # Official has an extra title property signal; text can resolve the conflict.
-    route = PR.resolve_document_route(plan, [CC.ExtractionChunk("x", "GB/T 1234-2026\n1 试验方法", clause_number="1")])
-    assert "route.ontology.dual_strong" in route.reasons
-    assert route.source in {"chunks", "fallback"}
+def test_empty_request_is_generic():
+    assert PR.resolve_document_route(OC.compile_plan(OFFICIAL), []).kind == 'generic'
 
 
-def test_chunk_shape_skills_preserve_stage_specific_rules():
-    text = '[{"故障详细分类":"RTU", "原因":"断线"}]'
+def test_simple_and_unknown_tables_do_not_receive_skills():
+    for text in ('object 用户 <<Stakeholder>> {}', '[{"字段":"值"}]'):
+        _, _, user = build(text=text)
+        assert user['domain_policy']['profiles'] == {}
+
+
+def test_family_skills_preserve_stage_specific_rules():
+    text = '[{"故障详细分类":"RTU", "故障原因":"断线"}]'
     _, _, entity = build(text=text)
-    assert "record_table" in entity["domain_policy"]["profiles"]
-    assert "不要添加" in entity["domain_policy"]["profiles"]["record_table"]["extraction_rules"]
+    assert "rule" in entity["domain_policy"]["profiles"]
+    assert "不添加" in entity["domain_policy"]["profiles"]["rule"]["extraction_rules"]
     schema = {"type": "object", "properties": {"updates": {"type": "array", "items": {"type": "object"}}}, "required": ["updates"]}
     _, messages, prop = build(text=text, task="property", output_schema=schema, local_context="相邻条文",
                               known_entities=[{"id": "entity-0", "type": "Rule", "name": "RTU", "missing_properties": {"body": {}}}])
     assert messages[0]["content"] == PR.BASE_SYSTEM_PROMPT
     assert prop["documents"][0]["local_context"] == "相邻条文"
     assert prop["output_contract"]["empty_result"] == {"updates": []}
-    assert "前件" in prop["domain_policy"]["profiles"]["record_table"]["extraction_rules"]
+    assert "前件" in prop["domain_policy"]["profiles"]["rule"]["extraction_rules"]
     assert "属性补全不开放关系目录" in prop["ontology"]["relation_signatures"]
     _, _, form = build(OFFICIAL, text="收文处理单\n拟办意见：技术中心负责落实。")
-    assert set(form["domain_policy"]["profiles"]) == {"official_document", "official_form"}
+    assert set(form["domain_policy"]["profiles"]) == {"official_document"}
 
 
 def test_pair_classification_keeps_endpoint_catalog_closed():
@@ -198,21 +214,30 @@ def test_model_plan_only_changes_domain_policy(task):
 
     def runner(messages, schema, operation):
         if operation == 'skill_read':
-            return {'action': 'read_skills', 'skill_ids': ['standard']}
+            return {'action': 'read_skills', 'skill_ids': ['rule']}
         return {'action': 'assemble', 'operation': task, 'chunk_id': 'chunk-1',
-                'skills': [{'skill_id': 'standard', 'sections': ['all']}], 'reason': '模型选中的标准策略'}
+                'skills': [{'skill_id': 'rule', 'sections': ['all']}], 'reason': '模型选中的标准策略'}
 
     plan = OC.compile_plan(GENERIC)
     schema = plan.output_schemas['entity_candidates' if task in {'entity', 'repair'} else 'relation_candidates']
     if task == 'property':
         schema = {'type': 'object', 'properties': {'updates': {'type': 'array', 'items': {'type': 'object'}}}, 'required': ['updates']}
-    kwargs = dict(task=task, output_schema=schema, local_context='真实相邻文本',
+    kwargs = dict(text='前件：异常；后件：报警。', task=task, output_schema=schema, local_context='真实相邻文本',
                   known_entities=[{'id': 'entity-0', 'type': 'Rule', 'name': '规则', 'properties': {}}])
     _, original_messages, original = build(**kwargs)
     planner = SkillAssemblyPlanner(runner)
     _, messages, user = build(**kwargs, assembly_planner=planner)
     assert messages[0] == original_messages[0]
     assert {k: v for k, v in user.items() if k != 'domain_policy'} == {k: v for k, v in original.items() if k != 'domain_policy'}
-    assert user['domain_policy']['default_profiles'] == ['standard']
-    assert user['domain_policy']['route']['kind'] == 'generic'  # route is a hint, not a Python selection gate
-    assert planner.audit()[0]['plan']['skills'][0]['skill_id'] == 'standard'
+    assert user['domain_policy']['default_profiles'] == ['rule']
+    assert user['domain_policy']['route']['kind'] == 'rule'
+    assert planner.audit()[0]['plan']['skills'][0]['skill_id'] == 'rule'
+
+
+@pytest.mark.parametrize('case', ['official_01', 'official_02', 'official_03', 'official_04', 'official_05'])
+def test_official_benchmark_first_chunk_routes_without_ontology(case):
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[4] / 'test_data' / 'eval' / 'official' / case / 'chunks.json'
+    items = json.loads(path.read_text())['data']['items']
+    first = CC.ExtractionChunk('first', items[0]['text'])
+    assert PR.resolve_document_route(OC.compile_plan(GENERIC), [first]).kind == 'official_document'
