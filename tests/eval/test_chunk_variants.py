@@ -57,6 +57,11 @@ def test_frozen_ranges_require_full_coverage_and_allow_overlap():
             validate_ranges('abcdef', items)
 
 
+def test_boundary_whitespace_trimming_is_not_lost_content():
+    validate_ranges(' \n甲\n\n乙\t', [{'text': '甲', 'range': [2, 3]},
+                                  {'text': '乙', 'range': [5, 6]}])
+
+
 @pytest.mark.parametrize('mode', ['extract', 'chunk-extract'])
 def test_reused_chunks_pass_provenance_through_runner(tmp_path, monkeypatch, mode):
     source = tmp_path / 'frozen'

@@ -50,10 +50,11 @@ def validate_ranges(markdown: str, items: list[dict]) -> None:
                 or span[0] < previous or markdown[span[0]:span[1]] != item.get('text')):
             raise ValueError('chunk text/source range mismatch')
         previous = span[0]
-        if span[0] > covered_end:
+        # Recursive splitters may intentionally trim boundary whitespace.
+        if span[0] > covered_end and markdown[covered_end:span[0]].strip():
             raise ValueError('chunk source range coverage gap')
         covered_end = max(covered_end, span[1])
-    if covered_end != len(markdown):
+    if markdown[covered_end:].strip():
         raise ValueError('chunk source range coverage gap')
 
 
