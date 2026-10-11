@@ -48,4 +48,6 @@ python3 eval/tools/judge_benchmark.py --base-url http://clef:8188 --model clef-f
 
 结果写入独立 `tmp/eval/judge/<时间>/`，含逐题输出、失败、耗时、语义/契约分组、能力分组、文档分组、文档宏平均、重复稳定性。分别报告有效判断准确率、包含失败的端到端准确率及覆盖率。还报告正例召回、负例识别率和 balanced accuracy，防止“全部判匹配”在不平衡数据上获得虚高分。重复轮次不作为独立样本累加；目前不自动宣称统计显著性。
 
+耗时包含整个工具执行的墙钟时间、请求累计耗时、平均每次请求、首轮平均，以及每个 case 所有轮次累计耗时的平均。窗口含多个判断格时，请求时间只计算一次。稳定性汇总可比较的重复 case 数、漂移数和比例；包含失败调用的 case 单列为未知，不视为稳定。2026-10-11 的预算受控小规模对比见 [结果报告](Judge裁判小规模对比20261011.md)。
+
 扩充素材使用 `eval/tools/harvest_judge_material.py`，输出到 `tmp/`；明确的独立标注经 `eval/tools/build_judge_dataset.py` 发布。基准数据全部留在 `test_data/`，工具在 `eval/`，不进入应用交付包。
