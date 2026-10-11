@@ -81,6 +81,15 @@ def fake_mineru(monkeypatch):
     module.parse = parse
     module.__version__ = "4.0.4"
     monkeypatch.setitem(sys.modules, "mineru", module)
+    # Exercise the real worker argument parser and output files across a mocked
+    # process boundary; subprocess isolation itself is covered separately below.
+    from algorithm.preproc.preproc_src.processors import mineru4_worker
+
+    def run_worker(cmd, **kwargs):
+        return types.SimpleNamespace(returncode=mineru4_worker.main(cmd[2:]), stderr="")
+
+    monkeypatch.setattr(mineru4_processor.subprocess, "run", run_worker)
+
     monkeypatch.setattr(
         mineru4_processor, "extract_edge_lines",
         lambda *_a, **_k: {"top": ["ICS01.120", "CCS A00"], "bottom": ["2026-01-28发布 2026-08-01实施"]},
@@ -115,10 +124,10 @@ def test_missing_file_reports_error_in_metadata(tmp_path):
     assert "文件不存在" in result["metadata"]["error"]
 
 
-def test_in_process_mode_is_recorded(pdf_file, fake_mineru, monkeypatch):
+def test_subprocess_mode_is_recorded(pdf_file, fake_mineru, monkeypatch):
     _fake_version(monkeypatch, "4.0.4")
     result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
-    assert result["metadata"]["mineru4_options"]["mode"] == "in-process"
+    assert result["metadata"]["mineru4_options"]["mode"] == "subprocess"
     assert result["metadata"]["mineru4_options"]["version"] == "4.0.4"
 
 
@@ -404,3 +413,42 @@ def test_ofd_conversion_failure_falls_back_to_mineru4(tmp_path, monkeypatch):
     assert captured["path"] == str(ofd)                       # 未经过 PDF
     assert result["metadata"]["engine_selection"]["request_role"] == "ofd_conversion_fallback"
     assert result["metadata"]["engine_selection"]["converted_file_type"] == ".ofd"
+
+
+@pytest.mark.parametrize('mode,expected', [('auto','auto'),('on','ocr'),('off','txt')])
+def test_subprocess_uses_current_python_and_canonical_ocr_mode(pdf_file, monkeypatch, tmp_path, mode, expected):
+    monkeypatch.delenv('MINERU4_PYTHON', raising=False)
+    monkeypatch.setattr(mineru4_processor, 'mineru_major_version', lambda: 4)
+    def child(cmd, **kwargs):
+        assert cmd[0] == sys.executable
+        assert cmd[cmd.index('--ocr-mode') + 1] == expected
+        out = Path(cmd[cmd.index('--out-dir') + 1])
+        (out/'result.json').write_text(json.dumps({'ok': True, 'mineru_version': '4.0.4'}))
+        (out/'markdown.md').write_text('识别正文')
+        return types.SimpleNamespace(returncode=0)
+    monkeypatch.setattr(mineru4_processor.subprocess, 'run', child)
+    result = Mineru4Processor().process(pdf_file, ocr_mode=mode, keep_page_edges='off')
+    assert result['content'] == '识别正文'
+
+
+def test_native_child_failure_is_returned_as_parse_error(pdf_file, monkeypatch):
+    monkeypatch.setattr(Mineru4Processor, '_venv_python', staticmethod(lambda: sys.executable))
+    monkeypatch.setattr(mineru4_processor.subprocess, 'run', lambda *a, **k: types.SimpleNamespace(returncode=-11, stderr='native crash'))
+    result = Mineru4Processor().process(pdf_file, keep_page_edges='off')
+    assert result['content'] == ''
+    assert 'native crash' in result['metadata']['error']
+
+
+def test_worker_omits_image_bytes_but_keeps_ocr_text(tmp_path, monkeypatch):
+    from algorithm.preproc.preproc_src.processors import mineru4_worker
+    class Result:
+        def markdown(self, *, image_renderer):
+            return '印章文字\n' + image_renderer('data:image/png;base64,AAAA') + '\n截止日期2026年4月10日'
+        def structured_content(self):
+            return {'pages': []}
+    monkeypatch.setitem(sys.modules, 'mineru', types.SimpleNamespace(parse=lambda *a, **k: Result(), __version__='4.0.4'))
+    out=tmp_path/'out'
+    assert mineru4_worker.main(['--pdf','fake.pdf','--out-dir',str(out),'--ocr-mode','ocr']) == 0
+    text=(out/'markdown.md').read_text()
+    assert 'base64' not in text
+    assert '印章文字' in text and '截止日期2026年4月10日' in text

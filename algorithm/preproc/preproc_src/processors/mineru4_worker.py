@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """在 MinerU 4.x 所在的解释器里执行一次解析（供适配层以子进程方式调用）。
 
-MinerU 4.0 与 2.x 依赖互斥（pypdfium2/pdftext 钉版本不同），也与 docling 需要的
-transformers 4.x 互斥。因此镜像里把 4.0 放在独立 venv（/opt/mineru4/venv），
-由本脚本作为进程边界：主进程（仓库代码）只需要 stdlib 就能调用它。
+模型加载和推理始终在子进程执行，避免原生代码阻塞 API worker 心跳。
+优先复用已安装 MinerU 4.x 的主解释器，也支持 MINERU4_PYTHON 指定解释器。
 
 用法：
 
@@ -56,7 +55,8 @@ def main(argv: list[str] | None = None) -> int:
             ocr_mode=args.ocr_mode,
             page_range=args.page_range,
         )
-        markdown = result.markdown() or ""
+        # Keep OCR text and captions, but never feed embedded image bytes to chunking/LLMs.
+        markdown = result.markdown(image_renderer=lambda *_args, **_kwargs: "") or ""
         (out_dir / "markdown.md").write_text(markdown, encoding="utf-8")
 
         structured: dict = {}
