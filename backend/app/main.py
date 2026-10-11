@@ -20,12 +20,13 @@ from .routers.algorithm_capabilities import router as capabilities_router
 from .routers.knowledge_precipitation import router as knowledge_router
 from .routers.execution import router as execution_router
 from mcp_services.server import mcp
+from mcp_services.runtime import streamable_http_app
 from external_services.application import capture_user_headers, reset_user_headers
 from . import api_recording, observability
 from .responses import ErrorCode, error_response
 
 
-mcp_app = mcp.streamable_http_app()
+mcp_app = streamable_http_app()
 
 
 @asynccontextmanager

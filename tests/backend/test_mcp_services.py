@@ -175,7 +175,8 @@ def test_graph_search_passes_atomic_filters(monkeypatch):
 def test_graph_search_has_no_depth_parameter():
     tools = asyncio.run(mcp.list_tools())
     tool = next(t for t in tools if t.name == "search_graph")
-    props = (tool.inputSchema or {}).get("properties", {})
+    schema = getattr(tool, "input_schema", getattr(tool, "inputSchema", {}))
+    props = (schema or {}).get("properties", {})
     assert "depth" not in props
     assert {"start_entity_id", "direction", "relationship_types", "limit", "question"}.issubset(props)
 
