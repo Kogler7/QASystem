@@ -64,7 +64,9 @@ def test_extraction_makes_one_chat_request_with_provider_thinking_parameter(base
     llm = SingleRequestLLM(client, model="deepseek-v4-flash", max_tokens=100,
                            disable_thinking=True, base_url=base_url)
     result = extract_harness("class Thing", [ExtractionChunk("c1", "No entities")], llm=llm)
-    assert result["status"] == "succeeded"
+    # 空结果不再算成功：链路跑通但一条事实都没有时显式失败。
+    assert result["status"] == "failed"
+    assert result["error_code"] == "EMPTY_EXTRACTION"
     assert result["profile"]["llm_calls"] == 1
     assert len(completions.calls) == 1
     assert completions.calls[0]["extra_body"] == expected

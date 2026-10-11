@@ -120,7 +120,10 @@ def test_undecided_type_reports_the_exclusion_instead_of_only_the_open_question(
     assert exclusion["claim"]["task_ids"] == [
         record["task_id"] for record in result["run_trace"]["tasks"] if record["kind"] == "entity_type"]
     assert [entity["name"] for entity in result["raw"]["entities"]] == ["乙"]
-    assert result["status"] == "partial"
+    # 类型未决导致该候选被排除＝召回缺口，已发布的图仍然可信。
+    assert result["status"] == "succeeded"
+    assert result["verification"]["valid"] is True
+    assert result["verification"]["coverage_complete"] is False
 
 
 def test_type_exclusion_issue_retires_once_the_type_is_actually_decided():

@@ -49,12 +49,90 @@ def _positive_number(value: float | None, env: str, default: float) -> float:
     return resolved
 
 
+_TRUE = {"1", "true", "yes", "on"}
+_FALSE = {"0", "false", "no", "off"}
+
+
+def _boolean(value: bool | None, env: str, default: bool) -> bool:
+    if value is not None:
+        return bool(value)
+    raw = os.getenv(env, "1" if default else "0").strip().lower()
+    if raw not in _TRUE | _FALSE:
+        raise ValueError(f"{env} must be boolean")
+    return raw in _TRUE
+
+
+def _unit_interval(value: float | None, env: str, default: float) -> float:
+    resolved = float(os.getenv(env, str(default)) if value is None else value)
+    if not 0 <= resolved <= 1:
+        raise ValueError(f"{env} must be within [0, 1]")
+    return resolved
+
+
+#: 已发布图谱本身是否可信，只由这些"图谱完整性"问题决定。它们描述的对象
+#: 已经进入图谱（条件未连接、重数冲突、属性冲突、身份未重键），因此可能
+#: 让已发布事实自相矛盾。候选被拒、任务未被裁决、调用超时、模型声明"某条
+#: 事实无法表达"都只说明召回/执行有缺口，记入 coverage_gaps 而不否决整张图
+#: （与 v2 的 coverage 语义一致：覆盖缺口是 warning，不是 hard error）。
+INTEGRITY_ISSUE_CODES = frozenset({
+    "CONDITION_NOT_LINKED",
+    "CARDINALITY_CONFLICT",
+    "PROPERTY_CONFLICT",
+    "REPAIR_CONTEXT_NOT_READ",
+    "IDENTITY_CHANGE_REQUIRES_REPAIR",
+})
+
+#: 模型显式声明的未完成事实：不改图谱可信度，但要在告警里保持 error 级别，
+#: 不能被当作普通提示淹没。
+DECLARED_GAP_ISSUE_CODES = frozenset({"SEMANTIC_SCOPE_UNRESOLVED"})
+
+#: 执行类问题：模型对某个切片/阶段没有给出可用响应（超时、请求失败、响应
+#: 不完整、调用预算耗尽）。它们说明"已知漏抽"，记入 failed_chunks，让调用方
+#: 知道哪一段原文没有被真正读完。
+EXECUTION_ISSUE_CODES = frozenset({
+    "LLM_TIMEOUT", "LLM_REQUEST_FAILED", "LLM_JSON_PARSE_FAILED",
+    "LLM_RESPONSE_INCOMPLETE", "LLM_CALL_BUDGET_EXHAUSTED", "DOCUMENT_BUDGET_EXHAUSTED",
+})
+
+#: 候选级问题（候选被拒、从未进入图谱）。它们可以随后由其它切片或修复轮以
+#: 合法证据重新提出，因此最终结果必须与已发布图谱对账后再判断。字段级问题
+#: （INVALID_PROPERTY_SCHEMA 等）不在此列：实体被发布不代表字段问题已修复，
+#: 它们只由实际字段修复（resolve_property_repairs）撤回。
+CANDIDATE_RELATION_ISSUE_CODES = frozenset({
+    "INVALID_RELATION", "INVALID_RELATION_REFERENCE_OR_EVIDENCE", "INVALID_RELATION_FACT",
+    "INVALID_CONDITION_REFERENCES",
+})
+CANDIDATE_ENTITY_ISSUE_CODES = frozenset({
+    "INVALID_ENTITY", "INVALID_ENTITY_TYPE", "INVALID_ENTITY_EVIDENCE_OR_NAME",
+    "ENTITY_TYPE_UNRESOLVED",
+})
+
+
+def decision_thresholds(*, support: float | None = None, alternate: float | None = None,
+                        margin: float | None = None) -> dict[str, float]:
+    """Clef 分流阈值：支持判定与其它判定分开，且都可按部署校准。"""
+    return {
+        "supported": _unit_interval(support, "KG_EXTRACT_V31_SUPPORT_THRESHOLD", .90),
+        "alternate": _unit_interval(alternate, "KG_EXTRACT_V31_ALTERNATE_THRESHOLD", .95),
+        "margin": _unit_interval(margin, "KG_EXTRACT_V31_DECISION_MARGIN", .15),
+    }
+
+
 class Harness:
     def __init__(self, *, ontology: str, chunks: list[ExtractionChunk], schema: OntologySchema,
-                 allowed: set[str], controller: Controller, decider: Any, mode: str):
+                 allowed: set[str], controller: Controller, decider: Any, mode: str,
+                 thresholds: dict[str, float] | None = None, strict_coverage: bool = False,
+                 relation_retries: int = 1, decision_group: int = 16):
         self.ontology, self.chunks, self.schema, self.allowed = ontology, chunks, schema, allowed
         self.context = ChunkContextManager(chunks)
         self.control, self.decider, self.mode = controller, decider, mode
+        self.thresholds = dict(thresholds or decision_thresholds())
+        #: 旧口径：任何未决候选都让整图不可信。保留开关以便发布门禁按需恢复。
+        self.strict_coverage = bool(strict_coverage)
+        #: 关系阶段失败后允许的有界重试次数（超时/请求失败/响应不完整）。
+        self.relation_retries = max(0, int(relation_retries))
+        #: 单次 Clef 调用携带的问题数，与服务端 CLEF_MAX_QUESTIONS 对齐。
+        self.decision_group = max(1, min(16, int(decision_group)))
         self.objects: dict[str, dict[str, Any]] = {}
         self.aliases: dict[str, str] = {}
         self.members: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -204,6 +282,27 @@ class Harness:
         except CallFailure as exc:
             self.issue(exc.code, chunk, stage, claim={"task_ids": [r["task_id"] for r in payload.get("tasks", []) if isinstance(r, dict) and "task_id" in r]})
             return None
+
+    def call_stage(self, stage: str, chunk: str, payload: dict[str, Any], *, retries: int = 0) -> dict[str, Any] | None:
+        """Bounded retry for a failed stage; a later success retires the transient failures.
+
+        每次显式阶段仍然一次 HTTP 请求；重试只覆盖"没有拿到可用响应"的情形，
+        并在拿到响应后把上一次失败留下的未决问题标为已解决，避免历史失败
+        永久否决整张图。
+        """
+        issue_start = len(self.issues)
+        for attempt in range(max(0, int(retries)) + 1):
+            if attempt and self.control.calls >= self.control.max_calls:
+                break
+            response = self.call(stage, chunk, payload)
+            if response is not None:
+                if attempt:
+                    for issue in self.issues[issue_start:]:
+                        if issue["status"] == "unresolved":
+                            issue["status"] = "resolved"
+                            issue["resolution"] = {"method": "stage_retry_succeeded", "attempt": attempt + 1}
+                return response
+        return None
 
     def array(self, payload: dict[str, Any], key: str, chunk: str, stage: str, *, required: bool = False) -> list[Any]:
         value = payload.get(key, [] if not required else None)
@@ -414,9 +513,11 @@ class Harness:
         if not records:
             return
         tasks = []
-        # Small groups share source state; every question binds its own immutable claim.
-        for offset in range(0, len(records), 4):
-            group = records[offset:offset + 4]
+        # 同组共享源状态，每个问题仍绑定自己的不可变 claim；组大小与 Clef 单次
+        # 调用可带的问题数一致，避免把同一批任务拆成多次串行 HTTP。
+        group_size = max(1, int(self.decision_group))
+        for offset in range(0, len(records), group_size):
+            group = records[offset:offset + group_size]
             state = {"claims": {r["task_id"]: r["claim"] for r in group},
                      "evidence_sets": {r["task_id"]: r["evidence"] for r in group},
                      "ontology_context": self.task_contract(group),
@@ -442,10 +543,12 @@ class Harness:
                 continue
             selected = result.selected
             probability = result.probabilities.get(selected, 0)
-            threshold = .95 if selected == "supported" else .98
+            threshold = self.thresholds["supported"] if selected == "supported" else self.thresholds["alternate"]
             record["clef"] = {"selected": selected, "probabilities": deepcopy(result.probabilities), "margin": result.margin,
-                              "details": deepcopy(result.details)}
-            if selected not in record["criteria"] or selected in {"insufficient", "UNKNOWN"} or probability < threshold or result.margin < .20:
+                              "details": deepcopy(result.details), "threshold": threshold,
+                              "margin_threshold": self.thresholds["margin"]}
+            if (selected not in record["criteria"] or selected in {"insufficient", "UNKNOWN"}
+                    or probability < threshold or result.margin < self.thresholds["margin"]):
                 continue
             record.update(selected=selected, provider="clef", status="decided")
         if allow_resolve:
@@ -999,7 +1102,7 @@ class Harness:
             if not self.schema.relations or not self.objects:
                 plan["status"] = "completed_no_endpoints" if self.schema.relations else "completed_no_signatures"
                 continue
-            response = self.call("relations", chunk.chunk_id, payload)
+            response = self.call_stage("relations", chunk.chunk_id, payload, retries=self.relation_retries)
             if response is None:
                 plan["status"] = "unresolved"
                 continue
@@ -1316,10 +1419,59 @@ class Harness:
                                            "decision_task_id": record["task_id"]})
                     record["status"] = "accepted"
 
+    def is_blocking(self, value: dict[str, Any]) -> bool:
+        """图谱完整性口径：只有它决定已发布图谱是否可信。
+
+        ``strict_coverage`` 恢复旧口径（任何未决候选都算阻断），供发布门禁按需启用。
+        """
+        if self.strict_coverage:
+            return True
+        code = value.get("code")
+        if code is None:
+            # 未决的逻辑任务：候选没有进入图谱，属于召回缺口。
+            return False
+        return code in INTEGRITY_ISSUE_CODES
+
+    def reconcile_issues(self) -> None:
+        """撤回"主体随后已被发布"的旧拒绝记录。
+
+        被拒候选可能由其它切片或修复轮以合法证据重新提出。候选一旦以同样的
+        三元组（或同样的实体身份）进入最终图谱，旧的就地拒绝就不再是未决事项；
+        否则历史失败会永久否决一张已经自洽的图。
+        """
+        published_relations = {(relation["from"], relation["type"], relation["to"]) for relation in self.relations}
+        for issue in self.issues:
+            if issue["status"] != "unresolved":
+                continue
+            relation_issue = issue["code"] in CANDIDATE_RELATION_ISSUE_CODES
+            if not relation_issue and issue["code"] not in CANDIDATE_ENTITY_ISSUE_CODES:
+                continue
+            claim, chunk = issue.get("claim"), issue["chunk"]
+            if not isinstance(claim, dict):
+                continue
+            published = False
+            if relation_issue:
+                left = self.endpoint(claim.get("from_id"), chunk)
+                right = self.endpoint(claim.get("to_id"), chunk)
+                names = {relation.identifier for relation in self.schema.resolve_relation(claim.get("rel_type"))}
+                published = bool(left and right and any((left, name, right) in published_relations for name in names))
+            else:
+                reference = claim.get("candidate_id") or claim.get("proposal_id")
+                if isinstance(reference, str) and reference:
+                    published = self.endpoint(reference, chunk) in self.objects
+            if published:
+                issue["status"] = "superseded"
+                issue["resolution"] = {"method": "subject_published_before_result"}
+
     def result(self, *, best_effort: bool, started: float, repairs: int) -> dict[str, Any]:
+        self.reconcile_issues()
         unresolved = self.unresolved()
-        failed_chunks = sorted({value["chunk"] for value in unresolved})
-        status = "succeeded" if not unresolved else ("partial" if best_effort and self.objects else "failed")
+        blocking = [value for value in unresolved if self.is_blocking(value)]
+        coverage = [value for value in unresolved if value not in blocking]
+        # 只有执行类问题才说明"这段原文没有被真正读完"；候选被拒是正常的语义
+        # 筛选，不应把整个切片记成失败。
+        failed_chunks = sorted({value["chunk"] for value in unresolved
+                                if value.get("code") in EXECUTION_ISSUE_CODES})
         objects = list(self.objects.values())
         relation_map = {}
         for relation in self.relations:
@@ -1342,13 +1494,34 @@ class Harness:
             stage = "relation" if has_entities else "entity"
             attempts.append({"provider": "harness", "chunk": chunk, "pass": stage, "type": "schema_validation",
                              "terminal": True, "message": "V3.1 logical tasks remain unresolved"})
-        error_code = "LLM_SCHEMA_INVALID" if unresolved else None
+        # 先算图谱，再按"图谱是否可用/可信"定状态：空图不是成功，完整性未过
+        # 才是 partial；召回与执行缺口只降覆盖率，不否决已经发布的事实。
+        usable = bool(objects) or bool(relations)
+        if not usable:
+            status = "failed"
+        elif (blocking or failed_chunks) and best_effort:
+            status = "partial"
+        elif blocking or failed_chunks:
+            status = "failed"
+        else:
+            status = "succeeded"
+        diagnostic_code = "LLM_SCHEMA_INVALID" if unresolved else None
         budget_failure = next((value.get("code") for value in unresolved if value.get("code") in {"DOCUMENT_BUDGET_EXHAUSTED", "LLM_TIMEOUT"}), None)
         if budget_failure:
-            error_code = "LLM_TIMEOUT"
+            diagnostic_code = "LLM_TIMEOUT"
         request_failure = next((value.get("code") for value in unresolved if value.get("code") == "LLM_REQUEST_FAILED"), None)
         if request_failure and not budget_failure:
-            error_code = "LLM_REQUEST_FAILED"
+            diagnostic_code = "LLM_REQUEST_FAILED"
+        if not usable:
+            # 空结果必须显式失败：模型返回空数组时 harness 不产生任何未决项，
+            # 旧实现会把它当成一次成功抽取。有执行/校验失败原因时优先报原因。
+            error_code = diagnostic_code or "EMPTY_EXTRACTION"
+        elif blocking and not diagnostic_code:
+            error_code = "PARTIAL_EXTRACTION_FAILED"
+        else:
+            # 执行类失败即使没有阻断整图也保留错误码：公开 extract() 契约要求
+            # 不能把"某个切片没读成"悄悄当作成功。
+            error_code = diagnostic_code
         profile = {"algorithm": "v3.1", "llm_calls": self.control.calls,
                    "llm_http_calls": sum(bool(a.get("request_sent")) for a in self.control.attempts),
                    "clef_calls": len({item["call_index"] for item in self.clef_trace if "call_index" in item}),
@@ -1363,15 +1536,24 @@ class Harness:
                    "late_responses_ignored": sum(bool(a.get("late_response_ignored")) for a in self.control.attempts),
                    "logical_task_counts": dict(Counter(record["status"] for record in self.tasks)),
                    "source_observation_count": sum(issue["status"] == "observed" for issue in self.issues),
+                   "strict_coverage": self.strict_coverage, "relation_retries": self.relation_retries,
+                   "decision_thresholds": dict(self.thresholds),
+                   "blocking_issue_count": len(blocking), "coverage_issue_count": len(coverage),
+                   "degraded_error_code": None if status != "succeeded" else diagnostic_code,
                    "search_plan": deepcopy(list(self.search.values()))}
         warnings = [{"code": value.get("code", "SEMANTIC_TASK_UNRESOLVED"), "chunk": value["chunk"],
-                     "severity": "error", "message": "未完成的语义任务，详见 run_trace", "path": value.get("id", value.get("task_id"))}
+                     "severity": ("error" if value in blocking or value.get("code") in DECLARED_GAP_ISSUE_CODES
+                                  else "warning"),
+                     "message": "未完成的语义任务，详见 run_trace", "path": value.get("id", value.get("task_id"))}
                     for value in unresolved]
         warnings.extend({"code": "SOURCE_OBSERVATION", "chunk": issue["chunk"], "severity": "info",
                          "message": issue["claim"]["message"], "path": issue["id"]}
                         for issue in self.issues if issue["status"] == "observed")
-        verification = {"valid": not unresolved, "failed_chunks": failed_chunks, "hard_issues": deepcopy(unresolved),
-                        "hard_issue_count": len(unresolved), "scope": "executed_semantic_search_plan_not_exhaustive_recall"}
+        verification = {"valid": usable and not blocking, "coverage_complete": not unresolved, "failed_chunks": failed_chunks,
+                        "hard_issues": deepcopy(blocking), "hard_issue_count": len(blocking),
+                        "coverage_issues": deepcopy(coverage), "coverage_issue_count": len(coverage),
+                        "strict_coverage": self.strict_coverage,
+                        "scope": "executed_semantic_search_plan_not_exhaustive_recall"}
         trace = {"status": status, "ontology_sha256": hashlib.sha256(self.ontology.encode()).hexdigest(),
                  "attempts": attempts, "tasks": deepcopy(self.tasks), "issues": deepcopy(self.issues),
                  "alias_mapping": deepcopy(self.aliases), "search_plan": deepcopy(list(self.search.values())),
@@ -1379,7 +1561,9 @@ class Harness:
         return {"raw": assembler.compat_raw(objects, relations), "graph": graph, "triples": assembler.build_triples(graph),
                 "intermediate_model": {"objects": objects, "relations": relations}, "warnings": warnings, "attempts": attempts,
                 "profile": profile, "verification": verification, "status": status, "error_code": error_code,
-                "_error": "V3.1 logical tasks remain unresolved" if unresolved else None,
+                "_error": ("V3.1 logical tasks remain unresolved" if not usable and unresolved
+                           else "V3.1 extracted nothing from nonempty chunks" if not usable
+                           else "V3.1 graph integrity issues remain unresolved" if blocking else None),
                 "extract_version": "v3.1", "coverage_gaps": deepcopy(unresolved), "run_trace": trace}
 
 
@@ -1393,6 +1577,9 @@ def extract_harness(
     clef_max_calls: int | None = None, max_repair_rounds: int = 1, use_scheduler: bool = True,
     repairer: Any = None, entity_adjudicator: Any = None, prompt_variant: str | None = None,
     max_attempts: int = 1, retry_base_seconds: float = 0,
+    support_threshold: float | None = None, alternate_threshold: float | None = None,
+    decision_margin: float | None = None, strict_coverage: bool | None = None,
+    relation_retries: int | None = None, clef_max_questions: int | None = None,
 ) -> dict[str, Any]:
     """V2-compatible contract, with independent V3.1 semantics and bounded repair.
 
@@ -1436,11 +1623,14 @@ def extract_harness(
     budget = _positive_number(document_timeout, "KG_EXTRACT_V31_DOCUMENT_TIMEOUT", 900)
     timeout = _positive_number(request_timeout, "KG_EXTRACT_V31_REQUEST_TIMEOUT", 120)
     clef_seconds = _positive_number(clef_timeout, "KG_EXTRACT_V31_CLEF_TIMEOUT", 10)
+    thresholds = decision_thresholds(support=support_threshold, alternate=alternate_threshold, margin=decision_margin)
     nonempty = sum(bool(item.text.strip()) for item in chunk_list)
     call_limit = 6 * nonempty + 2 if max_llm_calls is None else int(max_llm_calls)
-    clef_limit = int(os.getenv("KG_EXTRACT_V31_CLEF_MAX_CALLS", "128") if clef_max_calls is None else clef_max_calls)
-    if call_limit < 1 or clef_limit < 1:
-        raise ValueError("call limits must be positive")
+    clef_limit = int(os.getenv("KG_EXTRACT_V31_CLEF_MAX_CALLS", "512") if clef_max_calls is None else clef_max_calls)
+    clef_questions = int(os.getenv("KG_EXTRACT_V31_CLEF_MAX_QUESTIONS", "16")
+                         if clef_max_questions is None else clef_max_questions)
+    if call_limit < 1 or clef_limit < 1 or not 1 <= clef_questions <= 16:
+        raise ValueError("call limits must be positive and Clef questions within 1..16")
     resolved_llm = llm
     if nonempty and resolved_llm is None:
         config = get_llm_config()
@@ -1450,7 +1640,13 @@ def extract_harness(
     control = Controller(resolved_llm, deadline=started + budget, timeout=timeout, max_calls=call_limit,
                          scheduler=get_llm_scheduler() if use_scheduler and nonempty else None)
     harness = Harness(ontology=ontology, chunks=chunk_list, schema=schema, allowed=allowed,
-                      controller=control, decider=decider or ClefDecider(client=clef_client, timeout=clef_seconds, max_calls=clef_limit), mode=validation_mode)
+                      controller=control, decider=decider or ClefDecider(client=clef_client, timeout=clef_seconds,
+                                                                        max_calls=clef_limit, max_questions=clef_questions),
+                      mode=validation_mode, thresholds=thresholds,
+                      strict_coverage=_boolean(strict_coverage, "KG_EXTRACT_V31_STRICT_COVERAGE", False),
+                      relation_retries=(int(os.getenv("KG_EXTRACT_V31_RELATION_RETRIES", "1"))
+                                        if relation_retries is None else relation_retries),
+                      decision_group=clef_questions)
     harness.discovery()
     harness.resolve_property_conflicts()
     harness.enrich()

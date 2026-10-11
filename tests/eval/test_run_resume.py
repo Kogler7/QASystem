@@ -193,9 +193,10 @@ def test_default_params_come_from_eval_kit(tmp_path: Path):
 def test_real_workspace_inventory():
     workspace = eval_run.DEFAULT_WORKSPACE
     types = {item.name for item in eval_run.discover_types(workspace)}
-    assert types == {"official", "rule", "simple", "standard"}
-    assert len(eval_run.discover_cases(workspace / "official")) == 10
-    assert len(eval_run.discover_cases(workspace / "standard")) == 4
+    # 2026-10-11 评测集精简：standard 全域与 official_06–10 已下线，workspace 只保留
+    # official_01–05、rule/rule_01、simple/Simple_故障规则的诊断 三类共 7 个 case。
+    assert types == {"official", "rule", "simple"}
+    assert len(eval_run.discover_cases(workspace / "official")) == 5
     assert len(eval_run.discover_cases(workspace / "rule")) == 1
     assert len(eval_run.discover_cases(workspace / "simple")) == 1
     first = workspace / "official" / "official_01"

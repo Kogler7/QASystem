@@ -72,12 +72,18 @@ def test_choice_uses_distribution_not_confidence_and_keeps_semantic_thresholds_o
 
 def test_equal_state_batched_up_to_four_and_other_states_stay_separate():
     client = FakeClient()
-    tasks = [task(str(i)) for i in range(6)] + [task("separate", state={"evidence": "other"})]
+    tasks = [task(str(i)) for i in range(18)] + [task("separate", state={"evidence": "other"})]
     results, _, decider = run(client, tasks)
-    assert list(map(lambda request: len(request["questions"]), client.requests)) == [4, 2, 1]
+    # 单次调用的问题数上限跟服务端 CLEF_MAX_QUESTIONS（16）一致。
+    assert list(map(lambda request: len(request["questions"]), client.requests)) == [16, 2, 1]
     assert set(results) == {item.task_id for item in tasks}
     assert all(item.status == "decided" for item in results.values())
     assert decider.calls == 3
+
+
+def test_decider_rejects_batches_beyond_the_service_limit():
+    with pytest.raises(ValueError, match="between 1 and 16"):
+        ClefDecider(FakeClient(), max_questions=17)
 
 
 def test_runtime_cache_covers_state_question_criteria_order_and_kind():

@@ -35,9 +35,8 @@ test_data/eval/
 
 | 类型目录 | 含义 | case | 说明 |
 | --- | --- | --- | --- |
-| `official` | 公文 | 10（`official_01` … `official_10`） | 多数含通知 PDF + `表单.pdf` 两个附件 |
-| `standard` | 标准 | 4（`standard_01` … `standard_04`） | golden 很大（数百实体/关系），LLM-judge 很慢 |
-| `rule` | 规则 | 1（`故障记录test`） | 有 golden，会评分 |
+| `official` | 公文 | 5（`official_01` … `official_05`） | 多数含通知 PDF + `表单.pdf` 两个附件 |
+| `rule` | 规则 | 1（`rule_01`） | 有 golden，会评分 |
 | `simple` | 简单规则/术语 | 1（`Simple_故障规则的诊断`） |  |
 
 不再使用中文类型目录名（`公文`/`标准`/`规则`）。`中车RAG验证数据集/` 若出现会被扫描跳过。
@@ -129,7 +128,7 @@ mini_eval:
   seed: 42
 ```
 
-每类数量只能为 **1 或 2**；候选不足时取全部。`per_type` 可按类型目录名覆盖数量。默认 `first` 按 case 目录名排序选择，当前会选 `official_01`、`official_02`、`standard_01` 和 rule、simple 各自唯一的 case，共 **5 个**。标准类只选一例仍可能耗时较长。
+每类数量只能为 **1 或 2**；候选不足时取全部。`per_type` 可按类型目录名覆盖数量。默认 `first` 按 case 目录名排序选择，当前会选 `official_01`、`official_02` 和 rule、simple 各自唯一的 case，共 **4 个**。完整评测集共 **7 个** case；standard 与 official_06–10 已移出当前评测集。
 
 需要随机抽样时，将 `selection` 改为 `random`：固定整数 `seed` 可在评测集不变时复现选择；设为 `null` 则每次重新抽样。启动时打印策略和 case 列表，实际运行将配置与精确 case 路径保存到 `params.resolved.json` 的 `mini_eval`、`targets` 字段。
 
@@ -395,8 +394,8 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 ## 使用注意
 
-- `standard` 的 golden 很大（数百实体/关系）。默认 LLM-judge 会多次调模型，耗时长；正式开测或对比版本先 `--match-mode identity`。
-- `rule/故障记录test` 有 6 个实体、0 条关系，会评分（不是空 golden）。
+- 默认 LLM-judge 会多次调模型；可先用 `--match-mode identity` 检查链路，正式质量门禁仍使用 LLM 模式。
+- `rule/rule_01` 有 40 个实体、0 条关系，会评分（不是空 golden）。
 - 公文 `official_*` 多数含多附件：单个文件解析失败会立刻重试，最多 3 次，仍失败则跳过该文件并记 `failed_files`，其余文件继续；逐文件耗时、尝试次数与产出在 `per_file`。`--mode pipeline` 时沉淀同样按文件重试后跳过。
 - 扫类型目录时，单个 case 的切片/抽取/打分抛错或失败同样最多重试 3 次，然后跳过进入下一个 case，不会把整批停掉。无 docs、本体缺失这类配置错误不重试。
 - parse / chunk 只验接口成功和输出非空，没有独立 golden；质量分只打在图抽取上。

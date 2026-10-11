@@ -66,8 +66,14 @@ def _is_deepseek_model(model: str) -> bool:
 
 
 def _is_deepseek_v4_flash(model: str) -> bool:
-    """MaaS 上的 deepseek-v4-flash / -0731 在 Responses 路径上输出不稳定。"""
-    return model.casefold().startswith("deepseek-v4-flash")
+    """MaaS 上的 deepseek-v4-flash / -0731 在 Responses 路径上输出不稳定。
+
+    模型 id 可能带组织前缀（例如硅基流动的 ``deepseek-ai/DeepSeek-V4-Flash``），
+    这类 id 在只有 chat.completions 的兼容服务上会被 Responses 路径打成 404，
+    因此按最后一段名字匹配，而不是整串前缀匹配。
+    """
+    name = model.casefold().rsplit("/", 1)[-1]
+    return name.startswith("deepseek-v4-flash")
 
 
 def _is_official_deepseek_endpoint(base_url: str) -> bool:

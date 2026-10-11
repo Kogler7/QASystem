@@ -643,22 +643,5 @@
       }
     }
   ],
-  "relations": [
-    {
-      "from_type": "Problem",
-      "from_name": "基于故障规则的故障诊断问题_01",
-      "rel_type": "需要方案",
-      "to_type": "Solution",
-      "to_name": "基于故障规则的故障诊断方案_01",
-      "evidence": {
-        "quote": "object 基于故障规则的故障诊断方案_01",
-        "document": "Simple_故障规则的诊断.md",
-        "line_start": 166,
-        "line_end": 166,
-        "start_char": 4844,
-        "end_char": 4867,
-        "support": "endpoint_context"
-      }
-    }
-  ]
+  "relations": []
 }
