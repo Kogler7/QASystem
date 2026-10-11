@@ -91,6 +91,115 @@ def _log_chunks(algo: str, chunks: list[str]) -> None:
         logger.info("[步骤][切片] 存在碎片片(<500): %s", [s for s in sizes if s < 500])
 
 
+_FENCE_CHAR = chr(96)
+_FENCE_MARKS = (_FENCE_CHAR * 3, "~~~")
+
+
+def _fenced_spans(text: str) -> list[tuple[int, int]]:
+    """扫描围栏符配对，返回每个围栏块的 ``[start, end)`` 字符区间。"""
+    spans: list[tuple[int, int]] = []
+    open_at: int | None = None
+    position = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith(_FENCE_MARKS):
+            if open_at is None:
+                open_at = position
+            else:
+                spans.append((open_at, position + len(line)))
+                open_at = None
+        position += len(line)
+    return spans
+
+
+def _heading_start(text: str, fence_start: int) -> int:
+    """把紧邻表格上方的 Markdown 标题并进表格片，避免标题与表格分家。"""
+    head_lines = text[:fence_start].splitlines(keepends=True)
+    index = len(head_lines) - 1
+    back = 0
+    while index >= 0 and not head_lines[index].strip():
+        back += len(head_lines[index])
+        index -= 1
+    if index >= 0 and head_lines[index].lstrip().startswith("#"):
+        return fence_start - back - len(head_lines[index])
+    return fence_start
+
+
+def _table_aware_spans(content: str) -> list[tuple[bool, int, int]] | None:
+    """把每个围栏块（含紧邻标题）标成不可按长度切分的表格区间。
+
+    按字符切会在表格中间下刀：JSON 变成非法片段、围栏只剩一半、工作表标题与表格分家，
+    抽取必然失败（几十行 Excel 抽不出来就是此因）。超长表格不在这里切，改由抽取层
+    ``_structured_row_segments`` 按行拆成多个自洽子表消化——切片层保证"表格完整"、
+    抽取层负责"超长表格按行拆"，两段式契约缺一不可。
+
+    返回 ``None`` 表示没有围栏块（走原逻辑）；否则返回有序的 ``(is_table, start, end)``。
+    """
+    spans = _fenced_spans(content)
+    if not spans:
+        return None
+    segments: list[tuple[bool, int, int]] = []
+    cursor = 0
+    for start, end in spans:
+        # 相邻表格共用标题等情况下 head 可能落到上一片内，钳制以免区间重叠。
+        head = max(cursor, _heading_start(content, start))
+        if head > cursor:
+            segments.append((False, cursor, head))
+        segments.append((True, head, end))
+        cursor = end
+    if cursor < len(content):
+        segments.append((False, cursor, len(content)))
+    return [item for item in segments if content[item[1]:item[2]].strip()]
+
+
+def _chunk_units(
+    content: str,
+    chunk_type: int,
+    chunk_size: int,
+    chunk_characters: list[str] | None,
+    similarity: float,
+    chunk_overlap: int,
+    model_path: str | None,
+    breakpoint_method: str,
+) -> list[Document]:
+    """表格感知切分：围栏表格整块成片，其余文本交给 splitter。
+
+    表格片不经拆分器改写（既不重新序列化、也不会丢掉半截围栏），并带上精确的
+    ``__source_range``，保证下游 ``chunk_document_items`` 与 evidence 始终指回原文。
+    """
+    segments = _table_aware_spans(content)
+    if segments is None:
+        documents = _dispatch(
+            content, chunk_type, chunk_size, chunk_characters,
+            similarity, chunk_overlap, model_path, breakpoint_method,
+        )
+        return [doc for doc in documents if doc.page_content]
+
+    units: list[Document] = []
+    table_count = 0
+    for is_table, start, end in segments:
+        if is_table:
+            table_count += 1
+            units.append(
+                Document(page_content=content[start:end], metadata={"__source_range": [start, end]})
+            )
+            continue
+        for doc in _chunk_units(
+            content[start:end], chunk_type, chunk_size, chunk_characters,
+            similarity, chunk_overlap, model_path, breakpoint_method,
+        ):
+            meta = dict(doc.metadata)
+            source_range = meta.get("__source_range")
+            if isinstance(source_range, (list, tuple)) and len(source_range) == 2:
+                # 子片偏移相对片段起点，平移回整篇坐标系。
+                meta["__source_range"] = [start + int(source_range[0]), start + int(source_range[1])]
+            units.append(Document(page_content=doc.page_content, metadata=meta))
+    logger.info(
+        "[步骤][切片] 表格感知切分: 片段=%d 表格片=%d 切片=%d",
+        len(segments), table_count, len(units),
+    )
+    return units
+
+
 def chunk_document(
     content: str,
     chunk_type: int = 0,
@@ -119,7 +228,7 @@ def chunk_document(
         chunk_characters or DEFAULT_SEPARATORS,
     )
 
-    documents = _dispatch(
+    documents = _chunk_units(
         content, chunk_type, chunk_size, chunk_characters,
         similarity, chunk_overlap, model_path, breakpoint_method,
     )
@@ -157,7 +266,7 @@ def chunk_document_items(
     algo = CHUNK_ALGORITHMS.get(chunk_type, f"chunk_type={chunk_type}")
     logger.info("[步骤][切片][items] 输入: 算法=%s 字符数=%d size=%d", algo, len(content), chunk_size)
 
-    documents = _dispatch(
+    documents = _chunk_units(
         content, chunk_type, chunk_size, chunk_characters,
         similarity, chunk_overlap, model_path, breakpoint_method,
     )
@@ -181,6 +290,11 @@ def chunk_document_items(
         if start < 0:
             start = content.find(text)
         if start < 0:
+            # 定位失败会污染下游 evidence 的字符范围，必须留痕（历史实现是静默回退）。
+            logger.warning(
+                "[步骤][切片][items] 偏移定位失败，已回退到游标位置: 切片=%d 字符数=%d",
+                len(items), len(text),
+            )
             start = cursor
         end = min(len(content), start + len(text))
         items.append({"text": text, "range": [start, end]})
