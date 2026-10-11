@@ -7,6 +7,7 @@ import json
 import pytest
 
 from algorithm.knowledge_extract import v3_1
+from algorithm.knowledge_extract.v3_1.skill_planner import SkillAssemblyPlanner
 from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
 from algorithm.knowledge_extract.v2.graph_assembler import GraphAssembler
 from algorithm.knowledge_extract.v3_1.tests.stub_llm import StubLLM, span_item
@@ -16,15 +17,6 @@ from backend.app.services import knowledge_extract_adapter as adapter
 ONTOLOGY = """@startuml
 class Assignment
 @enduml"""
-
-
-class FixedPlanner:
-    """Keep domain assembly deterministic while exercising the real pipeline."""
-    def assemble(self, payload, *, stage):
-        return payload
-
-    def audit(self):
-        return []
 
 
 def _result(*, status="succeeded", failed_chunk=None):
@@ -145,7 +137,7 @@ def test_v31_real_harness_retains_healthy_chunk_when_another_source_cannot_compl
 
     real_runner = v3_1.extract_aggregate
     monkeypatch.setattr(v3_1, "extract_aggregate", lambda **kwargs: real_runner(
-        **kwargs, llm=generation, assembly_planner=FixedPlanner(), use_scheduler=False,
+        **kwargs, llm=generation, assembly_planner=SkillAssemblyPlanner(), use_scheduler=False,
     ))
 
     items = adapter.extract_chunks(ONTOLOGY, texts)
@@ -160,7 +152,7 @@ def test_v31_real_harness_retains_healthy_chunk_when_another_source_cannot_compl
     assert all(item["quality"]["status"] == "partial" for item in items)
 
 
-def test_v31_real_relation_projects_by_its_evidence_without_relabeling_endpoint_provenance(monkeypatch):
+def test_v31_real_harness_returns_entities_without_relations(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v3.1")
     ontology = "@startuml\nclass Team\nclass Work\nTeam --> Work : performs\n@enduml"
     texts = ["甲组已经设立。", "甲组承担巡检。"]
@@ -168,15 +160,12 @@ def test_v31_real_relation_projects_by_its_evidence_without_relabeling_endpoint_
     def entities(prompt, chunk):
         return [span_item("Team", "甲组")] if chunk["chunk_id"] == "chunk-0000" else [span_item("Work", "巡检")]
 
-    def relations(prompt, pairs, chunk):
-        return [{"pair_id": pair["pair_id"], "label": pair["relation_id"],
-                 "evidence": {"quote": texts[1]}} for pair in pairs]
 
-    generation = StubLLM(entity_handler=entities, relation_handler=relations)
+    generation = StubLLM(entity_handler=entities)
 
     real_runner = v3_1.extract_aggregate
     monkeypatch.setattr(v3_1, "extract_aggregate", lambda **kwargs: real_runner(
-        **kwargs, llm=generation, assembly_planner=FixedPlanner(), use_scheduler=False,
+        **kwargs, llm=generation, assembly_planner=SkillAssemblyPlanner(), use_scheduler=False,
     ))
 
     items = adapter.extract_chunks(ontology, texts)
@@ -184,10 +173,8 @@ def test_v31_real_relation_projects_by_its_evidence_without_relabeling_endpoint_
     assert all(item["error"] is None for item in items)
     assert all(item["quality"]["status"] == "succeeded" for item in items)
     assert items[0]["graph"]["relationships"] == []
-    relationship = items[1]["graph"]["relationships"][0]
-    assert relationship["chunk_indices"] == [1]
-    assert relationship["provenance_status"] == "evidence"
-    nodes = {node["label"]: node for node in items[1]["graph"]["nodes"]}
+    assert items[1]["graph"]["relationships"] == []
+    assert {task for task, _ in generation.calls} == {"entity", "property"}
+    nodes = {node["label"]: node for item in items for node in item["graph"]["nodes"]}
     assert nodes["Team"]["chunk_indices"] == [0]
     assert nodes["Work"]["chunk_indices"] == [1]
-    assert {relationship["from_uid"], relationship["to_uid"]} == {node["uid"] for node in nodes.values()}
