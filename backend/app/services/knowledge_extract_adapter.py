@@ -415,10 +415,10 @@ def _object_buckets(
     model = result.get("intermediate_model") or {}
     object_positions: dict[str, set[int]] = {}
     uid_by_object: dict[str, str] = {}
-    for obj in model.get("objects") or []:
+    for object_index, obj in enumerate(model.get("objects") or []):
         if not isinstance(obj, dict):
             continue
-        object_id = str(obj.get("id") or "")
+        object_id = str(obj.get("id") or f"row:{object_index}")
         uid_by_object[object_id] = _uid_for(
             obj.get("type"),
             obj.get("identity") or obj.get("display_name"),

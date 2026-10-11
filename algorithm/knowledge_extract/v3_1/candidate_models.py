@@ -55,35 +55,4 @@ class EntityCandidate:
         }
 
 
-@dataclass
-class RelationCandidate:
-    candidate_id: str
-    from_candidate_id: str
-    to_candidate_id: str
-    proposed_relation: str
-    canonical_relation: str | None
-    evidence: list[Evidence]
-    from_name: str = ""
-    to_name: str = ""
-    from_type: str = ""
-    to_type: str = ""
-    mapping_score: float | None = None
-    mapping_status: str = "accepted"
-    warnings: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "from_id": self.from_candidate_id,
-            "from_type": self.from_type,
-            "from_name": self.from_name,
-            "rel_type": self.canonical_relation or self.proposed_relation,
-            "to_type": self.to_type,
-            "to_name": self.to_name,
-            "to_id": self.to_candidate_id,
-        }
-        if self.evidence:
-            payload["evidence"] = self.evidence[0].to_dict()
-        return payload
-
-
-__all__ = ["EntityCandidate", "RelationCandidate"]
+__all__ = ["EntityCandidate"]
