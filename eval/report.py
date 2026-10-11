@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
+try:  # python3 -m eval.report / pytest
+    from eval.quality import build_quality_summary
+except ImportError:  # python3 eval/report.py
+    from quality import build_quality_summary
+
 MODULE_LABELS = {
     "backend_extract": "后台抽取",
     "backend_system": "沉淀 knowledge-ingestion",
@@ -272,49 +277,136 @@ def _render_gate(lines: list[str], summary: dict[str, Any]) -> None:
     lines.append("")
 
 
-def _render_overview(lines: list[str], summary: dict[str, Any]) -> None:
-    lines.append("## 总览")
-    lines.append("")
+def _included_modules(summary: dict[str, Any]) -> list[str]:
     overall = summary.get("overall") or {}
-    included = [
+    return [
         key
         for key in MODULE_ORDER
         if key == "backend_extract" or _module_has_data(overall.get(key))
     ]
+
+
+def _append_prf_table(lines: list[str], rows: list[tuple[str, dict[str, Any]]], *, lead: str) -> None:
+    """lead 是表头里类别列之前的列名，用「 | 」分隔。"""
+    lines.append(f"| {lead} | 类别 | golden | predicted | P | R | F1 |")
+    separators = " | ".join(["---"] * (lead.count("|") + 1))
+    lines.append(f"| {separators} | --- | ---: | ---: | ---: | ---: | ---: |")
+    for prefix, metrics in rows:
+        for side, side_label in SIDE_LABELS:
+            block = (metrics or {}).get(side) or {}
+            lines.append(
+                f"| {prefix} | {side_label} | {_fmt_count(block.get('golden'))} | "
+                f"{_fmt_count(block.get('predicted'))} | {_fmt_metric(block.get('precision'))} | "
+                f"{_fmt_metric(block.get('recall'))} | {_fmt_metric(block.get('f1'))} |"
+            )
+
+
+def _quality_view(summary: dict[str, Any]) -> dict[str, Any]:
+    quality = summary.get("quality")
+    if isinstance(quality, dict) and quality.get("modules"):
+        return quality
+    if not summary.get("cases"):
+        return {}
+    return build_quality_summary(summary)
+
+
+def _render_overall(lines: list[str], summary: dict[str, Any]) -> None:
+    lines.append("### 整体")
+    lines.append("")
+    lines.append("全部有效评分按 TP/FP/FN 累加（micro）。")
+    lines.append("")
+    overall = summary.get("overall") or {}
+    included = _included_modules(summary)
     if not overall:
         lines.append("（无总览数据）")
         lines.append("")
         return
-    lines.append("| 模块 | 类别 | golden | predicted | P | R | F1 |")
-    lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
-    for key in included:
-        metrics = overall.get(key) or {}
-        for side, side_label in SIDE_LABELS:
-            block = metrics.get(side) or {}
-            lines.append(
-                f"| {MODULE_LABELS.get(key, key)} | {side_label} | {_fmt_count(block.get('golden'))} | "
-                f"{_fmt_count(block.get('predicted'))} | {_fmt_metric(block.get('precision'))} | "
-                f"{_fmt_metric(block.get('recall'))} | {_fmt_metric(block.get('f1'))} |"
-            )
+    _append_prf_table(
+        lines,
+        [(MODULE_LABELS.get(key, key), overall.get(key) or {}) for key in included],
+        lead="模块",
+    )
     lines.append("")
     identity = summary.get("overall_identity") or {}
     if any(_module_has_data(identity.get(key)) for key in MODULE_ORDER):
         lines.append("**identity 精确匹配对照**")
         lines.append("")
-        lines.append("| 模块 | 类别 | golden | predicted | P | R | F1 |")
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
-        for key in included:
-            metrics = identity.get(key) or {}
-            if not _module_has_data(metrics):
-                continue
-            for side, side_label in SIDE_LABELS:
-                block = metrics.get(side) or {}
-                lines.append(
-                    f"| {MODULE_LABELS.get(key, key)} | {side_label} | {_fmt_count(block.get('golden'))} | "
-                    f"{_fmt_count(block.get('predicted'))} | {_fmt_metric(block.get('precision'))} | "
-                    f"{_fmt_metric(block.get('recall'))} | {_fmt_metric(block.get('f1'))} |"
-                )
+        identity_rows = [
+            (MODULE_LABELS.get(key, key), identity.get(key) or {})
+            for key in included
+            if _module_has_data(identity.get(key))
+        ]
+        _append_prf_table(lines, identity_rows, lead="模块")
         lines.append("")
+
+
+def _render_by_type(lines: list[str], summary: dict[str, Any]) -> None:
+    lines.append("### 分类型")
+    lines.append("")
+    lines.append("同一类型内的有效评分按 TP/FP/FN 累加。类型名是评测集目录，如 `official`、`rule`、`simple`。")
+    lines.append("")
+    quality = _quality_view(summary)
+    included = set(_included_modules(summary))
+    rows: list[tuple[str, dict[str, Any]]] = []
+    for module, item in (quality.get("modules") or {}).items():
+        if module not in included:
+            continue
+        label = MODULE_LABELS.get(module, module)
+        for group in sorted((item.get("by_group") or {})):
+            stats = item["by_group"][group]
+            if not int((stats.get("coverage") or {}).get("scored") or 0):
+                continue
+            rows.append((f"`{group}` | {label}", stats.get("micro") or {}))
+    if not rows:
+        lines.append("（无分类型数据）")
+        lines.append("")
+        return
+    _append_prf_table(lines, rows, lead="类型 | 模块")
+    lines.append("")
+
+
+def _render_per_file(lines: list[str], summary: dict[str, Any]) -> None:
+    lines.append("### 单个文件")
+    lines.append("")
+    lines.append("每个 case 单独列出实体、关系的 P、R、F1。一个 case 对应评测集里的一份文档（可含多个附件），分数对照该 case 的 golden。")
+    lines.append("")
+    cases = list(summary.get("cases") or [])
+    if not cases:
+        lines.append("（无文件）")
+        lines.append("")
+        return
+    lines.append("| 文件 | 模块 | 状态 | 实体 P | 实体 R | 实体 F1 | 关系 P | 关系 R | 关系 F1 |")
+    lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+    for record in cases:
+        blocks = [
+            (label, block["metrics"])
+            for label, block in _case_blocks(record)
+            if isinstance(block, dict) and isinstance(block.get("metrics"), dict)
+        ]
+        if not blocks:
+            lines.append(
+                f"| `{_case_label(record)}` | - | {_status_text(record)} | - | - | - | - | - | - |"
+            )
+            continue
+        for label, metrics in blocks:
+            entities = metrics.get("entities") or {}
+            relations = metrics.get("relations") or {}
+            lines.append(
+                f"| `{_case_label(record)}` | {MODULE_LABELS.get(label, label)} | {_status_text(record)} | "
+                f"{_fmt_metric(entities.get('precision'))} | {_fmt_metric(entities.get('recall'))} | {_fmt_metric(entities.get('f1'))} | "
+                f"{_fmt_metric(relations.get('precision'))} | {_fmt_metric(relations.get('recall'))} | {_fmt_metric(relations.get('f1'))} |"
+            )
+    lines.append("")
+
+
+def _render_conclusion(lines: list[str], summary: dict[str, Any]) -> None:
+    lines.append("## 指标结论")
+    lines.append("")
+    lines.append("本次评测的 P、R、F1 分三层：整体、分类型、单个文件。实体与关系分开计算。")
+    lines.append("")
+    _render_overall(lines, summary)
+    _render_by_type(lines, summary)
+    _render_per_file(lines, summary)
 
 
 def _render_cases(lines: list[str], summary: dict[str, Any]) -> None:
@@ -441,7 +533,8 @@ def _render_quality(lines: list[str], summary: dict[str, Any]) -> None:
     lines.extend([
         "## 评分覆盖率与分组统计", "",
         "总览 micro 和以下均值仅统计同口径的有效评分；未评分/请求失败不会伪造为 0 分，必须结合覆盖率与门禁使用。失败与已评分可重叠，例如空抽取会同时计入两者。",
-        "case macro 按文档等权，group macro 按类型等权；实体/关系两侧皆为空的项不参与该侧均值（显示 -）。", "",
+        "case macro 按文档等权，group macro 按类型等权；实体/关系两侧皆为空的项不参与该侧均值（显示 -）。",
+        "分类型与单个文件的 P、R、F1 见上方「指标结论」。", "",
         "| 模块 | 有效评分/预期 | 失败 | 缺评分 | judge 降级 | 实体 case macro F1 | 关系 case macro F1 | 实体 group macro F1 | 关系 group macro F1 |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ])
@@ -504,7 +597,7 @@ def render_report(summary: dict[str, Any], *, slow_top: int = 5) -> str:
     lines: list[str] = [f"# Benchmark 评测报告 {summary.get('run_id') or ''}".rstrip(), ""]
     _render_header(lines, summary)
     _render_gate(lines, summary)
-    _render_overview(lines, summary)
+    _render_conclusion(lines, summary)
     _render_quality(lines, summary)
     _render_baseline(lines, summary)
     _render_cases(lines, summary)
