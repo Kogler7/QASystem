@@ -41,3 +41,14 @@ def test_success_status_does_not_replace_numeric_quality_and_graph_is_not_export
     assert result[0]["numeric_metrics"]["entities"]["f1"] == 0
     assert result[0]["public_status"] == "succeeded"
     assert "secret" not in json.dumps(result)
+
+
+def test_interrupted_generation_is_counted_without_inventing_http_timeout(tmp_path):
+    (tmp_path / "manifest.json").write_text(json.dumps({"trace_id": "interrupted"}), encoding="utf8")
+    (tmp_path / "000001-call.json").write_text(json.dumps({"context": {"pass_name": "relation"}}), encoding="utf8")
+    result = audit_trace(tmp_path)
+    assert result["result_present"] is False
+    assert result["totals"]["generation_entries"] == 1
+    assert result["totals"]["response_artifact_missing"] == 1
+    assert result["totals"].get("actual_http", 0) == 0
+    assert result["totals"].get("http_timeout", 0) == 0

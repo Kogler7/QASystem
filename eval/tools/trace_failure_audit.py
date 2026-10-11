@@ -75,6 +75,20 @@ def audit_trace(directory):
                           "max_exact_multiplicity": m["max_exact_multiplicity"],
                           "zero_novel_tail_records": trajectory["zero_novel_tail_records"],
                           "severe_repeat": severe})
+    returned_ids = {r["call_id"] for r in responses}
+    for file in sorted(directory.glob("*-call.json")):
+        call_id = file.stem
+        if call_id in returned_ids:
+            continue
+        call = read(file)
+        stage = str(call.get("context", {}).get("pass_name") or "unknown")
+        stages[stage]["generation_entries"] += 1
+        stages[stage]["response_artifact_missing"] += 1
+        category = http_category(http[call_id]) if call_id in http else "http_record_missing"
+        stages[stage][category] += 1
+        stages[stage]["actual_http"] += int(category in {"http_returned", "http_timeout", "http_error"})
+        responses.append({"call_id": call_id, "stage": stage, "http_category": category,
+                          "response_artifact_missing": True, "finish_reason": None})
     terminals = []
     for attempt in result.get("attempts", []):
         if attempt.get("terminal"):
@@ -93,6 +107,7 @@ def audit_trace(directory):
             "responses": responses,
             "notes": ["Actual transport inferred from positive http_seconds; a http artifact alone is insufficient.",
                       "Severe repetition is offline >=40 records and last20 zero-new exact objects, not server cancellation.",
+                      "Missing response artifacts are unfinished or interrupted, not inferred model timeouts or loops.",
                       "Complete object counts and deduplication are not semantic quality labels."]}
 
 
