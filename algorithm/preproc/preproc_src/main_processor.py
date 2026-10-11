@@ -123,20 +123,12 @@ class DocumentProcessor:
 
             processor = DocxProcessor(libreoffice_path=self.libreoffice_path)
         elif engine in {"mineru", "vlm"}:
-            # MinerU 2.x 已退役：环境里装的是 4.x 时，这两个引擎名复用 4.x 适配层，
-            # 入参/返回/输出格式与其它引擎一致，只是底层引擎升级（元数据 engine 仍是请求名）。
-            from .processors.mineru4_processor import Mineru4Processor, mineru_major_version
+            # MinerU 2.x 已退役：这两个引擎名一律由 4.x 适配层承接（主解释器里没有 4.x
+            # 时，适配层会用独立 venv 的子进程解析，失败时给出明确错误）。不允许静默
+            # 降级到 2.x 的 OCRProcessor。
+            from .processors.mineru4_processor import Mineru4Processor
 
-            if (mineru_major_version() or 0) >= 4:
-                processor = Mineru4Processor(engine_name=engine)
-            else:
-                from .processors.ocr_processor import OCRProcessor
-
-                processor = OCRProcessor(
-                    config_path=self.mineru_config_path,
-                    model_source=self.mineru_model_source,
-                    required_mode="pipeline" if engine == "mineru" else "vlm",
-                )
+            processor = Mineru4Processor(engine_name=engine)
         elif engine == "mineru4":
             from .processors.mineru4_processor import Mineru4Processor
 
@@ -272,31 +264,22 @@ class DocumentProcessor:
             profile["profile_error"] = str(exc)
         return profile
 
-    def _local_pipeline_available(self) -> bool:
-        """Return whether the configured local MinerU pipeline model is usable.
+    def _local_mineru4_available(self) -> bool:
+        """本地是否能跑 MinerU 4.x（判定本地解析回退是否可用）。
 
-        Auto PDF routing must not select the HTTP VLM backend when no endpoint
-        exists on the worker.  This check is deliberately configuration-only;
-        importing MinerU here would initialize heavyweight model code during
-        every engine selection.
+        MinerU 2.x 已退役，本地回退目标是 4.x。两种运行方式都算数：主解释器里装了
+        4.x（镜像默认布局），或存在 4.x 独立 venv 解释器（``MINERU4_PYTHON``，
+        默认 ``/opt/mineru4/venv/bin/python``）。判定只做可导入/可执行检查，不在这里
+        初始化模型。
         """
-        if (self.mineru_model_source or "local").lower() != "local":
-            return False
-        override = os.getenv("MINERU_MODEL_PIPELINE_PATH", "").strip()
-        if override:
-            return Path(override).is_dir()
-        config_path = self.mineru_config_path
-        if not config_path:
-            return False
         try:
-            import json
-
-            config = json.loads(Path(config_path).read_text(encoding="utf-8"))
-            models_dir = config.get("models-dir")
-            pipeline_path = models_dir.get("pipeline") if isinstance(models_dir, dict) else None
-            return bool(pipeline_path and Path(str(pipeline_path)).is_dir())
-        except (OSError, TypeError, ValueError):
+            from .processors.mineru4_processor import mineru_major_version
+        except Exception:
             return False
+        if (mineru_major_version() or 0) >= 4:
+            return True
+        interpreter = os.getenv("MINERU4_PYTHON") or "/opt/mineru4/venv/bin/python"
+        return Path(interpreter).is_file()
 
     @staticmethod
     def _vlm_server_url() -> str:
@@ -386,15 +369,15 @@ class DocumentProcessor:
                 profile["kind"] != "text"
                 and not self._vlm_server_url()
                 and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
-                and self._local_pipeline_available()
+                and self._local_mineru4_available()
             ):
                 engine = "mineru"
-                selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地MinerU pipeline"
+                selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地 MinerU 4.x"
             selection["preferred_engine"] = engine
             selection["pdf_profile"] = profile
-            if engine == "docling" and self._local_pipeline_available():
+            if engine == "docling" and self._local_mineru4_available():
                 selection["fallback_engine"] = "mineru"
-                selection["fallback_reason"] = "Docling未生成有效文本时使用本地MinerU pipeline"
+                selection["fallback_reason"] = "Docling未生成有效文本时使用本地 MinerU 4.x"
             if requested_engine:
                 selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
                 selection["request_matched_selection"] = requested_engine == engine
@@ -408,7 +391,7 @@ class DocumentProcessor:
                 profile["kind"] == "complex"
                 and not self._vlm_server_url()
                 and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
-                and self._local_pipeline_available()
+                and self._local_mineru4_available()
                 and not requested_engine
             ):
                 # Complex Word files are converted to PDF before MinerU/VLM
@@ -417,7 +400,7 @@ class DocumentProcessor:
                 # pipeline just as the scanned-PDF route does.  A forced VLM
                 # request has already returned above and remains strict.
                 preferred_engine = "mineru"
-                selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地MinerU pipeline"
+                selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地 MinerU 4.x"
             selection["preferred_engine"] = preferred_engine
             if profile["kind"] == "complex" and requested_engine:
                 engine = requested_engine
@@ -438,13 +421,13 @@ class DocumentProcessor:
             and not requested_engine
             and not self._vlm_server_url()
             and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
-            and self._local_pipeline_available()
+            and self._local_mineru4_available()
             and "mineru" in allowed
         ):
             # Image and presentation routes also default to VLM.  Keep auto
             # parsing usable on workers that only mount the local pipeline.
             engine = "mineru"
-            selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地MinerU pipeline"
+            selection["auto_fallback_reason"] = "VLM HTTP endpoint未配置，使用本地 MinerU 4.x"
         selection["preferred_engine"] = engine
         if requested_engine:
             selection["request_role"] = "matched_default" if requested_engine == engine else "fallback_candidate"
@@ -484,52 +467,9 @@ class DocumentProcessor:
                         continue
                 return {"success": False, "error": "文本文件编码无法识别"}
 
-            # MinerU 4.x 原生支持 doc/docx/ppt/pptx 与图片，不需要先转 PDF；
-            # 只有 2.x 的 mineru/vlm 路线仍依赖 LibreOffice 转换。
-            if suffix in {".doc", ".docx", ".ppt", ".pptx", ".png", ".jpg", ".jpeg"} and engine in {"mineru", "vlm"}:
-                docling = self._processor("docling")
-                temp_pdf_path = docling.convert_to_pdf(file_path)
-                if not temp_pdf_path or not os.path.exists(temp_pdf_path):
-                    detail = getattr(docling, "last_conversion_error", None) or f"{suffix} 转 PDF 失败"
-                    return {"success": False, "error": detail}
-                process_path = temp_pdf_path
-
+            # MinerU 4.x 原生支持 doc/docx/ppt/pptx 与图片，不再需要先转 PDF。
             kwargs: dict[str, Any] = {}
-            if engine in {"mineru", "vlm"}:
-                backend = "pipeline" if engine == "mineru" else os.getenv("MINERU_VLM_BACKEND", "vlm-http-client")
-                pipeline_method = {"auto": "auto", "on": "ocr", "off": "txt"}[ocr_mode]
-                kwargs = {
-                    "output_dir": str(self.output_dir),
-                    "lang": lang,
-                    "backend": backend,
-                    "method": pipeline_method,
-                    "formula_enable": formula_enable,
-                    "table_enable": table_enable,
-                    "draw_layout_bbox": False,
-                    "draw_span_bbox": False,
-                    "dump_md": True,
-                    "dump_middle_json": False,
-                    "dump_model_output": False,
-                    "dump_orig_pdf": False,
-                    "dump_content_list": False,
-                    "start_page_id": start_page_id,
-                    "end_page_id": end_page_id,
-                }
-                if engine == "vlm":
-                    server_url = self._vlm_server_url()
-                    if server_url:
-                        kwargs["server_url"] = server_url
-                    kwargs["max_concurrency"] = int(os.getenv("MINERU_VLM_MAX_CONCURRENCY", "16"))
-                    kwargs["http_timeout"] = int(os.getenv("MINERU_VLM_HTTP_TIMEOUT_SECONDS", "600"))
-            elif engine == "docling":
-                # Docling 支持 0 基闭区间换算出的 1 基 page_range，并可按页补回页眉/页脚。
-                kwargs = {
-                    "start_page_id": start_page_id,
-                    "end_page_id": end_page_id,
-                    "keep_page_edges": keep_page_edges,
-                    "page_edge_min_chars": page_edge_min_chars,
-                }
-            if engine == "mineru4":
+            if engine in {"mineru", "vlm", "mineru4"}:
                 kwargs = {
                     "lang": lang,
                     "ocr_mode": ocr_mode,
@@ -540,9 +480,14 @@ class DocumentProcessor:
                     "keep_page_edges": keep_page_edges,
                     "page_edge_min_chars": page_edge_min_chars,
                 }
-            if engine in {"mineru", "vlm", "mineru4"}:
-                kwargs["keep_page_edges"] = keep_page_edges
-                kwargs["page_edge_min_chars"] = page_edge_min_chars
+            elif engine == "docling":
+                # Docling 支持 0 基闭区间换算出的 1 基 page_range，并可按页补回页眉/页脚。
+                kwargs = {
+                    "start_page_id": start_page_id,
+                    "end_page_id": end_page_id,
+                    "keep_page_edges": keep_page_edges,
+                    "page_edge_min_chars": page_edge_min_chars,
+                }
             result = self._processor(engine).process(process_path, **kwargs)
             metadata = result.get("metadata") or {}
             if engine == "mineru":

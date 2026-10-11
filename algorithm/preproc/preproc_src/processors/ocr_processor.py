@@ -14,13 +14,12 @@ from ..page_edges import (
     normalize_keep_page_edges,
     page_is_kept,
 )
-from ..table_json import convert_tables_to_json
+from ..table_json import convert_tables
 
 
 class OCRProcessor(BaseProcessor):
     """
     MinerU PDF/图像解析处理器，封装了底层API调用。
-    支持 pipeline 和 vlm 两种后端。
     """
 
     @staticmethod
@@ -132,28 +131,28 @@ class OCRProcessor(BaseProcessor):
             local_models_config = mineru_config_reader.get_local_models_dir()
             self._validate_local_models_config(local_models_config, required_mode)
 
-        from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
-        from mineru.data.data_reader_writer import FileBasedDataWriter
-        from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
-        from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
-        from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-        from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
-        from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
-        from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
-        from mineru.utils.enum_class import MakeMode
+        # from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
+        # from mineru.data.data_reader_writer import FileBasedDataWriter
+        # from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
+        # from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
+        # from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
+        # from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
+        # from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
+        # from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
+        # from mineru.utils.enum_class import MakeMode
 
-        self._convert_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2
-        self._prepare_env = prepare_env
-        self._read_fn = read_fn
-        self._FileBasedDataWriter = FileBasedDataWriter
-        self._pipeline_doc_analyze = pipeline_doc_analyze
-        self._pipeline_union_make = pipeline_union_make
-        self._pipeline_result_to_middle_json = pipeline_result_to_middle_json
-        self._vlm_doc_analyze = vlm_doc_analyze
-        self._vlm_union_make = vlm_union_make
-        self._draw_layout_bbox = draw_layout_bbox
-        self._draw_span_bbox = draw_span_bbox
-        self._MakeMode = MakeMode
+        # self._convert_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2
+        # self._prepare_env = prepare_env
+        # self._read_fn = read_fn
+        # self._FileBasedDataWriter = FileBasedDataWriter
+        # self._pipeline_doc_analyze = pipeline_doc_analyze
+        # self._pipeline_union_make = pipeline_union_make
+        # self._pipeline_result_to_middle_json = pipeline_result_to_middle_json
+        # self._vlm_doc_analyze = vlm_doc_analyze
+        # self._vlm_union_make = vlm_union_make
+        # self._draw_layout_bbox = draw_layout_bbox
+        # self._draw_span_bbox = draw_span_bbox
+        # self._MakeMode = MakeMode
 
         logger.info(
             "MinerU initialized with effective config: {}, model source: {}",
@@ -289,6 +288,7 @@ class OCRProcessor(BaseProcessor):
 
         # 准备输入数据：文件名、文件字节、语言列表
         file_names = []
+        source_paths: list[str] = []
         pdf_bytes_list = []
         lang_list = []
 
@@ -297,6 +297,7 @@ class OCRProcessor(BaseProcessor):
                 logger.warning(f"文件不存在，跳过: {path}")
                 continue
             file_names.append(path.stem)          # 不含扩展名的文件名
+            source_paths.append(str(path))        # 原始路径，用于表单类文件判定（文件名含 `表单`）
             pdf_bytes_list.append(self._read_fn(path))  # 读取文件为字节
             lang_list.append(lang)
 
@@ -323,6 +324,8 @@ class OCRProcessor(BaseProcessor):
 
             for idx, model_list in enumerate(infer_results):
                 pdf_file_name = file_names[idx]
+                # 表单类文件判定用原始文件名（文件名含 `表单`）
+                source_name = source_paths[idx] if idx < len(source_paths) else pdf_file_name
                 local_image_dir, local_md_dir = self._prepare_env(str(output_dir), pdf_file_name, method)
                 image_writer = self._FileBasedDataWriter(local_image_dir)
                 md_writer = self._FileBasedDataWriter(local_md_dir)
@@ -341,6 +344,7 @@ class OCRProcessor(BaseProcessor):
                     pdf_info=middle_json["pdf_info"],
                     pdf_bytes=pdf_bytes_list[idx],
                     pdf_file_name=pdf_file_name,
+                    source_name=source_name,
                     local_md_dir=local_md_dir,
                     local_image_dir=local_image_dir,
                     md_writer=md_writer,
@@ -370,6 +374,7 @@ class OCRProcessor(BaseProcessor):
                 backend = backend[4:]  # 去掉 'vlm-' 前缀
             for idx, pdf_bytes in enumerate(pdf_bytes_list):
                 pdf_file_name = file_names[idx]
+                source_name = source_paths[idx] if idx < len(source_paths) else pdf_file_name
                 # VLM 也支持页面范围裁剪
                 pdf_bytes = self._convert_pdf_bytes(pdf_bytes, start_page_id, end_page_id)
                 local_image_dir, local_md_dir = self._prepare_env(str(output_dir), pdf_file_name, "vlm")
@@ -389,6 +394,7 @@ class OCRProcessor(BaseProcessor):
                     pdf_info=middle_json["pdf_info"],
                     pdf_bytes=pdf_bytes,
                     pdf_file_name=pdf_file_name,
+                    source_name=source_name,
                     local_md_dir=local_md_dir,
                     local_image_dir=local_image_dir,
                     md_writer=md_writer,
@@ -416,6 +422,8 @@ class OCRProcessor(BaseProcessor):
         pdf_info = kwargs["pdf_info"]
         pdf_bytes = kwargs["pdf_bytes"]
         pdf_file_name = kwargs["pdf_file_name"]
+        # 表单类文件判定用原始文件名；未显式传入时退回 pdf_file_name（stem）。
+        source_name = kwargs.get("source_name") or pdf_file_name
         local_md_dir = kwargs["local_md_dir"]
         local_image_dir = kwargs["local_image_dir"]
         md_writer = kwargs["md_writer"]
@@ -461,10 +469,12 @@ class OCRProcessor(BaseProcessor):
                     logger.info(
                         "保留页眉/页脚: {} 页补回边缘文本 {}", len(injected), injected
                     )
-            # MinerU 以 HTML 形式输出表格，统一转成 JSON 代码块后再落盘。
-            md_content, table_count = convert_tables_to_json(md_content)
-            if table_count:
-                logger.info("表格转 JSON: {} 张", table_count)
+            # MinerU 以 HTML 形式输出表格：行列式表出 columns/rows JSON，稀疏表出键值对 JSON。
+            md_content, table_stats = convert_tables(md_content, source_name=source_name)
+            if table_stats["tables"]:
+                logger.info("表格转 JSON: {} 张", table_stats["tables"])
+            if table_stats["forms"]:
+                logger.info("稀疏表转键值对 JSON: {} 张", table_stats["forms"])
             md_writer.write_string(f"{pdf_file_name}.md", md_content)
 
         if f_dump_content_list:

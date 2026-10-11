@@ -183,6 +183,7 @@ intent/results_v3/
 intent/dataset
 test_docs/中车待抽取pdf/
 test_docs/抽取结果md/
+test_docs/表单/
 
 # 抽取算法相关（tests/ 与 benchmark/ 已纳入版本控制，勿再加忽略规则）
 algorithm/knowledge_extract/v2/ontology_backups

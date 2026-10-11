@@ -105,7 +105,7 @@ def test_process_returns_same_contract_as_other_engines(pdf_file, fake_mineru, m
     meta = result["metadata"]
     assert meta["processor"] == "mineru4"
     assert meta["engine"] == "mineru4"
-    assert meta["tables_json"] == {"count": 0}
+    assert meta["tables_json"] == {"count": 0, "forms": 0}
     assert "error" not in meta
 
 
@@ -199,9 +199,32 @@ def test_tables_become_json_blocks(pdf_file, monkeypatch, fake_mineru):
     )
     result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
     assert "<table" not in result["content"]
-    assert result["metadata"]["tables_json"] == {"count": 1}
+    assert result["metadata"]["tables_json"] == {"count": 1, "forms": 0}
     block = result["content"].split("```json")[1].split("```")[0]
     assert json.loads(block)["rows"] == [{"角色": "甲", "权限": "查看、编辑"}]
+
+
+def test_sparse_table_is_rendered_as_key_value_json(pdf_file, monkeypatch, fake_mineru):
+    """稀疏表（收文处理单）→ 键值对 JSON，不套 columns/rows。"""
+    _fake_version(monkeypatch, "4.0.4")
+    html = (
+        "<table><tr><td>收文号:</td><td colspan=2>信息公司收(2026)209号</td></tr>"
+        "<tr><td>来文单位:</td><td colspan=2>中国中车集团有限公司</td></tr>"
+        "<tr><td>领导批示:</td><td colspan=2>请阅办。白雪峰 2026-03-27 16:36</td></tr></table>"
+    )
+    monkeypatch.setattr(
+        sys.modules["mineru"], "parse",
+        lambda *a, **k: _FakeResult(f"# 收文处理单\n\n{html}\n", FAKE_STRUCTURED),
+    )
+    result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
+
+    assert "<table" not in result["content"]
+    assert result["metadata"]["tables_json"] == {"count": 0, "forms": 1}
+    document = json.loads(result["content"].split("```json")[1].split("```")[0])
+    assert document["doc_type"] == "form"
+    assert document["title"] == "收文处理单"
+    assert document["fields"]["收文号"] == "信息公司收(2026)209号"
+    assert document["signatures"][0]["signer"] == "白雪峰"
 
 
 def test_keep_page_edges_first_page_injects_top_and_bottom(pdf_file, fake_mineru, monkeypatch):
@@ -322,8 +345,8 @@ def test_legacy_engine_names_are_backed_by_mineru4(tmp_path, monkeypatch):
         assert instance.engine_name == name
 
 
-def test_legacy_engine_falls_back_to_2x_processor_when_installed(tmp_path, monkeypatch):
-    """旧环境（仍是 2.x）保持原行为：继续用 OCRProcessor（用假模块避免依赖 2.x 模型）。"""
+def test_legacy_engine_never_falls_back_to_2x_processor(tmp_path, monkeypatch):
+    """MinerU 2.x 已退役：主解释器里是 2.x 时也只用 4.x 适配层（子进程模式）。"""
     monkeypatch.setattr(mineru4_processor, "mineru_major_version", lambda: 2)
 
     class _LegacyOCR:
@@ -336,7 +359,10 @@ def test_legacy_engine_falls_back_to_2x_processor_when_installed(tmp_path, monke
         sys.modules, "algorithm.preproc.preproc_src.processors.ocr_processor", legacy
     )
     processor = _real_main_processor().DocumentProcessor(output_dir=str(tmp_path / "out"))
-    assert type(processor._processor("mineru")).__name__ == "_LegacyOCR"
+    for name in ("mineru", "vlm"):
+        instance = processor._processor(name)
+        assert type(instance).__name__ == "Mineru4Processor"
+        assert instance.engine_name == name
 
 
 def test_spreadsheet_and_ofd_accept_mineru4_but_keep_existing_defaults():

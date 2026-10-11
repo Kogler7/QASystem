@@ -38,29 +38,32 @@ def test_auto_text_pdf_falls_back_when_docling_only_returns_image(tmp_path, monk
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "text", "reason": "test"})
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
     calls = []
 
     class FakeRuntime:
-        def process(self, _path, **kwargs):
-            calls.append(kwargs["backend"] if "backend" in kwargs else "docling")
+        def __init__(self, engine):
+            self.engine = engine
+
+        def process(self, _path, **_kwargs):
+            calls.append(self.engine)
             if len(calls) == 1:
                 return {"content": "<!-- image -->", "metadata": {}}
             return {"content": "# parsed form", "metadata": {}}
 
-    monkeypatch.setattr(processor, "_processor", lambda _engine: FakeRuntime())
+    monkeypatch.setattr(processor, "_processor", lambda engine: FakeRuntime(engine))
     result = processor.process_file(str(path))
 
     assert result["success"] is True
     assert result["metadata"]["model_used"] == "mineru"
-    assert calls == ["docling", "pipeline"]
+    assert calls == ["docling", "mineru"]
 
 
 def test_forced_docling_image_only_result_stays_failure(tmp_path, monkeypatch):
     path = tmp_path / "sample.pdf"
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
 
     class FakeRuntime:
         def process(self, _path, **_kwargs):
@@ -102,7 +105,7 @@ def test_scanned_pdf_prefers_vlm(tmp_path, monkeypatch):
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: False)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: False)
     engine, _ = processor.select_engine(str(path))
     assert engine == "vlm"
 
@@ -112,7 +115,7 @@ def test_scanned_pdf_uses_local_pipeline_when_vlm_endpoint_is_missing(tmp_path, 
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     monkeypatch.delenv("MINERU_VL_SERVER", raising=False)
     monkeypatch.delenv("MINERU_VLM_BACKEND", raising=False)
@@ -128,7 +131,7 @@ def test_forced_vlm_remains_strict_without_endpoint(tmp_path, monkeypatch):
     path = tmp_path / "sample.pdf"
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
 
     engine, details = processor.select_engine(str(path), requested="vlm", force=True)
@@ -142,7 +145,7 @@ def test_native_mineru_vl_server_counts_as_vlm_endpoint(tmp_path, monkeypatch):
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_pdf", lambda _path: {"kind": "complex_or_scanned", "reason": "test"})
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     monkeypatch.setenv("MINERU_VL_SERVER", "http://127.0.0.1:30000")
 
@@ -298,7 +301,7 @@ def test_complex_docx_auto_uses_local_pipeline_without_vlm_endpoint(tmp_path, mo
     path.write_bytes(b"docx-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
     monkeypatch.setattr(processor, "_profile_docx", lambda _path: {"kind": "complex", "reason": "test"})
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     monkeypatch.delenv("MINERU_VL_SERVER", raising=False)
     monkeypatch.delenv("MINERU_VLM_BACKEND", raising=False)
@@ -314,7 +317,7 @@ def test_png_auto_uses_local_pipeline_without_vlm_endpoint(tmp_path, monkeypatch
     path = tmp_path / "attachment.png"
     path.write_bytes(b"png-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
-    monkeypatch.setattr(processor, "_local_pipeline_available", lambda: True)
+    monkeypatch.setattr(processor, "_local_mineru4_available", lambda: True)
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     monkeypatch.delenv("MINERU_VL_SERVER", raising=False)
     monkeypatch.delenv("MINERU_VLM_BACKEND", raising=False)
@@ -457,7 +460,8 @@ def test_user_engine_is_one_time_fallback_for_image_and_presentation(tmp_path):
         assert details["request_role"] == "fallback_candidate"
 
 
-def test_mineru_and_vlm_names_select_distinct_backends(tmp_path, monkeypatch):
+def test_mineru_and_vlm_names_both_use_mineru4_adapter(tmp_path, monkeypatch):
+    """MinerU 2.x 已退役：mineru/vlm 两个引擎名都交给 4.x 适配层，只是 engine 名保留。"""
     path = tmp_path / "sample.pdf"
     path.write_bytes(b"%PDF-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))
@@ -466,7 +470,7 @@ def test_mineru_and_vlm_names_select_distinct_backends(tmp_path, monkeypatch):
     class FakeMinerURuntime:
         def process(self, _path, **kwargs):
             calls.append(kwargs)
-            return {"content": "parsed", "metadata": {"backend": kwargs["backend"]}}
+            return {"content": "parsed", "metadata": {}}
 
     monkeypatch.setattr(processor, "_processor", lambda _engine: FakeMinerURuntime())
 
@@ -477,8 +481,9 @@ def test_mineru_and_vlm_names_select_distinct_backends(tmp_path, monkeypatch):
         "vlm", str(path), ".pdf", "ch", "off", False, False
     )
 
-    assert calls[0]["backend"] == "pipeline"
-    assert calls[0]["method"] == "ocr"
+    # 两个引擎名都走 4.x 的入参形态：没有 2.x 的 backend/method/dump_* 参数
+    assert "backend" not in calls[0] and "method" not in calls[0]
+    assert calls[0]["ocr_mode"] == "on"
     assert calls[0]["table_enable"] is False
     assert calls[0]["formula_enable"] is False
     assert pipeline_result["metadata"]["mineru_options"] == {
@@ -487,8 +492,21 @@ def test_mineru_and_vlm_names_select_distinct_backends(tmp_path, monkeypatch):
         "table_enable": False,
         "formula_enable": False,
     }
-    assert calls[1]["backend"] == "vlm-http-client"
+    assert "backend" not in calls[1]
+    assert calls[1]["ocr_mode"] == "off"
     assert "mineru_options" not in vlm_result["metadata"]
+
+
+def test_mineru_never_falls_back_to_retired_2x_processor(monkeypatch):
+    """主解释器里没有 4.x 时也必须用 4.x 适配层（子进程模式），不能静默降级到 2.x。"""
+    from algorithm.preproc.preproc_src.processors import mineru4_processor, ocr_processor
+
+    processor = DocumentProcessor()
+    monkeypatch.setattr(mineru4_processor, "mineru_major_version", lambda: 2)
+
+    assert isinstance(processor._processor("mineru"), mineru4_processor.Mineru4Processor)
+    assert isinstance(processor._processor("vlm"), mineru4_processor.Mineru4Processor)
+    assert not isinstance(processor._processor("mineru"), ocr_processor.OCRProcessor)
 
 
 def test_bounded_page_range_accepts_empty_processor_content(tmp_path, monkeypatch):

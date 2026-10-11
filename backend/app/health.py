@@ -12,9 +12,9 @@ from algorithm.runtime_profile import is_remote_only
 
 MODEL_PATHS = {
     "docling": Path("/models/docling-models"),
-    # MinerU 2.x pipeline 仍是 VLM 端点未配置时的本地回退层
-    # （main_processor 的 _local_pipeline_available 与 docling 回退都读它），
-    # 并未退役；4.0 模型目录另见 runtime_checks 的 mineru4 检查。
+    # MinerU 2.x 已退役：本地解析回退层是 4.x，可用性由 main_processor 的
+    # _local_mineru4_available（主解释器 4.x 或 MINERU4_PYTHON）判定；
+    # 4.0 模型目录另见 runtime_checks 的 mineru4 检查。
     "mineru_pipeline": Path("/models/mineru/pipeline"),
 }
 OPTIONAL_MODEL_ENV = (
