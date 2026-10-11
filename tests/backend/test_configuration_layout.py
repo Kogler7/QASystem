@@ -137,3 +137,14 @@ def test_agent_module_reads_its_own_llm_namespace(monkeypatch):
     assert config["base_url"] == "http://agent-llm:9000"
     assert config["api_key"] == "agent-key"
     assert config["model"] == "agent-model"
+
+
+def test_runtime_version_check_accepts_cuda_build_tag_but_rejects_release_drift(monkeypatch):
+    import pytest
+    from docker import verify_runtime
+    monkeypatch.setattr(verify_runtime, "EXPECTED_DISTRIBUTIONS", {"torch": "2.13.0"})
+    monkeypatch.setattr(verify_runtime.importlib.metadata, "version", lambda name: "2.13.0+cu130")
+    verify_runtime._check_distribution_versions()
+    monkeypatch.setattr(verify_runtime.importlib.metadata, "version", lambda name: "2.12.0+cu130")
+    with pytest.raises(RuntimeError, match="runtime distribution version mismatches"):
+        verify_runtime._check_distribution_versions()

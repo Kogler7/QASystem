@@ -87,6 +87,10 @@ RUN pip config set global.index-url "$PIP_INDEX_URL" && \
     pip config set global.extra-index-url "$PIP_EXTRA_INDEX_URL" && \
     pip config set global.trusted-host "pypi.tuna.tsinghua.edu.cn mirrors.aliyun.com" && \
     pip install --retries 8 --timeout 120 --upgrade pip "setuptools>=77,<81" wheel pycairo && \
+    # vLLM 0.31 carries an unused 0.66 OTLP exporter leftover that requires
+    # OTel 1.45, while its LMCache integration requires OTel <=1.40.
+    # The pinned 1.40 exporters use otlp-proto-common, not this package.
+    pip uninstall -y opentelemetry-exporter-otlp-common opentelemetry-exporter-http-transport && \
     pip install --retries 8 --timeout 120 -r /tmp/qasystem/requirements.txt && \
     pip check
 

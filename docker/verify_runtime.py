@@ -93,7 +93,8 @@ def _check_distribution_versions() -> None:
         except importlib.metadata.PackageNotFoundError:
             mismatches.append(f"{name}: missing (expected {expected})")
             continue
-        if actual != expected:
+        # CUDA wheels append a PEP 440 local tag (e.g. 2.13.0+cu130).
+        if actual.split("+", 1)[0] != expected:
             mismatches.append(f"{name}: {actual} (expected {expected})")
     if mismatches:
         raise RuntimeError("runtime distribution version mismatches:\n" + "\n".join(mismatches))
