@@ -212,6 +212,7 @@ class TwoPassPipelineTest(unittest.TestCase):
             RULE_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)],
             llm=llm,
+            clef=False,
         )
         raw = result["raw"]
         self.assertEqual(

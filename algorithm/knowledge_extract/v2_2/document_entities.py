@@ -257,7 +257,9 @@ def enrich_document_entities(
     properties = {_property_id(number_prop): number, _property_id(title_prop): title}
     properties.update(_document_metadata_properties(pool, class_id, number, chunks))
     evidence_quote = (chunk.text or "")[evidence_start:evidence_end]
-    primary = pool.add_entity(_candidate(class_id=class_id, name=f"{number} {title}", properties=properties,
+    # 展示名与评测 golden / official_document_strategy 对齐：优先文件标题，文号只进属性。
+    display_name = (title or "").strip() or (number or "").strip()
+    primary = pool.add_entity(_candidate(class_id=class_id, name=display_name, properties=properties,
                                          chunk_id=chunk.chunk_id, start=evidence_start, end=evidence_end,
                                          quote=evidence_quote, source="document_anchor"), warnings=warnings)
     if primary is None:

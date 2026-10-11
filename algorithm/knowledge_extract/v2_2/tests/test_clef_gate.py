@@ -196,6 +196,39 @@ class ClefGateTest(unittest.TestCase):
         self.assertGreaterEqual(gate.snapshot()["relation_dropped"], 1)
         self.assertEqual(gate.snapshot()["relation_sent_to_llm"], 0)
 
+    def test_preserve_on_none_falls_back_to_llm(self) -> None:
+        client = FakeClef(lambda _qid, _question, _state: {
+            "type": "choice", "choice": "NONE", "confidence": 0.99,
+        })
+        gate = GATE.ClefGate(client=client, enabled=True, accept=0.9)
+        plan = OC.compile_plan(ONTOLOGY)
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=TEXT)
+        entities = _pool("c0", [("e1", "Person", "张三"), ("e2", "Organization", "示例单位")])
+        pairs = MODULES["relation_resolver"].enumerate_relation_pairs(plan, entities.accepted_entities())
+        pairs = [{**pair, "preserve_on_none": True} for pair in pairs]
+        grounded, pending = gate.apply_relation_gate(TEXT, pairs, chunk_id="c0", attempts=[])
+        self.assertEqual(grounded, [])
+        self.assertEqual(len(pending), len(pairs))
+        self.assertEqual(gate.snapshot()["relation_dropped"], 0)
+
+    def test_related_to_positive_not_grounded(self) -> None:
+        def respond(_qid, question, _state):
+            label = next(key for key in question["criteria"] if key != "NONE")
+            return {"type": "choice", "choice": label, "confidence": 0.99}
+
+        gate = GATE.ClefGate(client=FakeClef(respond), enabled=True, accept=0.9)
+        pair = {
+            "pair_id": "p1",
+            "source_id": "e1",
+            "target_id": "e2",
+            "source_name": "张三",
+            "target_name": "示例单位",
+            "relation_id": "relatedto",
+        }
+        grounded, pending = gate.apply_relation_gate(TEXT, [pair], chunk_id="c0", attempts=[])
+        self.assertEqual(grounded, [])
+        self.assertEqual(pending, [pair])
+
     def test_high_confidence_positive_grounds_quote_without_llm(self) -> None:
         def respond(_qid, question, _state):
             label = next(key for key in question["criteria"] if key != "NONE")
@@ -210,7 +243,21 @@ class ClefGateTest(unittest.TestCase):
         self.assertIn("张三", relations[0]["evidence"]["quote"])
         self.assertEqual(gate.snapshot()["relation_grounded_without_llm"], 1)
 
-    def test_none_without_both_names_falls_back_to_llm(self) -> None:
+    def test_no_cooccurrence_prunes_before_clef_and_llm(self) -> None:
+        client = FakeClef(lambda _qid, _question, _state: {
+            "type": "choice", "choice": "NONE", "confidence": 0.99,
+        })
+        gate = GATE.ClefGate(client=client, enabled=True, accept=0.9)
+        # 两端名称各在一句，无共现窗口 → 直接裁掉，不打 Clef/关系 LLM。
+        _relations, relation_calls, _llm = _relation_pass(
+            "张三在北京。示例单位在上海。",
+            gate,
+        )
+        self.assertEqual(relation_calls, [])
+        self.assertEqual(client.calls, [])
+        self.assertGreaterEqual(gate.snapshot()["relation_pruned_no_cooccurrence"], 1)
+
+    def test_names_absent_from_chunk_are_pruned(self) -> None:
         client = FakeClef(lambda _qid, _question, _state: {
             "type": "choice", "choice": "NONE", "confidence": 0.99,
         })
@@ -220,8 +267,9 @@ class ClefGateTest(unittest.TestCase):
             gate,
             names=(("e1", "Person", "火星人"), ("e2", "Organization", "殖民地")),
         )
-        self.assertGreaterEqual(len(relation_calls), 1)
-        self.assertEqual(gate.snapshot()["relation_dropped"], 0)
+        self.assertEqual(relation_calls, [])
+        self.assertEqual(client.calls, [])
+        self.assertGreaterEqual(gate.snapshot()["relation_pruned_no_cooccurrence"], 1)
 
     def test_low_confidence_and_service_down_use_llm(self) -> None:
         low = GATE.ClefGate(
@@ -241,7 +289,7 @@ class ClefGateTest(unittest.TestCase):
 
     def test_input_too_long_splits_questions(self) -> None:
         client = TooLongThenOk()
-        gate = GATE.ClefGate(client=client, enabled=True, accept=0.9, max_questions=8)
+        gate = GATE.ClefGate(client=client, enabled=True, accept=0.9, max_questions=16)
         plan = OC.compile_plan(ONTOLOGY)
         chunk = CC.ExtractionChunk(chunk_id="c0", text=TEXT)
         entities = _pool("c0", [("e1", "Person", "张三"), ("e2", "Organization", "示例单位")])
