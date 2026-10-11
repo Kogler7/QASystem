@@ -20,6 +20,7 @@ logger = get_step_logger(__name__)
 _SENTENCE = re.compile(r"[^。！？\n]+[。！？\n]?")
 _STAT_KEYS = (
     "relation_seen",
+    "relation_pruned_no_cooccurrence",
     "relation_dropped",
     "relation_positive",
     "relation_uncertain",
@@ -29,7 +30,18 @@ _STAT_KEYS = (
     "verification_by_clef",
     "verification_fallback_llm",
     "unavailable",
+    "repair_required_relation_skipped",
 )
+
+
+def sentence_cooccurrence(text: str, left: str, right: str) -> bool:
+    """两端名称是否出现在同一句（用于裁掉无局部证据的笛卡尔 pair）。"""
+    if not text or not left or not right or left not in text or right not in text:
+        return False
+    for sentence in _SENTENCE.findall(text):
+        if left in sentence and right in sentence:
+            return True
+    return False
 
 
 def cooccurrence_quote(text: str, left: str, right: str, *, max_len: int = 400) -> str | None:
@@ -86,7 +98,11 @@ def mention_window(text: str, left: str, right: str, limit: int) -> tuple[str, b
 
 
 class ClefGate:
-    """一次抽取共用的 Clef 客户端。调用在进程内串行，避免打满单卡队列。"""
+    """一次抽取共用的 Clef 客户端。
+
+    默认最多 ``max_inflight`` 路并发（受服务 ``CLEF_MAX_QUEUE_SIZE=4`` 约束），
+    避免打满单卡推理队列；设为 1 即完全串行。
+    """
 
     def __init__(
         self,
@@ -94,21 +110,24 @@ class ClefGate:
         *,
         enabled: bool = False,
         accept: float = 0.9,
-        max_questions: int = 8,
+        max_questions: int = 16,
         timeout: float = 10.0,
         max_calls: int = 512,
         state_chars: int = 800,
+        max_inflight: int = 2,
     ) -> None:
         self.client = client
         self.enabled = bool(enabled and client is not None)
         self.accept = accept if 0.5 < accept <= 1.0 else 0.9
-        self.max_questions = min(8, max(1, int(max_questions)))
+        self.max_questions = min(16, max(1, int(max_questions)))
         self.timeout = timeout if timeout > 0 else 10.0
         self.max_calls = max(1, int(max_calls))
         self.state_chars = max(64, int(state_chars))
+        self.max_inflight = min(4, max(1, int(max_inflight)))
         self.disabled_reason = ""
         self._calls = 0
         self._lock = threading.Lock()
+        self._inflight = threading.BoundedSemaphore(self.max_inflight)
         self._stats = {key: 0 for key in _STAT_KEYS}
         self._timeout_keyword = False
         if client is not None:
@@ -149,6 +168,7 @@ class ClefGate:
             timeout=config["timeout"],
             max_calls=config["max_calls"],
             state_chars=config["state_chars"],
+            max_inflight=config["max_inflight"],
         )
 
     def note(self, **counts: int) -> None:
@@ -165,6 +185,8 @@ class ClefGate:
             "disabled_reason": self.disabled_reason,
             "calls": calls,
             "accept": self.accept,
+            "max_questions": self.max_questions,
+            "max_inflight": self.max_inflight,
             **stats,
         }
 
@@ -212,6 +234,7 @@ class ClefGate:
                     relation_id=str(pair.get("relation_id") or ""),
                     accept=self.accept,
                     both_names_visible=visible.get(pair_id, False),
+                    preserve=bool(pair.get("preserve_on_none")),
                 )
         grounded: list[tuple[dict[str, Any], str]] = []
         pending: list[dict[str, Any]] = []
@@ -219,11 +242,17 @@ class ClefGate:
         for pair in pairs:
             pair_id = str(pair.get("pair_id") or "")
             label = status.get(pair_id, "uncertain")
+            relation_id = str(pair.get("relation_id") or "")
             if label == "drop":
                 dropped += 1
                 continue
             if label == "positive":
                 positive += 1
+                # RELATED_TO 过于宽泛，Clef 正例直接落地易灌假阳；交给生成式写证据。
+                if _is_related_to(relation_id):
+                    uncertain += 1
+                    pending.append(pair)
+                    continue
                 quote = cooccurrence_quote(
                     text,
                     str(pair.get("source_name") or ""),
@@ -345,29 +374,36 @@ class ClefGate:
         )
         return {}
 
-    def _invoke(self, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    def _reserve_call(self) -> bool:
         with self._lock:
             if self._calls >= self.max_calls:
-                return None, "call_budget_exhausted"
+                return False
             self._calls += 1
+            return True
+
+    def _invoke(self, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+        if not self._reserve_call():
+            return None, "call_budget_exhausted"
+        kwargs = {"timeout": self.timeout} if self._timeout_keyword else {}
+        self._inflight.acquire()
+        try:
             try:
-                kwargs = {"timeout": self.timeout} if self._timeout_keyword else {}
                 body = self.client.systemone(payload, **kwargs)
             except Exception as exc:
                 kind = str(getattr(exc, "error_kind", "") or "client_error")
                 retryable = bool(getattr(exc, "retryable", False))
                 retry_after = getattr(exc, "retry_after", None)
-                if retryable and self._calls < self.max_calls:
+                if retryable and self._reserve_call():
                     delay = retry_after if isinstance(retry_after, (int, float)) and retry_after > 0 else 0.05
                     time.sleep(min(1.0, float(delay)))
-                    self._calls += 1
                     try:
-                        kwargs = {"timeout": self.timeout} if self._timeout_keyword else {}
                         body = self.client.systemone(payload, **kwargs)
                     except Exception as retry_exc:
                         return None, str(getattr(retry_exc, "error_kind", "") or "client_error")
                 else:
                     return None, kind
+        finally:
+            self._inflight.release()
         if not isinstance(body, dict):
             return None, "invalid_response"
         return body, None
@@ -402,12 +438,17 @@ def _relation_question(pair: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _is_related_to(relation_id: str) -> bool:
+    return "".join(ch for ch in str(relation_id).casefold() if ch.isalnum()) == "relatedto"
+
+
 def _relation_status(
     answer: Any,
     *,
     relation_id: str,
     accept: float,
     both_names_visible: bool,
+    preserve: bool = False,
 ) -> str:
     if not isinstance(answer, dict) or answer.get("type") != "choice":
         return "uncertain"
@@ -425,7 +466,8 @@ def _relation_status(
         return "uncertain"
     if choice == relation_id:
         return "positive"
-    if choice == "NONE" and both_names_visible:
+    # 文档锚点等保留 pair：Clef 高置信 NONE 仍回退生成式，避免误杀 APPLIES_TO 等公文关系。
+    if choice == "NONE" and both_names_visible and not preserve:
         return "drop"
     return "uncertain"
 

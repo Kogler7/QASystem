@@ -149,6 +149,7 @@ def assemble_document_relations(
         "issuedBy": 0,
         "proposedBy": 0,
         "administeredBy": 0,
+        "appliesTo": 0,
     }
     if primary is None:
         return counts
@@ -268,7 +269,91 @@ def assemble_document_relations(
                 warnings=warnings,
             )
         counts[relation_id] = len(pool.accepted_relations()) - before
+
+    # 公文主送/称谓行：标题后、正文前并列的运行主体 → APPLIES_TO（与 golden 主送口径对齐）。
+    before = len(pool.accepted_relations())
+    applies_signatures = tuple(pool.schema.resolve_relation("appliesTo"))
+    if not applies_signatures:
+        applies_signatures = tuple(pool.schema.resolve_relation("APPLIES_TO"))
+    addressee_text = _document_addressee_text(primary, manager)
+    if applies_signatures and addressee_text:
+        for target in entities.values():
+            if target.candidate_id == primary.candidate_id:
+                continue
+            name = str(getattr(target, "name", "") or "").strip()
+            if not name or name not in addressee_text:
+                continue
+            if not any(
+                pool.schema.is_assignable(primary.canonical_type or "", signature.source)
+                and pool.schema.is_assignable(target.canonical_type or "", signature.target)
+                for signature in applies_signatures
+            ):
+                continue
+            evidence = _structural_evidence(target, manager) or _structural_evidence(primary, manager)
+            if evidence is None:
+                continue
+            pool.add_relation(
+                RelationCandidate(
+                    candidate_id="",
+                    from_candidate_id=primary.candidate_id,
+                    to_candidate_id=target.candidate_id,
+                    proposed_relation="appliesTo",
+                    canonical_relation=None,
+                    evidence=[evidence],
+                ),
+                warnings=warnings,
+            )
+    counts["appliesTo"] = len(pool.accepted_relations()) - before
     return counts
+
+
+def _document_addressee_text(primary: Any, manager: Any) -> str:
+    """截取公文标题后、首段正文前的称谓/主送窗口。"""
+    texts: list[str] = []
+    for evidence in getattr(primary, "evidence", ()) or ():
+        quote = str(getattr(evidence, "quote", "") or "")
+        if quote.strip():
+            texts.append(quote)
+        for block_id in getattr(evidence, "source_block_ids", ()) or ():
+            try:
+                chunk = manager.get_chunk(str(block_id))
+            except Exception:
+                chunk = None
+            if chunk is not None and getattr(chunk, "text", None):
+                texts.append(str(chunk.text))
+    if not texts:
+        for chunk in manager:
+            if getattr(chunk, "text", None):
+                texts.append(str(chunk.text))
+                break
+    window = "\n".join(texts)
+    if not window.strip():
+        return ""
+    lines = window.splitlines()
+    captured: list[str] = []
+    seen_title = False
+    title = str(getattr(primary, "name", "") or "").strip()
+    title_compact = title.replace(" ", "")
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if captured:
+                break
+            continue
+        if title_compact and title_compact in stripped.replace(" ", ""):
+            seen_title = True
+            continue
+        if not seen_title and title_compact:
+            if not (stripped.endswith(("：", ":")) and ("各" in stripped or "部" in stripped)):
+                continue
+        if stripped.endswith(("：", ":")) and len(stripped) <= 200:
+            captured.append(stripped)
+            break
+        if seen_title and len(stripped) <= 200 and ("各" in stripped or "部门" in stripped):
+            captured.append(stripped)
+            if stripped.endswith(("：", ":")):
+                break
+    return "\n".join(captured) if captured else window[:800]
 
 
 def _position(entity: Any, manager: Any) -> tuple[int, int]:

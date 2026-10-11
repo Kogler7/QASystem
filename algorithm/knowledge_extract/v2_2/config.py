@@ -54,10 +54,11 @@ def get_v22_clef_config() -> dict:
     if not 0.5 < accept <= 1.0:
         accept = 0.9
     try:
-        max_questions = int(_env("KG_EXTRACT_V22_CLEF_MAX_QUESTIONS", default="8"))
+        max_questions = int(_env("KG_EXTRACT_V22_CLEF_MAX_QUESTIONS", default="16"))
     except ValueError:
-        max_questions = 8
-    max_questions = min(8, max(1, max_questions))
+        max_questions = 16
+    # 服务上限 CLEF_MAX_QUESTIONS=16；超长时 gate 会拆题，不必再人为压到 8。
+    max_questions = min(16, max(1, max_questions))
     try:
         timeout = float(_env("KG_EXTRACT_V22_CLEF_TIMEOUT", default="10"))
     except ValueError:
@@ -74,6 +75,12 @@ def get_v22_clef_config() -> dict:
     except ValueError:
         state_chars = 800
     state_chars = max(64, state_chars)
+    try:
+        max_inflight = int(_env("KG_EXTRACT_V22_CLEF_MAX_INFLIGHT", default="2"))
+    except ValueError:
+        max_inflight = 2
+    # 服务队列 CLEF_MAX_QUEUE_SIZE=4；默认 2 留出排队余量，1 即完全串行。
+    max_inflight = min(4, max(1, max_inflight))
     return {
         "enabled": enabled,
         "service_url": _env("CLEF_SERVICE_URL", default=""),
@@ -82,6 +89,7 @@ def get_v22_clef_config() -> dict:
         "timeout": timeout,
         "max_calls": max_calls,
         "state_chars": state_chars,
+        "max_inflight": max_inflight,
     }
 
 
