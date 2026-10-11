@@ -337,15 +337,14 @@ class Mineru4Processor(BaseProcessor):
                 "ignored_options": ignored,
             }
 
-            # 表格分流：普通文件出 columns/rows JSON，表单类文件（文件名含"表单"）
-            # 里的表按阅读顺序还原为文本，避免伪造 columns/rows。
+            # 表格按形状分流：行列式数据表出 columns/rows JSON，稀疏表出键值对 JSON。
             content, table_stats = convert_tables(content, source_name=file_path)
             metadata["tables_json"] = {
                 "count": table_stats["tables"],
                 "forms": table_stats["forms"],
             }
             if table_stats["forms"]:
-                logger.info("表单类文件按阅读顺序还原为文本: {} 张", table_stats["forms"])
+                logger.info("稀疏表转键值对 JSON: {} 张", table_stats["forms"])
 
             # 页眉/页脚按需补回（同一套 page_edges 规则）；关闭时也记录，便于确认是有意不补回
             injected: list[dict] = []

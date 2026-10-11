@@ -10,13 +10,17 @@ import pytest
 from algorithm.preproc.preproc_src.table_json import (
     convert_tables,
     convert_tables_to_json,
+    document_title,
+    form_document_from_grid,
     grid_from_html_table,
     html_tables_to_json,
     is_form_source,
+    is_sparse_table,
     markdown_tables_to_json,
     merge_grouped_header,
     render_form_text,
     render_json_block,
+    span_stats,
     table_from_columns_and_rows,
     table_from_grid,
 )
@@ -143,7 +147,7 @@ def test_multiple_tables_in_one_document(tmp_path):
     assert len(_json_blocks(converted)) == 2
 
 
-# ------------------------------------------------------------- 表单类文件
+# --------------------------------------------------------- 稀疏表 / 表单 JSON
 
 # MinerU 4.x 对「收文处理单」的真实输出：整张表单是一张 HTML 表，没有表头。
 FORM_HTML = (
@@ -163,67 +167,160 @@ FORM_HTML = (
 FORM_SOURCE = "test_docs/表单/表单.pdf"
 
 
+def _form_document(markdown: str) -> dict:
+    return _json_blocks(markdown)[0]
+
+
+# ------------------------------------------------ 暂时停用的文件名判定（保留）
+
 def test_is_form_source_matches_only_form_filenames():
+    """旧「表单类文件」判定的工具函数：输出分支已注释，函数保留备用。"""
     assert is_form_source("表单.pdf")
     assert is_form_source("/data/upload/表单.pdf")
     assert is_form_source(r"C:\upload\表单.docx")
     assert is_form_source("附件2表单.xlsx")
-    # 目录名不参与判定：test_docs/表单/ 下的普通文件不是表单文件
+    # 目录名不参与判定：test_docs/表单/ 下的普通文件不算
     assert not is_form_source("test_docs/表单/工作簿1.pdf")
     assert not is_form_source("通知.pdf")
     assert not is_form_source(None)
     assert not is_form_source("")
 
 
-def test_form_file_tables_become_reading_order_text():
-    converted, stats = convert_tables(FORM_HTML, source_name=FORM_SOURCE)
-
-    assert stats == {"tables": 0, "forms": 1}
-    assert "```json" not in converted
-    assert '"columns"' not in converted
-    # 标签与值保持一一对应
-    assert "收文号: 信息公司收(2026)209号" in converted
-    assert "来文单位: 中国中车集团有限公司" in converted
-    assert "来文字号: 中车集团办科信(2026)18号" in converted
-    assert "办公室主任拟办意见: 请刘总阅批。白雪峰 2026-03-27 16:36" in converted
-    assert "领导批示: 请公司领导阅，各中心和各事业部阅。" in converted
+def test_render_form_text_kept_for_restoring_filename_rule():
+    """阅读顺序文本还原函数保留可用（恢复文件名判定时直接接线）。"""
+    grid = grid_from_html_table(FORM_HTML)
+    text = render_form_text(grid)
+    assert "收文号: 信息公司收(2026)209号" in text
+    assert "来文字号: 中车集团办科信(2026)18号" in text
     # colspan 展开不再把同一个值复制成多列
-    assert converted.count("信息公司收(2026)209号") == 1
-    # 合并单元格挤在一起的连续标签各自成行，不与后面的字段粘连
-    assert "密级:\n\n缓急:\n\n收文日期: 2026-03-27" in converted
-    # 没有标签的行（传阅签字）按阅读顺序保留
-    assert "已阅。李鹏 2026-03-30 09:25" in converted
+    assert text.count("信息公司收(2026)209号") == 1
 
 
-def test_form_file_treats_every_table_as_text():
-    """表单文件里的表不区分形态，一律按阅读顺序还原。"""
-    converted, stats = convert_tables(HTML_GROUPED, source_name=FORM_SOURCE)
+def test_filename_no_longer_changes_table_output():
+    """文件名判定已停用：表单文件名与普通文件名得到同样的键值对 JSON。"""
+    with_form_name, stats_form = convert_tables(FORM_HTML, source_name=FORM_SOURCE)
+    with_plain_name, stats_plain = convert_tables(FORM_HTML, source_name="通知.pdf")
+
+    assert stats_form == stats_plain == {"tables": 0, "forms": 1}
+    assert "```json" in with_form_name and "```json" in with_plain_name
+    assert _form_document(with_form_name)["doc_type"] == "form"
+    assert _form_document(with_plain_name)["doc_type"] == "form"
+
+
+# ------------------------------------------------------------ 稀疏表 → 键值对 JSON
+
+def test_is_sparse_table_separates_forms_from_data_tables():
+    form = grid_from_html_table(FORM_HTML)
+    assert is_sparse_table(form, spans=span_stats(FORM_HTML))
+
+    # 行列式数据表（含分组表头）不判稀疏
+    grouped = grid_from_html_table(HTML_GROUPED)
+    assert not is_sparse_table(grouped, spans=span_stats(HTML_GROUPED))
+    assert not is_sparse_table(grid_from_html_table(
+        "<table><tr><td>名称</td><td>数量</td></tr><tr><td>甲</td><td>3</td></tr></table>"
+    ))
+    # 只有年月的列名（月报表）仍是数据表
+    assert not is_sparse_table(grid_from_html_table(
+        "<table><tr><td>项目</td><td>2026年6月</td><td>2026年7月</td></tr>"
+        "<tr><td>产量</td><td>12</td><td>15</td></tr></table>"
+    ))
+
+
+def test_wide_record_table_with_many_empty_cells_is_not_sparse():
+    """回归：真实记录表大量空单元格时不能判成稀疏表。
+
+    `故障数据样例（规则抽取）.xlsx` 是 17 列×10 行的记录表，填充率只有 0.64，
+    比多张表单（0.69~0.94）还低——所以判定刻意不看填充率。
+    """
+    header = ["序号", "日期", "故障状况", "所属系统", "故障原因", "处理方法", "故障地点"]
+    grid = [header]
+    for index in range(1, 11):
+        grid.append([str(index), "2014-01-02", f"故障{index}", "ATP/ATO",
+                     "", "更换后恢复" if index % 3 == 0 else "", "白云公园"])
+    assert not is_sparse_table(grid)
+
+
+def test_repeated_header_value_marks_the_row_as_data():
+    """传阅签字被切碎后 MinerU 会把一条「已阅」当表头：表头值在数据行首列反复出现。"""
+    grid = [
+        ["已阅", ""],
+        ["已阅。", "王思博2026-03-30 10:15"],
+        ["己阅。", "杨威2026-03-30 10:18"],
+        ["已阅。", "周新宇2026-03-30 11:15"],
+    ]
+    assert is_sparse_table(grid)
+
+
+def test_sparse_table_becomes_key_value_json():
+    converted, stats = convert_tables("# 收文处理单\n\n" + FORM_HTML, source_name="通知.pdf")
+
     assert stats == {"tables": 0, "forms": 1}
-    assert '"columns"' not in converted
-    assert "建议方" in converted and "查看、编辑" in converted
+    document = _form_document(converted)
+    assert document["doc_type"] == "form"
+    assert document["title"] == "收文处理单"
+    assert document["fields"]["收文号"] == "信息公司收(2026)209号"
+    assert document["fields"]["来文字号"] == "中车集团办科信(2026)18号"
+    assert document["fields"]["密级"] == "" and document["fields"]["缓急"] == ""
+    assert document["fields"]["收文日期"] == "2026-03-27"
+    # 签名抽成结构化记录
+    assert document["signatures"][0]["signer"] == "白雪峰"
+    assert document["signatures"][0]["time"] == "2026-03-27 16:36"
+    assert [item["signer"] for item in document["signatures"]] == ["白雪峰", "李鹏", "王元元"]
+    assert document["signatures"][1]["status"] == "已阅。"
 
 
-def test_form_shaped_table_in_ordinary_file_stays_json():
-    """普通文件不做内容形态猜测：即使长得像表单，也仍按数据表出 columns/rows。"""
-    converted, stats = convert_tables(FORM_HTML, source_name="通知.pdf")
+def test_data_table_still_emits_columns_and_rows():
+    converted, stats = convert_tables(HTML_GROUPED, source_name=FORM_SOURCE)
 
     assert stats == {"tables": 1, "forms": 0}
-    assert _json_blocks(converted)
+    document = _form_document(converted)
+    assert document["columns"] == ["相关方角色", "分阶段/提案登记", "分阶段/决定"]
+    assert "doc_type" not in document
 
 
-def test_headerless_signature_table_keeps_its_first_row_as_data():
+def test_form_json_repeated_label_becomes_list():
+    grid = [
+        ["传阅签字:", "已阅小黄 2026-03"],
+        ["传阅签字:", "已阅小蓝 2026-03"],
+        ["传阅签字:", "已阅小绿 2026-03"],
+    ]
+    document = form_document_from_grid(grid, title="收文处理单")
+    assert document["fields"]["传阅签字"] == [
+        "已阅小黄 2026-03", "已阅小蓝 2026-03", "已阅小绿 2026-03",
+    ]
+
+
+def test_form_json_drops_full_width_title_row_into_title():
+    grid = [
+        ["收文处理单", "收文处理单", "收文处理单"],
+        ["收文号:", "信息公司收", ""],
+        ["来文单位:", "中车", ""],
+    ]
+    document = form_document_from_grid(grid, title="")
+    assert document["title"] == "收文处理单"
+    assert "收文处理单" not in document["fields"]
+
+
+def test_document_title_prefers_heading_then_first_short_line():
+    assert document_title("# 收文处理单\n\n正文") == "收文处理单"
+    assert document_title("\n收文处理单\n\n<table></table>") == "收文处理单"
+    assert document_title("来文单位: 中车\n\n其他") == "其他"
+    assert document_title("正文", fallback="表单") == "正文"
+
+
+def test_headerless_signature_table_becomes_form_json():
     html = (
         "<table><tr><td></td><td>李明2026-03-30 09:35</td></tr>"
         "<tr><td>已阅。</td><td>刘云松 2026-03-30 09:36</td></tr>"
         "<tr><td>已阅。</td><td>陈东兰 2026-03-30 09:40</td></tr></table>"
     )
-    converted, stats = convert_tables(html, source_name=FORM_SOURCE)
+    converted, stats = convert_tables(html)
 
     assert stats == {"tables": 0, "forms": 1}
+    document = _form_document(converted)
     # 首行其实是签名数据，必须保留，不能变成列名
-    assert "李明2026-03-30 09:35" in converted
-    assert "刘云松 2026-03-30 09:36" in converted
-    assert '"columns"' not in converted
+    assert any(item.get("signer") == "李明" for item in document["signatures"])
+    assert any(item.get("signer") == "刘云松" for item in document["signatures"])
 
 
 def test_label_with_colon_split_into_next_cell_is_rejoined():
@@ -232,9 +329,11 @@ def test_label_with_colon_split_into_next_cell_is_rejoined():
         "<table><tr><td>来文单位:</td><td>中车</td><td>来文字号</td><td>:中车</td></tr>"
         "<tr><td>联系电话:</td><td>1234</td><td>密级:</td><td>测试</td></tr></table>"
     )
-    converted, stats = convert_tables(html, source_name=FORM_SOURCE)
+    converted, stats = convert_tables(html)
     assert stats == {"tables": 0, "forms": 1}
-    assert "来文字号:中车" in converted
+    document = _form_document(converted)
+    assert document["fields"]["来文字号"] == "中车"
+    assert document["fields"]["联系电话"] == "1234"
 
 
 def test_single_column_table_is_still_a_data_table():
@@ -248,6 +347,7 @@ def test_form_note_row_stays_text():
     converted, stats = convert_tables(html, source_name=FORM_SOURCE)
     assert stats["forms"] == 1
     assert "注:本表由收文部门填写。" in converted
+    assert converted.index("```") < converted.index("注:")
 
 
 # ------------------------------------------------------------------ 解析接线
@@ -290,6 +390,51 @@ def test_ocr_batch_passes_original_path_into_table_conversion(monkeypatch, tmp_p
     )
 
     assert captured and captured[0]["source_name"] == str(pdf)
+
+
+def test_excel_dense_sheet_with_empty_cells_stays_columns_rows(tmp_path):
+    """真实记录表（含大量空单元格）仍出 columns/rows，不被判成表单。"""
+    import pandas as pd
+
+    from algorithm.preproc.preproc_src.processors.excel_processor import ExcelProcessor
+
+    path = tmp_path / "faults.xlsx"
+    pd.DataFrame({
+        "序号": ["1", "2", "3"],
+        "故障状况": ["对标不准", "黑屏", "红光带"],
+        "故障原因": ["", "", "受潮"],
+        "处理方法": ["", "复位", ""],
+    }).to_excel(path, index=False)
+
+    result = ExcelProcessor().process(str(path))
+    assert result["metadata"]["tables_json"] == {"count": 1, "forms": 0}
+    assert _json_blocks(result["content"])[0]["columns"] == ["序号", "故障状况", "故障原因", "处理方法"]
+
+
+def test_excel_sparse_sheet_becomes_key_value_json(tmp_path):
+    """表单式工作表（收文处理单）→ 键值对 JSON。"""
+    import pandas as pd
+
+    from algorithm.preproc.preproc_src.processors.excel_processor import ExcelProcessor
+
+    path = tmp_path / "反馈表.xlsx"
+    pd.DataFrame([
+        ["收文处理单", "", ""],
+        ["收文号:", "信息公司收(2026)209号", ""],
+        ["来文单位:", "中国中车集团有限公司", "来文字号:"],
+        ["密级:", "测试", "缓急:"],
+        ["办公室主任拟办意见:", "请刘总阅批。白雪峰 2026-03-27 16:36", ""],
+        ["传阅签字:", "已阅。李鹏 2026-03-30 09:25", ""],
+    ]).to_excel(path, index=False, header=False)
+
+    result = ExcelProcessor().process(str(path))
+    assert result["metadata"]["tables_json"] == {"count": 0, "forms": 1}
+    document = _json_blocks(result["content"])[0]
+    assert document["doc_type"] == "form"
+    assert document["title"] == "收文处理单"
+    assert document["fields"]["收文号"] == "信息公司收(2026)209号"
+    assert document["signatures"][0]["signer"] == "白雪峰"
+    assert document["signatures"][1]["signer"] == "李鹏"
 
 
 def test_excel_engine_outputs_json_per_sheet(tmp_path):

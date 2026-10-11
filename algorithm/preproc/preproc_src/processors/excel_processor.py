@@ -5,11 +5,24 @@ import numpy as np
 from datetime import datetime, date
 import os
 import csv
+import re
 from . import BaseProcessor
-from ..table_json import render_json_block, table_from_columns_and_rows
+from ..table_json import render_grid_block, render_json_block, table_from_columns_and_rows
 from algorithm.logging_setup import get_step_logger, preview
 
 logger = get_step_logger(__name__)
+
+#: pandas 给表头空单元格的占位名（`Unnamed: 1`、`Unnamed: 2` …）。
+_PANDAS_UNNAMED = re.compile(r"^Unnamed: \d+$")
+
+
+def _restore_blank_headers(values):
+    """把 pandas 的空表头占位名还原成空串。
+
+    `pd.read_excel(header=0)` 会把表头里的空单元格命名为 `Unnamed: N`，重建矩阵做形状
+    判定时这些占位名既不是原值、又会被当成 `标签: 值`，必须还原。
+    """
+    return ["" if _PANDAS_UNNAMED.match(str(value)) else str(value) for value in values]
 
 
 class ExcelProcessor(BaseProcessor):
@@ -365,23 +378,40 @@ class ExcelProcessor(BaseProcessor):
 
         return schemas
 
-    def _render_markdown(self, excel_data: Dict[str, Any]) -> str:
+    def _render_markdown(self, excel_data: Dict[str, Any]) -> Tuple[str, Dict[str, int]]:
         """把 process_excel 的结构化结果渲染成 Markdown：每个 sheet 一个小节 + JSON 代码块。
 
-        表格统一用 JSON 表达（列名 + 记录数组），便于下游按字段抽取；
-        只有表格本身变成 JSON，小节标题仍是 Markdown。
+        每个 sheet 走与 PDF/Word 相同的形状判定：行列式数据表出 ``{"columns", "rows"}``
+        JSON；稀疏表（收文处理单、审批单这类版式）出键值对 JSON。小节标题仍是 Markdown。
+
+        返回 ``(markdown, {"tables": 行列式表数, "forms": 键值对表数})``。
         """
         parts: List[str] = []
+        tables = forms = 0
         for sheet in excel_data.get('sheets', []):
-            parts.append(f"## {sheet.get('sheet_name', '')}")
-            parts.append("")
-            table = table_from_columns_and_rows(
-                sheet.get('columns') or [],
-                sheet.get('data') or [],
+            sheet_name = str(sheet.get('sheet_name') or '')
+            columns = [str(column) for column in (sheet.get('columns') or [])]
+            data = [list(row) for row in (sheet.get('data') or [])]
+            # pandas 把表头的空单元格命名为 `Unnamed: N`；形状判定要看到原样（空单元格）
+            grid = [_restore_blank_headers(columns), *data]
+            block, kind = render_grid_block(
+                grid,
+                # 表内首行若是横跨整行的短文本会被当标题；否则退回 sheet 名
+                fallback_title=sheet_name,
+                # 行列式分支仍用 pandas 原列名，保持既有输出不变
+                columns=columns,
             )
-            parts.append(render_json_block(table))
+            if block is None:
+                continue
+            if kind == "form":
+                forms += 1
+            else:
+                tables += 1
+            parts.append(f"## {sheet_name}")
             parts.append("")
-        return "\n".join(parts).strip()
+            parts.append(block)
+            parts.append("")
+        return "\n".join(parts).strip(), {"tables": tables, "forms": forms}
 
     def process(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """
@@ -422,7 +452,11 @@ class ExcelProcessor(BaseProcessor):
             'formulas': 'cached_values_only',
             'merged_cells': 'top_left_value_only',
         }
-        markdown = self._render_markdown(result)
+        markdown, table_stats = self._render_markdown(result)
+        metadata['tables_json'] = {
+            'count': table_stats['tables'],
+            'forms': table_stats['forms'],
+        }
         logger.info(
             "[步骤][解析][Excel] 输入: file=%s 输出: 工作表=%d 行数=%s markdown=%d字符 预览=%s",
             os.path.basename(file_path),

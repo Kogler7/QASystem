@@ -131,28 +131,28 @@ class OCRProcessor(BaseProcessor):
             local_models_config = mineru_config_reader.get_local_models_dir()
             self._validate_local_models_config(local_models_config, required_mode)
 
-        from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
-        from mineru.data.data_reader_writer import FileBasedDataWriter
-        from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
-        from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
-        from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-        from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
-        from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
-        from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
-        from mineru.utils.enum_class import MakeMode
+        # from mineru.cli.common import convert_pdf_bytes_to_bytes_by_pypdfium2, prepare_env, read_fn
+        # from mineru.data.data_reader_writer import FileBasedDataWriter
+        # from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
+        # from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
+        # from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
+        # from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
+        # from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
+        # from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
+        # from mineru.utils.enum_class import MakeMode
 
-        self._convert_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2
-        self._prepare_env = prepare_env
-        self._read_fn = read_fn
-        self._FileBasedDataWriter = FileBasedDataWriter
-        self._pipeline_doc_analyze = pipeline_doc_analyze
-        self._pipeline_union_make = pipeline_union_make
-        self._pipeline_result_to_middle_json = pipeline_result_to_middle_json
-        self._vlm_doc_analyze = vlm_doc_analyze
-        self._vlm_union_make = vlm_union_make
-        self._draw_layout_bbox = draw_layout_bbox
-        self._draw_span_bbox = draw_span_bbox
-        self._MakeMode = MakeMode
+        # self._convert_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2
+        # self._prepare_env = prepare_env
+        # self._read_fn = read_fn
+        # self._FileBasedDataWriter = FileBasedDataWriter
+        # self._pipeline_doc_analyze = pipeline_doc_analyze
+        # self._pipeline_union_make = pipeline_union_make
+        # self._pipeline_result_to_middle_json = pipeline_result_to_middle_json
+        # self._vlm_doc_analyze = vlm_doc_analyze
+        # self._vlm_union_make = vlm_union_make
+        # self._draw_layout_bbox = draw_layout_bbox
+        # self._draw_span_bbox = draw_span_bbox
+        # self._MakeMode = MakeMode
 
         logger.info(
             "MinerU initialized with effective config: {}, model source: {}",
@@ -469,12 +469,12 @@ class OCRProcessor(BaseProcessor):
                     logger.info(
                         "保留页眉/页脚: {} 页补回边缘文本 {}", len(injected), injected
                     )
-            # MinerU 以 HTML 形式输出表格：普通文件出 columns/rows JSON，表单类文件还原为文本。
+            # MinerU 以 HTML 形式输出表格：行列式表出 columns/rows JSON，稀疏表出键值对 JSON。
             md_content, table_stats = convert_tables(md_content, source_name=source_name)
             if table_stats["tables"]:
                 logger.info("表格转 JSON: {} 张", table_stats["tables"])
             if table_stats["forms"]:
-                logger.info("表单类文件按阅读顺序还原为文本: {} 张", table_stats["forms"])
+                logger.info("稀疏表转键值对 JSON: {} 张", table_stats["forms"])
             md_writer.write_string(f"{pdf_file_name}.md", md_content)
 
         if f_dump_content_list:

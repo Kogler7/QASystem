@@ -204,11 +204,9 @@ def test_tables_become_json_blocks(pdf_file, monkeypatch, fake_mineru):
     assert json.loads(block)["rows"] == [{"角色": "甲", "权限": "查看、编辑"}]
 
 
-def test_form_file_table_is_rendered_as_reading_order_text(tmp_path, monkeypatch, fake_mineru):
-    """表单类文件（文件名含「表单」）里的表按阅读顺序还原为文本，不转 JSON。"""
+def test_sparse_table_is_rendered_as_key_value_json(pdf_file, monkeypatch, fake_mineru):
+    """稀疏表（收文处理单）→ 键值对 JSON，不套 columns/rows。"""
     _fake_version(monkeypatch, "4.0.4")
-    path = tmp_path / "表单.pdf"
-    path.write_bytes(b"%PDF-1.4 test")
     html = (
         "<table><tr><td>收文号:</td><td colspan=2>信息公司收(2026)209号</td></tr>"
         "<tr><td>来文单位:</td><td colspan=2>中国中车集团有限公司</td></tr>"
@@ -218,30 +216,15 @@ def test_form_file_table_is_rendered_as_reading_order_text(tmp_path, monkeypatch
         sys.modules["mineru"], "parse",
         lambda *a, **k: _FakeResult(f"# 收文处理单\n\n{html}\n", FAKE_STRUCTURED),
     )
-    result = Mineru4Processor().process(str(path), keep_page_edges="off")
+    result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
 
     assert "<table" not in result["content"]
     assert result["metadata"]["tables_json"] == {"count": 0, "forms": 1}
-    assert "```json" not in result["content"]
-    assert "收文号: 信息公司收(2026)209号" in result["content"]
-    assert "来文单位: 中国中车集团有限公司" in result["content"]
-
-
-def test_ordinary_file_table_still_becomes_json(pdf_file, monkeypatch, fake_mineru):
-    """普通文件（文件名不含「表单」）里的表仍然转 columns/rows JSON。"""
-    _fake_version(monkeypatch, "4.0.4")
-    html = (
-        "<table><tr><td>收文号:</td><td colspan=2>信息公司收(2026)209号</td></tr>"
-        "<tr><td>来文单位:</td><td colspan=2>中国中车集团有限公司</td></tr></table>"
-    )
-    monkeypatch.setattr(
-        sys.modules["mineru"], "parse",
-        lambda *a, **k: _FakeResult(f"# 收文处理单\n\n{html}\n", FAKE_STRUCTURED),
-    )
-    result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
-
-    assert result["metadata"]["tables_json"] == {"count": 1, "forms": 0}
-    assert "```json" in result["content"]
+    document = json.loads(result["content"].split("```json")[1].split("```")[0])
+    assert document["doc_type"] == "form"
+    assert document["title"] == "收文处理单"
+    assert document["fields"]["收文号"] == "信息公司收(2026)209号"
+    assert document["signatures"][0]["signer"] == "白雪峰"
 
 
 def test_keep_page_edges_first_page_injects_top_and_bottom(pdf_file, fake_mineru, monkeypatch):

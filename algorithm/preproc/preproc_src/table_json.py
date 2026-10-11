@@ -1,22 +1,27 @@
 """把解析结果里的表格规整成结构化内容。
 
-表格分两类，按**来源文件是不是表单类文件**决定处理方式：
+表格按**形状**分两类，一张表一张表地判：
 
-* **普通文件**里的表按数据表处理，输出为一个 ```` ```json ```` 代码块，结构固定为::
+* **行列式数据表**（表头 + 记录行，例如 GB/T 附录的权限表）输出为一个
+  ```` ```json ```` 代码块，结构固定为::
 
       {"columns": ["相关方角色", "提案登记", ...],
        "rows": [{"相关方角色": "建议方", "提案登记": "查看", ...}, ...]}
 
-* **表单类文件**（文件名含 `表单`，生产上固定叫 `表单.pdf`：收文处理单、审批单、
-  传阅签字栏这类"标签—值/区域"版式）里的表不套行列模型，改按阅读顺序还原成文本
-  （`标签: 值` 逐条），与 `docling` 路线一致。原因是这类表没有表头：首行是数据，
-  `rowspan`/`colspan` 展开还会把同一个值复制成多列，硬套 `{"columns", "rows"}` 会把
-  "标签 → 值"的对应关系彻底打乱。
+* **稀疏表**（收文处理单、审批单、传阅签字栏这类"标签—值/区域"版式：合并单元格多、
+  填充率低、首列大量 `标签:`、或首行根本不是表头）不套行列模型，输出为键值对 JSON::
 
-表单识别只看文件名，不做内容形态猜测：约定表单类文件的文件名一定含 `表单`，因此
-普通文件里的表格永远不会被误判成表单。判定见 :func:`is_form_source`。
+      {"doc_type": "form", "title": "收文处理单",
+       "fields": {"收文号": "...", "来文单位": "..."},
+       "signatures": [{"signer": "李鹏", "time": "2026-03-30 09:25", "status": "已阅。"}]}
 
-数据表的处理规则：
+判定见 :func:`is_sparse_table`；阈值是模块级常量，可按语料调整。
+
+按文件名判定"表单类文件里的表不转 JSON"的旧行为**暂时停用**：分支代码保留在
+:func:`_render_table_block` 里（注释状态），相关工具函数 :func:`is_form_source`、
+:func:`render_form_text` 也一并保留，取消注释即可恢复。
+
+行列式数据表的处理规则：
 
 * 首行作为表头；表头重名按 `分阶段`、`分阶段_2` 去重，空表头按 `列1`、`列2` 命名。
 * 合并单元格（HTML `rowspan`/`colspan`，以及 Markdown 里重复的分组表头）按
@@ -29,6 +34,7 @@ from __future__ import annotations
 import json
 import re
 from html.parser import HTMLParser
+from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 _HTML_TABLE = re.compile(r"<table\b.*?</table\s*>", re.IGNORECASE | re.DOTALL)
@@ -47,11 +53,20 @@ _CJK_PUNCT_SPACING = (
 # 表格末尾的整行注释（"注:"/"注1:"），不应作为数据行。
 _NOTE_PREFIX = re.compile(r"^注\s*\d*\s*[:：]")
 
-# ---------------------------------------------------------------- 表单类文件识别
+# ---------------------------------------------------------------- 表格形状判定
 
-#: 表单类文件的文件名特征。生产约定：表单文件一定叫 `表单.pdf`，不再有别的表单文件，
-#: 因此这里只认文件名，不做内容形态猜测（避免误伤普通数据表）。
+#: 表单类文件的文件名特征（生产约定：表单文件一定叫 `表单.pdf`）。当前只用于
+#: :func:`is_form_source`，该判定对应的输出分支暂时停用。
 _FORM_FILENAME = re.compile(r"表单")
+
+#: 带 rowspan/colspan 的单元格占比达到它就按稀疏表处理（只对 HTML 表可用）。
+SPARSE_MERGE_RATIO = 0.6
+#: 合并密度只在小表上不可靠（4 个单元格的表很容易到 0.5），低于这个单元格数不采信。
+SPARSE_MERGE_MIN_CELLS = 8
+#: 首列是 `标签:` 的行占比达到它就按稀疏表处理。
+SPARSE_LABEL_RATIO = 0.5
+#: 首行的值在数据行首列重复达到这个次数，说明首行也是数据（表头是伪造的）。
+SPARSE_HEADER_REPEAT = 2
 
 # 标签正文：不含句读、冒号和数字。排除数字是为了不把时间戳当标签
 # （`李明2026-03-30 09:35` 里的 `09:` 曾被误判成 `标签: 值`）。
@@ -62,6 +77,28 @@ _LABEL = re.compile(rf"^{_LABEL_BODY}{{1,18}}[:：]\s*\*?$")
 _LABEL_PREFIX = re.compile(rf"^{_LABEL_BODY}{{1,18}}[:：]")
 # 短文本且不含冒号/数字；MinerU 有时把冒号切到下一个单元格（`来文字号` + `:中车`）。
 _BARE_LABEL = re.compile(r"^[^，。；;、:：\s0-9][^，。；;、:：0-9]{0,18}$")
+# 完整日期（含日）或时分：表头里出现它，说明那一行是数据。
+# 刻意不匹配 `2026年6月` 这种只有年月的列名。
+_DATE_TIME = re.compile(r"\d{4}\s*[-/.年]\s*\d{1,2}\s*[-/.月]\s*\d{1,2}|\d{1,2}\s*[:：]\s*\d{2}")
+# 表头单元格里不该出现的句读。
+_SENTENCE_PUNCT = re.compile(r"[。！？；，]")
+# 比较"表头值是否也是数据"时剥掉的行尾句读（"已阅。" 与 "已阅" 视为同一个值）。
+_TRAILING_PUNCT = re.compile(r"[\s。.．]+$")
+# 统计 HTML 表格的合并密度：带 rowspan/colspan 的单元格占全部单元格的比例。
+_TD_TAG = re.compile(r"<t[dh]\b([^>]*)>", re.IGNORECASE)
+_SPAN_ATTR = re.compile(r"(?:rowspan|colspan)\s*=\s*[\"']?\s*([2-9]\d*)", re.IGNORECASE)
+
+# 签名：日期（兼容 `2026-03` 这种简写），人名取日期前紧邻的 2~3 个汉字。
+_DATE = re.compile(
+    r"\d{4}\s*[-/.]\s*\d{1,2}"
+    r"(?:\s*[-/.]\s*\d{1,2})?"
+    r"(?:\s*\d{1,2}\s*[:：]\s*\d{1,2})?"
+)
+_NAME_BEFORE_DATE = re.compile(r"([\u4e00-\u9fa5]{2,3})$")
+# 与姓名粘连的签阅状态词（表单里常写成 `已阅小黄`）
+_STATUS_WORDS = ("已阅。", "已阅", "己阅。", "己阅", "已阋。", "已阋", "阅。", "阅", "同意")
+# Markdown 标题，用于给表单 JSON 取 title。
+_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(?P<text>.+?)\s*$")
 
 
 def is_form_source(source_name: str | None) -> bool:
@@ -69,6 +106,9 @@ def is_form_source(source_name: str | None) -> bool:
 
     约定表单文件一定含 `表单`（如 `表单.pdf`、`附件2表单.docx`）。目录名不参与判定，
     避免把 `test_docs/表单/` 下的普通文件也当成表单。
+
+    注：「表单类文件里的表不转 JSON」的旧行为当前**未启用**，本函数只为恢复保留；
+    启用方式见 :func:`_render_table_block`。
     """
     if not source_name:
         return False
@@ -164,6 +204,247 @@ def render_form_text(grid: Sequence[Sequence[str]]) -> str:
                 lines.append(cell)
                 index += 1
     return "\n\n".join(lines)
+
+
+# ------------------------------------------------- 稀疏表判定与键值对 JSON
+
+def span_stats(html: str) -> tuple[int, int]:
+    """统计 HTML 表格的 ``(单元格总数, 带 rowspan/colspan 的单元格数)``。
+
+    只对 HTML 表格有意义：管道表格没有合并信息，调用方传 ``None``。
+    """
+    total = merged = 0
+    for attrs in _TD_TAG.findall(str(html or "")):
+        total += 1
+        if _SPAN_ATTR.search(attrs):
+            merged += 1
+    return total, merged
+
+
+def _looks_like_header(row: Sequence[str]) -> bool:
+    """首行是否像表头：无 `标签:`、无完整日期/时间、无句读。"""
+    cells = _condense_row(row)
+    if not cells:
+        return False
+    if any(_LABEL_PREFIX.match(cell) for cell in cells):
+        return False
+    if any(_DATE_TIME.search(cell) for cell in cells):
+        return False
+    if any(_SENTENCE_PUNCT.search(cell) for cell in cells):
+        return False
+    return True
+
+
+def _label_ratio(grid: Sequence[Sequence[str]]) -> float:
+    """首列（折叠合并单元格后第一个非空值）是 `标签:` 的行占比。"""
+    rows = [row for row in grid if any(cell for cell in row)]
+    if not rows:
+        return 0.0
+    hits = 0
+    for row in rows:
+        cells = _condense_row(row)
+        if cells and _LABEL.fullmatch(cells[0]):
+            hits += 1
+    return hits / len(rows)
+
+
+def _header_row_is_data(grid: Sequence[Sequence[str]]) -> bool:
+    """首行首个单元格的值在数据行首列反复出现 —— 首行其实也是数据。
+
+    传阅签字栏被切碎后，MinerU 会把某条 `已阅` 记录当成表头：表头只有一个短值，
+    这个值又在下面多行首列重复。真正的表头（`序号`、`相关方角色`）不会这样。
+    分组表头的第二行会让首列值重复 1 次，因此门槛取 ``SPARSE_HEADER_REPEAT``。
+    """
+    if len(grid) < 3:
+        return False
+    header = _condense_row(grid[0])
+    if not header:
+        return False
+    key = _TRAILING_PUNCT.sub("", header[0])
+    if not key or len(key) > 8:
+        return False
+    first_column = [
+        _TRAILING_PUNCT.sub("", _condense_row(row)[0])
+        for row in grid[1:]
+        if _condense_row(row)
+    ]
+    return first_column.count(key) >= SPARSE_HEADER_REPEAT
+
+
+def is_sparse_table(
+    grid: Sequence[Sequence[str]],
+    *,
+    spans: tuple[int, int] | None = None,
+) -> bool:
+    """这张表是不是"稀疏表"（表单/版式表），而不是行列式数据表。
+
+    三个信号取"或"，任一命中即按稀疏表处理：
+
+    * 合并密度达标（大量 rowspan/colspan；仅 HTML 表可得，且单元格太少时不采信）；
+    * 首列过半是 `标签:`（键值表单）；
+    * 首行不像表头（含完整日期/时间、句读，或本身是 `标签:`）；
+    * 首行的值在数据行首列反复出现（首行本身是数据）。
+
+    刻意**不用"填充率"**：实测真实记录表 `故障数据样例（规则抽取）.xlsx` 的填充率只有
+    0.64，而多张表单反而在 0.69~0.94，两者完全重叠——用它会把 17 列×10 行的故障记录表
+    误判成表单。合并密度 + 标签率 + 表头可信度这三条在语料上分得开。
+    """
+    if not grid:
+        return False
+    rows, cols = len(grid), max(len(row) for row in grid)
+    if cols < 2:
+        return False
+    if spans and spans[0] >= SPARSE_MERGE_MIN_CELLS:
+        total, merged = spans
+        if merged / total >= SPARSE_MERGE_RATIO:
+            return True
+    if _label_ratio(grid) >= SPARSE_LABEL_RATIO:
+        return True
+    if _header_row_is_data(grid):
+        return True
+    return not _looks_like_header(grid[0])
+
+
+def _extract_signatures(text: str) -> list[dict[str, str]]:
+    """从一段文本里抽出"姓名 + 时间"签名，附上它前面的状态/批示原文。"""
+    found: list[dict[str, str]] = []
+    for match in _DATE.finditer(text):
+        before = text[: match.start()].rstrip()
+        name = _NAME_BEFORE_DATE.search(before)
+        if name is None:
+            continue
+        signer = name.group(1)
+        status = before[: name.start()].strip()
+        for word in _STATUS_WORDS:
+            if signer.startswith(word):
+                status = f"{status}{signer[:len(word)]}".strip()
+                signer = signer[len(word):]
+                break
+        if signer:
+            found.append({
+                "signer": signer,
+                "time": match.group(0).strip(),
+                "status": status,
+                "raw": text.strip(),
+            })
+    return found
+
+
+def _form_entries(grid: Sequence[Sequence[str]]) -> Iterable[tuple[str, str, str]]:
+    """把表单矩阵按阅读顺序拆成 ``("pair", 标签, 值)`` / ``("text", 文本, "")``。
+
+    兼容 `标签: 值` 同格、`标签:` 与值分格、以及纯文本行；冒号被切进下一格的
+    （`来文字号` + `:中车`）也拼回去。docling 常把"姓名"和"时间"放进相邻单元格，
+    这里把紧跟其后的纯日期格并回前一个值，签名才抽得出来。
+    """
+    for row in grid:
+        cells = _condense_row(row)
+        index = 0
+        while index < len(cells):
+            cell = cells[index]
+            next_cell = cells[index + 1] if index + 1 < len(cells) else ""
+            prefix = _LABEL_PREFIX.match(cell)
+            if prefix:
+                label = prefix.group(0).rstrip(":：").rstrip("*").strip()
+                value = cell[prefix.end():].strip().lstrip("*").strip()
+                consumed = 1
+                if not value and next_cell and not _LABEL_PREFIX.match(next_cell):
+                    value, consumed = next_cell, 2
+                after = cells[index + consumed] if index + consumed < len(cells) else ""
+                if value and _DATE.fullmatch(after):
+                    value, consumed = f"{value} {after}", consumed + 1
+                yield ("pair", label, value)
+                index += consumed
+            elif _BARE_LABEL.fullmatch(cell) and next_cell.startswith((":", "：")):
+                yield ("pair", cell, next_cell.lstrip(":：").strip())
+                index += 2
+            elif next_cell and _DATE.fullmatch(next_cell):
+                yield ("text", f"{cell} {next_cell}", "")
+                index += 2
+            else:
+                yield ("text", cell, "")
+                index += 1
+
+
+def _add_field(fields: dict[str, Any], label: str, value: str) -> None:
+    """同名字段重复出现时收成数组，不丢内容。"""
+    if label not in fields:
+        fields[label] = value
+    elif isinstance(fields[label], list):
+        fields[label].append(value)
+    else:
+        fields[label] = [fields[label], value]
+
+
+def form_document_from_grid(
+    grid: Sequence[Sequence[str]],
+    *,
+    title: str = "",
+    fallback_title: str = "",
+) -> dict[str, Any]:
+    """把稀疏表矩阵转成键值对 JSON。
+
+    结构：``{"doc_type": "form", "title": ..., "fields": {...}, "signatures": [...]}``；
+    没被识别成字段或签名的文本进 ``notes``。标题优先用传入的 ``title``，其次用表格首行
+    横跨整行的短文本（例如 `收文处理单`），都没有才退回 ``fallback_title``。
+    """
+    rows = [list(row) for row in grid]
+    if rows:
+        head = _condense_row(rows[0])
+        # 横跨整行的短文本当标题；带日期/时间的单元格是数据（传阅签字首行），不能当标题
+        if (
+            len(head) == 1
+            and not title
+            and ":" not in head[0]
+            and "：" not in head[0]
+            and len(head[0]) <= 30
+            and not _DATE_TIME.search(head[0])
+        ):
+            title = head[0]
+            rows = rows[1:]
+
+    fields: dict[str, Any] = {}
+    signatures: list[dict[str, str]] = []
+    notes: list[str] = []
+    for kind, first, second in _form_entries(rows):
+        if kind == "pair":
+            _add_field(fields, first, second)
+            signatures.extend(_extract_signatures(second))
+        else:
+            found = _extract_signatures(first)
+            if found:
+                signatures.extend(found)
+            else:
+                notes.append(first)
+
+    document: dict[str, Any] = {
+        "doc_type": "form",
+        "title": title or fallback_title,
+        "fields": fields,
+        "signatures": signatures,
+    }
+    if notes:
+        document["notes"] = notes
+    return document
+
+
+def document_title(markdown: str, *, fallback: str = "") -> str:
+    """取文档标题，用于表单 JSON 的 ``title``。
+
+    优先 Markdown 标题；否则取第一行"不像字段"的短文本（表单文件常见形态：
+    正文第一行就是 `收文处理单`）。都取不到时返回 ``fallback``。
+    """
+    prose = _HTML_TABLE.sub("\n", str(markdown or ""))
+    for raw in prose.splitlines():
+        text = raw.strip()
+        if not text:
+            continue
+        heading = _HEADING.match(text)
+        candidate = heading.group("text") if heading else text
+        if ":" in candidate or "：" in candidate or len(candidate) > 30:
+            continue
+        return candidate
+    return fallback
 
 
 def _is_grouped_header(first: Sequence[str], second: Sequence[str]) -> bool:
@@ -337,23 +618,38 @@ def grid_from_html_table(html: str) -> list[list[str]]:
 def _render_table_block(
     rows: Sequence[Sequence[str]],
     *,
-    form: bool,
+    form: bool = False,
+    title: str = "",
+    fallback_title: str = "",
+    spans: tuple[int, int] | None = None,
 ) -> tuple[str | None, str]:
-    """渲染一张表，返回 ``(文本, 形态)``；形态为 ``data``（JSON）或 ``form``（阅读顺序文本）。
+    """渲染一张表，返回 ``(文本, 形态)``；形态为 ``data``（行列式 JSON）或 ``form``（键值对 JSON）。
 
-    ``form=True``（来源是表单类文件）时按阅读顺序还原成文本，否则输出 ``columns/rows``。
-    两种形态下，表格末尾的注释都按普通文本接在后面；渲染不出内容时返回 ``(None, "data")``。
+    稀疏表出键值对 JSON，行列式数据表出 ``columns/rows`` JSON；表格末尾的注释都按普通
+    文本接在后面。渲染不出内容时返回 ``(None, "data")``。
     """
     grid, notes = split_note_rows(normalize_grid(rows))
     if not grid:
         return None, "data"
-    if form:
-        text = render_form_text(grid)
-        if not text:
-            return None, "data"
+    # ------------------------------------------------------------------
+    # 【暂时停用】按文件名判定：表单类文件（文件名含"表单"）里的表不转 JSON，
+    # 改按阅读顺序还原为文本。恢复时取消下面这段注释即可（相关函数与常量都还在）。
+    # ------------------------------------------------------------------
+    # if form:
+    #     text = render_form_text(grid)
+    #     if not text:
+    #         return None, "data"
+    #     if notes:
+    #         text = text + "\n\n" + "\n".join(notes)
+    #     return text, "form"
+    if is_sparse_table(grid, spans=spans):
+        document = form_document_from_grid(
+            grid, title=title, fallback_title=fallback_title
+        )
+        block = render_json_block(document)
         if notes:
-            text = text + "\n\n" + "\n".join(notes)
-        return text, "form"
+            block = block + "\n\n" + "\n".join(notes)
+        return block, "form"
     table = table_from_grid(grid)
     if not table["columns"] and not table["rows"]:
         return None, "data"
@@ -363,15 +659,67 @@ def _render_table_block(
     return block, "data"
 
 
-def _replace_html_tables(markdown: str, *, form: bool) -> tuple[str, int, int]:
-    """替换 HTML 表格，返回 ``(文本, JSON 表数, 表单数)``。"""
+def render_grid_block(
+    rows: Sequence[Sequence[Any]],
+    *,
+    title: str = "",
+    fallback_title: str = "",
+    columns: Sequence[Any] | None = None,
+) -> tuple[str | None, str]:
+    """渲染一个"已知行列"的表格矩阵（Excel/CSV 等），返回 ``(文本, 形态)``。
+
+    与 HTML/管道表格走同一套形状判定：稀疏表（收文处理单、审批单这类版式）出键值对
+    JSON，行列式数据表出 ``columns/rows`` JSON。电子表格没有 `rowspan`/`colspan`
+    信息，合并密度传 ``None``。
+
+    ``columns`` 给定时，行列式分支用它当列名（Excel 的 pandas 列名，保持既有输出），
+    否则用矩阵首行；形状判定始终基于 ``rows`` 本身。
+    """
+    grid, notes = split_note_rows(normalize_grid(rows))
+    if not grid:
+        return None, "data"
+    if is_sparse_table(grid):
+        document = form_document_from_grid(
+            grid, title=title, fallback_title=fallback_title
+        )
+        block = render_json_block(document)
+        kind = "form"
+    else:
+        if columns is not None:
+            table = table_from_columns_and_rows(columns, grid[1:])
+        else:
+            table = table_from_grid(grid)
+        if not table["columns"] and not table["rows"]:
+            return None, "data"
+        block = render_json_block(table)
+        kind = "data"
+    if notes:
+        block = block + "\n\n" + "\n".join(notes)
+    return block, kind
+
+
+def _replace_html_tables(
+    markdown: str,
+    *,
+    form: bool = False,
+    title: str = "",
+    fallback_title: str = "",
+) -> tuple[str, int, int]:
+    """替换 HTML 表格，返回 ``(文本, 行列式 JSON 表数, 键值对 JSON 表数)``。"""
     tables = forms = 0
 
     def _replace(match: re.Match) -> str:
         nonlocal tables, forms
-        block, kind = _render_table_block(grid_from_html_table(match.group(0)), form=form)
+        html = match.group(0)
+        block, kind = _render_table_block(
+            grid_from_html_table(html),
+            form=form,
+            title=title,
+            fallback_title=fallback_title,
+            spans=span_stats(html),
+        )
         if block is None:
-            return match.group(0)
+            return html
         if kind == "form":
             forms += 1
         else:
@@ -381,13 +729,19 @@ def _replace_html_tables(markdown: str, *, form: bool) -> tuple[str, int, int]:
     return _HTML_TABLE.sub(_replace, str(markdown or "")), tables, forms
 
 
-def html_tables_to_json(markdown: str, *, source_name: str | None = None) -> tuple[str, int]:
+def html_tables_to_json(
+    markdown: str,
+    *,
+    source_name: str | None = None,
+    title: str = "",
+) -> tuple[str, int]:
     """把 Markdown 里的 HTML 表格替换成 JSON 代码块（MinerU 输出形态）。
 
-    来源文件是表单类文件（``source_name`` 含 `表单`）时，表格按阅读顺序还原成文本。
-    返回的计数只统计转成 JSON 的数据表；表单文本不计入。
+    返回的计数只统计行列式数据表；稀疏表的键值对 JSON 不计入。
     """
-    text, tables, _forms = _replace_html_tables(markdown, form=is_form_source(source_name))
+    text, tables, _forms = _replace_html_tables(
+        markdown, form=is_form_source(source_name), title=title
+    )
     return text, tables
 
 
@@ -419,8 +773,14 @@ def _is_pipe_row(line: str) -> bool:
     return line.strip().startswith("|")
 
 
-def _replace_markdown_tables(markdown: str, *, form: bool) -> tuple[str, int, int]:
-    """替换 Markdown 管道表格，返回 ``(文本, JSON 表数, 表单数)``。"""
+def _replace_markdown_tables(
+    markdown: str,
+    *,
+    form: bool = False,
+    title: str = "",
+    fallback_title: str = "",
+) -> tuple[str, int, int]:
+    """替换 Markdown 管道表格，返回 ``(文本, 行列式 JSON 表数, 键值对 JSON 表数)``。"""
     lines = str(markdown or "").split("\n")
     output: list[str] = []
     tables = forms = 0
@@ -438,7 +798,14 @@ def _replace_markdown_tables(markdown: str, *, form: bool) -> tuple[str, int, in
             while index < len(lines) and _is_pipe_row(lines[index]):
                 rows.append(_split_pipe_row(lines[index]))
                 index += 1
-            block, kind = _render_table_block(rows, form=form)
+            # 管道表格没有 rowspan/colspan 信息，合并密度传 None
+            block, kind = _render_table_block(
+                rows,
+                form=form,
+                title=title,
+                fallback_title=fallback_title,
+                spans=None,
+            )
             if block is not None:
                 output.append(block)
                 if kind == "form":
@@ -451,13 +818,19 @@ def _replace_markdown_tables(markdown: str, *, form: bool) -> tuple[str, int, in
     return "\n".join(output), tables, forms
 
 
-def markdown_tables_to_json(markdown: str, *, source_name: str | None = None) -> tuple[str, int]:
+def markdown_tables_to_json(
+    markdown: str,
+    *,
+    source_name: str | None = None,
+    title: str = "",
+) -> tuple[str, int]:
     """把 Markdown 管道表格替换成 JSON 代码块（Docling/其它输出形态）。
 
-    来源文件是表单类文件（``source_name`` 含 `表单`）时，表格按阅读顺序还原成文本。
-    返回的计数只统计转成 JSON 的数据表；表单文本不计入。
+    返回的计数只统计行列式数据表；稀疏表的键值对 JSON 不计入。
     """
-    text, tables, _forms = _replace_markdown_tables(markdown, form=is_form_source(source_name))
+    text, tables, _forms = _replace_markdown_tables(
+        markdown, form=is_form_source(source_name), title=title
+    )
     return text, tables
 
 
@@ -468,20 +841,26 @@ def convert_tables(
     pipe: bool = True,
     source_name: str | None = None,
 ) -> tuple[str, dict[str, int]]:
-    """统一入口：返回 ``(文本, {"tables": JSON 表数, "forms": 表单文本数})``。
+    """统一入口：返回 ``(文本, {"tables": 行列式 JSON 表数, "forms": 键值对 JSON 表数})``。
 
-    ``source_name`` 是来源文件名；:func:`is_form_source` 判定为表单类文件时，
-    该文件里的所有表格都按阅读顺序还原成文本，否则一律输出 ``columns/rows`` JSON。
+    每张表按 :func:`is_sparse_table` 单独判定：稀疏表出键值对 JSON，否则出
+    ``columns/rows`` JSON。``source_name``（文件名）只用于表单 JSON 的 ``title`` 兜底
+    和（当前停用的）表单类文件判定。
     """
-    form = is_form_source(source_name)
     text = str(markdown or "")
+    title = document_title(text)
+    fallback_title = Path(str(source_name)).stem if source_name else ""
     tables = forms = 0
     if html:
-        text, count, form_count = _replace_html_tables(text, form=form)
+        text, count, form_count = _replace_html_tables(
+            text, title=title, fallback_title=fallback_title
+        )
         tables += count
         forms += form_count
     if pipe:
-        text, count, form_count = _replace_markdown_tables(text, form=form)
+        text, count, form_count = _replace_markdown_tables(
+            text, title=title, fallback_title=fallback_title
+        )
         tables += count
         forms += form_count
     return text, {"tables": tables, "forms": forms}
@@ -496,7 +875,7 @@ def convert_tables_to_json(
 ) -> tuple[str, int]:
     """统一入口：先处理 HTML 表格，再处理 Markdown 管道表格。
 
-    返回的计数只统计转成 JSON 的数据表（与函数名一致）；需要区分表单文本时用
+    返回的计数只统计行列式数据表（与函数名一致）；需要区分键值对 JSON 时用
     :func:`convert_tables`。
     """
     text, stats = convert_tables(markdown, html=html, pipe=pipe, source_name=source_name)
