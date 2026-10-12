@@ -150,8 +150,14 @@ def render(config, rows: list[dict], index: int, selected: str, query: str, noti
             label = item_line(rows[pos], inner, pos == index) if pos < len(rows) else ""
             output.append("│" + paint(fit(label, inner), "selected" if pos == index and rows else "normal") + "│")
         output.append(paint("└" + "─" * inner + "┘", "muted"))
-        compact = details if current and current["kind"] in {'model', 'runtime'} else (
-            [details[0], details[2], details[3], details[4], details[6], details[8]] if current else details)
+        if current and current['kind'] == 'runtime':
+            c = current['container']
+            compact = [c['name'], '实际状态: ' + current['display_value'], '模型: ' + (c['model'] or '应用服务'),
+                       f"GPU: {c['gpu']}    宿主端口: {c['host_ports']}",
+                       '上下文: ' + (c['context'] or '未声明'), '镜像: ' + c['image']]
+        else:
+            compact = details if current and current["kind"] == 'model' else (
+                [details[0], details[2], details[3], details[4], details[6], details[8]] if current else details)
         text = [part for item in compact for part in wrap(item, cells - 2)]
         output += [full(" " + (text[i] if i < len(text) else ""), "muted") for i in range(6)]
     output += [full(f" {index + 1 if rows else 0}/{len(rows)} 项    备份: {config.backup.name}", "muted"),
