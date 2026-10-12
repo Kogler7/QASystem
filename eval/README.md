@@ -14,7 +14,7 @@ tags: []
 
 ## 两套评测
 
-正式评测有两个入口，评分、门禁和结论文档是同一套。每次运行结束都会在 `tmp/eval/runs/<时间戳>/report.md` 写下三层 P、R、F1，实体和关系分开：
+正式评测有两个入口，评分、门禁和结论文档是同一套。每次运行结束都会在 `tmp/eval/runs/<时间戳>/report.md` 生成可直接复制表格的编号报告，依次为 0 报告信息、1 目的与范围、2 评测口径、3 数据集总览、4 分数据集说明与评测数据、5 横向对比与结论。实体和关系分开，指标仍分三层：
 
 | 层次 | 含义 |
 | --- | --- |
@@ -30,6 +30,20 @@ tags: []
 | 结果 | `report.md` 里的整体、分类型、单个文件 | 同一份结论文档结构 |
 
 发布前的全量门禁用 eval。mini-eval 走同一个 `run.py`，只是先按类型抽样。下面「如何使用」分别给出命令。`quick_eval.py` 是另外的诊断入口，固定三个公文 case，不算这两套评测。
+
+单 case 表的 P/R/F1 使用 0–1 小数，保留三位；`耗时(s)` 使用数字秒，包含该 case 评分及重试。复用批次沿用 `summary.json` 的耗时口径；小计为 case 耗时之和，任一缺失则显示 `—`。实体、关系表重复展示同一 case 耗时，不能将两张表的耗时再累加。报告数据集总览统计本批次已记录 case，中断时不代表全部选中 case。
+
+历史批次可用现有 `summary.json` 重新渲染，无需重新调用 Backend 或 judge：
+
+```python
+import json
+from pathlib import Path
+from eval.report import render_report
+
+run_dir = Path("tmp/eval/runs/<批次>")
+summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+(run_dir / "report.md").write_text(render_report(summary), encoding="utf-8")
+```
 
 ## 做了什么
 
@@ -405,7 +419,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
   manifest.json               # 输入与评测代码 SHA256、评分契约、选项；不包含密钥
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
-  report.md                   # 本次评测报告：运行信息，以及 LLM-as-Judge 的 Average / 分类型 / 单个文件指标
+  report.md                   # 编号报告：数据集汇总、单 case 实体/关系表与 micro 小计，便于粘贴
   <类型>/<case>/
     parse_<文件名>.json       # 后台解析接口回包
     document.md               # 拼好的 Markdown（--from-run 的 chunk-extract 模式复用它跳过解析）
@@ -420,10 +434,10 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `report.md` | 批次结论文档（每批结束自动生成，含 resume/复用与中断批次）。只含运行信息和指标结论。指标结论三个二级标题为 Average、分类型（official、rule、simple 等）、单个文件，均标注 LLM-as-Judge；实体和关系分开，并带 golden/predicted。门禁、覆盖率、基线、逐 case 耗时和问题清单在 `summary.json` |
+| `report.md` | 对齐知识抽取测评报告的 0–5 章节（每批结束自动生成，含 resume/复用与中断批次）。每模块一份数据集汇总表（实体与关系 P/R/F1），每数据集分别列实体、关系单 case 表：case / 状态 / P / R / F1 / 耗时(s) / 备注，并附 micro 小计和 golden/predicted/TP/FP/FN/Jaccard。显示实际 identity/llm 口径；降级、无效、缺失评分不填入正式指标，备注有效评分数。双方无数据显示 —，零 golden 有预测仍计分。业务说明、本体详情和结论留待补充；门禁与基线详情仍在 `summary.json` |
 | `summary.json` | 各 case 成败和 P/R/F1/Jaccard；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时，每个 case 完成后更新。`overall` 是有效同口径 micro，`quality` 包含覆盖率、case/group 均值与分组结果；`overall_identity` 单列精确对照。`gate` 记录空抽取、实体 F1、耗时和 `quality` 评分有效性/关系阈值检查；`baseline_comparison` 是同口径基线判定与逐项差异 |
 | `manifest.json` | 源文件、golden、本体，以及实际复用 Markdown/切片的 SHA256；`evaluator` 记录 `run.py`、`quality.py`、`provenance.py` 的内容哈希（包含未提交修改）；`settings` 与 `scoring_contract` 记录安全配置和评分契约，不记录 API key / Authorization。同一内容也嵌入 `summary.manifest` |
-| `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
+| `scores.json` | 单案明细。`golden_counts` 是执行前记录的规范化 golden 实体/关系数，执行或评分失败时仍可用于数据集总览；旧批次缺此字段时从已保存指标取数，每 case 只计一次，缺失时标为待补充。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
 | `match_details.json` | 每个已评分块的 `entities` / `relations` 命中、漏抽、多抽明细。LLM-judge 另有 `aligned_relations` 诊断、`judge_batches`（窗口原索引、耗时、响应格式与失败尝试；聚焦补判的批次带 `focused: true`）、`judge_coverage` 和 `identity` 精确对照 |
 | `document.md` | 解析结果，便于对照原文；`--from-run` 且 `--mode chunk-extract` 时复用它跳过解析（同批重试也会复用），因此仍需保留 |
 | `chunks.json` | 实际送进抽取的切片 |

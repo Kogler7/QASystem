@@ -4221,6 +4221,13 @@ def main() -> int:
                     "plugin": None,
                     "error": None,
                 }
+                if golden is not None:
+                    gold_entities, gold_relations = normalize_graph(golden)
+                    # Dataset inventory remains available even if execution or
+                    # scoring fails before a metrics block can be saved.
+                    record["golden_counts"] = {
+                        "entities": len(gold_entities), "relations": len(gold_relations),
+                    }
                 case_started = time.perf_counter()
                 label = f"{type_dir.name}/{case_dir.name}"
                 log(f"开始 {label} files={len(sources)} golden={'yes' if golden else golden_reason}")

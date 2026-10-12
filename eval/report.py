@@ -43,23 +43,23 @@ def _fmt_metric(value: Any) -> str:
     try:
         return f"{float(value):.3f}"
     except (TypeError, ValueError):
-        return "-"
+        return "—"
 
 
 def _fmt_count(value: Any) -> str:
     try:
         return str(int(value))
     except (TypeError, ValueError):
-        return "-"
+        return "—"
 
 
 def _fmt_seconds(value: Any) -> str:
     if value is None:
-        return "-"
+        return "—"
     try:
         seconds = max(0.0, float(value))
     except (TypeError, ValueError):
-        return "-"
+        return "—"
     if seconds < 60:
         return f"{seconds:.1f}s"
     minutes, rest = divmod(seconds, 60)
@@ -73,7 +73,7 @@ def _one_line(text: Any, limit: int = ERROR_TEXT_LIMIT) -> str:
     flat = " ".join(str(text or "").split())
     if len(flat) > limit:
         return flat[: limit - 1] + "…"
-    return flat or "-"
+    return flat or "—"
 
 
 def _case_label(record: dict[str, Any]) -> str:
@@ -102,171 +102,180 @@ def _judge_fallbacks(cases: list[dict[str, Any]]) -> list[tuple[str, str]]:
     return items
 
 
-def _module_has_data(metrics: dict[str, Any] | None) -> bool:
-    for side, _label in SIDE_LABELS:
-        block = (metrics or {}).get(side) or {}
-        if int(block.get("golden") or 0) or int(block.get("predicted") or 0):
-            return True
-    return False
-
-
 def _status_text(record: dict[str, Any]) -> str:
     status = str(record.get("status") or "-")
     return {"succeeded": "成功", "failed": "失败"}.get(status, status)
 
 
-def _render_header(lines: list[str], summary: dict[str, Any]) -> None:
-    lines.append("## 运行信息")
-    lines.append("")
-    lines.append(f"- 运行 ID：`{summary.get('run_id') or '-'}`")
-    lines.append(f"- 开始：{summary.get('started_at') or '-'}")
-    lines.append(f"- 结束：{summary.get('finished_at') or '-'}")
-    lines.append(f"- 总耗时：{_fmt_seconds(summary.get('elapsed_seconds'))}")
-    lines.append(f"- Backend：{summary.get('backend_url') or '-'}")
-    lines.append(f"- 阶段：{summary.get('stage') or '-'}；模式：{', '.join(summary.get('modes') or []) or '-'}")
-    match_mode = str(summary.get("match_mode") or "-")
-    cases = list(summary.get("cases") or [])
-    fallbacks = _judge_fallbacks(cases)
-    if fallbacks:
-        match_mode += f"（{len(fallbacks)} 个 case judge 失败降级 identity_fallback）"
-    lines.append(f"- 评分口径：{match_mode}")
-    versions = summary.get("extract_versions") or []
-    lines.append(f"- 抽取版本：{', '.join(str(item) for item in versions) if versions else '-'}")
-    lines.append(
-        f"- case：成功 {int(summary.get('succeeded') or 0)} / 失败 {int(summary.get('failed') or 0)} / "
-        f"跳过 {int(summary.get('skipped') or 0)} / 未评分 {int(summary.get('unscored') or 0)}"
-    )
-    if summary.get("interrupted"):
-        lines.append("- ⚠ 本批次被 Ctrl+C 中断，以下为中断时已保存的进度")
-    lines.append("")
+GROUP_LABELS = {"official": "公文数据集", "rule": "规则数据集", "simple": "知识单元数据集", "trouble": "故障数据集"}
 
 
-def _included_modules(summary: dict[str, Any]) -> list[str]:
-    overall = summary.get("overall") or {}
-    return [
-        key
-        for key in MODULE_ORDER
-        if key == "backend_extract" or _module_has_data(overall.get(key))
-    ]
+def _cell(value: Any) -> str:
+    """Keep artifact names and notes inside one Markdown table cell."""
+    return _one_line(value).replace("&", "&amp;").replace("|", "&#124;").replace("<", "&lt;").replace(">", "&gt;").replace("`", "&#96;")
 
 
-def _append_prf_table(lines: list[str], rows: list[tuple[str, dict[str, Any]]], *, lead: str) -> None:
-    """lead 是表头里类别列之前的列名，用「 | 」分隔。"""
-    lines.append(f"| {lead} | 类别 | golden | predicted | P | R | F1 |")
-    separators = " | ".join(["---"] * (lead.count("|") + 1))
-    lines.append(f"| {separators} | --- | ---: | ---: | ---: | ---: | ---: |")
-    for prefix, metrics in rows:
-        for side, side_label in SIDE_LABELS:
-            block = (metrics or {}).get(side) or {}
-            lines.append(
-                f"| {prefix} | {side_label} | {_fmt_count(block.get('golden'))} | "
-                f"{_fmt_count(block.get('predicted'))} | {_fmt_metric(block.get('precision'))} | "
-                f"{_fmt_metric(block.get('recall'))} | {_fmt_metric(block.get('f1'))} |"
-            )
+def _prf(metrics: dict[str, Any], side: str) -> str:
+    block = metrics.get(side) or {}
+    if not block or (block.get("golden") == 0 and block.get("predicted") == 0):
+        return "— | — | —"
+    return " | ".join(_fmt_metric(block.get(key)) for key in ("precision", "recall", "f1"))
 
 
-def _quality_view(summary: dict[str, Any]) -> dict[str, Any]:
-    quality = summary.get("quality")
-    if isinstance(quality, dict) and quality.get("modules"):
-        return quality
-    if not summary.get("cases"):
-        return {}
-    return build_quality_summary(summary)
+def _seconds(value: Any) -> str:
+    """Numeric seconds for pasting into the reference report's 耗时(s) column."""
+    try:
+        return f"{max(0.0, float(value)):.1f}" if value is not None else "—"
+    except (TypeError, ValueError):
+        return "—"
 
 
-def _render_overall(lines: list[str], summary: dict[str, Any]) -> None:
-    lines.append("### Average：LLM-as-Judge")
-    lines.append("")
-    lines.append("全部有效评分按 TP/FP/FN 累加（micro）。")
-    lines.append("")
-    overall = summary.get("overall") or {}
-    included = _included_modules(summary)
-    if not overall:
-        lines.append("（无总览数据）")
-        lines.append("")
-        return
-    _append_prf_table(
-        lines,
-        [(MODULE_LABELS.get(key, key), overall.get(key) or {}) for key in included],
-        lead="模块",
-    )
+def _total_seconds(records: list[dict[str, Any]]) -> str:
+    if not records or any(record.get("elapsed_seconds") is None for record in records):
+        return "—"
+    return _seconds(sum(float(record["elapsed_seconds"]) for record in records))
+
+
+def _table(lines: list[str], header: str, rows: list[str]) -> None:
+    lines.extend([f"| {header} |", "| " + " | ".join("---" for _ in header.split("|")) + " |"])
+    lines.extend(f"| {row} |" for row in rows)
     lines.append("")
 
 
-def _render_by_type(lines: list[str], summary: dict[str, Any]) -> None:
-    lines.append("### 分类型：LLM-as-Judge")
-    lines.append("")
-    lines.append("同一类型内的有效评分按 TP/FP/FN 累加。类型名是评测集目录，如 `official`、`rule`、`simple`。")
-    lines.append("")
-    quality = _quality_view(summary)
-    included = set(_included_modules(summary))
-    rows: list[tuple[str, dict[str, Any]]] = []
-    for module, item in (quality.get("modules") or {}).items():
-        if module not in included:
-            continue
-        label = MODULE_LABELS.get(module, module)
-        for group in sorted((item.get("by_group") or {})):
-            stats = item["by_group"][group]
-            if not int((stats.get("coverage") or {}).get("scored") or 0):
-                continue
-            rows.append((f"`{group}` | {label}", stats.get("micro") or {}))
-    if not rows:
-        lines.append("（无分类型数据）")
-        lines.append("")
-        return
-    _append_prf_table(lines, rows, lead="类型 | 模块")
-    lines.append("")
+def _coverage_note(stats: dict[str, Any]) -> str:
+    coverage = stats.get("coverage") or {}
+    return f"有效评分 {int(coverage.get('scored') or 0)}/{int(coverage.get('expected') or 0)}"
 
 
-def _render_per_file(lines: list[str], summary: dict[str, Any]) -> None:
-    lines.append("### 单个文件：LLM-as-Judge")
-    lines.append("")
-    lines.append("每个 case 单独列出实体、关系的 P、R、F1。一个 case 对应评测集里的一份文档（可含多个附件），分数对照该 case 的 golden。")
-    lines.append("")
-    cases = list(summary.get("cases") or [])
-    if not cases:
-        lines.append("（无文件）")
-        lines.append("")
-        return
-    lines.append("| 文件 | 模块 | 状态 | 实体 P | 实体 R | 实体 F1 | 关系 P | 关系 R | 关系 F1 |")
-    lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
-    for record in cases:
-        blocks = [
-            (label, block["metrics"])
-            for label, block in _case_blocks(record)
-            if isinstance(block, dict) and isinstance(block.get("metrics"), dict)
-        ]
-        if not blocks:
-            lines.append(
-                f"| `{_case_label(record)}` | - | {_status_text(record)} | - | - | - | - | - | - |"
-            )
-            continue
-        for label, metrics in blocks:
-            entities = metrics.get("entities") or {}
-            relations = metrics.get("relations") or {}
-            lines.append(
-                f"| `{_case_label(record)}` | {MODULE_LABELS.get(label, label)} | {_status_text(record)} | "
-                f"{_fmt_metric(entities.get('precision'))} | {_fmt_metric(entities.get('recall'))} | {_fmt_metric(entities.get('f1'))} | "
-                f"{_fmt_metric(relations.get('precision'))} | {_fmt_metric(relations.get('recall'))} | {_fmt_metric(relations.get('f1'))} |"
-            )
-    lines.append("")
+def _case_view(summary: dict[str, Any], record: dict[str, Any], module: str) -> tuple[dict[str, Any], str]:
+    # Reuse the production scoring contract; fallback/invalid scores cannot look
+    # like formal LLM results even in the per-case copy/paste tables.
+    stats = build_quality_summary({**summary, "cases": [record]})["modules"].get(module) or {}
+    coverage = stats.get("coverage") or {}
+    notes = []
+    if coverage.get("fallback"):
+        notes.append("judge 降级 identity_fallback，不计入正式汇总")
+    elif coverage.get("mode_mismatch"):
+        notes.append("评分口径不一致，不计入汇总")
+    elif coverage.get("invalid"):
+        notes.append("评分字段无效，不计入汇总")
+    elif not coverage.get("scored"):
+        notes.append("未评分")
+    if record.get("empty_extraction"):
+        notes.append("空抽取")
+    if record.get("skipped_after_retries"):
+        notes.append("重试耗尽")
+    if record.get("error"):
+        notes.append(_one_line(record["error"]))
+    block = dict(_case_blocks(record)).get(module) or {}
+    return (block.get("metrics") or {}) if coverage.get("scored") else {}, _cell("；".join(notes))
 
 
-def _render_conclusion(lines: list[str], summary: dict[str, Any]) -> None:
-    lines.append("## 指标结论")
-    lines.append("")
-    lines.append("P、R、F1 按 LLM-as-Judge 口径分三层：Average、分类型、单个文件。实体与关系分开计算。")
-    lines.append("")
-    _render_overall(lines, summary)
-    _render_by_type(lines, summary)
-    _render_per_file(lines, summary)
+def _golden_counts(record: dict[str, Any]) -> dict[str, Any]:
+    # Old summaries only carry gold counts in scorer outputs. Use a single
+    # module per case so multi-mode/plugin runs never double-count the dataset.
+    if isinstance(record.get("golden_counts"), dict):
+        return record["golden_counts"]
+    for _, block in _case_blocks(record):
+        metrics = (block or {}).get("metrics") or {}
+        if all((metrics.get(side) or {}).get("golden") is not None for side, _ in SIDE_LABELS):
+            return {side: metrics[side]["golden"] for side, _ in SIDE_LABELS}
+    return {}
 
 
 def render_report(summary: dict[str, Any]) -> str:
-    """summary.json 内容 → Markdown 报告。对缺字段/中断中的 summary 容错。"""
+    """Render the numbered evaluation-report template from saved run evidence."""
     if not isinstance(summary, dict):
         raise TypeError("summary 必须是 dict")
-    lines: list[str] = [f"# Benchmark 评测报告 {summary.get('run_id') or ''}".rstrip(), ""]
-    _render_header(lines, summary)
-    _render_conclusion(lines, summary)
+    cases = list(summary.get("cases") or [])
+    quality = build_quality_summary(summary) if cases else summary.get("quality") or {}
+    modules = [key for key in MODULE_ORDER if key in (quality.get("modules") or {})]
+    groups = sorted({str(record.get("group") or "?") for record in cases})
+    lines = ["# 知识抽取评测报告（eval 数据集）", "", "## 0. 报告信息", ""]
+    versions = summary.get("extract_versions") or []
+    _table(lines, "项 | 内容", [
+        f"评测日期 | {_cell(str(summary.get('started_at') or '待补充')[:10])}",
+        f"后端环境 | {_cell(summary.get('backend_url'))}",
+        f"抽取算法版本 | {_cell(', '.join(str(v) for v in versions) or '待补充')}",
+        f"运行 ID | {_cell(summary.get('run_id'))}",
+        f"开始 / 结束 | {_cell(summary.get('started_at'))} / {_cell(summary.get('finished_at'))}",
+        f"总耗时 | {_fmt_seconds(summary.get('elapsed_seconds'))}",
+        "结论摘要 | 待补充（结合下方指标与问题分析填写）",
+    ])
+    if summary.get("interrupted"):
+        lines.extend(["⚠ 本批次被 Ctrl+C 中断，以下为中断时已保存的进度。", ""])
+    lines.extend(["## 1. 评测目的与范围", "",
+                  f"本报告统计本批次已记录的 **{len(groups)} 类数据集、{len(cases)} 个 case**；各 case 可含多个附件。", ""])
+    _table(lines, "项 | 说明", [
+        f"数据目录 | {_cell(summary.get('workspace'))}",
+        f"评测阶段 | {_cell(summary.get('stage'))}",
+        f"是否含插件链路 | {'是' if summary.get('stage') in ('plugin', 'all') else '否'}",
+        f"是否含全流程沉淀 | {'是' if 'backend_system' in modules else '否'}",
+    ])
+    lines.extend(["## 2. 评测口径", "", "### 2.1 模式（`--mode`）", ""])
+    _table(lines, "模式 | 含义 | 评分模块", [
+        "extract | 仅知识抽取（复用切片） | backend_extract",
+        "chunk-extract | 切片 + 抽取（解析原文件或复用 Markdown） | backend_extract",
+        "pipeline | 全流程知识沉淀 | backend_system",
+    ])
+    modes = summary.get("modes") or []
+    lines.extend([f"本批次模式：{_cell(', '.join(modes))}。", "", "### 2.2 指标计算", "",
+                  f"本批次评分口径：**{_cell(summary.get('match_mode') or 'identity')}**。", "",
+                  "`identity` 按实体 type + name / 关系五元组精确匹配；`llm` 使用 LLM-as-Judge 语义一对一匹配。两种分数不可直接比较。", ""])
+    fallbacks = _judge_fallbacks(cases)
+    if fallbacks:
+        lines.extend([f"⚠ {len(fallbacks)} 个 case judge 失败降级 identity_fallback；降级分数不计入正式汇总，明细表标注原因。", ""])
+    lines.extend(["### 2.3 指标定义", "",
+                  "实体与关系分别统计：P = TP/(TP+FP)，R = TP/(TP+FN)，F1 = 2PR/(P+R)，Jaccard = TP/(TP+FP+FN)。", "",
+                  "整体与分数据集均按有效同口径评分的 TP/FP/FN 累加（micro），不填补未评分结果。P/R/F1 使用 0–1 小数，保留三位。双方均无实体或关系时显示 `—`；golden 为零但有预测时仍计分。", "",
+                  "单 case 耗时(s)取记录的 case 总耗时（含评分及重试）；复用批次沿用 summary 中的复用耗时口径。小计为各 case 耗时之和，有缺失则显示 `—`，不等于批次墙钟耗时。", "",
+                  "## 3. 数据集总览", ""])
+    overview = []
+    for i, group in enumerate(groups, 1):
+        records = [r for r in cases if str(r.get('group') or '?') == group]
+        counts = [_golden_counts(r) for r in records]
+        gold = [str(sum(c[side] for c in counts)) if all(side in c for c in counts) else '待补充' for side, _ in SIDE_LABELS]
+        formats = sorted({str(name).rsplit('.', 1)[-1].upper() for r in records for name in r.get('files') or [] if '.' in str(name)})
+        overview.append(f"{_cell(group)} | {GROUP_LABELS.get(group, '待补充')} | {len(records)} | {_cell(', '.join(formats))} | 待补充 | {gold[0]} | {gold[1]} | §4.{i}")
+    if cases:
+        counts = [_golden_counts(r) for r in cases]
+        gold = [str(sum(c[side] for c in counts)) if all(side in c for c in counts) else '待补充' for side, _ in SIDE_LABELS]
+        overview.append(f"**合计** | — | **{len(cases)}** | — | — | {gold[0]} | {gold[1]} | —")
+    _table(lines, "数据集（`--groups`） | 业务含义 | case 数 | 文档格式 | 本体（类 / 关系） | golden 实体 | golden 关系 | 章节", overview)
+    lines.extend(["golden 数来自本批次记录，每个 case 只计一次；缺失计数时标为待补充，不从报告模板沿用。", ""])
+    for module in modules:
+        lines.extend([f"**各数据集结果汇总：{MODULE_LABELS[module]}**", ""])
+        stats = quality['modules'][module]
+        _table(lines, "数据集 | 实体 P | 实体 R | 实体 F1 | 关系 P | 关系 R | 关系 F1 | 备注", [
+            f"{_cell(group)} | {_prf((stats.get('by_group', {}).get(group) or {}).get('micro') or {}, 'entities')} | {_prf((stats.get('by_group', {}).get(group) or {}).get('micro') or {}, 'relations')} | {_coverage_note(stats.get('by_group', {}).get(group) or {})}"
+            for group in groups
+        ] + [f"**整体（micro）** | {_prf(stats.get('micro') or {}, 'entities')} | {_prf(stats.get('micro') or {}, 'relations')} | {_coverage_note(stats)}"])
+    lines.extend(["## 4. 分数据集说明与评测数据", ""])
+    if not cases:
+        lines.extend(["（无文件）", ""])
+    for i, group in enumerate(groups, 1):
+        records = [r for r in cases if str(r.get('group') or '?') == group]
+        lines.extend([f"### 4.{i} {_cell(group)} —— {GROUP_LABELS.get(group, '数据集')}", "",
+                      f"#### 4.{i}.1 数据集说明", "", "业务场景、本体类型与属性说明：待补充。", ""])
+        _table(lines, "case | 文档 | golden 实体 | golden 关系", [
+            f"{_cell(r.get('case'))} | {_cell('、'.join(r.get('files') or []))} | {_fmt_count(_golden_counts(r).get('entities'))} | {_fmt_count(_golden_counts(r).get('relations'))}" for r in records
+        ])
+        lines.extend([f"#### 4.{i}.2 评测数据", ""])
+        for module in modules:
+            stats = quality['modules'][module].get('by_group', {}).get(group) or {}
+            views = [(r, *_case_view(summary, r, module)) for r in records]
+            for side, label in SIDE_LABELS:
+                lines.extend([f"**{MODULE_LABELS[module]} · {label}：单 case 指标**", ""])
+                _table(lines, "case | 状态 | P | R | F1 | 耗时(s) | 备注", [
+                    f"{_cell(r.get('case'))} | {_cell(_status_text(r))} | {_prf(metrics, side)} | {_seconds(r.get('elapsed_seconds'))} | {note}" for r, metrics, note in views
+                ] + [f"**小计（micro）** | 成功 {sum(r.get('status') == 'succeeded' for r in records)}/{len(records)} | {_prf(stats.get('micro') or {}, side)} | {_total_seconds(records)} | {_coverage_note(stats)}"])
+            lines.extend([f"补充统计（{MODULE_LABELS[module]}，仅有效评分）：", ""])
+            _table(lines, "类别 | golden | predicted | TP | FP | FN | Jaccard", [
+                f"{label} | " + " | ".join(_fmt_count((stats.get('micro', {}).get(side) or {}).get(k)) for k in ('golden', 'predicted', 'tp', 'fp', 'fn')) + f" | {_fmt_metric((stats.get('micro', {}).get(side) or {}).get('jaccard'))}"
+                for side, label in SIDE_LABELS
+            ])
+        lines.extend([f"#### 4.{i}.3 问题与分析", "", "待补充（结合失败、空抽取、评分降级及匹配明细分析）。", ""])
+    lines.extend(["## 5. 横向对比与结论", "", "### 5.1 结论", "",
+                  "待补充（版本间比较需保证数据集、模式与评分口径一致；门禁与基线诊断见 summary.json）。", "",
+                  "### 5.2 待改进项与建议", "", "待补充。", ""])
     return "\n".join(lines).rstrip() + "\n"
