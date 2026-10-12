@@ -60,6 +60,7 @@ from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionReque
 from .composite import CompositeElementHandler
 from .coverage import CoverageAuditor
 from .document_entities import enrich_document_entities
+from .official_document_strategy import add_official_document_units
 from .entity_resolver import CandidatePool
 from .evidence import Evidence, evidence_coverage, locate_quote, verify_evidence
 from .graph_assembler import GraphAssembler
@@ -612,6 +613,7 @@ def extract_split(
                     properties=entity.get("properties") or {},
                     evidence=evidence,
                     source="",
+                    mentions=[str(item) for item in (entity.get("mentions") or []) if str(item).strip()],
                 ),
                 warnings=warnings,
             )
@@ -640,6 +642,11 @@ def extract_split(
         manager,
         allowed_types=plan.allowed_types,
         warnings=warnings,
+    )
+    official_units = (
+        add_official_document_units(pool, manager, plan, warnings=warnings)
+        if route.kind == "official_document"
+        else 0
     )
     standard_semantics = (
         enrich_standard_semantics(pool, manager, plan, warnings=warnings)
@@ -727,8 +734,10 @@ def extract_split(
             if resolved is None:
                 continue
             evidence = _bind_relation_evidence(raw_relation, manager)
-            if evidence is not None:
-                resolved.evidence = [evidence]
+            if evidence is not None and not any(
+                evidence.span_id == item.span_id for item in resolved.evidence
+            ):
+                resolved.evidence.append(evidence)
 
     logger.info(
         "[步骤][抽取] Pass2 关系候选输出: pairs=%d 池内关系=%d accepted=%d",
@@ -1201,6 +1210,7 @@ def extract_split(
             "accepted_relations": len(accepted_relations),
             "numbered_hierarchy_relations": numbered_hierarchy_relations,
             "document_entities": document_entities,
+            "official_document_units": official_units,
             "standard_semantics": standard_semantics,
             "property_enrichment": property_enrichment,
             "document_relations": document_relations,

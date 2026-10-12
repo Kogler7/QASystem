@@ -19,8 +19,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .candidate_models import EntityCandidate
 from .chunk_context import ChunkContextManager, ExtractionRequest
 from .coverage import CoverageGap
+from .evidence import Evidence
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
 from .standard_strategy import STRATEGY_REGISTRY
@@ -145,6 +147,10 @@ def _make_unit(
     original_text: str,
     order: str,
     location: str,
+    *,
+    start: int = 0,
+    end: int = 0,
+    evidence_quote: str = "",
 ) -> dict[str, Any]:
     return {
         "unit_id": name,
@@ -154,62 +160,209 @@ def _make_unit(
         "unit_order": order,
         "original_text": original_text,
         "unit_location": location,
+        "start": start,
+        "end": end,
+        "evidence_quote": evidence_quote or original_text,
     }
 
 
-def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
-    """按 golden 口径切分：通知正文 / 条 / 段落 / 附件说明。"""
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if title:
-        normalized = re.sub(r"\s+", "", title)
-        for index, line in enumerate(lines):
-            if normalized and normalized in re.sub(r"\s+", "", line):
-                lines = lines[index + 1:]
-                break
-    while lines and lines[0].endswith(("：", ":")):
-        lines.pop(0)
-    paragraphs: list[str] = []
-    current: list[str] = []
-    for line in lines:
-        if line:
-            current.append(line)
-        elif current:
-            paragraphs.append("\n".join(current).strip())
-            current = []
-    if current:
-        paragraphs.append("\n".join(current).strip())
+_DATE_LINE = re.compile(r"^\s*\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日\s*$")
+_HEADER_LABEL = re.compile(r"^\s*(?:来文单位|米文单位|发文机关|印发机关|内部事项)")
+_NOISE_LINE = re.compile(r"^(?:---|[*]{3}|(?:noteId|tags)\s*:)")
+_ATTACHMENT_ITEM = re.compile(r"^\s*\d+\s*[.、．]\s*\S")
+_OFFICIAL_NUMBER_LINE = re.compile(
+    r"[\u3400-\u9fffA-Za-z0-9]{1,30}?[〔\[［（(]\s*\d{4}\s*[〕\]］）)]\s*\d+\s*号"
+)
 
+
+def _line_body(stripped: str) -> str:
+    heading = re.match(r"^#{1,6}\s+(.*)$", stripped)
+    return heading.group(1).strip() if heading else stripped
+
+
+def _is_header_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or _ITEM_MARKER.match(stripped) or _ATTACHMENT_MARKER.match(stripped):
+        return False
+    if _HEADER_LABEL.match(stripped):
+        return True
+    if stripped.endswith(("：", ":")) and len(stripped) <= 200 and "。" not in stripped and "！" not in stripped:
+        return True
+    if "。" in stripped or len(stripped) > 40:
+        return False
+    return _OFFICIAL_NUMBER_LINE.search(stripped) is not None
+
+
+def _is_header_paragraph(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return bool(lines) and all(_is_header_line(line) for line in lines)
+
+
+def _is_noise_paragraph(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return bool(lines) and all(_NOISE_LINE.match(line) or line == "[]" for line in lines)
+
+
+def _is_signature_paragraph(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines or len(text) > 80:
+        return False
+    if any(mark in line for line in lines for mark in ("。", "！", "？")):
+        return False
+    if any(_DATE_LINE.match(line) for line in lines):
+        return True
+    return len(lines) == 1 and lines[0].endswith(("办公室", "办公厅")) and len(lines[0]) <= 40
+
+
+def _is_contact_paragraph(text: str) -> bool:
+    stripped = text.strip()
+    return stripped.startswith("联系人") and not any(marker in stripped for marker in _REPORT_MARKERS)
+
+
+def _paragraph_records(text: str, title: str) -> list[dict[str, Any]]:
+    """按空行和条目标记切段，并保留相对原文的字符区间。"""
+    title_norm = re.sub(r"\s+", "", title or "")
+    title_in_text = bool(title_norm) and title_norm in re.sub(r"\s+", "", text or "")
+    seen_title = not title_in_text
+    records: list[dict[str, Any]] = []
+    current: list[tuple[int, int, str]] = []
+
+    def flush() -> None:
+        nonlocal current
+        if not current:
+            return
+        start = current[0][0]
+        end = current[-1][1]
+        body = "\n".join(item[2] for item in current).strip()
+        current = []
+        if body:
+            records.append({"start": start, "end": end, "text": body, "quote": text[start:end]})
+
+    offset = 0
+    for raw in (text or "").splitlines(keepends=True):
+        line = raw.rstrip("\r\n")
+        stripped = line.strip()
+        if not stripped:
+            flush()
+            offset += len(raw)
+            continue
+        body = _line_body(stripped)
+        norm = re.sub(r"\s+", "", body)
+        if title_norm and title_norm in norm:
+            flush()
+            seen_title = True
+            offset += len(raw)
+            continue
+        if not seen_title:
+            offset += len(raw)
+            continue
+        content_start = offset + (len(line) - len(line.lstrip()))
+        content_end = offset + len(line.rstrip())
+        if _ITEM_MARKER.match(body) or _ATTACHMENT_MARKER.match(body):
+            flush()
+        current.append((content_start, content_end, body))
+        offset += len(raw)
+    flush()
+    return records
+
+
+def parse_official_body_units(text: str, title: str) -> list[dict[str, Any]]:
+    """识别前言、编号要求、报送段和附件列表，并记录完整字符区间。
+
+    条目按行首标记切开，不依赖空行；整段原文都保留，包括第二句里的主体、条件和禁止事项。
+    名称来自条目序号和文件标题里的事项词，不写死某一份公文的标题。
+    """
     units: list[dict[str, Any]] = []
     seen_intro = False
-    for paragraph in paragraphs:
-        if "<" in paragraph and ">" in paragraph:
+    paragraphs = _paragraph_records(text, title)
+    index = 0
+    while index < len(paragraphs):
+        paragraph = paragraphs[index]
+        body = paragraph["text"]
+        if _is_noise_paragraph(body) or ("<" in body and ">" in body):
+            index += 1
             continue
-        if _ATTACHMENT_MARKER.match(paragraph):
-            units.append(_make_unit("附件列表", "附件说明", "附件", paragraph, "", f"《{title}》附件"))
+        if _ATTACHMENT_MARKER.match(body):
+            block = [paragraph]
+            following = index + 1
+            while following < len(paragraphs) and _ATTACHMENT_ITEM.match(paragraphs[following]["text"]):
+                block.append(paragraphs[following])
+                following += 1
+            combined = "\n".join(item["text"] for item in block)
+            units.append(
+                _make_unit(
+                    "附件列表",
+                    "附件",
+                    "附件",
+                    combined,
+                    "",
+                    f"《{title}》附件",
+                    start=block[0]["start"],
+                    end=block[-1]["end"],
+                    evidence_quote=text[block[0]["start"] : block[-1]["end"]],
+                )
+            )
+            index = following
             continue
-        item = _ITEM_MARKER.match(paragraph)
+        if _is_header_paragraph(body) or _is_signature_paragraph(body) or _is_contact_paragraph(body):
+            index += 1
+            continue
+        item = _ITEM_MARKER.match(body)
         if item:
             numeral = _marker_numeral(item.group("mark"))
-            body = item.group("title").strip()
-            unit_title = re.split(r"[，,。；;]", body, maxsplit=1)[0].strip()
+            extra = "\n".join(body.splitlines()[1:]).strip()
+            requirement = item.group("title").strip()
+            if extra:
+                requirement = f"{requirement}\n{extra}".strip()
+            unit_title = re.split(r"[，,。；;]", requirement, maxsplit=1)[0].strip()
             units.append(
                 _make_unit(
                     f"{_item_prefix(title)}{numeral}",
                     "条",
                     unit_title,
-                    _first_sentence(body),
+                    requirement,
                     numeral,
                     f"《{title}》{numeral}",
+                    start=paragraph["start"],
+                    end=paragraph["end"],
+                    evidence_quote=paragraph["quote"],
                 )
             )
             seen_intro = True
+            index += 1
             continue
         if not seen_intro:
-            units.append(_make_unit("通知正文", "正文", title, paragraph, "", f"《{title}》正文"))
+            units.append(
+                _make_unit(
+                    "通知正文",
+                    "正文",
+                    title,
+                    body,
+                    "",
+                    f"《{title}》正文",
+                    start=paragraph["start"],
+                    end=paragraph["end"],
+                    evidence_quote=paragraph["quote"],
+                )
+            )
             seen_intro = True
+            index += 1
             continue
-        if any(marker in paragraph for marker in _REPORT_MARKERS):
-            units.append(_make_unit("报送要求", "段落", "排查情况报送要求", paragraph, "", f"《{title}》报送要求段落"))
+        if any(marker in body for marker in _REPORT_MARKERS):
+            units.append(
+                _make_unit(
+                    "报送要求",
+                    "段落",
+                    "排查情况报送要求",
+                    body,
+                    "",
+                    f"《{title}》报送要求段落",
+                    start=paragraph["start"],
+                    end=paragraph["end"],
+                    evidence_quote=paragraph["quote"],
+                )
+            )
+        index += 1
     deduped: list[dict[str, Any]] = []
     seen_names: set[str] = set()
     for unit in units:
@@ -218,6 +371,123 @@ def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
         seen_names.add(unit["name"])
         deduped.append(unit)
     return deduped
+
+
+def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
+    """按 golden 口径切分：通知正文 / 条 / 段落 / 附件。"""
+    return parse_official_body_units(text, title)
+
+
+def _processing_form_chunk(chunk: Any) -> bool:
+    text_head = str(getattr(chunk, "text", "") or "")[:800]
+    name_source = " ".join(
+        str(item)
+        for item in (
+            getattr(chunk, "document_id", "") or "",
+            str((getattr(chunk, "metadata", None) or {}).get("source_file") or ""),
+        )
+        if item
+    )
+    if "收文处理单" in text_head or "收文处理单" in name_source:
+        return True
+    return "表单" in name_source and any(marker in text_head for marker in ("来文字号", "拟办意见", "领导批示"))
+
+
+def _document_title_in_text(text: str) -> str:
+    for raw in (text or "").splitlines():
+        body = _line_body(raw.strip()).strip().rstrip("。")
+        match = _DOC_TITLE.search(body) or _DOC_TITLE.search(f"\n{body}")
+        if match:
+            return re.sub(r"\s+", "", match.group("title")).rstrip("。")
+    return ""
+
+
+def _assign_property(properties: dict[str, Any], schema: Any, class_id: str, value: Any, *symbols: str) -> None:
+    if value in (None, ""):
+        return
+    for symbol in symbols:
+        prop = schema.resolve_property(class_id, symbol)
+        if prop is not None:
+            properties[prop.identifier] = value
+            return
+
+
+def add_official_document_units(
+    pool: Any,
+    manager: ChunkContextManager,
+    plan: ExtractionPlan | None = None,
+    warnings: list[dict[str, Any]] | None = None,
+) -> int:
+    """把公文正文结构单元写入候选池。区间留在各自 chunk 内，处理单不产生正文单元。"""
+    schema = getattr(pool, "schema", None)
+    if schema is None or schema.resolve_class("DocumentUnit") is None:
+        return 0
+    class_id = schema.resolve_class("DocumentUnit").identifier
+    allowed = set(getattr(pool, "allowed_types", ()) or ())
+    if plan is not None:
+        allowed = allowed or set(getattr(plan, "allowed_types", ()) or ())
+    if class_id not in allowed:
+        return 0
+    titles = []
+    for chunk in manager:
+        if _processing_form_chunk(chunk):
+            continue
+        found = _document_title_in_text(chunk.text or "")
+        if found and found not in titles:
+            titles.append(found)
+    shared_title = titles[0] if len(titles) == 1 else ""
+    added = 0
+    for chunk in manager:
+        if _processing_form_chunk(chunk):
+            continue
+        text = chunk.text or ""
+        title = _document_title_in_text(text) or shared_title
+        units = parse_official_body_units(text, title)
+        if not units:
+            continue
+        if title and not any(unit["unit_type"] == "条" or unit["name"] in {"报送要求", "附件列表", "通知正文"} for unit in units):
+            continue
+        for unit in units:
+            start = int(unit.get("start") or 0)
+            end = int(unit.get("end") or 0)
+            if not (0 <= start < end <= len(text)):
+                continue
+            quote = text[start:end]
+            if not quote.strip():
+                continue
+            properties: dict[str, Any] = {}
+            _assign_property(properties, schema, class_id, unit.get("unit_id") or unit["name"], "unitId", "单元标识")
+            _assign_property(properties, schema, class_id, unit.get("unit_location") or "", "unitLocation", "原文位置", "location")
+            _assign_property(properties, schema, class_id, unit.get("unit_type") or "", "unitType", "单元类型")
+            _assign_property(properties, schema, class_id, unit.get("unit_title") or "", "unitTitle", "单元标题")
+            _assign_property(properties, schema, class_id, unit.get("unit_order") or "", "unitOrder", "顺序号")
+            _assign_property(properties, schema, class_id, unit.get("original_text") or "", "originalText", "原文内容")
+            before = pool.entity_candidate_count
+            created = pool.add_entity(
+                EntityCandidate(
+                    candidate_id="",
+                    proposed_type=class_id,
+                    canonical_type=class_id,
+                    name=str(unit["name"]),
+                    properties=properties,
+                    evidence=[
+                        Evidence(
+                            span_id=f"{chunk.chunk_id}:{start}:{end}",
+                            source_block_ids=[chunk.chunk_id],
+                            quote=quote,
+                            start_char=start,
+                            end_char=end,
+                            evidence_type="structural",
+                        )
+                    ],
+                    source="official_structure",
+                    mentions=[str(unit.get("original_text") or quote)],
+                ),
+                warnings=warnings,
+            )
+            if created is not None and pool.entity_candidate_count > before:
+                added += 1
+    return added
 
 
 class OfficialDocumentExtractionStrategy:
@@ -266,7 +536,7 @@ class OfficialDocumentExtractionStrategy:
                         "rel_type": "HAS_PART",
                         "to_type": "DocumentUnit",
                         "to_name": unit.get("name", unit.get("unit_id", "")),
-                        "evidence": {"quote": unit.get("original_text", unit.get("unit_title", ""))},
+                        "evidence": {"quote": unit.get("evidence_quote") or unit.get("original_text") or unit.get("unit_title", "")},
                     }
                 )
         return {"entities": entities, "relations": relations}
@@ -327,7 +597,7 @@ class OfficialDocumentExtractionStrategy:
             "type": "DocumentUnit",
             "name": unit.get("name", unit.get("unit_id", "")),
             "properties": properties,
-            "evidence": {"quote": unit.get("original_text", unit.get("unit_title", ""))},
+            "evidence": {"quote": unit.get("evidence_quote") or unit.get("original_text") or unit.get("unit_title", "")},
         }
 
     # ─────────────────────────── Coverage Audit（§12.4/§12.6） ───────────────────────────
@@ -479,4 +749,8 @@ def _chunk_has_document_unit(chunk: Any, entities: list[dict[str, Any]]) -> bool
 STRATEGY_REGISTRY["official_document"] = OfficialDocumentExtractionStrategy()
 
 
-__all__ = ["OfficialDocumentExtractionStrategy"]
+__all__ = [
+    "OfficialDocumentExtractionStrategy",
+    "add_official_document_units",
+    "parse_official_body_units",
+]

@@ -27,6 +27,14 @@ _CJK_GAP = re.compile(r"(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])")
 _PUBLICATION_DATE = re.compile(r"(?m)^(?P<date>\d{4}-\d{2}-\d{2})\s*发布\s*$")
 _IMPLEMENTATION_DATE = re.compile(r"(?m)^(?P<date>\d{4}-\d{2}-\d{2})\s*实施\s*$")
 _PURPOSE = re.compile(r"本文件规定了(?P<body>[^。]+。)")
+_OFFICIAL_TITLE_LINE = re.compile(
+    r"^(?:#+\s*)?(?P<title>(?:关于印发|关于开展|关于同意|关于做好|关于进一步|关于切实|关于全面|关于组织|关于)"
+    r".{2,160}?(?:的通知|的公告|的决定|的意见|的办法|的规定|的批复|的请示|的报告|的函))[。]?$"
+)
+_OFFICIAL_NUMBER = re.compile(
+    r"(?P<number>[\u3400-\u9fffA-Za-z0-9]{1,30}?[〔\[［（(]\s*\d{4}\s*[〕\]］）)]\s*\d+\s*号)"
+)
+_SOURCE_ORG = re.compile(r"(?:来文单位|米文单位|发文机关|印发机关)[：:]\s*(?P<org>[^。\n<|]+)")
 
 
 def _symbols(prop: Any) -> str:
@@ -223,6 +231,91 @@ def _anchored_h1(chunks: list[Any]) -> tuple[Any, int, str, str, str, int, int] 
     return anchored[0]
 
 
+def _is_official_document_class(cls: Any) -> bool:
+    symbols = " ".join(
+        (
+            str(getattr(cls, "class_id", None) or getattr(cls, "identifier", "") or ""),
+            str(getattr(cls, "display_name", "") or ""),
+        )
+    )
+    lowered = symbols.casefold()
+    if re.search(r"标准|standard", lowered):
+        return False
+    return bool(re.search(r"公文|officialdocument", lowered))
+
+
+def _official_title_on_line(line: str) -> str | None:
+    stripped = line.strip()
+    heading = _HEADING.match(stripped)
+    body = heading.group("body").strip() if heading else stripped.lstrip("#").strip()
+    match = _OFFICIAL_TITLE_LINE.match(body.rstrip("。").strip() + ("" if body.endswith("。") else ""))
+    if match is None:
+        match = _OFFICIAL_TITLE_LINE.match(re.sub(r"\s+", "", body).rstrip("。"))
+    if match is None:
+        return None
+    return re.sub(r"\s+", "", match.group("title")).rstrip("。")
+
+
+def _official_number_near(text: str, title_offset: int) -> str:
+    lines: list[tuple[int, str]] = []
+    offset = 0
+    for raw in text.splitlines(keepends=True):
+        lines.append((offset, raw.rstrip("\r\n")))
+        offset += len(raw)
+    title_index = 0
+    for index, (line_offset, _) in enumerate(lines):
+        if line_offset <= title_offset:
+            title_index = index
+    ranked: list[tuple[int, str]] = []
+    for index, (_, line) in enumerate(lines):
+        stripped = line.strip().rstrip("。")
+        match = _OFFICIAL_NUMBER.search(stripped)
+        if match is None or len(stripped) > 40:
+            continue
+        number = re.sub(r"\s+", "", match.group("number"))
+        ranked.append((abs(index - title_index), number))
+    if not ranked:
+        return ""
+    ranked.sort()
+    return ranked[0][1]
+
+
+def _anchored_official(chunks: list[Any]) -> tuple[Any, int, str, str, str, int, int] | None:
+    """唯一公文标题锚点。文号取标题附近的发文字号，不要求标准编号。"""
+    hits: list[tuple[bool, bool, Any, int, str, str, int, int]] = []
+    for chunk in chunks:
+        text = chunk.text or ""
+        form = "收文处理单" in text[:800] or (
+            "表单" in str((getattr(chunk, "metadata", None) or {}).get("source_file") or "")
+            and "拟办意见" in text[:800]
+        )
+        offset = 0
+        for raw in text.splitlines(keepends=True):
+            line = raw.rstrip("\r\n")
+            title = _official_title_on_line(line)
+            if title:
+                content_start = offset + (len(line) - len(line.lstrip()))
+                content_end = offset + len(line.rstrip())
+                heading = bool(_HEADING.match(line.strip()))
+                hits.append((form, not heading, chunk, content_start, line.strip(), title, content_start, content_end))
+            offset += len(raw)
+    if not hits:
+        return None
+    titles = {re.sub(r"\s+", "", item[5]) for item in hits}
+    if len(titles) != 1:
+        return None
+    hits.sort(key=lambda item: (item[0], item[1]))
+    form, _, chunk, start, line, title, evidence_start, evidence_end = hits[0]
+    del form
+    number = _official_number_near(chunk.text or "", start)
+    if not number:
+        for other in chunks:
+            number = _official_number_near(other.text or "", 0)
+            if number:
+                break
+    return chunk, start, line, number, title, evidence_start, evidence_end
+
+
 def _candidate(
     *, class_id: str, name: str, properties: dict[str, Any], chunk_id: str,
     start: int, end: int, quote: str, source: str,
@@ -249,19 +342,40 @@ def enrich_document_entities(
     cls, number_prop, title_prop = spec
     class_id = _class_id(cls)
     chunks = list(manager)
+    official = False
     anchored = _anchored_h1(chunks)
+    if anchored is None and _is_official_document_class(cls):
+        anchored = _anchored_official(chunks)
+        official = anchored is not None
     if anchored is None:
         summary["abstained"] = True
         return summary
     chunk, _, _, number, title, evidence_start, evidence_end = anchored
-    properties = {_property_id(number_prop): number, _property_id(title_prop): title}
-    properties.update(_document_metadata_properties(pool, class_id, number, chunks))
+    if official:
+        properties = {}
+        _set_property(properties, pool.schema, class_id, "文件标题", title)
+        _set_property(properties, pool.schema, class_id, "documentTitle", title)
+        if number:
+            _set_property(properties, pool.schema, class_id, "来文字号", number)
+            _set_property(properties, pool.schema, class_id, "sourceDocumentNumber", number)
+        org = _SOURCE_ORG.search("\n".join(str(item.text or "") for item in chunks))
+        if org is not None:
+            _set_property(properties, pool.schema, class_id, "来文单位", org.group("org").strip())
+            _set_property(properties, pool.schema, class_id, "sourceOrganization", org.group("org").strip())
+        summary["anchor_kind"] = "official_document"
+    else:
+        properties = {_property_id(number_prop): number, _property_id(title_prop): title}
+        properties.update(_document_metadata_properties(pool, class_id, number, chunks))
+        summary["anchor_kind"] = "standard"
     evidence_quote = (chunk.text or "")[evidence_start:evidence_end]
     # 展示名与评测 golden / official_document_strategy 对齐：优先文件标题，文号只进属性。
     display_name = (title or "").strip() or (number or "").strip()
-    primary = pool.add_entity(_candidate(class_id=class_id, name=display_name, properties=properties,
-                                         chunk_id=chunk.chunk_id, start=evidence_start, end=evidence_end,
-                                         quote=evidence_quote, source="document_anchor"), warnings=warnings)
+    anchor = _candidate(class_id=class_id, name=display_name, properties=properties,
+                        chunk_id=chunk.chunk_id, start=evidence_start, end=evidence_end,
+                        quote=evidence_quote, source="document_anchor")
+    visible = evidence_quote.strip().lstrip("#").strip()
+    anchor.mentions = [item for item in (visible, display_name) if item]
+    primary = pool.add_entity(anchor, warnings=warnings)
     if primary is None:
         summary["abstained"] = True
         return summary

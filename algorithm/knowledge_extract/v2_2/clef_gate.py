@@ -32,17 +32,111 @@ _STAT_KEYS = (
     "verification_fallback_llm",
     "unavailable",
     "repair_required_relation_skipped",
+    "relation_kept_anchor",
+    "relation_kept_same_sentence",
+    "relation_kept_same_unit",
+    "relation_kept_adjacent_unit",
+    "relation_kept_same_paragraph",
+    "relation_kept_adjacent_paragraph",
 )
 
 
 def sentence_cooccurrence(text: str, left: str, right: str) -> bool:
     """两端名称是否出现在同一句（用于裁掉无局部证据的笛卡尔 pair）。"""
-    if not text or not left or not right or left not in text or right not in text:
+    return surface_cooccurrence(text, [left], [right])
+
+
+def surface_cooccurrence(text: str, left_forms: list[str], right_forms: list[str]) -> bool:
+    """任一表面形式是否出现在同一句。规范名未逐字出现时，原文 mention 仍可共现。"""
+    if not text:
+        return False
+    left = [form for form in left_forms if form and form in text]
+    right = [form for form in right_forms if form and form in text]
+    if not left or not right:
         return False
     for sentence in _SENTENCE.findall(text):
-        if left in sentence and right in sentence:
+        if any(form in sentence for form in left) and any(form in sentence for form in right):
             return True
     return False
+
+
+def paragraph_spans(text: str) -> list[tuple[int, int]]:
+    """按空行切出段落的字符区间，区间相对传入文本。"""
+    spans: list[tuple[int, int]] = []
+    start: int | None = None
+    end = 0
+    offset = 0
+    for raw in (text or "").splitlines(keepends=True):
+        line = raw.rstrip("\r\n")
+        if line.strip():
+            content_start = offset + (len(line) - len(line.lstrip()))
+            content_end = offset + len(line.rstrip())
+            if start is None:
+                start = content_start
+            end = content_end
+        elif start is not None:
+            spans.append((start, end))
+            start = None
+        offset += len(raw)
+    if start is not None:
+        spans.append((start, end))
+    return spans
+
+
+def _span_index(spans: list[tuple[int, int]], start: int | None, end: int | None) -> int | None:
+    if start is None or end is None or start >= end:
+        return None
+    for index, (span_start, span_end) in enumerate(spans):
+        if start < span_end and end > span_start:
+            return index
+    return None
+
+
+# 没有空行的正文切片会变成一整段。超过该长度时，同段只保留证据位置接近的两端。
+_LONG_PARAGRAPH_CHARS = 480
+_LONG_PARAGRAPH_GAP = 120
+
+
+def _span_gap(left: tuple[int, int], right: tuple[int, int]) -> int:
+    return max(left[0], right[0]) - min(left[1], right[1])
+
+
+def local_context_reason(
+    text: str,
+    left_span: tuple[int, int] | None,
+    right_span: tuple[int, int] | None,
+    unit_spans: list[tuple[int, int]] | None = None,
+) -> str:
+    """同结构单元或相邻段落可以进入关系分类；更远的共现不作为证据。"""
+    if not left_span or not right_span:
+        return ""
+    units = sorted(unit_spans or [])
+    left_unit = _span_index(units, *left_span)
+    right_unit = _span_index(units, *right_span)
+    if left_unit is not None and right_unit is not None:
+        distance = abs(left_unit - right_unit)
+        if distance == 0:
+            return "same_unit"
+        if distance == 1:
+            return "adjacent_unit"
+        # 两端已经落在不相邻的结构单元里。无空行的正文切片会被看成一整段，
+        # 不能再据此把远处的单元配成同段候选。
+        return ""
+    paragraphs = paragraph_spans(text)
+    left_paragraph = _span_index(paragraphs, *left_span)
+    right_paragraph = _span_index(paragraphs, *right_span)
+    if left_paragraph is None or right_paragraph is None:
+        return ""
+    distance = abs(left_paragraph - right_paragraph)
+    if distance > 1:
+        return ""
+    involved = {left_paragraph, right_paragraph}
+    if any(
+        paragraphs[index][1] - paragraphs[index][0] > _LONG_PARAGRAPH_CHARS
+        for index in involved
+    ) and _span_gap(left_span, right_span) > _LONG_PARAGRAPH_GAP:
+        return ""
+    return "same_paragraph" if distance == 0 else "adjacent_paragraph"
 
 
 def cooccurrence_quote(text: str, left: str, right: str, *, max_len: int = 400) -> str | None:
@@ -207,8 +301,8 @@ class ClefGate:
         for pair in pairs:
             window, both = mention_window(
                 text,
-                str(pair.get("source_name") or ""),
-                str(pair.get("target_name") or ""),
+                str(pair.get("source_surface") or pair.get("source_name") or ""),
+                str(pair.get("target_surface") or pair.get("target_name") or ""),
                 self.state_chars,
             )
             grouped.setdefault(window, []).append(pair)
@@ -257,8 +351,8 @@ class ClefGate:
                     continue
                 quote = cooccurrence_quote(
                     text,
-                    str(pair.get("source_name") or ""),
-                    str(pair.get("target_name") or ""),
+                    str(pair.get("source_surface") or pair.get("source_name") or ""),
+                    str(pair.get("target_surface") or pair.get("target_name") or ""),
                 )
                 if quote:
                     grounded.append((pair, quote))

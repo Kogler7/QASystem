@@ -34,6 +34,7 @@ _SOURCE_PRIORITY = {
     "content_element": 2,
     "normative_reference": 3,
     "document_anchor": 4,
+    "official_structure": 1,
 }
 
 
@@ -447,6 +448,11 @@ def merge_candidate(existing: Any, incoming: Any) -> None:
         evidence_key = (evidence.span_id, evidence.quote)
         if not any((item.span_id, item.quote) == evidence_key for item in existing.evidence):
             existing.evidence.append(evidence)
+    merged_mentions = list(getattr(existing, "mentions", []) or [])
+    for mention in getattr(incoming, "mentions", []) or []:
+        if mention and mention not in merged_mentions:
+            merged_mentions.append(mention)
+    existing.mentions = merged_mentions
     existing.warnings.extend(incoming.warnings)
 
 
