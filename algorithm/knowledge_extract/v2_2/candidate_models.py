@@ -25,6 +25,8 @@ class EntityCandidate:
     resolution_method: str = "new_entity"
     resolution_methods: list[str] = field(default_factory=list)
     property_conflicts: list[dict[str, Any]] = field(default_factory=list)
+    # 规范名称在 name；mentions 只保留能在原文中定位的表面形式。
+    mentions: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {

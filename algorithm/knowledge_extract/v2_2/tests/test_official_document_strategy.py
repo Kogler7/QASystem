@@ -113,20 +113,27 @@ class DeterministicExtractionTest(unittest.TestCase):
     def test_document_units_match_gold_01(self) -> None:
         # v2/v3 均采用语义单元命名：DocumentUnit 按语义命名（如「通知正文」「排查要求一」），
         # 与 test_data/eval-v2、eval-v3 official golden 的命名约定一致（DU-XXX 编号已废弃）。
-        # 该 fixture 为单 chunk 摘录，确定性结构只切出正文一个单元；完整公文的
-        # 条款级切分见 benchmark golden。
         text = case_text("02_official_document")
         manager = CC.ChunkContextManager([CC.ExtractionChunk(chunk_id="chunk-0", text=text)])
         request = CC.ExtractionRequest(chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=text)])
         result = self.strategy.deterministic_extraction(self.plan, manager, request)
         units = [entity for entity in result["entities"] if entity["type"] == "DocumentUnit"]
-        self.assertEqual([unit["name"] for unit in units], ["通知正文"])
-        unit = units[0]
-        self.assertEqual(unit["properties"]["unitType"], "正文")
-        self.assertTrue(unit["properties"]["originalText"])
-        self.assertTrue(unit["evidence"]["quote"])
+        self.assertEqual(
+            [unit["name"] for unit in units],
+            ["通知正文", "排查要求一", "排查要求二", "排查要求三", "排查要求四", "排查要求五"],
+        )
+        intro = units[0]
+        self.assertEqual(intro["properties"]["unitType"], "正文")
+        self.assertIn("专项排查", intro["properties"]["originalText"])
+        requirement = units[2]
+        self.assertIn("境外企业", requirement["properties"]["originalText"])
+        self.assertIn("境外人员", requirement["properties"]["originalText"])
+        self.assertIn("未经集团批准", requirement["properties"]["originalText"])
+        for unit in units:
+            self.assertTrue(unit["evidence"]["quote"])
+            self.assertIsNotNone(manager.find_span("chunk-0", unit["evidence"]["quote"]))
         has_part = [r for r in result["relations"] if r["rel_type"] == "HAS_PART"]
-        self.assertEqual(len(has_part), 1)  # 单 chunk 摘录只切出正文一个结构单元
+        self.assertEqual(len(has_part), len(units))
 
     def test_respects_target_scope(self) -> None:
         plan = OC.compile_plan(OFFICIAL_ONTOLOGY, target_types=["OperationalActivity"])
@@ -234,6 +241,128 @@ class IntegrationTest(unittest.TestCase):
         emitted = {(type_id, canonical(name)) for type_id, name in verbatim}
         self.assertLessEqual(emitted, pred_keys)
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
+
+
+class OfficialBodyStructureTest(unittest.TestCase):
+    def test_notice_body_yields_eight_units_with_spans(self) -> None:
+        notice = Path(__file__).resolve().parents[4] / "test_data" / "eval" / "official" / "official_01" / "parse" / "关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.md"
+        text = notice.read_text(encoding="utf-8")
+        title = "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知"
+        units = OD.parse_official_body_units(text, title)
+        self.assertEqual(
+            [unit["name"] for unit in units],
+            ["通知正文", "排查要求一", "排查要求二", "排查要求三", "排查要求四", "排查要求五", "报送要求", "附件列表"],
+        )
+        second = next(unit for unit in units if unit["name"] == "排查要求二")
+        self.assertIn("境外企业", second["original_text"])
+        self.assertIn("境外人员", second["original_text"])
+        self.assertIn("严禁", second["original_text"])
+        third = next(unit for unit in units if unit["name"] == "排查要求三")
+        self.assertIn("未经本企业充分论证和安全测试", third["original_text"])
+        self.assertIn("不得部署", third["original_text"])
+        report = next(unit for unit in units if unit["name"] == "报送要求")
+        self.assertIn("2026年4月10日", report["original_text"])
+        for unit in units:
+            quote = text[unit["start"] : unit["end"]]
+            self.assertEqual(quote, unit["evidence_quote"])
+            self.assertIn(unit["original_text"].splitlines()[0][:12], quote)
+
+
+class MentionCandidateTest(unittest.TestCase):
+    def test_summary_name_in_same_paragraph_is_not_pruned(self) -> None:
+        text = "对于网络安全防护等级三级及以上网络系统，未经批准，不得部署安装各类开源智能体。"
+        plan = OC.compile_plan("""@startuml
+class OperationalActivity { name: String }
+class OperationalConstraint { name: String }
+OperationalConstraint --> OperationalActivity : CONSTRAINS_ACTIVITY
+@enduml
+""")
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        activity = types.SimpleNamespace(
+            candidate_id="a1",
+            canonical_type="OperationalActivity",
+            proposed_type="OperationalActivity",
+            name="高等级网络系统部署管控",
+            source="",
+            mentions=[],
+            properties={},
+            evidence=[EV.Evidence(
+                span_id="c0:0:1",
+                source_block_ids=["c0"],
+                quote="不得部署安装各类开源智能体",
+                start_char=text.index("不得部署安装各类开源智能体"),
+                end_char=text.index("不得部署安装各类开源智能体") + len("不得部署安装各类开源智能体"),
+            )],
+        )
+        constraint = types.SimpleNamespace(
+            candidate_id="c1",
+            canonical_type="OperationalConstraint",
+            proposed_type="OperationalConstraint",
+            name="未经批准不得部署",
+            source="",
+            mentions=[],
+            properties={},
+            evidence=[EV.Evidence(
+                span_id="c0:0:2",
+                source_block_ids=["c0"],
+                quote="未经批准，不得部署安装各类开源智能体",
+                start_char=text.index("未经批准"),
+                end_char=len(text) - 1,
+            )],
+        )
+
+        class _Pool:
+            def accepted_entities(self):
+                return [activity, constraint]
+
+            def entity_catalog(self):
+                return [
+                    {"id": activity.candidate_id, "type": activity.canonical_type, "name": activity.name},
+                    {"id": constraint.candidate_id, "type": constraint.canonical_type, "name": constraint.name},
+                ]
+
+        candidate_generation = sys.modules["knowledge_extract_v22.candidate_generation"]
+        prompt_router = sys.modules["knowledge_extract_v22.prompt_router"]
+        clef_gate = sys.modules["knowledge_extract_v22.clef_gate"]
+        llm = StubLLM()
+        results = candidate_generation.relation_pass(
+            plan,
+            CC.ChunkContextManager([chunk]),
+            CC.ExtractionRequest(chunks=[chunk]),
+            llm,
+            _Pool(),
+            route=prompt_router.resolve_document_route(plan, [chunk]),
+            max_workers=1,
+            use_scheduler=False,
+            attempts=[],
+            warnings=[],
+            local_previous=0,
+            local_next=0,
+            same_section=True,
+            clef=clef_gate.ClefGate(enabled=False),
+        )
+        self.assertTrue(results[0][1] or llm.calls)
+
+
+class OfficialAnchorTest(unittest.TestCase):
+    def test_notice_title_becomes_document_anchor(self) -> None:
+        text = case_text("02_official_document")
+        chunk = CC.ExtractionChunk(chunk_id="chunk-0", text=text)
+        manager = CC.ChunkContextManager([chunk])
+        plan = OC.compile_plan(OFFICIAL_ONTOLOGY)
+        schema = MODULES["ontology_schema"].OntologySchema.parse(OFFICIAL_ONTOLOGY)
+        pool = sys.modules["knowledge_extract_v22.entity_resolver"].CandidatePool(
+            schema, allowed_types=plan.allowed_types, manager=manager,
+        )
+        summary = sys.modules["knowledge_extract_v22.document_entities"].enrich_document_entities(
+            pool, manager, plan,
+        )
+        self.assertFalse(summary["abstained"])
+        self.assertEqual(summary["anchor_kind"], "official_document")
+        documents = [entity for entity in pool.accepted_entities() if entity.source == "document_anchor"]
+        self.assertEqual(len(documents), 1)
+        self.assertEqual(documents[0].name, "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知")
+        self.assertIn("中车集团办科信〔2026〕18号", documents[0].properties.values())
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ V2 只消费上游已解析、已切分的 `ExtractionChunk`，不接收完整 M
 ```
 
 评测 runner 使用上游 `knowledge_pipeline` 切块，再通过 `extract_harness` 获取内部诊断信息。
-`candidate_generation.py` 与 `prompt_router.py` 共同定义单一基础 chat prompt：所有实体、关系和修复调用都使用共享 system message 与统一 user 模板，领域差异只来自自动路由解析出的 domain extension。
+实体、属性和修复仍走共享 system message。关系阶段在实体冻结后按本体签名召回局部证据候选，再小批分类；领域差异只来自自动路由解析出的 domain extension。当前步骤见 [V2.2 抽取逻辑](../../../docs/算法/知识抽取V2.2抽取逻辑.md)。
 
 ## Benchmark 校验与评测
 
@@ -58,6 +58,7 @@ LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写�
 
 ## 设计与运维文档
 
+- [V2.2 抽取逻辑](../../../docs/算法/知识抽取V2.2抽取逻辑.md)
 - [V2.2 Clef 优化设计](../../../docs/算法/知识抽取V2.2-Clef优化.md)
 - [V3.1 流程说明](../../../docs/算法/知识抽取V3.1流程说明.md)
 - [V3.1 代码审查](../../../docs/算法/知识抽取V3.1全流程代码审查-2026-10-11.md)

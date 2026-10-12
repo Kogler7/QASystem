@@ -59,7 +59,7 @@ BASE_SYSTEM_PROMPT = """KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4
 - 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。
 """
 
-OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v5
+OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v6
 领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。
 这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。
 
@@ -72,7 +72,9 @@ OFFICIAL_DOCUMENT_PROMPT_EXTENSION = """OFFICIAL_DOCUMENT_PROMPT_EXTENSION v5
   · 例如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“高等级网络系统部署管控”“其他网络系统风险防范”“安全监测与事件处置”“报送排查反馈表”各为一个活动。
   · 又如“……按照任务分工进行分解落实、健全项目管理机制、加强资源投入、确保按计划完成项目实施、打造人工智能高质量数据集建设标杆示范”这类并列动宾，应各自抽为一个活动。
   · 不要把“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”这类同一动宾事项的状语/结果短语再拆成独立活动。
-- 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不应把其中的动作短语拆成 OperationalActivity。
+- 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不应把其中的动作短语拆成 OperationalActivity。约束原文要保留条件和禁止语义，例如“未经论证和测试、未经批准，不得部署”。
+- 区分执行主体、接收部门和联系人：报送、报告的接收方是 targetAgent 或接收部门，不要写成执行该活动的主体；联系人不是运行主体，除非原文明确赋责。
+- “各企业”等指代在证据支持时对应通知的适用单位，不要另造一个无原文的组织。
 - 不要把风险描述中的“病毒”“内部系统”“邮箱”等普通名词都抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。
 
 公文表单/收文处理单规则：
@@ -557,6 +559,29 @@ def format_relation_pair_line(pair: dict[str, Any]) -> str:
     target_name = _clip_pair_name(pair.get("target_name"))
     if source_name or target_name:
         line += f" 「{source_name}」→「{target_name}」"
+    source_mentions = [
+        _clip_pair_name(item)
+        for item in (pair.get("source_mentions") or [])
+        if _clip_pair_name(item) and _clip_pair_name(item) != source_name
+    ]
+    target_mentions = [
+        _clip_pair_name(item)
+        for item in (pair.get("target_mentions") or [])
+        if _clip_pair_name(item) and _clip_pair_name(item) != target_name
+    ]
+    if source_mentions or target_mentions:
+        line += " mention「" + "、".join(source_mentions[:2]) + "」→「" + "、".join(target_mentions[:2]) + "」"
+    context_labels = {
+        "anchor": "文档锚点",
+        "same_sentence": "同句",
+        "same_unit": "同结构单元",
+        "adjacent_unit": "相邻结构单元",
+        "same_paragraph": "同段",
+        "adjacent_paragraph": "相邻段",
+    }
+    context = context_labels.get(str(pair.get("context_reason") or ""))
+    if context:
+        line += f" 上下文={context}"
     comments = pair.get("relation_comments") if isinstance(pair.get("relation_comments"), dict) else {}
     glosses = [
         f"{relation_id}={comments[relation_id]}"
@@ -682,9 +707,10 @@ def build_chat_messages(
         entity_rules = """
 - 每项只能包含 pair_id、label、evidence.quote。
 - label 只能是该 pair 方括号里的关系标识；方括号中用 | 分隔时只能选其中一个。不能选其它 pair 的关系。
-- 先看「」中的两个名称：原文没有支持这对实体的对应关系时，label 必须是 NONE。
+- 「」中是规范名称。若同一行给出 mention，用原文 mention 判断关系；规范名称没有逐字出现不是选择 NONE 的理由。
+- 原文没有支持这对实体的对应关系时，label 必须是 NONE。
 - NONE 不产生关系。pair_id 必须来自候选 pair；禁止输出新端点、新 pair 或其他关系。
-- evidence.quote 必须是 current chunk.text 中逐字连续、能同时支撑两端名称的原文；没有这样的原文时选择 NONE。"""
+- evidence.quote 必须是 current chunk.text 中的逐字连续片段。同句关系引用该句；跨句关系引用同时覆盖两侧证据位置的最短连续原文。找不到这样的原文时选择 NONE。"""
 
     user = f"""## task
 {task}
@@ -730,6 +756,88 @@ kind={route.kind}; source={route.source}; reasons={', '.join(route.reasons)}
     ]
 
 
+def build_relation_task_messages(
+    *,
+    plan: ExtractionPlan,
+    route: DocumentRoute,
+    candidates: list[dict[str, Any]] | list[Any],
+    fragments: list[Any],
+    output_schema: dict[str, Any],
+) -> ChatMessages:
+    """关系小任务：只给出本批端点、一种或几种已固定的候选，以及这些候选的原文片段。"""
+    system = BASE_SYSTEM_PROMPT
+    if route.prompt_extension:
+        system = f"{system}\n\n{route.prompt_extension}"
+    candidate_lines = []
+    for item in candidates:
+        if isinstance(item, dict):
+            candidate_id = item["candidate_id"]
+            source_id = item["source_id"]
+            source_type = item["source_type"]
+            target_id = item["target_id"]
+            target_type = item["target_type"]
+            relation_key = item.get("relation_key") or item.get("relation_id")
+            source_name = item.get("source_name") or ""
+            target_name = item.get("target_name") or ""
+            comment = item.get("comment") or ""
+        else:
+            candidate_id = item.candidate_id
+            source_id = item.source_id
+            source_type = item.source_type
+            target_id = item.target_id
+            target_type = item.target_type
+            relation_key = item.relation_key
+            source_name = item.source_name
+            target_name = item.target_name
+            comment = item.comment
+        line = (
+            f"- `{candidate_id}`: {source_id}({source_type}) "
+            f"-[{relation_key}]-> {target_id}({target_type}) "
+            f"「{_clip_pair_name(source_name)}」→「{_clip_pair_name(target_name)}」"
+        )
+        if comment:
+            line += f" （{relation_key}={comment}）"
+        candidate_lines.append(line)
+    document_lines: list[str] = []
+    for fragment in fragments:
+        fragment_id = fragment["fragment_id"] if isinstance(fragment, dict) else fragment.fragment_id
+        chunk_id = fragment["chunk_id"] if isinstance(fragment, dict) else fragment.chunk_id
+        text = fragment["text"] if isinstance(fragment, dict) else fragment.text
+        document_lines.append(f"- `{fragment_id}` chunk=`{chunk_id}`")
+        document_lines.append(str(text))
+    user = f"""## task
+relation
+
+## task discipline
+只判断下面列出的候选关系。关系类型和两端实体已经固定，禁止创建新端点、新候选或未列出的关系。
+
+## output contract
+每个 candidate_id 必须返回一条决策，status 只能是 supported、not_supported 或 insufficient_evidence。
+supported 的 evidence.quote 必须是本次 documents 中某个片段的逐字连续原文，并且能支持这条关系，不能只因为两个名称同时出现。
+not_supported 表示这组证据不支持该候选，不是整篇文档证明该关系不存在；此时 evidence 用空数组。
+insufficient_evidence 用于指代不清、引用目标不在本次片段中、条件无法确定。不要输出推理过程。
+
+## ontology catalog
+{chr(10).join(candidate_lines) if candidate_lines else "（无候选）"}
+
+## ontology relation signatures
+（候选行已经给出关系标识和含义；不要改用其它关系）
+
+## output schema
+{json.dumps(output_schema, ensure_ascii=False, sort_keys=True)}
+
+## documents
+{chr(10).join(document_lines) if document_lines else "（无）"}
+
+## resolved route
+kind={route.kind}; ontology={getattr(plan, "ontology_id", "")}
+"""
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+
+
 __all__ = [
     "BASE_SYSTEM_PROMPT",
     "OFFICIAL_DOCUMENT_PROMPT_EXTENSION",
@@ -738,5 +846,6 @@ __all__ = [
     "ChatMessages",
     "DocumentRoute",
     "build_chat_messages",
+    "build_relation_task_messages",
     "resolve_document_route",
 ]

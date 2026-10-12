@@ -4,8 +4,11 @@
 - entity   pass：响应 {"entities": [{type, mention, start_char, end_char, evidence:{quote}}]}，
   mention/quote 必须逐字来自 current chunk；
 - property pass：响应 {"updates": [{entity_id, properties, evidence:{quote}}]}；
-- relation pass：prompt 列出候选 pair（``- `pair-x`: entity-0(T) -[rel]-> entity-1(T)``），
-  响应 {"decisions": [{pair_id, label, evidence:{quote}}]}，label 为 pair 的 relation_id 或 NONE；
+- relation pass：prompt 列出候选（``- `c-x`: entity-0(T) -[rel]-> entity-1(T)``）。
+  新契约响应 {"decisions": [{candidate_id, status, evidence:[{fragment_id, quote}]}]}，
+  status 为 supported / not_supported / insufficient_evidence。
+  测试 handler 仍可返回旧的 {pair_id, label, evidence:{quote}}，StubLLM 会按 schema 转换：
+  label 等于该候选关系或非 NONE 时视为 supported，NONE 视为 not_supported。
 - repair   pass：按 prompt 内 output schema 的顶层 required 键返回空集合。
 
 StubLLM 接收 ChatMessages（list[dict]），按 "## task" 段落路由到对应 handler；
@@ -70,8 +73,64 @@ def output_schema_required(prompt: str) -> list[str]:
 
 
 def parse_relation_pairs(prompt: str) -> list[dict[str, str]]:
-    """解析 relation pass prompt 中枚举的候选 pair。"""
+    """解析 relation pass prompt 中枚举的候选。"""
     return [match.groupdict() for match in _PAIR_ROW.finditer(prompt)]
+
+
+def _output_schema_object(prompt: str) -> dict[str, Any]:
+    lines = prompt.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() == "## output schema" and index + 1 < len(lines):
+            try:
+                schema = json.loads(lines[index + 1])
+            except json.JSONDecodeError:
+                return {}
+            return schema if isinstance(schema, dict) else {}
+    return {}
+
+
+def _default_fragment_id(prompt: str) -> str:
+    match = re.search(r"-\s*`(f[^`]+)`\s+chunk=", prompt)
+    return match.group(1) if match else "f1"
+
+
+def relation_decisions_for_schema(prompt: str, decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """把测试 handler 的旧 label 决策转换成当前关系 schema。"""
+    schema = _output_schema_object(prompt)
+    item = ((schema.get("properties") or {}).get("decisions") or {}).get("items") or {}
+    required = item.get("required") or []
+    if "status" not in required and "candidate_id" not in required:
+        return decisions
+    fragment_id = _default_fragment_id(prompt)
+    pairs = {row["pair_id"]: row for row in parse_relation_pairs(prompt)}
+    converted: list[dict[str, Any]] = []
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            continue
+        if decision.get("status") and decision.get("candidate_id"):
+            evidence = decision.get("evidence")
+            if isinstance(evidence, dict):
+                quote = str(evidence.get("quote") or "")
+                evidence = [{"fragment_id": fragment_id, "quote": quote}] if quote else []
+            converted.append({
+                "candidate_id": str(decision["candidate_id"]),
+                "status": str(decision["status"]),
+                "evidence": evidence if isinstance(evidence, list) else [],
+            })
+            continue
+        pair_id = str(decision.get("pair_id") or decision.get("candidate_id") or "")
+        label = str(decision.get("label") or "")
+        relation_id = str((pairs.get(pair_id) or {}).get("relation_id") or "")
+        if label == "NONE" or not label:
+            status = "not_supported"
+        elif not relation_id or label == relation_id:
+            status = "supported"
+        else:
+            status = "not_supported"
+        quote = str((decision.get("evidence") or {}).get("quote") or "") if isinstance(decision.get("evidence"), dict) else ""
+        evidence = [{"fragment_id": fragment_id, "quote": quote}] if status == "supported" and quote else []
+        converted.append({"candidate_id": pair_id, "status": status, "evidence": evidence})
+    return converted
 
 
 def parse_known_entities(prompt: str) -> list[dict[str, str]]:
@@ -140,7 +199,7 @@ class StubLLM:
             decisions = (
                 self.relation_handler(prompt, pairs, chunk) if self.relation_handler else []
             )
-            payload = {"decisions": decisions}
+            payload = {"decisions": relation_decisions_for_schema(prompt, decisions)}
         else:  # repair 或其他：按 output schema 顶层 required 键返回空集合
             if self.repair_handler is not None:
                 payload = self.repair_handler(prompt, chunk)

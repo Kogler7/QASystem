@@ -47,12 +47,14 @@ MODULES = _load_package_modules(
         "evidence",
         "prompt_router",
         "relation_resolver",
+        "relation_context",
         "candidate_generation",
         "split_extractor",
     ],
 )
 GATE = MODULES["clef_gate"]
 CG = MODULES["candidate_generation"]
+RC = MODULES["relation_context"]
 CC = MODULES["chunk_context"]
 EV = MODULES["evidence"]
 OC = MODULES["ontology_compiler"]
@@ -243,19 +245,72 @@ class ClefGateTest(unittest.TestCase):
         self.assertIn("张三", relations[0]["evidence"]["quote"])
         self.assertEqual(gate.snapshot()["relation_grounded_without_llm"], 1)
 
+    def test_wide_evidence_range_stays_on_the_quote_sentence(self) -> None:
+        text = "甲单位执行。" + ("填充。" * 200) + "丙单位汇总。"
+        entity = types.SimpleNamespace(
+            candidate_id="e-bing",
+            canonical_type="Organization",
+            proposed_type="Organization",
+            name="丙单位",
+            mentions=[],
+            properties={},
+            source="",
+            evidence=[
+                EV.Evidence(
+                    span_id="c0:0:1",
+                    source_block_ids=["c0"],
+                    quote="丙单位",
+                    start_char=0,
+                    end_char=len(text),
+                )
+            ],
+        )
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        index = RC.build_relation_index(
+            [entity],
+            CC.ChunkContextManager([chunk]),
+            local_previous=0,
+            local_next=0,
+            same_section=True,
+        )
+        placed = [
+            unit for unit in index.units
+            if "e-bing" in index.unit_entities[unit.unit_id]
+        ]
+        self.assertEqual(len(placed), 1)
+        self.assertEqual(placed[0].text, "丙单位汇总。")
+        self.assertNotIn("甲单位", placed[0].text)
+
+    def test_distant_units_in_one_paragraph_are_not_same_paragraph(self) -> None:
+        text = "甲单位执行排查。" + ("填充。" * 200) + "丙单位汇总报送。"
+        units = [(0, 8), (40, 80), (len(text) - 9, len(text))]
+        self.assertEqual(
+            GATE.local_context_reason(text, (0, 3), (len(text) - 9, len(text) - 6), units),
+            "",
+        )
+        self.assertEqual(
+            GATE.local_context_reason(text, (0, 3), (41, 44), units),
+            "adjacent_unit",
+        )
+        self.assertEqual(
+            GATE.local_context_reason(text, (0, 3), (len(text) - 9, len(text) - 6), []),
+            "",
+        )
+
     def test_no_cooccurrence_prunes_before_clef_and_llm(self) -> None:
         client = FakeClef(lambda _qid, _question, _state: {
             "type": "choice", "choice": "NONE", "confidence": 0.99,
         })
         gate = GATE.ClefGate(client=client, enabled=True, accept=0.9)
-        # 两端名称各在一句，无共现窗口 → 直接裁掉，不打 Clef/关系 LLM。
+        # 两端名称隔着一段以上，且没有同句 mention → 直接裁掉，不打 Clef/关系 LLM。
+        # 同一段或相邻段不再因为规范名不在同一句就被淘汰。
         _relations, relation_calls, _llm = _relation_pass(
-            "张三在北京。示例单位在上海。",
+            "张三在北京。\n\n中间还有一段说明。\n\n示例单位在上海。",
             gate,
         )
         self.assertEqual(relation_calls, [])
         self.assertEqual(client.calls, [])
-        self.assertGreaterEqual(gate.snapshot()["relation_pruned_no_cooccurrence"], 1)
+        self.assertEqual(_relations, [])
 
     def test_names_absent_from_chunk_are_pruned(self) -> None:
         client = FakeClef(lambda _qid, _question, _state: {
@@ -269,7 +324,7 @@ class ClefGateTest(unittest.TestCase):
         )
         self.assertEqual(relation_calls, [])
         self.assertEqual(client.calls, [])
-        self.assertGreaterEqual(gate.snapshot()["relation_pruned_no_cooccurrence"], 1)
+        self.assertEqual(_relations, [])
 
     def test_low_confidence_and_service_down_use_llm(self) -> None:
         low = GATE.ClefGate(
