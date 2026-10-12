@@ -1,5 +1,6 @@
 """Refine source chunks once using predicted entity-count bands."""
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -19,7 +20,7 @@ _TABLE_SEPARATOR = re.compile(r'^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\
 def _audit(record: dict) -> None:
     """One append per decision, including fallbacks and protected structures."""
     default = Path(__file__).resolve().parents[2] / 'backend/tmp/chunk_entity_decisions.jsonl'
-    path = Path(os.getenv('CHUNK_ENTITY_LOG_PATH', str(default)))
+    path = Path(config_getenv('CHUNK_ENTITY_LOG_PATH', str(default)))
     entry = {'timestamp': datetime.now(timezone.utc).isoformat(), 'pid': os.getpid(), **record}
     data = (json.dumps(entry, ensure_ascii=False) + '\n').encode('utf8')
     try:

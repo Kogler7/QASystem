@@ -1,5 +1,10 @@
 # Repository Delivery Rules
 
+- 应用配置统一从 `docker.configuration` 读取，不得在 Backend、Agent、算法、外部服务适配器、模型服务或 MCP 应用中新增直接的 `os.getenv`、`os.environ.get`、环境下标读取。启动时绑定 GPU、传递子进程环境等进程管理操作不作为业务配置读取入口。
+- 配置声明维护于 `docker/config-declarations.json`，部署默认值仍只在根 `.env.example` 定义；声明版本保存在 `docker/config-releases/`，旧版本不得覆盖。声明包括说明、默认值、消费者、热更新属性和兼容回退表达式。增删消费者、修改默认回退或热更新属性必须登记新声明版本。
+- 发布、打包和部署必须通过 `python -m docker.config_contract` 门禁；不得静默重新扫描生成声明来消除失败，不得保留失去消费者的配置。外部依赖自行读取的参数必须明确登记外部消费契约。
+- 每次人工批准自动归档独立配置版本；保存批准、容器可读验证和进程实际读取分开记录。原始 `.env` 归档仅保存在私有目录，不进入 Git、报告或 JSON 历史视图；JSON 只保留凭据指纹。不得由 Agent 代替用户批准配置版本。
+
 - The only application environment image is `qasystem-env-v1`.
 - `Dockerfile` must contain CUDA, vLLM, Torch, system tools, language runtimes and dependency contracts only. It must not copy Backend, Agent, algorithm, MCP application source, models, deployment secrets or runtime data into the final image.
 - Application source is delivered separately and mounted read-only from `QASYSTEM_SOURCE_DIR`. Do not add a runtime overlay image, image-conversion script, source-copying Dockerfile, or Compose source baked into the environment image.

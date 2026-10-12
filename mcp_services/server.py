@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 import os
 
 from .runtime import mcp, MCP_V2
@@ -10,9 +11,9 @@ from .domains import execution as _execution
 
 
 def main() -> None:
-    transport = os.getenv("MCP_TRANSPORT", "streamable-http")
-    binding = {"host": os.getenv("MCP_HOST", "0.0.0.0"),
-               "port": int(os.getenv("MCP_PORT", "8890"))}
+    transport = config_getenv("MCP_TRANSPORT", "streamable-http")
+    binding = {"host": config_getenv("MCP_HOST", "0.0.0.0"),
+               "port": int(config_getenv("MCP_PORT", "8890"))}
     mcp.run(transport=transport, **(binding if MCP_V2 and transport != "stdio" else {}))
 
 

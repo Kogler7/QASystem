@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 import re
@@ -100,10 +101,10 @@ class DocumentProcessor:
         self.mineru_config_path = (
             mineru_config_path
             or (str(default_mineru) if default_mineru.is_file() else None)
-            or os.getenv("MINERU_CONFIG_PATH")
+            or config_getenv("MINERU_CONFIG_PATH")
         )
         self.mineru_model_source = mineru_model_source
-        self.libreoffice_path = libreoffice_path or os.getenv("LIBREOFFICE_PATH") or os.getenv("SOFFICE_PATH")
+        self.libreoffice_path = libreoffice_path or config_getenv("LIBREOFFICE_PATH") or config_getenv("SOFFICE_PATH")
         self._processors: dict[str, Any] = {}
 
     @staticmethod
@@ -273,8 +274,8 @@ class DocumentProcessor:
     def _vlm_server_url() -> str:
         """Read both the application and native MinerU endpoint variables."""
         return (
-            os.getenv("MINERU_VLM_SERVER_URL", "").strip()
-            or os.getenv("MINERU_VL_SERVER", "").strip()
+            config_getenv("MINERU_VLM_SERVER_URL", "").strip()
+            or config_getenv("MINERU_VL_SERVER", "").strip()
         )
 
     def _profile_docx(self, file_path: str) -> dict[str, Any]:
@@ -356,7 +357,7 @@ class DocumentProcessor:
             if (
                 profile["kind"] != "text"
                 and not self._vlm_server_url()
-                and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
+                and config_getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
                 and self._local_mineru4_available()
             ):
                 engine = "mineru"
@@ -378,7 +379,7 @@ class DocumentProcessor:
             if (
                 profile["kind"] == "complex"
                 and not self._vlm_server_url()
-                and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
+                and config_getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
                 and self._local_mineru4_available()
                 and not requested_engine
             ):
@@ -408,7 +409,7 @@ class DocumentProcessor:
             engine == "vlm"
             and not requested_engine
             and not self._vlm_server_url()
-            and os.getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
+            and config_getenv("MINERU_VLM_BACKEND", "vlm-http-client").strip() == "vlm-http-client"
             and self._local_mineru4_available()
             and "mineru" in allowed
         ):

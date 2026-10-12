@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import asyncio
 import json as json_module
@@ -148,7 +149,7 @@ async def connect_single_server(
                 raise ValueError(f"{transport} transport requires 'url' field")
             # 必须给传输层超时：timeout=None 会让"死会话"永久挂住，
             # 只能靠工具级超时兜底（表现就是"工具调用超时"）。
-            http_timeout = float(os.getenv("MCP_HTTP_TIMEOUT_SECONDS", "30"))
+            http_timeout = float(config_getenv("MCP_HTTP_TIMEOUT_SECONDS", "30"))
             http_client = await stack.enter_async_context(
                 httpx.AsyncClient(
                     headers=cfg.get("headers") or None,
@@ -238,7 +239,7 @@ class MCPToolWrapper:
         self._owner_stop: Any = None
         self._owner_gen = 0
         self._lifecycle_lock = threading.RLock()
-        self._rebind_timeout = float(os.getenv("MCP_REBIND_TIMEOUT_SECONDS", "60"))
+        self._rebind_timeout = float(config_getenv("MCP_REBIND_TIMEOUT_SECONDS", "60"))
         self._user_header_names = (
             "Authorization",
             "X-User-Id",
@@ -293,7 +294,7 @@ class MCPToolWrapper:
             cfg["env"] = srv.env
         headers = dict(srv.headers or {})
         if srv.auth_ref:
-            token = os.getenv(srv.auth_ref)
+            token = config_getenv(srv.auth_ref)
             if token:
                 headers.setdefault("Authorization", f"Bearer {token}")
         headers.update(identity)          # 调用方身份优先

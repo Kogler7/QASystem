@@ -8,6 +8,7 @@
   超过环境变量预算时发送 slow_stage 告警（只告警，不中断任务）。
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import contextvars
 import json
@@ -156,7 +157,7 @@ def _stage_budget_seconds(stage: str) -> float | None:
     env_name = _STAGE_BUDGET_ENV.get(stage)
     if not env_name:
         return None
-    raw = os.environ.get(env_name, "").strip()
+    raw = config_getenv(env_name, "").strip()
     if not raw:
         return None
     try:

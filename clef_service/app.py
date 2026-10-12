@@ -1,6 +1,7 @@
 """Bounded text/JSON HTTP adapter around the locally supplied official loader."""
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv, required as config_required
 
 import asyncio
 import gc
@@ -40,7 +41,7 @@ class Settings:
     def from_env(cls, prefix: str = "CLEF_") -> "Settings":
         values: dict[str, Any] = {}
         for name in cls.__dataclass_fields__:
-            value = os.environ.get(prefix + name.upper())
+            value = config_getenv(prefix + name.upper())
             if value is not None:
                 if name.startswith("max_"):
                     try:
@@ -151,8 +152,8 @@ class LocalRuntime:
         if not self.settings.model_dir or not directory.is_dir() or not (directory / "joint_schema_model.py").is_file():
             raise RuntimeError("CLEF_MODEL_DIR must contain a local Clef release")
         # Apply isolation before importing torch, transformers, or the model module.
-        if os.environ.get("CLEF_CUDA_VISIBLE_DEVICES"):
-            os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["CLEF_CUDA_VISIBLE_DEVICES"]
+        if config_getenv("CLEF_CUDA_VISIBLE_DEVICES"):
+            os.environ["CUDA_VISIBLE_DEVICES"] = config_required('CLEF_CUDA_VISIBLE_DEVICES')
             os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["HF_HUB_OFFLINE"] = "1"
         os.environ["TRANSFORMERS_OFFLINE"] = "1"

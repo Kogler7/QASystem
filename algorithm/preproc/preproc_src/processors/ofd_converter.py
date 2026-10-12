@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 import shlex
@@ -14,7 +15,7 @@ class OFDConverter:
     DEFAULT_COMMAND = "java -jar /opt/qasystem/ofdrw/ofd-to-pdf.jar"
 
     def __init__(self, command: str | None = None, timeout: int = 120):
-        self.command = command or os.getenv("OFD_CONVERTER_COMMAND") or self.DEFAULT_COMMAND
+        self.command = command or config_getenv("OFD_CONVERTER_COMMAND") or self.DEFAULT_COMMAND
         self.timeout = timeout
         self.last_conversion_error: str | None = None
 

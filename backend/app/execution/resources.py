@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import os
@@ -72,9 +73,9 @@ def parse_device_ids(value: str | None) -> list[str]:
 
 
 def configured_gpu_ids() -> list[str]:
-    reserved = set(parse_device_ids(os.getenv("EXECUTION_GPU_RESERVED_DEVICE_IDS")))
+    reserved = set(parse_device_ids(config_getenv("EXECUTION_GPU_RESERVED_DEVICE_IDS")))
     for name in ("EXECUTION_GPU_DEVICE_IDS", "GPU_DEVICE_IDS", "CUDA_VISIBLE_DEVICES"):
-        ids = parse_device_ids(os.getenv(name))
+        ids = parse_device_ids(config_getenv(name))
         if ids:
             return [item for item in ids if item not in reserved]
     return []
@@ -106,7 +107,7 @@ def _query_nvidia_smi(device_ids: list[str]) -> list[GpuSnapshot]:
             check=False,
             capture_output=True,
             text=True,
-            timeout=float(os.getenv("EXECUTION_GPU_PROBE_TIMEOUT_SECONDS", "2")),
+            timeout=float(config_getenv("EXECUTION_GPU_PROBE_TIMEOUT_SECONDS", "2")),
         )
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
         return []
@@ -139,7 +140,7 @@ class GpuInventory:
     def __init__(self, cache_seconds: float | None = None):
         self.cache_seconds = max(
             0.0,
-            float(cache_seconds if cache_seconds is not None else os.getenv("EXECUTION_GPU_PROBE_CACHE_SECONDS", "1")),
+            float(cache_seconds if cache_seconds is not None else config_getenv("EXECUTION_GPU_PROBE_CACHE_SECONDS", "1")),
         )
         self._lock = threading.Lock()
         self._cached_at = 0.0
@@ -151,11 +152,11 @@ class GpuInventory:
             if not force and self._cached and now - self._cached_at < self.cache_seconds:
                 return list(self._cached)
             ids = configured_gpu_ids()
-            has_config = any(parse_device_ids(os.getenv(name)) for name in (
+            has_config = any(parse_device_ids(config_getenv(name)) for name in (
                 "EXECUTION_GPU_DEVICE_IDS", "GPU_DEVICE_IDS", "CUDA_VISIBLE_DEVICES"))
             snapshots = _query_nvidia_smi(ids) if ids or not has_config else []
             seen = {value for item in snapshots for value in (item.physical_index, item.device_uuid)}
-            reserved = set(parse_device_ids(os.getenv("EXECUTION_GPU_RESERVED_DEVICE_IDS")))
+            reserved = set(parse_device_ids(config_getenv("EXECUTION_GPU_RESERVED_DEVICE_IDS")))
             # A configured device list still produces a useful allocation record
             # in development containers without nvidia-smi or NVML.
             for physical_index in ids:
@@ -169,7 +170,7 @@ class GpuInventory:
                     GpuSnapshot(
                         physical_index=physical_index,
                         device_uuid=None,
-                        memory_total_mb=_parse_number(os.getenv("EXECUTION_GPU_MEMORY_TOTAL_MB")),
+                        memory_total_mb=_parse_number(config_getenv("EXECUTION_GPU_MEMORY_TOTAL_MB")),
                         memory_used_mb=0,
                         utilization_gpu=0,
                         source="configuration",
@@ -196,10 +197,10 @@ class ResourceScheduler:
 
     def __init__(self, store: Any = None, *, worker_id: str | None = None, inventory: GpuInventory | None = None):
         self.store = store
-        self.worker_id = worker_id or os.getenv("EXECUTION_WORKER_ID", "gateway-inline")
+        self.worker_id = worker_id or config_getenv("EXECUTION_WORKER_ID", "gateway-inline")
         self.inventory = inventory or GpuInventory()
-        self.lease_ttl_seconds = max(5, int(os.getenv("EXECUTION_GPU_LEASE_TTL_SECONDS", "900")))
-        self.prefix = getattr(store, "prefix", os.getenv("EXECUTION_KEY_PREFIX", "qasystem:execution"))
+        self.lease_ttl_seconds = max(5, int(config_getenv("EXECUTION_GPU_LEASE_TTL_SECONDS", "900")))
+        self.prefix = getattr(store, "prefix", config_getenv("EXECUTION_KEY_PREFIX", "qasystem:execution"))
 
     @property
     def redis(self):
@@ -208,13 +209,13 @@ class ResourceScheduler:
     def enabled_for(self, resource_class: str) -> bool:
         if not str(resource_class).startswith("gpu"):
             return False
-        return os.getenv("EXECUTION_GPU_SCHEDULING", "true").strip().lower() not in {"0", "false", "off", "no"}
+        return config_getenv("EXECUTION_GPU_SCHEDULING", "true").strip().lower() not in {"0", "false", "off", "no"}
 
     @staticmethod
     def _memory_request(resource_class: str) -> int:
         suffix = str(resource_class).replace(".", "_").replace("-", "_").upper()
-        value = os.getenv(f"EXECUTION_GPU_MEMORY_REQUEST_MB_{suffix}")
-        value = value or os.getenv("EXECUTION_GPU_MEMORY_REQUEST_MB", "0")
+        value = config_getenv(f"EXECUTION_GPU_MEMORY_REQUEST_MB_{suffix}")
+        value = value or config_getenv("EXECUTION_GPU_MEMORY_REQUEST_MB", "0")
         try:
             return max(0, int(value))
         except (TypeError, ValueError):
@@ -241,8 +242,8 @@ class ResourceScheduler:
     ) -> dict[str, Any]:
         record = {
             "worker_id": worker_id,
-            "worker_instance_id": os.getenv("EXECUTION_WORKER_INSTANCE_ID"),
-            "runtime": os.getenv("HOSTNAME", socket.gethostname()),
+            "worker_instance_id": config_getenv("EXECUTION_WORKER_INSTANCE_ID"),
+            "runtime": config_getenv("HOSTNAME", socket.gethostname()),
             "resource_classes": list(resource_classes),
             "gpu_devices": list(gpu_devices),
             "snapshots": [snapshot.as_dict() for snapshot in (snapshots or [])],
@@ -250,7 +251,7 @@ class ResourceScheduler:
             "host_id": socket.gethostname(),
             "updated_at": time.time(),
         }
-        ttl = max(self.lease_ttl_seconds, int(os.getenv("EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS", "30")))
+        ttl = max(self.lease_ttl_seconds, int(config_getenv("EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS", "30")))
         if self.redis is not None:
             self.redis.set(self._worker_key(worker_id), json.dumps(record, ensure_ascii=False, separators=(",", ":")), ex=ttl)
         else:
@@ -280,7 +281,7 @@ class ResourceScheduler:
         else:
             with self._local_lock:
                 now = time.time()
-                ttl = max(5, int(os.getenv("EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS", "30")))
+                ttl = max(5, int(config_getenv("EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS", "30")))
                 for worker_id, item in list(self._local_workers.items()):
                     if now - float(item.get("updated_at", 0)) > ttl:
                         self._local_workers.pop(worker_id, None)
@@ -406,7 +407,7 @@ class ResourceScheduler:
                 worker_id=worker_id,
             )
             allocation = {
-                "scheduler_id": os.getenv("EXECUTION_SCHEDULER_ID", "gpu-capacity-local"),
+                "scheduler_id": config_getenv("EXECUTION_SCHEDULER_ID", "gpu-capacity-local"),
                 "worker_id": worker.get("worker_id"),
                 "worker_instance_id": worker.get("worker_instance_id"),
                 "runtime": worker.get("runtime"),
@@ -429,12 +430,12 @@ class ResourceScheduler:
     ) -> bool:
         capacity_mb = device.memory_free_mb if device.memory_free_mb is not None else (device.memory_total_mb or 0)
         try:
-            capacity_mb = max(0, capacity_mb - int(os.getenv("EXECUTION_GPU_SAFETY_MARGIN_MB", "512")))
+            capacity_mb = max(0, capacity_mb - int(config_getenv("EXECUTION_GPU_SAFETY_MARGIN_MB", "512")))
         except (TypeError, ValueError):
             capacity_mb = max(0, capacity_mb)
         try:
             default_max = "16"
-            max_leases = max(1, int(os.getenv("EXECUTION_GPU_MAX_LEASES_PER_DEVICE", default_max)))
+            max_leases = max(1, int(config_getenv("EXECUTION_GPU_MAX_LEASES_PER_DEVICE", default_max)))
         except (TypeError, ValueError):
             max_leases = 1
         redis = self.redis
@@ -484,7 +485,7 @@ class ResourceScheduler:
             return 1
             """
             try:
-                worker_limit = max(1, int(os.getenv("EXECUTION_GPU_MAX_LEASES_PER_WORKER", "1"))) if worker_id else 0
+                worker_limit = max(1, int(config_getenv("EXECUTION_GPU_MAX_LEASES_PER_WORKER", "1"))) if worker_id else 0
             except (TypeError, ValueError):
                 worker_limit = 1 if worker_id else 0
             return bool(
@@ -521,7 +522,7 @@ class ResourceScheduler:
                     if expiry <= now:
                         worker_leases.pop(old_id, None)
                 try:
-                    worker_limit = max(1, int(os.getenv("EXECUTION_GPU_MAX_LEASES_PER_WORKER", "1")))
+                    worker_limit = max(1, int(config_getenv("EXECUTION_GPU_MAX_LEASES_PER_WORKER", "1")))
                 except (TypeError, ValueError):
                     worker_limit = 1
                 if len(worker_leases) >= worker_limit:
@@ -662,7 +663,7 @@ class ResourceScheduler:
                 }
             )
         return {
-            "scheduler_id": os.getenv("EXECUTION_SCHEDULER_ID", "gpu-capacity-local"),
+            "scheduler_id": config_getenv("EXECUTION_SCHEDULER_ID", "gpu-capacity-local"),
             "devices": devices,
             "workers": self.list_workers(),
             "observed_at": time.time(),

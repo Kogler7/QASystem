@@ -31,6 +31,7 @@ agentcode HTTP API — 高并发异步任务模型。
 """
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import asyncio
 import logging
@@ -89,11 +90,11 @@ _worker_threads: list[threading.Thread] = []
 _worker_pool: ToolManagerPool | None = None
 
 # 每进程的工作线程数（--concurrency / AGENT_WORKER_CONCURRENCY）
-_WORKER_CONCURRENCY = int(os.getenv("AGENT_WORKER_CONCURRENCY", "1"))
+_WORKER_CONCURRENCY = int(config_getenv("AGENT_WORKER_CONCURRENCY", "1"))
 
 # 每进程的 ToolManager 连接池大小（--pool-size / AGENT_WORKER_POOL_SIZE）
 # 默认等于 _WORKER_CONCURRENCY，保证每个线程配一个连接，无需排队
-_WORKER_POOL_SIZE = int(os.getenv("AGENT_WORKER_POOL_SIZE", str(_WORKER_CONCURRENCY)))
+_WORKER_POOL_SIZE = int(config_getenv("AGENT_WORKER_POOL_SIZE", str(_WORKER_CONCURRENCY)))
 
 
 def _start_workers() -> None:
@@ -110,7 +111,7 @@ def _start_workers() -> None:
     """
     global _worker_stop_event, _worker_threads, _worker_pool
 
-    api_workers = int(os.getenv("AGENT_API_WORKERS", "1"))
+    api_workers = int(config_getenv("AGENT_API_WORKERS", "1"))
     if api_workers > 1 and not task_store.is_distributed():
         raise RuntimeError("Redis is required when AGENT_API_WORKERS > 1")
 
@@ -452,7 +453,7 @@ def main():
     elif args.concurrency:
         _WORKER_POOL_SIZE = args.concurrency
 
-    api_workers = args.workers or int(os.getenv("AGENT_API_WORKERS", "1"))
+    api_workers = args.workers or int(config_getenv("AGENT_API_WORKERS", "1"))
     os.environ["AGENT_API_WORKERS"] = str(api_workers)
 
     import uvicorn
@@ -461,8 +462,8 @@ def main():
         # 多 worker 模式：必须用字符串引用，uvicorn 在每个子进程中重新导入 app
         logger.info("启动 API: host=%s port=%s api_workers=%d concurrency=%s pool_size=%s",
                     args.host, args.port, api_workers,
-                    os.environ.get("AGENT_WORKER_CONCURRENCY", "1"),
-                    os.environ.get("AGENT_WORKER_POOL_SIZE", "1"))
+                    config_getenv("AGENT_WORKER_CONCURRENCY", "1"),
+                    config_getenv("AGENT_WORKER_POOL_SIZE", "1"))
         uvicorn.run(
             "agentcode.api:app",
             host=args.host,
@@ -474,8 +475,8 @@ def main():
         # 单 worker 模式：直接传 app 实例
         logger.info("启动 API: host=%s port=%s api_workers=1 concurrency=%s pool_size=%s",
                     args.host, args.port,
-                    os.environ.get("AGENT_WORKER_CONCURRENCY", "1"),
-                    os.environ.get("AGENT_WORKER_POOL_SIZE", "1"))
+                    config_getenv("AGENT_WORKER_CONCURRENCY", "1"),
+                    config_getenv("AGENT_WORKER_POOL_SIZE", "1"))
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 

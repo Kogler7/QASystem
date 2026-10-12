@@ -4,6 +4,7 @@ The extraction runtime is SDK independent; callers can inject any messages
 callable. The benchmark uses this same adapter for both V2 and V3.
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv, required as config_required
 
 from dataclasses import asdict, dataclass, field
 import json
@@ -65,8 +66,8 @@ class ProviderConfig:
                 if match:
                     values[name] = match.group(1).rstrip(',')
         for name, variable in [('base_url','KG_EXTRACT_V3_BASE_URL'), ('model','KG_EXTRACT_V3_MODEL'), ('api_key','KG_EXTRACT_V3_API_KEY')]:
-            if os.environ.get(variable):
-                values[name] = os.environ[variable]
+            if config_getenv(variable):
+                values[name] = config_required(variable)
         config = cls(**values)
         if not config.api_key:
             raise ValueError('V3 API key missing: configure eval_api.md or KG_EXTRACT_V3_API_KEY')

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import os
@@ -37,7 +38,7 @@ class AgentRuntime:
         try:
             from .tools.base_tools.memory_tool import MemoryCompactor
             self._compactor = MemoryCompactor()
-            self._compactor_threshold = int(os.environ.get("COMPACT_TOKEN_THRESHOLD", 100000))
+            self._compactor_threshold = int(config_getenv("COMPACT_TOKEN_THRESHOLD", 100000))
         except Exception:
             self._compactor = None
             self._compactor_threshold = 0

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ _FALSE_VALUES = {"0", "false", "no", "off"}
 
 def should_load_local_dotenv() -> bool:
     """Use dotenv for unmanaged local runs, never as a production config source."""
-    explicit = os.getenv("QASYSTEM_LOAD_DOTENV")
+    explicit = config_getenv("QASYSTEM_LOAD_DOTENV")
     if explicit is not None:
         normalized = explicit.strip().lower()
         if normalized in _TRUE_VALUES:
@@ -26,7 +27,7 @@ def should_load_local_dotenv() -> bool:
 
     # Docker/Kubernetes/systemd normally inject a deployment environment.
     # If it is already present, process environment is the single source of truth.
-    return "ENVIRONMENT" not in os.environ
+    return config_getenv("ENVIRONMENT") is None
 
 
 def configure_runtime_environment() -> bool:

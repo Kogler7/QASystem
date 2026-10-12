@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import functools
 import hashlib
@@ -54,7 +55,7 @@ _PIPELINE_PARSE_SHARDING_TRUE_VALUES = {"1", "true", "yes", "on"}
 def _pipeline_parse_sharding_enabled() -> bool:
     """沉淀流水线解析页分片开关（KNOWLEDGE_PIPELINE_PARSE_SHARDING，默认关闭）。"""
     return (
-        str(os.getenv("KNOWLEDGE_PIPELINE_PARSE_SHARDING", "")).strip().lower()
+        str(config_getenv("KNOWLEDGE_PIPELINE_PARSE_SHARDING", "")).strip().lower()
         in _PIPELINE_PARSE_SHARDING_TRUE_VALUES
     )
 

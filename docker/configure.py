@@ -292,7 +292,7 @@ class Configuration:
                 restart="unless-stopped", init=True, gpus="all", environment={"CUDA_VISIBLE_DEVICES": model["gpu"],
                 "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "VLLM_NO_USAGE_STATS": "1"},
                 volumes=[f"{self.model_root()}:/models:ro", f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
-                         f"{self.directory}:/app/runtime-config:ro", f"{self.root / '.env'}:/app/.env:ro",
+                         f"{self.directory}:/app/runtime-config:ro", f"{self.directory / 'observed'}:/app/runtime-config/observed", f"{self.root / '.env'}:/app/.env:ro",
                          f"{self.root / '.env.example'}:/app/deployment.env.example:ro"], ports=[f"127.0.0.1:{model['port']}:8000"],
                 command=["vllm", "serve", "/models/llm/" + repo.replace("/", "--"), "--served-model-name", repo,
                          "--max-model-len", model["context"], "--gpu-memory-utilization", model["utilization"],
@@ -302,12 +302,14 @@ class Configuration:
         return {"services": services}
 
     def pending_payloads(self) -> dict:
-        static = {k: v for k, v in self.values.items() if k not in HOT_KEYS}
+        from docker.configuration import declarations
+        retired = set(declarations().get('retired', []))
+        static = {k: v for k, v in self.values.items() if k not in HOT_KEYS and k not in retired}
         original_values = helper.read_env(self.original or self.template)
         changes = {k: v for k, v in static.items() if original_values.get(k) != v}
         env = helper.update_env(self.original or self.template, changes)
         env = "\n".join(line for line in env.splitlines() if not (
-            (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in HOT_KEYS)) + "\n"
+            (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in HOT_KEYS | retired)) + "\n"
         settings = dict(self.persisted_hot)
         settings.update({k: v for k, v in self.values.items() if k in HOT_KEYS and self.initial_hot.get(k) != v})
         return {self.root / '.env': env, self.root / '.env.example': self.template,
@@ -490,7 +492,7 @@ def review_save(config: Configuration) -> bool:
             actual = guard.snapshot(config.root, config.directory)
             if actual != current:
                 raise ValueError('审核过程中配置发生变化；未生成批准记录，请重新审核')
-            guard.record(config.directory, actual, reason=reason, reviewer=getpass.getuser())
+            guard.record(config.directory, actual, reason=reason, reviewer=getpass.getuser(), root=config.root)
             return True
 
 

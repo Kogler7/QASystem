@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import math
 import os
@@ -59,13 +60,13 @@ def build_page_ranges(page_count: int, shard_count: int) -> list[tuple[int, int]
 
 def _min_pages() -> int:
     try:
-        return max(1, int(os.getenv("EXECUTION_VLM_SHARD_MIN_PAGES", "8")))
+        return max(1, int(config_getenv("EXECUTION_VLM_SHARD_MIN_PAGES", "8")))
     except (TypeError, ValueError):
         return 8
 
 
 def _configured_shard_count(config: ParserConfig, page_count: int, worker_count: int) -> int:
-    raw_count = os.getenv("EXECUTION_VLM_SHARD_COUNT", "auto").strip().lower()
+    raw_count = config_getenv("EXECUTION_VLM_SHARD_COUNT", "auto").strip().lower()
     try:
         if raw_count == "auto":
             # Keep a half-wave queued for work stealing without coupling
@@ -204,7 +205,7 @@ def _monitor_children(manager: ExecutionManager, parent_job_id: str, specs: list
     pending = {spec["job_id"] for spec in specs}
     seen: dict[str, tuple[Any, ...]] = {}
     by_id = {spec["job_id"]: spec for spec in specs}
-    deadline = time.monotonic() + float(os.getenv("EXECUTION_SHARD_TIMEOUT_SECONDS", "3600"))
+    deadline = time.monotonic() + float(config_getenv("EXECUTION_SHARD_TIMEOUT_SECONDS", "3600"))
     while pending:
         if time.monotonic() >= deadline:
             for job_id in pending:

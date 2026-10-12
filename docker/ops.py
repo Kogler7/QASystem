@@ -13,6 +13,8 @@ import sys
 from docker import config_guard as guard
 from docker.runtime_config import HOT_KEYS, read_document, read_settings
 from docker.setup_llm import read_env
+from docker.config_database import append_event, database
+from docker.configuration import UndeclaredConfigurationError
 
 
 class ControlError(ValueError):
@@ -85,7 +87,7 @@ def probe_runtime(root, directory):
     from backend.app.services.extraction_config import resolve_config
     try:
         resolve_config({})
-    except (ValueError, ImportError, AttributeError):
+    except (ValueError, ImportError, AttributeError, UndeclaredConfigurationError):
         raise ControlError('抽取配置或运行依赖校验失败；未输出配置值，请检查所选算法与模型配置') from None
     print(json.dumps({'revision': revision, 'hot_keys': sorted(settings),
                       'scope': 'new requests / new clients'}, ensure_ascii=False))
@@ -121,6 +123,7 @@ def reload_services(root, directory, services):
             return code
     print(f'批准版本 r{revision} 已通过容器读取与抽取配置检查；动态值供后续请求/新建客户端使用。'
           '在途任务不变；此检查不代表下游服务连通性测试。', flush=True)
+    append_event(directory, {'event': 'verified-readable', 'revision': revision, 'services': services})
     return 0
 
 
@@ -132,6 +135,8 @@ def main(argv=None):
     sub.add_parser('config', help='打开配置 UI，人工审核并保存')
     sub.add_parser('check', help='校验批准版本及配置冲突，不部署')
     sub.add_parser('status', help='显示批准版本及容器状态，不显示凭据')
+    history = sub.add_parser('history', help='查看配置版本和实际读取记录，生成本地 JSON 数据库视图')
+    history.add_argument('--json', action='store_true', help='输出脱敏 JSON 历史')
     sub.add_parser('deploy', help='调用现有部署流程；必须已在 UI 确认')
     reload_parser = sub.add_parser('reload', help='核对动态配置在容器内可读，不重启容器')
     reload_parser.add_argument('--services', nargs='+', choices=['backend', 'agent'], default=['backend', 'agent'])
@@ -148,6 +153,16 @@ def main(argv=None):
         if args.action == 'install':
             return install_command(root)
         directory = root / 'runtime-config' if args.action == '_probe' else directory_for(root)
+        if args.action == 'history':
+            data = database(directory)
+            if args.json:
+                print(json.dumps(data, ensure_ascii=False, indent=2))
+            else:
+                for version in data['versions']:
+                    print(f"r{version['revision']}  声明版本 {version['release']}  {version['time']}  已审核")
+                print(f"流程事件 {len(data['events'])} 条；进程实际读取 {len(data['observations'])} 条。"
+                      '读取记录不等于下游调用成功。')
+            return 0
         if args.action == '_probe':
             return probe_runtime(root, directory)
         if args.action == 'status':

@@ -34,6 +34,7 @@ transport 取值与必需字段：
 """
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv, required as config_required
 
 import json
 import os
@@ -70,8 +71,8 @@ def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
             raise ValueError(f"MCP 服务 {name} 不支持的 transport: {transport}")
 
         url = (cfg.get("url") or "").strip() or None
-        if len(mcp_servers) == 1 and os.getenv("AGENT_MCP_URL"):
-            url = os.environ["AGENT_MCP_URL"].strip()
+        if len(mcp_servers) == 1 and config_getenv("AGENT_MCP_URL"):
+            url = config_required('AGENT_MCP_URL').strip()
         command = (cfg.get("command") or "").strip() or None
         if transport == "stdio" and not command:
             raise ValueError(f"MCP 服务 {name} 缺少 command 字段")

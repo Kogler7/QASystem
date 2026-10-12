@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 from functools import lru_cache
@@ -14,7 +15,7 @@ def _binding_device() -> str | None:
     otherwise load the encoder on physical GPU0, which is reserved for the LLM
     service. Binding keeps the encoder on the worker's assigned GPU or on CPU.
     """
-    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    visible = config_getenv("CUDA_VISIBLE_DEVICES", "").strip()
     if visible and visible.lower() not in {"", "none", "no", "-1", "all"}:
         return "cuda"
     return None

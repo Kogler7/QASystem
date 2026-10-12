@@ -12,6 +12,7 @@
 """
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import argparse
 import json
@@ -47,7 +48,7 @@ _DIRECT_ENV_KEYS = ("TERM_GRAPH_HTTP_URL", "TERM_GRAPH_USER", "TERM_GRAPH_PASSWO
 
 
 def _direct_db_configured() -> bool:
-    return bool(os.getenv("TERM_GRAPH_HTTP_URL", "").strip())
+    return bool(config_getenv("TERM_GRAPH_HTTP_URL", "").strip())
 
 
 def _http_cypher(statement: str, parameters: dict[str, Any]) -> list[dict[str, Any]]:
@@ -55,10 +56,10 @@ def _http_cypher(statement: str, parameters: dict[str, Any]) -> list[dict[str, A
 
     import httpx
 
-    base = os.getenv("TERM_GRAPH_HTTP_URL", "").strip().rstrip("/")
-    user = os.getenv("TERM_GRAPH_USER", "").strip()
-    password = os.getenv("TERM_GRAPH_PASSWORD", "").strip()
-    database = os.getenv("TERM_GRAPH_DB", "neo4j").strip() or "neo4j"
+    base = config_getenv("TERM_GRAPH_HTTP_URL", "").strip().rstrip("/")
+    user = config_getenv("TERM_GRAPH_USER", "").strip()
+    password = config_getenv("TERM_GRAPH_PASSWORD", "").strip()
+    database = config_getenv("TERM_GRAPH_DB", "neo4j").strip() or "neo4j"
     if not user or not password:
         raise SystemExit("直连图库缺少 TERM_GRAPH_USER / TERM_GRAPH_PASSWORD，请在内网 .env 配置")
     url = f"{base}/db/{database}/tx/commit"
@@ -202,13 +203,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="构建 Term 语义向量索引")
     parser.add_argument(
         "--output",
-        default=os.getenv("TERM_VECTOR_INDEX", "term_index.json"),
+        default=config_getenv("TERM_VECTOR_INDEX", "term_index.json"),
         help="索引输出路径（env TERM_VECTOR_INDEX 可覆盖）",
     )
     parser.add_argument("--limit", type=int, default=10000, help="最大拉取 Term 条数")
     parser.add_argument(
         "--term-type",
-        default=os.getenv("TERM_RESOURCE_TYPE", "Term"),
+        default=config_getenv("TERM_RESOURCE_TYPE", "Term"),
         help="resource_type 过滤关键词（默认 Term，与实体链接一致）",
     )
     parser.add_argument("--no-logical", action="store_true", help="跳过逻辑属性兜底")

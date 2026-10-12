@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 from pathlib import Path
@@ -30,7 +31,7 @@ class RemoteEmbeddingClient:
         self.path = endpoint_for("models.embeddings.create").path or "/v1/embeddings"
         self.model = model or getenv("EMBEDDING_MODEL", "")
         self.timeout = timeout or float(getenv("EMBEDDING_TIMEOUT_SECONDS", "60"))
-        self.api_key = os.getenv("EMBEDDING_SERVICE_API_KEY", "").strip()
+        self.api_key = config_getenv("EMBEDDING_SERVICE_API_KEY", "").strip()
         try:
             self.max_batch_size = max(1, int(getenv("EMBEDDING_MAX_BATCH_SIZE", "32")))
         except ValueError:
@@ -106,7 +107,7 @@ class RemoteDocumentParserClient:
         ).strip().rstrip("/")
         self.path = endpoint_for("documents.parse").path or "/v1/documents/parse"
         self.timeout = timeout or float(getenv("DOCUMENT_PARSE_TIMEOUT_SECONDS", "900"))
-        self.api_key = os.getenv("DOCUMENT_PARSE_SERVICE_API_KEY", "").strip()
+        self.api_key = config_getenv("DOCUMENT_PARSE_SERVICE_API_KEY", "").strip()
 
     def parse(self, file_path: str, **options: Any) -> dict[str, Any]:
         if not self.base_url:

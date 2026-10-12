@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.settings import settings as docling_settings
 from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -31,7 +32,7 @@ DOCLING_MODELS_PATH = "/models/docling-models"
 
 def get_docling_models_path() -> str:
     """Docling 离线模型目录：默认容器挂载点，可用 DOCLING_MODELS_PATH 覆盖。"""
-    return os.getenv("DOCLING_MODELS_PATH") or DOCLING_MODELS_PATH
+    return config_getenv("DOCLING_MODELS_PATH") or DOCLING_MODELS_PATH
 
 
 class DocxProcessor(BaseProcessor):
@@ -87,7 +88,7 @@ class DocxProcessor(BaseProcessor):
         # 可能的执行文件路径
         candidates = []
         for key in ("LIBREOFFICE_PATH", "SOFFICE_PATH"):
-            v = os.getenv(key)
+            v = config_getenv(key)
             if v:
                 candidates.append(v)
         candidates.extend(

@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 import os
 import json
 import importlib
@@ -68,8 +69,8 @@ class OCRProcessor(BaseProcessor):
         _default_json = _preproc_root / "mineru.json"
         effective_config_path = (
             config_path
-            or os.getenv("MINERU_CONFIG_PATH")
-            or os.getenv("MINERU_TOOLS_CONFIG_JSON")
+            or config_getenv("MINERU_CONFIG_PATH")
+            or config_getenv("MINERU_TOOLS_CONFIG_JSON")
             or (str(_default_json) if _default_json.is_file() else str(_default_json))
         )
 
@@ -88,14 +89,14 @@ class OCRProcessor(BaseProcessor):
                         effective_config_path = str(cand2)
         except Exception:
             pass
-        effective_model_source = model_source or os.getenv("MINERU_MODEL_SOURCE") or 'local'
+        effective_model_source = model_source or config_getenv("MINERU_MODEL_SOURCE") or 'local'
 
         # 允许通过环境变量覆盖 mineru.json 中 models-dir 的路径，便于不同环境部署。
         # 覆盖变量：
         # - MINERU_MODEL_PIPELINE_PATH
         # - MINERU_MODEL_VLM_PATH
-        pipeline_override = os.getenv("MINERU_MODEL_PIPELINE_PATH")
-        vlm_override = os.getenv("MINERU_MODEL_VLM_PATH")
+        pipeline_override = config_getenv("MINERU_MODEL_PIPELINE_PATH")
+        vlm_override = config_getenv("MINERU_MODEL_VLM_PATH")
         if pipeline_override or vlm_override:
             try:
                 with open(effective_config_path, "r", encoding="utf-8") as f:
@@ -156,8 +157,8 @@ class OCRProcessor(BaseProcessor):
 
         logger.info(
             "MinerU initialized with effective config: {}, model source: {}",
-            os.environ.get("MINERU_TOOLS_CONFIG_JSON"),
-            os.environ.get("MINERU_MODEL_SOURCE"),
+            config_getenv("MINERU_TOOLS_CONFIG_JSON"),
+            config_getenv("MINERU_MODEL_SOURCE"),
         )
 
     def process(self, file_path: str, **kwargs) -> Dict[str, Any]:

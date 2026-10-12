@@ -100,7 +100,7 @@ def _validate_document(data):
     return {"settings": settings, "models": models}
 
 
-def read_settings(path: Path | None = None, *, root: Path | None = None, env=None) -> dict[str, str]:
+def read_settings(path: Path | None = None, *, root: Path | None = None, env=None, with_revision=False):
     path = runtime_path(root, env) if path is None else Path(path)
     managed = path.name == 'config.json' and (path.is_file() or
         (path.parent / 'approved-config.json').exists() or (path.parent / 'history').is_dir() or
@@ -111,10 +111,11 @@ def read_settings(path: Path | None = None, *, root: Path | None = None, env=Non
         except ImportError:
             from config_guard import require_runtime
         raw = path.read_bytes() if path.is_file() else None
-        require_runtime(path.parent, config_bytes=raw)
+        revision = require_runtime(path.parent, config_bytes=raw)
         try:
             data = _validate_document(json.loads(raw))
         except (ValueError, TypeError):
             raise ValueError('Invalid runtime configuration file') from None
-        return data['settings']
-    return read_document(path, root=root, env=env)['settings']
+        return (data['settings'], revision) if with_revision else data['settings']
+    settings = read_document(path, root=root, env=env)['settings']
+    return (settings, None) if with_revision else settings

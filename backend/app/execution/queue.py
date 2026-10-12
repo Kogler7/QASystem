@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import os
@@ -52,7 +53,7 @@ class RedisTaskQueue:
         self.store = store
         self.redis = store.redis
         self.prefix = f"{store.prefix}:queue"
-        self.consumer_group = os.getenv("EXECUTION_CONSUMER_GROUP", "workers")
+        self.consumer_group = config_getenv("EXECUTION_CONSUMER_GROUP", "workers")
 
     def _stream(self, resource_class: str, target_worker: str | None = None) -> str:
         suffix = f":worker:{target_worker}" if target_worker else ""
@@ -62,7 +63,7 @@ class RedisTaskQueue:
         return self.redis.xadd(
             self._stream(resource_class, target_worker),
             {"payload": json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))},
-            maxlen=int(os.getenv("EXECUTION_QUEUE_MAXLEN", "100000")),
+            maxlen=int(config_getenv("EXECUTION_QUEUE_MAXLEN", "100000")),
             approximate=True,
         )
 

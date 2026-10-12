@@ -8,6 +8,7 @@
 """
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -20,12 +21,12 @@ from typing import Any
 
 logger = logging.getLogger("agentcode.task_store")
 
-_REDIS_URL = os.getenv("TASK_STORE_REDIS_URL", "redis://localhost:6379/0")
-_KEY_PREFIX = os.getenv("TASK_STORE_KEY_PREFIX", "agentcode:task")
-_TASK_TTL = int(os.getenv("TASK_STORE_TASK_TTL", 86400))
-_MAX_QUEUE_SIZE = int(os.getenv("TASK_STORE_MAX_QUEUE", 50000))
-_VISIBILITY_TIMEOUT = int(os.getenv("TASK_STORE_VISIBILITY_TIMEOUT", 1500))
-_EVENT_MAXLEN = int(os.getenv("TASK_STORE_EVENT_MAXLEN", 10000))
+_REDIS_URL = config_getenv("TASK_STORE_REDIS_URL", "redis://localhost:6379/0")
+_KEY_PREFIX = config_getenv("TASK_STORE_KEY_PREFIX", "agentcode:task")
+_TASK_TTL = int(config_getenv("TASK_STORE_TASK_TTL", 86400))
+_MAX_QUEUE_SIZE = int(config_getenv("TASK_STORE_MAX_QUEUE", 50000))
+_VISIBILITY_TIMEOUT = int(config_getenv("TASK_STORE_VISIBILITY_TIMEOUT", 1500))
+_EVENT_MAXLEN = int(config_getenv("TASK_STORE_EVENT_MAXLEN", 10000))
 
 _QUEUED = "queued"
 _RUNNING = "running"

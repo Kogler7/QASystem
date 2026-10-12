@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import logging
 import os
@@ -28,7 +29,7 @@ class ChildProcess:
 
 def _env_int(name: str, default: int, *, minimum: int = 0, maximum: int = 256) -> int:
     try:
-        return min(max(int(os.getenv(name, str(default))), minimum), maximum)
+        return min(max(int(config_getenv(name, str(default))), minimum), maximum)
     except (TypeError, ValueError):
         return default
 
@@ -40,7 +41,7 @@ def _gpu_ids() -> list[str]:
 
 
 def _auto_cpu_workers(cpu_count: int) -> int:
-    configured = os.getenv("EXECUTION_CPU_WORKERS", "auto").strip().lower()
+    configured = config_getenv("EXECUTION_CPU_WORKERS", "auto").strip().lower()
     if configured != "auto":
         return _env_int("EXECUTION_CPU_WORKERS", 2, minimum=1, maximum=32)
     if is_remote_only():
@@ -51,7 +52,7 @@ def _auto_cpu_workers(cpu_count: int) -> int:
 def _auto_vlm_workers(cpu_count: int, gpu_count: int) -> int:
     if gpu_count <= 0:
         return 0
-    configured = os.getenv("EXECUTION_VLM_WORKERS_PER_GPU", "auto").strip().lower()
+    configured = config_getenv("EXECUTION_VLM_WORKERS_PER_GPU", "auto").strip().lower()
     if configured != "auto":
         return _env_int("EXECUTION_VLM_WORKERS_PER_GPU", 2, minimum=1, maximum=8)
     cores_per_gpu = max(1, cpu_count // max(gpu_count, 1))
@@ -66,7 +67,7 @@ class RuntimeSupervisor:
         self.gpu_ids = _gpu_ids()
         self.cpu_count = os.cpu_count() or 4
         self.base_port = _env_int("VLLM_BASE_PORT", 8100, minimum=1024, maximum=65000)
-        self.ready_file = Path(os.getenv("EXECUTION_RUNTIME_READY_FILE", "/tmp/qasystem-runtime-ready"))
+        self.ready_file = Path(config_getenv("EXECUTION_RUNTIME_READY_FILE", "/tmp/qasystem-runtime-ready"))
         self.ready_file.unlink(missing_ok=True)
 
     def stop(self, *_args) -> None:
@@ -84,19 +85,19 @@ class RuntimeSupervisor:
             "-m",
             "vllm.entrypoints.openai.api_server",
             "--model",
-            os.getenv("VLLM_MODEL_PATH", "/models/mineru/vlm"),
+            config_getenv("VLLM_MODEL_PATH", "/models/mineru/vlm"),
             "--host",
             "127.0.0.1",
             "--port",
             str(port),
             "--served-model-name",
-            os.getenv("VLLM_SERVED_MODEL_NAME", "mineru-vlm"),
+            config_getenv("VLLM_SERVED_MODEL_NAME", "mineru-vlm"),
             "--gpu-memory-utilization",
-            os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.82"),
+            config_getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.82"),
             "--max-num-seqs",
-            os.getenv("VLLM_MAX_NUM_SEQS", "32"),
+            config_getenv("VLLM_MAX_NUM_SEQS", "32"),
         ]
-        command.extend(shlex.split(os.getenv("VLLM_EXTRA_ARGS", "")))
+        command.extend(shlex.split(config_getenv("VLLM_EXTRA_ARGS", "")))
         return command
 
     def _planned_engine_ports(self) -> list[int]:
@@ -108,7 +109,7 @@ class RuntimeSupervisor:
         """
         if is_remote_only():
             return []
-        if not self.gpu_ids or os.getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+        if not self.gpu_ids or config_getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
             return []
         return [self.base_port + index for index in range(len(self.gpu_ids))]
 
@@ -133,8 +134,8 @@ class RuntimeSupervisor:
                 future.result()
 
     def _wait_until_warm(self, gpu_id: str, port: int, process: subprocess.Popen) -> None:
-        deadline = time.monotonic() + float(os.getenv("VLLM_STARTUP_TIMEOUT_SECONDS", "900"))
-        readiness_script = Path(os.getenv("VLLM_READINESS_SCRIPT", "/usr/local/bin/vllm_readiness.py"))
+        deadline = time.monotonic() + float(config_getenv("VLLM_STARTUP_TIMEOUT_SECONDS", "900"))
+        readiness_script = Path(config_getenv("VLLM_READINESS_SCRIPT", "/usr/local/bin/vllm_readiness.py"))
         while time.monotonic() < deadline and not self.stopping:
             exit_code = process.poll()
             if exit_code is not None:
@@ -153,7 +154,7 @@ class RuntimeSupervisor:
                     [sys.executable, str(readiness_script)],
                     env=env,
                     check=False,
-                    timeout=float(os.getenv("VLLM_WARMUP_TIMEOUT_SECONDS", "300")) + 15,
+                    timeout=float(config_getenv("VLLM_WARMUP_TIMEOUT_SECONDS", "300")) + 15,
                 )
             except subprocess.TimeoutExpired:
                 result = None
@@ -295,7 +296,7 @@ class RuntimeSupervisor:
 
 def main() -> None:
     logging.basicConfig(
-        level=os.getenv("EXECUTION_LOG_LEVEL", "INFO").upper(),
+        level=config_getenv("EXECUTION_LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
     supervisor = RuntimeSupervisor()

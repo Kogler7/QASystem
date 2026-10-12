@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 import json
 import logging
 import os
@@ -95,7 +96,7 @@ def _search_neighbors(
     triples: list[dict[str, Any]] = []
     found_entities: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    max_content = int(os.getenv("GRAPH_NEIGHBOR_CONTENT_MAX", "1200"))
+    max_content = int(config_getenv("GRAPH_NEIGHBOR_CONTENT_MAX", "1200"))
     head = {"id": node_id, "name": start_name, "labels": [], "properties": {}}
     for row in rows:
         mid = row.get("id", "")

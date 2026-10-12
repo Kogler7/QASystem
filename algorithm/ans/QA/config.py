@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 # config.py
 import os
 from dataclasses import dataclass
@@ -32,8 +33,8 @@ class Config:
     @classmethod
     def from_env(cls):
         """从环境变量加载配置"""
-        llm_model = os.getenv("GRAPH_LLM_MODEL") or cls.GRAPH_LLM_MODEL
-        llm_api_key = os.getenv("GRAPH_LLM_API_KEY") or cls.GRAPH_LLM_API_KEY
+        llm_model = config_getenv("GRAPH_LLM_MODEL") or cls.GRAPH_LLM_MODEL
+        llm_api_key = config_getenv("GRAPH_LLM_API_KEY") or cls.GRAPH_LLM_API_KEY
         return cls(
             GRAPH_LLM_MODEL=llm_model,
             GRAPH_LLM_API_KEY=llm_api_key,

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import base64
 import logging
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 from pathlib import Path as _Path
 
-_log_dir = _Path(os.getenv("AGENT_LOG_DIR") or tempfile.gettempdir()) / "agentcode"
+_log_dir = _Path(config_getenv("AGENT_LOG_DIR") or tempfile.gettempdir()) / "agentcode"
 try:
     _log_dir.mkdir(parents=True, exist_ok=True)
     _fh = logging.FileHandler(str(_log_dir / "shell_tool.log"), encoding="utf-8")

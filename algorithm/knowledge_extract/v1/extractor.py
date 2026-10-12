@@ -5,6 +5,7 @@ the authority: it normalizes identifiers, coerces property values, enforces the
 selected class scope, and rejects invented schema elements before graph output.
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -513,7 +514,7 @@ def extract_v2(
         0,
         json_retries
         if json_retries is not None
-        else int(os.getenv("KG_EXTRACT_LLM_JSON_RETRIES", os.getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
+        else int(config_getenv("KG_EXTRACT_LLM_JSON_RETRIES", config_getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
     )
 
     logger.info(
@@ -752,7 +753,7 @@ def summarize_text(
         0,
         json_retries
         if json_retries is not None
-        else int(os.getenv("KG_EXTRACT_LLM_JSON_RETRIES", os.getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
+        else int(config_getenv("KG_EXTRACT_LLM_JSON_RETRIES", config_getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
     )
 
     logger.info("summarize_text: text_len=%d model=%s", len(text), model)

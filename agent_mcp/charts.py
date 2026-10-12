@@ -4,6 +4,7 @@
 compose 中 agent-mcp 与 agent 容器共享 agent-output 卷，agent 容器内同路径可见。
 不导入 mcp_services（容器未挂该卷），直接同步调用 algorithm.visualization.charts.VisualizationExecutor。
 """
+from docker.configuration import getenv as config_getenv
 
 import os
 from functools import lru_cache
@@ -18,7 +19,7 @@ def _executor():
     from algorithm.visualization.charts import VisualizationExecutor
 
     default_dir = Path.cwd() / "agent" / "image_result"
-    return VisualizationExecutor(os.getenv("MCP_IMAGE_OUTPUT_DIR", str(default_dir)))
+    return VisualizationExecutor(config_getenv("MCP_IMAGE_OUTPUT_DIR", str(default_dir)))
 
 
 def _draw(method: str, data: dict[str, Any]) -> dict[str, Any]:

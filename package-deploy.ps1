@@ -34,6 +34,11 @@ if (-not $resolvedDeployDir.StartsWith($resolvedRepoRoot + [System.IO.Path]::Dir
 }
 
 Write-ProgressLog "[1/6] Preparing deployment directory"
+$configPython = Join-Path $repoRoot '.venv/Scripts/python.exe'
+if (-not (Test-Path -LiteralPath $configPython)) { $configPython = 'python' }
+Write-ProgressLog 'Checking versioned configuration declarations and consumers'
+& $configPython -m docker.config_contract
+if ($LASTEXITCODE -ne 0) { throw 'Configuration contract gate failed; packaging is blocked' }
 New-Item -ItemType Directory -Force -Path $deployDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $deployDir "models") | Out-Null
 New-Item -ItemType Directory -Force -Path $offlineDir | Out-Null
@@ -76,13 +81,14 @@ Set-Content -LiteralPath (Join-Path $deployDir ".env.example") -Value $deliveryE
 
 Write-ProgressLog "[3/6] Creating the read-only runtime source directory"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "external_services", "clef_service", "nanojev_service")) {
+foreach ($directory in @("backend", "algorithm", "mcp_services", "agent_mcp", "agent", "external_services", "clef_service", "nanojev_service")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "configuration.py", "config_contract.py", "config_database.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
 }
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docker/config-releases') -Destination (Join-Path $runtimeDir 'docker/config-releases') -Recurse -Force
 foreach ($file in @('ops', 'ops.py', 'ops.ps1')) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination (Join-Path $deployDir $file) -Force
 }

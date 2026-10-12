@@ -3,6 +3,7 @@
 所有查询经 KnowledgeMapClient → 前端接口，自动带权限过滤；
 用户上下文请求头由 app.py 的中间件捕获并随查询透传。
 """
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -18,7 +19,7 @@ from external_services.application import get_user_headers
 LOGGER = logging.getLogger(__name__)
 
 # 邻居/候选的 content 截断长度，避免超长文档撑爆 Agent 上下文
-CONTENT_MAX = int(os.getenv("AGENT_MCP_CONTENT_MAX", "1200"))
+CONTENT_MAX = int(config_getenv("AGENT_MCP_CONTENT_MAX", "1200"))
 
 # 只读防线：run_cypher 拒绝包含写子句的语句
 _WRITE_CLAUSE = re.compile(
@@ -84,7 +85,7 @@ _IN_LIST_UNSUPPORTED = False
 
 #: 根空间 → 子空间 id 的 TTL 缓存（子空间结构基本不变，避免每次检索都多一次图谱往返）。
 _SUBSPACE_CACHE: dict[str, tuple[float, tuple[str, ...]]] = {}
-_SUBSPACE_TTL = float(os.getenv("AGENT_MCP_SUBSPACE_TTL_SECONDS", "300"))
+_SUBSPACE_TTL = float(config_getenv("AGENT_MCP_SUBSPACE_TTL_SECONDS", "300"))
 
 
 def _child_space_ids(root_name: str) -> tuple[str, ...]:

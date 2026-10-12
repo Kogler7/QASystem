@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 import os
 
 from algorithm.embedding_runtime import encode, get_sentence_transformer
@@ -22,7 +23,7 @@ def _load_model(model_path: str):
 
 
 def _model_path(model_path: str | None = None) -> str:
-    return model_path or os.getenv("VECTOR_MODEL_PATH") or DEFAULT_MODEL_PATH
+    return model_path or config_getenv("VECTOR_MODEL_PATH") or DEFAULT_MODEL_PATH
 
 
 def text_to_vector(text: str, model_path: str | None = None) -> list[float]:

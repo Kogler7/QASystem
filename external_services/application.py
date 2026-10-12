@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 from contextlib import contextmanager
@@ -61,8 +62,8 @@ class ApplicationServiceError(RuntimeError):
 def get_application_service_url(explicit: str | None = None) -> str:
     return (
         explicit
-        or os.getenv("APPLICATION_SERVICE_URL", "").strip()
-        or os.getenv("FILE_SERVICE_URL", "").strip()
+        or config_getenv("APPLICATION_SERVICE_URL", "").strip()
+        or config_getenv("FILE_SERVICE_URL", "").strip()
     ).rstrip("/")
 
 
@@ -107,7 +108,7 @@ def bind_user_headers(headers: dict[str, str] | None) -> Iterator[None]:
 class ApplicationServiceClient:
     def __init__(self, base_url: str | None = None, timeout: float | None = None):
         self.base_url = get_application_service_url(base_url)
-        self.timeout = timeout or float(os.getenv("APPLICATION_SERVICE_TIMEOUT_SECONDS", "30"))
+        self.timeout = timeout or float(config_getenv("APPLICATION_SERVICE_TIMEOUT_SECONDS", "30"))
 
     def _headers(self) -> dict[str, str]:
         return {

@@ -4,6 +4,7 @@ Pools are keyed by a server-controlled quota group, never by algorithm version.
 They deliberately do not claim to coordinate quotas across worker processes.
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 from collections import deque
 from contextlib import contextmanager
@@ -173,7 +174,7 @@ def create_request_llm(config: dict[str, Any]):
         package = version
     module = importlib.import_module(f"algorithm.knowledge_extract.{package}.llm_client")
     factory = module.create_llm_client
-    credential = os.getenv(config["api_key_env"], "")
+    credential = config_getenv(config["api_key_env"], "")
     if config["provider"] != "default" and not credential.strip():
         raise ValueError("Extraction provider credential is not configured")
     llm = factory(base_url=config["base_url"], api_key=credential,
@@ -184,7 +185,7 @@ def create_request_llm(config: dict[str, Any]):
     llm.max_input_tokens = int(config.get("max_input_tokens", 65536))
     llm.max_output_tokens = int(config.get("max_output_tokens") or config["max_tokens"])
     from algorithm.extraction_trace import ExtractionTrace
-    trace_root = os.getenv("KG_EXTRACT_TRACE_DIR", "tmp/extraction-traces").strip()
+    trace_root = config_getenv("KG_EXTRACT_TRACE_DIR", "tmp/extraction-traces").strip()
     if trace_root:
         llm.extraction_trace = ExtractionTrace(trace_root, config=config, secrets=(credential,))
         llm.client.extraction_trace = llm.extraction_trace

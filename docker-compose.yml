@@ -16,6 +16,7 @@ services:
       # 命名卷覆盖，写操作不回落到源码目录。
       - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}:/app/runtime-config:ro
+      - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
@@ -55,6 +56,7 @@ services:
       # 整项目目录挂载为 /app（只读）；Agent 输出写入下方命名卷。
       - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}:/app/runtime-config:ro
+      - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - agent-output:/app/agent/image_result
@@ -88,6 +90,7 @@ services:
     volumes:
       - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}:/app/runtime-config:ro
+      - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
@@ -114,6 +117,7 @@ services:
     volumes:
       - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
       - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}:/app/runtime-config:ro
+      - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro

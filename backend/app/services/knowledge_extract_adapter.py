@@ -35,6 +35,7 @@ Two deliberate choices worth knowing about for the V2 path:
   failure attribution remains meaningful.
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 from algorithm.table_jsonl import decode_records, row_boundaries
@@ -88,7 +89,7 @@ def publish_best_effort_graph() -> bool:
     设为 0 恢复旧行为（响应 ``graph`` 置空，图谱仅出现在 ``isolated_graph``）。
     读取方式与 ``KG_EXTRACT_STRICT_CHUNK_FAILURES`` 一致：调用时读环境变量。
     """
-    value = str(os.environ.get("KG_EXTRACT_PUBLISH_BEST_EFFORT", "1")).strip().lower()
+    value = str(config_getenv("KG_EXTRACT_PUBLISH_BEST_EFFORT", "1")).strip().lower()
     return value not in {"0", "false", "no"}
 
 

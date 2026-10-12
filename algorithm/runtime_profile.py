@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import os
 
@@ -8,7 +9,7 @@ FULL_RUNTIME = "full-runtime"
 
 
 def get_runtime_profile() -> str:
-    value = os.getenv("ALGORITHM_RUNTIME_PROFILE", FULL_RUNTIME).strip().lower()
+    value = config_getenv("ALGORITHM_RUNTIME_PROFILE", FULL_RUNTIME).strip().lower()
     if value in {REMOTE_ONLY, FULL_RUNTIME}:
         return value
     raise ValueError(

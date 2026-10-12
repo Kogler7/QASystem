@@ -1,5 +1,6 @@
 """Request-scoped extraction configuration; snapshots never contain credentials."""
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv, UndeclaredConfigurationError
 
 from copy import deepcopy
 import importlib
@@ -62,7 +63,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
     """Resolve non-secret defaults once at submission, not again on retry."""
     hot = read_settings()
     def setting(key, default=None):
-        return hot.get(key, os.getenv(key, default))
+        return hot.get(key, config_getenv(key, default))
     version = options.get("version") or str(setting("KG_EXTRACT_ALGO_VERSION", "latest")).strip().lower()
     if version not in SUPPORTED_VERSIONS:
         raise ValueError("Unsupported extraction version")
@@ -155,6 +156,6 @@ def snapshot_payload(operation: str, payload: Any) -> Any:
     # Always replace caller-supplied internal data at the submission boundary.
     try:
         result["__extraction_config"] = resolve_config(options)
-    except ValueError:
+    except (ValueError, UndeclaredConfigurationError):
         raise ExtractionConfigurationError("Invalid extraction configuration or unavailable provider profile") from None
     return result

@@ -10,6 +10,7 @@
 """
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import os
@@ -25,12 +26,12 @@ def _load_env() -> dict[str, Any]:
     if root_env.exists():
         load_dotenv(root_env, override=False)
     return {
-        "base_url": (os.getenv("AGENT_LLM_BASE_URL") or "http://localhost:9999").strip(),
-        "api_key": (os.getenv("AGENT_LLM_API_KEY") or "").strip(),
-        "model": (os.getenv("AGENT_LLM_MODEL") or "Qwen/Qwen3-8B").strip(),
-        "temperature": float(os.getenv("AGENT_TEMPLATE_TEMPERATURE") or 0.2),
-        "max_tokens": int(os.getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),
-        "timeout_s": int(os.getenv("AGENT_TEMPLATE_TIMEOUT_SECONDS") or 120),
+        "base_url": (config_getenv("AGENT_LLM_BASE_URL") or "http://localhost:9999").strip(),
+        "api_key": (config_getenv("AGENT_LLM_API_KEY") or "").strip(),
+        "model": (config_getenv("AGENT_LLM_MODEL") or "Qwen/Qwen3-8B").strip(),
+        "temperature": float(config_getenv("AGENT_TEMPLATE_TEMPERATURE") or 0.2),
+        "max_tokens": int(config_getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),
+        "timeout_s": int(config_getenv("AGENT_TEMPLATE_TIMEOUT_SECONDS") or 120),
     }
 
 
@@ -47,12 +48,12 @@ def _chat_completions_url(base_url: str) -> str:
 def _default_mcp_path() -> Path:
     """获取默认 MCP 配置文件路径，优先 AGENT_MCP_CONFIG 环境变量。"""
     for candidate in [
-        Path(os.getenv("AGENT_MCP_CONFIG") or ""),
+        Path(config_getenv("AGENT_MCP_CONFIG") or ""),
         Path(__file__).resolve().parent / "tools" / "mcp_tools" / "mcp_config.json",
     ]:
         if candidate.is_file():
             return candidate
-    return Path(os.getenv("AGENT_MCP_CONFIG") or "mcp_config.json")
+    return Path(config_getenv("AGENT_MCP_CONFIG") or "mcp_config.json")
 
 
 def _messages_to_openai(agent_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:

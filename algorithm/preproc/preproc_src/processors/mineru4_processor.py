@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import os
@@ -149,7 +150,7 @@ class Mineru4Processor(BaseProcessor):
         if not worker.is_file():
             raise RuntimeError(f"缺少 4.x 子进程 worker：{worker}")
 
-        timeout = int(os.getenv("MINERU4_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS)
+        timeout = int(config_getenv("MINERU4_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS)
         workdir = tempfile.mkdtemp(prefix="mineru4-")
         try:
             cmd = [
@@ -180,7 +181,7 @@ class Mineru4Processor(BaseProcessor):
 
     @staticmethod
     def _resolve_tier(explicit: str | None) -> str:
-        tier = (explicit or os.getenv("MINERU4_TIER") or DEFAULT_TIER).strip().lower()
+        tier = (explicit or config_getenv("MINERU4_TIER") or DEFAULT_TIER).strip().lower()
         return tier if tier in TIERS else DEFAULT_TIER
 
     @staticmethod

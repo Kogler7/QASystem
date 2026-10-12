@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -58,12 +59,12 @@ class MemoryCompactor:
 
         self._encoding = tiktoken.get_encoding("cl100k_base")
 
-        api_key = api_key or os.environ.get("AGENT_LLM_API_KEY", "")
-        base_url = base_url or os.environ.get("AGENT_LLM_BASE_URL", "http://localhost:9999")
+        api_key = api_key or config_getenv("AGENT_LLM_API_KEY", "")
+        base_url = base_url or config_getenv("AGENT_LLM_BASE_URL", "http://localhost:9999")
         self._client: OpenAI | None = None
         if api_key:
             self._client = OpenAI(base_url=base_url, api_key=api_key)
-        self._model = model or os.environ.get("AGENT_LLM_MODEL", "") or DEFAULT_MODEL
+        self._model = model or config_getenv("AGENT_LLM_MODEL", "") or DEFAULT_MODEL
 
         self._transcript_dir = Path(transcript_dir) if transcript_dir else None
 

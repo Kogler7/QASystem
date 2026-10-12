@@ -12,6 +12,7 @@ worker 拿到任务后先走 run_orchestrated 入口：
 """
 
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -55,11 +56,11 @@ class DecompSettings:
     @classmethod
     def from_env(cls) -> "DecompSettings":
         def _flag(name: str, default: str = "1") -> bool:
-            return os.getenv(name, default).strip().lower() not in {"0", "false", "off", "no", ""}
+            return config_getenv(name, default).strip().lower() not in {"0", "false", "off", "no", ""}
 
         def _clamped(name: str, default: int, lo: int, hi: int) -> int:
             try:
-                return min(max(int(os.getenv(name, str(default))), lo), hi)
+                return min(max(int(config_getenv(name, str(default))), lo), hi)
             except (TypeError, ValueError):
                 return default
 

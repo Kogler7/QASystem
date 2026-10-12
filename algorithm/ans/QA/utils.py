@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 import os
 import time
 
@@ -13,18 +14,18 @@ def run_llm(
     engine: str = "Qwen/Qwen3-8B",
 ) -> str:
     """调用图谱检索专用 LLM；失败时重试并返回明确错误标记。"""
-    model = engine or os.getenv("GRAPH_LLM_MODEL", "Qwen/Qwen3-8B")
+    model = engine or config_getenv("GRAPH_LLM_MODEL", "Qwen/Qwen3-8B")
     default_host = "host.docker.internal" if os.path.exists("/.dockerenv") else "127.0.0.1"
-    base_url = os.getenv("GRAPH_LLM_BASE_URL", f"http://{default_host}:9999").rstrip("/")
-    key = api_key or os.getenv("GRAPH_LLM_API_KEY", "")
-    verify_ssl = os.getenv("GRAPH_LLM_VERIFY_SSL", "true").lower() not in {
+    base_url = config_getenv("GRAPH_LLM_BASE_URL", f"http://{default_host}:9999").rstrip("/")
+    key = api_key or config_getenv("GRAPH_LLM_API_KEY", "")
+    verify_ssl = config_getenv("GRAPH_LLM_VERIFY_SSL", "true").lower() not in {
         "false",
         "0",
         "no",
         "off",
     }
-    retries = max(1, int(os.getenv("GRAPH_LLM_RETRIES", "3")))
-    timeout = float(os.getenv("GRAPH_LLM_TIMEOUT_SECONDS", "60"))
+    retries = max(1, int(config_getenv("GRAPH_LLM_RETRIES", "3")))
+    timeout = float(config_getenv("GRAPH_LLM_TIMEOUT_SECONDS", "60"))
     messages = [
         {
             "role": "system",

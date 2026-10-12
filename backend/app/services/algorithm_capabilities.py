@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -220,7 +221,7 @@ def _strict_chunk_failures() -> bool:
     避免"一片失败 → 整篇 500"；需要旧行为时设环境变量
     KG_EXTRACT_STRICT_CHUNK_FAILURES=1。
     """
-    return str(os.environ.get("KG_EXTRACT_STRICT_CHUNK_FAILURES", "")).strip().lower() in {"1", "true", "yes"}
+    return str(config_getenv("KG_EXTRACT_STRICT_CHUNK_FAILURES", "")).strip().lower() in {"1", "true", "yes"}
 
 
 def _extraction_error(failed: list[dict[str, Any]], total_count: int) -> ErrorCode:

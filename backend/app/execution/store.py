@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import os
@@ -157,8 +158,8 @@ class RedisExecutionStore:
             socket_connect_timeout=3,
             socket_timeout=5,
         )
-        self.prefix = prefix or os.getenv("EXECUTION_KEY_PREFIX", "qasystem:execution")
-        self.event_maxlen = int(os.getenv("EXECUTION_EVENT_MAXLEN", "10000"))
+        self.prefix = prefix or config_getenv("EXECUTION_KEY_PREFIX", "qasystem:execution")
+        self.event_maxlen = int(config_getenv("EXECUTION_EVENT_MAXLEN", "10000"))
 
     def _job_key(self, job_id: str) -> str:
         return f"{self.prefix}:job:{job_id}"
@@ -189,7 +190,7 @@ class RedisExecutionStore:
         }
         encoded = {key: _json(value) for key, value in job.items()}
         self.redis.hset(self._job_key(job_id), mapping=encoded)
-        self.redis.expire(self._job_key(job_id), int(os.getenv("EXECUTION_JOB_TTL", "604800")))
+        self.redis.expire(self._job_key(job_id), int(config_getenv("EXECUTION_JOB_TTL", "604800")))
         return job
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
@@ -213,7 +214,7 @@ class RedisExecutionStore:
     def create_execution(self, job_id: str, **fields: Any) -> dict[str, Any]:
         record = {"execution_id": uuid.uuid4().hex, **fields}
         self.redis.rpush(self._execution_key(job_id), _json(record))
-        self.redis.expire(self._execution_key(job_id), int(os.getenv("EXECUTION_JOB_TTL", "604800")))
+        self.redis.expire(self._execution_key(job_id), int(config_getenv("EXECUTION_JOB_TTL", "604800")))
         return record
 
     def update_execution(self, job_id: str, execution_id: str, **fields: Any) -> dict[str, Any] | None:
@@ -272,7 +273,7 @@ class RedisExecutionStore:
         self.redis.set(
             self._auth_context_key(auth_context_id),
             _json({"job_id": job_id, "headers": headers}),
-            ex=int(os.getenv("EXECUTION_AUTH_CONTEXT_TTL_SECONDS", "3600")),
+            ex=int(config_getenv("EXECUTION_AUTH_CONTEXT_TTL_SECONDS", "3600")),
         )
         return auth_context_id
 
@@ -295,7 +296,7 @@ _STORE_KEY: str | None = None
 
 def get_execution_store() -> MemoryExecutionStore | RedisExecutionStore:
     global _STORE, _STORE_KEY
-    url = os.getenv("EXECUTION_REDIS_URL", "").strip()
+    url = config_getenv("EXECUTION_REDIS_URL", "").strip()
     key = url or "memory"
     with _STORE_LOCK:
         if _STORE is not None and _STORE_KEY == key:

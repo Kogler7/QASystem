@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import re
 import sys
+from functools import lru_cache
+import subprocess
 
 try:
     from docker.runtime_config import HOT_KEYS, read_document
@@ -31,6 +33,18 @@ def safe_value(key, value):
     if sensitive(key) or re.search(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+@', value):
         return {'value': '[凭据已隐藏]', 'fingerprint': digest(value.encode())}
     return {'value': value}
+
+
+def source_version():
+    source = Path(__file__).resolve().parents[1]
+    marker = source / 'SOURCE_COMMIT'
+    if marker.is_file():
+        return marker.read_text(encoding='utf-8-sig').strip()
+    if (source / '.git').exists():
+        result = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=source, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    return 'unknown'
 
 
 def snapshot(root, directory, *, payloads=None):
@@ -65,6 +79,16 @@ def snapshot(root, directory, *, payloads=None):
              '.env.example': digest(content(template)),
              'release.env.example': digest(content(release)),
              'models.compose.json': digest(content(directory / 'models.compose.json'))}
+    declaration = Path(__file__).with_name('config-declarations.json')
+    files['config-declarations.json'] = digest(declaration.read_bytes()) if declaration.exists() else digest(b'')
+    values['release.source_commit'] = {'value': source_version()}
+    if declaration.exists():
+        registry = json.loads(declaration.read_text(encoding='utf-8'))
+        values['declarations.version'] = {'value': registry['version']}
+        for key, item in registry['items'].items():
+            values['declarations.' + key] = {**safe_value(key, str(item['default'])),
+                'description': item['desc'], 'mode': item['mode'], 'consumers': item['consumers'],
+                'fallbacks': item.get('fallbacks', [])}
     catalog = read_env(content(template).decode('utf-8-sig'))
     comments, descriptions = [], {}
     for line in content(template).decode('utf-8-sig').splitlines():
@@ -111,10 +135,12 @@ def changes(previous, current):
         after = new.get(key, {}).get('value', '(无)')
         mode = '新请求热更' if key.startswith('settings.') else '配置清单升级' if key.startswith('catalog.') else '重新创建容器'
         result.append(f'[{action}] {key}: {before} → {after}  [{mode}]')
-        if key.startswith('catalog.') and old.get(key, {}).get('description') != new.get(key, {}).get('description'):
+        if key.startswith(('catalog.', 'declarations.')) and old.get(key, {}).get('description') != new.get(key, {}).get('description'):
             result.append(f"  说明: {old.get(key, {}).get('description', '(无)')} → {new.get(key, {}).get('description', '(无)')}")
-        if key.startswith('catalog.') and old.get(key, {}).get('mode') != new.get(key, {}).get('mode'):
+        if key.startswith(('catalog.', 'declarations.')) and old.get(key, {}).get('mode') != new.get(key, {}).get('mode'):
             result.append(f"  生效方式: {old.get(key, {}).get('mode', '(无)')} → {new.get(key, {}).get('mode', '(无)')}")
+        if key.startswith('declarations.') and any(old.get(key, {}).get(field) != new.get(key, {}).get(field) for field in ('consumers', 'fallbacks')):
+            result.append('  消费者或兼容回退发生变化，请核对当前版本声明')
     if previous:
         for name, value in current['files'].items():
             if previous['snapshot']['files'].get(name) != value:
@@ -122,7 +148,7 @@ def changes(previous, current):
     return result
 
 
-def record(directory, current, *, reason, reviewer):
+def record(directory, current, *, reason, reviewer, root=None):
     """Only called after interactive review; no CLI auto-approval option exists."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -132,6 +158,8 @@ def record(directory, current, *, reason, reviewer):
     data = {'schema': 1, 'revision': revision, 'time': datetime.now(timezone.utc).isoformat(),
             'reviewer': reviewer, 'reason': reason, 'previous': digest(json.dumps(previous, sort_keys=True).encode()) if previous else None,
             'changes': changes(previous, current), 'snapshot': current}
+    from docker.config_database import record_approval
+    record_approval(directory, data, root=root)
     history = directory / 'history'
     history.mkdir(mode=0o700, exist_ok=True)
     target = history / f'{revision:06d}-{digest(json.dumps(data, sort_keys=True).encode())[:12]}.json'
@@ -140,22 +168,53 @@ def record(directory, current, *, reason, reviewer):
     return revision
 
 
-def verified_record(directory):
-    previous = approved(directory)
-    if previous is None:
-        raise ValueError('配置尚未人工确认；请打开 CLI UI，审核差异并确认保存')
-    history = Path(directory) / 'history'
-    filename = f"{int(previous['revision']):06d}-{digest(json.dumps(previous, sort_keys=True).encode())[:12]}.json"
+@lru_cache(maxsize=8)
+def _runtime_record(raw):
     try:
-        if json.loads((history / filename).read_text(encoding='utf-8')) != previous:
+        data = json.loads(raw)
+        if (not isinstance(data, dict) or data.get('schema') != 1 or
+                not isinstance(data.get('revision'), int) or data['revision'] < 1 or
+                not isinstance(data.get('snapshot'), dict) or
+                not isinstance(data['snapshot'].get('files'), dict) or
+                not isinstance(data['snapshot'].get('values'), dict)):
             raise ValueError
+        return data
+    except (ValueError, TypeError):
+        raise ValueError('配置批准记录损坏；请在 CLI UI 中重新审核') from None
+
+
+@lru_cache(maxsize=8)
+def _history_name(raw):
+    previous = _runtime_record(raw)
+    return f"{int(previous['revision']):06d}-{digest(json.dumps(previous, sort_keys=True).encode())[:12]}.json"
+
+
+@lru_cache(maxsize=8)
+def _verified_bytes(raw, history_raw):
+    previous = _runtime_record(raw)
+    if json.loads(history_raw) != previous:
+        raise ValueError('配置批准记录与历史记录不一致；禁止部署，请重新人工审核')
+    return previous
+
+
+def verified_record(directory):
+    path = Path(directory) / 'approved-config.json'
+    if not path.is_file():
+        raise ValueError('配置尚未人工确认；请打开 CLI UI，审核差异并确认保存')
+    raw = path.read_bytes()
+    history = Path(directory) / 'history'
+    filename = _history_name(raw)
+    try:
+        return _verified_bytes(raw, (history / filename).read_bytes())
     except (OSError, ValueError):
         raise ValueError('配置批准记录与历史记录不一致；禁止部署，请重新人工审核') from None
-    return previous
 
 
 def require_runtime(directory, *, config_bytes=None):
     previous = verified_record(directory)
+    declaration = Path(__file__).with_name('config-declarations.json')
+    if declaration.exists() and digest(declaration.read_bytes()) != previous['snapshot']['files'].get('config-declarations.json'):
+        raise ValueError('配置声明版本变化；请在 CLI UI 审核升级')
     for name in ('config.json', 'models.compose.json'):
         path = Path(directory) / name
         raw = config_bytes if name == 'config.json' and config_bytes is not None else path.read_bytes() if path.is_file() else None
@@ -165,6 +224,12 @@ def require_runtime(directory, *, config_bytes=None):
 
 
 def require(root, directory):
+    from docker.config_contract import require_contract
+    # Validate current source, including an external packaged source directory.
+    source = Path(__file__).resolve().parents[1]
+    errors = require_contract(source)
+    if errors:
+        raise ValueError('配置声明门禁失败：' + '；'.join(errors))
     previous = verified_record(directory)
     current = snapshot(root, directory)
     if current != previous['snapshot']:

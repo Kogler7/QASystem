@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import importlib.util
 import os
@@ -19,7 +20,6 @@ MODEL_PATHS = {
 }
 OPTIONAL_MODEL_ENV = (
     "VECTOR_MODEL_PATH",
-    "CONFIDENCE_SBERT_MODEL_PATH",
     "NL2CYPHER_EMBEDDING_MODEL_PATH",
 )
 
@@ -31,7 +31,7 @@ def _directory_check(path: Path) -> dict[str, Any]:
 
 
 def _optional_directory_check(name: str) -> dict[str, Any]:
-    value = os.getenv(name, "").strip()
+    value = config_getenv(name, "").strip()
     if not value:
         return {"ok": True, "skipped": True, "reason": "未配置"}
     return _directory_check(Path(value))
@@ -86,8 +86,8 @@ def runtime_checks() -> dict[str, Any]:
         }
     else:
         checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
-        checks["mineru4"] = _directory_check(Path(os.getenv("MINERU_MODEL_BASE_DIR", "/models/mineru4")))
-        if os.getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+        checks["mineru4"] = _directory_check(Path(config_getenv("MINERU_MODEL_BASE_DIR", "/models/mineru4")))
+        if config_getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
             checks["mineru_vlm"] = {"ok": True, "skipped": True, "reason": "VLLM 未启用，2.x VLM 权重不参与运行"}
         else:
             checks["mineru_vlm"] = _directory_check(Path("/models/mineru/vlm"))
@@ -96,7 +96,7 @@ def runtime_checks() -> dict[str, Any]:
 
 
 def dependency_checks() -> dict[str, Any]:
-    database_port = os.getenv("DATABASE_PORT", "3306")
+    database_port = config_getenv("DATABASE_PORT", "3306")
     try:
         database_port_number = int(database_port)
     except ValueError:
@@ -104,9 +104,9 @@ def dependency_checks() -> dict[str, Any]:
     from external_services.application import get_application_service_url
 
     checks = {
-        "mysql": _tcp_check("mysql", os.getenv("DATABASE_HOST", "").strip(), database_port_number),
+        "mysql": _tcp_check("mysql", config_getenv("DATABASE_HOST", "").strip(), database_port_number),
         "knowledge_llm": _url_tcp_check(
-            "knowledge_llm", os.getenv("KG_EXTRACT_LLM_BASE_URL", "").strip(), 80
+            "knowledge_llm", config_getenv("KG_EXTRACT_LLM_BASE_URL", "").strip(), 80
         ),
         "application_service": _url_tcp_check(
             "application_service", get_application_service_url(), 80
@@ -114,10 +114,10 @@ def dependency_checks() -> dict[str, Any]:
     }
     if is_remote_only():
         checks["document_parse_service"] = _required_url_tcp_check(
-            "document_parse_service", os.getenv("DOCUMENT_PARSE_SERVICE_URL", "").strip(), 80
+            "document_parse_service", config_getenv("DOCUMENT_PARSE_SERVICE_URL", "").strip(), 80
         )
         checks["embedding_service"] = _required_url_tcp_check(
-            "embedding_service", os.getenv("EMBEDDING_SERVICE_URL", "").strip(), 80
+            "embedding_service", config_getenv("EMBEDDING_SERVICE_URL", "").strip(), 80
         )
     return checks
 

@@ -15,6 +15,7 @@
   不会进入任何记录文件。所有落盘逻辑整体兜底：任何失败只告警，绝不影响响应。
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import contextvars
 import json
@@ -42,12 +43,12 @@ _FALSE_VALUES = {"0", "false", "no", "off"}
 
 def recording_enabled() -> bool:
     """KG_API_RECORD_ENABLED：默认开；仅显式 0/false/no/off 关闭。"""
-    return os.getenv("KG_API_RECORD_ENABLED", "1").strip().lower() not in _FALSE_VALUES
+    return config_getenv("KG_API_RECORD_ENABLED", "1").strip().lower() not in _FALSE_VALUES
 
 
 def record_root() -> Path:
     """记录根目录：KG_API_RECORD_DIR，默认 backend/data/api_records（容器可写卷）。"""
-    configured = os.getenv("KG_API_RECORD_DIR", "").strip()
+    configured = config_getenv("KG_API_RECORD_DIR", "").strip()
     if configured:
         return Path(configured)
     return Path(__file__).resolve().parents[1] / "data" / "api_records"
@@ -55,7 +56,7 @@ def record_root() -> Path:
 
 def record_retention_days() -> float:
     """KG_API_RECORD_RETENTION_DAYS：默认 7；非法值按默认；<=0 表示不清理。"""
-    raw = os.getenv("KG_API_RECORD_RETENTION_DAYS", "7").strip()
+    raw = config_getenv("KG_API_RECORD_RETENTION_DAYS", "7").strip()
     try:
         return float(raw)
     except ValueError:

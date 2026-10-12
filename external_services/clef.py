@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import json
 import math
@@ -71,7 +72,7 @@ class ClefFlashClient:
         if not self.path or not self.path.startswith("/") or self.path.startswith("//"):
             raise ModelServiceError("CLEF_SERVICE_PATH 必须是服务内的绝对路径")
         self.model = model or getenv("CLEF_MODEL", "").strip() or "clef-flash"
-        self.api_key = os.getenv(f"{env_prefix}_SERVICE_API_KEY", "").strip()
+        self.api_key = config_getenv(f"{env_prefix}_SERVICE_API_KEY", "").strip()
         try:
             self.timeout = float(
                 timeout if timeout is not None else getenv(f"{env_prefix}_SERVICE_TIMEOUT_SECONDS", "120")

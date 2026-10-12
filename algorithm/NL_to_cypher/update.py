@@ -3,6 +3,7 @@
 知识更新服务 - Neo4j + Milvus 同步脚本
 向量化使用 transformers 直接加载 bge-small-zh-v1.5，不依赖 sentence-transformers
 """
+from docker.configuration import getenv as config_getenv
 import json
 import os
 import uuid
@@ -32,7 +33,7 @@ PROXIES = {"http": None, "https": None}
 
 def _binding_device() -> str | None:
     """Return 'cuda' only when this process is explicitly bound to specific GPUs."""
-    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    visible = config_getenv("CUDA_VISIBLE_DEVICES", "").strip()
     if visible and visible.lower() not in {"", "none", "no", "-1", "all"}:
         return "cuda"
     return None

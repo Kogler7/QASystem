@@ -5,6 +5,7 @@ It answers a Jev-shaped ``state + questions`` request in one forward pass and
 does not decode text.  Harness code in ``jev_harness`` decides what to ask.
 """
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import importlib.util
 import os
@@ -24,7 +25,7 @@ _TRAINER_RELATIVE = Path("source") / "scripts" / "train_toy_decisions.py"
 
 def _binding_device() -> str:
     """Match embedding_runtime: CUDA only when this process is GPU-bound."""
-    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    visible = config_getenv("CUDA_VISIBLE_DEVICES", "").strip()
     if visible and visible.lower() not in {"", "none", "no", "-1", "all"}:
         return "cuda"
     return "cpu"
@@ -250,7 +251,7 @@ def create_jev_client(*, model_path: str | None = None) -> JevClient:
     """Load NanoJev.  Callers must only do this when Jev is enabled."""
     from algorithm.runtime_profile import is_remote_only
 
-    if model_path is None and os.getenv("NANOJEV_SERVICE_URL", "").strip():
+    if model_path is None and config_getenv("NANOJEV_SERVICE_URL", "").strip():
         return RemoteNanoJevClient()
     if is_remote_only():
         raise JevUnavailableError("remote-only 模式禁止加载本地 NanoJev")

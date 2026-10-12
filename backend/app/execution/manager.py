@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import base64
 import copy
@@ -58,8 +59,8 @@ class ExecutionManager:
         self.hub = hub or get_event_hub()
         self.queue = get_task_queue(self.store)
         self.scheduler = ResourceScheduler(self.store)
-        self.mode = os.getenv("EXECUTION_MODE", "async").strip().lower()
-        self.allow_memory_queue = os.getenv("EXECUTION_ALLOW_MEMORY_QUEUE", "false").lower() in {
+        self.mode = config_getenv("EXECUTION_MODE", "async").strip().lower()
+        self.allow_memory_queue = config_getenv("EXECUTION_ALLOW_MEMORY_QUEUE", "false").lower() in {
             "1", "true", "yes", "on"
         }
         if self.mode not in {"async", "inline"}:
@@ -105,35 +106,35 @@ class ExecutionManager:
         reserved = (envelope or {}).get("reserved_allocation")
         if isinstance(reserved, dict):
             allocation = copy.deepcopy(reserved)
-            allocation.setdefault("worker_id", os.getenv("EXECUTION_WORKER_ID", "gateway-inline"))
-            allocation.setdefault("worker_instance_id", os.getenv("EXECUTION_WORKER_INSTANCE_ID", f"pid-{os.getpid()}"))
+            allocation.setdefault("worker_id", config_getenv("EXECUTION_WORKER_ID", "gateway-inline"))
+            allocation.setdefault("worker_instance_id", config_getenv("EXECUTION_WORKER_INSTANCE_ID", f"pid-{os.getpid()}"))
             allocation.setdefault("process_id", os.getpid())
-            allocation.setdefault("runtime", os.getenv("HOSTNAME", socket.gethostname()))
+            allocation.setdefault("runtime", config_getenv("HOSTNAME", socket.gethostname()))
             allocation.setdefault("host_id", socket.gethostname())
             allocation.setdefault("resource_class", resource_class)
-            allocation.setdefault("model", os.getenv("EXECUTION_MODEL"))
-            allocation.setdefault("endpoint", os.getenv("MINERU_VLM_SERVER_URL") if resource_class == "gpu.vlm" else None)
+            allocation.setdefault("model", config_getenv("EXECUTION_MODEL"))
+            allocation.setdefault("endpoint", config_getenv("MINERU_VLM_SERVER_URL") if resource_class == "gpu.vlm" else None)
             return allocation
-        external_device = os.getenv("EXECUTION_GPU_DEVICE", "").strip()
-        visible = external_device or os.getenv("CUDA_VISIBLE_DEVICES", "").strip()
+        external_device = config_getenv("EXECUTION_GPU_DEVICE", "").strip()
+        visible = external_device or config_getenv("CUDA_VISIBLE_DEVICES", "").strip()
         physical = [item.strip() for item in visible.split(",") if item.strip()]
         allocation: dict[str, Any] = {
-            "worker_id": os.getenv("EXECUTION_WORKER_ID", "gateway-inline"),
-            "worker_instance_id": os.getenv("EXECUTION_WORKER_INSTANCE_ID", f"pid-{os.getpid()}"),
+            "worker_id": config_getenv("EXECUTION_WORKER_ID", "gateway-inline"),
+            "worker_instance_id": config_getenv("EXECUTION_WORKER_INSTANCE_ID", f"pid-{os.getpid()}"),
             "process_id": os.getpid(),
-            "runtime": os.getenv("HOSTNAME", socket.gethostname()),
+            "runtime": config_getenv("HOSTNAME", socket.gethostname()),
             "host_id": socket.gethostname(),
-            "model": os.getenv("EXECUTION_MODEL", None),
+            "model": config_getenv("EXECUTION_MODEL", None),
             "resource_class": resource_class,
             "gpu_allocations": [],
         }
         if resource_class.startswith("gpu"):
-            lease_mode = os.getenv("EXECUTION_GPU_LEASE_MODE", "auto").strip().lower()
+            lease_mode = config_getenv("EXECUTION_GPU_LEASE_MODE", "auto").strip().lower()
             if not external_device and lease_mode not in {"external", "disabled", "none"}:
                 try:
                     leases = self.scheduler.acquire(resource_class)
                 except ResourceLeaseUnavailable:
-                    if os.getenv("EXECUTION_GPU_SCHEDULING_REQUIRED", "false").lower() in {"1", "true", "yes", "on"}:
+                    if config_getenv("EXECUTION_GPU_SCHEDULING_REQUIRED", "false").lower() in {"1", "true", "yes", "on"}:
                         raise
                     leases = []
                 allocation["gpu_allocations"] = [lease.as_dict() for lease in leases]
@@ -148,10 +149,10 @@ class ExecutionManager:
                     }
                     for index, item in enumerate(physical)
                 ]
-            allocation["model"] = os.getenv("EXECUTION_MODEL") or allocation["model"]
-            allocation["model_version"] = os.getenv("EXECUTION_MODEL_VERSION")
-            allocation["model_instance_id"] = os.getenv("EXECUTION_MODEL_INSTANCE_ID")
-            allocation["endpoint"] = os.getenv("MINERU_VLM_SERVER_URL") if resource_class == "gpu.vlm" else None
+            allocation["model"] = config_getenv("EXECUTION_MODEL") or allocation["model"]
+            allocation["model_version"] = config_getenv("EXECUTION_MODEL_VERSION")
+            allocation["model_instance_id"] = config_getenv("EXECUTION_MODEL_INSTANCE_ID")
+            allocation["endpoint"] = config_getenv("MINERU_VLM_SERVER_URL") if resource_class == "gpu.vlm" else None
         return allocation
 
     @staticmethod
@@ -519,9 +520,9 @@ _MANAGER_KEY: tuple[str, str, str] | None = None
 def get_execution_manager() -> ExecutionManager:
     global _MANAGER, _MANAGER_KEY
     key = (
-        os.getenv("EXECUTION_MODE", "async").strip().lower(),
-        os.getenv("EXECUTION_REDIS_URL", "").strip(),
-        os.getenv("EXECUTION_DATA_DIR", "").strip(),
+        config_getenv("EXECUTION_MODE", "async").strip().lower(),
+        config_getenv("EXECUTION_REDIS_URL", "").strip(),
+        config_getenv("EXECUTION_DATA_DIR", "").strip(),
     )
     if _MANAGER is None or _MANAGER_KEY != key:
         _MANAGER = ExecutionManager()

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import argparse
 import logging
@@ -51,7 +52,7 @@ class WorkerRuntime:
         self.resource_classes = tuple(item.strip() for item in resource_class.split(",") if item.strip()) or ("cpu.default",)
         self.resource_class = ",".join(self.resource_classes)
         configured_worker_id = worker_id or f"{resource_class}-{socket.gethostname()}-{os.getpid()}"
-        if os.getenv("EXECUTION_WORKER_ID_UNIQUE", "false").lower() in {"1", "true", "yes", "on"}:
+        if config_getenv("EXECUTION_WORKER_ID_UNIQUE", "false").lower() in {"1", "true", "yes", "on"}:
             configured_worker_id = f"{configured_worker_id}-{socket.gethostname()}"
         self.worker_id = configured_worker_id
         os.environ["EXECUTION_WORKER_ID"] = self.worker_id
@@ -63,15 +64,15 @@ class WorkerRuntime:
         self.stopped = False
         self._last_heartbeat = 0.0
         # PEL 滞留消息重投（崩溃恢复）：开关与阈值见 _reap。
-        self._reaper_enabled = os.getenv("EXECUTION_REAPER_ENABLED", "true").strip().lower() not in {
+        self._reaper_enabled = config_getenv("EXECUTION_REAPER_ENABLED", "true").strip().lower() not in {
             "0", "false", "off", "no",
         }
-        self._reaper_min_idle_seconds = float(os.getenv("EXECUTION_REAPER_MIN_IDLE_SECONDS", "600"))
-        self._reaper_interval_seconds = float(os.getenv("EXECUTION_REAPER_INTERVAL_SECONDS", "60"))
+        self._reaper_min_idle_seconds = float(config_getenv("EXECUTION_REAPER_MIN_IDLE_SECONDS", "600"))
+        self._reaper_interval_seconds = float(config_getenv("EXECUTION_REAPER_INTERVAL_SECONDS", "60"))
         self._last_reap = 0.0
 
     def _heartbeat(self, *, force: bool = False) -> None:
-        if not force and time.monotonic() - self._last_heartbeat < float(os.getenv("EXECUTION_WORKER_HEARTBEAT_SECONDS", "5")):
+        if not force and time.monotonic() - self._last_heartbeat < float(config_getenv("EXECUTION_WORKER_HEARTBEAT_SECONDS", "5")):
             return
         devices = [self.gpu_device] if self.gpu_device else []
         snapshots = self.manager.scheduler.inventory.snapshots(force=True) if devices else []
@@ -80,7 +81,7 @@ class WorkerRuntime:
             resource_classes=self.resource_classes,
             gpu_devices=devices,
             snapshots=snapshots,
-            endpoint=os.getenv("MINERU_VLM_SERVER_URL"),
+            endpoint=config_getenv("MINERU_VLM_SERVER_URL"),
         )
         self._last_heartbeat = time.monotonic()
 
@@ -129,7 +130,7 @@ class WorkerRuntime:
             LOGGER.info("task cancelled: job_id=%s", job_id)
             return
         attempt = int(envelope.get("attempt", 1))
-        max_attempts = int(os.getenv("EXECUTION_MAX_ATTEMPTS", "3"))
+        max_attempts = int(config_getenv("EXECUTION_MAX_ATTEMPTS", "3"))
         retryable = _error_retryable(exc)
         if attempt < max_attempts and retryable:
             next_envelope = self._retry_envelope(resource_class, envelope)
@@ -189,7 +190,7 @@ class WorkerRuntime:
         """处理一条收回的滞留消息：重投（attempt+1）或按上限/取消态终态化。"""
         job_id = envelope.get("job_id")
         attempt = int(envelope.get("attempt", 1))
-        max_attempts = int(os.getenv("EXECUTION_MAX_ATTEMPTS", "3"))
+        max_attempts = int(config_getenv("EXECUTION_MAX_ATTEMPTS", "3"))
         job = self.manager.store.get_job(job_id) if job_id else None
         if not job:
             # job 记录已过期：消息没有可归属的任务，清掉鉴权上下文后丢弃。
@@ -250,7 +251,7 @@ class WorkerRuntime:
         self.stopped = True
 
     def run(self) -> None:
-        LOGGER.info("worker ready: id=%s resource_class=%s gpu=%s", self.worker_id, self.resource_class, os.getenv("CUDA_VISIBLE_DEVICES", ""))
+        LOGGER.info("worker ready: id=%s resource_class=%s gpu=%s", self.worker_id, self.resource_class, config_getenv("CUDA_VISIBLE_DEVICES", ""))
         self._heartbeat(force=True)
         while not self.stopped:
             self._heartbeat()
@@ -308,9 +309,9 @@ class WorkerRuntime:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="QASystem durable execution worker")
-    parser.add_argument("--resource-class", default=os.getenv("EXECUTION_RESOURCE_CLASS", "cpu.default"))
-    parser.add_argument("--worker-id", default=os.getenv("EXECUTION_WORKER_ID"))
-    parser.add_argument("--gpu-device", default=os.getenv("EXECUTION_GPU_DEVICE"))
+    parser.add_argument("--resource-class", default=config_getenv("EXECUTION_RESOURCE_CLASS", "cpu.default"))
+    parser.add_argument("--worker-id", default=config_getenv("EXECUTION_WORKER_ID"))
+    parser.add_argument("--gpu-device", default=config_getenv("EXECUTION_GPU_DEVICE"))
     args = parser.parse_args()
     runtime = WorkerRuntime(args.resource_class, args.worker_id, args.gpu_device)
     signal.signal(signal.SIGTERM, runtime.stop)

@@ -1,3 +1,4 @@
+from docker.configuration import getenv as config_getenv
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -55,7 +56,7 @@ async def capture_application_user_context(request: Request, call_next):
 
 async def _proxy_agent(request: Request, path: str = "") -> StreamingResponse:
     """Expose the isolated Agent service through the Backend public endpoint."""
-    upstream = os.getenv("AGENT_INTERNAL_URL", "http://agent:9180").rstrip("/")
+    upstream = config_getenv("AGENT_INTERNAL_URL", "http://agent:9180").rstrip("/")
     target = f"{upstream}/{path.lstrip('/')}"
     headers = {
         key: value
@@ -141,7 +142,7 @@ async def health(
     full: bool = Query(default=False),
     validate_models: bool = Query(default=False),
 ) -> dict | JSONResponse:
-    ready_file = os.getenv("EXECUTION_RUNTIME_READY_FILE", "").strip()
+    ready_file = config_getenv("EXECUTION_RUNTIME_READY_FILE", "").strip()
     if ready_file and not Path(ready_file).is_file():
         return JSONResponse(status_code=503, content={"status": "starting", "reason": "runtime warmup pending"})
     if full or validate_models:

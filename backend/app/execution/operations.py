@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import base64
 import os
@@ -10,7 +11,7 @@ from typing import Any
 @contextmanager
 def _mcp_activity_context():
     """Prevent a Worker Activity from submitting itself back to the queue."""
-    previous = os.environ.get("MCP_EXECUTION_MODE")
+    previous = config_getenv("MCP_EXECUTION_MODE")
     os.environ["MCP_EXECUTION_MODE"] = "inline"
     try:
         yield

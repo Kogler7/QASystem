@@ -1,4 +1,5 @@
 from __future__ import annotations
+from docker.configuration import getenv as config_getenv
 
 import asyncio
 import json
@@ -24,7 +25,7 @@ if not _LOGGER.handlers:
 class ExecutionEventHub:
     def __init__(self, store: MemoryExecutionStore | RedisExecutionStore):
         self.store = store
-        self.default_level = os.getenv("EXECUTION_LOG_LEVEL", "INFO").upper()
+        self.default_level = config_getenv("EXECUTION_LOG_LEVEL", "INFO").upper()
         if self.default_level not in LEVEL_ORDER:
             self.default_level = "INFO"
 
