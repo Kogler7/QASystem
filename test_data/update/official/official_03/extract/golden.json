@@ -1,0 +1,292 @@
+{
+  "entities": [
+    {
+      "type": "OfficialDocument",
+      "name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "properties": {
+        "领导批示": "赵清宁（2025-08-14 17:20）：请各位领导阅，请各部门经理阅。请技术中心，工业软件事业部阅研，结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设。臧大昕（2025-08-15 10:34）：已阅，请部门主管及业务骨干阅。白雪峰、金涛、张慧颖、宋昕杰、韩毅斌等：已阅。",
+        "联系电话": "62043",
+        "缓急": "",
+        "来文字号": "中车股份科信〔2025〕45号",
+        "来文单位": "中国中车股份有限公司",
+        "文件标题": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "文件备注": "",
+        "收文部门": "综合管理部（党群工作部、董事会办公室、企业文化部）",
+        "收文日期": "2025-08-14",
+        "收文号": "信息公司收〔2025〕551号",
+        "拟办意见": "请赵总阅批。（白雪峰 2025-08-14 16:47）",
+        "抄送": "公司领导，总师级领导。",
+        "密级": "",
+        "主送": "中国中车股份有限公司各一级子公司，总部各部门",
+        "主办部门": ""
+      }
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "通知正文",
+      "properties": {
+        "单元标题": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+        "单元类型": "正文",
+        "原文位置": "《关于印发《中国中车股份有限公司产品研发管理办法》的通知》正文",
+        "原文内容": "《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+        "顺序号": ""
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "中国中车股份有限公司",
+      "properties": {
+        "主体名称": "中国中车股份有限公司",
+        "主体类型": "组织",
+        "组织层级": "股份公司",
+        "职责": "印发《中国中车股份有限公司产品研发管理办法》的通知"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "各相关单位",
+      "properties": {
+        "主体名称": "各相关单位",
+        "主体类型": "组织",
+        "组织层级": "子公司",
+        "职责": "贯彻执行产品研发管理办法"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "技术中心",
+      "properties": {
+        "主体名称": "技术中心",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "阅研产品研发管理办法，结合公司产品研发服务研发数字化建设"
+      }
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "工业软件事业部",
+      "properties": {
+        "主体名称": "工业软件事业部",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "阅研产品研发管理办法，融合中车产品研发管理要求"
+      }
+    },
+    {
+      "type": "OperationalObject",
+      "name": "中国中车股份有限公司产品研发管理办法",
+      "properties": {
+        "对象类型": "制度",
+        "对象描述": "经股份公司2025年第25次总裁办公会审议通过的产品研发管理制度",
+        "对象名称": "中国中车股份有限公司产品研发管理办法",
+        "所属领域": "产品研发"
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "贯彻执行产品研发管理办法",
+      "properties": {
+        "活动名称": "贯彻执行产品研发管理办法",
+        "活动描述": "请各单位贯彻执行《中国中车股份有限公司产品研发管理办法》",
+        "活动类型": "管理",
+        "动作词": "贯彻、执行",
+        "预期结果": "各单位贯彻执行产品研发管理办法",
+        "优先级": ""
+      }
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "服务研发数字化建设",
+      "properties": {
+        "活动名称": "服务研发数字化建设",
+        "活动描述": "技术中心、工业软件事业部结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+        "活动类型": "建设",
+        "动作词": "服务",
+        "预期结果": "融合中车产品研发管理要求，服务研发数字化建设",
+        "优先级": ""
+      }
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "印发产品研发管理办法",
+      "properties": {
+        "交互类型": "通知",
+        "交互描述": "中国中车股份有限公司印发《中国中车股份有限公司产品研发管理办法》的通知"
+      }
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "贯彻执行要求",
+      "properties": {
+        "强制程度": "应当",
+        "约束原文": "请各单位贯彻执行《中国中车股份有限公司产品研发管理办法》",
+        "约束名称": "贯彻执行要求",
+        "约束类型": "流程约束",
+        "校验规则": ""
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车股份有限公司"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "中国中车股份有限公司产品研发管理办法"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "贯彻执行产品研发管理办法"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "服务研发数字化建设"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "印发产品研发管理办法"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "贯彻执行产品研发管理办法",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "中国中车股份有限公司产品研发管理办法"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "贯彻执行产品研发管理办法",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "贯彻执行产品研发管理办法",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "服务研发数字化建设",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "中国中车股份有限公司产品研发管理办法"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "服务研发数字化建设",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "服务研发数字化建设",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "贯彻执行要求",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "贯彻执行产品研发管理办法"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "贯彻执行要求",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "贯彻执行要求",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "中国中车股份有限公司",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "各相关单位",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "中国中车股份有限公司产品研发管理办法",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发产品研发管理办法",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发产品研发管理办法",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车股份有限公司"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发产品研发管理办法",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "各相关单位"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "印发产品研发管理办法",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "贯彻执行产品研发管理办法"
+    }
+  ]
+}
