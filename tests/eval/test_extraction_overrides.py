@@ -46,7 +46,7 @@ def test_chunk_overlap_default_and_explicit_disable():
     from backend.app.schemas import ChunkOptions
     assert ChunkOptions().chunk_overlap == 50
     assert ChunkOptions(chunk_overlap=0).chunk_overlap == 0
-    assert run.load_params(run.KIT_DIR / "params.yaml")["options"] == {}
+    assert run.params_from_args(run.parse_args([]))["options"] == {}
     assert run.extraction_overrides(run.parse_args(["--chunk-overlap", "0"]), {})["chunking"]["chunk_overlap"] == 0
 
 

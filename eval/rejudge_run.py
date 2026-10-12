@@ -26,7 +26,8 @@ try:
         extract_graph_from_envelope,
         finalize_metrics,
         iter_metrics_lines,
-        load_params,
+        add_runtime_arguments,
+        params_from_args,
         log,
         maybe_score,
         normalize_eval_dir,
@@ -44,7 +45,8 @@ except ImportError:
         extract_graph_from_envelope,
         finalize_metrics,
         iter_metrics_lines,
-        load_params,
+        add_runtime_arguments,
+        params_from_args,
         log,
         maybe_score,
         normalize_eval_dir,
@@ -196,7 +198,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="复用 backend_extract 只重跑 B 方案评分")
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--from-run", required=True)
-    parser.add_argument("--params", default=None)
+    add_runtime_arguments(parser)
+    parser.add_argument("--judge-model")
+    parser.add_argument("--judge-base-url")
+    parser.add_argument("--judge-adapter", choices=("auto", "chat", "systemone"))
+    parser.add_argument("--judge-key-env")
     parser.add_argument("--match-mode", choices=("llm", "identity"), default="llm")
     parser.add_argument("--out-run", default=None)
     parser.add_argument(
@@ -214,10 +220,7 @@ def main() -> int:
 
     workspace = normalize_eval_dir(Path(args.workspace).expanduser().resolve())
     from_run = resolve_reuse_dir(workspace, args.from_run)
-    params_path = Path(args.params).expanduser().resolve() if args.params else (
-        workspace / "params.yaml" if (workspace / "params.yaml").is_file() else Path("eval/params.yaml")
-    )
-    params = load_params(params_path)
+    params = params_from_args(args)
     eval_cfg = params.get("eval") or {}
 
     score_ctx: dict[str, Any] = {

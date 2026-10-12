@@ -15,7 +15,6 @@ except ImportError:  # python3 eval/mini_eval.py
     import run
 
 
-DEFAULT_PARAMS_PATH = Path(__file__).resolve().with_name("params.yaml")
 CONFIG_KEYS = {"cases_per_type", "per_type", "selection", "seed"}
 
 
@@ -77,16 +76,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.targets or args.groups or args.cases or any(
         arg.split("=", 1)[0] in {"--groups", "--cases"} for arg in raw_args
     ):
-        run.log("mini_eval 不接受路径、--groups 或 --cases；请在 params.yaml 的 mini_eval 中配置每类数量")
+        run.log("mini_eval 不接受路径、--groups 或 --cases；请使用 --mini-cases-per-type / --mini-per-type")
         return 1
 
     workspace = Path(args.workspace).expanduser().resolve()
-    params_path = Path(args.params).expanduser().resolve() if args.params else DEFAULT_PARAMS_PATH
     try:
-        if not params_path.is_file():
-            raise ValueError(f"参数文件不存在: {params_path}")
-        params = run.load_params(params_path)
-        chosen, selection, seed = select_cases(workspace, params.get("mini_eval", {}))
+        per_type = {}
+        for item in args.mini_per_type.split(","):
+            if not item.strip(): continue
+            name, count = item.split("=", 1)
+            per_type[name.strip()] = int(count)
+        selection_config = {"cases_per_type": args.mini_cases_per_type, "per_type": per_type,
+                            "selection": args.mini_selection, "seed": args.mini_seed}
+        chosen, selection, seed = select_cases(workspace, selection_config)
     except (OSError, RuntimeError, ValueError) as exc:
         run.log(str(exc))
         return 1
@@ -100,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     command = [
         sys.executable, str(Path(run.__file__).resolve()),
         *(str(case) for case in chosen), *forwarded_args,
-        "--workspace", str(workspace), "--params", str(params_path),
+        "--workspace", str(workspace),
     ]
     return subprocess.run(command, check=False).returncode
 

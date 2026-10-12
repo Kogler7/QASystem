@@ -48,8 +48,8 @@ def test_nanojev_uses_its_own_endpoint():
 
 def test_default_params_choose_api():
     from pathlib import Path
-    for name in ("params.yaml", "quick_params.yaml"):
-        config = run.load_params(Path(run.__file__).with_name(name))
+    for name in ("params.yaml",):
+        config = run.params_from_args(run.parse_args([]))
         assert config["eval"]["judge_model"] == "deepseek-flash"
 
 

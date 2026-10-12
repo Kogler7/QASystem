@@ -59,7 +59,7 @@ def test_default_cli_submits_each_file_once_without_application_overrides(
 
 def test_default_options_remain_empty_and_quality_scoring_is_independent():
     args = run.parse_args([])
-    params = run.load_params(run.KIT_DIR / "params.yaml")
+    params = run.params_from_args(run.parse_args([]))
     assert run.extraction_overrides(args, params) == {}
     assert params["eval"]["match_mode"] == "llm"
     assert params["eval"]["judge_model"] == "deepseek-flash"
@@ -72,7 +72,7 @@ def test_default_judge_uses_api_credentials_independent_of_extraction(monkeypatc
     monkeypatch.setenv("DEEPSEEK_API_KEY", "judge-fixture")
     monkeypatch.setenv("KG_EXTRACT_LLM_API_KEY", "different-extraction-fixture")
     monkeypatch.setenv("KG_EXTRACT_LLM_MODEL", "local-4b")
-    client = run.build_judge_client(run.load_params(run.KIT_DIR / "params.yaml"))
+    client = run.build_judge_client(run.params_from_args(run.parse_args([])))
     assert client.model == "deepseek-flash"
     assert client.base_url == "https://api.deepseek.com/v1"
     assert client.adapter == "chat"

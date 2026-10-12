@@ -26,7 +26,7 @@ tags: []
 | --- | --- | --- |
 | 用途 | 改完抽取或评分后先看一小批 | 发布前的全量门禁，也用于按路径或类型抽查 |
 | 入口 | `python3 eval/mini_eval.py`，或 `bash eval/mini_eval.sh` | `python3 eval/run.py`，或 `./eval/run.sh` |
-| 范围 | 每类 1–2 个 case，由 `eval/params.yaml` 的 `mini_eval` 决定。当前默认是 `official_01`、`official_02`，以及 rule、simple 各 1 个，共 4 个 | `test_data/eval/` 下全部 case。当前是 official 5 个、rule 1 个、simple 1 个，共 7 个 |
+| 范围 | 每类 1–2 个 case，由本轮 `--mini-cases-per-type` / `--mini-per-type` 决定。当前默认是 `official_01`、`official_02`，以及 rule、simple 各 1 个，共 4 个 | `test_data/eval/` 下全部 case。当前是 official 5 个、rule 1 个、simple 1 个，共 7 个 |
 | 结果 | `report.md` 里的整体、分类型、单个文件 | 同一份结论文档结构 |
 
 发布前的全量门禁用 eval。mini-eval 走同一个 `run.py`，只是先按类型抽样。下面「如何使用」分别给出命令。`quick_eval.py` 是另外的诊断入口，固定三个公文 case，不算这两套评测。
@@ -37,7 +37,7 @@ tags: []
 
 ```text
 eval/
-  run.sh / run.py / params.yaml
+  run.sh / run.py / configure.py
   mini_eval.sh / mini_eval.py  # 每类 1–2 个 case 的小样本入口
 
 test_data/eval/
@@ -60,9 +60,9 @@ test_data/eval/
 
 不再使用中文类型目录名（`公文`/`标准`/`规则`）。`中车RAG验证数据集/` 若出现会被扫描跳过。
 
-`run.py` 的参数文件默认是 [`eval/params.yaml`](params.yaml)。若 `test_data/eval/params.yaml` 存在则覆盖它。`run.sh` 只转调 `run.py`，工作区默认仍是 `test_data/eval`。下文的 `mini_eval` 入口默认固定读取 `eval/params.yaml`。
+评测只接受本轮命令行参数，`eval/params.yaml` 与 `--params` 已删除，不读取工作区配置、`eval/.env` 或 TUI profile。凭据仍来自现有进程环境或根 `.env`。`params.resolved.json` 是输出审计快照，不是输入配置。
 
-默认入口与直接调用 `/api/v1/pipelines/knowledge-ingestion`（省略 options 或传 `{}`）对齐。`--groups` 只筛选组中的全部 case，不切换算法或模型，也不自动选择精简集。若实际 API 请求显式设置了 options，评测也必须用 `--params` 或 `--extract-*` / `--chunk-*` 设置同样的值。
+默认入口与直接调用 `/api/v1/pipelines/knowledge-ingestion`（省略 options 或传 `{}`）对齐。`--groups` 只筛选组中的全部 case，不切换算法或模型，也不自动选择精简集。若实际 API 请求显式设置了 options，评测也必须用 `--extract-*` / `--chunk-*` / `--adaptive-entity-count` / `--persist-graph` 设置同样的值。
 
 默认使用现有 DeepSeek API（`deepseek-flash`）做 LLM 评分；它不参与抽取，`elapsed_seconds`（API）与 `score_elapsed_seconds`（评分）分别记录在 `backend.system`。整轮总耗时包含评分，不等于用户请求耗时。只想看 API 耗时，可用 `--match-mode identity` 做本地匹配；别名/同义表达可能漏匹配，正式质量门禁仍用 `llm`。
 
@@ -118,9 +118,9 @@ summary 里另附 identity（type+name 精确集合）对照。judge 失败仍�
 
 88 机 `official_01` 初评暴露了裁判把部门与活动/交互配对、缺少端点上下文时 8 个关系窗口全部返回空数组的问题。因此该次 F1 不能直接归因于抽取算法。类型硬约束、属性归一化和端点上下文均已改变评分口径，需要重新评分并建立新基线，不能沿用初评数值作版本优劣结论。
 
-Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 yes/no 选择，缺失或异常选择使评分失败。`eval.judge_response_format: auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
+Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 yes/no 选择，缺失或异常选择使评分失败。`--judge-response-format auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
 
-`eval.judge_disable_thinking: true` 向官方 DeepSeek 发送 `thinking: {type: disabled}`，向官方 SiliconFlow（`api.siliconflow.cn` / `api.siliconflow.com`）发送 `enable_thinking: false`，其他兼容服务不附加这些厂商参数。参见 [SiliconFlow Chat API](https://docs.siliconflow.cn/docs/api/chat-completions-post)。评分只解析最终 `content`，不会用 `reasoning_content` 代替答案；空内容或被截断的回答判为评分失败。提示词明确索引范围、候选边数量上限与输出结束条件。每条输入显式标注 `golden_index` / `predicted_index`，索引是**窗口内**下标；评分代码通过窗口保存的原索引列表回填全局下标，即使列表不连续也不使用起点加偏移代替映射。所有格式均检查数组结构、整数类型与索引边界；越界响应使评分失败。`judge_batches` 保留每次尝试的格式、状态、响应 ID、结束原因、token 用量及内容长度，不保存模型原始文本或鉴权信息；失败时保留已完成调用的诊断。
+`--judge-disable-thinking` 向官方 DeepSeek 发送 `thinking: {type: disabled}`，向官方 SiliconFlow（`api.siliconflow.cn` / `api.siliconflow.com`）发送 `enable_thinking: false`，其他兼容服务不附加这些厂商参数。参见 [SiliconFlow Chat API](https://docs.siliconflow.cn/docs/api/chat-completions-post)。评分只解析最终 `content`，不会用 `reasoning_content` 代替答案；空内容或被截断的回答判为评分失败。提示词明确索引范围、候选边数量上限与输出结束条件。每条输入显式标注 `golden_index` / `predicted_index`，索引是**窗口内**下标；评分代码通过窗口保存的原索引列表回填全局下标，即使列表不连续也不使用起点加偏移代替映射。所有格式均检查数组结构、整数类型与索引边界；越界响应使评分失败。`judge_batches` 保留每次尝试的格式、状态、响应 ID、结束原因、token 用量及内容长度，不保存模型原始文本或鉴权信息；失败时保留已完成调用的诊断。
 
 预测只写 `tmp/eval/runs/<时间戳>/`，不会覆盖 `test_data/eval/<类型>/<case>/extract/golden.json`。
 
@@ -131,10 +131,10 @@ Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 y
 ### 准备
 
 1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
-2. 默认 LLM-judge 使用 DeepSeek API `deepseek-flash`，需要现有 `DEEPSEEK_API_KEY` 或 `QASYSTEM_JUDGE_API_KEY`。地址和模型按命令行 → `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → 默认 API 配置读取，不随抽取供应商变化。官方 DeepSeek 不回退到其他供应商的抽取密钥；缺凭据在抽取前报错。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
+2. 默认 LLM-judge 使用 DeepSeek API `deepseek-flash`，需要现有 `DEEPSEEK_API_KEY` 或 `QASYSTEM_JUDGE_API_KEY`。地址和模型按命令行 → 应用裁判设置 → 默认 API 配置读取，不随抽取供应商变化。官方 DeepSeek 不回退到其他供应商的抽取密钥；缺凭据在抽取前报错。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
 3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
-地址也可用 `QASYSTEM_BACKEND_URL` / `QASYSTEM_MCP_URL`，或改 `params.yaml`。流水线选项在 `params.yaml` 的 `options`，与生产 `PipelineOptions` 对齐。不要把密钥写进 YAML。
+地址通过 `--backend-url` / `--mcp-url` 指定；切片、抽取、存储与裁判参数使用对应 CLI。密钥仅使用环境变量，不放进命令行。
 
 ### 命令
 
@@ -144,27 +144,20 @@ Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 y
 # 先查看本次选择，不调用 Backend 或 judge
 python3 eval/mini_eval.py --dry-run
 
-# 使用 params.yaml 中的评分和流水线配置，运行选中的 case
+# 使用本轮命令行的评分和流水线参数，运行选中的 case
 python3 eval/mini_eval.py
 
 # 固定已有切片，仅重跑所选 case 的知识抽取
 python3 eval/mini_eval.py --mode extract --from-run <冻结切片批次> --match-mode llm
 ```
 
-也可用 `bash eval/mini_eval.sh`，或 `python3 -m eval.mini_eval`。默认扫描 `test_data/eval/`，读取 `eval/params.yaml` 的 `mini_eval` 配置；可通过 `--workspace`、`--params` 显式指定其他位置。mini 入口固定使用这里的参数文件，不自动采用工作区内另一份 `params.yaml`。
+也可用 `bash eval/mini_eval.sh` 或 `python3 -m eval.mini_eval`。mini 使用本轮命令行临时配置，不读取文件。
 
-```yaml
-mini_eval:
-  cases_per_type: 1
-  per_type:
-    official: 2
-  selection: first
-  seed: 42
+```bash
+python3 eval/mini_eval.py --mini-cases-per-type 1 --mini-per-type official=2 --mini-selection first --mini-seed 42 --dry-run
 ```
 
-每类数量只能为 **1 或 2**；候选不足时取全部。`per_type` 可按类型目录名覆盖数量。默认 `first` 按 case 目录名排序选择，当前会选 `official_01`、`official_02` 和 rule、simple 各自唯一的 case，共 **4 个**。完整评测集共 **7 个** case；standard 与 official_06–10 已移出当前评测集。
-
-需要随机抽样时，将 `selection` 改为 `random`：固定整数 `seed` 可在评测集不变时复现选择；设为 `null` 则每次重新抽样。启动时打印策略和 case 列表，实际运行将配置与精确 case 路径保存到 `params.resolved.json` 的 `mini_eval`、`targets` 字段。
+每类数量只能为 **1 或 2**；候选不足时取全部。`--mini-per-type official=2,rule=1` 按类型覆盖；空字符串关闭类型覆盖。随机选择使用 `--mini-selection random --mini-seed 42`，固定种子可复现。
 
 mini 入口直接调用统一的 `run.py`，不复制评测数据，不另建评分链路；支持 `--mode`、`--from-run`、`--reuse-extract-from`、`--match-mode`、耗时/F1 门禁等现有参数。额外的位置路径及 `--groups`、`--cases` 不允许与自动抽样混用；配置错误或未选出任何 case 时直接报错，不会回退到全量。结果仍写入 `tmp/eval/runs/<时间戳>/`。mini 用于快速回归，不能替代发布前的全量评测门禁。
 
@@ -176,7 +169,7 @@ mini 入口直接调用统一的 `run.py`，不复制评测数据，不另建评
 chmod +x eval/run.sh
 ```
 
-`run.sh` 只把参数原样传给同目录的 `run.py`。工作区默认 `test_data/eval`，参数默认 `eval/params.yaml`。建议在仓库根目录执行。
+`run.sh` 只把参数原样传给同目录的 `run.py`。工作区默认 `test_data/eval`，评测参数每次通过命令行设置。建议在仓库根目录执行。
 
 ---
 
@@ -322,7 +315,7 @@ python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批�
   --judge-key-env QASYSTEM_JUDGE_API_KEY --case-attempts 1
 ```
 
-换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > `QASYSTEM_JUDGE_*` > YAML > 默认 API 配置；密钥仅从环境变量读取。官方 DeepSeek 用 `DEEPSEEK_API_KEY`，其他 Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。
+换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > 应用裁判配置 > 默认 API 配置；密钥仅从环境变量读取。官方 DeepSeek 用 `DEEPSEEK_API_KEY`，其他 Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。
 
 组合实验先固定切片、golden、本体和预算，再更换抽取模型。测试不同裁判时可复用同一批预测重新评分，避免重复抽取消耗；更换抽取模型时不能复用旧预测。裁判改变后须分别建立基线，不能用不同裁判的分数直接证明抽取质量提升。manifest 保存抽取配置与裁判 model/base_url/adapter，不包含密钥。
 
@@ -330,7 +323,7 @@ python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批�
 
 完整操作与边界见 [固定切片与模型组合评测](../docs/算法/固定切片与模型组合评测.md)：包含准备/执行分离、四模型方案、更换 judge 补评、切片策略实验、并发和产物说明。
 
-`python -m eval.model_matrix --workspace test_data/eval --params eval/params.yaml --plan <方案.json> --output tmp/eval/matrix/<批次> --workers 4` 会先统一准备切片，再经 `eval/run.py` 比较多个抽取模型。`--prepare-only` 仅准备输入；之后用 `--prepared <准备批次>/inputs` 复用同一份切片。准备阶段遇到解析部分失败或切片兜底会停止，避免悄悄改变比较输入。
+`python -m eval.model_matrix --workspace test_data/eval --plan <方案.json> --output tmp/eval/matrix/<批次> --workers 4` 会先统一准备切片，再经 `eval/run.py` 比较多个抽取模型。`--prepare-only` 仅准备输入；之后用 `--prepared <准备批次>/inputs` 复用同一份切片。准备阶段遇到解析部分失败或切片兜底会停止，避免悄悄改变比较输入。
 
 方案 JSON 包含 `cases`、`extractors`、`judge` 与可选 `comparison`。每个 extractor 填 `id/provider/model/version`，本地模型可填 `health_url` 等待就绪；judge 填 `id/adapter/model/base_url`，API key 仅用 `key_env` 指定变量名。`comparison` 填 `extractor` ID 与另一套 `judge`，只重新评分已保存预测，缺失预测另存覆盖清单，不重新抽取。每个组合各有独立日志、manifest、summary 和退出码；某模型启动失败不作为正常抽取质量结果。
 
@@ -409,7 +402,6 @@ python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批�
 
 ```text
 tmp/eval/runs/<YYYYMMDD-HHMMSS>/
-  params.yaml                 # 本次拷贝的评测参数
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
   manifest.json               # 输入与评测代码 SHA256、评分契约、选项；不包含密钥
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
@@ -446,7 +438,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 实际评测通过配置与输入检查后，清理 `tmp/eval/runs/` 下过期的历史批次；`--dry-run` 不清理历史：
 
 - 保留期默认 **30 天**，按批次目录名的时间戳（`<YYYYMMDD-HHMMSS>`）判定；命名不符合该格式的目录不动。
-- 配置走 `params.yaml` 的 `runs_retention_days`，命令行 `--runs-retention-days <天数>` 优先；`<=0` 表示不清理。
+- 使用 `--runs-retention-days <天数>`，默认30；`<=0` 不清理。
 - 被 `--from-run`、`--reuse-extract-from` 或 `--baseline` 引用的批次即使过期也跳过。
 - 清理结束打印摘要：删除了几个批次、释放多少空间；单个目录删除失败只记日志，不影响评测。
 
@@ -472,10 +464,12 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 上面的 mini-eval 和 eval 是两套正式评测。本节是固定样本的诊断入口。
 
-`python3 eval/quick_eval.py --extract-version v3` 使用 `eval/quick_params.yaml`，固定选择
+`python3 eval/quick_eval.py --extract-version v3` 直接通过命令行快速实验参数，固定选择
 `official_01`、`official_03`、`official_04` 三个完整用例，覆盖普通公文、短公文和密集表格/截断压力。
 默认从 `test_data/eval` 读取已有 `chunks.json`；不会重新解析，也不会复用旧抽取结果。
-可在 `quick_eval.cases` 中更换 1–3 个用例，须保持各轮输入、golden、模型和预算相同。
+可用 `--quick-cases official/official_01 official/official_03` 更换 1–3 个用例，须保持各轮输入、golden、模型和预算相同。
+
+快速实验差异在 `quick_eval.py` 的 `QUICK_ARGUMENTS` 明确设置：v3 / SiliconFlow、不落图、无限轮询、judge 超时30秒及4096输出tokens；其后追加的本轮 CLI 可以覆盖模型、供应商和裁判预算。不生成输入配置文件。
 
 ```bash
 # 88 上复用之前已冻结的输入；需要 Backend 已恢复 siliconflow 供应商配置。
@@ -490,12 +484,12 @@ python3 eval/quick_eval.py --dry-run
 ```
 
 凭据从现有 judge 环境变量读取，不写入配置。默认 LLM 评分；临时 `--match-mode identity`
-可去掉裁判调用，但不能将 identity 分数与 LLM 分数直接比较。配置项及 `--extract-provider`
+可去掉裁判调用，但不能将 identity 分数与 LLM 分数直接比较。`--extract-provider`
 可切换已登记的供应商；请求输入/输出 token 预算仍来自 Backend 供应商配置。
 
 - 外层 `--case-attempts 1`，partial 不再整篇重抽；算法内部拆批和必要重试保留。
 - 默认不限制整轮、文档耗时；不覆盖供应商的网络请求超时。靠缩小评测集控制工作量，不承诺固定时间结束。
-- `poll_timeout_seconds: 0` 表示一直等待 Backend 完成，兼容 inline 与排队模式。
+- `--poll-timeout-seconds 0` 表示一直等待 Backend 完成，兼容 inline 与排队模式。
 - 可显式指定 `--wall-seconds`，但诊断评测不使用该硬时限。
 - 每轮独立保存 `tmp/eval/quick/<UTC时间-随机编号>/run.log` 与 `status.json`；
   `run.log` 中指向统一入口生成的 `tmp/eval/runs/<批次>/summary.json` 和报告。
@@ -515,7 +509,7 @@ python3 eval/quick_eval.py --dry-run
 
 ```bash
 python3 -m eval.tools.chunk_variants --source <冻结inputs目录> --output tmp/chunk-compare/jsonl-adaptive \
-  --params <评测参数文件> --variant jsonl-adaptive --source-commit <Backend源码提交> \
+  --backend-url http://127.0.0.1:8006 --variant jsonl-adaptive --source-commit <Backend源码提交> \
   --cases official/official_01 official/official_02 rule/rule_01 simple/Simple_故障规则的诊断 trouble/trouble_mini
 ```
 

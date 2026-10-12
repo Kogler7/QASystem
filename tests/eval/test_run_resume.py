@@ -183,13 +183,29 @@ def test_successful_parse_is_reused_on_second_call(tmp_path: Path):
     assert markdown.startswith("# a.txt")
 
 
-def test_default_params_come_from_eval_kit(tmp_path: Path):
-    path = eval_run.default_params_path(tmp_path)
-    assert path == eval_run.KIT_DIR / "params.yaml"
-    assert path.is_file()
-    override = tmp_path / "params.yaml"
-    override.write_text("backend_url: http://override\n", encoding="utf-8")
-    assert eval_run.default_params_path(tmp_path) == override
+def test_default_params_are_only_code_defaults(tmp_path: Path):
+    (tmp_path / "params.yaml").write_text("backend_url: http://ignored",encoding="utf-8")
+    params = eval_run.params_from_args(eval_run.parse_args([]))
+    assert params["backend_url"] == "http://127.0.0.1:8006"
+    with pytest.raises(SystemExit): eval_run.parse_args(["--params",str(tmp_path / "params.yaml")])
+
+
+def test_only_root_env_is_loaded_on_import(tmp_path: Path):
+    import os
+    import subprocess
+    import sys
+    kit = tmp_path / "eval"
+    kit.mkdir()
+    copied = kit / "run.py"
+    copied.write_text(Path(eval_run.__file__).read_text(encoding="utf-8"), encoding="utf-8")
+    (kit / ".env").write_text("QASYSTEM_CONFIG_TEST_EVAL_ONLY=must-not-load\nQASYSTEM_CONFIG_TEST_ROOT=old-eval\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("QASYSTEM_CONFIG_TEST_ROOT=root\n", encoding="utf-8")
+    environment = dict(os.environ, PYTHONPATH=str(eval_run.KIT_DIR.parent))
+    environment.pop("QASYSTEM_CONFIG_TEST_ROOT", None)
+    environment.pop("QASYSTEM_CONFIG_TEST_EVAL_ONLY", None)
+    code = "import os,runpy,sys; runpy.run_path(sys.argv[1]); assert os.environ['QASYSTEM_CONFIG_TEST_ROOT']=='root'; assert 'QASYSTEM_CONFIG_TEST_EVAL_ONLY' not in os.environ"
+    completed = subprocess.run([sys.executable, "-c", code, str(copied)], env=environment, capture_output=True, check=False)
+    assert completed.returncode == 0, completed.stderr.decode(errors="replace")
 
 
 def test_real_workspace_inventory():

@@ -14,7 +14,7 @@ def setup_profile(tmp_path):
         (path / 'chunks.json').write_text('{}')
     params = tmp_path / 'params.json'
     params.write_text(json.dumps({'quick_eval': {'cases': ['official/a', 'official/b', 'official/c']}}))
-    return ['--workspace', str(tmp_path), '--params', str(params)]
+    return ['--workspace', str(tmp_path), '--quick-cases', 'official/a', 'official/b', 'official/c']
 
 
 def test_quick_fixed_inputs_without_forced_time_budgets(tmp_path):
@@ -28,6 +28,25 @@ def test_quick_fixed_inputs_without_forced_time_budgets(tmp_path):
     assert len(args.targets) == 3
     assert Path(args.from_run) == tmp_path
     assert wall is None
+
+
+def test_quick_uses_only_explicit_cli_overrides(tmp_path):
+    command, wall = quick_eval.build_command(setup_profile(tmp_path))
+    args = run.parse_args(command[2:])
+    params = run.params_from_args(args)
+    assert not hasattr(args, 'params')
+    assert params['poll_timeout_seconds'] == 0
+    assert params['eval']['judge_max_tokens'] == 4096
+    assert args.extract_provider == 'siliconflow'
+    assert args.persist_graph is False
+    assert not list(tmp_path.glob('tmp/eval/quick-config/*'))
+
+
+def test_quick_cli_can_override_diagnostic_budgets(tmp_path):
+    command,_ = quick_eval.build_command(setup_profile(tmp_path)+['--judge-max-tokens','2048','--poll-timeout-seconds','60'])
+    args = run.parse_args(command[2:])
+    assert args.judge_max_tokens == 2048
+    assert args.poll_timeout_seconds == 60
 
 
 @pytest.mark.parametrize('extra', [['--wall-seconds', '0'],

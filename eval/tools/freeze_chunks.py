@@ -37,11 +37,11 @@ try:  # pytest / python3 -m 方式
         case_names_for_type,
         chunk_document,
         collect_source_files,
-        default_params_path,
+        add_runtime_arguments,
+        params_from_args,
         discover_cases,
         discover_types,
         elapsed_seconds,
-        load_params,
         log,
         parse_document,
         selection_from_targets,
@@ -56,11 +56,11 @@ except ImportError:  # 直接 python3 eval/tools/freeze_chunks.py
         case_names_for_type,
         chunk_document,
         collect_source_files,
-        default_params_path,
+        add_runtime_arguments,
+        params_from_args,
         discover_cases,
         discover_types,
         elapsed_seconds,
-        load_params,
         log,
         parse_document,
         selection_from_targets,
@@ -79,10 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("targets", nargs="*", metavar="路径", help="评测目录，如 official/official_01 或 test_data/eval；传类型目录则跑该类型全部 case")
     parser.add_argument("--workspace", default=None, help="工作区根目录，默认 test_data/eval")
-    parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml（工作区 params.yaml 优先）")
+    add_runtime_arguments(parser)
     parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule,simple")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
-    parser.add_argument("--backend-url", default=None, help="覆盖 params.yaml 的 backend_url")
     parser.add_argument("--force", action="store_true", help="忽略已有产物，重新解析并重新切片")
     parser.add_argument("--rechunk-only", action="store_true", help="复用已有 parse/<stem>.json，只重跑切片")
     parser.add_argument("--dry-run", action="store_true", help="只打印本次会处理的 case 与产物路径，不调 Backend")
@@ -283,15 +282,14 @@ def main(argv: list[str] | None = None) -> int:
     if not workspace.is_dir():
         log(f"工作区不存在: {workspace}")
         return 1
-    params_path = Path(args.params).expanduser().resolve() if args.params else default_params_path(workspace)
     try:
-        params = load_params(params_path)
-    except (OSError, ValueError, RuntimeError) as exc:
-        log(f"参数文件不可用 {params_path}: {exc}")
+        params = params_from_args(args)
+    except ValueError as exc:
+        log(str(exc))
         return 1
     base_url = str(args.backend_url or params.get("backend_url") or "").rstrip("/")
     if not base_url:
-        log("缺少 backend_url（params.yaml 或 --backend-url）")
+        log("缺少 --backend-url")
         return 1
     options = params.get("options") or {}
     chunking = options.get("chunking") or {}
@@ -310,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = RUNS_DIR / run_id
     log(f"工作区: {workspace}")
-    log(f"参数: {params_path}")
+    log("参数来源: 本轮命令行")
     log(f"Backend: {base_url}")
     log(f"切片选项: strategy={chunking.get('strategy')} size={chunking.get('size')} {chunking.get('size_unit')} "
         f"overlap={chunking.get('chunk_overlap')} breakpoint={chunking.get('breakpoint_method')}")
@@ -321,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     summary: dict[str, Any] = {
         "run_id": run_id,
         "workspace": str(workspace),
-        "params": str(params_path),
+        "params": params,
         "backend_url": base_url,
         "chunking": chunking,
         "started_at": datetime.now().isoformat(timespec="seconds"),

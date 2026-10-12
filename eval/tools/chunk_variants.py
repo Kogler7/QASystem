@@ -97,14 +97,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--params', type=Path, required=True)
+    run.add_runtime_arguments(parser)
     parser.add_argument('--cases', nargs='+', required=True)
     parser.add_argument('--variant', choices=['json', 'jsonl', 'jsonl-adaptive'], required=True)
     parser.add_argument('--source-commit', required=True)
     args = parser.parse_args()
     if 'tmp' not in args.output.resolve().parts or any(not (args.source / c).resolve().is_relative_to(args.source.resolve()) for c in args.cases):
         parser.error('inputs must stay in source; outputs must stay under tmp')
-    prepare(args.source, args.output, args.cases, run.load_params(args.params), args.variant, args.source_commit)
+    prepare(args.source, args.output, args.cases, run.params_from_args(args), args.variant, args.source_commit)
 
 
 if __name__ == '__main__':

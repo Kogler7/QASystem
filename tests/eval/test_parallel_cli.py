@@ -84,7 +84,7 @@ def test_two_cli_processes_keep_parameters_requests_and_artifacts_isolated(tmp_p
     def invoke(spec):
         version, provider, overlap, timeout = spec
         return subprocess.run([sys.executable, "-c", bootstrap, str(runs), "--workspace", str(workspace),
-            "--params", str(params), "--from-run", str(source), "--mode", "chunk-extract",
+            "--backend-url", f"http://127.0.0.1:{server.server_port}", "--from-run", str(source), "--mode", "chunk-extract",
             "--match-mode", "identity", "--runs-retention-days", "0",
             "--extract-version", version, "--extract-provider", provider, "--extract-model", provider + "-model",
             "--extract-request-timeout", str(timeout), "--chunk-overlap", str(overlap), "--chunk-size", "1000"],

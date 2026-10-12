@@ -119,7 +119,7 @@ def test_main_delegates_selected_paths_and_preserves_extract_options(workspace, 
     child = Mock(return_value=subprocess.CompletedProcess([], 4))
     monkeypatch.setattr(mini_eval.subprocess, "run", child)
     result = mini_eval.main([
-        "--workspace", str(workspace), "--params", str(params), "--match-mode", "llm",
+        "--workspace", str(workspace), "--mini-per-type", "official=2", "--match-mode", "llm",
         "--from-run", "frozen", "--reuse-extract-from", "old", "--max-case-seconds", "1800", "--mode", "extract",
     ])
     assert result == 4
@@ -140,12 +140,11 @@ def test_main_delegates_selected_paths_and_preserves_extract_options(workspace, 
 def test_default_params_does_not_switch_to_workspace_params(workspace, tmp_path, monkeypatch):
     params = _params(tmp_path, {"per_type": {"official": 2}})
     (workspace / "params.yaml").write_text("mini_eval: {cases_per_type: 999}", encoding="utf-8")
-    monkeypatch.setattr(mini_eval, "DEFAULT_PARAMS_PATH", params)
     child = Mock(return_value=subprocess.CompletedProcess([], 0))
     monkeypatch.setattr(mini_eval.subprocess, "run", child)
     assert mini_eval.main(["--workspace", str(workspace), "--dry-run", "--"]) == 0
     parsed = mini_eval.run.parse_args(child.call_args.args[0][2:])
-    assert parsed.params == str(params)
+    assert not hasattr(parsed,"params")
     assert parsed.dry_run
     assert len(parsed.targets) == 5
 
@@ -174,14 +173,15 @@ def test_invalid_config_never_launches_child(workspace, tmp_path, monkeypatch, c
     child = Mock()
     monkeypatch.setattr(mini_eval.subprocess, "run", child)
     params = _params(tmp_path, config)
-    assert mini_eval.main(["--workspace", str(workspace), "--params", str(params)]) == 1
+    assert mini_eval.main(["--workspace", str(workspace), "--mini-per-type", "missing=1"]) == 1
     child.assert_not_called()
 
 
 def test_missing_params_never_launches_child(workspace, tmp_path, monkeypatch):
     child = Mock()
     monkeypatch.setattr(mini_eval.subprocess, "run", child)
-    assert mini_eval.main(["--workspace", str(workspace), "--params", str(tmp_path / "missing.yaml")]) == 1
+    with pytest.raises(SystemExit):
+        mini_eval.main(["--workspace",str(workspace),"--params",str(tmp_path / "missing.yaml")])
     child.assert_not_called()
 
 
@@ -189,7 +189,7 @@ def test_missing_params_never_launches_child(workspace, tmp_path, monkeypatch):
 def test_entrypoints_dry_run_only_selected_cases(workspace, tmp_path, entry):
     params = _params(tmp_path, {"per_type": {"official": 2}})
     result = subprocess.run(
-        [sys.executable, *entry, "--workspace", str(workspace), "--params", str(params), "--dry-run"],
+        [sys.executable, *entry, "--workspace", str(workspace), "--mini-per-type", "official=2", "--dry-run"],
         cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
@@ -204,7 +204,7 @@ def test_mini_forwards_extraction_overrides(workspace, tmp_path, monkeypatch):
     params = _params(tmp_path)
     child = Mock(return_value=subprocess.CompletedProcess([], 0))
     monkeypatch.setattr(mini_eval.subprocess, "run", child)
-    assert mini_eval.main(["--workspace", str(workspace), "--params", str(params),
+    assert mini_eval.main(["--workspace", str(workspace), "--mini-per-type", "official=2",
                           "--extract-version", "v3.1", "--extract-provider", "siliconflow",
                           "--extract-request-timeout", "300", "--chunk-overlap", "80"]) == 0
     command = child.call_args.args[0]

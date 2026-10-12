@@ -17,25 +17,27 @@ except ImportError:
     import run
 
 
+QUICK_CASES = ['official/official_01', 'official/official_03', 'official/official_04']
+QUICK_ARGUMENTS = ['--extract-version', 'v3', '--extract-provider', 'siliconflow', '--no-persist-graph',
+                   '--poll-timeout-seconds', '0', '--judge-timeout-seconds', '30', '--judge-max-tokens', '4096']
+
+
 def build_command(argv):
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
-    parser.add_argument('--params', default=str(Path(__file__).with_name('quick_params.yaml')))
+    parser.add_argument('--quick-cases', nargs='+', default=QUICK_CASES)
     parser.add_argument('--wall-seconds', type=int)
     args, forwarded = parser.parse_known_args(argv)
     parsed = run.parse_args(forwarded)
     if parsed.targets or parsed.groups or parsed.cases or parsed.reuse_extract_from:
-        raise ValueError('快速集只接受 quick_eval.cases 选择，不允许复用旧抽取结果')
+        raise ValueError('快速集只接受 --quick-cases 选择，不允许复用旧抽取结果')
     if parsed.stage != 'backend' or parsed.system or parsed.mode not in (None, ['extract']):
         raise ValueError('快速集只支持 Backend extract；切片必须预先准备')
-    params_path = Path(args.params).resolve()
-    params = run.load_params(params_path)
-    quick = params.get('quick_eval', {})
-    cases = quick.get('cases')
+    cases = args.quick_cases
     if not isinstance(cases, list) or not 1 <= len(cases) <= 3 or not all(isinstance(c, str) for c in cases):
-        raise ValueError('quick_eval.cases 必须指定 1–3 个完整用例')
+        raise ValueError('--quick-cases 必须指定 1–3 个完整用例')
     if len(set(cases)) != len(cases):
-        raise ValueError('quick_eval.cases 不允许重复用例')
-    wall = args.wall_seconds if args.wall_seconds is not None else quick.get('wall_seconds')
+        raise ValueError('--quick-cases 不允许重复用例')
+    wall = args.wall_seconds if args.wall_seconds is not None else None
     if wall is not None and (type(wall) is not int or wall <= 0):
         raise ValueError('wall_seconds 必须为正整数，省略则不限制整轮耗时')
     workspace = Path(parsed.workspace).resolve()
@@ -50,9 +52,9 @@ def build_command(argv):
     for case in cases:
         if not (Path(source) / case / 'chunks.json').is_file():
             raise ValueError(f'缺少固定切片: {case}/chunks.json；请指定 --from-run')
-    command = [sys.executable, str(Path(run.__file__).resolve()), *chosen, *forwarded,
-               '--params', str(params_path), '--mode', 'extract', '--stage', 'backend',
-               '--from-run', source, '--case-attempts', '1', '--runs-retention-days', '0']
+    command = [sys.executable, str(Path(run.__file__).resolve()), *chosen, *QUICK_ARGUMENTS, *forwarded,
+               '--mode', 'extract', '--stage', 'backend', '--from-run', source,
+               '--case-attempts', '1', '--runs-retention-days', '0']
     return command, wall
 
 

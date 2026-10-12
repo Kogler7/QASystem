@@ -9,10 +9,10 @@ from eval import model_matrix as matrix
 def test_extract_and_rescore_commands_keep_models_independent(tmp_path):
     extractor = {"id": "sf", "provider": "siliconflow", "model": "extract-model", "version": "v3"}
     judge = {"id": "clef", "adapter": "systemone", "model": "clef-flash", "base_url": "http://clef:8188"}
-    command = matrix.build_command(tmp_path, tmp_path, ["official/test"], tmp_path / "p.json", extractor, judge)
+    command = matrix.build_command(tmp_path, tmp_path, ["official/test"], matrix.run.params_from_args(matrix.run.parse_args([])), extractor, judge)
     assert command[command.index("--extract-model") + 1] == "extract-model"
     assert command[command.index("--judge-model") + 1] == "clef-flash"
-    command = matrix.build_command(tmp_path, tmp_path, ["official/test"], tmp_path / "p.json", extractor, judge, tmp_path / "old")
+    command = matrix.build_command(tmp_path, tmp_path, ["official/test"], matrix.run.params_from_args(matrix.run.parse_args([])), extractor, judge, tmp_path / "old")
     assert "--extract-model" not in command
     assert "--extract-provider" not in command
     assert "--reuse-extract-from" in command

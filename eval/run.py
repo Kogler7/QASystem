@@ -4,7 +4,7 @@
 评测集布局（每个类型下每个 case）：
   <类型>/<case>/docs/<原文件>
   <类型>/<case>/extract/golden.json
-类型级本体在 <类型>/ontology/，也可用 params.yaml 覆盖。
+类型级本体在 <类型>/ontology/；评测参数只接受本轮命令行。
 
 后台评测按模式归一化成三类（--mode，可组合）：
   extract       仅知识抽取：经 --from-run 复用上次运行的 chunks.json，只调抽取接口；
@@ -132,7 +132,6 @@ def load_env_file(path: Path) -> None:
             os.environ[key] = value
 
 
-load_env_file(KIT_DIR / ".env")
 load_env_file(KIT_DIR.parent / ".env")
 
 
@@ -146,26 +145,70 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any] | None) -> dict[st
     return merged
 
 
-def default_params_path(workspace: Path) -> Path:
-    """默认 eval/params.yaml；工作区若有 params.yaml 则覆盖。"""
-    for candidate in (workspace / "params.yaml", KIT_DIR / "params.yaml"):
-        if candidate.is_file():
-            return candidate
-    return KIT_DIR / "params.yaml"
+def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Shared per-invocation settings; no evaluation config file is read."""
+    parser.add_argument("--backend-url", default=DEFAULT_PARAMS["backend_url"], help="本轮 Backend 地址")
+    parser.add_argument("--mcp-url", default=None, help="本轮 MCP 地址，默认 Backend /mcp")
+    parser.add_argument("--poll-interval-seconds", type=float, default=DEFAULT_PARAMS["poll_interval_seconds"], help="排队轮询间隔，秒")
+    parser.add_argument("--poll-timeout-seconds", type=float, default=DEFAULT_PARAMS["poll_timeout_seconds"], help="等待 Backend 秒数；0 不限制")
+    parser.add_argument("--judge-timeout-seconds", type=float, default=None, help="裁判单次请求超时，默认300秒")
+    parser.add_argument("--judge-max-tokens", type=int, default=None, help="裁判输出 token 上限，默认8192")
+    parser.add_argument("--judge-batch-size", type=int, default=DEFAULT_PARAMS["eval"]["judge_batch_size"], help="裁判预测窗口条数")
+    parser.add_argument("--judge-golden-batch-size", type=int, default=DEFAULT_PARAMS["eval"]["judge_golden_batch_size"], help="裁判 golden 窗口条数")
+    parser.add_argument("--judge-max-concurrency", type=int, default=DEFAULT_PARAMS["eval"]["judge_max_concurrency"], help="裁判并发数")
+    parser.add_argument("--judge-response-format", choices=("auto", "json_object", "json_schema"), default=DEFAULT_PARAMS["eval"]["judge_response_format"], help="裁判响应协议")
+    parser.add_argument("--judge-disable-thinking", action=argparse.BooleanOptionalAction, default=DEFAULT_PARAMS["eval"]["judge_disable_thinking"], help="关闭裁判思考输出")
+    parser.add_argument("--mini-cases-per-type", type=int, choices=(1, 2), default=1, help="mini 每类型选择数量")
+    parser.add_argument("--mini-per-type", default="official=2", help="mini 类型覆盖，格式 official=2,rule=1；空值无覆盖")
+    parser.add_argument("--mini-selection", choices=("first", "random"), default="first", help="mini 按名称或随机抽样")
+    parser.add_argument("--mini-seed", type=int, default=42, help="mini 随机种子")
+    parser.add_argument("--adaptive-entity-count", action=argparse.BooleanOptionalAction, default=None, help="本轮显式启停实体自适应切片")
+    parser.add_argument("--entity-count-model", choices=("clef-flash", "nanojev"), default=None, help="自适应切片分类模型")
+    parser.add_argument("--chunk-strategy", default=None, help="本轮切片策略，省略沿用 Backend")
+    parser.add_argument("--persist-graph", action=argparse.BooleanOptionalAction, default=None, help="本轮是否写图，省略沿用 Backend")
+    parser.add_argument("--chunk-overlap", type=int, help="本轮切片重叠长度；0关闭，省略沿用Backend")
+    parser.add_argument("--chunk-size", type=int, help="本轮切片大小；必须大于overlap")
 
 
-def load_params(path: Path) -> dict[str, Any]:
-    try:
-        import yaml
-    except ImportError as exc:
-        raise RuntimeError("需要 PyYAML：pip install pyyaml") from exc
+def params_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    """Translate only this invocation's arguments to the internal request format."""
+    params = deepcopy(DEFAULT_PARAMS)
+    for key in ("backend_url", "mcp_url", "poll_interval_seconds", "poll_timeout_seconds"):
+        if hasattr(args, key): params[key] = getattr(args, key)
+    for key in ("timeout_seconds", "max_tokens", "batch_size", "golden_batch_size", "max_concurrency", "response_format", "disable_thinking"):
+        if getattr(args, "judge_" + key, None) is not None: params["eval"]["judge_" + key] = getattr(args, "judge_" + key)
+    params["_judge_overrides"] = {key: getattr(args, "judge_" + key) for key in ("model", "base_url", "adapter", "key_env") if getattr(args, "judge_" + key, None) is not None}
+    params["_judge_overrides"].update({key: getattr(args, "judge_" + key) for key in ("max_tokens", "timeout_seconds") if getattr(args, "judge_" + key, None) is not None})
+    if getattr(args, "match_mode", None) is not None: params["eval"]["match_mode"] = args.match_mode
+    for name in ("poll_interval_seconds", "poll_timeout_seconds"):
+        value = params[name]
+        if not math.isfinite(value) or value < 0 or (name == "poll_interval_seconds" and value == 0): raise ValueError(f"{name} 必须为有限非负数，轮询间隔必须大于0")
+    for key in ("judge_timeout_seconds", "judge_max_tokens", "judge_batch_size", "judge_golden_batch_size", "judge_max_concurrency"):
+        value = params["eval"][key]
+        if not math.isfinite(value) or value <= 0: raise ValueError(f"{key} 必须为有限正数")
+    options = params["options"]
+    chunking = {key: getattr(args, attr) for key, attr in (("adaptive_entity_count", "adaptive_entity_count"), ("entity_count_model", "entity_count_model"), ("strategy", "chunk_strategy"), ("size", "chunk_size"), ("chunk_overlap", "chunk_overlap")) if getattr(args, attr, None) is not None}
+    if chunking.get("size", 1) <= 0 or chunking.get("chunk_overlap", 0) < 0: raise ValueError("size 必须大于0，overlap不能为负")
+    if "size" in chunking and "chunk_overlap" in chunking and chunking["size"] <= chunking["chunk_overlap"]: raise ValueError("size必须大于overlap")
+    if chunking: options["chunking"] = chunking
+    if getattr(args, "persist_graph", None) is not None: options["storage"] = {"persist_graph": args.persist_graph}
+    return params
 
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else {}
-    if raw is None:
-        raw = {}
-    if not isinstance(raw, dict):
-        raise ValueError(f"参数文件必须是 YAML 对象: {path}")
-    return deep_merge(DEFAULT_PARAMS, raw)
+
+def runtime_cli_args(params: dict[str, Any]) -> list[str]:
+    """Forward an internal experiment plan as explicit CLI, never a config file."""
+    result = []
+    fields = {key: params.get(key) for key in ("backend_url", "mcp_url", "poll_interval_seconds", "poll_timeout_seconds")}
+    fields.update({key: value for key, value in params.get("eval", {}).items() if key not in {"match_mode", "judge_model", "judge_base_url", "judge_adapter"}})
+    options = params.get("options") or {}
+    for key, flag in (("adaptive_entity_count", "adaptive_entity_count"), ("entity_count_model", "entity_count_model"), ("strategy", "chunk_strategy"), ("size", "chunk_size"), ("chunk_overlap", "chunk_overlap")):
+        if key in options.get("chunking", {}): fields[flag] = options["chunking"][key]
+    if "persist_graph" in options.get("storage", {}): fields["persist_graph"] = options["storage"]["persist_graph"]
+    for key, value in fields.items():
+        if value is None: continue
+        flag = "--" + key.replace("_", "-")
+        result.extend([flag if value else "--no-" + key.replace("_", "-")]) if isinstance(value, bool) else result.extend([flag, str(value)])
+    return result
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -2164,20 +2207,16 @@ def llm_judge_score_case(
 
 
 def build_judge_client(params: dict[str, Any]) -> JudgeClient:
+    if str(KIT_DIR.parent) not in sys.path:
+        sys.path.insert(0, str(KIT_DIR.parent))
     eval_cfg = params.get("eval") or {}
     overrides = params.get("_judge_overrides") or {}
-    # Host evaluations read the same persisted non-secret settings as Backend.
-    settings_path = Path(os.environ.get("QASYSTEM_RUNTIME_SETTINGS_FILE") or (
-        "/app/runtime-config/settings.json" if Path("/app/runtime-config").is_dir() else
-        str(Path(os.environ.get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config")) / "settings.json")))
-    hot = {}
-    if settings_path.exists():
-        try:
-            hot = json.loads(settings_path.read_text(encoding="utf-8"))
-            if not isinstance(hot, dict) or any(not isinstance(v, str) for v in hot.values()):
-                raise ValueError()
-        except (ValueError, OSError):
-            raise RuntimeError("Invalid runtime judge configuration") from None
+    # One shared reader: config.json wins; legacy files are migration inputs only.
+    from docker.runtime_config import read_settings
+    try:
+        hot = read_settings()
+    except ValueError:
+        raise RuntimeError("Invalid runtime judge configuration") from None
     def setting(key, default=None):
         return hot.get(key, os.environ.get(key, default))
 
@@ -2206,7 +2245,7 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
             if str(model) == "deepseek-flash":
                 base_url = "https://api.deepseek.com/v1"
             else:
-                raise RuntimeError("Chat judge 必须配置 --judge-base-url 或 QASYSTEM_JUDGE_BASE_URL 或 eval.judge_base_url")
+                raise RuntimeError("Chat judge 必须配置 --judge-base-url 或应用 QASYSTEM_JUDGE_BASE_URL")
     key_env = overrides.get("key_env") or "QASYSTEM_JUDGE_API_KEY"
     api_key = os.environ.get(key_env, "")
     if adapter == "chat" and not api_key and key_env == "QASYSTEM_JUDGE_API_KEY":
@@ -2216,8 +2255,8 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
             api_key = os.environ.get("KG_EXTRACT_LLM_API_KEY", "")
     if adapter == "chat" and urlsplit(base_url).hostname == "api.deepseek.com" and not api_key:
         raise RuntimeError("DeepSeek API judge 未配置凭据：设置 DEEPSEEK_API_KEY 或 QASYSTEM_JUDGE_API_KEY")
-    timeout = float(eval_cfg.get("judge_timeout_seconds") or setting("KG_EXTRACT_LLM_TIMEOUT_SECONDS") or 300)
-    max_tokens = int(eval_cfg.get("judge_max_tokens") or setting("QASYSTEM_JUDGE_MAX_TOKENS") or setting("KG_EXTRACT_LLM_MAX_TOKENS") or 8192)
+    timeout = float(overrides.get("timeout_seconds") or eval_cfg.get("judge_timeout_seconds") or 300)
+    max_tokens = int(overrides.get("max_tokens") or setting("QASYSTEM_JUDGE_MAX_TOKENS") or eval_cfg.get("judge_max_tokens") or 8192)
     return JudgeClient(
         base_url=base_url,
         api_key=api_key,
@@ -3566,7 +3605,7 @@ def parse_stage_budgets(raw: str | None) -> dict[str, float]:
 
 
 def extraction_overrides(args: argparse.Namespace, params: dict[str, Any]) -> dict[str, Any]:
-    """CLI > YAML; absent values remain absent so Backend supplies defaults."""
+    """Only this invocation's CLI overrides Backend defaults."""
     options = deepcopy(params.get("options") or {})
     extraction = dict(options.get("extraction") or {})
     for key in ("version", "provider", "model", "request_timeout", "document_timeout"):
@@ -3613,9 +3652,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="评测目录，如 official/official_01 或 test_data/eval/official；传类型目录则跑该类型全部 case",
     )
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE), help="工作区根目录，默认 test_data/eval")
-    parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml")
-    parser.add_argument("--chunk-overlap", type=int, help="本次切片重叠长度，覆盖 YAML；0 关闭，默认 50")
-    parser.add_argument("--chunk-size", type=int, help="本次切片大小，覆盖 YAML；必须大于 overlap")
+    add_runtime_arguments(parser)
     parser.add_argument("--extract-version", choices=("v0", "v2", "v2.1", "v2.2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
     parser.add_argument("--extract-provider", help="Backend 预配置供应商名称，不接受密钥或 URL")
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
@@ -3717,7 +3754,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         metavar="天数",
         help="启动时自动清理 tmp/eval/runs/ 下超过保留期的历史批次目录（按目录名时间戳），"
-        "默认读 params.yaml 的 runs_retention_days（再默认 30）；<=0 表示不清理",
+        "默认 30 天；<=0 表示不清理",
     )
     return parser.parse_args(argv)
 
@@ -3930,7 +3967,6 @@ def main() -> int:
     except FileNotFoundError as exc:
         log(str(exc))
         return 1
-    params_path = Path(args.params).expanduser().resolve() if args.params else default_params_path(workspace)
     group_filter = [item.strip() for item in str(args.groups or "").split(",") if item.strip()]
     case_filter = [item.strip() for item in str(args.cases or "").split(",") if item.strip()]
     if args.targets and (group_filter or case_filter):
@@ -3947,14 +3983,10 @@ def main() -> int:
         log(str(exc))
         return 1
     try:
-        params = load_params(params_path)
-    except RuntimeError as exc:
+        params = params_from_args(args)
+    except ValueError as exc:
         log(str(exc))
         return 1
-    params["_judge_overrides"] = {
-        key: getattr(args, "judge_" + key) for key in ("model", "base_url", "adapter", "key_env")
-        if getattr(args, "judge_" + key) is not None
-    }
     if args.runs_retention_days is not None:
         retention_days = float(args.runs_retention_days)
     else:
@@ -3966,10 +3998,9 @@ def main() -> int:
     protected_dirs = {path for path in (reuse_run_dir, reuse_extract_run_dir) if path is not None}
     if baseline_path:
         protected_dirs.add(baseline_path.parent)
-    base_url = (os.environ.get("QASYSTEM_BACKEND_URL") or params.get("backend_url") or DEFAULT_PARAMS["backend_url"]).rstrip("/")
+    base_url = params["backend_url"].rstrip("/")
     mcp_url = (
-        os.environ.get("QASYSTEM_MCP_URL")
-        or params.get("mcp_url")
+        params.get("mcp_url")
         or urljoin(base_url + "/", "mcp")
     )
     try:
@@ -4052,7 +4083,7 @@ def main() -> int:
     for error in cleanup["errors"]:
         log(f"  清理失败: {error}")
     log(f"工作区: {workspace}")
-    log(f"参数文件: {params_path}")
+    log("参数来源: 本轮命令行（不读取评测配置文件）")
     log(f"Backend: {base_url}")
     if run_plugin:
         log(f"MCP: {mcp_url}")
@@ -4128,8 +4159,6 @@ def main() -> int:
         snapshot["eval"]["judge_base_url"] = score_ctx["judge_client"].base_url
         snapshot["eval"]["judge_adapter"] = getattr(score_ctx["judge_client"], "adapter", "chat")
     write_json(run_dir / "params.resolved.json", snapshot)
-    if params_path.is_file():
-        (run_dir / "params.yaml").write_text(params_path.read_text(encoding="utf-8"), encoding="utf-8")
 
     summary: dict[str, Any] = {
         "manifest": manifest,

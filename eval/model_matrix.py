@@ -62,12 +62,12 @@ def prepare_inputs(workspace, cases, destination, params):
     return prepared
 
 
-def build_command(output, workspace, cases, params_file, extractor, judge, reuse=None):
+def build_command(output, workspace, cases, params, extractor, judge, reuse=None):
     # Isolate each run directory even when subprocesses begin simultaneously.
     launcher = "import sys;from pathlib import Path;from eval import run;run.RUNS_DIR=Path(sys.argv.pop(1));sys.exit(run.main())"
     command = [sys.executable, "-c", launcher, str(output / "runs"),
                *(str(workspace / case) for case in cases), "--workspace", str(workspace),
-               "--params", str(params_file), "--stage", "backend", "--mode", "extract",
+               *run.runtime_cli_args(params), "--stage", "backend", "--mode", "extract",
                "--from-run", str(workspace), "--match-mode", "llm", "--case-attempts", "1",
                "--runs-retention-days", "0", "--require-scored", "--fail-on-empty",
                "--judge-adapter", judge["adapter"], "--judge-model", judge["model"],
@@ -84,7 +84,7 @@ def build_command(output, workspace, cases, params_file, extractor, judge, reuse
     return command
 
 
-def execute(output, workspace, cases, params_file, extractor, judge, reuse=None):
+def execute(output, workspace, cases, params, extractor, judge, reuse=None):
     output.mkdir(parents=True, exist_ok=False)
     if not reuse and extractor.get("health_url"):
         started = time.monotonic()
@@ -102,7 +102,7 @@ def execute(output, workspace, cases, params_file, extractor, judge, reuse=None)
                 save(output / "result.json", record)
                 return record
             time.sleep(5)
-    command = build_command(output, workspace, cases, params_file, extractor, judge, reuse)
+    command = build_command(output, workspace, cases, params, extractor, judge, reuse)
     # CLI contains no credentials. Secrets are loaded only from named env vars.
     save(output / "command.json", command)
     run.log(f"Matrix start: {extractor['id']} / {judge['id']}")
@@ -120,7 +120,7 @@ def execute(output, workspace, cases, params_file, extractor, judge, reuse=None)
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, default=run.DEFAULT_WORKSPACE)
-    parser.add_argument("--params", type=Path, default=Path(run.__file__).with_name("params.yaml"))
+    run.add_runtime_arguments(parser)
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prepare-only", action="store_true")
@@ -129,13 +129,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if "tmp" not in args.output.resolve().parts or args.workers < 1:
         parser.error("output must be under tmp/ and workers must be positive")
-    params = run.load_params(args.params)
+    params = run.params_from_args(args)
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
     identifiers = [entry["id"] for entry in plan["extractors"]] + [plan["judge"]["id"]]
     if any(not re.fullmatch(r"[A-Za-z0-9_-]+", value) for value in identifiers) or len({e["id"] for e in plan["extractors"]}) != len(plan["extractors"]):
         parser.error("extractor/judge ids must be unique safe directory names")
     workspace = args.workspace.resolve()
-    cases = [workspace / label for label in plan["cases"]] if plan.get("cases") else select_cases(workspace, params.get("mini_eval", {}))[0]
+    per_type = {}
+    for item in args.mini_per_type.split(","):
+        if not item.strip(): continue
+        name, count = item.split("=", 1)
+        per_type[name.strip()] = int(count)
+    cases = [workspace / label for label in plan["cases"]] if plan.get("cases") else select_cases(workspace, {"cases_per_type": args.mini_cases_per_type, "per_type": per_type, "selection": args.mini_selection, "seed": args.mini_seed})[0]
     if any(not c.resolve().is_relative_to(workspace) or not c.is_dir() for c in cases):
         parser.error("cases must be existing directories within workspace")
     output = args.output.resolve()
@@ -150,14 +155,13 @@ def main(argv=None):
     if args.prepare_only:
         return 0
     evaluation_params = deepcopy(params)
-    evaluation_params["options"]["extraction"] = {}
-    params_file = output / "params.json"
-    save(params_file, evaluation_params)
+    evaluation_params["options"].pop("extraction", None)
+    save(output / "params.resolved.json", evaluation_params)
     results = []
     lock = threading.Lock()
     def one(extractor):
         result = execute(output / extractor["id"] / plan["judge"]["id"], frozen, labels,
-                         params_file, extractor, plan["judge"])
+                         evaluation_params, extractor, plan["judge"])
         with lock:
             results.append(result)
             save(output / "results.json", results)
@@ -175,7 +179,7 @@ def main(argv=None):
             raise RuntimeError("API comparison source has no saved predictions; will not re-extract")
         save(output / "comparison.coverage.json", {"included": available, "missing_predictions": sorted(set(labels) - set(available))})
         result = execute(output / extractor["id"] / comparison["judge"]["id"], frozen, available,
-                         params_file, extractor, comparison["judge"], Path(source["run_dir"]))
+                         evaluation_params, extractor, comparison["judge"], Path(source["run_dir"]))
         results.append(result)
         save(output / "results.json", results)
     return 0 if all(r["exit_code"] == 0 for r in results) else 2
