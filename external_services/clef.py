@@ -8,6 +8,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
+from algorithm.runtime_settings import getenv
 
 from .application import endpoint_for
 from .models import ModelServiceError
@@ -62,18 +63,18 @@ class ClefFlashClient:
         capability: str = "models.decisions.create",
     ) -> None:
         self.base_url = (
-            base_url if base_url is not None else os.getenv(f"{env_prefix}_SERVICE_URL", "")
+            base_url if base_url is not None else getenv(f"{env_prefix}_SERVICE_URL", "")
         ).strip().rstrip("/")
         endpoint = endpoint_for(capability)
         self.path = endpoint.path
         self.method = endpoint.method
         if not self.path or not self.path.startswith("/") or self.path.startswith("//"):
             raise ModelServiceError("CLEF_SERVICE_PATH 必须是服务内的绝对路径")
-        self.model = model or os.getenv("CLEF_MODEL", "").strip() or "clef-flash"
+        self.model = model or getenv("CLEF_MODEL", "").strip() or "clef-flash"
         self.api_key = os.getenv(f"{env_prefix}_SERVICE_API_KEY", "").strip()
         try:
             self.timeout = float(
-                timeout if timeout is not None else os.getenv(f"{env_prefix}_SERVICE_TIMEOUT_SECONDS", "120")
+                timeout if timeout is not None else getenv(f"{env_prefix}_SERVICE_TIMEOUT_SECONDS", "120")
             )
         except (TypeError, ValueError):
             raise ModelServiceError("CLEF_SERVICE_TIMEOUT_SECONDS 必须为正数") from None

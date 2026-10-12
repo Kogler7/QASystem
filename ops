@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+QASYSTEM_OPS_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec python3 "$QASYSTEM_OPS_ROOT/ops.py" "$@"

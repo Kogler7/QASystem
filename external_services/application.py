@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import httpx
+from algorithm.runtime_settings import getenv
 
 
 USER_CONTEXT_HEADERS = (
@@ -70,7 +71,7 @@ def endpoint_for(capability: str) -> Endpoint:
         registered = ENDPOINTS[capability]
     except KeyError as exc:
         raise ExternalCapabilityUnavailable(capability, "能力未注册") from exc
-    configured_path = os.getenv(registered.env_name, "").strip()
+    configured_path = getenv(registered.env_name, "").strip()
     path = configured_path or registered.path
     if not path:
         raise ExternalCapabilityUnavailable(capability, "第三方接口尚未开通")

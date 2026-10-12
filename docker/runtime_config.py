@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 HOT_KEYS = frozenset({
     "KG_EXTRACT_ALGO_VERSION", "KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_LLM_MODEL",
@@ -12,6 +13,11 @@ HOT_KEYS = frozenset({
     "KG_EXTRACT_LLM_QPS", "KG_EXTRACT_LLM_QPM", "KG_EXTRACT_LLM_TIMEOUT_SECONDS",
     "KG_EXTRACT_LLM_DISABLE_THINKING", "KG_EXTRACT_LLM_QUOTA_GROUP",
     "KG_EXTRACT_V31_REQUEST_TIMEOUT", "KG_EXTRACT_V31_DOCUMENT_TIMEOUT",
+    "EMBEDDING_SERVICE_URL", "EMBEDDING_SERVICE_PATH", "EMBEDDING_MODEL",
+    "EMBEDDING_TIMEOUT_SECONDS", "EMBEDDING_MAX_BATCH_SIZE",
+    "DOCUMENT_PARSE_SERVICE_URL", "DOCUMENT_PARSE_SERVICE_PATH", "DOCUMENT_PARSE_TIMEOUT_SECONDS",
+    "CLEF_SERVICE_URL", "CLEF_SERVICE_PATH", "CLEF_SERVICE_TIMEOUT_SECONDS", "CLEF_MODEL",
+    "NANOJEV_SERVICE_URL", "NANOJEV_SERVICE_PATH", "NANOJEV_SERVICE_TIMEOUT_SECONDS",
     "QASYSTEM_JUDGE_BASE_URL", "QASYSTEM_JUDGE_MODEL", "QASYSTEM_JUDGE_ADAPTER",
     "QASYSTEM_JUDGE_MAX_TOKENS",
 })
@@ -60,6 +66,29 @@ def _validate_document(data):
     settings, models = data.get("settings", {}), data.get("models", {})
     if not isinstance(settings, dict) or any(k not in HOT_KEYS or not isinstance(v, str) for k, v in settings.items()):
         raise ValueError("Invalid runtime settings keys or values")
+    for key, value in settings.items():
+        if key.endswith('_SERVICE_URL') and value:
+            url = urlsplit(value)
+            if url.scheme not in {'http', 'https'} or not url.hostname or url.username or url.password or url.query or url.fragment:
+                raise ValueError('Invalid runtime service URL')
+        if key.endswith('_SERVICE_PATH') and value and (not value.startswith('/') or value.startswith('//') or '?' in value or '#' in value):
+            raise ValueError('Invalid runtime service path')
+        if key in {'EMBEDDING_TIMEOUT_SECONDS', 'DOCUMENT_PARSE_TIMEOUT_SECONDS',
+                   'CLEF_SERVICE_TIMEOUT_SECONDS', 'NANOJEV_SERVICE_TIMEOUT_SECONDS'}:
+            import math
+            try:
+                valid = math.isfinite(float(value)) and float(value) > 0
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError('Invalid runtime service timeout')
+        if key == 'EMBEDDING_MAX_BATCH_SIZE':
+            try:
+                valid = int(value) > 0
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError('Invalid runtime embedding batch size')
     if not isinstance(models, dict) or any(not isinstance(m, dict) for m in models.values()):
         raise ValueError("Invalid runtime model configuration")
     fields = {'enabled', 'gpu', 'port', 'context', 'utilization'}

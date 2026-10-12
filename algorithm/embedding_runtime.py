@@ -47,7 +47,7 @@ def encode(model_path: str, values, *, local_files_only: bool = True):
 
         items = [values] if isinstance(values, str) else list(values)
         return np.asarray(
-            RemoteEmbeddingClient(model=os.getenv("EMBEDDING_MODEL") or None).encode(items),
+            RemoteEmbeddingClient().encode(items),
             dtype=float,
         )
     model = get_sentence_transformer(model_path, local_files_only=local_files_only)

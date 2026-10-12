@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from algorithm.runtime_settings import getenv
 
 from .application import endpoint_for
 
@@ -14,7 +15,7 @@ class ModelServiceError(RuntimeError):
 
 
 def _base_url() -> str:
-    return os.getenv("EMBEDDING_SERVICE_URL", "").strip().rstrip("/")
+    return getenv("EMBEDDING_SERVICE_URL", "").strip().rstrip("/")
 
 
 class RemoteEmbeddingClient:
@@ -27,11 +28,11 @@ class RemoteEmbeddingClient:
     ) -> None:
         self.base_url = (base_url or _base_url()).rstrip("/")
         self.path = endpoint_for("models.embeddings.create").path or "/v1/embeddings"
-        self.model = model or os.getenv("EMBEDDING_MODEL", "")
-        self.timeout = timeout or float(os.getenv("EMBEDDING_TIMEOUT_SECONDS", "60"))
+        self.model = model or getenv("EMBEDDING_MODEL", "")
+        self.timeout = timeout or float(getenv("EMBEDDING_TIMEOUT_SECONDS", "60"))
         self.api_key = os.getenv("EMBEDDING_SERVICE_API_KEY", "").strip()
         try:
-            self.max_batch_size = max(1, int(os.getenv("EMBEDDING_MAX_BATCH_SIZE", "32")))
+            self.max_batch_size = max(1, int(getenv("EMBEDDING_MAX_BATCH_SIZE", "32")))
         except ValueError:
             self.max_batch_size = 32
 
@@ -101,10 +102,10 @@ class RemoteEmbeddingClient:
 class RemoteDocumentParserClient:
     def __init__(self, base_url: str | None = None, *, timeout: float | None = None) -> None:
         self.base_url = (
-            base_url or os.getenv("DOCUMENT_PARSE_SERVICE_URL", "")
+            base_url or getenv("DOCUMENT_PARSE_SERVICE_URL", "")
         ).strip().rstrip("/")
         self.path = endpoint_for("documents.parse").path or "/v1/documents/parse"
-        self.timeout = timeout or float(os.getenv("DOCUMENT_PARSE_TIMEOUT_SECONDS", "900"))
+        self.timeout = timeout or float(getenv("DOCUMENT_PARSE_TIMEOUT_SECONDS", "900"))
         self.api_key = os.getenv("DOCUMENT_PARSE_SERVICE_API_KEY", "").strip()
 
     def parse(self, file_path: str, **options: Any) -> dict[str, Any]:

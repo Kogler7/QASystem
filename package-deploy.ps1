@@ -80,8 +80,11 @@ foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "exter
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
+}
+foreach ($file in @('ops', 'ops.py', 'ops.ps1')) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination (Join-Path $deployDir $file) -Force
 }
 foreach ($relative in @(
     "backend/data/documents", "backend/data/preproc_output", "backend/data/preproc_upload",
