@@ -22,7 +22,8 @@ class Work {
 def complete(handler, *, batch_size=24):
     chunks = [ExtractionChunk('a', '巡检：人员负责检查。'), ExtractionChunk('b', '巡检：人员负责记录。')]
     plan = compile_plan(ONTOLOGY)
-    llm = StubLLM(property_handler=handler, verification_handler=lambda item, chunk: "yes" if item["value"] == "检查并记录" else "no")
+    llm = StubLLM(property_handler=handler, verification_handler=lambda item, chunk:
+                  "yes" if item["value"] in ("检查并记录", "检查", "记录", "巡检") else "no")
     attempts = []
     rows, stats = enrich_entity_properties([
         ('a', [{'type': 'Person', 'name': '巡检', 'properties': {'duty': '检查'}, 'evidence': {'quote': chunks[0].text}},
@@ -36,7 +37,7 @@ def complete(handler, *, batch_size=24):
 def test_key_group_never_split_and_model_owns_consolidated_properties():
     def handler(prompt, chunk):
         payload = json.loads(prompt)
-        known = payload['task']['known_entities']
+        known = payload['stage_context']['known_entities']
         assert len(known) == 1
         entity = known[0]
         assert 'id' not in entity
@@ -61,7 +62,7 @@ def test_key_group_never_split_and_model_owns_consolidated_properties():
 def test_rejects_invalid_model_consolidation(bad):
     def handler(prompt, chunk):
         entities = []
-        for e in json.loads(prompt)['task']['known_entities']:
+        for e in json.loads(prompt)['stage_context']['known_entities']:
             entities.append({'type': e['type'], 'name': e['name'], 'properties': {}, 'evidence': {'quote': '巡检'}})
         if bad == 'duplicate':
             entities.append(dict(entities[0]))
@@ -143,5 +144,5 @@ def test_unlocated_quote_does_not_manufacture_offsets():
     rows = _normalize_span_entities({'entities': [{'type': 'Person', 'mention': '不存在',
         'evidence': {'quote': '没有此原文'}}]}, chunk=chunk, schema=OntologySchema.parse(ONTOLOGY),
         target_types=None, warnings=[])
-    evidence = bind_entity_evidence(rows, ChunkContextManager([chunk]))[0]['evidence']
-    assert evidence == {'quote': '没有此原文'}
+    assert rows == []  # no source means no accepted fact, not an unbound node
+    assert bind_entity_evidence(rows, ChunkContextManager([chunk])) == []

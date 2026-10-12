@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from dataclasses import replace
@@ -74,12 +75,18 @@ def split_request_failure(attempts):
             ("context length", "context_length", "maximum context", "token limit", "too many tokens")))))
 
 
-def document_expired(llm):
+def document_deadline(llm):
+    deadlines = []
     for owner in (llm, getattr(llm, 'client', None)):
         deadline = getattr(owner, 'deadline', None)
-        if isinstance(deadline, (int, float)) and time.monotonic() >= deadline:
-            return True
-    return False
+        if type(deadline) in (int, float) and math.isfinite(deadline):
+            deadlines.append(deadline)
+    return min(deadlines) if deadlines else None
+
+
+def document_expired(llm):
+    deadline = document_deadline(llm)
+    return deadline is not None and time.monotonic() >= deadline
 
 
 def recover_split_attempts(attempts):

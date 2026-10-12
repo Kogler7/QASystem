@@ -8,12 +8,15 @@ new runtime dependency.
 from __future__ import annotations
 
 import re
+import math
 from typing import Any
 
 
 def validate_json_schema(instance: Any, schema: dict[str, Any], *, path: str = "$") -> list[str]:
     """Return deterministic validation errors for the emitted schema subset."""
     errors: list[str] = []
+    if isinstance(instance, float) and not math.isfinite(instance):
+        return [f"{path}: non-finite numbers are not JSON values"]
     expected_type = schema.get("type")
     if expected_type is not None and not _matches_type(instance, expected_type):
         return [f"{path}: expected {expected_type}, got {type(instance).__name__}"]
@@ -44,6 +47,8 @@ def validate_json_schema(instance: Any, schema: dict[str, Any], *, path: str = "
     if isinstance(instance, list):
         if len(instance) < int(schema.get("minItems") or 0):
             errors.append(f"{path}: expected at least {schema['minItems']} items")
+        if "maxItems" in schema and len(instance) > schema["maxItems"]:
+            errors.append(f"{path}: expected at most {schema['maxItems']} items")
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(instance):
@@ -52,6 +57,8 @@ def validate_json_schema(instance: Any, schema: dict[str, Any], *, path: str = "
     if isinstance(instance, str):
         if len(instance) < int(schema.get("minLength") or 0):
             errors.append(f"{path}: string is shorter than {schema['minLength']}")
+        if "maxLength" in schema and len(instance) > schema["maxLength"]:
+            errors.append(f"{path}: string is longer than {schema['maxLength']}")
         pattern = schema.get("pattern")
         if pattern and re.search(pattern, instance) is None:
             errors.append(f"{path}: value does not match {pattern!r}")

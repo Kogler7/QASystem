@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import json
 
+def policy_text(policy):
+    return "\n\n".join(block["text"] for block in policy["rule_blocks"])
+
+
 import pytest
 
 from .. import prompt_router as PR
@@ -50,12 +54,12 @@ def test_stage_system_and_route_selected_skills(ontology, text, kind):
     assert [message["role"] for message in messages] == ["system", "user"]
     assert messages[0]["content"].startswith(PR.BASE_SYSTEM_PROMPT)
     assert "PROMPT_EXTENSION" not in messages[0]["content"]
-    assert set(user) == {"task", "output_contract", "domain_policy", "ontology", "documents"}
+    assert set(user) == {"task", "output_contract", "domain_policy", "ontology", "documents", "stage_context"}
     policy = user["domain_policy"]
-    assert bool(policy["extraction_rules"]) == (kind == "official_document")
+    assert bool(policy_text(policy)) == (kind == "official_document")
     assert "input_scope" not in user["task"]
     assert set(user["ontology"]) == {"catalog"}
-    assert set(policy) == {"extraction_rules"}
+    assert set(policy) == {"rule_blocks"}
 
 
 def test_entity_contract_remains_span_based_and_rejects_extra_fields():
@@ -111,23 +115,23 @@ def test_route_matches_v2_rules(ontology, chunks, kind):
 def test_simple_and_unknown_tables_do_not_receive_skills():
     for text in ('object 用户 <<Stakeholder>> {}', '[{"字段":"值"}]'):
         _, _, user = build(text=text)
-        assert user['domain_policy']['extraction_rules'] == ''
+        assert policy_text(user['domain_policy']) == ''
 
 
 def test_family_skills_preserve_stage_specific_rules():
     text = '关于开展巡检的通知\n〔2026〕1号'
     _, _, entity = build(text=text)
-    assert entity["domain_policy"]["extraction_rules"]
+    assert policy_text(entity["domain_policy"])
     schema = OUT.property_entity_schema([{"type": "OfficialDocument", "name": "通知"}], OC.compile_plan(OFFICIAL))
     _, messages, prop = build(text=text, task="property", output_schema=schema,
                               known_entities=[{"id": "entity-0", "type": "Rule", "name": "RTU", "missing_properties": {"body": {}}}])
     assert "[当前阶段：property]" in messages[0]["content"]
     assert "local_context" not in prop["documents"][0]
     assert prop["output_contract"]["empty_result"] == "{}"
-    assert prop["domain_policy"]["extraction_rules"]
+    assert policy_text(prop["domain_policy"])
     assert "relation_signatures" not in prop["ontology"]
     _, _, form = build(OFFICIAL, text="收文处理单\n拟办意见：技术中心负责落实。")
-    assert form["domain_policy"]["extraction_rules"]
+    assert policy_text(form["domain_policy"])
 
 
 
@@ -136,7 +140,7 @@ def test_repair_keeps_issue_scope_and_budget():
     plan = OC.compile_plan(GENERIC)
     issues = [{"code": "MISSING_ENTITY", "message": "仅修复该问题"}]
     _, _, user = build(text="原" * 9000, task="repair", output_schema=plan.output_schemas["entity_candidates"], repair_issues=issues)
-    assert user["task"]["repair_issues"] == issues
+    assert user["stage_context"]["repair_issues"] == issues
     assert "只修复列出" in user["task"]["discipline"]
     assert len(user["documents"][0]["text"]) == 9000  # caller windows, never silently truncate
     assert user["output_contract"]["success_schema"] == plan.output_schemas["entity_candidates"]["properties"]["entities"]["items"]
@@ -157,7 +161,7 @@ def test_retry_remains_json_and_keeps_system_schema_and_source():
     assert len(calls) == 2
     assert calls[0][0] == calls[1][0] == messages[0]
     retried = json.loads(calls[1][1]["content"])
-    assert retried["task"].pop("retry_feedback")
+    assert retried.pop("retry_feedback")
     assert retried == user
     assert json.loads(messages[1]["content"]) == user
 
@@ -251,7 +255,7 @@ def test_stage_system_scope_survives_retry(stage, heading, excluded):
     assert len(calls) == 2
     assert calls[0][0] == calls[1][0] == messages[0]
     retried = json.loads(calls[1][1]["content"])
-    assert retried["task"].pop("retry_feedback")
+    assert retried.pop("retry_feedback")
     assert retried == user
 
 
@@ -265,13 +269,13 @@ def test_user_field_order_survives_skill_assembly_and_retry(task):
         schema = OUT.property_entity_schema([{"type": "OfficialDocument", "name": "通知"}], OC.compile_plan(OFFICIAL))
     _, messages, user = build(ontology=OFFICIAL, task=task, output_schema=schema,
                               assembly_planner=SkillAssemblyPlanner())
-    expected = ["documents", "ontology", "domain_policy", "output_contract", "task"]
+    expected = ["task", "domain_policy", "ontology", "documents", "stage_context", "output_contract"]
     assert list(user) == expected
     assert set(user["output_contract"]) == {"format", "success_schema", "empty_result", "constraints"}
     assert user["task"]["operation"] == task
     retried = json.loads(user_with_retry_feedback(messages[1]["content"], "请修正输出格式"))
-    assert list(retried) == expected
-    assert retried["task"].pop("retry_feedback") == "请修正输出格式"
+    assert list(retried) == expected + ["retry_feedback"]
+    assert retried.pop("retry_feedback") == "请修正输出格式"
     assert retried == user
 
 
@@ -283,7 +287,7 @@ def test_prompt_omits_transport_metadata_and_local_context(task):
     messages = PR.build_chat_messages(task=task, plan=plan, route=PR.resolve_document_route(plan, [chunk]), chunk=chunk, output_schema=schema)
     document = json.loads(messages[1]["content"])["documents"][0]
     assert "current_chunk" not in document
-    assert "chunk_id" not in document
+    assert document["chunk_id"] == "c1"
     assert next(iter(document)) == "text"
     assert "local_context" not in document
     assert "signal_source" not in document.get("metadata", {})
@@ -299,31 +303,31 @@ def test_selected_official_domain_is_an_execution_policy(stage):
     schema = plan.output_schemas["entity_candidates"] if stage != "property" else OUT.property_entity_schema([{"type": "OfficialDocument", "name": "通知"}], plan)
     _, messages, user = build(OFFICIAL, task=stage, output_schema=schema)
     policy = user["domain_policy"]
-    assert policy["extraction_rules"].startswith("公文领域抽取规则：重点识别")
-    assert "若文本是公文" not in policy["extraction_rules"]
+    assert policy_text(policy).startswith("公文领域抽取规则：重点识别")
+    assert "若文本是公文" not in policy_text(policy)
     assert "无需重新判断领域" in messages[0]["content"]
     assert "profiles" not in policy
 
 
 def test_multiple_skills_keep_confirmed_domain_and_all_rules():
     from ..prompt_templates import render_user
-    policy = {"route": {"kind": "official_document"}, "profiles": {
-        "custom_one": {"extraction_rules": "规则一"},
-        "custom_two": {"extraction_rules": "规则二"},
-    }}
+    policy = {"rule_blocks": [
+        {"skill_id": "custom_one", "version": "1", "section": "all", "text": "规则一"},
+        {"skill_id": "custom_two", "version": "2", "section": "entity", "text": "规则二"},
+    ]}
     user = json.loads(render_user(task={}, output_contract={}, domain_policy=policy,
                                   ontology={"catalog": "目录"}, documents=[]))
-    assert user["domain_policy"] == {"extraction_rules": "规则一\n\n规则二"}
-    assert list(policy["profiles"]) == ["custom_one", "custom_two"]
+    assert user["domain_policy"] == policy
+    assert [block["skill_id"] for block in user["domain_policy"]["rule_blocks"]] == ["custom_one", "custom_two"]
 
 
-def test_user_source_and_entity_provenance_stays_internal():
+def test_source_identity_is_visible_but_entity_offsets_stay_internal():
     from copy import deepcopy
     chunk = CC.ExtractionChunk('c1', '正文', document_id='d1', section_id='s1',
                                start_offset=0, end_offset=2, previous_chunk_id='c0',
                                section_title='第一章', page_no=1)
     original = deepcopy(chunk.to_dict())
-    assert PR._chunk_payload(chunk, task='entity') == {'text': '正文', 'section_title': '第一章', 'page_no': 1}
+    assert PR._chunk_payload(chunk, task='entity') == {'text': '正文', 'chunk_id': 'c1', 'document_id': 'd1', 'section_id': 's1', 'section_title': '第一章', 'page_no': 1}
     assert chunk.to_dict() == original
     entities = [{'type': 'Rule', 'name': '规则', 'properties': {}, 'occurrences': [
         {'chunk_id': 'c1', 'properties': {}, 'evidence': {'quote': '正文', 'start_char': 0, 'end_char': 2}},
@@ -338,4 +342,4 @@ def test_user_source_and_entity_provenance_stays_internal():
     assert entities == before
     _, _, user = build()
     assert set(user['task']) == {'operation', 'discipline'}
-    assert user['documents'] == [{'text': '有效原文'}]
+    assert user['documents'] == [{'text': '有效原文', 'chunk_id': 'chunk-1', 'document_id': 'doc-1'}]

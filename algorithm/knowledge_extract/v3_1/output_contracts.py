@@ -8,6 +8,45 @@ from typing import Any, Iterable, TYPE_CHECKING
 if TYPE_CHECKING:
     from .ontology_compiler import ClassSpec, PropertySpec, ExtractionPlan
 
+VERIFICATION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "verdicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "supported": {"type": "string", "enum": ["yes", "no", "uncertain"]},
+                    "reason": {"type": "string"},
+                },
+                "required": ["item_id", "supported", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["verdicts"],
+    "additionalProperties": False,
+}
+
+def verification_schema(items: list[dict[str, Any]]) -> dict[str, Any]:
+    """The same concrete contract is sent to the model and local validator."""
+    ids = [item["item_id"] for item in items]
+    if any(not isinstance(value, str) or not value for value in ids) or len(set(ids)) != len(ids):
+        raise ValueError("Verification item IDs must be nonempty and unique")
+    schema = deepcopy(VERIFICATION_SCHEMA)
+    verdicts = schema["properties"]["verdicts"]
+    verdicts.update(minItems=len(ids), maxItems=len(ids))
+    verdicts["items"]["properties"]["item_id"]["enum"] = ids
+    return schema
+
+
+def validate_verification_items(payload: dict[str, Any], items: list[dict[str, Any]]) -> list[str]:
+    expected = {item["item_id"] for item in items}
+    ids = [item["item_id"] for item in payload.get("verdicts", [])]
+    return [] if set(ids) == expected and len(ids) == len(expected) else ["verdicts 必须逐项且仅一次覆盖所有 item_id"]
+
+
 ENTITY_NAME_RULES = """- mention 将直接作为最终实体 name：原文有明确名称时，必须逐字保留完整名称及内部空格、大小写、标点，不自行改写、缩写或概括。
 - 当前提供片段明确说明同一实体的全称和简称时，优先选择原文中实际出现的完整全称；不得凭常识扩写简称，也不得把不同实体仅凭名称相似视为同一实体。
 - 仅当原文没有明确名称时，才允许依据实际证据忠实归纳 mention；不得用概括名称替换已有的原文名称。"""
@@ -176,11 +215,20 @@ def property_entity_schema(entities: list[dict[str, Any]], plan: ExtractionPlan)
             "required": ["entities"], "additionalProperties": False}
 
 
-def validate_candidate_properties(parsed, plan):
+def validate_candidate_properties(parsed, plan, *, chunk=None):
     """Cross-type property constraints run inside the generation retry loop."""
     from .structured_output import validate_json_schema
     errors = []
     for index, row in enumerate(parsed.get("entities", [])):
+        name = (row.get('mention') or '').strip()
+        if not name:
+            errors.append(f'$.entities[{index}].mention: must be non-empty')
+        if chunk is not None:
+            from .chunk_context import ChunkContextManager
+            manager = ChunkContextManager([chunk])
+            quote = row.get('evidence', {}).get('quote', '')
+            if manager.find_span(chunk.chunk_id, quote) is None and name not in chunk.text:
+                errors.append(f'$.entities[{index}].evidence: neither quote nor mention has a source')
         if row.get("type") not in plan.class_specs:
             continue
         schema = property_entity_schema([{"type": row["type"], "name": row.get("mention", "")}], plan)

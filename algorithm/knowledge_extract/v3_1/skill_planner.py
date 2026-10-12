@@ -8,6 +8,27 @@ from typing import Any
 from .skill_registry import SkillConfigurationError, SkillRegistry, STAGES
 
 
+def compose_domain_policy(route: dict[str, Any], stages: tuple[str, ...],
+                          planner: SkillAssemblyPlanner | None = None) -> dict[str, Any]:
+    """Preserve whole rule sections; deduplicate only the same registered section.
+
+    A preview also uses one snapshot for every stage. Runtime callers pass their
+    request-scoped planner so verification and repair cannot reload changed files.
+    """
+    planner = planner if planner is not None else SkillAssemblyPlanner()
+    blocks = {}
+    for stage in stages:
+        policy = planner.assemble({"task": {"operation": stage}, "ontology": {},
+                                   "domain_policy": {"route": route}}, stage=stage)["domain_policy"]
+        for name, profile in policy.get("profiles", {}).items():
+            for block in profile["rule_blocks"]:
+                key = (name, block["version"], block["section"])
+                if key in blocks and blocks[key] != block:
+                    raise SkillConfigurationError("Conflicting rule section in request snapshot")
+                blocks[key] = deepcopy(block)
+    return {"rule_blocks": list(blocks.values())}
+
+
 class SkillAssemblyPlanner:
     """Compile all stage policies once; never ask a model to select skills.
 

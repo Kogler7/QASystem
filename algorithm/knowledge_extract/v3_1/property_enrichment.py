@@ -13,7 +13,7 @@ from .output_contracts import property_entity_schema
 from .prompt_router import build_chat_messages
 from .property_grounding import ground_properties, merge_evidences
 from .request_budget import (fits, input_limit, recover_split_attempts,
-                             split_request_failure, window_chars, windows)
+                             split_request_failure, window_chars, windows, document_expired)
 
 
 def _support_sources(entity):
@@ -21,9 +21,11 @@ def _support_sources(entity):
     seen = set()
     for receipt in entity.get('property_evidence', {}).values():
         for span in receipt['sources']:
-            if span['span_id'] in seen:
+            # All coordinates remain in the receipts; identical quotations do
+            # not need to be resent hundreds of times to the completion model.
+            if span['quote'] in seen:
                 continue
-            seen.add(span['span_id'])
+            seen.add(span['quote'])
             yield ExtractionChunk(span['source_block_ids'][0], span['quote'],
                 metadata={'_v31_window_start': span['start_char']})
 
@@ -61,7 +63,7 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
                 ground_properties([row], [manager.get_chunk(cid)], llm,
                     attempts=attempts, warnings=warnings, use_scheduler=use_scheduler,
                     max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
-                    call_metrics=call_metrics, plan=plan)
+                    call_metrics=call_metrics, plan=plan, route=route, assembly_planner=assembly_planner)
         state = {'type': type_id, 'name': name, 'properties': {}, 'property_evidence': {},
                  'evidence': deepcopy(candidates[0].get('evidence') or {}),
                  'evidences': merge_evidences(*(row.get('evidences', []) for row in candidates))}
@@ -70,6 +72,9 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
             for prop, value in row.get('properties', {}).items():
                 if prop in state['properties'] and state['properties'][prop] != value:
                     conflicts.add(prop)
+                elif prop in state['properties']:
+                    receipt = state['property_evidence'][prop]
+                    receipt['sources'] = merge_evidences(receipt['sources'], row['property_evidence'][prop]['sources'])
                 else:
                     state['properties'][prop] = deepcopy(value)
                     state['property_evidence'][prop] = deepcopy(row['property_evidence'][prop])
@@ -115,6 +120,12 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
         def process(sources, depth=0):
             nonlocal state, budget_exhausted
             if budget_exhausted:
+                return
+            if document_expired(llm):
+                attempts.append({'attempt': 1, 'type': 'timeout', 'pass': 'property',
+                    'chunk': sources[0].chunk_id, 'message': 'document deadline exhausted',
+                    'retryable': False, 'terminal': True})
+                budget_exhausted = True
                 return
             support_sources = list(_support_sources(state))
             documents = sources + support_sources
@@ -173,6 +184,9 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
                     call_metrics=call_metrics, validator=validate,
                     split_on_overflow=depth < 12 and (len(sources) > 1 or len(sources[0].text) > 256))
             if too_big or (parsed is None and split_request_failure(attempts[start:])):
+                if document_expired(llm):
+                    budget_exhausted = True
+                    return
                 if depth < 12 and (len(sources) > 1 or len(sources[0].text) > 256):
                     recover_split_attempts(attempts[start:])
                     if len(sources) > 1:
@@ -193,7 +207,8 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
             before = len(call_metrics or [])
             rows = ground_properties(deepcopy(parsed['entities']), documents, llm,
                 attempts=attempts, warnings=warnings, use_scheduler=use_scheduler,
-                max_attempts=max_attempts, retry_base_seconds=retry_base_seconds, call_metrics=call_metrics, prior=state, plan=plan)
+                max_attempts=max_attempts, retry_base_seconds=retry_base_seconds, call_metrics=call_metrics, prior=state, plan=plan,
+                route=route, assembly_planner=assembly_planner)
             stats['verifications'] += len(call_metrics or []) - before
             row = rows[0]
             # Preserve previously verified values omitted by a later local window.
@@ -238,6 +253,8 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
                             yield from windows(excerpt, limit)
 
         for part in source_windows():
+            if budget_exhausted:
+                break
             if packet and (size + len(part.text) > text_limit or len(packet) >= max(1, batch_size)):
                 process(packet)
                 packet, size = [], 0
@@ -246,5 +263,13 @@ def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
             stats['source_windows'] += 1
         if packet:
             process(packet)
+        unresolved = sorted(conflicts - state['properties'].keys())
+        if unresolved:
+            from .graph_utils import append_warning
+            append_warning(warnings, 'PROPERTY_CONFLICT_UNRESOLVED',
+                '属性冲突仍未消解，保留实体及证据，不任意选择值', f'{type_id}::{name}', unresolved)
+            attempts.append({'attempt': 1, 'type': 'schema_validation', 'pass': 'property',
+                'chunk': source_ids[0], 'message': 'conflicting property values remain unresolved',
+                'terminal': True})
         completed.append(state)
     return completed, stats

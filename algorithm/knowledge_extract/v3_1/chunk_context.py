@@ -85,9 +85,9 @@ class ChunkContextManager:
         self._order: list[str] = []
         self._positions: dict[str, int] = {}
         for chunk in chunks:
-            chunk_id = (chunk.chunk_id or "").strip()
-            if not chunk_id:
-                raise ValueError("chunk_id 不能为空")
+            chunk_id = chunk.chunk_id
+            if not isinstance(chunk_id, str) or not chunk_id or chunk_id != chunk_id.strip():
+                raise ValueError("chunk_id 必须是非空且无首尾空白的字符串")
             if chunk_id in self._chunks:
                 raise ValueError(f"chunk_id 重复: {chunk_id!r}")
             self._chunks[chunk_id] = chunk
@@ -139,30 +139,36 @@ class ChunkContextManager:
         same_section: bool = True,
     ) -> list[ExtractionChunk]:
         """返回以 ``chunk_id`` 为中心的有界局部上下文（§6）。"""
-        self.get_chunk(chunk_id)
+        anchor = self.get_chunk(chunk_id)
+        visited = {chunk_id}
+
+        def admitted(candidate_id: str | None) -> bool:
+            if candidate_id is None or candidate_id in visited:
+                return False
+            candidate = self.get_chunk(candidate_id)
+            return candidate.document_id == anchor.document_id and (
+                not same_section or candidate.section_id == anchor.section_id)
+
         ids: list[str] = []
         current = chunk_id
         for _ in range(max(0, previous)):
             previous_id = self._previous_id(current)
-            if previous_id is None:
+            if not admitted(previous_id):
                 break
+            visited.add(previous_id)
             ids.insert(0, previous_id)
             current = previous_id
         ids.append(chunk_id)
         current = chunk_id
         for _ in range(max(0, next)):
             next_id = self._next_id(current)
-            if next_id is None:
+            if not admitted(next_id):
                 break
+            visited.add(next_id)
             ids.append(next_id)
             current = next_id
 
-        chunks = [self.get_chunk(item_id) for item_id in ids]
-        anchor = self.get_chunk(chunk_id)
-        chunks = [chunk for chunk in chunks if chunk.document_id == anchor.document_id]
-        if same_section:
-            chunks = [chunk for chunk in chunks if chunk.section_id == anchor.section_id]
-        return chunks
+        return [self.get_chunk(item_id) for item_id in ids]
 
     def context_text(
         self,

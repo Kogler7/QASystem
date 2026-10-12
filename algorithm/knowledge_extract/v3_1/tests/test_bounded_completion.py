@@ -52,7 +52,8 @@ def test_missing_and_duplicate_keys_retry_before_acceptance(bad):
         row = {'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
                'evidence': {'quote': '张三负责检查。'}}
         return {'entities': ([] if bad == 'missing' else [row, row]) if count == 1 else [row]}
-    llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', '张三')], property_handler=complete)
+    llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', '张三')], property_handler=complete,
+                  verification_handler=lambda item, chunk: 'yes' if item['value'] == '检查' else 'no')
     result = extract([ExtractionChunk('c', '张三负责检查。')], llm)
     assert count == 2
     assert result['status'] == 'succeeded'
@@ -60,12 +61,14 @@ def test_missing_and_duplicate_keys_retry_before_acceptance(bad):
     assert not any(a['terminal'] for a in result['attempts'])
 
 
-def test_literal_first_pass_skips_completion_and_preserves_all_sources():
+def test_verified_first_pass_skips_completion_and_preserves_all_sources():
     chunks = [ExtractionChunk(f'c{i}', '张三负责检查。', section_id='s') for i in range(100)]
-    llm = StubLLM(entity_handler=lambda p, c: [candidate('张三', '检查', c['text'])])
+    llm = StubLLM(entity_handler=lambda p, c: [candidate('张三', '检查', c['text'])],
+                  verification_handler=lambda item, chunk: 'yes' if item['value'] == '检查' else 'no')
     result = extract(chunks, llm)
     assert result['status'] == 'succeeded'
-    assert len(llm.calls) == 100
+    assert len([t for t, _ in llm.calls if t == 'entity']) == 100
+    assert len([t for t, _ in llm.calls if t == 'evidence_verification']) == 100
     assert result['profile']['property_enrichment']['calls'] == 0
     assert result['profile']['repair_rounds'] == []
     assert not result['coverage_gaps']
@@ -147,7 +150,7 @@ def test_repeated_conflicting_wording_revisits_distinct_support_only():
 
     def complete(prompt, chunk):
         payload = json.loads(prompt)
-        for row in payload['task']['known_entities'][0]['occurrences']:
+        for row in payload['stage_context']['known_entities'][0]['occurrences']:
             values.add(row['properties']['duty'])
         return {'entities': [{'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
                                'evidence': {'quote': '张三负责检查。'}}]}
@@ -155,7 +158,8 @@ def test_repeated_conflicting_wording_revisits_distinct_support_only():
     duties = iter(['负责检查', '检查'] * 10)
     llm = StubLLM(entity_handler=lambda p, c: [candidate('张三',
         next(duties), '张三负责检查。')]
-        if '张三' in c['text'] else [], property_handler=complete)
+        if '张三' in c['text'] else [], property_handler=complete,
+        verification_handler=lambda item, chunk: 'yes' if item['value'] in ('负责检查', '检查') else 'no')
     result = extract(chunks, llm, max_repair_rounds=0)
     assert result['status'] == 'succeeded'
     assert values == {'检查', '负责检查'}
@@ -206,7 +210,9 @@ def test_candidate_schema_exposes_identifiers_and_retries_display_names():
                  'evidence': {'quote': chunk['text']}}]
 
     result = extract_split(ontology, [ExtractionChunk('c', '规则 R01 停车检查。')],
-                          llm=StubLLM(entity_handler=entities), retry_base_seconds=0)
+                          llm=StubLLM(entity_handler=entities,
+                              verification_handler=lambda item, chunk: 'yes' if item['value'] == 'R01' else 'no'),
+                          retry_base_seconds=0)
     assert count == 2
     assert result['status'] == 'succeeded'
     assert result['raw']['entities'][0]['properties'] == {'规则ID': 'R01'}
@@ -238,7 +244,8 @@ def test_frequent_key_sources_are_bounded_even_for_legacy_candidates(monkeypatch
         return {'entities': [{'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
                               'evidence': {'quote': '张三负责检查。'}}]}
     llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', '张三')] if '张三' in c['text'] else [],
-                  property_handler=complete)
+                  property_handler=complete,
+                  verification_handler=lambda item, chunk: 'yes' if item['value'] == '检查' else 'no')
     result = extract(chunks, llm)
     assert result['status'] == 'succeeded'
     assert result['raw']['entities'][0]['properties'] == {'duty': '检查'}
@@ -255,6 +262,8 @@ def test_incomplete_response_splits_instead_of_retrying_same_window(monkeypatch,
         def __init__(self):
             self.lengths = []
         def generate_structured(self, schema, messages, run_context):
+            if run_context['pass_name'] == 'property_verification':
+                return StubLLM(verification_handler=lambda item, chunk: 'yes')(messages)
             payload = json.loads(messages[1]['content'])
             text = payload['documents'][0]['text']
             self.lengths.append(len(text))
@@ -297,10 +306,11 @@ def test_source_windows_cover_every_character():
 
 def test_failed_key_keeps_discovery_and_does_not_erase_other_keys():
     def properties(prompt, chunk):
-        name = json.loads(prompt)['task']['known_entities'][0]['name']
+        name = json.loads(prompt)['stage_context']['known_entities'][0]['name']
         return {'entities': [] if name == '张三' else [{'type': 'Person', 'name': name,
             'properties': {'duty': '检查'}, 'evidence': {'quote': '李四负责检查。'}}]}
-    llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', c['text'][:2])], property_handler=properties)
+    llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', c['text'][:2])], property_handler=properties,
+                  verification_handler=lambda item, chunk: 'yes' if item['name'] == '李四' and item['value'] == '检查' else 'no')
     result = extract([ExtractionChunk('a', '张三负责检查。'), ExtractionChunk('b', '李四负责检查。')],
                      llm, best_effort=True, max_attempts=2)
     assert result['status'] == 'partial'
@@ -353,12 +363,14 @@ def test_property_overflow_splits_sources_and_retains_both_ends():
         def __init__(self):
             self.properties = []
         def generate_structured(self, schema, messages, run_context):
+            if run_context['pass_name'] == 'property_verification':
+                return StubLLM(verification_handler=lambda item, chunk: 'yes')(messages)
             user = json.loads(messages[1]['content'])
             if run_context['pass_name'] == 'entity':
                 return json.dumps(span_item('Person', '张三'), ensure_ascii=False)
             docs = user['documents']
             self.properties.append([d['text'] for d in docs])
-            if len(docs) > 2 and not user['task']['known_entities'][0].get('properties'):
+            if len(docs) > 2 and not user['stage_context']['known_entities'][0].get('properties'):
                 return StructuredLLMResponse(text='', api='chat.completions', response_mode='plain', status='incomplete', finish_reason='length')
             return json.dumps({'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
                                'evidence': {'quote': '张三负责检查。'}}, ensure_ascii=False)
