@@ -2,6 +2,8 @@
 from __future__ import annotations
 import re
 import uuid
+import hashlib
+import json
 from copy import deepcopy
 from functools import lru_cache
 from collections.abc import Iterable
@@ -19,6 +21,61 @@ from .prompt_router import resolve_document_route
 from .property_enrichment import enrich_entity_properties
 from .run_state import ExtractionRun, ExtractionValidationError
 from .verification import ExtractionVerifier
+from .output_contracts import validate_candidate_properties
+from .structured_output import validate_json_schema
+from .request_budget import document_expired
+
+
+def _custom_repair_candidates(proposal, plan):
+    """Project legacy callbacks onto the ordinary candidate admission contract.
+
+    Host evidence receipts/coordinates and retired relations are not accepted
+    from an extension; only source quotations can cross this boundary.
+    """
+    if not isinstance(proposal, dict) or not isinstance(proposal.get('entities'), list):
+        return None
+    candidates = []
+    for row in proposal['entities']:
+        if not isinstance(row, dict) or not isinstance(row.get('evidence'), dict):
+            return None
+        candidates.append({'type': row.get('type'), 'mention': row.get('name'),
+            'properties': deepcopy(row.get('properties', {})),
+            'evidence': {key: deepcopy(value) for key, value in row['evidence'].items()
+                         if key in {'quote', 'property_quotes'}}})
+    payload = {'entities': candidates}
+    if (validate_json_schema(payload, plan.output_schemas['entity_candidates'])
+            or validate_candidate_properties(payload, plan)):
+        return None
+    return [{'type': row['type'], 'name': row['mention'], 'properties': row['properties'],
+             'evidence': row['evidence']} for row in candidates]
+
+
+def _admit_repair_scope(grouped, issues, entities, manager, warnings):
+    """Uncovered blocks admit discovery; fact repairs admit only affected keys."""
+    discovery_chunks, allowed_keys = set(), set()
+    for issue in issues:
+        if issue.get('repair_type') == 'uncovered_block':
+            discovery_chunks.update(c.chunk_id for c in _repair_context_chunks([issue], manager,
+                                    entities=entities, relations=[]))
+            continue
+        context = issue.get('context') or {}
+        match = re.match(r'^entities\[(\d+)\]', str(issue.get('path') or ''))
+        if match and int(match.group(1)) < len(entities):
+            entity = entities[int(match.group(1))]
+            allowed_keys.add((entity['type'], entity['name']))
+        elif context.get('target_type') and context.get('evidence'):
+            allowed_keys.add((context['target_type'], context['evidence']))
+    accepted = []
+    for chunk_id, rows in grouped:
+        scoped = []
+        for row in rows:
+            if chunk_id in discovery_chunks or (row['type'], row['name']) in allowed_keys:
+                scoped.append(row)
+            else:
+                _append_warning(warnings, 'REPAIR_OUT_OF_SCOPE',
+                    '修复候选不属于待修复实体或漏抽切片，已拒收', f"{row['type']}::{row['name']}")
+        accepted.append((chunk_id, scoped))
+    return accepted
 
 @lru_cache(maxsize=32)
 def _compile_runtime(
@@ -45,7 +102,7 @@ def _repair_context_chunks(
     *,
     entities: list[dict[str, Any]],
     relations: list[dict[str, Any]],
-    max_chunks: int = 3,
+    max_chunks: int | None = None,
 ) -> list[ExtractionChunk]:
     """Resolve verifier issues to evidence chunks without guessing document prefixes."""
     known_ids = set(manager.chunk_ids)
@@ -81,11 +138,12 @@ def _repair_context_chunks(
 
     if not selected and len(manager.chunk_ids) <= 3:
         selected.update(manager.chunk_ids)
-    return [
+    resolved = [
         manager.get_chunk(chunk_id)
         for chunk_id in manager.chunk_ids
         if chunk_id in selected
-    ][: max(1, max_chunks)]
+    ]
+    return resolved if max_chunks is None else resolved[:max(1, max_chunks)]
 
 
 def extract_split(
@@ -109,6 +167,9 @@ def extract_split(
     chunks = list(chunks)
     if any(not isinstance(c, ExtractionChunk) for c in chunks):
         raise TypeError("extract_split 只接收 ExtractionChunk 序列")
+    # Freeze caller-owned text/metadata before model calls and worker handoff.
+    chunks = deepcopy(chunks)
+    target_types = tuple(target_types) if target_types is not None else None
     if validation_mode.casefold() not in {"strict", "permissive"}:
         raise ValueError("validation_mode 仅支持 strict 或 permissive")
     if entity_adjudicator is not None:
@@ -126,7 +187,7 @@ def extract_split(
     attempts, calls = [], []
     run = ExtractionRun.create(run_id=run_id or f"ke-{uuid.uuid4().hex}", ontology=ontology,
         markdown="\n".join(c.text for c in chunks), model=model,
-        prompt_version="knowledge-extract-v3.1-bounded-properties-v2", best_effort=best_effort)
+        prompt_version="knowledge-extract-v3.1-stage-messages-v5", best_effort=best_effort)
     run.start()
     for c in chunks:
         run.register_block(c.chunk_id, block_id=str(c.metadata.get("block_id") or c.chunk_id), kind="chunk")
@@ -162,16 +223,33 @@ def extract_split(
             break
         seen_repair_states.add(fingerprint)
         if repairer is not None:
-            proposal = repairer({"round": round_number, "issues": issues,
-                "entities": deepcopy(entities), "relations": [], "chunks": [c.to_dict() for c in referenced],
-                "schemas": deepcopy(plan.output_schemas)})
+            # 以下为安全注释COSEC：回调输入完全脱离请求状态；回执由本地核验重建。
+            try:
+                if document_expired(llm):
+                    raise TimeoutError('document deadline exhausted')
+                proposal = repairer(deepcopy({"round": round_number, "issues": issues,
+                    "entities": entities, "relations": [], "chunks": [c.to_dict() for c in referenced],
+                    "schemas": plan.output_schemas}))
+                if document_expired(llm):
+                    raise TimeoutError('document deadline exhausted')
+            except Exception as exc:
+                attempts.append({'attempt': round_number, 'type': 'timeout' if isinstance(exc, TimeoutError) else 'request',
+                    'pass': 'repair', 'chunk': 'callback', 'message': 'Repair callback failed',
+                    'terminal': True, 'retryable': False})
+                repair_stop_reason = 'repair_failed'
+                break
             from .property_grounding import ground_properties
-            additions = [deepcopy(e) for e in proposal.get("entities", []) if e.get("type") in plan.allowed_types]
-            for e in additions:
-                e.pop("property_evidence", None)
+            additions = _custom_repair_candidates(proposal, plan)
+            if additions is None:
+                attempts.append({'attempt': round_number, 'type': 'schema', 'pass': 'repair',
+                    'chunk': 'callback', 'message': 'Repair callback violated candidate contract',
+                    'terminal': True, 'retryable': False})
+                repair_stop_reason = 'repair_failed'
+                break
             additions = ground_properties(additions, referenced, llm, attempts=attempts, warnings=warnings,
                 use_scheduler=use_scheduler, max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds, call_metrics=calls, plan=plan)
+                retry_base_seconds=retry_base_seconds, call_metrics=calls, plan=plan,
+                route=route, assembly_planner=planner)
             grouped = [(c.chunk_id, [e for e in additions
                 if c.chunk_id in (e.get("evidence") or {}).get("source_block_ids", [])]) for c in referenced]
         else:
@@ -179,7 +257,8 @@ def extract_split(
                 llm, route=route, assembly_planner=planner, max_workers=max_workers,
                 use_scheduler=use_scheduler, attempts=attempts, warnings=warnings,
                 max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
-                call_metrics=calls, task="repair", repair_issues=issues[:24])
+                call_metrics=calls, task="repair", repair_issues=issues)
+        grouped = _admit_repair_scope(grouped, issues, entities, manager, warnings)
         affected = {(e["type"], e["name"]) for _, rows in grouped for e in rows}
         if not affected:
             repair_stop_reason = "no_progress"
@@ -214,7 +293,7 @@ def extract_split(
         evidence = entity.get("evidences") or ([entity["evidence"]] if entity.get("evidence") else [])
         objects.append({"uid": entity_uid(entity["type"], entity["name"], None), "type": entity["type"], "identity": entity["name"], "display_name": entity["name"],
                         "properties": deepcopy(entity["properties"]), "evidence": evidence,
-                        "mapping": {"status": "accepted", "score": score.score}})
+                        "mapping": {"status": score.status, "score": score.score}})
         # Legacy graph transport requires a uid, but this does not deduplicate,
         # change the complete model records or feed IDs back into extraction.
         nodes.append({"uid": entity_uid(entity["type"], entity["name"], None), "label": entity["type"],
@@ -222,25 +301,31 @@ def extract_split(
                       "evidences": deepcopy(evidence)})
     raw = {"entities": final_entities, "relations": []}
     report = verifier.verify(plan, schema, manager, request, final_entities, [])
-    if not report.repairable_issues:
+    if report.hard_issues:
+        repair_stop_reason = "verification_failed"
+    elif not report.repairable_issues:
         repair_stop_reason = "validation_complete"
-    if validation_mode.casefold() == "strict" and report.hard_issues:
+    if report.hard_issues:
         attempts.append({"attempt": 1, "type": "schema_validation", "pass": "verification", "chunk": "final",
                          "message": "; ".join(i.message for i in report.hard_issues), "terminal": True})
     failed = {(a.get("pass"), a.get("chunk")) for a in attempts if a.get("terminal")}
     for c in chunks:
         run.mark_chunk_scan(c.chunk_id, "entity", completed=("entity", c.chunk_id) not in failed)
     run.absorb_attempts(attempts)
-    run.finish(accepted_entities=len(final_entities), accepted_relations=0)
+    run.finish(accepted_entities=len(final_entities), accepted_relations=0, stop_reason=repair_stop_reason)
     gaps = [g.to_dict() for g in CoverageAuditor().audit(plan, manager, request, final_entities, [])]
     trace = run.to_trace()
-    trace.update(calls=calls, repair_rounds=rounds, verification=report.to_dict())
+    trace.update(calls=calls, repair_rounds=rounds, repair_stop_reason=repair_stop_reason,
+                 verification=report.to_dict())
     result = {"raw": raw, "graph": {"nodes": nodes, "relationships": []}, "triples": [],
         "intermediate_model": {"objects": objects, "relations": [], "coverage_gaps": gaps},
         "warnings": warnings, "attempts": attempts, "evidence_coverage": evidence_coverage(raw),
         "coverage_gaps": gaps, "verification": report.to_dict(),
         "mapping": {"entities": scores, "relations": [], "rejected": sum(s["status"] == "rejected" for s in scores)},
         "profile": {"document_route": route.to_dict(), "pipeline": "entity_property", "chunks": len(chunks),
+            "input_manifest": [{"chunk_id": c.chunk_id,
+                "sha256": hashlib.sha256(json.dumps(c.to_dict(), ensure_ascii=False,
+                    sort_keys=True, default=str).encode('utf-8')).hexdigest()} for c in chunks],
             "entity_candidates": sum(len(es) for _, es in discovered), "relation_candidates": 0,
             "accepted_entities": len(final_entities), "accepted_relations": 0, "property_enrichment": property_stats,
             "mapping_mode": "enforce" if apply_mapping_threshold else "annotate",

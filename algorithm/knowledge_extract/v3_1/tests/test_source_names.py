@@ -35,7 +35,7 @@ def test_original_name_rules_reach_system_and_user(stage):
 def test_full_source_name_unchanged_after_cross_chunk_completion():
     def properties(prompt, chunk):
         user=json.loads(prompt)
-        known=user['task']['known_entities']
+        known=user['stage_context']['known_entities']
         assert len(known)==1 and known[0]['name']==NAME
         assert len(known[0]['occurrences'])==2
         assert user['output_contract']['success_schema']['properties']['name']['enum']==[NAME]

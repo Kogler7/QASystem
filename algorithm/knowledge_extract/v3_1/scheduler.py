@@ -41,13 +41,15 @@ class LLMRequestScheduler:
         while window and now - window[0] >= seconds:
             window.popleft()
 
-    def _wait_for_rate_limit(self) -> None:
+    def _wait_for_rate_limit(self, deadline: float | None = None) -> None:
         if self.limits.qps <= 0 and self.limits.qpm <= 0:
             return
 
         with self._condition:
             while True:
                 now = time.monotonic()
+                if deadline is not None and now >= deadline:
+                    raise TimeoutError('document deadline exhausted during rate limiting')
                 self._prune(self._second_window, now, 1.0)
                 self._prune(self._minute_window, now, 60.0)
 
@@ -65,13 +67,21 @@ class LLMRequestScheduler:
                     waits.append(max(0.001, 1.0 - (now - self._second_window[0])))
                 if qpm_full:
                     waits.append(max(0.001, 60.0 - (now - self._minute_window[0])))
+                if deadline is not None:
+                    waits.append(max(0, deadline - now))
                 self._condition.wait(timeout=min(waits))
 
     @contextmanager
-    def request_slot(self) -> Iterator[None]:
-        self._semaphore.acquire()
+    def request_slot(self, *, deadline: float | None = None) -> Iterator[None]:
+        if deadline is None:
+            acquired = self._semaphore.acquire()
+        else:
+            remaining = deadline - time.monotonic()
+            acquired = remaining > 0 and self._semaphore.acquire(timeout=remaining)
+        if not acquired:
+            raise TimeoutError('document deadline exhausted during scheduling')
         try:
-            self._wait_for_rate_limit()
+            self._wait_for_rate_limit(deadline)
             yield
         finally:
             self._semaphore.release()

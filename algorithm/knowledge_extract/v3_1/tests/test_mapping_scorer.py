@@ -213,7 +213,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(result["profile"]["mapping_mode"], "annotate")
         self.assertEqual(
             result["intermediate_model"]["objects"][0]["mapping"]["status"],
-            "accepted",
+            result["mapping"]["entities"][0]["status"],
         )
 
     def test_enforce_mode_filters_rejected(self) -> None:

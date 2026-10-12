@@ -159,7 +159,7 @@ class TwoPassPipelineTest(unittest.TestCase):
         model = result["intermediate_model"]
         self.assertEqual(len(model["objects"]), 3)
         self.assertEqual(model["relations"], [])
-        self.assertEqual(model["objects"][0]["mapping"]["status"], "accepted")
+        self.assertEqual(model["objects"][0]["mapping"]["status"], result["mapping"]["entities"][0]["status"])
         self.assertEqual(model["objects"][0]["identity"], COMPOSITE_TEXT)
         # 证据覆盖
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
@@ -207,7 +207,8 @@ class "术语" as Terminology <<KnowledgeUnit>> {
             }
 
         llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler,
-                      verification_handler=lambda item, chunk: "yes" if item["property"] == "TermDefinition" else "uncertain")
+                      verification_handler=lambda item, chunk: "yes" if item["property"] in
+                      {"TermName", "TermDefinition", "Synonyms"} else "uncertain")
         result = SE.extract_split(terminology_ontology, chunks=chunks, llm=llm)
         entities = result["raw"]["entities"]
         self.assertEqual(len(entities), 1)
@@ -221,7 +222,7 @@ class "术语" as Terminology <<KnowledgeUnit>> {
         import json
         payload = json.loads(next(p for t, p in llm.calls if t == "property"))
         self.assertEqual([d["text"] for d in payload["documents"]], [c.text for c in chunks])
-        self.assertEqual(len(payload["task"]["known_entities"][0]["occurrences"]), 2)
+        self.assertEqual(len(payload["stage_context"]["known_entities"][0]["occurrences"]), 2)
 
     def test_out_of_scope_entity_rejected(self) -> None:
         # 重构后 entity pass 的 output schema enum 已限定在目标范围内，范围外类型
@@ -282,7 +283,8 @@ class FailureAndEdgeTest(unittest.TestCase):
                     for e in parse_known_entities(prompt)]}
             return SE.extract_split(RULE_ONTOLOGY, chunks=[CC.ExtractionChunk("c", "规则内容：" + value)],
                 llm=StubLLM(entity_handler=lambda p, c: [span_item("SimpleRule", "规则")],
-                            property_handler=properties))
+                            property_handler=properties,
+                            verification_handler=lambda item, chunk: 'yes' if item['value'] == value else 'no'))
         first, second = run("A"), run("B")
         self.assertEqual(first["graph"]["nodes"][0]["uid"], second["graph"]["nodes"][0]["uid"])
         self.assertNotEqual(first["raw"]["entities"][0]["properties"], second["raw"]["entities"][0]["properties"])

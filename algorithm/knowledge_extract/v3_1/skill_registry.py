@@ -127,6 +127,8 @@ class SkillRegistry:
                     or len(set(sections)) != len(sections)):
                 raise SkillConfigurationError(f"Invalid or duplicate sections for {name}")
             profiles[name] = {"extraction_rules": "\n\n".join(available[s] for s in sections),
+                              "rule_blocks": [{"skill_id": name, "version": loaded["version"],
+                                               "section": s, "text": available[s]} for s in sections],
                               "skill_version": loaded["version"], "skill_sha256": loaded["sha256"],
                               "sections": list(sections)}
         return profiles

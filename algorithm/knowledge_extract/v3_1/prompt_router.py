@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
 from .prompt_templates import BASE_SYSTEM_PROMPT, build_system_prompt, render_user
-from .domain_skills import select_domain_policy
+from .skill_planner import compose_domain_policy
+from .prompt_templates import document_payload
 from .output_contracts import build_output_contract
 from .chunk_context import ExtractionChunk
 from .structured_text import is_structured_payload
@@ -335,15 +336,7 @@ def _known_entities_payload(
 
 
 def _chunk_payload(chunk: ExtractionChunk, *, task: str) -> dict[str, Any]:
-    if task == "repair":
-        return {"text": chunk.text or ""}
-    payload = chunk.to_dict()
-    for key in ("chunk_id", "document_id", "section_id", "parent_chunk_id",
-                "previous_chunk_id", "next_chunk_id", "start_offset", "end_offset"):
-        payload.pop(key, None)
-    payload["metadata"] = {key: value for key, value in payload.get("metadata", {}).items()
-                           if key != "signal_source" and not key.startswith("_v31_")}
-    return {key: value for key, value in payload.items() if key == "text" or value not in (None, "", {}, [])}
+    return document_payload(chunk)
 
 
 def _looks_like_record_table(chunk: ExtractionChunk) -> bool:
@@ -407,37 +400,18 @@ def build_chat_messages(
         task={
             "operation": task,
             "discipline": discipline,
-            "known_entities": known,
-            "repair_issues": repair_issues or [],
         },
         output_contract=contract,
-        domain_policy={"route": route.to_dict()} if assembly_planner is not None else select_domain_policy(
-            kind=route.kind, route=route.to_dict(),
-            task="entity" if entity_task else task,
-        ),
+        domain_policy=compose_domain_policy(route.to_dict(),
+            ("entity", "property", "repair") if task == "repair" else
+            ("entity", "property") if entity_task else ("property",), assembly_planner),
+        stage_context={**({"known_entities": known} if not entity_task else {}),
+                       **({"repair_issues": repair_issues or []} if task == "repair" else {})},
         ontology={
             "catalog": ontology_section,
         },
         documents=[_chunk_payload(source, task=task) for source in (source_chunks or [chunk])],
     )
-    if assembly_planner is not None:
-        payload = assembly_planner.assemble(payload, stage="entity" if entity_task else task)
-    if entity_task:
-        property_policy = (assembly_planner.assemble(payload, stage="property")["domain_policy"]
-                           if assembly_planner is not None else select_domain_policy(
-                               kind=route.kind, route=route.to_dict(), task="property"))
-        # Candidate discovery now also extracts local properties. Both policies
-        # are compiled once per request; append only stage-specific new lines.
-        profiles = payload["domain_policy"].setdefault("profiles", {})
-        for name, profile in property_policy.get("profiles", {}).items():
-            if name not in profiles:
-                profiles[name] = profile
-                continue
-            current = profiles[name]["extraction_rules"]
-            existing = set(current.splitlines())
-            extra = [line for line in profile["extraction_rules"].splitlines() if line and line not in existing]
-            if extra:
-                profiles[name]["extraction_rules"] = current + "\n\n" + "\n".join(extra)
     user = render_user(**payload)
     return [
         {"role": "system", "content": build_system_prompt(

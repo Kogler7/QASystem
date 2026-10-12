@@ -10,6 +10,7 @@ import os
 import re
 import time
 from collections import deque
+from copy import deepcopy
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
@@ -28,7 +29,8 @@ from .prompt_templates import user_with_retry_feedback
 
 
 logger = get_step_logger(__name__)
-from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages, semantic_support
+from .semantic_evidence import build_verification_messages, semantic_support
+from .output_contracts import verification_schema, validate_verification_items
 from .scheduler import get_llm_scheduler
 from .structured_output import validate_json_schema
 
@@ -366,6 +368,8 @@ def _invoke_generation(
     response_mode: str,
     record_table: bool = False,
 ) -> Any:
+    # 以下为安全注释COSEC：扩展适配器只能操作副本，不得改写本地准入契约或重试证据。
+    schema, messages = deepcopy(schema), deepcopy(messages)
     structured = getattr(llm, "generate_structured", None)
     if callable(structured):
         return structured(
@@ -401,6 +405,7 @@ def generate_structured(
     split_on_overflow: bool = False,
 ) -> dict[str, Any] | None:
     """Call one required pass with bounded retry and conservative prefix recovery."""
+    messages, schema = deepcopy(messages), deepcopy(schema)
     attempt_messages = messages
     resolved_max_attempts = max(1, int(max_attempts))
     response_mode = "plain"
@@ -436,7 +441,10 @@ def generate_structured(
             return None
         try:
             if use_scheduler:
-                with get_llm_scheduler().request_slot():
+                from .request_budget import document_deadline
+                with get_llm_scheduler().request_slot(deadline=document_deadline(llm)):
+                    if document_expired(llm):
+                        raise TimeoutError('document deadline exhausted during scheduling')
                     response = _invoke_generation(
                         llm,
                         schema,
@@ -458,6 +466,9 @@ def generate_structured(
                     response_mode=response_mode,
                     record_table=record_table_flag,
                 )
+            # A provider may ignore its timeout. A late result is not a successful attempt.
+            if document_expired(llm):
+                raise TimeoutError('document deadline exhausted during generation')
             pre_parse_error = _pre_parse_response_error(response)
             if pre_parse_error is not None:
                 error_type, message = pre_parse_error
@@ -540,7 +551,14 @@ def generate_structured(
                         return parsed
         except Exception as exc:  # noqa: BLE001 - recorded as typed run evidence
             error_type = "timeout" if _is_timeout(exc) else "request"
-            message = str(exc) or type(exc).__name__
+            # 以下为安全注释COSEC：供应商异常可能回显鉴权头、URL 或请求正文。
+            # 仅保留控制重试所需的错误类别，不将原始异常写入日志或结果。
+            raw_message = str(exc).lower()
+            overflow = any(text in raw_message for text in
+                ('context length', 'context_length', 'maximum context', 'token limit', 'too many tokens'))
+            message = ('context length exceeded' if overflow else
+                       'document deadline exhausted' if document_expired(llm) else
+                       'LLM request timed out' if error_type == 'timeout' else 'LLM provider request failed')
             retryable = _is_retryable_exception(exc) and not document_expired(llm)
 
         message = message.encode("utf-8")[:1024].decode("utf-8", errors="ignore")
@@ -628,7 +646,12 @@ def generate_structured(
             ]
         response_mode = next_response_mode
         if retry_base_seconds > 0:
-            time.sleep(retry_base_seconds * (2 ** (attempt_number - 1)))
+            from .request_budget import document_deadline
+            deadline = document_deadline(llm)
+            delay = retry_base_seconds * (2 ** (attempt_number - 1))
+            if deadline is not None:
+                delay = min(delay, max(0, deadline - time.monotonic()))
+            time.sleep(delay)
     return None
 
 
@@ -657,7 +680,8 @@ def verify_items_with_llm(
         parsed = generate_structured(
             llm,
             messages,
-            VERIFICATION_SCHEMA,
+            verification_schema(items),
+            validator=lambda payload: validate_verification_items(payload, items),
             use_scheduler=use_scheduler,
             attempts=attempts if attempts is not None else [],
             pass_name=pass_name,
@@ -741,9 +765,12 @@ def _normalize_span_entities(
                 "mention 无法逐字定位，已保留归纳型实体名并以 evidence.quote 作为证据",
                 path, name)
         elif not name_in_text and not quote_in_text:
-            _append_warning(warnings, "ENTITY_UNGROUNDED",
-                "mention 与 evidence.quote 均非原文片段，按生成式实体保留",
-                path, name)
+            if ChunkContextManager([chunk]).find_span(chunk.chunk_id, quote) is not None:
+                quote_in_text = True
+            else:
+                _append_warning(warnings, "ENTITY_UNGROUNDED",
+                    "mention 与 evidence.quote 均无法定位，拒收无来源实体", path, name)
+                continue
         # Offsets are exclusively computed by the evidence binder. Do not accept
         # model offsets or manufacture 0:0 spans when no source can be located.
         locator = quote if quote_in_text else name if name_in_text else ""
@@ -809,6 +836,12 @@ def entity_pass(
         from .property_grounding import ground_properties
 
         def scan(part, types, depth=0):
+            if document_expired(llm):
+                local_attempts.append({'attempt': 1, 'type': 'timeout',
+                    'pass': 'repair_entity' if task == 'repair' else 'entity',
+                    'chunk': chunk.chunk_id, 'message': 'document deadline exhausted',
+                    'retryable': False, 'terminal': True})
+                return []
             output_schema = output_schema_for_types(plan, "entity_candidates", types)
             messages = build_chat_messages(assembly_planner=assembly_planner,
                 task=task, plan=plan, route=route, chunk=part, output_schema=output_schema,
@@ -825,7 +858,9 @@ def entity_pass(
                     max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
                     call_metrics=local_call_metrics,
                     split_on_overflow=depth < 12 and (len(types) > 1 or len(part.text) > 256),
-                    validator=lambda payload: validate_candidate_properties(payload, plan))
+                    validator=lambda payload: validate_candidate_properties(payload, plan, chunk=part))
+            if parsed is None and document_expired(llm):
+                return []
             if too_big or (parsed is None and split_request_failure(local_attempts[before:])):
                 if depth < 12 and (len(types) > 1 or len(part.text) > 256):
                     parent_failures = local_attempts[before:]
@@ -849,7 +884,8 @@ def entity_pass(
                 target_types=request.target_types, warnings=local_warnings)
             return ground_properties(entities, [part], llm, attempts=local_attempts,
                 warnings=local_warnings, use_scheduler=use_scheduler, max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds, call_metrics=local_call_metrics, plan=plan)
+                retry_base_seconds=retry_base_seconds, call_metrics=local_call_metrics, plan=plan,
+                route=route, assembly_planner=assembly_planner)
 
         grounded_entities = [entity for part in windows(chunk, window_chars(llm))
                              for entity in scan(part, sorted(plan.relevant_types(part.text)))]

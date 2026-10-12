@@ -80,7 +80,7 @@ def parse_known_entities(prompt: str) -> list[dict[str, str]]:
             "type": item["type"], "name": item["name"],
             "properties": ", ".join(f"{k}={v}" for k, v in item.get("properties", {}).items()),
             "missing": ", ".join(item.get("missing_properties", {})),
-        } for item in payload["task"]["known_entities"]]
+        } for item in payload["stage_context"]["known_entities"]]
     rows = []
     for match in _KNOWN_ROW.finditer(prompt):
         row = match.groupdict()
@@ -133,7 +133,7 @@ class StubLLM:
         if task in {"relation", "relation_verification"}:
             raise AssertionError("V3.1 must not request relationship extraction")
         elif task == "evidence_verification":
-            items = json.loads(prompt.split("## candidates\n", 1)[1].split("\n\n## output schema", 1)[0])
+            items = _user_payload(prompt)["stage_context"]["items"]
             payload = {"verdicts": [{"item_id": item["item_id"],
                 "supported": self.verification_handler(item, chunk) if self.verification_handler else "uncertain",
                 "reason": "fixture verdict"} for item in items]}
@@ -144,7 +144,7 @@ class StubLLM:
             payload = (
                 self.property_handler(prompt, chunk) if self.property_handler else {
                     "entities": [{"type": e["type"], "name": e["name"], "properties": e.get("properties", {}),
-                                  "evidence": {"quote": e["name"]}} for e in _user_payload(prompt)["task"]["known_entities"]]
+                                  "evidence": {"quote": e["name"]}} for e in _user_payload(prompt)["stage_context"]["known_entities"]]
                 }
             )
         else:  # repair 或其他：按 output schema 顶层 required 键返回空集合
