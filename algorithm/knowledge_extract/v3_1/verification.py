@@ -115,6 +115,15 @@ class ExtractionVerifier:
                     )
                 )
             entity_keys.add(key)
+            for prop, value in (entity.get("properties") or {}).items():
+                receipt = (entity.get("property_evidence") or {}).get(prop) or {}
+                spans = receipt.get("sources") or []
+                if (receipt.get("value") != value or receipt.get("support") not in {"literal", "llm"}
+                        or not spans or any(not span.get("source_block_ids") or
+                            not all(manager.has_chunk(cid) and manager.find_span(cid, span.get("quote", "")) is not None
+                                    for cid in span["source_block_ids"]) for span in spans)):
+                    issues.append(VerificationIssue(code="PROPERTY_EVIDENCE_INVALID",
+                        message="属性缺少与当前值一致且可定位的支持证据", path=f"entities[{index}].properties.{prop}"))
 
         for verdict in verify_evidence(raw, manager):
             if verdict.status == "fail":

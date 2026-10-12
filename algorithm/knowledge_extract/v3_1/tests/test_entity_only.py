@@ -4,7 +4,6 @@ import json
 import pytest
 
 from .. import extract_harness, extract
-from ..candidate_models import EntityCandidate
 from ..chunk_context import ExtractionChunk, ChunkContextManager
 from ..ontology_schema import OntologySchema
 from ..ontology_compiler import compile_plan
@@ -42,7 +41,7 @@ def test_many_entities_with_required_relations_finish_after_properties():
     def properties(prompt, chunk):
         known = json.loads(prompt)["task"]["known_entities"]
         return {'entities': [{'type': e['type'], 'name': e['name'], 'properties': {'duty': '巡检'} if e['type']=='Person' else {},
-                             'evidence': {'quote': '负责巡检'}} for e in known]}
+                             'evidence': {'quote': e['name'] + '负责巡检。' if e['type']=='Person' else e['name']}} for e in known]}
     llm = StubLLM(entity_handler=lambda p, c: [span_item('Person' if n.startswith('人员') else 'Work', n) for n in names],
                   property_handler=properties)
     result = extract_harness(ONTOLOGY, [ExtractionChunk('c0', text)], llm=llm,
@@ -69,7 +68,7 @@ def test_public_result_has_empty_relations():
 
 
 def test_property_response_cannot_add_relationships():
-    llm = StubLLM(entity_handler=lambda p, c: [span_item('Work', '巡检')],
+    llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', '巡检')],
                   property_handler=lambda p, c: {'entities': [], 'relations': [{}]})
     result = extract_harness(ONTOLOGY, [ExtractionChunk('c0', '巡检')], llm=llm,
                              use_scheduler=False, max_attempts=1)

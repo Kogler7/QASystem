@@ -32,6 +32,11 @@ def validate_json_schema(instance: Any, schema: dict[str, Any], *, path: str = "
             for name in instance:
                 if name not in properties:
                     errors.append(f"{path}: unexpected property {name!r}")
+        extra_schema = schema.get("additionalProperties")
+        if isinstance(extra_schema, dict):
+            for name, value in instance.items():
+                if name not in properties:
+                    errors.extend(validate_json_schema(value, extra_schema, path=f"{path}.{name}"))
         for name, child in properties.items():
             if name in instance:
                 errors.extend(validate_json_schema(instance[name], child, path=f"{path}.{name}"))
