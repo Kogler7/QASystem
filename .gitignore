@@ -215,3 +215,6 @@ eval_api.md
 
 # 本地备份（不提交）
 algorithm/knowledge_extract/v2/backups/
+
+# Mutable deployment configuration and credential-bearing backups
+runtime-config/

@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from algorithm.runtime_settings import read_settings, getenv
 from algorithm.knowledge_extract.version import SUPPORTED_VERSIONS, get_extract_version
 
 
@@ -54,18 +55,31 @@ def has_overrides(options: dict[str, Any]) -> bool:
 
 def _credential_env() -> str:
     return next((name for name in ("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY")
-                 if os.getenv(name, "").strip()), "KG_EXTRACT_LLM_API_KEY")
+                 if getenv(name, "").strip()), "KG_EXTRACT_LLM_API_KEY")
 
 
 def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
     """Resolve non-secret defaults once at submission, not again on retry."""
-    version = options.get("version") or get_extract_version()
+    hot = read_settings()
+    def setting(key, default=None):
+        return hot.get(key, os.getenv(key, default))
+    version = options.get("version") or str(setting("KG_EXTRACT_ALGO_VERSION", "latest")).strip().lower()
     if version not in SUPPORTED_VERSIONS:
         raise ValueError("Unsupported extraction version")
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
     package = {"v2.1": "v2_1", "v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
     defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
+    # Snapshot once: retries retain the submitted configuration.
+    casts = {"BASE_URL": ("base_url", str), "MODEL": ("model", str),
+             "MAX_TOKENS": ("max_tokens", int), "MAX_CONCURRENCY": ("max_concurrency", int),
+             "QPS": ("qps", int), "QPM": ("qpm", int),
+             "TIMEOUT_SECONDS": ("request_timeout", float),
+             "DISABLE_THINKING": ("disable_thinking", lambda v: v.lower() not in {"0", "false", "no"})}
+    for suffix, (field, cast) in casts.items():
+        key = "KG_EXTRACT_LLM_" + suffix
+        if key in hot:
+            defaults[field] = cast(hot[key])
     provider = options.get("provider") or "default"
     if provider == "default":
         values = {key: defaults[key] for key in (
@@ -73,16 +87,16 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
             "max_concurrency", "qps", "qpm",
         )}
         values.update(api_key_env=_credential_env(),
-                      quota_group=os.getenv("KG_EXTRACT_LLM_QUOTA_GROUP", "default"),
+                      quota_group=setting("KG_EXTRACT_LLM_QUOTA_GROUP", "default"),
                       api_mode="auto", thinking_parameter="thinking")
-        values["max_input_tokens"] = int(os.getenv("KG_EXTRACT_LLM_MAX_INPUT_TOKENS", "65536"))
-        values["max_output_tokens"] = int(os.getenv("KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS") or values["max_tokens"])
+        values["max_input_tokens"] = int(setting("KG_EXTRACT_LLM_MAX_INPUT_TOKENS", "65536"))
+        values["max_output_tokens"] = int(setting("KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS") or values["max_tokens"])
         values["max_tokens"] = values["max_output_tokens"]
         if values["max_input_tokens"] < 1 or values["max_output_tokens"] < 1:
             raise ValueError("Token limits must be positive")
     else:
         try:
-            profiles = json.loads(os.getenv("KG_EXTRACT_PROVIDERS_JSON", "{}"))
+            profiles = json.loads(setting("KG_EXTRACT_PROVIDERS_JSON", "{}"))
             values = ProviderProfile.model_validate(profiles[provider]).model_dump()
         except Exception:
             # Pydantic/JSON errors may echo configuration values. Never expose them.
@@ -90,15 +104,17 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
         url = urlsplit(values["base_url"])
         if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password or url.query or url.fragment:
             raise ValueError("Provider base_url must be an HTTP(S) URL without credentials or query")
-        if not os.getenv(values["api_key_env"], "").strip():
+        if not setting(values["api_key_env"], "").strip():
             raise ValueError("Extraction provider credential is not configured")
     if version == "v3.1":
         if provider == "default":
-            values["request_timeout"] = float(os.getenv("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
+            values["request_timeout"] = float(setting("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
             values["disable_thinking"] = defaults["disable_thinking"]
-        document_timeout = float(os.getenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "900"))
+        document_timeout = float(setting("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "900"))
     else:
         document_timeout = None
+    checked = ProviderProfile.model_validate(values)
+    values = checked.model_dump()
     values.update(version=version, provider=provider, document_timeout=document_timeout)
     for key in ("model", "request_timeout", "document_timeout"):
         if options.get(key) is not None:

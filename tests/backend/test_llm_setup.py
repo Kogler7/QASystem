@@ -75,7 +75,7 @@ def answer(monkeypatch, answers):
 def test_cancel_leaves_environment_and_services_untouched(project, monkeypatch):
     root, env, calls, answers = project
     answer(monkeypatch, answers + ['no'])
-    assert wizard.main(['--project-dir', str(root)]) == 0
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 0
     assert (root / '.env').read_text() == env
     assert not any('up' in command for command in calls)
 
@@ -83,7 +83,7 @@ def test_cancel_leaves_environment_and_services_untouched(project, monkeypatch):
 def test_apply_reserves_gpu_before_starting_model_and_sets_existing_judge_config(project, monkeypatch):
     root, env, calls, answers = project
     answer(monkeypatch, answers + ['yes'])
-    assert wizard.main(['--project-dir', str(root)]) == 0
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 0
     values = wizard.read_env((root / '.env').read_text())
     assert values['GPU_DEVICE_IDS'] == '4,5,6,7'
     assert values['EXECUTION_GPU_RESERVED_DEVICE_IDS'] == '6,7'
@@ -108,7 +108,7 @@ def test_invalid_compose_restores_original_environment_without_restarting(projec
 
     monkeypatch.setattr(wizard, 'run', run)
     answer(monkeypatch, answers + ['yes'])
-    assert wizard.main(['--project-dir', str(root)]) == 1
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
     assert (root / '.env').read_text() == env
     assert not any('up' in command for command in calls)
 
@@ -125,7 +125,7 @@ def test_start_failure_retains_live_configuration_and_never_stops_other_services
 
     monkeypatch.setattr(wizard, 'run', run)
     answer(monkeypatch, answers + ['yes'])
-    assert wizard.main(['--project-dir', str(root)]) == 1
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
     assert wizard.read_env((root / '.env').read_text())['LLM_GPU_DEVICE_IDS'] == '6'
     assert not any('stop' in command or 'down' in command for command in calls)
 
@@ -141,7 +141,7 @@ def test_existing_llm_is_not_replaced_and_no_configuration_is_changed(project, m
 
     monkeypatch.setattr(wizard, 'run', run)
     monkeypatch.setattr(wizard, 'prompt', lambda *a: pytest.fail('Must stop before requesting changes'))
-    assert wizard.main(['--project-dir', str(root)]) == 1
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
     assert (root / '.env').read_text() == env
     assert not any('up' in command for command in calls)
 
@@ -161,7 +161,7 @@ def test_gpu_becoming_busy_during_selection_does_not_apply_configuration(project
 
     monkeypatch.setattr(wizard, 'run', run)
     answer(monkeypatch, answers + ['yes'])
-    assert wizard.main(['--project-dir', str(root)]) == 1
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
     assert (root / '.env').read_text() == env
     assert not any('up' in command for command in calls)
 

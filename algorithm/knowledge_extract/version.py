@@ -13,7 +13,7 @@
 """
 from __future__ import annotations
 
-import os
+from algorithm.runtime_settings import getenv
 
 LATEST = "latest"
 V0 = "v0"
@@ -29,7 +29,7 @@ DEFAULT_VERSION = LATEST
 
 def get_extract_version_label() -> str:
     """返回配置原值（可能是 latest / v2 / v2.2 / v3 / v3.1 / jev），不做 latest 解析。"""
-    value = os.getenv("KG_EXTRACT_ALGO_VERSION", DEFAULT_VERSION).strip().lower()
+    value = getenv("KG_EXTRACT_ALGO_VERSION", DEFAULT_VERSION).strip().lower()
     if value in SUPPORTED_VERSIONS:
         return value
     raise ValueError(

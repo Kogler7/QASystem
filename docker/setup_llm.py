@@ -276,5 +276,22 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
+legacy_main = main
+
+
+def main(argv=None):
+    """Default to the configuration editor; retain the old flow explicitly."""
+    import sys
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--legacy" in args:
+        args.remove("--legacy")
+        return legacy_main(args)
+    try:
+        from docker.configure import main as configure_main
+    except ImportError:
+        from configure import main as configure_main
+    return configure_main(args)
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

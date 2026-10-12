@@ -2166,19 +2166,34 @@ def llm_judge_score_case(
 def build_judge_client(params: dict[str, Any]) -> JudgeClient:
     eval_cfg = params.get("eval") or {}
     overrides = params.get("_judge_overrides") or {}
+    # Host evaluations read the same persisted non-secret settings as Backend.
+    settings_path = Path(os.environ.get("QASYSTEM_RUNTIME_SETTINGS_FILE") or (
+        "/app/runtime-config/settings.json" if Path("/app/runtime-config").is_dir() else
+        str(Path(os.environ.get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config")) / "settings.json")))
+    hot = {}
+    if settings_path.exists():
+        try:
+            hot = json.loads(settings_path.read_text(encoding="utf-8"))
+            if not isinstance(hot, dict) or any(not isinstance(v, str) for v in hot.values()):
+                raise ValueError()
+        except (ValueError, OSError):
+            raise RuntimeError("Invalid runtime judge configuration") from None
+    def setting(key, default=None):
+        return hot.get(key, os.environ.get(key, default))
+
     base_url = (
         overrides.get("base_url")
-        or os.environ.get("QASYSTEM_JUDGE_BASE_URL")
+        or setting("QASYSTEM_JUDGE_BASE_URL")
         or eval_cfg.get("judge_base_url")
         or ""
     ).rstrip("/")
     model = (
         overrides.get("model")
-        or os.environ.get("QASYSTEM_JUDGE_MODEL")
+        or setting("QASYSTEM_JUDGE_MODEL")
         or eval_cfg.get("judge_model")
         or "deepseek-flash"
     )
-    adapter = overrides.get("adapter") or os.environ.get("QASYSTEM_JUDGE_ADAPTER") or eval_cfg.get("judge_adapter") or "auto"
+    adapter = overrides.get("adapter") or setting("QASYSTEM_JUDGE_ADAPTER") or eval_cfg.get("judge_adapter") or "auto"
     if adapter == "auto":
         adapter = "systemone" if str(model).lower() in {"clef-flash", "nanojev"} else "chat"
     if not base_url:
@@ -2201,8 +2216,8 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
             api_key = os.environ.get("KG_EXTRACT_LLM_API_KEY", "")
     if adapter == "chat" and urlsplit(base_url).hostname == "api.deepseek.com" and not api_key:
         raise RuntimeError("DeepSeek API judge 未配置凭据：设置 DEEPSEEK_API_KEY 或 QASYSTEM_JUDGE_API_KEY")
-    timeout = float(eval_cfg.get("judge_timeout_seconds") or os.environ.get("KG_EXTRACT_LLM_TIMEOUT_SECONDS") or 300)
-    max_tokens = int(eval_cfg.get("judge_max_tokens") or os.environ.get("KG_EXTRACT_LLM_MAX_TOKENS") or 8192)
+    timeout = float(eval_cfg.get("judge_timeout_seconds") or setting("KG_EXTRACT_LLM_TIMEOUT_SECONDS") or 300)
+    max_tokens = int(eval_cfg.get("judge_max_tokens") or setting("QASYSTEM_JUDGE_MAX_TOKENS") or setting("KG_EXTRACT_LLM_MAX_TOKENS") or 8192)
     return JudgeClient(
         base_url=base_url,
         api_key=api_key,
