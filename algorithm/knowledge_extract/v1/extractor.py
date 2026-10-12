@@ -26,9 +26,10 @@ from .graph_utils import (
 from .ontology_schema import OntologySchema
 from .scheduler import get_llm_scheduler
 
-# 通用抽取规则：直接引用 v3 的 base prompt（v3/prompt_router.BASE_SYSTEM_PROMPT，v5），
-# 用它覆盖 V1 原有的 GENERIC_INSTRUCTION。
-from ..v3.prompt_router import BASE_SYSTEM_PROMPT as GENERIC_INSTRUCTION
+# 通用抽取规则：使用 v1 自己的冻结副本（原为 v3/prompt_router.BASE_SYSTEM_PROMPT 的运行值）。
+# 不直接 import v3：父包会重导出 v1，任何版本导入都会因此把 v3 整包带进导入链。
+# 文本来源与同步方式见 v1/generic_prompt.py 的模块说明。
+from .generic_prompt import GENERIC_INSTRUCTION
 
 logger = logging.getLogger(__name__)
 

@@ -64,7 +64,7 @@ def resolve_config(options: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Unsupported extraction version")
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
-    package = {"v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
+    package = {"v2.1": "v2_1", "v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
     defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
     provider = options.get("provider") or "default"
     if provider == "default":
@@ -112,7 +112,7 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
         "max_tokens", "max_input_tokens", "max_output_tokens", "disable_thinking",
         "api_mode", "thinking_parameter", "response_format",
     )}
-    if config.get("version") in {"v2", "v3", "latest"}:
+    if config.get("version") in {"v0", "v2", "v2.1", "v3", "latest"}:
         # Provider profiles can retain legacy preferences, but extraction no
         # longer sends a response_format parameter on the wire.
         result.update(response_format=None, output_format="jsonl", api_mode="chat")

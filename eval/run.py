@@ -12,7 +12,7 @@
   chunk-extract 切片+抽取：解析（或复用 document.md）→ 切片 → 抽取并评分（默认）
   pipeline      全流程知识沉淀：POST /api/v1/pipelines/knowledge-ingestion 并评分
 
-每批次结束在批次目录（tmp/eval/runs/<时间戳>/）写 report.md 详细报告；
+每批次结束在批次目录（tmp/eval/runs/<时间戳>/）写 report.md 报告；
 启动时按 runs_retention_days（默认 30 天，--runs-retention-days 可覆盖，<=0 关闭）清理过期批次。
 
 本目录只调已有 HTTP / MCP，不 import algorithm / backend。
@@ -3598,7 +3598,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--params", default=None, help="参数 YAML，默认 eval/params.yaml")
     parser.add_argument("--chunk-overlap", type=int, help="本次切片重叠长度，覆盖 YAML；0 关闭，默认 50")
     parser.add_argument("--chunk-size", type=int, help="本次切片大小，覆盖 YAML；必须大于 overlap")
-    parser.add_argument("--extract-version", choices=("v2", "v2.2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
+    parser.add_argument("--extract-version", choices=("v0", "v2", "v2.1", "v2.2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
     parser.add_argument("--extract-provider", help="Backend 预配置供应商名称，不接受密钥或 URL")
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
     parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")
