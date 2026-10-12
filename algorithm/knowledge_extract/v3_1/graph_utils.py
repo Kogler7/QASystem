@@ -39,9 +39,10 @@ def canonical_name(value: Any) -> str:
 def entity_uid(entity_type: Any, entity_name: Any, properties: dict[str, Any] | None) -> str:
     """Build a readable, process-stable UID for an extracted entity."""
     normalized_type = coerce_non_empty_name(entity_type) or "Element"
-    normalized_name = canonical_name(entity_name)
+    normalized_name = str(entity_name) if entity_name is not None else ""
     if normalized_name:
-        return f"{normalized_type}::{normalized_name}"
+        payload = json.dumps([normalized_type, normalized_name], ensure_ascii=False)
+        return f"{normalized_type}::{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
     payload = json.dumps(
         properties or {},
         ensure_ascii=False,

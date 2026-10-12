@@ -158,8 +158,9 @@ class ChunkContextManager:
             current = next_id
 
         chunks = [self.get_chunk(item_id) for item_id in ids]
+        anchor = self.get_chunk(chunk_id)
+        chunks = [chunk for chunk in chunks if chunk.document_id == anchor.document_id]
         if same_section:
-            anchor = self.get_chunk(chunk_id)
             chunks = [chunk for chunk in chunks if chunk.section_id == anchor.section_id]
         return chunks
 
@@ -188,7 +189,7 @@ class ChunkContextManager:
         if not quote:
             return None
         pattern = r"\s+".join(re.escape(part) for part in quote.split(" "))
-        match = re.search(pattern, text, re.IGNORECASE)
+        match = re.search(pattern, text)
         if match is None:
             return None
         return match.start(), match.end()

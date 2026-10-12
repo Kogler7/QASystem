@@ -12,7 +12,7 @@ benchmark 数据集（`benchmark/*/docs/*.md` 里的裸 JSON）的形态。两�
 同一份数据，benchmark 能命中记录表策略（专用提示词、空数组重试、证据兜底），
 从前端上传 xlsx/docx 却永远命中不了。
 
-本模块把「剥壳判定」收敛到一处，供 `prompt_router` 与 `candidate_selector` 共用。
+本模块把「剥壳判定」收敛到一处，供提示词路由与抽取证据判断使用。
 注意：判定只影响抽取策略，不参与 evidence span 定位——证据仍必须逐字来自 chunk 原文。
 """
 from __future__ import annotations

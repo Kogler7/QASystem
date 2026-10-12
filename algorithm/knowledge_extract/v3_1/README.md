@@ -27,11 +27,10 @@ result = extract(
 - `skills/*/SKILL.md`：用户维护的领域规则；`skill_registry.py` 和 `skill_planner.py` 负责发现、读取与请求内一次性编译。
 - `domain_skills.py`：无模型的低层兼容预览，只从 Markdown 读取策略正文。
 - `output_contracts.py`：所有阶段的输出约束及动态 schema 构造。
-- `object_identity.py`：依据原文 object 声明统一名称与引用，保留文档范围和对象编号。
 
-User 固定为 `task`、`output_contract`、`domain_policy`、`ontology`、`documents`。第一步只输出 `type + mention + evidence.quote`，只读取当前 chunk；后续阶段按原有规则使用已接受实体、属性和局部上下文。`name / properties` 是后处理结果，不是第一步模型字段。
+User 固定为 `task`、`output_contract`、`domain_policy`、`ontology`、`documents`。第一步输出 `type + mention + properties + evidence`，同时抽取当前请求窗口支持的本体属性；`mention` 直接成为原文 `name`。`evidence.property_quotes` 按属性记录引文。为兼容旧输出，省略 properties 的候选仍会进入补全。JSONL 逐行解析及所有普通文本调用保持不变。
 
-公共入口自动执行“模型请求读 skill → 模型生成计划 → 程序保真装配”。通过 `skills_dir` 参数可替换技能目录；默认使用本包的 `skills/`。维护方式与运行边界见下文。
+公共入口自动执行“程序确定领域 → 读取 skill 固定快照 → 按阶段编译并装配规则”，不调用模型选择领域或规划技能。发送给模型的 `domain_policy` 仅含 `extraction_rules`，表示已确认领域的本阶段执行规则；无适用技能时为空字符串。通过 `skills_dir` 参数可替换技能目录；默认使用本包的 `skills/`。维护方式与运行边界见下文。
 
 User 保持原五段 JSON 模板；各顶层及嵌套字段的含义见[User 字段字典](../../../docs/算法/知识抽取V3.1提示词与文档路由.md#11-user-原模板与字段字典)。
 
@@ -45,7 +44,7 @@ User 保持原五段 JSON 模板；各顶层及嵌套字段的含义见[User 字
 python -m pytest -q algorithm/knowledge_extract/v3_1/tests
 ```
 
-2026-10-11 删除关系抽取后的相关算法及 Backend 契约测试：本地 265 passed、1 skipped（缺少标准本体）。本次未部署到 88。完整发布门禁仍按根目录 `AGENTS.md` 执行。
+2026-10-12：P1/P2 修复曾同步到 88 的现有 `qasystem_backend`，相关算法及 Backend 契约测试 322 passed、1 skipped（缺少标准本体）。真实模型门禁未通过，评测期间另一次发布覆盖了 88 上的修复文件；当前修复保留在工作区与测试快照。固定切片评测及长文本实验见 [修复与验证记录](../../../docs/算法/知识抽取V3.1-P1P2修复与88验证-20261012.md)。完整发布门禁仍按根目录 `AGENTS.md` 执行。
 
 基准数据放 `test_data/`，线上链路评测统一走 `eval/run.py`，输出放 `tmp/`。历史 benchmark lint 公共工具保留在 `algorithm.knowledge_extract.v2.benchmark_lint`；v3.1 不再重复维护同一工具。
 
@@ -55,7 +54,9 @@ tags: []
 
 ---
 
-### 用户维护 Skill 与 User 装配
+### 用户维护 Skill 与 User 装配（2026-10-11 历史记录）
+
+以下记录描述初始实现；候选属性与请求预算以本文开头及文末的当前流程为准。
 
 更新时间：2026-10-11。实现范围是用户维护 Markdown 技能、程序按 V2 路由编译一次、保真填充 User。当前接入 v3.1 公共 Python 入口；尚未部署到 Backend。全部本轮源码、测试、技能与说明均位于 v3.1，未改公共运行层和其它算法版本。
 
@@ -220,8 +221,32 @@ python -m pytest -q -p no:cacheprovider \
 
 ### 按 type + name 完成实体
 
-属性调用以完全相同的 `type + name` 为键，每个键只进入一个批次（同一类型默认每批 24 个唯一键），相关切片完整放入 `documents`。`task.known_entities[].occurrences` 保留每次出现的切片 ID、原始属性与证据，不预先拼接或覆盖属性值。LLM 结合全部来源，为每个键返回一个完整的 `type`、`name`、`properties` 与 `evidence.quote`。同名不同类型分开；不做别名、模糊名称归并。
+候选输出 schema 显式列出当前类型分组的属性标识与数据类型，防止把显示名或原文表头当成属性键；跨类型同名字段另按每行实际类型严格校验。
 
-程序校验键集合、唯一性、本体属性和证据，再收集模型结果；不生成抽取实体 ID，不执行属性 updates 或程序属性合并。旧 Backend 图输出协议所需的 `uid` 仅在兼容输出边界计算，不进入 LLM message 或公开实体 JSON。`output_contract` 不含 `version`、`status`。候选非空时，属性响应不得返回空实体集合。
+实体按完全相同的 `type + name` 分组。同名不同类型、大小写、全半角、内部空格均不归并；不做别名或模糊名称归并。Graph UID 对原始键的 JSON 编码做 SHA-256，Backend 优先使用对象携带的 UID，避免投影时再次规范化名称造成覆盖。
 
-User 的诊断字段在序列化边界移除：ontology 只发 catalog，domain_policy 只发 profiles 下的 extraction_rules，task 不再发送 input_scope。技能选择与版本审计仍保留。属性 schema 按单一类型生成，避免跨类型属性混用；实体和修复保持 span 候选结构，属性返回完整实体结构。
+候选阶段读取完整类型及属性目录，同时抽取当前窗口支持的属性。程序只复制已核验的相同值或互不冲突的属性，不改写或拼接语义内容。所有出现都已检查、没有冲突且没有待处理邻片时，直接完成；无属性的类型也不调用补全。缺少 `properties` 的旧候选、冲突和无候选的邻片上下文才需要补全。邻片受 `local_previous/local_next/same_section` 限制，且不跨 `document_id`。
+
+属性补全按单个键流式处理有界来源批次；同一实体可进入多个请求，不再要求把全部来源塞入同一次调用。每次仅提供当前来源、去重后的当前 occurrence、已核验属性及其支持引文，LLM 返回该键的完整实体。默认一批最多 24 个来源窗口，同时受字符和完整提示词字节预算约束。完整键集合与唯一性检查位于重试循环内，遗漏、重复、改名或类型错误会带反馈重试。失败保留此前已核验事实并明确标记 failed/partial，不用空结果覆盖候选。
+
+所有来源已扫描、只剩属性冲突时，补全只读取冲突值的支持引文及前后各 200 字上下文；相同文本和相同候选属性不重复提交，不因高频实体而逐键重读整篇长文。旧候选与未抽到实体的邻片仍读取完整有界窗口，所有原始来源继续保留。
+
+属性支持校验独立于实体名称定位：直接的肯定字面值可用原文引文验证；语义改写、否定、歧义及跨批修改需独立 LLM 返回 yes，no/uncertain/核验失败均不接收新值。引用不存在或仅为实体名不能证明其他属性。`property_evidence` 保存与当前属性值对应的校验记录，最终验证再次核对值与来源。LLM 核验仍是语义判断，不等于形式化事实证明。
+
+单一 `evidence` 保留兼容；全部出现及属性支持来源另存 `evidences`，并保留到中间对象、图节点和 Backend 投影。覆盖检查使用全部来源。修复只补全受影响的键，所有引用切片都经过同样窗口限制；没有进展时停止并报告 `no_progress`，不会将仍有缺口的结果标为 `validation_complete`。
+
+### 长文本请求预算
+
+- `KG_EXTRACT_V31_WINDOW_CHARS=2000`：上游切片内部的请求窗口，重叠 100 字符（小窗口不超过四分之一）；不改上游 chunk ID，证据偏移回映原切片。所有字符都被覆盖，不再使用 repair 的 `[:8000]` 静默截断。
+- `KG_EXTRACT_V31_MAX_INPUT_BYTES=48000`：完整序列化消息的上限，含 System、skill、本体、元数据、来源和累计状态。UTF-8 字节数用作保守 token 上界，并取请求/环境 `max_input_tokens` 的较小值，另留 2048 字节重试空间。
+- 窗口还参考模型输出 token 上限；单次超时、输出截断或上下文超限会拆分来源/类型后重试，最多递归 12 层；文档总 deadline 耗尽后不再发起调用或递归拆分。大本体按类型分批访问全部允许类型，不因文本未命中词面提示而删掉某类。
+- 累计属性及其证据本身超过最小请求预算时，明确返回 `LLM_INPUT_BUDGET_EXCEEDED` 并保留已有事实，不截断证据、不无限重试。不能保证任意大实体或任意小模型上下文均能完整抽取。
+- 按请求窗口并发，单个超长切片也能使用配置的 worker 数；惰性生成窗口，至多预提交 `2 * max_workers` 个任务。完整提示词仅保留前 `KG_EXTRACT_V31_TRACE_CALLS=32` 次。其余调用保留输入字节数、耗时、状态及 usage，避免长文诊断信息无限复制输入。
+
+新增回归覆盖幻觉属性、缺键/重复重试、精确键投影、100 次出现的来源保留、600 个实体的单长片尾部覆盖、大本体分批、邻片代词、截断拆分、部分失败和修复无进展。测试使用确定性模型桩；未进行真实模型效果/耗时评测或部署。
+
+### 原文名称优先与运行时清理（2026-10-12）
+
+实体候选和修复共享命名规则：mention 直接成为最终 name；有明确原文名称时逐字保留完整名称、内部空格、大小写及标点。当前片段明确指向同一实体的全称和简称时，优先原文出现的完整全称，不凭常识扩写。只有没有明确名称时才允许忠实归纳。属性补全通过 name 枚举保持该名称，跨片只按完全相同的 type + name 合并，不新增别名或模糊归并。
+
+已移除无运行时调用的 candidate_selector、document_entities、standard_semantics、structure_entities、graph_assembler、orchestrator 模块。原 candidate_models 中带 ID 和合并状态的候选模型也已删除；映射评分只接收 EntityMappingInput(type, properties)。原图组装器的有效输出兼容测试迁移到当前抽取入口（test_graph_output.py），关系组装和旧程序归并专用测试随实现退役。Backend 仍使用的图输出兼容、批次协议及证据定位模块保留。

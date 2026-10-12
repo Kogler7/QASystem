@@ -6,6 +6,12 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class EntityMappingInput:
+    type: str
+    properties: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class MappingScore:
     score: float
     status: str  # accepted | low_confidence | rejected
@@ -54,7 +60,7 @@ class MappingScorer:
         plan: Any,
     ) -> MappingScore:
         """§17：实体候选 = 属性 + 上下文（不适用分量重新归一化）。"""
-        type_id = entity.canonical_type or entity.proposed_type
+        type_id = entity.type
         feature_specs = plan.feature_specs.get(type_id, ())
         intrinsic = [spec for spec in feature_specs if spec.kind == "intrinsic"]
         context_features = [spec for spec in feature_specs if spec.kind == "context"]
@@ -83,7 +89,7 @@ class MappingScorer:
             required_ratio = required_present / len(required)
             return round(0.6 * required_ratio + 0.4 * coverage, 4)
 
-        spec = plan.class_specs.get(entity.canonical_type or entity.proposed_type)
+        spec = plan.class_specs.get(entity.type)
         valid_property_ids = {prop.identifier for prop in spec.properties} if spec else set()
         validity = (
             len(provided & valid_property_ids) / len(provided) if provided else 0.0
@@ -149,4 +155,4 @@ class MappingScorer:
             return "low_confidence"
         return "rejected"
 
-__all__ = ["MappingScore", "MappingScorer"]
+__all__ = ["EntityMappingInput", "MappingScore", "MappingScorer"]

@@ -44,7 +44,7 @@ def current_chunk(prompt: str) -> dict[str, Any]:
     """解析 "## current chunk" 段落中的 chunk JSON（单行 json.dumps）。"""
     payload = _user_payload(prompt)
     if payload:
-        return payload["documents"][0]["current_chunk"]
+        return payload["documents"][0]
     lines = prompt.splitlines()
     for index, line in enumerate(lines):
         if line.strip() == "## current chunk" and index + 1 < len(lines):
@@ -105,10 +105,12 @@ class StubLLM:
         entity_handler: Callable[[str, dict[str, Any]], list[dict[str, Any]]] | None = None,
         property_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
         repair_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        verification_handler=None,
     ) -> None:
         self.entity_handler = entity_handler
         self.property_handler = property_handler
         self.repair_handler = repair_handler
+        self.verification_handler = verification_handler
         self.calls: list[tuple[str, str]] = []
 
     def _ground(self, item: dict[str, Any], chunk: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +121,8 @@ class StubLLM:
         return {
             "type": item["type"],
             "mention": mention,
-            "evidence": {"quote": str((item.get("evidence") or {}).get("quote") or mention)},
+            "evidence": dict(item.get("evidence") or {"quote": mention}),
+            **({"properties": item["properties"]} if "properties" in item else {}),
         }
 
     def __call__(self, messages: Any) -> str:
@@ -129,6 +132,11 @@ class StubLLM:
         self.calls.append((task, prompt))
         if task in {"relation", "relation_verification"}:
             raise AssertionError("V3.1 must not request relationship extraction")
+        elif task == "evidence_verification":
+            items = json.loads(prompt.split("## candidates\n", 1)[1].split("\n\n## output schema", 1)[0])
+            payload = {"verdicts": [{"item_id": item["item_id"],
+                "supported": self.verification_handler(item, chunk) if self.verification_handler else "uncertain",
+                "reason": "fixture verdict"} for item in items]}
         elif task == "entity":
             items = self.entity_handler(prompt, chunk) if self.entity_handler else []
             payload: dict[str, Any] = {"entities": [self._ground(item, chunk) for item in items]}
@@ -145,4 +153,4 @@ class StubLLM:
             else:
                 required = output_schema_required(prompt) or ["entities"]
                 payload = {key: [] for key in required}
-        return json.dumps(payload, ensure_ascii=False)
+        return ("\n".join(json.dumps(item, ensure_ascii=False) for item in payload["entities"]) or "{}") if "entities" in payload else json.dumps(payload, ensure_ascii=False)

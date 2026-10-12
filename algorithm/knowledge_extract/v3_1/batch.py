@@ -68,6 +68,7 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                     "chunk_indices": source_indices,
                 }
             else:
+                _merge_relationship_provenance(nodes_by_uid[uid], node)
                 nodes_by_uid[uid]["properties"] = merge_node_properties(
                     nodes_by_uid[uid].setdefault("properties", {}),
                     node.get("properties") or {},
@@ -78,6 +79,8 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                         chunk_indices.append(source_index)
 
     valid_uids = set(nodes_by_uid)
+    uid_by_key = {(node.get("label"), (node.get("properties") or {}).get("name")): uid
+                  for uid, node in nodes_by_uid.items()}
 
     relationship_candidates: list[dict[str, Any]] = []
     for item in items:
@@ -99,8 +102,8 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                 continue
             relationship_candidates.append(
                 {
-                    "from_uid": entity_uid(from_type, from_name, None),
-                    "to_uid": entity_uid(to_type, to_name, None),
+                    "from_uid": uid_by_key.get((from_type, from_name), entity_uid(from_type, from_name, None)),
+                    "to_uid": uid_by_key.get((to_type, to_name), entity_uid(to_type, to_name, None)),
                     "type": relation_type,
                     **{
                         field: deepcopy(relation[field])
