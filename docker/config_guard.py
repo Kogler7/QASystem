@@ -1,0 +1,195 @@
+"""Deployment guard and local configuration revision records (stdlib only)."""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import sys
+
+try:
+    from docker.runtime_config import HOT_KEYS, read_document
+    from docker.setup_llm import read_env, atomic_write
+except ImportError:
+    from runtime_config import HOT_KEYS, read_document
+    from setup_llm import read_env, atomic_write
+
+
+def sensitive(key):
+    return bool(re.search(r'KEY|SECRET|PASSWORD|TOKEN|AUTH|CREDENTIAL|HEADER|DATABASE_URL|REDIS_URL', key, re.I)) and not re.search(
+        r'(MAX_(?:INPUT_|OUTPUT_)?TOKENS|BATCHED_TOKENS)$', key)
+
+
+def digest(value):
+    return hashlib.sha256(value).hexdigest()
+
+
+def safe_value(key, value):
+    if sensitive(key) or re.search(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+@', value):
+        return {'value': '[凭据已隐藏]', 'fingerprint': digest(value.encode())}
+    return {'value': value}
+
+
+def snapshot(root, directory, *, payloads=None):
+    root, directory = Path(root), Path(directory)
+    payloads = payloads or {}
+    def content(path):
+        if path in payloads:
+            return payloads[path].encode('utf-8')
+        return path.read_bytes() if path.is_file() else b''
+    env_path = root / '.env'
+    config_path = directory / 'config.json'
+    template = root / 'deployment.env.example' if (root / 'deployment.env.example').is_file() else root / '.env.example'
+    # The image mounts source at /app; the host UI can use its bundled catalog.
+    if not template.is_file():
+        template = Path(__file__).resolve().parents[1] / '.env.example'
+    release = Path(__file__).resolve().parents[1] / '.env.example'
+    if not release.is_file():
+        release = template
+    env = read_env(content(env_path).decode('utf-8-sig'))
+    if config_path in payloads:
+        document = json.loads(payloads[config_path])
+    else:
+        document = read_document(config_path)
+    values = {'env.' + k: safe_value(k, v) for k, v in env.items()}
+    for key, value in document['settings'].items():
+        values['settings.' + key] = {'value': value}
+    for repo, model in document['models'].items():
+        for key, value in model.items():
+            values[f'models.{repo}.{key}'] = {'value': str(value)}
+    # Exact file hashes catch comments, quoting, duplicate assignments and catalog changes.
+    files = {'.env': digest(content(env_path)), 'config.json': digest(content(config_path)),
+             '.env.example': digest(content(template)),
+             'release.env.example': digest(content(release)),
+             'models.compose.json': digest(content(directory / 'models.compose.json'))}
+    catalog = read_env(content(template).decode('utf-8-sig'))
+    comments, descriptions = [], {}
+    for line in content(template).decode('utf-8-sig').splitlines():
+        if line.startswith('#'):
+            comments.append(line[1:].strip())
+        elif '=' in line and line.split('=', 1)[0] in catalog:
+            descriptions[line.split('=', 1)[0]] = ' / '.join(comments)
+            comments = []
+        elif not line.strip():
+            comments = []
+    for key, value in catalog.items():
+        values['catalog.' + key] = {**safe_value(key, value),
+                                  'description': descriptions.get(key, ''),
+                                  'mode': 'hot' if key in HOT_KEYS else 'startup'}
+    return {'files': files, 'values': values}
+
+
+def approved(directory):
+    path = Path(directory) / 'approved-config.json'
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if (not isinstance(data, dict) or data.get('schema') != 1
+                or not isinstance(data.get('revision'), int) or data['revision'] < 1
+                or not isinstance(data.get('snapshot'), dict)
+                or not isinstance(data['snapshot'].get('values'), dict)
+                or not isinstance(data['snapshot'].get('files'), dict)):
+            raise ValueError
+        return data
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, AttributeError):
+        raise ValueError('配置批准记录损坏；请在 CLI UI 中重新审核') from None
+
+
+def changes(previous, current):
+    old = previous['snapshot']['values'] if previous else {}
+    new = current['values']
+    result = []
+    for key in sorted(set(old) | set(new)):
+        if old.get(key) == new.get(key):
+            continue
+        action = '新增' if key not in old else '删除' if key not in new else '修改'
+        before = old.get(key, {}).get('value', '(无)')
+        after = new.get(key, {}).get('value', '(无)')
+        mode = '新请求热更' if key.startswith('settings.') else '配置清单升级' if key.startswith('catalog.') else '重新创建容器'
+        result.append(f'[{action}] {key}: {before} → {after}  [{mode}]')
+        if key.startswith('catalog.') and old.get(key, {}).get('description') != new.get(key, {}).get('description'):
+            result.append(f"  说明: {old.get(key, {}).get('description', '(无)')} → {new.get(key, {}).get('description', '(无)')}")
+        if key.startswith('catalog.') and old.get(key, {}).get('mode') != new.get(key, {}).get('mode'):
+            result.append(f"  生效方式: {old.get(key, {}).get('mode', '(无)')} → {new.get(key, {}).get('mode', '(无)')}")
+    if previous:
+        for name, value in current['files'].items():
+            if previous['snapshot']['files'].get(name) != value:
+                result.append(f'[文件变更] {name}（包括格式、注释和说明）')
+    return result
+
+
+def record(directory, current, *, reason, reviewer):
+    """Only called after interactive review; no CLI auto-approval option exists."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    directory.chmod(0o700)
+    previous = approved(directory)
+    revision = int(previous.get('revision', 0)) + 1 if previous else 1
+    data = {'schema': 1, 'revision': revision, 'time': datetime.now(timezone.utc).isoformat(),
+            'reviewer': reviewer, 'reason': reason, 'previous': digest(json.dumps(previous, sort_keys=True).encode()) if previous else None,
+            'changes': changes(previous, current), 'snapshot': current}
+    history = directory / 'history'
+    history.mkdir(mode=0o700, exist_ok=True)
+    target = history / f'{revision:06d}-{digest(json.dumps(data, sort_keys=True).encode())[:12]}.json'
+    atomic_write(target, json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    atomic_write(directory / 'approved-config.json', json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    return revision
+
+
+def verified_record(directory):
+    previous = approved(directory)
+    if previous is None:
+        raise ValueError('配置尚未人工确认；请打开 CLI UI，审核差异并确认保存')
+    history = Path(directory) / 'history'
+    filename = f"{int(previous['revision']):06d}-{digest(json.dumps(previous, sort_keys=True).encode())[:12]}.json"
+    try:
+        if json.loads((history / filename).read_text(encoding='utf-8')) != previous:
+            raise ValueError
+    except (OSError, ValueError):
+        raise ValueError('配置批准记录与历史记录不一致；禁止部署，请重新人工审核') from None
+    return previous
+
+
+def require_runtime(directory, *, config_bytes=None):
+    previous = verified_record(directory)
+    for name in ('config.json', 'models.compose.json'):
+        path = Path(directory) / name
+        raw = config_bytes if name == 'config.json' and config_bytes is not None else path.read_bytes() if path.is_file() else None
+        if raw is None or digest(raw) != previous['snapshot']['files'].get(name):
+            raise ValueError('热配置与批准版本不一致；拒绝使用，请在 CLI UI 审核')
+    return previous['revision']
+
+
+def require(root, directory):
+    previous = verified_record(directory)
+    current = snapshot(root, directory)
+    if current != previous['snapshot']:
+        raise ValueError('配置或版本清单与批准记录不一致；禁止部署，请回 CLI UI 审核变更')
+    return previous['revision']
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--project-dir', type=Path, default=Path.cwd())
+    parser.add_argument('--runtime-dir', type=Path)
+    parser.add_argument('--exec', dest='execute', nargs=argparse.REMAINDER)
+    args = parser.parse_args(argv)
+    try:
+        root = args.project_dir.resolve()
+        directory = args.runtime_dir or root / read_env((root / '.env').read_text()).get('QASYSTEM_RUNTIME_CONFIG_DIR', './runtime-config')
+        revision = require(root, directory)
+        print(f'配置 guard 通过，批准版本 r{revision}', flush=True)
+        if args.execute:
+            os.execvp(args.execute[0], args.execute)
+        return 0
+    except (OSError, ValueError) as exc:
+        print(str(exc) if isinstance(exc, ValueError) else '配置 guard 无法读取部署文件', file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -18,21 +18,14 @@ import sys
 try:
     from docker import setup_llm as helper
     from docker import terminal_ui as screen
+    from docker.runtime_config import HOT_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
+    from docker import config_guard as guard
 except ImportError:
     import setup_llm as helper
     import terminal_ui as screen
+    from runtime_config import HOT_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
+    import config_guard as guard
 
-# This utility also ships outside the application package.
-HOT_KEYS = frozenset({
-    "KG_EXTRACT_ALGO_VERSION", "KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_LLM_MODEL",
-    "KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_LLM_MAX_INPUT_TOKENS",
-    "KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS", "KG_EXTRACT_LLM_MAX_CONCURRENCY",
-    "KG_EXTRACT_LLM_QPS", "KG_EXTRACT_LLM_QPM", "KG_EXTRACT_LLM_TIMEOUT_SECONDS",
-    "KG_EXTRACT_LLM_DISABLE_THINKING", "KG_EXTRACT_LLM_QUOTA_GROUP",
-    "KG_EXTRACT_V31_REQUEST_TIMEOUT", "KG_EXTRACT_V31_DOCUMENT_TIMEOUT",
-    "QASYSTEM_JUDGE_BASE_URL", "QASYSTEM_JUDGE_MODEL", "QASYSTEM_JUDGE_ADAPTER",
-    "QASYSTEM_JUDGE_MAX_TOKENS",
-})
 
 
 def secret(key: str) -> bool:
@@ -67,7 +60,8 @@ class Configuration:
     def __init__(self, root: Path):
         self.root = root.resolve()
         self.catalog = json.loads(Path(__file__).with_name("llm-models.json").read_text(encoding="utf-8"))
-        self.template = (root / ".env.example").read_text(encoding="utf-8-sig")
+        release_template = Path(__file__).resolve().parents[1] / '.env.example'
+        self.template = (release_template if release_template.is_file() else root / '.env.example').read_text(encoding='utf-8-sig')
         self.fields = schema(self.template)
         self.original = (root / ".env").read_text(encoding="utf-8-sig") if (root / ".env").exists() else ""
         self.values = {**helper.read_env(self.template), **helper.read_env(self.original)}
@@ -75,23 +69,27 @@ class Configuration:
         self.directory = (root / directory).resolve() if not directory.is_absolute() else directory
         self.directory.mkdir(parents=True, exist_ok=True)
         self.directory.chmod(0o700)
-        hot = self.directory / "settings.json"
-        if hot.exists():
-            current = json.loads(hot.read_text())
-            if not isinstance(current, dict) or any(k not in HOT_KEYS or not isinstance(v, str) for k, v in current.items()):
-                raise ValueError("热配置文件内容无效")
-            self.values.update(current)
-        models = self.directory / "models.json"
-        self.models = json.loads(models.read_text()) if models.exists() else {}
+        hot = self.directory / "config.json"
+        document = read_document(hot)
+        self.values.update(document["settings"])
+        self.persisted_hot = {k: v for k, v in helper.read_env(self.original).items() if k in HOT_KEYS}
+        self.persisted_hot.update(document['settings'])
+        self.initial_hot = {k: self.values[k] for k in HOT_KEYS if k in self.values}
+        self.models = document["models"]
+        if set(self.models) - {m['repo'] for m in self.catalog}:
+            raise ValueError('模型计划包含未登记模型，请先更新当前版本模型清单')
+        models = self.directory / "models.json"  # migration input only
         applied = self.directory / "applied-models.json"
         self.previous_models = json.loads(applied.read_text()) if applied.exists() else {}
         for index, model in enumerate(self.catalog):
-            self.models.setdefault(model["repo"], dict(enabled=False, gpu="", port=str(9997 + index),
-                context="32768", utilization="0.90"))
+            self.models[model['repo']] = {**dict(enabled=False, gpu='', port=str(9997 + index),
+                context='32768', utilization='0.90'), **self.models.get(model['repo'], {})}
         # Back up on entry, before any edits. Permission-restricted, never displayed.
         self.backup = self.directory / ("backups/" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
         self.backup.mkdir(parents=True, mode=0o700)
-        for name, source in [("deployment.env", root / ".env"), ("settings.json", hot),
+        for name, source in [("deployment.env", root / ".env"), ("config.json", hot),
+                             ('deployment.env.example', root / '.env.example'),
+                             ("settings.json", self.directory / "settings.json"),
                              ("models.json", models), ("applied-models.json", applied),
                              ("models.compose.json", self.directory / "models.compose.json")]:
             if source.exists():
@@ -99,9 +97,10 @@ class Configuration:
                 target.write_bytes(source.read_bytes())
                 target.chmod(0o600)
         self.expected = {p: p.read_bytes() if p.exists() else None for p in
-            (root / ".env", hot, models, self.directory / "models.compose.json")}
+            (root / ".env", root / '.env.example', hot, models, self.directory / "settings.json", self.directory / "models.compose.json")}
         self.live = []
         self.live_error = "实际状态尚未读取"
+        self.pending_reservations = set()
 
     def refresh_live(self) -> None:
         """Read only selected non-secret environment keys; never dump container Env."""
@@ -175,9 +174,9 @@ class Configuration:
         if key in HOT_KEYS:
             mount = next((m for m in backend['mounts'] if m['Destination'] == '/app/runtime-config'), None)
             if mount:
-                path = Path(mount['Source']) / 'settings.json'
+                path = Path(mount['Source']) / 'config.json'
                 try:
-                    data = json.loads(path.read_text())
+                    data = read_settings(path)
                     if key in data: return data[key] or '(空)'
                 except FileNotFoundError: pass
                 except (OSError, ValueError): return '未确认（热配置读取失败）'
@@ -209,6 +208,7 @@ class Configuration:
                     rows.append(dict(kind="model", repo=repo, key=key, display_name=f"  [启动] {name}",
                         display_value=state[key] or '(空)', label=f"    {name}: {state[key]}"))
         for field in self.fields:
+            if field["key"] in LEGACY_MODEL_KEYS: continue
             value = self.values.get(field["key"], "")
             shown = "******" if field["secret"] and value else value
             actual = self.actual_value(field['key']) if not field['secret'] else '隐藏（未读取容器凭据）'
@@ -224,6 +224,15 @@ class Configuration:
         allowed = set(helper.read_env("GPU_DEVICE_IDS=" + self.values.get("GPU_DEVICE_IDS", ""))["GPU_DEVICE_IDS"].split(","))
         reserved = set(self.values.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(","))
         own = {m["gpu"] for m in self.previous_models.values() if m.get("enabled")}
+        own.update(self.pending_reservations)
+        try:
+            guard.require(self.root, self.directory)
+            approved_values = guard.approved(self.directory)['snapshot']['values']
+            own.update(m['gpu'] for repo, m in self.models.items()
+                       if approved_values.get(f'models.{repo}.enabled', {}).get('value') == 'True'
+                       and approved_values.get(f'models.{repo}.gpu', {}).get('value') == m['gpu'])
+        except (ValueError, OSError):
+            pass
         for key in ("BACKEND_HOST_PORT", "AGENT_HOST_PORT", "CLEF_PORT", "NANOJEV_PORT"):
             if self.values.get(key):
                 try:
@@ -279,15 +288,31 @@ class Configuration:
         for repo, model in self.models.items():
             if not model["enabled"]: continue
             services[slug(repo)] = dict(image=self.values["QASYSTEM_ENV_IMAGE"], pull_policy="never",
+                entrypoint=['python', '/app/docker/config_guard.py', '--project-dir', '/app', '--runtime-dir', '/app/runtime-config', '--exec'],
                 restart="unless-stopped", init=True, gpus="all", environment={"CUDA_VISIBLE_DEVICES": model["gpu"],
                 "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "VLLM_NO_USAGE_STATS": "1"},
-                volumes=[f"{self.model_root()}:/models:ro"], ports=[f"127.0.0.1:{model['port']}:8000"],
+                volumes=[f"{self.model_root()}:/models:ro", f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
+                         f"{self.directory}:/app/runtime-config:ro", f"{self.root / '.env'}:/app/.env:ro",
+                         f"{self.root / '.env.example'}:/app/deployment.env.example:ro"], ports=[f"127.0.0.1:{model['port']}:8000"],
                 command=["vllm", "serve", "/models/llm/" + repo.replace("/", "--"), "--served-model-name", repo,
                          "--max-model-len", model["context"], "--gpu-memory-utilization", model["utilization"],
                          "--max-num-seqs", self.values.get("LLM_MAX_NUM_SEQS", "8"), "--max-num-batched-tokens",
                          self.values.get("LLM_MAX_NUM_BATCHED_TOKENS", "2048"), "--dtype", self.values.get("LLM_DTYPE", "bfloat16"), "--language-model-only"],
                 healthcheck=dict(test=["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"], interval="15s", timeout="5s", retries=40, start_period="300s"))
         return {"services": services}
+
+    def pending_payloads(self) -> dict:
+        static = {k: v for k, v in self.values.items() if k not in HOT_KEYS}
+        original_values = helper.read_env(self.original or self.template)
+        changes = {k: v for k, v in static.items() if original_values.get(k) != v}
+        env = helper.update_env(self.original or self.template, changes)
+        env = "\n".join(line for line in env.splitlines() if not (
+            (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in HOT_KEYS)) + "\n"
+        settings = dict(self.persisted_hot)
+        settings.update({k: v for k, v in self.values.items() if k in HOT_KEYS and self.initial_hot.get(k) != v})
+        return {self.root / '.env': env, self.root / '.env.example': self.template,
+                self.directory / 'config.json': json.dumps({'settings': settings, 'models': self.models}, ensure_ascii=False, indent=2) + '\n',
+                self.directory / 'models.compose.json': json.dumps(self.compose(), ensure_ascii=False, indent=2) + '\n'}
 
     def save(self) -> None:
         errors = self.validate(probe=True)
@@ -297,20 +322,11 @@ class Configuration:
                 raise ValueError("配置已被其他进程修改；请退出并重新打开，避免覆盖")
         if Path(self.values.get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config")) != Path(helper.read_env(self.original).get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config")):
             raise ValueError("运行时目录是启动位置，不能在当前编辑会话中移动")
-        static = {k: v for k, v in self.values.items() if k not in HOT_KEYS}
-        # Preserve historical credentials/comments/unknown keys and existing hot fallbacks.
-        original_values = helper.read_env(self.original or self.template)
-        # Unchanged credentials must keep their original quoting and interpolation semantics.
-        changes = {k: v for k, v in static.items() if original_values.get(k) != v}
-        env = helper.update_env(self.original or self.template, changes)
-        payloads = {self.root / ".env": env,
-            self.directory / "settings.json": json.dumps({k: self.values[k] for k in HOT_KEYS if k in self.values}, ensure_ascii=False, indent=2),
-            self.directory / "models.json": json.dumps(self.models, ensure_ascii=False, indent=2),
-            self.directory / "models.compose.json": json.dumps(self.compose(), ensure_ascii=False, indent=2)}
+        payloads = self.pending_payloads()
         written = []
         try:
             for path, content in payloads.items():
-                helper.atomic_write(path, content + "\n")
+                helper.atomic_write(path, content)
                 written.append(path)
         except Exception:
             for path in reversed(written):
@@ -318,7 +334,12 @@ class Configuration:
                 if old is None: path.unlink(missing_ok=True)
                 else: helper.atomic_write(path, old.decode("utf-8-sig"))
             raise
-        self.expected = {p: p.read_bytes() for p in payloads}
+        # Old inputs were backed up on entry. Never continue to overlay them.
+        for legacy in (self.directory / "settings.json", self.directory / "models.json"):
+            legacy.unlink(missing_ok=True)
+        self.expected = {p: p.read_bytes() if p.exists() else None for p in self.expected}
+        self.persisted_hot = json.loads(payloads[self.directory / 'config.json'])['settings']
+        self.initial_hot = {k: self.values[k] for k in HOT_KEYS if k in self.values}
 
     def verify_weights(self) -> None:
         for entry in self.catalog:
@@ -330,6 +351,11 @@ class Configuration:
 
     def apply(self) -> None:
         """Explicit action only; never called on entry or Save."""
+        # Approval is checked before even temporary Docker probes.
+        guard.require(self.root, self.directory)
+        if any((p.read_text(encoding='utf-8') if p.exists() else None) != value
+               for p, value in self.pending_payloads().items()):
+            raise ValueError('存在未审核的编辑；请先在 UI 确认保存')
         errors = self.validate(probe=True)
         if errors: raise ValueError("；".join(errors))
         image = self.values["QASYSTEM_ENV_IMAGE"]
@@ -340,7 +366,7 @@ class Configuration:
         prior_compose = self.directory / "applied.compose.json"
         if prior_compose.exists(): command += ["-f", str(prior_compose)]
         command += ["-f", str(self.directory / "models.compose.json")]
-        self.save()
+        guard.require(self.root, self.directory)
         helper.run(command + ["config", "--quiet"], cwd=self.root)
         changed = [slug(repo) for repo, old in self.previous_models.items() if old.get("enabled") and
                    self.models.get(repo) != old]
@@ -355,6 +381,7 @@ class Configuration:
             if self.previous_models.get(entry["repo"], {}) == model: continue
             check = dict(self.values, LLM_GPU_MEMORY_UTILIZATION=model["utilization"])
             own = {m["gpu"] for m in self.previous_models.values() if m.get("enabled")}
+            own.update(m['gpu'] for m in self.models.values() if m.get('enabled'))
             check["EXECUTION_GPU_RESERVED_DEVICE_IDS"] = ",".join(set(check.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(",")) - own)
             size = sum(p["size"] for p in entry["files"] if p["rfilename"].endswith(".safetensors"))
             helper.choose_gpu(gpus, model["gpu"], check, size)
@@ -362,11 +389,10 @@ class Configuration:
         reserved = set(filter(None, self.values.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(",")))
         reserved.update(m["gpu"] for m in self.models.values() if m["enabled"])
         reserved.update(m["gpu"] for m in self.previous_models.values() if m.get("enabled"))
-        env_path = self.root / ".env"
-        helper.atomic_write(env_path, helper.update_env(env_path.read_text(),
-            {"EXECUTION_GPU_RESERVED_DEVICE_IDS": ",".join(sorted(reserved))}))
-        self.expected[env_path] = env_path.read_bytes()
-        self.values["EXECUTION_GPU_RESERVED_DEVICE_IDS"] = ",".join(sorted(reserved))
+        configured = set(filter(None, self.values.get('EXECUTION_GPU_RESERVED_DEVICE_IDS', '').split(',')))
+        if not reserved <= configured:
+            raise ValueError('模型 GPU 预留尚未审核；请重新确认保存配置')
+        guard.require(self.root, self.directory)
         helper.progress("更新启动配置和目录挂载（Backend/Agent 会重建）；请确保现有任务已完成")
         helper.run(command + ["up", "-d", "--no-deps", "--force-recreate", "backend", "agent"], cwd=self.root, timeout=120)
         names = list(self.compose()["services"])
@@ -376,6 +402,15 @@ class Configuration:
         self.previous_models = json.loads(json.dumps(self.models))
         helper.atomic_write(self.directory / "applied-models.json", json.dumps(self.previous_models, indent=2))
         helper.atomic_write(prior_compose, json.dumps(self.compose(), indent=2))
+
+    def prepare_deployment(self):
+        errors = self.validate(probe=True)
+        if errors:
+            raise ValueError('；'.join(errors))
+        self.pending_reservations = {m['gpu'] for m in self.models.values() if m.get('enabled')}
+        self.pending_reservations.update(m['gpu'] for m in self.previous_models.values() if m.get('enabled'))
+        reserved = set(filter(None, self.values.get('EXECUTION_GPU_RESERVED_DEVICE_IDS', '').split(',')))
+        self.values['EXECUTION_GPU_RESERVED_DEVICE_IDS'] = ','.join(sorted(reserved | self.pending_reservations))
 
 
 def read_key() -> str:
@@ -405,6 +440,58 @@ def ui(config: Configuration) -> None:
         _ui(config)
     finally:
         print("\x1b[0m\x1b[?25h\x1b[?1049l", end="", flush=True)
+
+
+def review_save(config: Configuration) -> bool:
+    """Review every page before explicit, interactive approval; no headless bypass."""
+    if not sys.stdin.isatty():
+        raise ValueError('人工审核需要交互终端，不能通过管道自动批准')
+    errors = config.validate(probe=True)
+    if errors:
+        raise ValueError('；'.join(errors))
+    payloads = config.pending_payloads()
+    current = guard.snapshot(config.root, config.directory, payloads=payloads)
+    previous = guard.approved(config.directory)
+    revision = int(previous.get('revision', 0)) + 1 if previous else 1
+    changes = guard.changes(previous, current)
+    if not changes and previous and current == previous['snapshot']:
+        guard.require(config.root, config.directory)
+        return True
+    page, visited = 0, set()
+    while True:
+        columns, lines = shutil.get_terminal_size((100, 28))
+        cells, height = max(30, columns - 2), max(4, lines - 7)
+        rendered = [part for line in changes for part in screen.wrap(line, cells)] or ['首次配置批准；全部配置将纳入记录。']
+        pages = max(1, math.ceil(len(rendered) / height))
+        page = min(page, pages - 1)
+        visited.add(page)
+        print('\x1b[H\x1b[J' + '\n'.join([
+            f'配置变更审核 · 拟批准 r{revision} · {page + 1}/{pages} 页',
+            '凭据只显示变更，不显示内容。首次审核包含完整清单。', '',
+            *rendered[page * height:(page + 1) * height], '',
+            '←/PgUp 上页  →/PgDn 下页  Enter 确认  q 取消（不保存）']), end='', flush=True)
+        key = read_key()
+        if key in {'q', 'escape', '\x03'}:
+            return False
+        if key in {'right', 'pagedown', 'down', 'j'}:
+            page = min(pages - 1, page + 1)
+        elif key in {'left', 'pageup', 'up', 'k'}:
+            page = max(0, page - 1)
+        elif key in {'\r', '\n'}:
+            if len(visited) != pages:
+                continue
+            reason = input('\n变更原因（必填）: ').strip()
+            if not reason:
+                continue
+            if input(f'输入 confirm r{revision} 批准并保存，其他输入取消: ') != f'confirm r{revision}':
+                return False
+            # A concurrent edit is rejected by save before any writes.
+            config.save()
+            actual = guard.snapshot(config.root, config.directory)
+            if actual != current:
+                raise ValueError('审核过程中配置发生变化；未生成批准记录，请重新审核')
+            guard.record(config.directory, actual, reason=reason, reviewer=getpass.getuser())
+            return True
 
 
 def _ui(config: Configuration) -> None:
@@ -455,15 +542,21 @@ def _ui(config: Configuration) -> None:
                         config.values[name] = {"true": "false", "false": "true", "0": "1", "1": "0"}[value.lower()]
                     elif key != " ": config.values[name] = (getpass.getpass if row["secret"] else input)(f"{name} 新值: ")
             elif key == "s":
-                config.save()
-                baseline = json.dumps([config.values, config.models], sort_keys=True)
-                notice = "配置已保存；没有启动模型。启动配置尚未应用。"
+                if review_save(config):
+                    baseline = json.dumps([config.values, config.models], sort_keys=True)
+                    notice = '配置已审核、保存并记录版本；没有启动模型。'
+                else:
+                    notice = '已取消审核，文件未修改。'
             elif key == "v":
                 if input("将完整读取已勾选模型的权重，可能耗时数分钟。输入 verify 开始: ") == "verify":
                     config.verify_weights(); input("权重校验完成，回车返回。")
             elif key == "a":
                 print("将保存配置、重建 Backend/Agent 并启动勾选模型；请先完成在途任务。")
                 if input("输入 deploy 执行，其他输入返回: ") == "deploy":
+                    config.prepare_deployment()
+                    if not review_save(config):
+                        notice = '已取消审核；未部署。'
+                        continue
                     config.apply()
                     baseline = json.dumps([config.values, config.models], sort_keys=True)
                     input("回车返回配置界面。")

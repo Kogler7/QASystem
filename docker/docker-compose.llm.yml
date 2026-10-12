@@ -5,6 +5,7 @@ services:
     profiles: [llm]
     restart: unless-stopped
     init: true
+    entrypoint: ["python", "/app/docker/config_guard.py", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
     gpus: all
     env_file:
       - .env
@@ -16,6 +17,10 @@ services:
       DO_NOT_TRACK: "1"
     volumes:
       - ${HOST_MODELS_DIR:-./deploy/models}:/models:ro
+      - ${QASYSTEM_SOURCE_DIR:-.}:/app:ro
+      - ${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}:/app/runtime-config:ro
+      - ./.env:/app/.env:ro
+      - ./.env.example:/app/deployment.env.example:ro
     command:
       - /bin/sh
       - -ec

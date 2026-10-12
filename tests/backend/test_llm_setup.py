@@ -80,21 +80,13 @@ def test_cancel_leaves_environment_and_services_untouched(project, monkeypatch):
     assert not any('up' in command for command in calls)
 
 
-def test_apply_reserves_gpu_before_starting_model_and_sets_existing_judge_config(project, monkeypatch):
+def test_legacy_apply_cannot_bypass_configuration_review(project, monkeypatch):
     root, env, calls, answers = project
     answer(monkeypatch, answers + ['yes'])
-    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 0
-    values = wizard.read_env((root / '.env').read_text())
-    assert values['GPU_DEVICE_IDS'] == '4,5,6,7'
-    assert values['EXECUTION_GPU_RESERVED_DEVICE_IDS'] == '6,7'
-    assert values['QASYSTEM_JUDGE_BASE_URL'] == 'http://llm:8000/v1'
-    assert values['API_KEY'] == 'private'
-    assert next(root.glob('.env.backup-*')).read_text() == env
-    deployments = [command for command in calls if 'up' in command]
-    assert deployments[0][-2:] == ['backend', 'agent']
-    assert deployments[1][-1] == 'llm'
-    assert all('--no-deps' in command for command in deployments)
-    assert sum('nvidia-smi' in command for command in calls) == 2
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
+    assert (root / '.env').read_text() == env
+    assert not any('up' in command for command in calls)
+    assert not list(root.glob('.env.backup-*'))
 
 
 def test_invalid_compose_restores_original_environment_without_restarting(project, monkeypatch):
@@ -113,8 +105,8 @@ def test_invalid_compose_restores_original_environment_without_restarting(projec
     assert not any('up' in command for command in calls)
 
 
-def test_start_failure_retains_live_configuration_and_never_stops_other_services(project, monkeypatch):
-    root, _, calls, answers = project
+def test_legacy_never_reaches_startup_even_with_yes(project, monkeypatch):
+    root, env, calls, answers = project
     original_run = wizard.run
 
     def run(command, **kwargs):
@@ -126,7 +118,8 @@ def test_start_failure_retains_live_configuration_and_never_stops_other_services
     monkeypatch.setattr(wizard, 'run', run)
     answer(monkeypatch, answers + ['yes'])
     assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
-    assert wizard.read_env((root / '.env').read_text())['LLM_GPU_DEVICE_IDS'] == '6'
+    assert (root / '.env').read_text() == env
+    assert not any('up' in command for command in calls)
     assert not any('stop' in command or 'down' in command for command in calls)
 
 

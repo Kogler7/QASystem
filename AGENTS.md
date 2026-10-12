@@ -12,6 +12,13 @@
 - Preserve queue execution for authenticated external calls. Queue records carry only `auth_context_id`; never place Authorization headers in payload artifacts, logs, SSE, `execution`, or results.
 - SQL may retain the configured direct connection compatibility. Do not restore direct Neo4j or Elasticsearch access; unopened graph-write, confidence, and document-evidence capabilities must fail explicitly when invoked.
 
+# Configuration Maintenance Rules
+
+- 环境变量清单只在根 `.env.example` 维护；新增、删除、改默认值或生效方式，必须同步消费者、测试及 `docs/部署/配置体系说明.md` 中的迭代记录，并随代码提交。不得通过业务代码、Compose 或评测参数文件另设一套默认部署配置。
+- 部署 `.env` 和 `runtime-config/config.json` 的变更必须在 CLI UI 展示与上次批准版本的差异，由用户逐页审核、填写原因并人工确认。AI、脚本、CI 不得替用户生成生产/测试部署批准记录；单元测试的临时目录记录除外。
+- 配置 guard 必须在部署前及应用容器启动时执行。未经确认、文件与批准记录不符、清单升级未审核或历史记录不一致时拒绝启动，不得添加跳过 guard、自动确认或非交互批准选项。
+- 批准记录和历史版本保存在部署运行时目录，仅本地保存、凭据脱敏，不进入 Git 或交付镜像。修改 `.env` 需要 recreate；仅修改已挂载热配置影响新请求，无需重建环境镜像。
+
 # Git Workflow Rules
 
 - 合并一律禁止使用 fast-forward（`git merge --no-ff`），即使可以快进也要生成合并提交，保留功能分支的提交分组与回滚边界；禁止 `git merge --ff-only` 与 `git pull --rebase` 等会抹平分支拓扑的操作。仓库已配置 `merge.ff=false` 作为兜底。

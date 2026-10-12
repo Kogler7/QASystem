@@ -25,7 +25,7 @@ def runtime_path(root: Path | None = None, env=None) -> Path:
     root = Path.cwd() if root is None else Path(root)
     explicit = env.get("QASYSTEM_RUNTIME_SETTINGS_FILE")
     directory = env.get("QASYSTEM_RUNTIME_CONFIG_DIR")
-    path = Path(explicit) if explicit else Path("/app/runtime-config/config.json") if Path("/app/runtime-config").is_dir() else (
+    path = Path("/app/runtime-config/config.json") if Path("/app/runtime-config").is_dir() else Path(explicit) if explicit else (
         Path(directory) / "config.json" if directory else Path("runtime-config/config.json"))
     return path if path.is_absolute() else root / path
 
@@ -51,6 +51,10 @@ def read_document(path: Path | None = None, *, root: Path | None = None, env=Non
         data = {"settings": {}, "models": {}}
     elif path.name != "config.json" and isinstance(data, dict) and "settings" not in data:
         data = {"settings": data, "models": {}}
+    return _validate_document(data)
+
+
+def _validate_document(data):
     if not isinstance(data, dict) or set(data) - {"settings", "models"}:
         raise ValueError("Invalid runtime configuration structure")
     settings, models = data.get("settings", {}), data.get("models", {})
@@ -58,8 +62,30 @@ def read_document(path: Path | None = None, *, root: Path | None = None, env=Non
         raise ValueError("Invalid runtime settings keys or values")
     if not isinstance(models, dict) or any(not isinstance(m, dict) for m in models.values()):
         raise ValueError("Invalid runtime model configuration")
+    fields = {'enabled', 'gpu', 'port', 'context', 'utilization'}
+    for repo, model in models.items():
+        if (not isinstance(repo, str) or set(model) - fields or
+                ('enabled' in model and not isinstance(model['enabled'], bool)) or
+                any(not isinstance(v, str) for k, v in model.items() if k != 'enabled')):
+            raise ValueError('Invalid runtime model keys or values')
     return {"settings": settings, "models": models}
 
 
 def read_settings(path: Path | None = None, *, root: Path | None = None, env=None) -> dict[str, str]:
-    return read_document(path, root=root, env=env)["settings"]
+    path = runtime_path(root, env) if path is None else Path(path)
+    managed = path.name == 'config.json' and (path.is_file() or
+        (path.parent / 'approved-config.json').exists() or (path.parent / 'history').is_dir() or
+        str(path).replace('\\', '/') == '/app/runtime-config/config.json')
+    if managed:
+        try:
+            from docker.config_guard import require_runtime
+        except ImportError:
+            from config_guard import require_runtime
+        raw = path.read_bytes() if path.is_file() else None
+        require_runtime(path.parent, config_bytes=raw)
+        try:
+            data = _validate_document(json.loads(raw))
+        except (ValueError, TypeError):
+            raise ValueError('Invalid runtime configuration file') from None
+        return data['settings']
+    return read_document(path, root=root, env=env)['settings']

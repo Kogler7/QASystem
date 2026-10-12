@@ -30,16 +30,19 @@ def test_catalog_covers_every_release_key_and_masks_secrets(editor):
 def test_save_generates_defaults_and_hot_file_without_deploy(editor, monkeypatch):
     editor.values['KG_EXTRACT_LLM_MODEL'] = 'test-model'
     editor.save()
-    assert json.loads((editor.directory / 'settings.json').read_text())['KG_EXTRACT_LLM_MODEL'] == 'test-model'
+    assert json.loads((editor.directory / 'config.json').read_text())['settings']['KG_EXTRACT_LLM_MODEL'] == 'test-model'
     env = configure.helper.read_env((editor.root / '.env').read_text())
     assert env['PRIVATE_API_KEY'] == 'never-print'
     assert env['GPU_DEVICE_IDS'] == '4,5,6,7'
     assert env['EXECUTION_GPU_RESERVED_DEVICE_IDS'] == '7'
+    assert 'KG_EXTRACT_LLM_MODEL' not in env
     assert json.loads((editor.directory / 'models.compose.json').read_text()) == {'services': {}}
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'settings.json'))
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
+    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
     assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'test-model'
     editor.values['KG_EXTRACT_LLM_MODEL'] = 'second-model'
     editor.save()
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'second-model'
 
 
@@ -92,13 +95,15 @@ def test_runtime_rejects_secrets_and_malformed_file(tmp_path, monkeypatch):
 
 
 def test_new_requests_reload_model_and_version_existing_snapshot_is_stable(editor, monkeypatch):
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'settings.json'))
+    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
     editor.values.update(KG_EXTRACT_ALGO_VERSION='v3', KG_EXTRACT_LLM_MODEL='first',
                          KG_EXTRACT_LLM_MAX_TOKENS='1024', KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS='1024')
     editor.save()
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     first = extraction_config.resolve_config({})
     editor.values.update(KG_EXTRACT_ALGO_VERSION='v2', KG_EXTRACT_LLM_MODEL='second')
     editor.save()
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     second = extraction_config.resolve_config({})
     assert (first['model'], first['version'], first['max_tokens']) == ('first', 'v3', 1024)
     assert (second['model'], second['version']) == ('second', 'v2')
@@ -123,6 +128,9 @@ def test_old_entry_point_opens_editor_without_legacy_checks(monkeypatch):
 
 def test_apply_reserves_gpu_before_recreating_existing_backend(editor, monkeypatch):
     enable(editor, 0)
+    editor.prepare_deployment()
+    editor.save()
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     calls = []
     def run(command, **kwargs):
         calls.append(command)
@@ -146,6 +154,9 @@ def test_disabled_model_stops_only_previously_managed_service(editor, monkeypatc
     editor.previous_models = json.loads(json.dumps(editor.models))
     configure.helper.atomic_write(editor.directory / 'applied.compose.json', json.dumps(editor.compose()))
     editor.models[repo]['enabled'] = False
+    editor.prepare_deployment()
+    editor.save()
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     calls = []
     monkeypatch.setattr(configure.helper, 'run', lambda command, **kwargs: calls.append(command) or '')
     editor.apply()
@@ -157,6 +168,9 @@ def test_disabled_model_stops_only_previously_managed_service(editor, monkeypatc
 
 def test_busy_gpu_prevents_starting_models(editor, monkeypatch):
     enable(editor, 0)
+    editor.prepare_deployment()
+    editor.save()
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     calls = []
     def run(command, **kwargs):
         calls.append(command)
@@ -171,7 +185,8 @@ def test_host_judge_uses_runtime_settings_and_explicit_override_wins(editor, mon
     editor.values.update(QASYSTEM_JUDGE_MODEL='local-test', QASYSTEM_JUDGE_BASE_URL='http://127.0.0.1:60123/v1',
                          QASYSTEM_JUDGE_ADAPTER='chat', QASYSTEM_JUDGE_MAX_TOKENS='512')
     editor.save()
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'settings.json'))
+    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
+    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     client = build_judge_client({})
     assert client.model == 'local-test'
     assert client.max_tokens == 512
@@ -281,3 +296,87 @@ def test_actual_value_uses_live_mount_not_unapplied_edit_directory(editor, tmp_p
     editor.live = [{'name': 'qasystem_backend', 'status': 'running', 'env': {'KG_EXTRACT_LLM_MODEL': 'old-env'},
         'mounts': [{'Destination': '/app/runtime-config', 'Source': str(actual_dir)}]}]
     assert editor.actual_value('KG_EXTRACT_LLM_MODEL') == 'mounted-model'
+
+
+def test_save_migrates_legacy_files_and_env_without_persisting_template_defaults(editor):
+    directory = editor.directory
+    (directory / 'settings.json').write_text(json.dumps({'KG_EXTRACT_LLM_MODEL': 'legacy-model'}))
+    (directory / 'models.json').write_text('{}')
+    with (editor.root / '.env').open('a') as stream:
+        stream.write('KG_EXTRACT_LLM_MAX_CONCURRENCY=3\n')
+    reopened = configure.Configuration(editor.root)
+    assert reopened.values['KG_EXTRACT_LLM_MODEL'] == 'legacy-model'
+    reopened.save()
+    settings = json.loads((directory / 'config.json').read_text())['settings']
+    assert settings == {'KG_EXTRACT_LLM_MODEL': 'legacy-model', 'KG_EXTRACT_LLM_MAX_CONCURRENCY': '3'}
+    assert 'KG_EXTRACT_LLM_MAX_CONCURRENCY' not in configure.helper.read_env((editor.root / '.env').read_text())
+    assert not (directory / 'settings.json').exists()
+    assert not (directory / 'models.json').exists()
+    assert (reopened.backup / 'settings.json').is_file()
+    assert 'PRIVATE_API_KEY=never-print' in (editor.root / '.env').read_text()
+
+
+def test_canonical_runtime_file_does_not_overlay_old_files(editor):
+    from docker.runtime_config import read_document
+    (editor.directory / 'config.json').write_text('{"settings": {}, "models": {}}')
+    (editor.directory / 'settings.json').write_text('{"KG_EXTRACT_LLM_MODEL":"stale"}')
+    assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}}
+
+
+@pytest.mark.parametrize('filename', ['settings.json', 'models.json'])
+def test_migration_rejects_invalid_legacy_structure(editor, filename):
+    from docker.runtime_config import read_document
+    (editor.directory / filename).write_text('[]')
+    with pytest.raises(ValueError, match='Invalid runtime'):
+        read_document(editor.directory / 'config.json')
+
+
+def test_container_mount_precedes_host_relative_config_dir(monkeypatch):
+    from docker.runtime_config import runtime_path
+    original = Path.is_dir
+    monkeypatch.setattr(Path, 'is_dir', lambda path: str(path).replace('\\', '/') == '/app/runtime-config' or original(path))
+    assert str(runtime_path(Path('/app'), {'QASYSTEM_RUNTIME_CONFIG_DIR': './host-only'})).replace('\\', '/') == '/app/runtime-config/config.json'
+
+
+def test_judge_budget_does_not_inherit_extraction_budget(editor, monkeypatch):
+    from eval.run import build_judge_client
+    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
+    monkeypatch.setenv('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS', '16384')
+    monkeypatch.setenv('KG_EXTRACT_LLM_TIMEOUT_SECONDS', '900')
+    monkeypatch.setenv('QASYSTEM_JUDGE_BASE_URL', 'http://127.0.0.1:60123/v1')
+    client = build_judge_client({'eval': {'judge_max_tokens': 768, 'judge_timeout_seconds': 45}})
+    assert client.max_tokens == 768
+    assert client.timeout == 45
+
+
+def test_apply_cannot_run_docker_without_manual_approval(editor):
+    with pytest.raises(ValueError, match='人工确认'):
+        editor.apply()
+
+
+def test_ui_cancelled_review_does_not_write_hot_changes(editor, monkeypatch):
+    monkeypatch.setattr(configure.sys.stdin, 'isatty', lambda: True)
+    monkeypatch.setattr(configure, 'read_key', lambda: 'q')
+    original = (editor.root / '.env').read_bytes()
+    editor.values['KG_EXTRACT_LLM_MODEL'] = 'pending-only'
+    assert configure.review_save(editor) is False
+    assert (editor.root / '.env').read_bytes() == original
+    assert not (editor.directory / 'config.json').exists()
+    assert not (editor.directory / 'approved-config.json').exists()
+
+
+def test_ui_explicit_review_records_saved_configuration(editor, monkeypatch):
+    monkeypatch.setattr(configure.sys.stdin, 'isatty', lambda: True)
+    columns, lines = configure.shutil.get_terminal_size((100, 28))
+    changes = configure.guard.changes(None, configure.guard.snapshot(editor.root, editor.directory, payloads=editor.pending_payloads()))
+    length = sum(len(configure.screen.wrap(line, max(30, columns - 2))) for line in changes)
+    pages = configure.math.ceil(length / max(4, lines - 7))
+    keys = iter(['pagedown'] * (pages - 1) + ['\r'])
+    monkeypatch.setattr(configure, 'read_key', lambda: next(keys))
+    answers = iter(['initial deployment review', 'confirm r1'])
+    monkeypatch.setattr('builtins.input', lambda *args: next(answers))
+    assert configure.review_save(editor)
+    assert configure.guard.require(editor.root, editor.directory) == 1
+    record = configure.guard.approved(editor.directory)
+    assert record['reason'] == 'initial deployment review'
+    assert 'never-print' not in json.dumps(record)

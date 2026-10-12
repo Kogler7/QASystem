@@ -13,7 +13,9 @@ def test_llm_uses_shared_image_readonly_models_and_explicit_gpu():
     service = yaml.safe_load((ROOT / "docker/docker-compose.llm.yml").read_text())["services"]["llm"]
     backend = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["backend"]
     assert service["image"] == backend["image"]
-    assert service["volumes"] == ["${HOST_MODELS_DIR:-./deploy/models}:/models:ro"]
+    assert "${HOST_MODELS_DIR:-./deploy/models}:/models:ro" in service["volumes"]
+    assert './.env:/app/.env:ro' in service['volumes']
+    assert 'config_guard.py' in service['entrypoint'][1]
     assert ":?" in service["environment"]["CUDA_VISIBLE_DEVICES"]
     assert service["environment"]["VLLM_NO_USAGE_STATS"] == "1"
     assert service["environment"]["DO_NOT_TRACK"] == "1"

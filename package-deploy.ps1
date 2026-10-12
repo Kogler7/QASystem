@@ -53,6 +53,7 @@ foreach ($item in @(
     @{ source = "docker-compose.yml"; destination = "docker-compose.yml" },
     @{ source = "docker/docker-compose.llm.yml"; destination = "docker-compose.llm.yml" },
     @{ source = "docs/部署/小模型统一部署.md"; destination = "LLM_MODELS.md" },
+    @{ source = "docs/部署/配置体系说明.md"; destination = "CONFIGURATION.md" },
     @{ source = "docker-compose.remote-only.yml"; destination = "docker-compose.remote-only.yml" },
     @{ source = "build-remote-only-image.ps1"; destination = "build-remote-only-image.ps1" },
     @{ source = "download-models.ps1"; destination = "download-models.ps1" },
@@ -79,7 +80,7 @@ foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "exter
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "terminal_ui.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
 }
 foreach ($relative in @(

@@ -230,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
         if prompt("应用配置并启动？输入 yes；其他输入取消", "no") != "yes":
             progress("已取消，未修改配置或常驻服务")
             return 0
+        # The old prompt sequence cannot display and approve the full release delta.
+        raise RuntimeError('旧版部署入口不再允许改配置或启动服务；请使用 docker/configure.py 的版本审核界面')
         # GPU ownership may have changed during hashing and user input.
         fresh = gpu_rows(run(["docker", "run", "--rm", "--gpus", "all", "--entrypoint",
             "nvidia-smi", image, "--query-gpu=index,name,memory.total,memory.used,utilization.gpu",
