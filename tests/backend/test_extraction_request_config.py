@@ -131,7 +131,7 @@ def test_pipeline_snapshot_and_unstructured_rejection(providers):
         config.snapshot_payload("graph.extract", {"ontology": "", "options": {"version": "v3"}})
 
 
-@pytest.mark.parametrize("version", ["v2", "v3", "latest", "v3.1"])
+@pytest.mark.parametrize("version", ["v0", "v2", "v2.1", "v3", "latest", "v3.1"])
 def test_each_version_receives_isolated_client_and_effective_config(providers, monkeypatch, version):
     from backend.app.services import knowledge_extract_adapter as adapter
 
@@ -216,7 +216,7 @@ def test_provider_json_format_override_is_request_local(providers, monkeypatch):
     assert schema["type"] == "json_schema"
 
 
-@pytest.mark.parametrize("version", ["v2", "v3", "latest", "v3.1"])
+@pytest.mark.parametrize("version", ["v0", "v2", "v2.1", "v3", "latest", "v3.1"])
 @pytest.mark.parametrize("max_tokens", [4096, 16384])
 def test_live_client_configuration_uses_chat_only_without_network(providers, monkeypatch, version, max_tokens):
     import openai

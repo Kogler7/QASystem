@@ -60,7 +60,7 @@ class ChunkOptions(StrictModel):
 
 class ExtractionOptions(StrictModel):
     model: str | None = None
-    version: Literal["v2", "v2.2", "v3", "v3.1", "latest"] | None = None
+    version: Literal["v0", "v2", "v2.1", "v2.2", "v3", "v3.1", "latest"] | None = None
     provider: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
     request_timeout: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     document_timeout: float | None = Field(default=None, gt=0, allow_inf_nan=False)

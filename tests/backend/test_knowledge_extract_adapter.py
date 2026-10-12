@@ -133,14 +133,16 @@ def test_run_aggregate_feeds_field_dicts_to_v3_and_latest(monkeypatch):
             assert resolved.text == chunk["text"]
 
 
-@pytest.mark.parametrize("label", ["v2", "v2.2", "v3.1"])
+@pytest.mark.parametrize("label", ["v0", "v2", "v2.1", "v2.2", "v3.1"])
 def test_run_aggregate_feeds_version_specific_chunk_objects(monkeypatch, label):
     """各版本接收各自包的 ExtractionChunk，保留来源元数据。"""
+    from algorithm.knowledge_extract.v0.chunk_context import ExtractionChunk as V0Chunk
     from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk as V2Chunk
+    from algorithm.knowledge_extract.v2_1.chunk_context import ExtractionChunk as V21Chunk
     from algorithm.knowledge_extract.v2_2.chunk_context import ExtractionChunk as V22Chunk
 
     from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk as V31Chunk
-    expected_type = {"v2": V2Chunk, "v2.2": V22Chunk, "v3.1": V31Chunk}[label]
+    expected_type = {"v0": V0Chunk, "v2": V2Chunk, "v2.1": V21Chunk, "v2.2": V22Chunk, "v3.1": V31Chunk}[label]
 
     captured = {}
 

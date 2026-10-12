@@ -12,7 +12,7 @@ environment variable ``KG_EXTRACT_ALGO_VERSION`` (see
 
 * ``latest`` (default): runs the independent ``latest`` package through the
   same per-chunk projection.
-* ``v2`` / ``v2.2``: build that package's ``ExtractionChunk`` objects, run
+* ``v0`` / ``v2`` / ``v2.1`` / ``v2.2``: build that package's ``ExtractionChunk`` objects, run
   ``extract_aggregate`` once, then project the document-level result back onto the
   individual chunks using each entity's evidence anchor, so the caller keeps seeing
   one item per chunk and ``deduplicate_chunk_graphs`` can still rebuild the merged
@@ -44,7 +44,7 @@ import re
 from copy import deepcopy
 from typing import Any, Callable, Iterable, Sequence
 
-from algorithm.knowledge_extract import latest, v2, v2_2, v3, v3_1, version as ke_version
+from algorithm.knowledge_extract import latest, v0, v2, v2_1, v2_2, v3, v3_1, version as ke_version
 
 from backend.app import observability
 
@@ -293,6 +293,10 @@ def build_chunks(
     """
     if package == "v2_2":
         from algorithm.knowledge_extract.v2_2.chunk_context import ExtractionChunk
+    elif package == "v2_1":
+        from algorithm.knowledge_extract.v2_1.chunk_context import ExtractionChunk
+    elif package == "v0":
+        from algorithm.knowledge_extract.v0.chunk_context import ExtractionChunk
     else:
         from algorithm.knowledge_extract.v2.chunk_context import ExtractionChunk
 
@@ -323,7 +327,9 @@ def run_aggregate(
             runner = jev_extract.extract_aggregate
         else:
             runner = {
+                ke_version.V0: v0.extract_aggregate,
                 ke_version.V2: v2.extract_aggregate,
+                ke_version.V21: v2_1.extract_aggregate,
                 ke_version.V22: v2_2.extract_aggregate,
                 ke_version.V3: v3.extract_aggregate,
                 ke_version.V31: v3_1.extract_aggregate,
@@ -334,6 +340,10 @@ def run_aggregate(
     # jev_extract 仍是旧窗口抽取副本，入口要求 v2 的 ExtractionChunk。
     if label == ke_version.V22:
         chunks = build_chunks(texts, ranges, metadata, package="v2_2")
+    elif label == ke_version.V21:
+        chunks = build_chunks(texts, ranges, metadata, package="v2_1")
+    elif label == ke_version.V0:
+        chunks = build_chunks(texts, ranges, metadata, package="v0")
     elif label in {ke_version.V2, ke_version.JEV}:
         chunks = build_chunks(texts, ranges, metadata)
     else:
