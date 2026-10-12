@@ -9,18 +9,22 @@ from docker.download_llm_models import verify
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_llm_uses_shared_image_readonly_models_and_explicit_gpu():
-    service = yaml.safe_load((ROOT / "docker/docker-compose.llm.yml").read_text())["services"]["llm"]
+def test_llm_uses_shared_image_readonly_models_and_explicit_gpu(tmp_path):
+    from docker.configure import Configuration, slug
+    editor = Configuration(tmp_path)
+    repo = editor.catalog[0]['repo']
+    editor.models[repo].update(enabled=True, gpu='6')
+    service = editor.compose()['services'][slug(repo)]
     backend = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["backend"]
-    assert service["image"] == backend["image"]
-    assert "${HOST_MODELS_DIR:-./deploy/models}:/models:ro" in service["volumes"]
-    assert './.env:/app/.env:ro' in service['volumes']
+    assert service["image"] == 'qasystem-env-v1'
+    assert backend['image'].startswith('${QASYSTEM_ENV_IMAGE')
+    assert any(v.endswith(':/models:ro') for v in service['volumes'])
+    assert any(v.endswith(':/app/.env:ro') for v in service['volumes'])
     assert 'config_guard.py' in service['entrypoint'][1]
-    assert ":?" in service["environment"]["CUDA_VISIBLE_DEVICES"]
+    assert service["environment"]["CUDA_VISIBLE_DEVICES"] == '6'
     assert service["environment"]["VLLM_NO_USAGE_STATS"] == "1"
-    assert service["environment"]["DO_NOT_TRACK"] == "1"
-    assert "exec vllm serve" in service["command"][-1]
-    assert "venv" not in service["command"][-1]
+    assert service["command"][:2] == ['vllm', 'serve']
+    assert 'venv' not in repr(service['command'])
 
 
 @pytest.mark.parametrize("data", [None, b"short", b"wrong!!", b"weights"])

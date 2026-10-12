@@ -104,7 +104,7 @@ class DocumentProcessor:
             or config_getenv("MINERU_CONFIG_PATH")
         )
         self.mineru_model_source = mineru_model_source
-        self.libreoffice_path = libreoffice_path or config_getenv("LIBREOFFICE_PATH") or config_getenv("SOFFICE_PATH")
+        self.libreoffice_path = libreoffice_path or config_getenv("LIBREOFFICE_PATH")
         self._processors: dict[str, Any] = {}
 
     @staticmethod

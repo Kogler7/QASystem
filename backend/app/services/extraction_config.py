@@ -55,8 +55,7 @@ def has_overrides(options: dict[str, Any]) -> bool:
 
 
 def _credential_env() -> str:
-    return next((name for name in ("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY")
-                 if getenv(name, "").strip()), "KG_EXTRACT_LLM_API_KEY")
+    return "KG_EXTRACT_LLM_API_KEY"
 
 
 def resolve_config(options: dict[str, Any]) -> dict[str, Any]:

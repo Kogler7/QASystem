@@ -421,7 +421,7 @@ def test_pipeline_returns_file_service_metadata_when_configured(protocol_module,
         captured["items"] = items
         return {"success": True, "inserted_count": len(items), "ids": ["vector-0"]}
 
-    monkeypatch.setenv("FILE_SERVICE_URL", "https://files.example")
+    monkeypatch.setenv("APPLICATION_SERVICE_URL", "https://files.example")
     monkeypatch.setattr(pipeline_module, "store_vectors", store_vectors)
     body = TestClient(protocol_module.app).post(
         "/api/v1/pipelines/knowledge-ingestion",
@@ -446,7 +446,7 @@ def test_pipeline_returns_file_service_metadata_when_configured(protocol_module,
 def test_pipeline_reports_file_service_failure(protocol_module, monkeypatch):
     from backend.app.services import knowledge_precipitation as pipeline_module
 
-    monkeypatch.setenv("FILE_SERVICE_URL", "https://files.example")
+    monkeypatch.setenv("APPLICATION_SERVICE_URL", "https://files.example")
     monkeypatch.setattr(
         pipeline_module,
         "upload_file",
@@ -466,7 +466,7 @@ def test_pipeline_reports_file_service_failure(protocol_module, monkeypatch):
 def test_pipeline_preserves_extraction_and_reports_vector_store_failure(protocol_module, monkeypatch):
     from backend.app.services import knowledge_precipitation as pipeline_module
 
-    monkeypatch.setenv("FILE_SERVICE_URL", "https://files.example")
+    monkeypatch.setenv("APPLICATION_SERVICE_URL", "https://files.example")
     monkeypatch.setattr(
         pipeline_module,
         "store_vectors",
@@ -490,7 +490,7 @@ def test_pipeline_preserves_extraction_and_reports_vector_store_failure(protocol
 def test_pipeline_reports_vector_id_count_mismatch_without_publishing_invalid_ids(protocol_module, monkeypatch):
     from backend.app.services import knowledge_precipitation as pipeline_module
 
-    monkeypatch.setenv("FILE_SERVICE_URL", "https://files.example")
+    monkeypatch.setenv("APPLICATION_SERVICE_URL", "https://files.example")
     monkeypatch.setattr(
         pipeline_module,
         "store_vectors",

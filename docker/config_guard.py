@@ -85,6 +85,8 @@ def snapshot(root, directory, *, payloads=None):
     if declaration.exists():
         registry = json.loads(declaration.read_text(encoding='utf-8'))
         values['declarations.version'] = {'value': registry['version']}
+        for key in ('aliases', 'model_defaults', 'model_descriptions', 'model_migrations', 'retired'):
+            values['declarations.' + key] = {'value': json.dumps(registry.get(key), ensure_ascii=False, sort_keys=True)}
         for key, item in registry['items'].items():
             values['declarations.' + key] = {**safe_value(key, str(item['default'])),
                 'description': item['desc'], 'mode': item['mode'], 'consumers': item['consumers'],
@@ -232,6 +234,10 @@ def require(root, directory):
         raise ValueError('配置声明门禁失败：' + '；'.join(errors))
     previous = verified_record(directory)
     current = snapshot(root, directory)
+    from docker.configuration import declarations
+    retired = set(declarations().get('retired', []))
+    if any('env.' + key in current['values'] for key in retired):
+        raise ValueError('配置仍含已删除或迁移的参数；请通过 ops config 审核迁移后部署')
     if current != previous['snapshot']:
         raise ValueError('配置或版本清单与批准记录不一致；禁止部署，请回 CLI UI 审核变更')
     return previous['revision']

@@ -196,7 +196,7 @@ curl -X POST 'http://127.0.0.1:8006/api/v1/pipelines/knowledge-ingestion' \
 
 v1 不提供本地文件保存或下载接口：
 
-- 配置 `APPLICATION_SERVICE_URL` 时，解析后的 Markdown 上传到应用团队服务，文本切片向量写入 `{APPLICATION_SERVICE_URL}/third/vectors/store`；旧 `FILE_SERVICE_URL` 继续作为回退变量。
+- 配置 `APPLICATION_SERVICE_URL` 时，解析后的 Markdown 上传到应用团队服务，文本切片向量写入 `{APPLICATION_SERVICE_URL}/third/vectors/store`；旧 `FILE_SERVICE_URL` 由配置 UI 迁移，不再作为运行时回退。
 - `data.artifacts.markdown` 返回文件服务的 `id`、`name`、`path`、`url`。
 - `data.artifacts.vector_ids` 返回向量存储产生的 ID，顺序与 `ranges` 一致。
 - 两个服务地址变量均未配置时不上传 Markdown、不执行向量存储，`data.artifacts` 为 `null`。

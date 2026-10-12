@@ -15,10 +15,10 @@ def test_application_service_url_prefers_canonical_name(monkeypatch):
     assert get_application_service_url() == "https://application.example"
 
 
-def test_application_service_url_supports_legacy_name(monkeypatch):
+def test_application_service_url_requires_canonical_name(monkeypatch):
     monkeypatch.delenv("APPLICATION_SERVICE_URL", raising=False)
     monkeypatch.setenv("FILE_SERVICE_URL", "https://legacy.example/")
-    assert get_application_service_url() == "https://legacy.example"
+    assert get_application_service_url() == ""
 
 
 def test_unopened_capability_fails_only_when_resolved(monkeypatch):

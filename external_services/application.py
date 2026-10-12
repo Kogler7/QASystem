@@ -63,7 +63,6 @@ def get_application_service_url(explicit: str | None = None) -> str:
     return (
         explicit
         or config_getenv("APPLICATION_SERVICE_URL", "").strip()
-        or config_getenv("FILE_SERVICE_URL", "").strip()
     ).rstrip("/")
 
 
@@ -129,7 +128,7 @@ class ApplicationServiceClient:
         if not self.base_url:
             raise ExternalCapabilityUnavailable(
                 capability,
-                "未配置 APPLICATION_SERVICE_URL（兼容变量 FILE_SERVICE_URL）",
+                "未配置 APPLICATION_SERVICE_URL",
             )
         url = f"{self.base_url}{endpoint.path}"
         try:

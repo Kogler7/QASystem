@@ -64,26 +64,44 @@ class Configuration:
         self.template = (release_template if release_template.is_file() else root / '.env.example').read_text(encoding='utf-8-sig')
         self.fields = schema(self.template)
         self.original = (root / ".env").read_text(encoding="utf-8-sig") if (root / ".env").exists() else ""
-        self.values = {**helper.read_env(self.template), **helper.read_env(self.original)}
+        from docker.config_migrations import migrate, duplicate_conflicts
+        original_values, self.migration_conflicts = migrate(helper.read_env(self.original))
+        self.resolved_migrations = set()
+        self.values = {**helper.read_env(self.template), **original_values}
         directory = Path(self.values.get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config"))
         self.directory = (root / directory).resolve() if not directory.is_absolute() else directory
         self.directory.mkdir(parents=True, exist_ok=True)
         self.directory.chmod(0o700)
         hot = self.directory / "config.json"
-        document = read_document(hot)
-        self.values.update(document["settings"])
-        self.persisted_hot = {k: v for k, v in helper.read_env(self.original).items() if k in HOT_KEYS}
+        document = read_document(hot, migration=True)
+        original_values, self.migration_conflicts = migrate({**helper.read_env(self.original), **document['settings']})
+        self.migration_conflicts.update({key: old for key, old in duplicate_conflicts(self.original).items()
+                                         if key in helper.read_env(self.template)})
+        self.values.update(original_values)
+        from docker.config_migrations import ALIASES
+        for field in self.fields:
+            old = [key for key, target in ALIASES.items() if target == field['key'] and key in helper.read_env(self.original)]
+            if old:
+                field['description'] += ' / 迁移：' + ', '.join(old) + ' → ' + field['key']
+            if field['key'] in self.migration_conflicts:
+                field['description'] += ' / [冲突] 请编辑本项，明确确认最终取值后才能保存'
+        self.persisted_hot = {k: v for k, v in original_values.items() if k in HOT_KEYS}
         self.persisted_hot.update(document['settings'])
         self.initial_hot = {k: self.values[k] for k in HOT_KEYS if k in self.values}
-        self.models = document["models"]
+        from docker.config_migrations import migrate_models
+        self.models, model_conflicts = migrate_models(helper.read_env(self.original), document['models'], self.catalog)
+        self.migration_conflicts.update(model_conflicts)
         if set(self.models) - {m['repo'] for m in self.catalog}:
             raise ValueError('模型计划包含未登记模型，请先更新当前版本模型清单')
         models = self.directory / "models.json"  # migration input only
         applied = self.directory / "applied-models.json"
         self.previous_models = json.loads(applied.read_text()) if applied.exists() else {}
+        self.model_defaults = {}
         for index, model in enumerate(self.catalog):
-            self.models[model['repo']] = {**dict(enabled=False, gpu='', port=str(9997 + index),
-                context='32768', utilization='0.90'), **self.models.get(model['repo'], {})}
+            from docker.runtime_config import MODEL_DEFAULTS
+            self.model_defaults[model['repo']] = {**MODEL_DEFAULTS, 'port': str(9997 + index),
+                'model_dir': 'llm/' + model['repo'].replace('/', '--')}
+            self.models[model['repo']] = {**self.model_defaults[model['repo']], **self.models.get(model['repo'], {})}
         # Back up on entry, before any edits. Permission-restricted, never displayed.
         self.backup = self.directory / ("backups/" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
         self.backup.mkdir(parents=True, mode=0o700)
@@ -198,15 +216,21 @@ class Configuration:
         for model in self.catalog:
             repo = model["repo"]
             state = self.models[repo]
-            exists = (self.model_root() / "llm" / repo.replace("/", "--")).is_dir()
+            exists = (self.model_root() / state['model_dir']).is_dir()
             rows.append(dict(kind="model", repo=repo, key="enabled",
                 display_name=f"[{ 'x' if state['enabled'] else ' ' }] {repo}",
                 display_value='权重已找到' if exists else '无本地权重',
                 label=f"[{ 'x' if state['enabled'] else ' ' }] {repo} ({'权重已找到' if exists else '无本地权重'})"))
-            if state["enabled"]:
-                for key, name in (("gpu", "GPU编号"), ("port", "宿主端口"), ("context", "上下文上限"), ("utilization", "显存比例")):
+            if state["enabled"] or any(key.startswith(repo + '.') for key in self.migration_conflicts):
+                for key, name in (("gpu", "GPU编号"), ("port", "宿主端口"), ("context", "上下文上限"), ("utilization", "显存比例"),
+                                  ('bind', '监听地址'), ('model_dir', '权重相对路径'), ('max_num_seqs', '最大并发序列'),
+                                  ('max_num_batched_tokens', '批处理 token 上限'), ('dtype', '计算精度')):
+                    conflict = repo + '.' + key in self.migration_conflicts and repo + '.' + key not in self.resolved_migrations
+                    from docker.runtime_config import MODEL_DESCRIPTIONS
                     rows.append(dict(kind="model", repo=repo, key=key, display_name=f"  [启动] {name}",
-                        display_value=state[key] or '(空)', label=f"    {name}: {state[key]}"))
+                        default=self.model_defaults[repo][key],
+                        description=('[冲突] 请编辑本项确认取值。' if conflict else '') + MODEL_DESCRIPTIONS[key],
+                        display_value=('! ' if conflict else '') + (state[key] or '(空)'), label=f"    {name}: {state[key]}"))
         for field in self.fields:
             if field["key"] in LEGACY_MODEL_KEYS: continue
             value = self.values.get(field["key"], "")
@@ -221,6 +245,9 @@ class Configuration:
 
     def validate(self, probe: bool = False) -> list[str]:
         errors, ports, gpus = [], {}, {}
+        for key, old in self.migration_conflicts.items():
+            if key not in self.resolved_migrations:
+                errors.append(f'{key} 与旧配置 {", ".join(old)} 冲突；在 UI 中编辑标准项确认取值')
         allowed = set(helper.read_env("GPU_DEVICE_IDS=" + self.values.get("GPU_DEVICE_IDS", ""))["GPU_DEVICE_IDS"].split(","))
         reserved = set(self.values.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(","))
         own = {m["gpu"] for m in self.previous_models.values() if m.get("enabled")}
@@ -247,6 +274,10 @@ class Configuration:
                 port, length, ratio = int(model["port"]), int(model["context"]), float(model["utilization"])
                 if not 1 <= port <= 65535 or not 1024 <= length <= 262144 or not math.isfinite(ratio) or not 0 < ratio < 1:
                     raise ValueError()
+                if (int(model['max_num_seqs']) < 1 or int(model['max_num_batched_tokens']) < 1 or
+                        model['dtype'] not in {'auto', 'half', 'float16', 'bfloat16', 'float', 'float32'} or
+                        model['bind'] not in {'127.0.0.1', '0.0.0.0'}):
+                    raise ValueError()
                 if port in ports: errors.append(f"{repo} 与 {ports[port]} 端口重复")
                 ports[port] = repo
                 gpu = model["gpu"]
@@ -255,12 +286,14 @@ class Configuration:
                 if gpu in gpus: errors.append(f"{repo} 与 {gpus[gpu]} 使用同一卡")
                 if gpu in reserved and gpu not in own: errors.append(f"{repo} GPU 已被其他服务预留")
                 gpus[gpu] = repo
-                path = self.model_root() / "llm" / repo.replace("/", "--")
+                path = (self.model_root() / model['model_dir']).resolve()
+                if not model['model_dir'] or not path.is_relative_to(self.model_root()):
+                    raise ValueError()
                 if not path.is_dir(): errors.append(f"{repo} 本地权重目录不存在")
                 previous = self.previous_models.get(repo, {})
                 unchanged_port = previous.get("enabled") and previous.get("port") == model["port"]
                 if probe and not unchanged_port:
-                    with socket.socket() as sock: sock.bind(("127.0.0.1", port))
+                    with socket.socket() as sock: sock.bind((model['bind'], port))
             except (ValueError, OSError): errors.append(f"{repo} 参数无效或端口被其他进程占用")
         for key, value in self.values.items():
             if key in HOT_KEYS and value and any(suffix in key for suffix in ("MAX_TOKENS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CONCURRENCY", "QPS", "QPM", "TIMEOUT")):
@@ -293,20 +326,23 @@ class Configuration:
                 "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "VLLM_NO_USAGE_STATS": "1"},
                 volumes=[f"{self.model_root()}:/models:ro", f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
                          f"{self.directory}:/app/runtime-config:ro", f"{self.directory / 'observed'}:/app/runtime-config/observed", f"{self.root / '.env'}:/app/.env:ro",
-                         f"{self.root / '.env.example'}:/app/deployment.env.example:ro"], ports=[f"127.0.0.1:{model['port']}:8000"],
-                command=["vllm", "serve", "/models/llm/" + repo.replace("/", "--"), "--served-model-name", repo,
+                         f"{self.root / '.env.example'}:/app/deployment.env.example:ro"], ports=[f"{model['bind']}:{model['port']}:8000"],
+                command=["vllm", "serve", "/models/" + model['model_dir'], "--served-model-name", repo,
                          "--max-model-len", model["context"], "--gpu-memory-utilization", model["utilization"],
-                         "--max-num-seqs", self.values.get("LLM_MAX_NUM_SEQS", "8"), "--max-num-batched-tokens",
-                         self.values.get("LLM_MAX_NUM_BATCHED_TOKENS", "2048"), "--dtype", self.values.get("LLM_DTYPE", "bfloat16"), "--language-model-only"],
+                         "--max-num-seqs", model['max_num_seqs'], "--max-num-batched-tokens",
+                         model['max_num_batched_tokens'], "--dtype", model['dtype'], "--language-model-only"],
                 healthcheck=dict(test=["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"], interval="15s", timeout="5s", retries=40, start_period="300s"))
         return {"services": services}
 
     def pending_payloads(self) -> dict:
         from docker.configuration import declarations
-        retired = set(declarations().get('retired', []))
+        from docker.config_migrations import ALIASES
+        retired = set(declarations().get('retired', [])) | set(ALIASES)
         static = {k: v for k, v in self.values.items() if k not in HOT_KEYS and k not in retired}
         original_values = helper.read_env(self.original or self.template)
-        changes = {k: v for k, v in static.items() if original_values.get(k) != v}
+        # Rewrite declared keys once, eliminating duplicate assignments.
+        # Unknown user-owned values remain untouched until consumers are known.
+        changes = {k: v for k, v in static.items() if k in declarations()['items'] or original_values.get(k) != v}
         env = helper.update_env(self.original or self.template, changes)
         env = "\n".join(line for line in env.splitlines() if not (
             (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in HOT_KEYS | retired)) + "\n"
@@ -346,7 +382,7 @@ class Configuration:
     def verify_weights(self) -> None:
         for entry in self.catalog:
             if self.models[entry["repo"]]["enabled"]:
-                folder = self.model_root() / "llm" / entry["repo"].replace("/", "--")
+                folder = self.model_root() / self.models[entry['repo']]['model_dir']
                 for i, part in enumerate(entry["files"], 1):
                     helper.progress(f"{entry['repo']} 校验 {i}/{len(entry['files'])}，{part['size']/1024**3:.2f} GiB：{part['rfilename']}")
                     helper.verify(folder, [part])
@@ -381,7 +417,7 @@ class Configuration:
             model = self.models[entry["repo"]]
             if not model["enabled"]: continue
             if self.previous_models.get(entry["repo"], {}) == model: continue
-            check = dict(self.values, LLM_GPU_MEMORY_UTILIZATION=model["utilization"])
+            check = dict(self.values, utilization=model["utilization"])
             own = {m["gpu"] for m in self.previous_models.values() if m.get("enabled")}
             own.update(m['gpu'] for m in self.models.values() if m.get('enabled'))
             check["EXECUTION_GPU_RESERVED_DEVICE_IDS"] = ",".join(set(check.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(",")) - own)
@@ -535,7 +571,9 @@ def _ui(config: Configuration) -> None:
                 if row["kind"] == "model":
                     state = config.models[row["repo"]]
                     if row["key"] == "enabled": state["enabled"] = not state["enabled"]
+                    elif key == 'd': state[row['key']] = row['default']
                     elif key != " ": state[row["key"]] = input(f"{row['label']} → ").strip()
+                    if key != " ": config.resolved_migrations.add(row['repo'] + '.' + row['key'])
                 else:
                     name = row["key"]; value = config.values.get(name, "")
                     if key == "d": config.values[name] = row["default"]
@@ -543,6 +581,7 @@ def _ui(config: Configuration) -> None:
                             (value in {"0", "1"} and any(s in name for s in ("ENABLED", "DISABLE", "VERIFY", "SCHEDULING")))):
                         config.values[name] = {"true": "false", "false": "true", "0": "1", "1": "0"}[value.lower()]
                     elif key != " ": config.values[name] = (getpass.getpass if row["secret"] else input)(f"{name} 新值: ")
+                    if key != " ": config.resolved_migrations.add(name)
             elif key == "s":
                 if review_save(config):
                     baseline = json.dumps([config.values, config.models], sort_keys=True)

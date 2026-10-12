@@ -19,6 +19,8 @@ def declarations():
 
 def declared(key):
     catalog = declarations()
+    if key in catalog.get('retired', []):
+        raise UndeclaredConfigurationError('配置项已删除或迁移；请使用当前版本标准配置')
     if key in catalog['items'] or any(re.fullmatch(pattern, key) for pattern in catalog['dynamic_keys']):
         return
     raise UndeclaredConfigurationError('读取了未声明的配置项；请更新当前版本配置声明')

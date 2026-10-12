@@ -180,17 +180,17 @@ def test_busy_gpu_prevents_starting_models(editor, monkeypatch):
     assert all('up' not in c for c in calls)
 
 
-def test_host_judge_uses_runtime_settings_and_explicit_override_wins(editor, monkeypatch):
+def test_host_judge_uses_temporary_cli_settings_and_ignores_persistent_defaults(editor, monkeypatch):
     from eval.run import build_judge_client
-    editor.values.update(QASYSTEM_JUDGE_MODEL='local-test', QASYSTEM_JUDGE_BASE_URL='http://127.0.0.1:60123/v1',
-                         QASYSTEM_JUDGE_ADAPTER='chat', QASYSTEM_JUDGE_MAX_TOKENS='512')
-    editor.save()
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
-    configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
-    client = build_judge_client({})
+    monkeypatch.setenv('QASYSTEM_JUDGE_MODEL', 'stale-model')
+    monkeypatch.setenv('QASYSTEM_JUDGE_MAX_TOKENS', '9999')
+    params = {'_judge_overrides': {'model': 'local-test', 'base_url': 'http://127.0.0.1:60123/v1',
+                                  'adapter': 'chat', 'max_tokens': 512}}
+    client = build_judge_client(params)
     assert client.model == 'local-test'
     assert client.max_tokens == 512
-    assert build_judge_client({'_judge_overrides': {'model': 'override'}}).model == 'override'
+    params['_judge_overrides']['model'] = 'override'
+    assert build_judge_client(params).model == 'override'
 
 
 @pytest.mark.parametrize('columns,lines', [(56, 18), (80, 24), (109, 28), (110, 24), (120, 32), (200, 60)])
@@ -249,10 +249,10 @@ def test_keyboard_ui_navigation_restores_terminal_without_saving(editor, monkeyp
 def test_key_value_columns_have_common_right_edge_and_flag(editor):
     from docker import terminal_ui as screen
     rows = [r for r in editor.rows() if r['kind'] == 'env']
-    row = next(r for r in rows if r['key'] == 'LLM_MAX_NUM_SEQS')
-    assert row['display_name'] == '[启动] LLM_MAX_NUM_SEQS'
+    row = next(r for r in rows if r['key'] == 'BACKEND_HOST_PORT')
+    assert row['display_name'] == '[启动] BACKEND_HOST_PORT'
     line = screen.item_line(row, 76)
-    assert line.rstrip().endswith('8')
+    assert line.rstrip().endswith('8006')
     assert screen.width(line) == 76
     hot = next(r for r in rows if r['key'] == 'KG_EXTRACT_LLM_MODEL')
     assert hot['display_name'].startswith('[热更] ')
@@ -344,7 +344,8 @@ def test_judge_budget_does_not_inherit_extraction_budget(editor, monkeypatch):
     monkeypatch.setenv('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS', '16384')
     monkeypatch.setenv('KG_EXTRACT_LLM_TIMEOUT_SECONDS', '900')
     monkeypatch.setenv('QASYSTEM_JUDGE_BASE_URL', 'http://127.0.0.1:60123/v1')
-    client = build_judge_client({'eval': {'judge_max_tokens': 768, 'judge_timeout_seconds': 45}})
+    client = build_judge_client({'eval': {'judge_max_tokens': 768, 'judge_timeout_seconds': 45},
+                                 '_judge_overrides': {'base_url': 'http://127.0.0.1:60123/v1'}})
     assert client.max_tokens == 768
     assert client.timeout == 45
 

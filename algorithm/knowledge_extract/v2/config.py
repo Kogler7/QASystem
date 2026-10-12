@@ -11,10 +11,10 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
     return default
 
 
-KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_API_URL", default="http://localhost:9999")
-KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY", default="")
-KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="deepseek-v4-flash")
-KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_MAX_TOKENS", default="16384"))
+KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", default="http://localhost:9999")
+KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", default="")
+KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", default="deepseek-v4-flash")
+KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", default="16384"))
 KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
 KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
 KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
@@ -46,9 +46,9 @@ def get_llm_config() -> dict:
 
 
 def get_jev_config() -> dict:
-    # 新名优先；仍接受旧 NOUL_*，避免已有部署一开 JEV 就因变量更名失效。
-    accept = float(_env("KG_EXTRACT_JEV_ACCEPT", "KG_EXTRACT_JEV_NOUL_ACCEPT", default="0.9"))
-    reject = float(_env("KG_EXTRACT_JEV_REJECT", "KG_EXTRACT_JEV_NOUL_REJECT", default="0.9"))
+    # 统一使用当前版本的 JEV 阈值名称。
+    accept = float(_env("KG_EXTRACT_JEV_ACCEPT", default="0.9"))
+    reject = float(_env("KG_EXTRACT_JEV_REJECT", default="0.9"))
     if not (0.0 <= accept <= 1.0 and 0.0 <= reject <= 1.0):
         raise ValueError(
             "Jev 阈值需分别落在 [0, 1]，"

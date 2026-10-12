@@ -514,7 +514,7 @@ def extract_v2(
         0,
         json_retries
         if json_retries is not None
-        else int(config_getenv("KG_EXTRACT_LLM_JSON_RETRIES", config_getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
+        else int(config_getenv("KG_EXTRACT_LLM_JSON_RETRIES", "2")),
     )
 
     logger.info(
@@ -753,7 +753,7 @@ def summarize_text(
         0,
         json_retries
         if json_retries is not None
-        else int(config_getenv("KG_EXTRACT_LLM_JSON_RETRIES", config_getenv("KG_EXTRACT_JSON_RETRIES", "2"))),
+        else int(config_getenv("KG_EXTRACT_LLM_JSON_RETRIES", "2")),
     )
 
     logger.info("summarize_text: text_len=%d model=%s", len(text), model)

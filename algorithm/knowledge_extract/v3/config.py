@@ -11,10 +11,10 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
     return default
 
 
-KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_API_URL", default="http://localhost:9999")
-KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", "KG_EXTRACT_API_KEY", default="")
-KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", "KG_EXTRACT_MODEL", default="deepseek-v4-flash")
-KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_MAX_TOKENS", default="16384"))
+KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", default="http://localhost:9999")
+KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", default="")
+KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", default="deepseek-v4-flash")
+KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", default="16384"))
 # 实体输出去截断：整块调用失败后按 markdown 段落切段，分段输出再组装。
 KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS = int(_env("KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS", default="2600"))
 KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS = int(_env("KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS", default="400"))

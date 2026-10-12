@@ -65,12 +65,12 @@ class ProviderConfig:
                 match = re.search(pattern, text, flags=re.IGNORECASE)
                 if match:
                     values[name] = match.group(1).rstrip(',')
-        for name, variable in [('base_url','KG_EXTRACT_V3_BASE_URL'), ('model','KG_EXTRACT_V3_MODEL'), ('api_key','KG_EXTRACT_V3_API_KEY')]:
+        for name, variable in [('base_url','KG_EXTRACT_LLM_BASE_URL'), ('model','KG_EXTRACT_LLM_MODEL'), ('api_key','KG_EXTRACT_LLM_API_KEY')]:
             if config_getenv(variable):
                 values[name] = config_required(variable)
         config = cls(**values)
         if not config.api_key:
-            raise ValueError('V3 API key missing: configure eval_api.md or KG_EXTRACT_V3_API_KEY')
+            raise ValueError('V3 API key missing: configure eval_api.md or KG_EXTRACT_LLM_API_KEY')
         return config
 
     def safe_dict(self) -> dict:

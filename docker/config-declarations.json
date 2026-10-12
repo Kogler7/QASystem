@@ -1,11 +1,15 @@
 {
   "schema": 1,
-  "version": "2026.10.12.1",
+  "version": "2026.10.12.2",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
   ],
   "retired": [
+    "AGENT_MEMORY_LIMIT",
+    "BACKEND_MEMORY_LIMIT",
+    "CLEF_PYTHON",
+    "CLEF_SOURCE_DIR",
     "CONFIDENCE_SBERT_MODEL_PATH",
     "DOCUMENT_PARSE_MAX_CONCURRENCY",
     "DOCUMENT_PARSE_MAX_FILE_MB",
@@ -13,9 +17,17 @@
     "EMBEDDING_MODEL_NAME",
     "EMBEDDING_MODEL_VERSION",
     "EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS",
+    "FILE_SERVICE_URL",
+    "KG_EXTRACT_API_KEY",
+    "KG_EXTRACT_API_URL",
     "KG_EXTRACT_JEV_BASE_URL",
+    "KG_EXTRACT_JEV_NOUL_ACCEPT",
+    "KG_EXTRACT_JEV_NOUL_REJECT",
     "KG_EXTRACT_JEV_PROVIDER",
     "KG_EXTRACT_JEV_TIMEOUT_SECONDS",
+    "KG_EXTRACT_JSON_RETRIES",
+    "KG_EXTRACT_MAX_TOKENS",
+    "KG_EXTRACT_MODEL",
     "KG_EXTRACT_THINKING_MAX_TOKENS",
     "KG_EXTRACT_THINKING_PASSES",
     "KG_EXTRACT_USE_ROUTER",
@@ -27,6 +39,28 @@
     "KG_EXTRACT_V31_RELATION_RETRIES",
     "KG_EXTRACT_V31_STRICT_COVERAGE",
     "KG_EXTRACT_V31_SUPPORT_THRESHOLD",
+    "KG_EXTRACT_V3_API_KEY",
+    "KG_EXTRACT_V3_BASE_URL",
+    "KG_EXTRACT_V3_MODEL",
+    "LLM_BIND",
+    "LLM_DTYPE",
+    "LLM_GPU_DEVICE_IDS",
+    "LLM_GPU_MEMORY_UTILIZATION",
+    "LLM_HOST_PORT",
+    "LLM_MAX_MODEL_LEN",
+    "LLM_MAX_NUM_BATCHED_TOKENS",
+    "LLM_MAX_NUM_SEQS",
+    "LLM_MODEL_DIR",
+    "LLM_SERVED_MODEL_NAME",
+    "NANOJEV_REVISION",
+    "NL2CYPHER_EMBEDDING_MODEL_PATH",
+    "QASYSTEM_JUDGE_ADAPTER",
+    "QASYSTEM_JUDGE_BASE_URL",
+    "QASYSTEM_JUDGE_MAX_TOKENS",
+    "QASYSTEM_JUDGE_MODEL",
+    "QASYSTEM_REMOTE_ENV_IMAGE",
+    "REDIS_MEMORY_LIMIT",
+    "SOFFICE_PATH",
     "VLLM_MODEL_VERSION"
   ],
   "items": {
@@ -136,19 +170,6 @@
         }
       ]
     },
-    "QASYSTEM_REMOTE_ENV_IMAGE": {
-      "desc": "部署参数 QASYSTEM_REMOTE_ENV_IMAGE",
-      "default": "qasystem-env-v1-remote-only",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.remote-only.yml",
-          "kind": "external",
-          "token": "QASYSTEM_REMOTE_ENV_IMAGE"
-        }
-      ]
-    },
     "QASYSTEM_SOURCE_DIR": {
       "desc": "部署参数 QASYSTEM_SOURCE_DIR",
       "default": ".",
@@ -228,216 +249,16 @@
         }
       ]
     },
-    "LLM_MODEL_DIR": {
-      "desc": "Optional unified vLLM service: enable with --profile llm. / Relative to HOST_MODELS_DIR; all weights are mounted read-only at /models.",
-      "default": "llm/Qwen--Qwen3.5-4B",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_MODEL_DIR"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_MODEL_DIR"
-        }
-      ]
-    },
-    "LLM_SERVED_MODEL_NAME": {
-      "desc": "部署参数 LLM_SERVED_MODEL_NAME",
-      "default": "Qwen/Qwen3.5-4B",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_SERVED_MODEL_NAME"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_SERVED_MODEL_NAME"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_SERVED_MODEL_NAME"
-        }
-      ]
-    },
-    "LLM_GPU_DEVICE_IDS": {
-      "desc": "Explicit dedicated host GPU IDs; reserve these from the Backend scheduler too.",
-      "default": "",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_GPU_DEVICE_IDS"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_GPU_DEVICE_IDS"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_GPU_DEVICE_IDS"
-        }
-      ]
-    },
-    "LLM_BIND": {
-      "desc": "部署参数 LLM_BIND",
-      "default": "127.0.0.1",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_BIND"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_BIND"
-        }
-      ]
-    },
-    "LLM_HOST_PORT": {
-      "desc": "部署参数 LLM_HOST_PORT",
-      "default": "9998",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_HOST_PORT"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_HOST_PORT"
-        }
-      ]
-    },
-    "LLM_GPU_MEMORY_UTILIZATION": {
-      "desc": "部署参数 LLM_GPU_MEMORY_UTILIZATION",
-      "default": "0.90",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_GPU_MEMORY_UTILIZATION"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_GPU_MEMORY_UTILIZATION"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_GPU_MEMORY_UTILIZATION"
-        }
-      ]
-    },
-    "LLM_MAX_MODEL_LEN": {
-      "desc": "部署参数 LLM_MAX_MODEL_LEN",
-      "default": "32768",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_MAX_MODEL_LEN"
-        },
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "LLM_MAX_MODEL_LEN"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_MAX_MODEL_LEN"
-        }
-      ]
-    },
-    "LLM_MAX_NUM_SEQS": {
-      "desc": "部署参数 LLM_MAX_NUM_SEQS",
-      "default": "8",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_MAX_NUM_SEQS"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_MAX_NUM_SEQS"
-        }
-      ]
-    },
-    "LLM_MAX_NUM_BATCHED_TOKENS": {
-      "desc": "部署参数 LLM_MAX_NUM_BATCHED_TOKENS",
-      "default": "2048",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_MAX_NUM_BATCHED_TOKENS"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_MAX_NUM_BATCHED_TOKENS"
-        }
-      ]
-    },
-    "LLM_DTYPE": {
-      "desc": "部署参数 LLM_DTYPE",
-      "default": "bfloat16",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "LLM_DTYPE"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "LLM_DTYPE"
-        }
-      ]
-    },
     "PYTHONUNBUFFERED": {
-      "desc": "部署参数 PYTHONUNBUFFERED",
+      "desc": "vLLM 模型启用、权重、GPU、端口和推理参数统一由 ops config 的模型分区维护。",
       "default": "1",
       "scope": "deployment",
       "mode": "startup",
       "consumers": [
         {
-          "path": "docker/clef-flash.service",
+          "path": "docker-compose.yml",
           "kind": "external",
-          "token": "PYTHONUNBUFFERED"
+          "token": "env_file:"
         }
       ]
     },
@@ -1021,7 +842,7 @@
       ]
     },
     "APPLICATION_SERVICE_URL": {
-      "desc": "应用团队统一服务。FILE_SERVICE_URL 仅作为旧部署兼容变量，二者同时存在时新变量优先。",
+      "desc": "应用团队统一服务，统一使用 APPLICATION_SERVICE_URL。",
       "default": "http://host.docker.internal",
       "scope": "deployment",
       "mode": "startup",
@@ -1030,25 +851,6 @@
           "path": "external_services/application.py",
           "kind": "read",
           "token": "APPLICATION_SERVICE_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "external_services/application.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "FILE_SERVICE_URL": {
-      "desc": "部署参数 FILE_SERVICE_URL",
-      "default": "",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "read",
-          "token": "FILE_SERVICE_URL"
         }
       ],
       "fallbacks": [
@@ -1340,31 +1142,8 @@
         }
       ]
     },
-    "QASYSTEM_JUDGE_BASE_URL": {
-      "desc": "评测 LLM-judge（与抽取隔离；优先于 KG_EXTRACT_LLM_*） / 留空沿用默认 DeepSeek API deepseek-flash；密钥可复用下方 DEEPSEEK_API_KEY。 / 非默认 judge 再设置地址/模型；本地模型宿主机用 127.0.0.1，容器内用 host.docker.internal。",
-      "default": "",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_BASE_URL"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_BASE_URL"
-        },
-        {
-          "path": "eval/run.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_BASE_URL"
-        }
-      ]
-    },
     "QASYSTEM_JUDGE_API_KEY": {
-      "desc": "部署参数 QASYSTEM_JUDGE_API_KEY",
+      "desc": "评测凭据；judge 地址、模型、适配器、输出上限只通过每次评测命令行设置。",
       "default": "",
       "scope": "deployment",
       "mode": "startup",
@@ -1373,55 +1152,6 @@
           "path": "eval/run.py",
           "kind": "external",
           "token": "QASYSTEM_JUDGE_API_KEY"
-        }
-      ]
-    },
-    "QASYSTEM_JUDGE_MODEL": {
-      "desc": "部署参数 QASYSTEM_JUDGE_MODEL",
-      "default": "",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_MODEL"
-        },
-        {
-          "path": "eval/run.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_MODEL"
-        }
-      ]
-    },
-    "QASYSTEM_JUDGE_ADAPTER": {
-      "desc": "部署参数 QASYSTEM_JUDGE_ADAPTER",
-      "default": "auto",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "docker/setup_llm.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_ADAPTER"
-        },
-        {
-          "path": "eval/run.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_ADAPTER"
-        }
-      ]
-    },
-    "QASYSTEM_JUDGE_MAX_TOKENS": {
-      "desc": "部署参数 QASYSTEM_JUDGE_MAX_TOKENS",
-      "default": "1024",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "eval/run.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_MAX_TOKENS"
         }
       ]
     },
@@ -1479,6 +1209,11 @@
         {
           "path": "docker/configure.py",
           "kind": "external",
+          "token": "KG_EXTRACT_LLM_BASE_URL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/jev_extract/client.py",
+          "kind": "reference",
           "token": "KG_EXTRACT_LLM_BASE_URL"
         }
       ],
@@ -1649,6 +1384,11 @@
           "path": "eval/run.py",
           "kind": "external",
           "token": "KG_EXTRACT_LLM_API_KEY"
+        },
+        {
+          "path": "algorithm/knowledge_extract/jev_extract/client.py",
+          "kind": "reference",
+          "token": "KG_EXTRACT_LLM_API_KEY"
         }
       ],
       "fallbacks": [
@@ -1730,6 +1470,11 @@
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
+          "token": "KG_EXTRACT_LLM_MODEL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/jev_extract/client.py",
+          "kind": "reference",
           "token": "KG_EXTRACT_LLM_MODEL"
         }
       ],
@@ -1960,16 +1705,16 @@
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v1/extractor.py",
-          "expression": "config_getenv('KG_EXTRACT_JSON_RETRIES', '2')"
+          "expression": "'2'"
         },
         {
           "path": "algorithm/knowledge_extract/v1/extractor.py",
-          "expression": "config_getenv('KG_EXTRACT_JSON_RETRIES', '2')"
+          "expression": "'2'"
         }
       ]
     },
     "KG_EXTRACT_LLM_DISABLE_THINKING": {
-      "desc": "默认 1：所有 pass 关闭 thinking。设 0 后仅 KG_EXTRACT_THINKING_PASSES 列出的步骤开思考。",
+      "desc": "默认 1：关闭模型 thinking；设 0 后允许模型思考。",
       "default": "1",
       "scope": "deployment",
       "mode": "hot",
@@ -3467,45 +3212,6 @@
         }
       ]
     },
-    "BACKEND_MEMORY_LIMIT": {
-      "desc": "部署参数 BACKEND_MEMORY_LIMIT",
-      "default": "2750m",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.remote-only.yml",
-          "kind": "external",
-          "token": "BACKEND_MEMORY_LIMIT"
-        }
-      ]
-    },
-    "AGENT_MEMORY_LIMIT": {
-      "desc": "部署参数 AGENT_MEMORY_LIMIT",
-      "default": "512m",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.remote-only.yml",
-          "kind": "external",
-          "token": "AGENT_MEMORY_LIMIT"
-        }
-      ]
-    },
-    "REDIS_MEMORY_LIMIT": {
-      "desc": "部署参数 REDIS_MEMORY_LIMIT",
-      "default": "256m",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.remote-only.yml",
-          "kind": "external",
-          "token": "REDIS_MEMORY_LIMIT"
-        }
-      ]
-    },
     "VECTOR_MODEL_PATH": {
       "desc": "部署参数 VECTOR_MODEL_PATH",
       "default": "/models/bge-small-zh-v1.5",
@@ -3748,34 +3454,8 @@
         }
       ]
     },
-    "CLEF_SOURCE_DIR": {
-      "desc": "以下两项仅供旧宿主 systemd 服务使用；Compose 使用 /app 和镜像内 venv。",
-      "default": "/mnt/data3/qasys/services/clef-flash/source",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/clef-flash.service",
-          "kind": "external",
-          "token": "CLEF_SOURCE_DIR"
-        }
-      ]
-    },
-    "CLEF_PYTHON": {
-      "desc": "部署参数 CLEF_PYTHON",
-      "default": "/mnt/data3/qasys/services/clef-flash/venv/bin/python",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker/clef-flash.service",
-          "kind": "external",
-          "token": "CLEF_PYTHON"
-        }
-      ]
-    },
     "CLEF_MODEL_DIR": {
-      "desc": "部署参数 CLEF_MODEL_DIR",
+      "desc": "以下两项仅供旧宿主 systemd 服务使用；Compose 使用 /app 和镜像内 venv。",
       "default": "/models/clef-flash",
       "scope": "deployment",
       "mode": "startup",
@@ -4825,19 +4505,6 @@
         {
           "path": "backend/app/environment.py",
           "expression": "None"
-        }
-      ]
-    },
-    "NL2CYPHER_EMBEDDING_MODEL_PATH": {
-      "desc": "内部/兼容参数 NL2CYPHER_EMBEDDING_MODEL_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/health.py",
-          "kind": "reference",
-          "token": "NL2CYPHER_EMBEDDING_MODEL_PATH"
         }
       ]
     },
@@ -5936,59 +5603,6 @@
         }
       ]
     },
-    "KG_EXTRACT_API_KEY": {
-      "desc": "内部/兼容参数 KG_EXTRACT_API_KEY，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/services/extraction_config.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_KEY"
-        }
-      ]
-    },
     "AGENT_DECOMPOSITION_ENABLED": {
       "desc": "内部/兼容参数 AGENT_DECOMPOSITION_ENABLED，消费者见 consumers；未列入部署模板",
       "default": null,
@@ -6285,189 +5899,6 @@
         }
       ]
     },
-    "KG_EXTRACT_V3_BASE_URL": {
-      "desc": "内部/兼容参数 KG_EXTRACT_V3_BASE_URL，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/jev_extract/client.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_V3_BASE_URL"
-        }
-      ]
-    },
-    "KG_EXTRACT_V3_MODEL": {
-      "desc": "内部/兼容参数 KG_EXTRACT_V3_MODEL，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/jev_extract/client.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_V3_MODEL"
-        }
-      ]
-    },
-    "KG_EXTRACT_V3_API_KEY": {
-      "desc": "内部/兼容参数 KG_EXTRACT_V3_API_KEY，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/jev_extract/client.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_V3_API_KEY"
-        }
-      ]
-    },
-    "KG_EXTRACT_API_URL": {
-      "desc": "内部/兼容参数 KG_EXTRACT_API_URL，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_API_URL"
-        }
-      ]
-    },
-    "KG_EXTRACT_MODEL": {
-      "desc": "内部/兼容参数 KG_EXTRACT_MODEL，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MODEL"
-        }
-      ]
-    },
-    "KG_EXTRACT_MAX_TOKENS": {
-      "desc": "内部/兼容参数 KG_EXTRACT_MAX_TOKENS，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_MAX_TOKENS"
-        }
-      ]
-    },
     "KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS": {
       "desc": "内部/兼容参数 KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS，消费者见 consumers；未列入部署模板",
       "default": "2600",
@@ -6549,113 +5980,6 @@
         {
           "path": "algorithm/knowledge_extract/v3/config.py",
           "expression": "'3'"
-        }
-      ]
-    },
-    "KG_EXTRACT_JEV_NOUL_ACCEPT": {
-      "desc": "内部/兼容参数 KG_EXTRACT_JEV_NOUL_ACCEPT，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_ACCEPT"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_ACCEPT"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_ACCEPT"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_ACCEPT"
-        }
-      ]
-    },
-    "KG_EXTRACT_JEV_NOUL_REJECT": {
-      "desc": "内部/兼容参数 KG_EXTRACT_JEV_NOUL_REJECT，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_REJECT"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_REJECT"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_REJECT"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JEV_NOUL_REJECT"
-        }
-      ]
-    },
-    "NANOJEV_REVISION": {
-      "desc": "内部/兼容参数 NANOJEV_REVISION，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/v0/jev_client.py",
-          "kind": "reference",
-          "token": "NANOJEV_REVISION"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/jev_client.py",
-          "kind": "reference",
-          "token": "NANOJEV_REVISION"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/jev_client.py",
-          "kind": "reference",
-          "token": "NANOJEV_REVISION"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/jev_client.py",
-          "kind": "reference",
-          "token": "NANOJEV_REVISION"
-        }
-      ]
-    },
-    "KG_EXTRACT_JSON_RETRIES": {
-      "desc": "内部/兼容参数 KG_EXTRACT_JSON_RETRIES，消费者见 consumers；未列入部署模板",
-      "default": "2",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/v1/extractor.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_JSON_RETRIES"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/knowledge_extract/v1/extractor.py",
-          "expression": "'2'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/extractor.py",
-          "expression": "'2'"
         }
       ]
     },
@@ -6816,25 +6140,6 @@
         },
         {
           "path": "algorithm/preproc/preproc_src/processors/ocr_processor.py",
-          "expression": "None"
-        }
-      ]
-    },
-    "SOFFICE_PATH": {
-      "desc": "内部/兼容参数 SOFFICE_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/preproc/preproc_src/main_processor.py",
-          "kind": "read",
-          "token": "SOFFICE_PATH"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/preproc/preproc_src/main_processor.py",
           "expression": "None"
         }
       ]
@@ -7373,7 +6678,6 @@
       "setting('KG_EXTRACT_PROVIDERS_JSON', '{}')",
       "setting('KG_EXTRACT_V31_REQUEST_TIMEOUT', '120')",
       "setting(values['api_key_env'], '')",
-      "getenv(name, '')",
       "setting('KG_EXTRACT_ALGO_VERSION', 'latest')"
     ],
     "backend/app/services/knowledge_extract_adapter.py": [
@@ -7496,10 +6800,10 @@
       "config_required(variable)"
     ],
     "algorithm/knowledge_extract/latest/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS', default='2600')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS', default='400')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_OVERLAP', default='200')",
@@ -7516,10 +6820,10 @@
       "_env('KG_EXTRACT_EVIDENCE_ADMISSION', default='warn')"
     ],
     "algorithm/knowledge_extract/v0/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
@@ -7528,8 +6832,8 @@
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
       "config_getenv(k)",
       "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
-      "_env('KG_EXTRACT_JEV_ACCEPT', 'KG_EXTRACT_JEV_NOUL_ACCEPT', default='0.9')",
-      "_env('KG_EXTRACT_JEV_REJECT', 'KG_EXTRACT_JEV_NOUL_REJECT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_ACCEPT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_REJECT', default='0.9')",
       "_env('KG_EXTRACT_JEV_CHOICE_CONFIDENCE', default='0.9')",
       "_env('KG_EXTRACT_JEV_BATCH_QUESTIONS', default='32')",
       "_env('KG_EXTRACT_JEV_MODEL_PATH', default='/models/nanojev')",
@@ -7540,10 +6844,10 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v1/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash-0731')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash-0731')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
@@ -7551,16 +6855,14 @@
       "config_getenv(k)"
     ],
     "algorithm/knowledge_extract/v1/extractor.py": [
-      "config_getenv('KG_EXTRACT_LLM_JSON_RETRIES', config_getenv('KG_EXTRACT_JSON_RETRIES', '2'))",
-      "config_getenv('KG_EXTRACT_LLM_JSON_RETRIES', config_getenv('KG_EXTRACT_JSON_RETRIES', '2'))",
-      "config_getenv('KG_EXTRACT_JSON_RETRIES', '2')",
-      "config_getenv('KG_EXTRACT_JSON_RETRIES', '2')"
+      "config_getenv('KG_EXTRACT_LLM_JSON_RETRIES', '2')",
+      "config_getenv('KG_EXTRACT_LLM_JSON_RETRIES', '2')"
     ],
     "algorithm/knowledge_extract/v2/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
@@ -7569,8 +6871,8 @@
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
       "config_getenv(k)",
       "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
-      "_env('KG_EXTRACT_JEV_ACCEPT', 'KG_EXTRACT_JEV_NOUL_ACCEPT', default='0.9')",
-      "_env('KG_EXTRACT_JEV_REJECT', 'KG_EXTRACT_JEV_NOUL_REJECT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_ACCEPT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_REJECT', default='0.9')",
       "_env('KG_EXTRACT_JEV_CHOICE_CONFIDENCE', default='0.9')",
       "_env('KG_EXTRACT_JEV_BATCH_QUESTIONS', default='32')",
       "_env('KG_EXTRACT_JEV_MODEL_PATH', default='/models/nanojev')",
@@ -7581,10 +6883,10 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v2_1/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
@@ -7593,8 +6895,8 @@
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
       "config_getenv(k)",
       "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
-      "_env('KG_EXTRACT_JEV_ACCEPT', 'KG_EXTRACT_JEV_NOUL_ACCEPT', default='0.9')",
-      "_env('KG_EXTRACT_JEV_REJECT', 'KG_EXTRACT_JEV_NOUL_REJECT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_ACCEPT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_REJECT', default='0.9')",
       "_env('KG_EXTRACT_JEV_CHOICE_CONFIDENCE', default='0.9')",
       "_env('KG_EXTRACT_JEV_BATCH_QUESTIONS', default='32')",
       "_env('KG_EXTRACT_JEV_MODEL_PATH', default='/models/nanojev')",
@@ -7605,10 +6907,10 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v2_2/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
@@ -7619,8 +6921,8 @@
       "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
       "_env('KG_EXTRACT_V22_CLEF_ENABLED', default='0')",
       "_env('CLEF_SERVICE_URL', default='')",
-      "_env('KG_EXTRACT_JEV_ACCEPT', 'KG_EXTRACT_JEV_NOUL_ACCEPT', default='0.9')",
-      "_env('KG_EXTRACT_JEV_REJECT', 'KG_EXTRACT_JEV_NOUL_REJECT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_ACCEPT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_REJECT', default='0.9')",
       "_env('KG_EXTRACT_JEV_CHOICE_CONFIDENCE', default='0.9')",
       "_env('KG_EXTRACT_JEV_BATCH_QUESTIONS', default='32')",
       "_env('KG_EXTRACT_JEV_MODEL_PATH', default='/models/nanojev')",
@@ -7637,10 +6939,10 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v3/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS', default='2600')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS', default='400')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_OVERLAP', default='50')",
@@ -7657,10 +6959,10 @@
       "_env('KG_EXTRACT_EVIDENCE_ADMISSION', default='warn')"
     ],
     "algorithm/knowledge_extract/v3_1/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_API_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', 'KG_EXTRACT_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', 'KG_EXTRACT_MODEL', default='deepseek-v4-flash')",
-      "_env('KG_EXTRACT_LLM_MAX_TOKENS', 'KG_EXTRACT_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
+      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
+      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
@@ -7671,7 +6973,6 @@
     "algorithm/preproc/preproc_src/main_processor.py": [
       "config_getenv('MINERU_CONFIG_PATH')",
       "config_getenv('LIBREOFFICE_PATH')",
-      "config_getenv('SOFFICE_PATH')",
       "config_getenv('MINERU_VLM_SERVER_URL', '')",
       "config_getenv('MINERU_VL_SERVER', '')",
       "config_getenv('MINERU_VLM_BACKEND', 'vlm-http-client')",
@@ -7701,8 +7002,7 @@
     "external_services/application.py": [
       "getenv(registered.env_name, '')",
       "config_getenv('APPLICATION_SERVICE_TIMEOUT_SECONDS', '30')",
-      "config_getenv('APPLICATION_SERVICE_URL', '')",
-      "config_getenv('FILE_SERVICE_URL', '')"
+      "config_getenv('APPLICATION_SERVICE_URL', '')"
     ],
     "external_services/clef.py": [
       "config_getenv(f'{env_prefix}_SERVICE_API_KEY', '')",
@@ -7783,5 +7083,55 @@
       "config_getenv('AGENT_MCP_HOST', '0.0.0.0')",
       "config_getenv('AGENT_MCP_PORT', '9181')"
     ]
+  },
+  "aliases": {
+    "KG_EXTRACT_API_URL": "KG_EXTRACT_LLM_BASE_URL",
+    "KG_EXTRACT_V3_BASE_URL": "KG_EXTRACT_LLM_BASE_URL",
+    "KG_EXTRACT_API_KEY": "KG_EXTRACT_LLM_API_KEY",
+    "KG_EXTRACT_V3_API_KEY": "KG_EXTRACT_LLM_API_KEY",
+    "KG_EXTRACT_MODEL": "KG_EXTRACT_LLM_MODEL",
+    "KG_EXTRACT_V3_MODEL": "KG_EXTRACT_LLM_MODEL",
+    "KG_EXTRACT_MAX_TOKENS": "KG_EXTRACT_LLM_MAX_TOKENS",
+    "KG_EXTRACT_JSON_RETRIES": "KG_EXTRACT_LLM_JSON_RETRIES",
+    "KG_EXTRACT_JEV_NOUL_ACCEPT": "KG_EXTRACT_JEV_ACCEPT",
+    "KG_EXTRACT_JEV_NOUL_REJECT": "KG_EXTRACT_JEV_REJECT",
+    "SOFFICE_PATH": "LIBREOFFICE_PATH",
+    "FILE_SERVICE_URL": "APPLICATION_SERVICE_URL"
+  },
+  "model_defaults": {
+    "enabled": false,
+    "gpu": "",
+    "port": "9998",
+    "context": "32768",
+    "utilization": "0.90",
+    "bind": "127.0.0.1",
+    "model_dir": "",
+    "max_num_seqs": "8",
+    "max_num_batched_tokens": "2048",
+    "dtype": "bfloat16"
+  },
+  "model_migrations": {
+    "LLM_MODEL_DIR": "model_dir",
+    "LLM_GPU_DEVICE_IDS": "gpu",
+    "LLM_BIND": "bind",
+    "LLM_HOST_PORT": "port",
+    "LLM_GPU_MEMORY_UTILIZATION": "utilization",
+    "LLM_MAX_MODEL_LEN": "context",
+    "LLM_MAX_NUM_SEQS": "max_num_seqs",
+    "LLM_MAX_NUM_BATCHED_TOKENS": "max_num_batched_tokens",
+    "LLM_DTYPE": "dtype",
+    "LLM_SERVED_MODEL_NAME": "models.<repo>"
+  },
+  "model_descriptions": {
+    "enabled": "勾选只改变启用计划，部署后才启动服务。",
+    "gpu": "宿主机单个 GPU 编号，必须在允许列表内且没有其他服务占用。",
+    "port": "宿主机监听端口，不能与其他服务重复；新模型按清单顺序从 9997 分配。",
+    "context": "单次输入与输出 token 的合计上限。",
+    "utilization": "vLLM 可使用的 GPU 显存比例，必须在 0 与 1 之间。",
+    "bind": "127.0.0.1 只允许本机访问；0.0.0.0 监听所有 IPv4 网卡。",
+    "model_dir": "相对 HOST_MODELS_DIR 的权重目录；模型默认路径为 llm/<仓库名，斜杠替换为双横线>。",
+    "max_num_seqs": "同时处理的最大序列数，必须为正整数。",
+    "max_num_batched_tokens": "每个调度批次的 token 上限，必须为正整数。",
+    "dtype": "vLLM 计算精度；auto 按权重配置选择。"
   }
 }

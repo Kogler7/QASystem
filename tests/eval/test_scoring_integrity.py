@@ -180,14 +180,14 @@ def test_partial_local_matching_keeps_augmenting_paths_through_matched_rows(monk
     assert coverage["pairs_presented"] == 4
 
 
-def test_independent_judge_configuration_overrides_extraction(monkeypatch):
+def test_temporary_judge_configuration_ignores_persistent_defaults(monkeypatch):
     for prefix, value in (("QASYSTEM_JUDGE", "judge"), ("KG_EXTRACT_LLM", "extract")):
         monkeypatch.setenv(f"{prefix}_BASE_URL", f"https://{value}.example.test/v1")
         monkeypatch.setenv(f"{prefix}_MODEL", value)
         monkeypatch.setenv(f"{prefix}_API_KEY", f"{value}-key")
     client = run.build_judge_client({"eval": {"judge_base_url": "https://config.example.test/v1", "judge_model": "config"}})
-    assert client.base_url == "https://judge.example.test/v1"
-    assert client.model == "judge"
+    assert client.base_url == "https://config.example.test/v1"
+    assert client.model == "config"
     assert client.api_key == "judge-key"
 
 

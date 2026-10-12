@@ -89,7 +89,9 @@ def detail(row: dict | None, config) -> list[str]:
     if row["kind"] == "model":
         model = config.models[row["repo"]]
         running = [c for c in config.live if c['model'] == row['repo'] and c['status'] == 'running']
-        return [row["repo"], "", "实际状态: " + (f"{len(running)} 个服务运行中" if running else '未发现运行服务' if not config.live_error else '未确认'),
+        return [row["repo"], row.get('description', ''),
+                "配置: " + str(model[row['key']]), "默认: " + str(row.get('default', False)),
+                "实际状态: " + (f"{len(running)} 个服务运行中" if running else '未发现运行服务' if not config.live_error else '未确认'),
                 "计划状态: " + ("启用" if model["enabled"] else "关闭"),
                 f"GPU: {model['gpu'] or '未选择'}", f"端口: {model['port']}",
                 f"上下文: {model['context']}", f"显存比例: {model['utilization']}", "",

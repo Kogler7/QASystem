@@ -87,7 +87,7 @@ class DocxProcessor(BaseProcessor):
         """检测系统中的LibreOffice应用"""
         # 可能的执行文件路径
         candidates = []
-        for key in ("LIBREOFFICE_PATH", "SOFFICE_PATH"):
+        for key in ("LIBREOFFICE_PATH",):
             v = config_getenv(key)
             if v:
                 candidates.append(v)

@@ -2211,28 +2211,17 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
         sys.path.insert(0, str(KIT_DIR.parent))
     eval_cfg = params.get("eval") or {}
     overrides = params.get("_judge_overrides") or {}
-    # One shared reader: config.json wins; legacy files are migration inputs only.
-    from docker.runtime_config import read_settings
-    try:
-        hot = read_settings()
-    except ValueError:
-        raise RuntimeError("Invalid runtime judge configuration") from None
-    def setting(key, default=None):
-        return hot.get(key, os.environ.get(key, default))
-
     base_url = (
         overrides.get("base_url")
-        or setting("QASYSTEM_JUDGE_BASE_URL")
         or eval_cfg.get("judge_base_url")
         or ""
     ).rstrip("/")
     model = (
         overrides.get("model")
-        or setting("QASYSTEM_JUDGE_MODEL")
         or eval_cfg.get("judge_model")
         or "deepseek-flash"
     )
-    adapter = overrides.get("adapter") or setting("QASYSTEM_JUDGE_ADAPTER") or eval_cfg.get("judge_adapter") or "auto"
+    adapter = overrides.get("adapter") or eval_cfg.get("judge_adapter") or "auto"
     if adapter == "auto":
         adapter = "systemone" if str(model).lower() in {"clef-flash", "nanojev"} else "chat"
     if not base_url:
@@ -2245,7 +2234,7 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
             if str(model) == "deepseek-flash":
                 base_url = "https://api.deepseek.com/v1"
             else:
-                raise RuntimeError("Chat judge 必须配置 --judge-base-url 或应用 QASYSTEM_JUDGE_BASE_URL")
+                raise RuntimeError("Chat judge 必须配置 --judge-base-url ")
     key_env = overrides.get("key_env") or "QASYSTEM_JUDGE_API_KEY"
     api_key = os.environ.get(key_env, "")
     if adapter == "chat" and not api_key and key_env == "QASYSTEM_JUDGE_API_KEY":
@@ -2256,7 +2245,7 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
     if adapter == "chat" and urlsplit(base_url).hostname == "api.deepseek.com" and not api_key:
         raise RuntimeError("DeepSeek API judge 未配置凭据：设置 DEEPSEEK_API_KEY 或 QASYSTEM_JUDGE_API_KEY")
     timeout = float(overrides.get("timeout_seconds") or eval_cfg.get("judge_timeout_seconds") or 300)
-    max_tokens = int(overrides.get("max_tokens") or setting("QASYSTEM_JUDGE_MAX_TOKENS") or eval_cfg.get("judge_max_tokens") or 8192)
+    max_tokens = int(overrides.get("max_tokens") or eval_cfg.get("judge_max_tokens") or 8192)
     return JudgeClient(
         base_url=base_url,
         api_key=api_key,

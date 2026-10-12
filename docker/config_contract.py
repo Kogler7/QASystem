@@ -71,6 +71,17 @@ def check(root, *, deployed=False):
         if changed.returncode == 0 and changed.stdout.strip():
             errors.append('禁止修改既有声明版本文件；请新增版本文件')
     from docker.runtime_config import HOT_KEYS
+    from docker.runtime_config import MODEL_DEFAULTS, MODEL_DESCRIPTIONS
+    from docker.config_migrations import ALIASES, MODEL_KEYS
+    if catalog.get('schema') == 1:
+        if catalog.get('aliases') != ALIASES:
+            errors.append('别名迁移规则与当前版本声明不一致')
+        if catalog.get('model_defaults') != MODEL_DEFAULTS:
+            errors.append('模型配置默认值变化，必须登记配置声明新版本')
+        if catalog.get('model_descriptions') != MODEL_DESCRIPTIONS:
+            errors.append('模型配置说明变化，必须登记配置声明新版本')
+        if catalog.get('model_migrations') != {**MODEL_KEYS, 'LLM_SERVED_MODEL_NAME': 'models.<repo>'}:
+            errors.append('模型配置迁移规则与当前版本声明不一致')
     for key, item in catalog['items'].items():
         if item.get('mode') != ('hot' if key in HOT_KEYS else 'startup'):
             errors.append(f'{key} 热更新属性与实际读取规则不一致')

@@ -1,9 +1,7 @@
 param(
     [switch]$IncludeEnvImage,
-    [switch]$IncludeRemoteEnvImage,
     [switch]$IncludeRedisImage,
     [string]$EnvImage = "qasystem-env-v1",
-    [string]$RemoteEnvImage = "qasystem-env-v1-remote-only",
     [string]$RedisImage = "redis:7-alpine",
     [switch]$ReuseExistingArchives
 )
@@ -45,9 +43,6 @@ New-Item -ItemType Directory -Force -Path $offlineDir | Out-Null
 if (-not $IncludeEnvImage -and (Test-Path -LiteralPath (Join-Path $deployDir "qasystem-env-v1.tar"))) {
     Remove-Item -LiteralPath (Join-Path $deployDir "qasystem-env-v1.tar") -Force
 }
-if (-not $IncludeRemoteEnvImage -and (Test-Path -LiteralPath (Join-Path $deployDir "qasystem-env-v1-remote-only.tar"))) {
-    Remove-Item -LiteralPath (Join-Path $deployDir "qasystem-env-v1-remote-only.tar") -Force
-}
 if (-not $IncludeRedisImage -and (Test-Path -LiteralPath (Join-Path $deployDir "redis-7-alpine.tar"))) {
     Remove-Item -LiteralPath (Join-Path $deployDir "redis-7-alpine.tar") -Force
 }
@@ -56,11 +51,8 @@ if (Test-Path -LiteralPath $runtimeDir) { Remove-Item -LiteralPath $runtimeDir -
 Write-ProgressLog "[2/6] Copying Compose, environment template and deployment documentation"
 foreach ($item in @(
     @{ source = "docker-compose.yml"; destination = "docker-compose.yml" },
-    @{ source = "docker/docker-compose.llm.yml"; destination = "docker-compose.llm.yml" },
     @{ source = "docs/部署/小模型统一部署.md"; destination = "LLM_MODELS.md" },
     @{ source = "docs/部署/配置体系说明.md"; destination = "CONFIGURATION.md" },
-    @{ source = "docker-compose.remote-only.yml"; destination = "docker-compose.remote-only.yml" },
-    @{ source = "build-remote-only-image.ps1"; destination = "build-remote-only-image.ps1" },
     @{ source = "download-models.ps1"; destination = "download-models.ps1" },
     @{ source = "run-offline-validation.ps1"; destination = "run-offline-validation.ps1" },
     @{ source = "docs/部署/环境变量迁移说明.md"; destination = "ENV_MIGRATION.md" },
@@ -85,7 +77,7 @@ foreach ($directory in @("backend", "algorithm", "mcp_services", "agent_mcp", "a
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "configuration.py", "config_contract.py", "config_database.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "configuration.py", "config_contract.py", "config_database.py", "config_migrations.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docker/config-releases') -Destination (Join-Path $runtimeDir 'docker/config-releases') -Recurse -Force
@@ -129,17 +121,6 @@ if ($IncludeEnvImage) {
     }
     if (-not (Test-Path -LiteralPath $envTar) -or (Get-Item $envTar).Length -eq 0) { throw "Missing environment image archive: $envTar" }
     $images += [ordered]@{ tag = $EnvImage; image_id = (docker image inspect $EnvImage --format "{{.Id}}").Trim(); archive = "qasystem-env-v1.tar"; sha256 = Get-Sha256 $envTar }
-}
-if ($IncludeRemoteEnvImage) {
-    Assert-Image $RemoteEnvImage
-    $remoteEnvTar = Join-Path $deployDir "qasystem-env-v1-remote-only.tar"
-    if (-not $ReuseExistingArchives) {
-        Write-ProgressLog "Exporting remote-only environment image; this can take several minutes"
-        docker save -o $remoteEnvTar $RemoteEnvImage
-        if ($LASTEXITCODE -ne 0) { throw "Failed to export $RemoteEnvImage" }
-    }
-    if (-not (Test-Path -LiteralPath $remoteEnvTar) -or (Get-Item $remoteEnvTar).Length -eq 0) { throw "Missing remote-only environment image archive: $remoteEnvTar" }
-    $images += [ordered]@{ tag = $RemoteEnvImage; image_id = (docker image inspect $RemoteEnvImage --format "{{.Id}}").Trim(); archive = "qasystem-env-v1-remote-only.tar"; sha256 = Get-Sha256 $remoteEnvTar }
 }
 if ($IncludeRedisImage) {
     docker image inspect $RedisImage *> $null

@@ -18,12 +18,26 @@ HOT_KEYS = frozenset({
     "DOCUMENT_PARSE_SERVICE_URL", "DOCUMENT_PARSE_SERVICE_PATH", "DOCUMENT_PARSE_TIMEOUT_SECONDS",
     "CLEF_SERVICE_URL", "CLEF_SERVICE_PATH", "CLEF_SERVICE_TIMEOUT_SECONDS", "CLEF_MODEL",
     "NANOJEV_SERVICE_URL", "NANOJEV_SERVICE_PATH", "NANOJEV_SERVICE_TIMEOUT_SECONDS",
-    "QASYSTEM_JUDGE_BASE_URL", "QASYSTEM_JUDGE_MODEL", "QASYSTEM_JUDGE_ADAPTER",
-    "QASYSTEM_JUDGE_MAX_TOKENS",
 })
 
 LEGACY_MODEL_KEYS = frozenset({"LLM_MODEL_DIR", "LLM_SERVED_MODEL_NAME", "LLM_GPU_DEVICE_IDS",
-    "LLM_BIND", "LLM_HOST_PORT", "LLM_GPU_MEMORY_UTILIZATION", "LLM_MAX_MODEL_LEN"})
+    "LLM_BIND", "LLM_HOST_PORT", "LLM_GPU_MEMORY_UTILIZATION", "LLM_MAX_MODEL_LEN",
+    "LLM_MAX_NUM_SEQS", "LLM_MAX_NUM_BATCHED_TOKENS", "LLM_DTYPE"})
+
+MODEL_DEFAULTS = dict(enabled=False, gpu='', port='9998', context='32768', utilization='0.90',
+                      bind='127.0.0.1', model_dir='', max_num_seqs='8', max_num_batched_tokens='2048', dtype='bfloat16')
+MODEL_DESCRIPTIONS = {
+    'enabled': '勾选只改变启用计划，部署后才启动服务。',
+    'gpu': '宿主机单个 GPU 编号，必须在允许列表内且没有其他服务占用。',
+    'port': '宿主机监听端口，不能与其他服务重复；新模型按清单顺序从 9997 分配。',
+    'context': '单次输入与输出 token 的合计上限。',
+    'utilization': 'vLLM 可使用的 GPU 显存比例，必须在 0 与 1 之间。',
+    'bind': '127.0.0.1 只允许本机访问；0.0.0.0 监听所有 IPv4 网卡。',
+    'model_dir': '相对 HOST_MODELS_DIR 的权重目录；模型默认路径为 llm/<仓库名，斜杠替换为双横线>。',
+    'max_num_seqs': '同时处理的最大序列数，必须为正整数。',
+    'max_num_batched_tokens': '每个调度批次的 token 上限，必须为正整数。',
+    'dtype': 'vLLM 计算精度；auto 按权重配置选择。',
+}
 
 
 def runtime_path(root: Path | None = None, env=None) -> Path:
@@ -45,7 +59,7 @@ def _json(path: Path):
         raise ValueError("Invalid runtime configuration file") from None
 
 
-def read_document(path: Path | None = None, *, root: Path | None = None, env=None) -> dict:
+def read_document(path: Path | None = None, *, root: Path | None = None, env=None, migration=False) -> dict:
     path = runtime_path(root, env) if path is None else Path(path)
     data = _json(path)
     if data is None and path.name == "config.json":
@@ -57,6 +71,10 @@ def read_document(path: Path | None = None, *, root: Path | None = None, env=Non
         data = {"settings": {}, "models": {}}
     elif path.name != "config.json" and isinstance(data, dict) and "settings" not in data:
         data = {"settings": data, "models": {}}
+    if migration and isinstance(data, dict) and isinstance(data.get('settings'), dict):
+        from docker.configuration import declarations
+        retired = set(declarations().get('retired', []))
+        data = {**data, 'settings': {k: v for k, v in data['settings'].items() if k not in retired}}
     return _validate_document(data)
 
 
@@ -91,7 +109,7 @@ def _validate_document(data):
                 raise ValueError('Invalid runtime embedding batch size')
     if not isinstance(models, dict) or any(not isinstance(m, dict) for m in models.values()):
         raise ValueError("Invalid runtime model configuration")
-    fields = {'enabled', 'gpu', 'port', 'context', 'utilization'}
+    fields = set(MODEL_DEFAULTS)
     for repo, model in models.items():
         if (not isinstance(repo, str) or set(model) - fields or
                 ('enabled' in model and not isinstance(model['enabled'], bool)) or

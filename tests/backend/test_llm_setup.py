@@ -75,7 +75,7 @@ def answer(monkeypatch, answers):
 def test_cancel_leaves_environment_and_services_untouched(project, monkeypatch):
     root, env, calls, answers = project
     answer(monkeypatch, answers + ['no'])
-    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 0
+    assert wizard.main(['--legacy', '--project-dir', str(root)]) == 1
     assert (root / '.env').read_text() == env
     assert not any('up' in command for command in calls)
 
@@ -161,9 +161,9 @@ def test_gpu_becoming_busy_during_selection_does_not_apply_configuration(project
 
 @pytest.mark.parametrize('budget', ['nan', 'inf', '0', '1'])
 def test_invalid_memory_budget_is_rejected(budget):
-    with pytest.raises(ValueError, match='LLM_GPU_MEMORY_UTILIZATION'):
+    with pytest.raises(ValueError, match='utilization'):
         wizard.choose_gpu([{'id': '6', 'name': 'A40', 'total': 46080, 'used': 0, 'utilization': 0}],
-                          '6', {'LLM_GPU_MEMORY_UTILIZATION': budget}, 1)
+                          '6', {'utilization': budget}, 1)
 
 
 def test_wrong_served_model_cannot_pass_readiness(project, monkeypatch):
