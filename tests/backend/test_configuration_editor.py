@@ -220,7 +220,7 @@ def test_terminal_sanitizes_control_characters_and_handles_tiny_windows(editor):
 
 
 def test_keyboard_ui_navigation_restores_terminal_without_saving(editor, monkeypatch, capsys):
-    keys = iter(['right', 'end', 'pageup', '\t', 'q'])
+    keys = iter(['right', 'right', 'end', 'pageup', '\t', 'q'])
     monkeypatch.setattr(configure, 'read_key', lambda: next(keys))
     original = (editor.root / '.env').read_bytes()
     configure.ui(editor)
@@ -229,3 +229,55 @@ def test_keyboard_ui_navigation_restores_terminal_without_saving(editor, monkeyp
     assert output.startswith('\x1b[?1049h')
     assert output.endswith('\x1b[0m\x1b[?25h\x1b[?1049l')
     assert (editor.root / '.env').read_bytes() == original
+
+
+def test_key_value_columns_have_common_right_edge_and_flag(editor):
+    from docker import terminal_ui as screen
+    rows = [r for r in editor.rows() if r['kind'] == 'env']
+    row = next(r for r in rows if r['key'] == 'LLM_MAX_NUM_SEQS')
+    assert row['display_name'] == '[启动] LLM_MAX_NUM_SEQS'
+    line = screen.item_line(row, 76)
+    assert line.rstrip().endswith('8')
+    assert screen.width(line) == 76
+    hot = next(r for r in rows if r['key'] == 'KG_EXTRACT_LLM_MODEL')
+    assert hot['display_name'].startswith('[热更] ')
+    assert screen.width(screen.item_line(hot, 76)) == 76
+    assert screen.width(screen.pair('中文名称', '中文值', 35)) == 35
+
+
+def test_live_inspection_is_readonly_masks_secrets_and_reports_actual_difference(editor, monkeypatch):
+    metadata = {'name': '/qasystem_backend', 'image': 'qasystem-env-v1', 'status': 'running',
+        'health': 'healthy', 'ports': {'8000/tcp': [{'HostPort': '8006'}]}, 'mounts': [],
+        'command': ['python', '-m', 'app.execution.supervisor']}
+    model = {**metadata, 'name': '/qasystem-matrix-qwen35-4b', 'command': ['vllm', 'serve', '/models/4b',
+        '--served-model-name', 'Qwen/Qwen3.5-4B', '--max-model-len', '262144', '--api-key', 'never-expose'],
+        'ports': {'8000/tcp': [{'HostPort': '9998'}]}}
+    raw = '\n'.join(json.dumps(x) for x in [metadata, {'env': 'KG_EXTRACT_LLM_MODEL=actual-model'}, model, {'env': 'CUDA_VISIBLE_DEVICES=6'}])
+    commands = []
+    def run(command, **kwargs):
+        commands.append(command)
+        if command[0] == 'nvidia-smi': return '6, GPU-test'
+        return 'abc def' if command[1] == 'ps' else raw
+    monkeypatch.setattr(configure.helper, 'run', run)
+    editor.refresh_live()
+    assert all(c[0] == 'nvidia-smi' or c[1] in {'ps', 'inspect'} for c in commands)
+    assert 'KG_EXTRACT_LLM_API_KEY' not in commands[1][3]
+    assert editor.actual_value('KG_EXTRACT_LLM_MODEL') == 'actual-model'
+    rows = editor.rows()
+    r = next(r for r in rows if r['key'] == 'KG_EXTRACT_LLM_MODEL')
+    assert r['display_value'].startswith('! ')
+    assert r['actual_value'] == 'actual-model'
+    runtime = next(r for r in rows if r['key'] == 'qasystem-matrix-qwen35-4b')
+    assert runtime['container']['gpu'] == '6'
+    assert runtime['container']['context'] == '262144'
+    assert runtime['container']['host_ports'] == '9998'
+    assert 'never-expose' not in json.dumps(editor.live)
+
+
+def test_actual_value_uses_live_mount_not_unapplied_edit_directory(editor, tmp_path):
+    actual_dir = tmp_path / 'actual-mount'
+    actual_dir.mkdir()
+    (actual_dir / 'settings.json').write_text('{"KG_EXTRACT_LLM_MODEL":"mounted-model"}')
+    editor.live = [{'name': 'qasystem_backend', 'status': 'running', 'env': {'KG_EXTRACT_LLM_MODEL': 'old-env'},
+        'mounts': [{'Destination': '/app/runtime-config', 'Source': str(actual_dir)}]}]
+    assert editor.actual_value('KG_EXTRACT_LLM_MODEL') == 'mounted-model'

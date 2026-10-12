@@ -10,7 +10,9 @@ import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import socket
+import subprocess
 import sys
 
 try:
@@ -98,6 +100,89 @@ class Configuration:
                 target.chmod(0o600)
         self.expected = {p: p.read_bytes() if p.exists() else None for p in
             (root / ".env", hot, models, self.directory / "models.compose.json")}
+        self.live = []
+        self.live_error = "实际状态尚未读取"
+
+    def refresh_live(self) -> None:
+        """Read only selected non-secret environment keys; never dump container Env."""
+        self.live = []
+        try:
+            ids = helper.run(["docker", "ps", "-aq"], cwd=self.root).split()
+            if not ids:
+                self.live_error = "未发现容器"; return
+            keys = {r['key'] for r in self.fields if not r['secret']}
+            keys.update({'CUDA_VISIBLE_DEVICES', 'NVIDIA_VISIBLE_DEVICES'})
+            condition = "or " + " ".join('(eq (index (split . "=") 0) ' + json.dumps(k) + ')' for k in sorted(keys))
+            template = ('{"name":{{json .Name}},"image":{{json .Config.Image}},"status":{{json .State.Status}},'
+                '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}"none"{{end}},'
+                '"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}},'
+                '"devices":{{json .HostConfig.DeviceRequests}},"command":{{json .Config.Cmd}}}\n'
+                '{{range .Config.Env}}{{if ' + condition + '}}{"env":{{json .}}}\n{{end}}{{end}}')
+            raw = helper.run(["docker", "inspect", "--format", template, *ids], cwd=self.root)
+            container = None
+            for line in raw.splitlines():
+                if not line.strip(): continue
+                entry = json.loads(line)
+                if 'name' in entry:
+                    container = entry
+                    container['name'] = container['name'].lstrip('/')
+                    container['env'] = {}
+                    if container['image'].split(':')[0] in {'qasystem-env-v1', 'vllm/vllm-openai'}:
+                        self.live.append(container)
+                elif container is not None and 'env' in entry:
+                    key, _, value = entry['env'].partition('=')
+                    container['env'][key] = value
+            gpu_names = {}
+            try:
+                gpu_raw = helper.run(['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader,nounits'], cwd=self.root)
+                for line in gpu_raw.splitlines():
+                    index, sep, uuid = line.partition(',')
+                    if sep and index.strip().isdigit(): gpu_names[uuid.strip()] = index.strip()
+            except (OSError, RuntimeError, subprocess.TimeoutExpired): pass
+            for c in self.live:
+                env = c['env']; command = c.get('command') or []
+                tokens = []
+                for part in command:
+                    try: tokens.extend(shlex.split(part))
+                    except ValueError: pass
+                def flag(name):
+                    try: return tokens[tokens.index(name) + 1]
+                    except (ValueError, IndexError): return ''
+                c['model'] = flag('--served-model-name') or env.get('LLM_SERVED_MODEL_NAME', '')
+                if not c['model'] and 'vllm' in tokens and 'serve' in tokens:
+                    try: c['model'] = tokens[tokens.index('serve') + 1]
+                    except IndexError: pass
+                if c['name'] == 'qasystem_clef': c['model'] = 'clef-flash'
+                if c['name'] == 'qasystem_nanojev': c['model'] = 'nanojev'
+                dedicated = env.get('CLEF_CUDA_VISIBLE_DEVICES') if c['name'] == 'qasystem_clef' else env.get('NANOJEV_CUDA_VISIBLE_DEVICES') if c['name'] == 'qasystem_nanojev' else ''
+                requested = [device for request in c.get('devices') or [] for device in request.get('DeviceIDs') or []]
+                declared = dedicated or env.get('CUDA_VISIBLE_DEVICES') or env.get('LLM_GPU_DEVICE_IDS')
+                if not declared:
+                    declared = ','.join(requested) or env.get('NVIDIA_VISIBLE_DEVICES', '')
+                if declared in {'all', ''}: declared = '未固定GPU'
+                c['gpu'] = ','.join(gpu_names.get(value.strip(), value.strip()) for value in declared.split(','))
+                c['context'] = flag('--max-model-len') or env.get('LLM_MAX_MODEL_LEN', '')
+                c['host_ports'] = ', '.join(sorted({p['HostPort'] for bindings in (c['ports'] or {}).values() for p in bindings or []})) or '未发布'
+                # Discard raw command: arbitrary arguments may include credentials.
+                c.pop('command', None)
+            self.live_error = ""
+        except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired):
+            self.live_error = "读取实际状态失败；检查 Docker 权限/连接，按 r 重试"
+
+    def actual_value(self, key: str) -> str:
+        backend = next((c for c in self.live if c['name'] == 'qasystem_backend' and c['status'] == 'running'), None)
+        if backend is None: return '未确认（没有运行中的 Backend）'
+        if key in HOT_KEYS:
+            mount = next((m for m in backend['mounts'] if m['Destination'] == '/app/runtime-config'), None)
+            if mount:
+                path = Path(mount['Source']) / 'settings.json'
+                try:
+                    data = json.loads(path.read_text())
+                    if key in data: return data[key] or '(空)'
+                except FileNotFoundError: pass
+                except (OSError, ValueError): return '未确认（热配置读取失败）'
+        if key in backend['env']: return backend['env'][key] or '(空)'
+        return '未显式配置（使用程序默认值）'
 
     def model_root(self) -> Path:
         path = Path(self.values["HOST_MODELS_DIR"]).expanduser()
@@ -105,18 +190,33 @@ class Configuration:
 
     def rows(self, query: str = "") -> list[dict]:
         rows = []
+        for container in self.live:
+            status = {'running': '运行中', 'exited': '已停止', 'created': '未启动', 'restarting': '重启中'}.get(container['status'], container['status'])
+            if container['health'] not in {'none', 'healthy'}: status += ' / ' + container['health']
+            rows.append(dict(kind='runtime', key=container['name'], container=container,
+                display_name=container['name'], display_value=status,
+                label=container['name'] + ' ' + status + ' ' + container['model']))
         for model in self.catalog:
             repo = model["repo"]
             state = self.models[repo]
             exists = (self.model_root() / "llm" / repo.replace("/", "--")).is_dir()
-            rows.append(dict(kind="model", repo=repo, key="enabled", label=f"[{ 'x' if state['enabled'] else ' ' }] {repo} ({'权重已找到' if exists else '无本地权重'})"))
+            rows.append(dict(kind="model", repo=repo, key="enabled",
+                display_name=f"[{ 'x' if state['enabled'] else ' ' }] {repo}",
+                display_value='权重已找到' if exists else '无本地权重',
+                label=f"[{ 'x' if state['enabled'] else ' ' }] {repo} ({'权重已找到' if exists else '无本地权重'})"))
             if state["enabled"]:
                 for key, name in (("gpu", "GPU编号"), ("port", "宿主端口"), ("context", "上下文上限"), ("utilization", "显存比例")):
-                    rows.append(dict(kind="model", repo=repo, key=key, label=f"    {name}: {state[key]}"))
+                    rows.append(dict(kind="model", repo=repo, key=key, display_name=f"  [启动] {name}",
+                        display_value=state[key] or '(空)', label=f"    {name}: {state[key]}"))
         for field in self.fields:
             value = self.values.get(field["key"], "")
             shown = "******" if field["secret"] and value else value
-            rows.append(dict(kind="env", **field, label=f"{'热更新' if field['hot'] else '启动配置'}  {field['key']} = {shown}"))
+            actual = self.actual_value(field['key']) if not field['secret'] else '隐藏（未读取容器凭据）'
+            pending = not field['secret'] and not actual.startswith(('未', '隐藏')) and actual != (value or '(空)')
+            rows.append(dict(kind="env", **field, actual_value=actual,
+                display_name=f"{'[热更]' if field['hot'] else '[启动]'} {field['key']}",
+                display_value=('! ' if pending else '') + (shown or '(空)'),
+                label=f"{'[热更]' if field['hot'] else '[启动]'} {field['key']} = {shown}"))
         return [r for r in rows if query.lower() in (r["label"] + r.get("description", "")).lower()]
 
     def validate(self, probe: bool = False) -> list[str]:
@@ -336,7 +436,13 @@ def _ui(config: Configuration) -> None:
                 print("\n", end="")
                 query = input("搜索配置名称/说明（空为全部）: ").strip()
                 selected = screen.SECTIONS.index("全部"); index = 0
+            elif key == "r":
+                config.refresh_live()
+                notice = config.live_error or "实际服务状态已刷新；没有修改配置或启动服务。"
             elif key in {" ", "\r", "\n", "d"} and row:
+                if row['kind'] == 'runtime':
+                    notice = "此行为运行中的实际服务；启用计划请切换到“模型”分区编辑。"
+                    continue
                 if row["kind"] == "model":
                     state = config.models[row["repo"]]
                     if row["key"] == "enabled": state["enabled"] = not state["enabled"]
@@ -376,6 +482,8 @@ def main(argv=None) -> int:
             print("\n".join(errors) if errors else "配置检查通过（未部署、未校验权重）")
             return int(bool(errors))
         if not sys.stdin.isatty(): raise ValueError("配置界面需要交互终端，请使用 ssh -t")
+        print("正在读取容器实际配置（只读查询，不启动服务）……", flush=True)
+        config.refresh_live()
         ui(config)
         return 0
     except (OSError, ValueError, KeyboardInterrupt, EOFError):

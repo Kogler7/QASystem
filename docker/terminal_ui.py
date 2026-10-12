@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-SECTIONS = ("模型", "服务", "抽取", "裁判", "队列", "其他", "全部")
+SECTIONS = ("运行", "模型", "服务", "抽取", "裁判", "队列", "其他", "全部")
 RESET = "\x1b[0m"
 STYLES = {"title": "\x1b[1;36m", "muted": "\x1b[90m", "selected": "\x1b[1;30;46m",
           "good": "\x1b[32m", "warning": "\x1b[33m", "normal": ""}
@@ -45,7 +45,22 @@ def wrap(value: str, cells: int) -> list[str]:
     return result or [""]
 
 
+def pair(name: str, value: str, cells: int, *, name_cells: int | None = None) -> str:
+    """Fixed name column; values share a right edge, including CJK text."""
+    if cells < 4: return fit(name, cells)
+    left = min(cells - 3, name_cells if name_cells is not None else int((cells - 2) * .64))
+    right = cells - left - 2
+    clipped = fit(value, right).rstrip()
+    return fit(name, left) + "  " + " " * (right - width(clipped)) + clipped
+
+
+def item_line(row: dict, cells: int, selected: bool = False) -> str:
+    prefix = " › " if selected else "   "
+    return prefix + pair(row["display_name"], row["display_value"], cells - width(prefix) - 1) + " "
+
+
 def section(row: dict) -> str:
+    if row['kind'] == 'runtime': return '运行'
     if row["kind"] == "model" or row["key"].startswith("LLM_"): return "模型"
     key = row["key"]
     if key.startswith("QASYSTEM_JUDGE_"): return "裁判"
@@ -65,11 +80,19 @@ def page_size(columns: int, lines: int) -> int:
 
 def detail(row: dict | None, config) -> list[str]:
     if row is None: return ["没有匹配的配置项", "按 / 清空搜索，或切换分区。"]
+    if row['kind'] == 'runtime':
+        c = row['container']
+        return [c['name'], '', '实际状态: ' + row['display_value'], '镜像: ' + c['image'],
+                '模型: ' + (c['model'] or '应用服务'), 'GPU: ' + c['gpu'], '宿主端口: ' + c['host_ports'],
+                '上下文: ' + (c['context'] or '未声明'), '', '只读展示 Docker 实际配置。',
+                '按 r 刷新；这里不修改外部服务。', '参数以实际运行容器为准。']
     if row["kind"] == "model":
         model = config.models[row["repo"]]
-        return [row["repo"], "", "计划状态: " + ("启用" if model["enabled"] else "关闭"),
-                f"GPU: {model['gpu'] or '未选择'}    端口: {model['port']}",
-                f"上下文: {model['context']}    显存比例: {model['utilization']}", "",
+        running = [c for c in config.live if c['model'] == row['repo'] and c['status'] == 'running']
+        return [row["repo"], "", "实际状态: " + (f"{len(running)} 个服务运行中" if running else '未发现运行服务' if not config.live_error else '未确认'),
+                "计划状态: " + ("启用" if model["enabled"] else "关闭"),
+                f"GPU: {model['gpu'] or '未选择'}", f"端口: {model['port']}",
+                f"上下文: {model['context']}", f"显存比例: {model['utilization']}", "",
                 "空格勾选模型，回车编辑参数。", "保存只生成配置，不启动模型。",
                 "校验权重按 v；实际部署按 a。", "启动参数变化需重建对应模型容器。"]
     value = config.values.get(row["key"], "")
@@ -77,7 +100,8 @@ def detail(row: dict | None, config) -> list[str]:
     if row["secret"]:
         value = "******（已隐藏）" if value else "(空)"
         default = "******（已隐藏）" if default else "(空)"
-    return [row["key"], "", "当前: " + (value or "(空)"), "默认: " + (default or "(空)"), "",
+    return [row["key"], "", "实际: " + row.get('actual_value', '未确认'),
+            "配置: " + (value or "(空)"), "默认: " + (default or "(空)"), "",
             "生效: " + ("热更新 / 新请求" if row["hot"] else "启动配置 / 需相应服务重启"), "",
             row["description"], "", "Enter 编辑  ·  d 恢复默认", "凭据不会回显。" if row["secret"] else ""]
 
@@ -92,22 +116,28 @@ def render(config, rows: list[dict], index: int, selected: str, query: str, noti
         return "\n".join([full("QASystem · 配置"), full("终端过小，请扩大至至少 56 列 × 18 行。"), full("q 退出；扩大窗口后按任意键刷新。")])
     current = rows[index] if rows else None
     count = sum(bool(m["enabled"]) for m in config.models.values())
+    running = sum(c['status'] == 'running' for c in config.live)
     output = [full(" QASystem  /  系统配置", "title"),
-              full(f" {count} 个模型计划启用    {'● 有未保存修改' if dirty else '○ 当前配置'}    打开界面不会启动服务", "warning" if dirty else "muted")]
+              full(f" 实际运行服务 {running}    计划启用模型 {count}    {'● 未保存修改' if dirty else '○ 配置未修改'}", "warning" if dirty else "muted")]
     tabs = "  ".join(f"[{s}]" if s == selected else s for s in SECTIONS)
     if width(tabs) > cells - 2: tabs = f"分区: {selected}    ← → 切换 / Tab 下一分区"
-    output += [full(" " + tabs, "title"), full(f" 搜索: {query or '全部配置'}    / 搜索    ← → 切换分区", "muted")]
+    output += [full(" " + tabs, "title"), full(f" 搜索: {query or '全部配置'}   [启动]需重启 / [热更]新请求   r 刷新实际状态", "muted")]
     height = page_size(columns, lines)
     start = min(max(0, index - height + 1), max(0, len(rows) - height))
     details = detail(current, config)
     if columns >= 110:
         left = int((cells - 3) * .59); right = cells - left - 3
         output.append(paint("┌" + "─" * left + "┬" + "─" * right + "┐", "muted"))
-        output.append("│" + paint(fit(" 配置项 / 当前值", left), "title") + "│" + paint(fit(" 参数说明", right), "title") + "│")
-        detail_lines = [part for line in details for part in wrap(line, right - 2)]
+        output.append("│" + paint("   " + pair("服务 / 配置项", "实际状态" if selected == '运行' else "配置值", left - 4) + " ", "title") + "│" + paint(fit(" 参数说明", right), "title") + "│")
+        detail_lines = []
+        for line in details:
+            name, separator, value = line.partition(": ")
+            if separator and name in {"实际", "配置", "默认", "生效", "实际状态", "计划状态", "GPU", "端口", "宿主端口", "镜像", "模型", "上下文", "显存比例"} and width(line) <= right - 2:
+                detail_lines.append(pair(name, value, right - 2, name_cells=width(name)))
+            else: detail_lines.extend(wrap(line, right - 2))
         for i in range(height):
             pos = start + i
-            label = (" › " if pos == index else "   ") + rows[pos]["label"] if pos < len(rows) else ""
+            label = item_line(rows[pos], left, pos == index) if pos < len(rows) else ""
             style = "selected" if pos == index and rows else "good" if pos < len(rows) and rows[pos]["label"].startswith("[x]") else "normal"
             description = " " + detail_lines[i] if i < len(detail_lines) else ""
             output.append("│" + paint(fit(label, left), style) + "│" + fit(description, right) + "│")
@@ -117,14 +147,14 @@ def render(config, rows: list[dict], index: int, selected: str, query: str, noti
         output.append(paint("┌" + "─" * inner + "┐", "muted"))
         for i in range(height):
             pos = start + i
-            label = (" › " if pos == index else "   ") + rows[pos]["label"] if pos < len(rows) else ""
+            label = item_line(rows[pos], inner, pos == index) if pos < len(rows) else ""
             output.append("│" + paint(fit(label, inner), "selected" if pos == index and rows else "normal") + "│")
         output.append(paint("└" + "─" * inner + "┘", "muted"))
-        compact = details if current and current["kind"] == "model" else (
-            [details[0], details[2], details[3], details[5], details[7]] if current else details)
+        compact = details if current and current["kind"] in {'model', 'runtime'} else (
+            [details[0], details[2], details[3], details[4], details[6], details[8]] if current else details)
         text = [part for item in compact for part in wrap(item, cells - 2)]
         output += [full(" " + (text[i] if i < len(text) else ""), "muted") for i in range(6)]
     output += [full(f" {index + 1 if rows else 0}/{len(rows)} 项    备份: {config.backup.name}", "muted"),
-               full(" " + notice, "warning"), full(" ↑↓ 移动  Space 开关  Enter 编辑  d 默认  PgUp/PgDn 翻页", "muted"),
+               full(" " + (config.live_error if selected == '运行' and config.live_error else notice), "warning"), full(" ↑↓ 移动  Space 开关  Enter 编辑  d 默认  PgUp/PgDn 翻页", "muted"),
                full(" s 保存  v 校验权重  a 部署  q 退出", "title")]
     return "\n".join(output[:lines])
