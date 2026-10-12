@@ -74,37 +74,11 @@ DEFAULT_PARAMS: dict[str, Any] = {
     "mcp_url": None,
     "poll_interval_seconds": 2,
     "poll_timeout_seconds": 3600,
-    "options": {
-        "parser": {
-            "engine": "auto",
-            "force": False,
-            "page_sharding": "auto",
-            "page_shard_size": 0,
-            "max_page_shards": 16,
-            "mineru_options": {
-                "language": "ch",
-                "ocr_mode": "auto",
-                "table_enable": True,
-                "formula_enable": True,
-            },
-            "keep_page_edges": "first_page",
-            "page_edge_min_chars": 3,
-        },
-        "chunking": {
-            "strategy": "recursive",
-            "size": 4000,
-            "chunk_overlap": 50,
-            "similarity": 0.6,
-            "separators": None,
-            "size_unit": "char",
-            "breakpoint_method": "percentile",
-        },
-        "extraction": {"model": None, "merge": True},
-        "storage": {"persist_graph": False, "knowledge_space_id": None},
-    },
+    # Match an API request without overrides; Backend owns application defaults.
+    "options": {},
     "eval": {
         "match_mode": "llm",
-        "judge_model": "clef-flash",
+        "judge_model": "deepseek-flash",
         "judge_base_url": None,
         "judge_timeout_seconds": 300,
         "judge_max_tokens": 8192,
@@ -206,7 +180,7 @@ def call_with_retries(
     operation: Callable[[], T],
     *,
     label: str,
-    attempts: int = MAX_ATTEMPTS,
+    attempts: int = 1,
     retry_sleep: float | None = None,
 ) -> tuple[T, int]:
     """失败立即重试，用尽次数后把最后一次异常抛出。"""
@@ -2202,7 +2176,7 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
         overrides.get("model")
         or os.environ.get("QASYSTEM_JUDGE_MODEL")
         or eval_cfg.get("judge_model")
-        or "clef-flash"
+        or "deepseek-flash"
     )
     adapter = overrides.get("adapter") or os.environ.get("QASYSTEM_JUDGE_ADAPTER") or eval_cfg.get("judge_adapter") or "auto"
     if adapter == "auto":
@@ -2214,11 +2188,19 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
             else:
                 base_url = os.environ.get("CLEF_SERVICE_URL") or "http://127.0.0.1:8188"
         else:
-            raise RuntimeError("Chat judge 必须配置 --judge-base-url 或 QASYSTEM_JUDGE_BASE_URL 或 eval.judge_base_url")
+            if str(model) == "deepseek-flash":
+                base_url = "https://api.deepseek.com/v1"
+            else:
+                raise RuntimeError("Chat judge 必须配置 --judge-base-url 或 QASYSTEM_JUDGE_BASE_URL 或 eval.judge_base_url")
     key_env = overrides.get("key_env") or "QASYSTEM_JUDGE_API_KEY"
     api_key = os.environ.get(key_env, "")
     if adapter == "chat" and not api_key and key_env == "QASYSTEM_JUDGE_API_KEY":
-        api_key = os.environ.get("KG_EXTRACT_LLM_API_KEY", "")
+        if urlsplit(base_url).hostname == "api.deepseek.com":
+            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+        else:
+            api_key = os.environ.get("KG_EXTRACT_LLM_API_KEY", "")
+    if adapter == "chat" and urlsplit(base_url).hostname == "api.deepseek.com" and not api_key:
+        raise RuntimeError("DeepSeek API judge 未配置凭据：设置 DEEPSEEK_API_KEY 或 QASYSTEM_JUDGE_API_KEY")
     timeout = float(eval_cfg.get("judge_timeout_seconds") or os.environ.get("KG_EXTRACT_LLM_TIMEOUT_SECONDS") or 300)
     max_tokens = int(eval_cfg.get("judge_max_tokens") or os.environ.get("KG_EXTRACT_LLM_MAX_TOKENS") or 8192)
     return JudgeClient(
@@ -2675,7 +2657,7 @@ def _parse_sources(
     params: dict[str, Any],
     out_dir: Path,
 ) -> tuple[str, dict[str, Any]]:
-    """模块 parse：docs/ 原文件 → 拼接 Markdown。单文件最多试 3 次，失败则跳过。"""
+    """模块 parse：docs/ 原文件 → 拼接 Markdown。默认单次提交，失败则跳过。"""
     markdown_parts: list[str] = []
     parse_failures: list[dict[str, Any]] = []
     per_file: list[dict[str, Any]] = []
@@ -2728,6 +2710,7 @@ def _parse_sources(
             envelope, attempts = call_with_retries(
                 _parse_once,
                 label=f"模块 parse {source.name}",
+                attempts=params.get("request_attempts", 1),
             )
             write_json(out_dir / f"parse_{source.stem}.json", envelope)
             parsed = str((envelope.get("data") or {}).get("markdown") or "")
@@ -2744,13 +2727,13 @@ def _parse_sources(
         except FILE_RETRY_ERRORS as exc:
             failed = fail_payload(exc)
             failed["file"] = source.name
-            failed["attempts"] = MAX_ATTEMPTS
+            failed["attempts"] = params.get("request_attempts", 1)
             parse_failures.append(failed)
             per_file.append(
                 {
                     "file": source.name,
                     "status": "failed",
-                    "attempts": MAX_ATTEMPTS,
+                    "attempts": params.get("request_attempts", 1),
                     "elapsed_seconds": elapsed_seconds(file_started),
                     "error": failed["message"],
                 }
@@ -2818,11 +2801,22 @@ def _chunk_markdown(
 
 def extract_version_from(envelope: dict[str, Any]) -> str | None:
     """服务端在 quality 里盖戳本次抽取用的算法版本（KG_EXTRACT_ALGO_VERSION）。"""
-    for layer in _payload_layers(envelope):
+    for layer in _extraction_quality_layers(envelope):
         quality = layer.get("quality") if isinstance(layer, dict) else None
         if isinstance(quality, dict) and quality.get("extract_version"):
             return str(quality["extract_version"])
     return None
+
+
+def _extraction_quality_layers(envelope: dict[str, Any]) -> list[dict[str, Any]]:
+    layers = _payload_layers(envelope)
+    result = list(layers)
+    for layer in layers:
+        for parent in (layer, layer.get("stats") or {}):
+            extraction = parent.get("extraction") if isinstance(parent, dict) else None
+            if isinstance(extraction, dict):
+                result.append(extraction)
+    return result
 
 
 def _extract_cache_complete(envelope: dict[str, Any]) -> bool:
@@ -2832,7 +2826,7 @@ def _extract_cache_complete(envelope: dict[str, Any]) -> bool:
     partial graphs. A scoring failure must not cause successful inference to
     run again. Legacy responses without quality still require a graph.
     """
-    for layer in _payload_layers(envelope):
+    for layer in _extraction_quality_layers(envelope):
         if layer.get("status") in {"failed", "partial", "error"} or layer.get("success") is False:
             return False
         quality = layer.get("quality")
@@ -2844,7 +2838,7 @@ def _extract_cache_complete(envelope: dict[str, Any]) -> bool:
 
 def _apply_extraction_quality(block: dict[str, Any], envelope: dict[str, Any]) -> None:
     """Keep Backend best-effort quality visible even when its graph can be scored."""
-    for layer in _payload_layers(envelope):
+    for layer in _extraction_quality_layers(envelope):
         quality = layer.get("quality")
         if not isinstance(quality, dict) or not quality:
             continue
@@ -2949,6 +2943,8 @@ def _run_system(
         if existing.is_file():
             try:
                 envelope = json.loads(existing.read_text(encoding="utf-8"))
+                if not _extract_cache_complete(envelope):
+                    raise ValueError("Incomplete ingestion must be submitted again")
                 graph = extract_graph_from_envelope(envelope)
                 graphs.append(graph)
                 version = version or extract_version_from(envelope)
@@ -2964,12 +2960,13 @@ def _run_system(
                     }
                 )
                 continue
-            except json.JSONDecodeError:
+            except ValueError:
                 pass
         try:
             envelope, attempts = call_with_retries(
                 lambda src=source: ingest_file(base_url, src, ontology, options, params),
                 label=f"沉淀 {source.name}",
+                attempts=params.get("request_attempts", 1),
             )
             write_json(out_dir / f"backend_system_{source.stem}.json", envelope)
             graph = extract_graph_from_envelope(envelope)
@@ -2985,16 +2982,17 @@ def _run_system(
                     "relationships": len(graph.get("relationships") or []),
                 }
             )
+            _apply_extraction_quality(per_file[-1], envelope)
         except FILE_RETRY_ERRORS as exc:
             failed = fail_payload(exc)
             failed["file"] = source.name
-            failed["attempts"] = MAX_ATTEMPTS
+            failed["attempts"] = params.get("request_attempts", 1)
             ingest_failures.append(failed)
             per_file.append(
                 {
                     "file": source.name,
                     "status": "failed",
-                    "attempts": MAX_ATTEMPTS,
+                    "attempts": params.get("request_attempts", 1),
                     "elapsed_seconds": elapsed_seconds(file_started),
                     "error": failed["message"],
                 }
@@ -3016,7 +3014,11 @@ def _run_system(
     score_started = time.perf_counter()
     metrics = split_match_details(out_dir, "backend_system", maybe_score(golden, graph, score_ctx))
     block: dict[str, Any] = {
-        "status": "partial" if ingest_failures else "succeeded",
+        "status": (
+            "failed" if all(item["status"] == "failed" for item in per_file)
+            else "partial" if any(item["status"] in {"partial", "failed"} for item in per_file)
+            else "succeeded"
+        ),
         "nodes": len(graph.get("nodes") or []),
         "relationships": len(graph.get("relationships") or []),
         "metrics": metrics,
@@ -3188,7 +3190,7 @@ def run_backend_case(
     ``reuse_dir`` 指向上次运行的 case 目录（``tmp/eval/runs/<ts>/<类型>/<case>``）：
     extract 模式从中读 chunks.json，chunk-extract 模式从中读 document.md。
     """
-    modes = modes or ["chunk-extract"]
+    modes = modes or ["pipeline"]
     result: dict[str, Any] = {
         "system": {"status": "skipped", "message": "未选择 pipeline 模式；需要时加 --mode pipeline"},
         "modules": {},
@@ -3458,8 +3460,8 @@ def run_case_with_retries(
     reuse_extract_dir: Path | None = None,
     max_attempts: int | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str, int, str | None]:
-    """同一 case 最多试 3 次；未捕获异常不会冒出。返回 (backend, plugin, markdown, attempts, error)."""
-    max_attempts = MAX_ATTEMPTS if max_attempts is None else max_attempts
+    """默认尝试一次，显式配置可至多三次；返回结果、尝试次数及错误。"""
+    max_attempts = 1 if max_attempts is None else max_attempts
     if type(max_attempts) is not int or not 1 <= max_attempts <= 3:
         raise ValueError("case attempts must be between 1 and 3")
     last_backend: dict[str, Any] | None = None
@@ -3567,7 +3569,8 @@ def extraction_overrides(args: argparse.Namespace, params: dict[str, Any]) -> di
         extraction.get(key) is not None for key in ("version", "provider", "request_timeout", "document_timeout")
     )):
         raise ValueError("覆盖抽取配置时不能复用旧预测；请仅使用 --from-run 复用切片")
-    options["extraction"] = extraction
+    if extraction:
+        options["extraction"] = extraction
     chunk_overrides = {key: getattr(args, arg, None) for key, arg in (
         ("chunk_overlap", "chunk_overlap"), ("size", "chunk_size"))}
     if any(value is not None for value in chunk_overrides.values()):
@@ -3584,7 +3587,7 @@ def extraction_overrides(args: argparse.Namespace, params: dict[str, Any]) -> di
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="知识沉淀评测：默认只测后台切片+抽取（chunk-extract）。可直接传 case/类型目录。",
+        description="知识沉淀评测：默认调用完整后台沉淀 API（pipeline），沿用服务端默认参数。可直接传 case/类型目录。",
         epilog="示例: python3 eval/run.py test_data/eval/official/official_01",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -3603,7 +3606,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
     parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")
     parser.add_argument("--extract-document-timeout", type=float, help="文档抽取模型调用总预算（秒）")
-    parser.add_argument("--case-attempts", type=int, choices=(1, 2, 3), default=3, help="外层整篇抽取尝试次数，快速对比建议 1；不改变算法内部重试")
+    parser.add_argument("--case-attempts", type=int, choices=(1, 2, 3), default=1, help="外层 case 尝试次数，默认 1；不改变算法内部重试")
+    parser.add_argument("--request-attempts", type=int, choices=(1, 2, 3), default=1, help="解析/沉淀接口失败时的提交尝试次数，默认 1；重新提交可能重复执行")
     parser.add_argument("--groups", default="", help="只处理指定类型，逗号分隔，如 official,standard,rule")
     parser.add_argument("--cases", default="", help="只处理指定 case 目录名，逗号分隔")
     parser.add_argument(
@@ -3619,7 +3623,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         metavar="模式",
         help="后台评测模式，可组合：extract=仅知识抽取（经 --from-run 复用切片）；"
-        "chunk-extract=切片+抽取（默认）；pipeline=全流程知识沉淀 knowledge-ingestion",
+        "chunk-extract=切片+抽取；pipeline=全流程知识沉淀 knowledge-ingestion（默认）",
     )
     parser.add_argument(
         "--from-run",
@@ -3652,8 +3656,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=0.0,
         help="已评分 case 的最低实体 F1（后台系统、后台抽取、插件三者取最低），低于则门禁未过（退出码 4）",
     )
-    parser.add_argument("--judge-model", help="替换裁判模型；默认 clef-flash")
-    parser.add_argument("--judge-base-url", help="裁判服务地址；默认本机 Clef 8188 端口")
+    parser.add_argument("--judge-model", help="替换裁判模型；默认 DeepSeek API deepseek-flash，Clef 可显式选择")
+    parser.add_argument("--judge-base-url", help="裁判服务地址；默认模型走现有 DeepSeek API，Clef 使用 CLEF_SERVICE_URL")
     parser.add_argument("--judge-adapter", choices=("auto", "chat", "systemone"), help="裁判协议，auto 按模型选择")
     parser.add_argument("--judge-key-env", help="裁判密钥环境变量名，不在命令行传密钥")
     parser.add_argument(
@@ -3884,7 +3888,10 @@ def main() -> int:
     if args.system and "pipeline" not in modes:
         modes.append("pipeline")
     if not modes:
-        modes = ["chunk-extract"]
+        modes = ["pipeline"]
+    if args.from_run and not any(mode in modes for mode in ("extract", "chunk-extract")):
+        log("--from-run 需要显式选择 --mode extract 或 chunk-extract；pipeline 不复用中间产物")
+        return 1
     baseline_summary = None
     baseline_path = None
     if args.baseline:
@@ -3956,6 +3963,7 @@ def main() -> int:
         log(str(exc))
         return 1
     params["options"] = options
+    params["request_attempts"] = args.request_attempts
     group_cfg = params.get("groups") or {}
     eval_cfg = params.get("eval") or {}
     match_mode = str(args.match_mode or eval_cfg.get("match_mode") or "llm").strip().lower()
@@ -4045,6 +4053,8 @@ def main() -> int:
         log(f"阶段: {'后台 → 插件' if run_backend else '插件'}")
     if run_backend:
         log(f"模式: {', '.join(modes)}")
+        log(f"尝试次数: case={args.case_attempts}, 接口提交={args.request_attempts}")
+        log("请求 options: " + json.dumps(options, ensure_ascii=False, sort_keys=True))
     if reuse_run_dir is not None:
         log(f"复用: {reuse_run_dir}")
     if reuse_extract_run_dir is not None:
@@ -4074,6 +4084,8 @@ def main() -> int:
     snapshot["mcp_url"] = mcp_url
     snapshot["stage"] = args.stage
     snapshot["modes"] = modes
+    snapshot["case_attempts"] = args.case_attempts
+    snapshot["request_attempts"] = args.request_attempts
     snapshot["from_run"] = str(reuse_run_dir) if reuse_run_dir is not None else None
     snapshot["reuse_extract_from"] = str(reuse_extract_run_dir) if reuse_extract_run_dir is not None else None
     if reuse_extract_run_dir is not None:

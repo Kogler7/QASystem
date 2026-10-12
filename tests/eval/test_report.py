@@ -346,7 +346,7 @@ def test_main_writes_report_md(monkeypatch, tmp_path):
     runs_dir = tmp_path / "runs"
     monkeypatch.setattr(eval_run, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(
-        sys, "argv", ["run.py", "--workspace", str(ws), "--match-mode", "identity", "--min-f1", "0.5"]
+        sys, "argv", ["run.py", "--workspace", str(ws), "--match-mode", "identity", "--min-f1", "0.5", "--mode", "chunk-extract"]
     )
     with patch.object(eval_run, "run_backend_case", side_effect=_backend_ok):
         code = eval_run.main()

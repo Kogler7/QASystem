@@ -62,13 +62,28 @@ test_data/eval/
 
 `run.py` 的参数文件默认是 [`eval/params.yaml`](params.yaml)。若 `test_data/eval/params.yaml` 存在则覆盖它。`run.sh` 只转调 `run.py`，工作区默认仍是 `test_data/eval`。下文的 `mini_eval` 入口默认固定读取 `eval/params.yaml`。
 
+默认入口与直接调用 `/api/v1/pipelines/knowledge-ingestion`（省略 options 或传 `{}`）对齐。`--groups` 只筛选组中的全部 case，不切换算法或模型，也不自动选择精简集。若实际 API 请求显式设置了 options，评测也必须用 `--params` 或 `--extract-*` / `--chunk-*` 设置同样的值。
+
+默认使用现有 DeepSeek API（`deepseek-flash`）做 LLM 评分；它不参与抽取，`elapsed_seconds`（API）与 `score_elapsed_seconds`（评分）分别记录在 `backend.system`。整轮总耗时包含评分，不等于用户请求耗时。只想看 API 耗时，可用 `--match-mode identity` 做本地匹配；别名/同义表达可能漏匹配，正式质量门禁仍用 `llm`。
+
+```bash
+# 默认：完整 API 链路 + DeepSeek API 评分，应用参数来自 Backend
+./eval/run.sh --groups official
+# 只比较 API 链路耗时，不额外调用 judge
+./eval/run.sh --groups official --match-mode identity
+# 非默认分段实验，生成后续 extract 模式需要的切片
+./eval/run.sh --groups official --mode chunk-extract
+```
+
+启动日志打印模式、请求 options 和尝试次数；运行目录的 `params.resolved.json` 保存这些配置。完整 API 响应保存在每个 case 的 `backend_system_<文件名>.json`，其中抽取 quality/effective_config 记录实际算法和模型。空 options 表示使用服务端默认值，不代表参数缺失。
+
 **评测模式。** 后台评测归一化成三类（`--mode`，可组合）：
 
 | 模式 | 含义 | 调用 | 输入 |
 | --- | --- | --- | --- |
 | `extract` | 仅知识抽取 | `POST /api/v1/graphs/extract` | `--from-run` 复用的切片（chunks.json） |
-| `chunk-extract`（默认） | 切片+抽取 | `POST /api/v1/documents/chunk` + extract | docs/ 现解析，或 `--from-run` 复用 document.md |
-| `pipeline` | 全流程知识沉淀 | `POST /api/v1/pipelines/knowledge-ingestion` | docs/ 原文件 |
+| `chunk-extract` | 切片+抽取 | `POST /api/v1/documents/chunk` + extract | docs/ 现解析，或 `--from-run` 复用 document.md |
+| `pipeline`（默认） | 全流程知识沉淀 | `POST /api/v1/pipelines/knowledge-ingestion` | docs/ 原文件 |
 
 `extract` 模式只重跑抽取这一步，切片固定不变——这是对比抽取算法版本（v2/v3/v3.1）的推荐方式：先跑一次 `chunk-extract` 冻结切片，再让待比较的两个版本都用 `--mode extract --from-run <冻结批次>` 运行，保证两边模式与输入一致。插件走 MCP `kg_extract_v2`，同样受版本开关控制。
 
@@ -116,7 +131,7 @@ Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 y
 ### 准备
 
 1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
-2. 默认 LLM-judge 使用 Clef，需要能访问其服务。地址和模型按命令行 → `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → Clef 默认值读取，不再随抽取供应商变化。Chat API key 可兼容 `KG_EXTRACT_LLM_API_KEY`；不把抽取 API key 发给默认 Clef。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
+2. 默认 LLM-judge 使用 DeepSeek API `deepseek-flash`，需要现有 `DEEPSEEK_API_KEY` 或 `QASYSTEM_JUDGE_API_KEY`。地址和模型按命令行 → `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → 默认 API 配置读取，不随抽取供应商变化。官方 DeepSeek 不回退到其他供应商的抽取密钥；缺凭据在抽取前报错。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
 3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
 地址也可用 `QASYSTEM_BACKEND_URL` / `QASYSTEM_MCP_URL`，或改 `params.yaml`。流水线选项在 `params.yaml` 的 `options`，与生产 `PipelineOptions` 对齐。不要把密钥写进 YAML。
@@ -187,7 +202,7 @@ chmod +x eval/run.sh
 python3 eval/run.py test_data/eval/official/official_01
 ```
 
-默认 `--stage backend` + `--mode chunk-extract`：**解析 / 切片 / 抽取并对抽取结果评分**，不跑沉淀、不调 MCP。传类型目录则跑该类型全部 case：
+默认 `--stage backend` + `--mode pipeline`：**每个文件调用一次完整沉淀 API，再对结果评分**，不调 MCP。请求默认 `options: {}`，解析、切片、算法、模型、超时和存储均沿用 Backend 默认值。默认不复用历史产物，也不因失败或 partial 自动重抽。传类型目录则跑该类型全部 case：
 
 ```bash
 ./eval/run.sh test_data/eval/rule
@@ -295,8 +310,8 @@ python3 eval/run.py --stage backend --mode extract \
 
 **替换抽取模型和裁判模型**
 
-普通评测与快速评测默认裁判为 `clef-flash`，使用 `/v1/systemone` 逐候选对选择判断；语义规则、关系端点上下文、最终一对一匹配和裁判失败门禁继续由统一评分器维护。
-默认地址取 `CLEF_SERVICE_URL`，未设置则为 `http://127.0.0.1:8188`。88 的 Clef 当前位于 Compose 内部网络：在同网络容器中用 `http://clef:8188`；宿主机或开发机运行评测时，须指定实际可达的服务地址，不要将未开放的宿主端口当成可用地址。
+普通评测与快速评测默认裁判为 DeepSeek API `deepseek-flash`，使用 Chat API 按窗口判断候选匹配；语义规则、关系端点上下文、最终一对一匹配和裁判失败门禁继续由统一评分器维护。
+默认 API 地址为 `https://api.deepseek.com/v1`，密钥读取 `QASYSTEM_JUDGE_API_KEY` 或 `DEEPSEEK_API_KEY`。显式选择 Clef 时，地址取 `CLEF_SERVICE_URL` 或 `http://127.0.0.1:8188`。88 的 Clef 当前位于 Compose 内部网络：在同网络容器中用 `http://clef:8188`；宿主机或开发机运行评测时，须指定实际可达的服务地址，不要将未开放的宿主端口当成可用地址。
 
 抽取模型和裁判独立配置。例如使用已在 Backend 注册的供应商与模型，并切换到 API 裁判：
 
@@ -307,7 +322,7 @@ python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批�
   --judge-key-env QASYSTEM_JUDGE_API_KEY --case-attempts 1
 ```
 
-换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > `QASYSTEM_JUDGE_*` > YAML > Clef 默认值；密钥仅从环境变量读取，默认 `QASYSTEM_JUDGE_API_KEY`，Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。
+换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > `QASYSTEM_JUDGE_*` > YAML > 默认 API 配置；密钥仅从环境变量读取。官方 DeepSeek 用 `DEEPSEEK_API_KEY`，其他 Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。
 
 组合实验先固定切片、golden、本体和预算，再更换抽取模型。测试不同裁判时可复用同一批预测重新评分，避免重复抽取消耗；更换抽取模型时不能复用旧预测。裁判改变后须分别建立基线，不能用不同裁判的分数直接证明抽取质量提升。manifest 保存抽取配置与裁判 model/base_url/adapter，不包含密钥。
 
@@ -486,8 +501,8 @@ python3 eval/quick_eval.py --dry-run
   `run.log` 中指向统一入口生成的 `tmp/eval/runs/<批次>/summary.json` 和报告。
 - 快速集用于局部回归比较，不能替代全量门禁。比较不同版本时必须保持相同的模型、超时配置和输入；不能直接对比之前被硬预算截断的结果。
 
-统一入口也支持直接传 `python3 eval/run.py ... --case-attempts 1`，默认仍为 3 次，
-该参数只影响外层整篇尝试，不改变传输重试。
+统一入口也支持直接传 `python3 eval/run.py ... --case-attempts 1`，默认已经为 1 次；需要重试可显式传 `--case-attempts 3`。
+解析/沉淀接口提交也默认一次，可用 `--request-attempts 3` 单独增加；算法内部重试不变。
 
 
 ### 冻结 JSON / JSONL / 自适应切片对照

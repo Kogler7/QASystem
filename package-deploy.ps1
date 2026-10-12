@@ -79,7 +79,7 @@ foreach ($directory in @("backend", "algorithm", "mcp_services", "agent", "exter
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("verify_runtime.py", "download_models.py", "download_llm_models.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
 }
 foreach ($relative in @(

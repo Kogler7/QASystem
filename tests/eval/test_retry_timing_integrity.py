@@ -38,7 +38,7 @@ def test_outer_retries_archive_each_result_including_success(tmp_path, monkeypat
     monkeypatch.setattr(run, 'RETRY_SLEEP_SECONDS', 0)
     run.run_case_with_retries(label='case', run_backend=True, run_plugin=False,
         base_url='', mcp_url='', ontology='', sources=[], options={}, params={},
-        golden=None, out_dir=tmp_path, score_ctx=None, modes=['extract'], reuse_dir=None)
+        golden=None, out_dir=tmp_path, score_ctx=None, modes=['extract'], reuse_dir=None, max_attempts=3)
     assert counter[0] == 2
     assert json.loads((tmp_path / 'attempts/01/backend_extract.json').read_text())['round'] == 1
     assert json.loads((tmp_path / 'attempts/02/backend_extract.json').read_text())['round'] == 2

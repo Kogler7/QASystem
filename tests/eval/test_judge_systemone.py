@@ -11,11 +11,11 @@ def clean_judge_env(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
 
-def test_default_clef_is_independent_from_extraction_provider(monkeypatch):
+def test_explicit_clef_is_independent_from_extraction_provider(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_LLM_MODEL", "extract-model")
     monkeypatch.setenv("KG_EXTRACT_LLM_BASE_URL", "https://extract.test/v1")
     monkeypatch.setenv("KG_EXTRACT_LLM_API_KEY", "extract-secret")
-    client = run.build_judge_client({})
+    client = run.build_judge_client({"eval": {"judge_model": "clef-flash"}})
     assert (client.model, client.base_url, client.adapter, client.api_key) == (
         "clef-flash", "http://127.0.0.1:8188", "systemone", "")
     assert client.clone().response_modes == ("systemone",)
@@ -46,18 +46,18 @@ def test_nanojev_uses_its_own_endpoint():
     assert client.adapter == "systemone"
 
 
-def test_default_params_choose_clef():
+def test_default_params_choose_api():
     from pathlib import Path
     for name in ("params.yaml", "quick_params.yaml"):
         config = run.load_params(Path(run.__file__).with_name(name))
-        assert config["eval"]["judge_model"] == "clef-flash"
+        assert config["eval"]["judge_model"] == "deepseek-flash"
 
 
 def test_systemone_preserves_all_edges_and_endpoint_context(monkeypatch):
     golden = [{"rel_type": "owns", "from_type": "Org", "from_name": "A", "to_type": "Item", "to_name": "B",
                "from_entity_context": [{"type": "Org", "name": "A", "properties": {"description": "endpoint detail"}}]}]
     predicted = [golden[0], {**golden[0], "from_name": "C"}]
-    client = run.build_judge_client({})
+    client = run.build_judge_client({"eval": {"judge_model": "clef-flash"}})
 
     def request(url, **kwargs):
         assert url == "http://127.0.0.1:8188/v1/systemone"
@@ -78,7 +78,7 @@ def test_systemone_preserves_all_edges_and_endpoint_context(monkeypatch):
 
 @pytest.mark.parametrize("answers", [{}, {"g0_p0": {"choice": "maybe"}}, {"g0_p0": {"choice": "yes"}, "extra": {"choice": "no"}}])
 def test_systemone_missing_or_invalid_decision_fails_scoring(monkeypatch, answers):
-    client = run.build_judge_client({})
+    client = run.build_judge_client({"eval": {"judge_model": "clef-flash"}})
     monkeypatch.setattr(run, "http_request", lambda *a, **k: (200, {}, json.dumps({"answers": answers}).encode()))
     with pytest.raises(run.JudgeBatchError):
         run._judge_one_batch(client, "entity_matches", [{"type": "T", "name": "A"}], [{"type": "T", "name": "B"}], 0)
@@ -86,7 +86,7 @@ def test_systemone_missing_or_invalid_decision_fails_scoring(monkeypatch, answer
 
 @pytest.mark.parametrize("limit_status", [413, 422])
 def test_systemone_splits_complete_windows_preserving_indices_and_coverage(monkeypatch, limit_status):
-    client = run.build_judge_client({})
+    client = run.build_judge_client({"eval": {"judge_model": "clef-flash"}})
     calls = []
 
     def request(url, **kwargs):
@@ -118,7 +118,7 @@ def test_systemone_terminal_or_unrelated_errors_fail_without_fallback(monkeypatc
         return status, {}, json.dumps({"detail": detail}).encode()
     monkeypatch.setattr(run, "http_request", request)
     with pytest.raises(run.JudgeBatchError):
-        run._judge_windows(run.build_judge_client({}), "entity_matches",
+        run._judge_windows(run.build_judge_client({"eval": {"judge_model": "clef-flash"}}), "entity_matches",
             [{"type": "T", "name": "A"}], [{"type": "T", "name": "B"}], [0], [0],
             golden_window=40, predicted_window=20, max_concurrency=1)
     assert len(calls) == 1

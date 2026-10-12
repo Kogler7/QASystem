@@ -1,7 +1,7 @@
 {
   "entities": [
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "故障现象",
       "properties": {
         "synonyms": [
@@ -25,7 +25,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "所属系统",
       "properties": {
         "synonyms": [
@@ -48,7 +48,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "故障原因",
       "properties": {
         "synonyms": [
@@ -72,7 +72,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "处理方法",
       "properties": {
         "synonyms": [
@@ -96,7 +96,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "故障详细分类",
       "properties": {
         "synonyms": [
@@ -119,7 +119,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "故障地点",
       "properties": {
         "synonyms": [
@@ -143,7 +143,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "车次",
       "properties": {
         "synonyms": [
@@ -166,7 +166,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "是否晚点",
       "properties": {
         "synonyms": [
@@ -188,7 +188,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "故障次数",
       "properties": {
         "synonyms": [
@@ -211,7 +211,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "对标不准",
       "properties": {
         "synonyms": [
@@ -234,7 +234,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "屏蔽门不能联动",
       "properties": {
         "synonyms": [
@@ -257,7 +257,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "轨道电路异常",
       "properties": {
         "synonyms": [
@@ -280,7 +280,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "RTU 报警",
       "properties": {
         "synonyms": [
@@ -302,7 +302,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "电源板异常",
       "properties": {
         "synonyms": [
@@ -325,7 +325,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "运营停车点不能自动取消",
       "properties": {
         "synonyms": [
@@ -347,7 +347,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "开门使能信号异常",
       "properties": {
         "synonyms": [
@@ -369,7 +369,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "同步环线检测板异常",
       "properties": {
         "synonyms": [
@@ -391,7 +391,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "同步环线报警板异常",
       "properties": {
         "synonyms": [
@@ -413,7 +413,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "多路接收器 CPU850 工作不稳定",
       "properties": {
         "synonyms": [
@@ -435,7 +435,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "接收端轨旁盒潮湿",
       "properties": {
         "synonyms": [
@@ -457,7 +457,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "ATP/ATO 系统",
       "properties": {
         "synonyms": [
@@ -479,7 +479,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "ATS 系统",
       "properties": {
         "synonyms": [
@@ -501,7 +501,7 @@
       }
     },
     {
-      "type": "Term",
+      "type": "Terminology",
       "name": "SICAS 系统",
       "properties": {
         "synonyms": [
@@ -523,7 +523,7 @@
       }
     },
     {
-      "type": "Stakeholder",
+      "type": "stakeholder",
       "name": "信号维修工程师_01",
       "properties": {
         "stakeholderId": "SH_DIAG_001",

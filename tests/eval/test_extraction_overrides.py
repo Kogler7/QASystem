@@ -20,7 +20,7 @@ def test_cli_overrides_yaml_without_changing_judge_or_source():
 
 def test_absent_overrides_leave_backend_defaults():
     args = run.parse_args([])
-    assert run.extraction_overrides(args, {}) == {"extraction": {}}
+    assert run.extraction_overrides(args, {}) == {}
 
 
 def test_chunk_cli_overrides_yaml_and_reaches_http(monkeypatch):
@@ -46,7 +46,7 @@ def test_chunk_overlap_default_and_explicit_disable():
     from backend.app.schemas import ChunkOptions
     assert ChunkOptions().chunk_overlap == 50
     assert ChunkOptions(chunk_overlap=0).chunk_overlap == 0
-    assert run.load_params(run.KIT_DIR / "params.yaml")["options"]["chunking"]["chunk_overlap"] == 50
+    assert run.load_params(run.KIT_DIR / "params.yaml")["options"] == {}
     assert run.extraction_overrides(run.parse_args(["--chunk-overlap", "0"]), {})["chunking"]["chunk_overlap"] == 0
 
 

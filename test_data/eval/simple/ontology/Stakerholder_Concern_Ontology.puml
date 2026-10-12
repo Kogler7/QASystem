@@ -1,6 +1,6 @@
 @startuml
 
-  class 利益相关者 <<Stakeholder>> {
+  class 利益相关者 <<stakeholder>> {
 - 利益相关者标识 (stakeholderId): String
 - 名称 (name): String
 - 角色 (role): String
