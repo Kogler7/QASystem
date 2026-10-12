@@ -8,7 +8,7 @@ skinparam linetype ortho
 ' ============================================
 ' 术语
 ' ============================================
-class Term <<Term, KnowledgeUnit>> #LightCyan {
+class Term <<Terminology, KnowledgeUnit>> #LightCyan {
 - name: String // 术语名称
 - definition: String // 术语定义（标准定义）
 - synonyms: String[] // 同义词列表，分号分隔
