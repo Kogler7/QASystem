@@ -165,6 +165,8 @@ def create_request_llm(config: dict[str, Any]):
     version = config["version"]
     if version == "v3.1":
         package = "v3_1"
+    elif version == "v2.1":
+        package = "v2_1"
     elif version == "v2.2":
         package = "v2_2"
     else:

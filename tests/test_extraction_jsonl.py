@@ -79,7 +79,7 @@ def test_property_protocol_is_per_field_and_does_not_mutate_caller():
     assert messages[0]["content"] == "抽取"
 
 
-@pytest.mark.parametrize("version", ["v2", "v3", "latest"])
+@pytest.mark.parametrize("version", ["v0", "v2", "v2_1", "v3", "latest"])
 def test_live_adapter_never_sends_schema_or_json_response_format(version):
     module = importlib.import_module(f"algorithm.knowledge_extract.{version}.llm_client")
     calls = []
@@ -97,7 +97,7 @@ def test_live_adapter_never_sends_schema_or_json_response_format(version):
     assert response.text == '{"name":"甲"}'
 
 
-@pytest.mark.parametrize("version", ["v2", "v3", "latest"])
+@pytest.mark.parametrize("version", ["v0", "v2", "v2_1", "v3", "latest"])
 @pytest.mark.parametrize("finish_reason", ["length", "stop"])
 def test_recovery_validates_each_line_and_keeps_failure_visible(version, finish_reason):
     cg = importlib.import_module(f"algorithm.knowledge_extract.{version}.candidate_generation")
@@ -115,7 +115,7 @@ def test_recovery_validates_each_line_and_keeps_failure_visible(version, finish_
     assert any(row.get("terminal") and row["type"] in {"incomplete", "json"} for row in attempts)
     assert any(row["type"] == "recovered_prefix" for row in attempts)
 
-@pytest.mark.parametrize("version", ["v2", "v3", "latest"])
+@pytest.mark.parametrize("version", ["v0", "v2", "v2_1", "v3", "latest"])
 @pytest.mark.parametrize("task,collection", [("entity", "entities"), ("property", "updates"), ("identity", "updates"), ("relation", "relations"), ("repair", "entities")])
 @pytest.mark.parametrize("table", [False, True])
 def test_router_exposes_only_wire_record_schema(version, task, collection, table):
@@ -148,7 +148,7 @@ def test_object_protocol_does_not_forbid_its_required_wrapper_or_request_null():
     assert record_schema(schema) == schema
     assert decode_jsonl('{"decisions":{}}', schema) == ({"decisions": {}}, [])
 
-@pytest.mark.parametrize("version", ["v2", "v3", "latest"])
+@pytest.mark.parametrize("version", ["v0", "v2", "v2_1", "v3", "latest"])
 def test_verification_prompt_uses_shared_record_protocol(version):
     from algorithm.knowledge_extract.jsonl_protocol import record_schema, jsonl_instruction
     module = importlib.import_module(f"algorithm.knowledge_extract.{version}.semantic_evidence")
