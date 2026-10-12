@@ -336,6 +336,51 @@ def test_label_with_colon_split_into_next_cell_is_rejoined():
     assert document["fields"]["联系电话"] == "1234"
 
 
+def test_header_only_table_stays_a_data_table():
+    """只有表头、没有数据行的表不能判成稀疏表。
+
+    全空数据行会被 normalize_grid 丢掉，剩下的一行就是表头本身。`项目号：/跟踪号：`
+    这类模板表头会把标签率顶到 1.0，但它描述的是表头，不是"标签→值"版式。
+    """
+    cases = [
+        # 普通表头
+        "<table><tr><td>跟踪号编码</td><td>跟踪号名称</td><td>工时</td></tr>"
+        "<tr><td></td><td></td><td></td></tr></table>",
+        # 表头本身是 `标签：`（曾把标签率顶到 1.0）
+        "<table><tr><td>项目号：</td><td>跟踪号：</td><td>成本对象：</td></tr>"
+        "<tr><td></td><td></td><td></td></tr></table>",
+        # 表头含句读
+        "<table><tr><td>项目，明细</td><td>金额</td></tr><tr><td></td><td></td></tr></table>",
+        # 分组表头 + 空数据行
+        "<table><tr><td rowspan=2>会计期间</td><td colspan=2>期初在产品</td></tr>"
+        "<tr><td>成本中心1</td><td>小计</td></tr><tr><td></td><td></td><td></td></tr></table>",
+    ]
+    for html in cases:
+        converted, stats = convert_tables(html, source_name="通知.pdf")
+        assert stats == {"tables": 1, "forms": 0}, html
+        document = _json_blocks(converted)[0]
+        assert "doc_type" not in document and document["rows"] == [], html
+
+
+def test_header_only_markdown_pipe_table_stays_a_data_table():
+    markdown = "| 项目号： | 跟踪号： |\n| --- | --- |\n|  |  |\n|  |  |\n"
+    converted, stats = convert_tables(markdown, source_name="通知.pdf")
+    assert stats == {"tables": 1, "forms": 0}
+    assert _json_blocks(converted)[0]["columns"] == ["项目号：", "跟踪号："]
+
+
+def test_excel_header_only_sheet_stays_a_data_table(tmp_path):
+    import pandas as pd
+
+    from algorithm.preproc.preproc_src.processors.excel_processor import ExcelProcessor
+
+    path = tmp_path / "template.xlsx"
+    pd.DataFrame({"项目号：": [], "跟踪号：": [], "成本对象：": []}).to_excel(path, index=False)
+
+    result = ExcelProcessor().process(str(path))
+    assert result["metadata"]["tables_json"] == {"count": 1, "forms": 0}
+
+
 def test_single_column_table_is_still_a_data_table():
     converted, count = convert_tables_to_json("| a |\n| --- |\n| 1 |")
     assert count == 1
