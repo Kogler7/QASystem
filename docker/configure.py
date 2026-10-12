@@ -15,8 +15,10 @@ import sys
 
 try:
     from docker import setup_llm as helper
+    from docker import terminal_ui as screen
 except ImportError:
     import setup_llm as helper
+    import terminal_ui as screen
 
 # This utility also ships outside the application package.
 HOT_KEYS = frozenset({
@@ -280,7 +282,7 @@ def read_key() -> str:
     if os.name == "nt":
         import msvcrt
         key = msvcrt.getwch()
-        if key in {"\x00", "\xe0"}: return {"H": "up", "P": "down", "K": "left", "M": "right"}.get(msvcrt.getwch(), "")
+        if key in {"\x00", "\xe0"}: return {"H": "up", "P": "down", "K": "left", "M": "right", "I": "pageup", "Q": "pagedown", "G": "home", "O": "end"}.get(msvcrt.getwch(), "")
         return key
     import termios, tty, select
     fd = sys.stdin.fileno()
@@ -291,36 +293,49 @@ def read_key() -> str:
         if key == "\x1b":
             tail = ""
             while select.select([sys.stdin], [], [], 0.05)[0]: tail += os.read(fd, 1).decode(errors="ignore")
-            return {"[A": "up", "[B": "down", "[C": "right", "[D": "left"}.get(tail, "escape")
+            return {"[A": "up", "[B": "down", "[C": "right", "[D": "left", "[5~": "pageup", "[6~": "pagedown", "[H": "home", "[F": "end"}.get(tail, "escape")
         return key
     finally: termios.tcsetattr(fd, termios.TCSADRAIN, original)
 
 
 def ui(config: Configuration) -> None:
-    index, query, notice = 0, "", "已备份原配置；未校验权重、未启动服务。"
+    # Restore the original terminal even when interrupted during editing.
+    print("\x1b[?1049h", end="", flush=True)
+    try:
+        _ui(config)
+    finally:
+        print("\x1b[0m\x1b[?25h\x1b[?1049l", end="", flush=True)
+
+
+def _ui(config: Configuration) -> None:
+    index, query, notice, selected = 0, "", "原配置已备份。保存、校验、部署分别操作。", 0
+    baseline = json.dumps([config.values, config.models], sort_keys=True)
     while True:
-        rows = config.rows(query)
+        category = screen.SECTIONS[selected]
+        rows = screen.filter_rows(config.rows(query), category)
         index = min(index, max(0, len(rows) - 1))
-        height = max(4, shutil.get_terminal_size((100, 28)).lines - 12)
-        start = max(0, index - height + 1)
-        print("\x1b[2J\x1b[H", end="")
-        print("QASystem 配置 | ↑↓/j k 移动 | 空格开关 | Enter 编辑 | / 搜索 | d 恢复默认")
-        print("s 保存配置（不部署） | v 校验已勾选权重 | a 应用启动配置并部署 | q 退出")
-        print(f"备份: {config.backup}\n搜索: {query or '全部'}\n")
-        for i, row in enumerate(rows[start:start + height], start): print(("> " if i == index else "  ") + row["label"])
+        columns, lines = shutil.get_terminal_size((100, 28))
+        height = screen.page_size(columns, lines)
+        dirty = baseline != json.dumps([config.values, config.models], sort_keys=True)
+        frame = screen.render(config, rows, index, category, query, notice, columns, lines,
+                              dirty=dirty, color="NO_COLOR" not in os.environ)
+        print("\x1b[H" + frame + "\x1b[J", end="", flush=True)
         row = rows[index] if rows else None
-        if row and row["kind"] == "env":
-            default = "******" if row["secret"] and row["default"] else (row["default"] or "(空)")
-            print(f"\n说明: {row['description']}\n默认: {default}\n生效: {'保存后，新提交请求读取；在途任务保留原参数' if row['hot'] else '保存只写配置，需相应服务重启/重建后生效'}")
-        elif row:
-            print("\n勾选表示计划启用；保存不会启动。权重检查和部署需分别按 v / a。\n模型启动参数修改需要重建该模型容器。")
-        print("\n" + notice)
         key = read_key()
         try:
             if key in {"q", "\x03", "escape"}: return
             if key in {"down", "j"}: index = min(len(rows) - 1, index + 1)
             elif key in {"up", "k"}: index = max(0, index - 1)
-            elif key == "/": query = input("筛选配置名称/说明（空为全部）: ").strip(); index = 0
+            elif key in {"left", "right", "\t"}:
+                selected = (selected + (-1 if key == "left" else 1)) % len(screen.SECTIONS); index = 0
+            elif key == "pageup": index = max(0, index - height)
+            elif key == "pagedown": index = min(max(0, len(rows) - 1), index + height)
+            elif key == "home": index = 0
+            elif key == "end": index = max(0, len(rows) - 1)
+            elif key == "/":
+                print("\n", end="")
+                query = input("搜索配置名称/说明（空为全部）: ").strip()
+                selected = screen.SECTIONS.index("全部"); index = 0
             elif key in {" ", "\r", "\n", "d"} and row:
                 if row["kind"] == "model":
                     state = config.models[row["repo"]]
@@ -333,14 +348,19 @@ def ui(config: Configuration) -> None:
                             (value in {"0", "1"} and any(s in name for s in ("ENABLED", "DISABLE", "VERIFY", "SCHEDULING")))):
                         config.values[name] = {"true": "false", "false": "true", "0": "1", "1": "0"}[value.lower()]
                     elif key != " ": config.values[name] = (getpass.getpass if row["secret"] else input)(f"{name} 新值: ")
-            elif key == "s": config.save(); notice = "已生成配置；热配置对新请求生效。启动配置尚未应用，未启动模型。"
+            elif key == "s":
+                config.save()
+                baseline = json.dumps([config.values, config.models], sort_keys=True)
+                notice = "配置已保存；没有启动模型。启动配置尚未应用。"
             elif key == "v":
                 if input("将完整读取已勾选模型的权重，可能耗时数分钟。输入 verify 开始: ") == "verify":
                     config.verify_weights(); input("权重校验完成，回车返回。")
             elif key == "a":
                 print("将保存配置、重建 Backend/Agent 并启动勾选模型；请先完成在途任务。")
                 if input("输入 deploy 执行，其他输入返回: ") == "deploy":
-                    config.apply(); input("回车返回配置界面。")
+                    config.apply()
+                    baseline = json.dumps([config.values, config.models], sort_keys=True)
+                    input("回车返回配置界面。")
         except (ValueError, OSError, RuntimeError) as exc: notice = str(exc)
 
 

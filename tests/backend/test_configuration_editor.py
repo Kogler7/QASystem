@@ -176,3 +176,56 @@ def test_host_judge_uses_runtime_settings_and_explicit_override_wins(editor, mon
     assert client.model == 'local-test'
     assert client.max_tokens == 512
     assert build_judge_client({'_judge_overrides': {'model': 'override'}}).model == 'override'
+
+
+@pytest.mark.parametrize('columns,lines', [(56, 18), (80, 24), (109, 28), (110, 24), (120, 32), (200, 60)])
+def test_terminal_layout_fits_cjk_text_and_preserves_action_bar(editor, columns, lines):
+    from docker import terminal_ui as screen
+    rows = editor.rows()
+    frame = screen.render(editor, rows, 0, '模型', '', '保存不会部署；' * 30, columns, lines)
+    assert len(frame.splitlines()) <= lines
+    assert all(screen.width(line) <= columns - 1 for line in frame.splitlines())
+    assert 's 保存' in frame
+    assert 'a 部署' in frame
+    assert '\x1b[1;30;46m' in frame
+
+
+def test_terminal_detail_masks_current_and_default_credentials(editor):
+    from docker import terminal_ui as screen
+    editor.values['KG_EXTRACT_LLM_API_KEY'] = 'do-not-expose'
+    row = next(r for r in editor.rows() if r['key'] == 'KG_EXTRACT_LLM_API_KEY')
+    frame = screen.render(editor, [row], 0, '抽取', '', '', 120, 32)
+    assert 'do-not-expose' not in frame
+    assert '******' in frame
+
+
+def test_terminal_category_filters_and_plain_color_mode(editor):
+    from docker import terminal_ui as screen
+    models = screen.filter_rows(editor.rows(), '模型')
+    assert any(r['kind'] == 'model' for r in models)
+    assert not any(r['key'] == 'BACKEND_HOST_PORT' for r in models)
+    judge = screen.filter_rows(editor.rows(), '裁判')
+    assert all(r['key'].startswith('QASYSTEM_JUDGE_') for r in judge)
+    frame = screen.render(editor, judge, 0, '裁判', '', '', 120, 32, color=False)
+    assert '\x1b' not in frame
+
+
+def test_terminal_sanitizes_control_characters_and_handles_tiny_windows(editor):
+    from docker import terminal_ui as screen
+    assert '\x1b' not in screen.fit('text\x1b[2J\nmalicious', 40)
+    assert screen.width(screen.fit('中文参数目录' * 20, 15)) == 15
+    frame = screen.render(editor, [], 0, '模型', '', '', 40, 12)
+    assert '终端过小' in frame
+    assert all(screen.width(line) <= 39 for line in frame.splitlines())
+
+
+def test_keyboard_ui_navigation_restores_terminal_without_saving(editor, monkeypatch, capsys):
+    keys = iter(['right', 'end', 'pageup', '\t', 'q'])
+    monkeypatch.setattr(configure, 'read_key', lambda: next(keys))
+    original = (editor.root / '.env').read_bytes()
+    configure.ui(editor)
+    output = capsys.readouterr().out
+    assert '[服务]' in output and '[抽取]' in output
+    assert output.startswith('\x1b[?1049h')
+    assert output.endswith('\x1b[0m\x1b[?25h\x1b[?1049l')
+    assert (editor.root / '.env').read_bytes() == original
