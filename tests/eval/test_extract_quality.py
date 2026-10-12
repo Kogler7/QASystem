@@ -108,6 +108,7 @@ def test_best_effort_graph_fails_cli_gate_even_with_perfect_score(
     monkeypatch.setattr(eval_run, "RUNS_DIR", runs)
     args = ["run.py", "--workspace", str(workspace), "--match-mode", "identity",
             "--mode", "extract", "--from-run", str(chunks), "--min-f1", "0.5",
+            "--case-attempts", "3",
             # Isolate execution quality from legacy reuse provenance checks.
             "--no-require-scored"]
     if reuse_previous_run:

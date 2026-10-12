@@ -90,7 +90,7 @@ def _run_eval(monkeypatch, tmp_path: Path, ws: Path, backend_fn, *argv):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["run.py", "--workspace", str(ws), "--match-mode", "identity", *argv],
+        ["run.py", "--workspace", str(ws), "--match-mode", "identity", "--mode", "chunk-extract", *argv],
     )
     with patch.object(eval_run, "run_backend_case", side_effect=backend_fn):
         code = eval_run.main()

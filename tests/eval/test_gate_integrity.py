@@ -112,7 +112,7 @@ def test_require_scored_rejects_missing_scoring_even_when_backend_succeeds(cli, 
     if not annotated:
         cli.golden.unlink()
     monkeypatch.setattr(eval_run, "run_backend_case", _backend(missing_metrics=True))
-    assert cli.run("--require-scored") == 4
+    assert cli.run("--require-scored", "--mode", "chunk-extract") == 4
     summary = cli.summary()
     assert summary["succeeded"] == 1
     assert summary["gate"]["passed"] is False
@@ -197,7 +197,7 @@ def test_nonfinite_or_negative_thresholds_and_budgets_are_config_errors(cli, mon
 def test_partial_pipeline_cannot_be_reported_as_success(cli, monkeypatch):
     backend = Mock(side_effect=_backend(pipeline_status="partial"))
     monkeypatch.setattr(eval_run, "run_backend_case", backend)
-    assert cli.run("--mode", "pipeline") == 2
+    assert cli.run("--mode", "pipeline", "--case-attempts", "3") == 2
     assert backend.call_count == eval_run.MAX_ATTEMPTS
     summary = cli.summary()
     assert summary["failed"] == 1

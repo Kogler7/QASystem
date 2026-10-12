@@ -33,7 +33,7 @@ def test_call_with_retries_succeeds_on_third_try():
             raise RuntimeError(f"fail-{hits['n']}")
         return "ok"
 
-    value, attempts = eval_run.call_with_retries(boom, label="unit")
+    value, attempts = eval_run.call_with_retries(boom, label="unit", attempts=3)
     assert value == "ok"
     assert attempts == 3
     assert hits["n"] == 3
@@ -50,7 +50,7 @@ def test_parse_retries_then_skips_middle_file(tmp_path: Path):
         return {"data": {"markdown": f"# {source.name}\nbody"}}
 
     with patch.object(eval_run, "parse_document", side_effect=fake_parse):
-        markdown, block = eval_run._parse_sources("http://x", sources, {}, {}, tmp_path / "out")
+        markdown, block = eval_run._parse_sources("http://x", sources, {}, {"request_attempts": 3}, tmp_path / "out")
 
     assert "a.txt" in markdown and "c.txt" in markdown
     assert "b.txt" not in markdown
@@ -83,7 +83,7 @@ def test_ingest_retries_then_skips_middle_file(tmp_path: Path):
         }
 
     with patch.object(eval_run, "ingest_file", side_effect=fake_ingest):
-        block = eval_run._run_system("http://x", sources, "onto", {}, {}, None, tmp_path / "out", None)
+        block = eval_run._run_system("http://x", sources, "onto", {}, {"request_attempts": 3}, None, tmp_path / "out", None)
 
     assert block["status"] == "partial"
     assert calls == ["a.txt", "b.txt", "b.txt", "b.txt", "c.txt"]
@@ -126,6 +126,7 @@ def test_case_retries_then_continues_to_next(tmp_path: Path):
                 score_ctx=None,
                 modes=["chunk-extract"],
                 reuse_dir=None,
+                max_attempts=3,
             )
             results.append((case, backend, plugin, markdown, attempts, error))
 
@@ -158,6 +159,7 @@ def test_uncaught_exception_does_not_leave_run_case_with_retries(tmp_path: Path)
             score_ctx=None,
             modes=["chunk-extract"],
             reuse_dir=None,
+            max_attempts=3,
         )
     assert attempts == 3
     assert "unexpected" in (error or "")

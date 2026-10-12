@@ -15,7 +15,7 @@ options:
 eval:
   match_mode: llm
   judge_base_url: null
-  judge_model: clef-flash
+  judge_model: deepseek-flash
   judge_adapter: auto
   judge_timeout_seconds: 30
   judge_max_tokens: 4096
