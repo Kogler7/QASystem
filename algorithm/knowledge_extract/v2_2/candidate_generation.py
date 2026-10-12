@@ -16,7 +16,7 @@ from typing import Any
 
 from algorithm.output_batching import generate_batched, output_batch_size
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
-from .clef_gate import ClefGate
+from .clef_gate import ClefGate, sentence_cooccurrence
 from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import canonical_name
 from .ontology_compiler import ExtractionPlan
@@ -26,7 +26,7 @@ from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table
 
 
 logger = get_step_logger(__name__)
-from .relation_resolver import enumerate_relation_pairs
+from .relation_resolver import enumerate_relation_pairs, pair_relation_ids, withheld_relation_tokens
 from .semantic_evidence import VERIFICATION_SCHEMA, build_verification_messages, semantic_support
 from .scheduler import get_llm_scheduler
 from .structured_output import validate_json_schema
@@ -322,7 +322,7 @@ def output_schema_for_types(
 def relation_pair_decision_schema(pairs: list[dict[str, Any]]) -> dict[str, Any]:
     """Strict provider schema for classifying a pre-enumerated pair batch."""
     pair_ids = [str(pair["pair_id"]) for pair in pairs]
-    labels = sorted({str(pair["relation_id"]) for pair in pairs} | {"NONE"})
+    labels = sorted({rel for pair in pairs for rel in pair_relation_ids(pair)} | {"NONE"})
     decision = {
         "type": "object",
         "properties": {
@@ -1226,7 +1226,11 @@ def relation_pass(
             entity for entity in entity_objects
             if entity.candidate_id in permitted_ids
         ]
-        pairs = enumerate_relation_pairs(plan, permitted_objects)
+        pairs = enumerate_relation_pairs(
+            plan,
+            permitted_objects,
+            skip_tokens=withheld_relation_tokens(route.kind),
+        )
         anchor_types = {
             canonical_name(entity.canonical_type)
             for entity in entity_objects
@@ -1254,12 +1258,33 @@ def relation_pass(
                 or pair["target_id"] in current_ids
             )
         ]
+        # 关系证据必须是当前切片原文子串。两端名称若不在同一句共现，
+        # 生成式模型也几乎写不出可定位引文；文档锚点可隐式指代，予以保留。
+        chunk_text = chunk.text or ""
+        kept_pairs: list[dict[str, Any]] = []
+        pruned = 0
+        for pair in pairs:
+            if pair["source_id"] in anchor_ids or pair["target_id"] in anchor_ids:
+                # 锚点 pair：保留给 Clef/LLM，且禁止 Clef 高置信 NONE 直接丢弃。
+                kept_pairs.append({**pair, "preserve_on_none": True})
+                continue
+            if sentence_cooccurrence(
+                chunk_text,
+                str(pair.get("source_name") or ""),
+                str(pair.get("target_name") or ""),
+            ):
+                kept_pairs.append(pair)
+            else:
+                pruned += 1
+        pairs = kept_pairs
+        if clef is not None and pruned:
+            clef.note(relation_pruned_no_cooccurrence=pruned)
         if not pairs:
             return chunk.chunk_id, [], local_attempts, local_warnings, local_call_metrics
         all_relations: list[dict[str, Any]] = []
         if clef is not None and clef.enabled:
             grounded, pairs = clef.apply_relation_gate(
-                chunk.text or "",
+                chunk_text,
                 pairs,
                 chunk_id=chunk.chunk_id,
                 attempts=local_attempts,
@@ -1287,8 +1312,16 @@ def relation_pass(
                 relation_grounded_without_llm=grounded_count,
                 relation_sent_to_llm=len(pairs),
             )
-        for offset in range(0, len(pairs), RELATION_PAIR_BATCH_SIZE):
+
+        def _decide_batch(
+            offset: int,
+        ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
             pair_batch = pairs[offset : offset + RELATION_PAIR_BATCH_SIZE]
+            batch_attempts: list[dict[str, Any]] = []
+            batch_warnings: list[dict[str, Any]] = []
+            batch_metrics: list[dict[str, Any]] = []
+            batch_relations: list[dict[str, Any]] = []
+
             def build_request(subset):
                 output_schema = relation_pair_decision_schema(subset)
                 messages = build_chat_messages(
@@ -1302,49 +1335,68 @@ def relation_pass(
                     relation_pairs=subset,
                 )
                 return messages, output_schema
+
             parsed = generate_batched(
                 pair_batch, build_request, generate_structured, llm,
                 batch_size=output_batch_size(llm, tokens_per_item=128, ceiling=RELATION_PAIR_BATCH_SIZE),
                 use_scheduler=use_scheduler,
-                attempts=local_attempts,
+                attempts=batch_attempts,
                 pass_name="relation",
                 chunk_id=f"{chunk.chunk_id}.batch-{offset // RELATION_PAIR_BATCH_SIZE}",
                 max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds,
-                call_metrics=local_call_metrics,
+                call_metrics=batch_metrics,
             )
             if parsed is None:
-                continue
+                return batch_relations, batch_attempts, batch_warnings, batch_metrics
             by_id = {pair["pair_id"]: pair for pair in pair_batch}
             seen_decisions: set[str] = set()
             for index, decision in enumerate(parsed.get("decisions", [])):
                 if not isinstance(decision, dict):
-                    _append_warning(local_warnings, "INVALID_RELATION_DECISION", "关系决策必须是对象", f"decisions[{index}]")
+                    _append_warning(batch_warnings, "INVALID_RELATION_DECISION", "关系决策必须是对象", f"decisions[{index}]")
                     continue
                 pair_id = str(decision.get("pair_id") or "")
                 pair = by_id.get(pair_id)
                 if pair is None:
-                    _append_warning(local_warnings, "UNKNOWN_RELATION_PAIR_ID", "关系决策引用未知 pair_id", f"decisions[{index}].pair_id", pair_id)
+                    _append_warning(batch_warnings, "UNKNOWN_RELATION_PAIR_ID", "关系决策引用未知 pair_id", f"decisions[{index}].pair_id", pair_id)
                     continue
                 if pair_id in seen_decisions:
-                    _append_warning(local_warnings, "DUPLICATE_RELATION_PAIR_DECISION", "同一 pair 重复决策", f"decisions[{index}].pair_id", pair_id)
+                    _append_warning(batch_warnings, "DUPLICATE_RELATION_PAIR_DECISION", "同一 pair 重复决策", f"decisions[{index}].pair_id", pair_id)
                     continue
                 seen_decisions.add(pair_id)
                 label = str(decision.get("label") or "")
                 if label == "NONE":
                     continue
-                if label != pair["relation_id"]:
-                    _append_warning(local_warnings, "RELATION_PAIR_SIGNATURE_MISMATCH", "关系标签不符合 pair 本体签名", f"decisions[{index}].label", label)
+                allowed = pair_relation_ids(pair)
+                if label not in allowed:
+                    _append_warning(batch_warnings, "RELATION_PAIR_SIGNATURE_MISMATCH", "关系标签不符合 pair 本体签名", f"decisions[{index}].label", label)
                     continue
                 evidence = bind_relation_evidence(decision, manager, chunk_ids=(chunk.chunk_id,))
                 if evidence is None:
                     quote = str((decision.get("evidence") or {}).get("quote") or "")
-                    _append_warning(local_warnings, "RELATION_EVIDENCE_INVALID", "关系 evidence 无法在当前 chunk 定位", f"decisions[{index}].evidence", quote)
+                    _append_warning(batch_warnings, "RELATION_EVIDENCE_INVALID", "关系 evidence 无法在当前 chunk 定位", f"decisions[{index}].evidence", quote)
                     continue
-                all_relations.append({
+                batch_relations.append({
                     "from_id": pair["source_id"], "to_id": pair["target_id"],
                     "rel_type": label, "evidence": evidence.to_dict(),
                 })
+            return batch_relations, batch_attempts, batch_warnings, batch_metrics
+
+        offsets = list(range(0, len(pairs), RELATION_PAIR_BATCH_SIZE))
+        batch_worker_count = min(max(1, max_workers), len(offsets)) if offsets else 1
+        if batch_worker_count <= 1:
+            batch_results = [_decide_batch(offset) for offset in offsets]
+        else:
+            with ThreadPoolExecutor(
+                max_workers=batch_worker_count,
+                thread_name_prefix="ke-rel-batch",
+            ) as batch_executor:
+                batch_results = list(batch_executor.map(_decide_batch, offsets))
+        for batch_relations, batch_attempts, batch_warnings, batch_metrics in batch_results:
+            all_relations.extend(batch_relations)
+            local_attempts.extend(batch_attempts)
+            local_warnings.extend(batch_warnings)
+            local_call_metrics.extend(batch_metrics)
         return chunk.chunk_id, all_relations, local_attempts, local_warnings, local_call_metrics
 
     worker_count = max(1, max_workers)

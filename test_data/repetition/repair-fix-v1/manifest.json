@@ -1,0 +1,31 @@
+{
+  "cases": [
+    {
+      "id": "repair-original",
+      "sha256": "839f31d35a58b50d1a45364a92e3fd4e4e8b7371f77e05a75af5ba1b6ab550e0"
+    },
+    {
+      "id": "repair-fixed-skip",
+      "sha256": "67342257edeab6a0c92a4ea6d828dac1861633d81b4e081045e7a1e1f3524b89"
+    },
+    {
+      "id": "repair-positive-original",
+      "sha256": "2e5b2abf19337962dce43dd7104019e7bc66e96384111b22b2354e071a530a84"
+    },
+    {
+      "id": "repair-positive-fixed",
+      "sha256": "82268e2bae4cc21415701a5d5d1081de7d22d925a9ecfc06c388b5a544da1c28"
+    },
+    {
+      "id": "entity-segment-a",
+      "sha256": "31c177f1e20a891a1f58e1faf4e6cb0ed4ec7ce686745507da4da20288ff23aa"
+    },
+    {
+      "id": "entity-segment-b",
+      "sha256": "4a5aa51f29b0ea1ef9b06c122de2cf6e79ab717891d91b4525f7df48bc2b86ca"
+    }
+  ],
+  "max_tokens": 16384,
+  "label_status": "agent-reviewed / provisional",
+  "skipped_arm_not_called": "repair-fixed-skip"
+}

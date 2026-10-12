@@ -2,12 +2,9 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Iterable
-import json
-import threading
 
 from .skill_planner import SkillAssemblyPlanner
 from .skill_registry import SkillRegistry
-from .candidate_generation import generate_structured
 from .chunk_context import ExtractionChunk
 from .config import get_llm_config
 from .llm_client import create_llm_client
@@ -38,7 +35,7 @@ def extract_harness(
     assembly_planner: SkillAssemblyPlanner | None = None,
     skills_dir: str | None = None,
 ) -> dict[str, Any]:
-    """Run the two-pass pipeline over caller-provided chunks."""
+    """Run entity extraction and property enrichment over caller-provided chunks."""
     ontology = (ontology or "").strip()
     if not ontology:
         raise ValueError("本体定义不能为空")
@@ -57,32 +54,9 @@ def extract_harness(
             else request_timeout
         ),
     )
-    planning_attempts: list[dict[str, Any]] = []
-    planning_calls: list[dict[str, Any]] = []
-    planning_lock = threading.Lock()
-
-    def run_planning(messages: list[dict[str, str]], output_schema: dict[str, Any], operation: str):
-        # Use the same caller-supplied runtime and existing scheduling path as
-        # extraction. The shared planner owns no client, queue or rate limiter.
-        attempts: list[dict[str, Any]] = []
-        calls: list[dict[str, Any]] = []
-        target = json.loads(messages[1]["content"])["assembly_target"]["user"]
-        chunk_id = target["documents"][0]["current_chunk"]["chunk_id"]
-        try:
-            return generate_structured(
-                resolved_llm, messages, output_schema, use_scheduler=use_scheduler,
-                attempts=attempts, pass_name=operation, chunk_id=chunk_id,
-                max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
-                call_metrics=calls,
-            )
-        finally:
-            with planning_lock:
-                planning_attempts.extend(attempts)
-                planning_calls.extend(calls)
-
     if assembly_planner is not None and skills_dir is not None:
         raise ValueError("skills_dir cannot be combined with an explicitly configured assembly_planner")
-    planner = assembly_planner if assembly_planner is not None else SkillAssemblyPlanner(run_planning, SkillRegistry(skills_dir))
+    planner = assembly_planner if assembly_planner is not None else SkillAssemblyPlanner(SkillRegistry(skills_dir))
     result = extract_split(
         ontology,
         chunks=chunks,
@@ -104,8 +78,8 @@ def extract_harness(
     plans = planner.audit()
     if plans:
         result.setdefault("profile", {})["prompt_assembly"] = {
-            "mode": "model_skill_plan", "plans": plans,
-            "calls": planning_calls, "attempts": planning_attempts,
+            "mode": "deterministic_skill_compile", "plans": plans,
+            "calls": [], "attempts": [],
         }
     return result
 

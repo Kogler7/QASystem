@@ -289,7 +289,7 @@ def test_relation_failure_preserves_successful_entity_batch_diagnostics(monkeypa
 
 def test_build_judge_client_reads_configuration(monkeypatch):
     monkeypatch.setenv("KG_EXTRACT_LLM_BASE_URL", "https://api.deepseek.com/v1")
-    client = run.build_judge_client({"eval": {"judge_response_format": "json_object", "judge_disable_thinking": False}})
+    client = run.build_judge_client({"eval": {"judge_model": "deepseek-flash", "judge_base_url": "https://api.deepseek.com/v1", "judge_response_format": "json_object", "judge_disable_thinking": False}})
     assert client.response_modes == ("json_object", "plain")
     assert client.disable_thinking is False
 

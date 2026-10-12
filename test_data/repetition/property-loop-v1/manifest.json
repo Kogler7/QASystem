@@ -1,0 +1,73 @@
+{
+  "cases": [
+    {
+      "id": "property-000034-baseline",
+      "sha256": "21c3bd4b35fe9fca2c7c3fdefeaa1122000b25cd3b7d5dbe12e0eacdf297add0"
+    },
+    {
+      "id": "property-000040-baseline",
+      "sha256": "3aa86b84406abe221f9778b41f49ed21684702de8b0ea31c6c831cd23dad5a69"
+    },
+    {
+      "id": "property-000040-entity-2",
+      "sha256": "be129962c842526c29d9017cc62775a95b8853cb470342f7c88f6263f0b7a4cb"
+    },
+    {
+      "id": "property-000040-entity-3",
+      "sha256": "9845872e37616f3713721da174791a2333c6f6e140ea0c76aa2356ed210a6d4b"
+    },
+    {
+      "id": "property-000040-entity-4",
+      "sha256": "dd33ca1eab952dfb9a1941631f8a78ce9d1a029415eb03b3138322de2a8f365e"
+    },
+    {
+      "id": "property-000040-entity-25",
+      "sha256": "9294296b74505d64125f00c844206093ac307919d1a76896dacfbf7113412326"
+    },
+    {
+      "id": "property-000040-entity-25-主体名称",
+      "sha256": "6362a2a6b2b83ac4fac94d7b7a5d2e9a42171a0018ef8897c933ce23d975211b"
+    },
+    {
+      "id": "property-000040-entity-25-主体标识",
+      "sha256": "22ccddad19105a488c05785562e1dd3c92bef1b32a643e33e802a457a6d29585"
+    },
+    {
+      "id": "property-000040-entity-25-主体类型",
+      "sha256": "03e3f565316d6eb8baba8fa671a35b3cda7778f1565b62bb202ae0d3b5f8055a"
+    },
+    {
+      "id": "property-000040-entity-25-组织层级",
+      "sha256": "02dbcc2fb809a9166a54efcf0f6f74f2ba43f67c21cb6a8a421b775b08aa0a66"
+    },
+    {
+      "id": "property-000040-entity-25-职责",
+      "sha256": "2491a85b515b2b52c76d67d36a069b279077381c7fbbf2abc8863cf1463a9e6e"
+    }
+  ],
+  "provider": "matrix-qwen35",
+  "model": "Qwen/Qwen3.5-4B",
+  "temperature": 0,
+  "max_tokens": 8192,
+  "thinking": {
+    "type": "disabled"
+  },
+  "timeout_seconds": 180,
+  "max_retries": 0,
+  "workers": 1,
+  "entity_partition": [
+    "entity-2",
+    "entity-3",
+    "entity-4",
+    "entity-25"
+  ],
+  "entity_25_property_partition": [
+    "主体名称",
+    "主体标识",
+    "主体类型",
+    "组织层级",
+    "职责"
+  ],
+  "coverage_warning": "Six calls diagnose the looping entity/field only. Other frozen partitions are not executed; no whole-batch coverage claim.",
+  "main_matrix_overlap": "must wait for main Qwen extraction matrix to finish before replay"
+}

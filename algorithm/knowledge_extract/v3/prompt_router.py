@@ -1,6 +1,8 @@
 """Canonical chat prompt builder and deterministic document routing."""
 from __future__ import annotations
 
+from algorithm.knowledge_extract.repair_scope import relation_repair_scope
+
 import json
 from algorithm.knowledge_extract.jsonl_protocol import jsonl_instruction, record_schema
 import math
@@ -779,6 +781,12 @@ def build_chat_messages(
     else:
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
 
+    repair_scope = None
+    if task == "repair" and "relations" in (output_schema or {}).get("properties", {}):
+        repair_scope = relation_repair_scope(plan, known_entities, repair_issues, output_schema)
+        output_schema = repair_scope.schema
+        repair_issues = repair_scope.issues
+
     record_table = _looks_like_record_table(chunk)
     table_semantics = analyze_table_semantics(plan, chunk)
     has_table = "source.not_table" not in table_semantics.reasons
@@ -838,6 +846,8 @@ def build_chat_messages(
         ontology_section = _catalog_text(plan, include_comments=record_table or task in {"property", "identity"})
         feature_section = _feature_text(plan)
         relation_section = _signature_text(plan)
+        if repair_scope is not None:
+            relation_section = repair_scope.signatures
         known_section = _known_entities_text(known_entities)
         context_section = local_context or "（无）"
         entity_rules = ""

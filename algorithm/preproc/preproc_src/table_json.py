@@ -497,8 +497,19 @@ def table_from_columns_and_rows(columns: Sequence[Any], rows: Iterable[Sequence[
     return {"columns": names, "rows": records}
 
 
+def render_jsonl_block(table: dict[str, Any]) -> str:
+    """渲染非空记录表：每行完整对象，列名为键，字段内换行由 JSON 转义。"""
+    rows = table.get("rows")
+    if not isinstance(rows, list) or not rows or not all(isinstance(row, dict) for row in rows):
+        raise ValueError("JSONL table requires nonempty object records")
+    body = "\n".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) for row in rows)
+    return f"```jsonl\n{body}\n```"
+
+
 def render_json_block(table: dict[str, Any]) -> str:
-    """把表对象渲染成 ```json 代码块。"""
+    """兼容各解析路线的公共入口：记录表用 JSONL，表单/网格/空表用 JSON。"""
+    if isinstance(table.get("columns"), list) and isinstance(table.get("rows"), list) and table["rows"]:
+        return render_jsonl_block(table)
     body = json.dumps(table, ensure_ascii=False, indent=2)
     return f"```json\n{body}\n```"
 

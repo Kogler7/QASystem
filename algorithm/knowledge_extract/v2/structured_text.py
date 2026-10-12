@@ -21,6 +21,7 @@ import json
 import re
 from dataclasses import dataclass
 from typing import Any
+from algorithm.table_jsonl import decode_records, row_boundaries
 
 #: JSON 主体占有效（非空白）字符的比例下限。
 #: 低于它说明 chunk 里还有成规模的正文，按普通文档处理，不套用记录表策略。
@@ -31,7 +32,7 @@ _BATCH_HEADER = re.compile(r"^\s*#{1,6}\s*文件\s*[:：].*$")
 _HEADING = re.compile(r"^\s{0,3}#{1,6}\s+\S")
 _FENCE = re.compile(r"^\s*```\s*(?P<lang>[A-Za-z0-9_+-]*)\s*$")
 #: 允许的代码块语言标注：空标注或 json。
-_JSON_LANGS = frozenset({"", "json"})
+_JSON_LANGS = frozenset({"", "json", "jsonl"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +69,7 @@ def _parse_payload(payload: str) -> Any | None:
     try:
         return json.loads(payload)
     except (TypeError, ValueError):
-        return None
+        return decode_records(payload)
 
 
 def _is_record_payload(data: Any) -> bool:
@@ -90,7 +91,10 @@ def _collect_block(
         return
     data = _parse_payload(body)
     if lang in _JSON_LANGS and data is not None and _is_record_payload(data):
-        json_blocks.append((body, data))
+        if decode_records(body) is not None and len(body.splitlines()) > 1:
+            json_blocks.extend((line, json.loads(line)) for line in body.splitlines() if line.strip())
+        else:
+            json_blocks.append((body, data))
         return
     other_parts.append(body)
 
@@ -115,12 +119,17 @@ def extract_json_payload(
         return None
 
     body = _strip_leading_scaffolding(raw)
+    if row_boundaries(body) is not None:
+        lines = [line for line in body.splitlines() if decode_records(line) is not None]
+        return StructuredPayload(text="\n".join(lines),
+                                 blocks=tuple(json.loads(line) for line in lines))
 
     # 形态 1：整段 JSON
     stripped = body.strip()
     data = _parse_payload(stripped)
     if data is not None and _is_record_payload(data):
-        return StructuredPayload(text=stripped, blocks=(data,))
+        return StructuredPayload(text=stripped, blocks=(tuple(decode_records(stripped))
+                                 if decode_records(stripped) is not None else (data,)))
 
     # 形态 2：Markdown 外壳 + json 代码块（允许一个或多个）
     json_blocks: list[tuple[str, Any]] = []

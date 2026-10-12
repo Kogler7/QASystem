@@ -21,7 +21,6 @@ from .output_contracts import compile_output_schemas
 from ._logging import get_step_logger
 from .graph_utils import canonical_name, coerce_non_empty_name
 from .ontology_schema import OntologyClass, OntologyProperty, OntologySchema
-from .composite import CompositeSpec, discover_composite_specs
 
 
 logger = get_step_logger(__name__)
@@ -168,7 +167,6 @@ class ExtractionPlan:
     identity_specs: dict[str, IdentitySpec]
     target_scope: TargetScope
     feature_specs: dict[str, tuple[FeatureSpec, ...]]
-    composite_specs: dict[str, CompositeSpec]
     output_schemas: dict[str, dict[str, Any]]
     schema_partitions: tuple[SchemaPartition, ...]
     schema_warnings: tuple[SchemaWarning, ...] = ()
@@ -644,7 +642,6 @@ def _compile_feature_specs(
     return {key: tuple(value) for key, value in features.items()}
 
 
-
 def _compile_schema_partitions(
     class_specs: dict[str, ClassSpec],
     allowed_types: frozenset[str],
@@ -728,7 +725,7 @@ class OntologyCompiler:
         relation_specs = _compile_relation_specs(schema)
         identity_specs = _compile_identity_specs(schema)
         feature_specs = _compile_feature_specs(class_specs, relation_specs)
-        output_schemas = compile_output_schemas(class_specs, scope.expanded_types, relation_specs)
+        output_schemas = compile_output_schemas(class_specs, scope.expanded_types)
         schema_partitions = _compile_schema_partitions(class_specs, scope.expanded_types, relation_specs)
         return ExtractionPlan(
             ontology_id=ontology_id or _derive_ontology_id(ontology or ""),
@@ -738,7 +735,6 @@ class OntologyCompiler:
             identity_specs=identity_specs,
             target_scope=scope,
             feature_specs=feature_specs,
-            composite_specs=discover_composite_specs(schema),
             output_schemas=output_schemas,
             schema_partitions=schema_partitions,
             schema_warnings=tuple(warnings),

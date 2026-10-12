@@ -550,20 +550,16 @@ class KnowledgePrecipitationService:
         extraction_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         chunk_started = time.monotonic()
-        threshold = options.chunking.chunk_threshold
         if document_segments:
             # Batch input is one artifact for storage, but remains a sequence of
             # independent documents for extraction.  Chunk each segment before
-            # combining it so a threshold bypass cannot create a cross-file
-            # chunk (and so all ranges remain offsets into combined markdown).
+            # combining it; no chunk may span files, and all ranges must remain
+            # offsets into combined markdown.
             chunks = []
             for segment in document_segments:
                 text = str(segment["text"])
                 base = int(segment["start"])
-                if len(text) <= threshold:
-                    segment_items = [{"text": text, "range": [0, len(text)]}]
-                else:
-                    segment_items = self.chunking.chunk(text, options.chunking)["items"]
+                segment_items = self.chunking.chunk(text, options.chunking)["items"]
                 segment_metadata = dict(segment.get("metadata") or {})
                 for item in segment_items:
                     local_start, local_end = item["range"]
@@ -575,12 +571,6 @@ class KnowledgePrecipitationService:
                     }
                     chunks.append(item)
             chunked = {"count": len(chunks), "items": chunks}
-        elif len(markdown) <= threshold:
-            chunked = {
-                "count": 1,
-                "items": [{"text": markdown, "range": [0, len(markdown)]}],
-            }
-            chunks = chunked["items"]
         else:
             chunked = self.chunking.chunk(markdown, options.chunking)
             chunks = chunked["items"]
@@ -589,11 +579,10 @@ class KnowledgePrecipitationService:
             item_metadata.update(dict(item.get("metadata") or {}))
             item["metadata"] = item_metadata
         logger.info(
-            "%s[知识沉淀] 切片完成: count=%d 总字符=%d threshold=%d",
+            "%s[知识沉淀] 切片完成: count=%d 总字符=%d",
             _log_prefix(fingerprint),
             len(chunks),
             sum(len(item["text"]) for item in chunks),
-            threshold,
         )
         observability.record_stage_duration(
             "chunk",
@@ -615,7 +604,6 @@ class KnowledgePrecipitationService:
                 title="切片输出",
                 summary=(
                     f"count={len(chunks)} 总字符={sum(len(item['text']) for item in chunks)}"
-                    f" threshold={threshold}"
                 ),
             )
 
@@ -959,7 +947,6 @@ class KnowledgePrecipitationService:
             "strategy": options.chunking.strategy,
             "size": options.chunking.size,
             "separators": options.chunking.separators,
-            "threshold":threshold,
             "vector_storage_enabled": origin is not None,
             "vector_dimension": vector_dimension,
             "vector_source": "text_chunk",

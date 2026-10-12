@@ -217,6 +217,9 @@ def test_ofd_is_converted_then_uses_pdf_selection(tmp_path, monkeypatch):
 
 
 def test_ofd_conversion_failure_is_reported(tmp_path, monkeypatch):
+    # The failure contract is for environments without native MinerU fallback.
+    from algorithm.preproc.preproc_src.processors import mineru4_processor
+    monkeypatch.setattr(mineru4_processor, "mineru_major_version", lambda: None)
     path = tmp_path / "sample.ofd"
     path.write_bytes(b"ofd-test")
     processor = DocumentProcessor(output_dir=str(tmp_path / "out"))

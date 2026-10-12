@@ -1,0 +1,140 @@
+{
+  "id": "entity-normal",
+  "source": "/app/backend/tmp/extraction-traces/20261011/fb63ea80e14f4bea8db3e7f56254f693/000001-call-response.json",
+  "source_call_sha256": "4b30e1d1c38754749807d99291c32618e4fbf6e2057934b2b20582a3f95b6b5b",
+  "call": {
+    "recorded_at": "2026-10-11T08:24:54.755673+00:00",
+    "context": {
+      "pass_name": "entity",
+      "chunk_id": "chunk-0000",
+      "attempt_number": 1,
+      "response_mode": "jsonl",
+      "record_table": false
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v5\n你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。\n只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出遵循本轮 JSONL 协议，记录只能包含记录 schema 允许的字段。\n\n[核心原则]\n- 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。\n- mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。\n- evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。\n- 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。\n\n[通用归类与粒度规则]\n- 使用最具体的类型；不要用父类/抽象类型重复表达同一实体。\n- 同一现实对象只保留一个实体：全称、简称、别名、编号不拆成多个；同一对象的不同表达应复用同一实体。\n- 结构实体只按实际标题层级创建；一个标题只用一个最合适的结构类型；段落、列表、条目类内容优先抽为结构单元，不要拆成零散活动。\n- 行为/工作事项以“一个动宾事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合为一个；原文中并列出现的多个动宾事项必须分别抽取，不得只取其一或强行合并。\n- 字段缺失保持缺失，不要用模板标题、编号或其他字段填充；不要把普通名词都抽成业务对象，只有作为管理/治理/建设/约束/交换/引用对象出现的才抽取。\n\n[通用语义归类规则]\n- 属性类实体是事实：对对象、能力、状态或测量结果的客观陈述，回答是什么、值多少；约束类实体是规则：要求、限定、条件或允许范围，回答应当/必须/不得超过/不得低于/适用什么条件。\n- 规则句归约束，事实句归属性；同一特性可分别以事实和规则出现，不要合并或改名。\n- 义务/禁止性表述（应/不应/不得/严禁/禁止/未经……不得）优先归约束类实体，不要把其中的动作短语拆成独立活动；试验方法、操作步骤、单位、公式、计算过程不作为约束。\n- 同一范围内同一特性或同一规则的多个数值先合并为一条，再用属性记录最大值/最小值/范围/单位，不要按条件或测试项拆成多条。\n- 实体/属性名只写名词短语本身，不要带“要求/条件/方法/步骤/单位/计算/试验/计量”等结构词尾。\n\n[实体提取规则]\n- 优先提取显式命名的实体。\n- 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。\n- 同类型实体的 mention 长度应合理（避免截断或过度包含）。\n- 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。\n- 数值、单位、标量属性值、字段标签和修饰词不是独立实体。\n- 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。\n- 输出预算：单次调用最多输出 60 个实体；候选很多时优先覆盖不同标题/条款，不要重复同一事实。\n- evidence.quote 只给最短可逐字定位的片段（建议不超过 80 字），不要整段复制正文；同一候选/同一证据不得重复输出。\n\n[关系提取规则]\n- 只提取原文明确表达的关系。\n- 避免推测性关系，不得虚构端点。\n- 关系必须符合 ontology 声明的签名。\n- 结构/证据类关系（如 HAS_PART、EVIDENCED_BY、sourceAgent、targetAgent）在 ontology 签名允许时应输出。\n\n[属性提取规则]\n- 字面属性（编号、名称、日期、数值、单位、原文引文等）必须逐字或按本体规范化值来自原文。\n- 描述、目的、职责、范围、类别、预期结果等语义属性可忠实归纳，但不得引入证据之外的新事实。\n- ICS/CCS 分类名称等公认标准编码值可依据规范编码表补全，但不得臆造编码或分类名。\n- 避免填充原文不支持的属性；原文确实为空/缺失时按本轮 schema 允许的空值表达，不要臆造。\n- 枚举属性多项时尽量全部提取。\n- 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。\n"
+      },
+      {
+        "role": "user",
+        "content": "## task\nentity\n\n## task discipline\n只提议实体候选，禁止输出关系。\n\n## resolved route\nkind=generic; labels=none; source=fallback; reasons=route.fallback.no_domain_signal\n\n## ontology catalog\n- `Device` -> type `Device`\n- `Fault` -> type `Fault`\n\n## ontology feature catalog\n（实体任务不展示属性目录）\n\n## ontology relation signatures\n（实体任务不展示关系目录）\n\n## output protocol\n输出协议：JSONL。每行必须是独立完整的 JSON 对象，不要 Markdown 或解释。字符串中的换行必须转义为 \\n；禁止重复记录。每条记录独占一行，不要外层数组或集合键。没有记录时只输出一行 null。\n\n## record schema\n{\"additionalProperties\": false, \"properties\": {\"end_char\": {\"type\": \"integer\"}, \"evidence\": {\"additionalProperties\": false, \"properties\": {\"quote\": {\"type\": \"string\"}}, \"required\": [\"quote\"], \"type\": \"object\"}, \"mention\": {\"type\": \"string\"}, \"start_char\": {\"type\": \"integer\"}, \"type\": {\"enum\": [\"Device\", \"Fault\"], \"type\": \"string\"}}, \"required\": [\"type\", \"mention\", \"start_char\", \"end_char\", \"evidence\"], \"type\": \"object\"}\n\n## output constraints\n\n- evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。\n - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。\n\n- 每项只能包含 type、mention、start_char、end_char、evidence.quote；禁止 name、properties 或其他键。\n- mention 可以是 current chunk.text 中逐字连续的原文片段，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。\n- start_char/end_char 是 chunk-relative、左闭右开区间；mention 无法逐字定位时填 0，系统会按 evidence.quote 兜底。\n- 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。\n\n## known entities\n（实体任务不使用已知实体目录）\n\n## local context\n（实体任务禁止从 local_context 抽取；仅使用 current chunk）\n\n## current chunk\n{\"chunk_id\": \"chunk-0000\", \"document_id\": \"document-0001\", \"metadata\": {\"signal_source\": \"external\"}, \"text\": \"设备：牵引电机。故障：轴承过热。牵引电机发生轴承过热故障时，应检查轴承润滑状态。设备：制动控制器。故障：通信中断。制动控制器发生通信中断故障时，应检查连接线。\"}\n\n## repair issues\n（无）"
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Device",
+                  "Fault"
+                ]
+              },
+              "mention": {
+                "type": "string"
+              },
+              "start_char": {
+                "type": "integer"
+              },
+              "end_char": {
+                "type": "integer"
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "quote": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "quote"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "mention",
+              "start_char",
+              "end_char",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "entities"
+      ],
+      "additionalProperties": false
+    },
+    "status": "pending"
+  },
+  "reference_policy": "observed unique records are candidates, not gold; agent-reviewed provisional anchors separate; no independent human gold",
+  "observed_metrics": {
+    "records": 4,
+    "unique_records": 4,
+    "duplicate_fraction": 0.0,
+    "first_duplicate_record": null,
+    "max_exact_multiplicity": 1,
+    "repeated_substring_chars": 0,
+    "identity_unique": 4,
+    "identity_duplicate_fraction": 0.0,
+    "characters": 421
+  },
+  "observed_finish": "stop",
+  "reference_anchors": [
+    {
+      "type": "Device",
+      "mention_contains": "牵引电机"
+    },
+    {
+      "type": "Device",
+      "mention_contains": "制动控制器"
+    },
+    {
+      "type": "Fault",
+      "mention_contains": "轴承过热"
+    },
+    {
+      "type": "Fault",
+      "mention_contains": "通信中断"
+    }
+  ],
+  "quality_labels": {
+    "expected_behavior": "finite grounded records; no repeated records or repeated substrings",
+    "coverage_warning": "short_chunk changes scope; compare covered text only",
+    "agent_review_status": "Four explicit entities (two Device/Fault pairs) checked against source text by the research agent; provisional and not independently human-reviewed.",
+    "independent_human_review": false,
+    "label_status": "agent-reviewed / provisional"
+  },
+  "source_model_config": {
+    "version": "v3",
+    "provider": "siliconflow",
+    "model": "deepseek-ai/DeepSeek-V4-Flash",
+    "max_tokens": null
+  },
+  "observed_usage": {
+    "completion_tokens": 162,
+    "prompt_tokens": 1825,
+    "total_tokens": 1987,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": null,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": null
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cached_tokens": 0
+    },
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 1825
+  }
+}

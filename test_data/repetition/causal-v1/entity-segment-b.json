@@ -1,0 +1,124 @@
+{
+  "id": "entity-segment-b",
+  "source": "/app/backend/tmp/extraction-traces/20261011/22c0326238974287ad19fa5f028a3db3/000002-call-response.json",
+  "source_call_sha256": "8bcafc09c66be3a2a2519e79d459d0bc9a4c9cf01ab49705bde688ccecbdc05b",
+  "call": {
+    "recorded_at": "2026-10-11T08:39:32.340195+00:00",
+    "context": {
+      "pass_name": "entity",
+      "chunk_id": "chunk-0001",
+      "attempt_number": 1,
+      "response_mode": "frozen-wire",
+      "record_table": false
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v4\n你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。\n只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出遵循本轮 JSONL 协议，记录只能包含记录 schema 允许的字段。\n\n[核心原则]\n- 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。\n- mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。\n- evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。\n- 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。\n\n[实体提取规则]\n- 优先提取显式命名的实体。\n- 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。\n- 同类型实体的 mention 长度应合理（避免截断或过度包含）。\n- 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。\n- 数值、单位、标量属性值、字段标签和修饰词不是独立实体。\n- 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。\n\n[关系提取规则]\n- 只提取原文明确表达的关系。\n- 避免推测性关系，不得虚构端点。\n- 关系必须符合 ontology 声明的签名。\n- 结构/证据类关系（如 HAS_PART、EVIDENCED_BY、sourceAgent、targetAgent）在 ontology 签名允许时应输出。\n\n[属性提取规则]\n- 字面属性（编号、名称、日期、数值、单位、原文引文等）必须逐字或按本体规范化值来自原文。\n- 描述、目的、职责、范围、类别、预期结果等语义属性可忠实归纳，但不得引入证据之外的新事实。\n- ICS/CCS 分类名称等公认标准编码值可依据规范编码表补全，但不得臆造编码或分类名。\n- 避免填充原文不支持的属性；原文确实为空/缺失时按本轮 schema 允许的空值表达，不要臆造。\n- 枚举属性多项时尽量全部提取。\n- 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。\n\n\nOFFICIAL_DOCUMENT_PROMPT_EXTENSION v5\n领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。\n这些提示只帮助映射 ontology 已声明字段；不得新增实体类型、关系、字段或无证据事实。\n\n公文抽取精度规则：\n- 一份公文只保留一个 OfficialDocument 实体，mention 使用“文件标题”；文号、收文号、来文字号等是属性/证据，不要作为单独的 OfficialDocument 或 OperationalInformation 实体。\n- 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit，而不是拆成多个 OperationalActivity。\n- 公文中明确提到的附件、材料、反馈表、报告等信息对象应抽取为 OperationalInformation，例如“附件1 六要六不要建议”“附件2 排查反馈表”“排查情况反馈信息”。\n- 发布通知、报送反馈、安全事件报告等明确传递/报送行为应抽取为 OperationalExchange。\n- OperationalActivity 以“动宾工作事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合成一个活动；但原文中并列出现的多个动宾事项必须分别抽取，不得只取其中一个或强行合并。\n  · 例如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“高等级网络系统部署管控”“其他网络系统风险防范”“安全监测与事件处置”“报送排查反馈表”各为一个活动。\n  · 又如“……按照任务分工进行分解落实、健全项目管理机制、加强资源投入、确保按计划完成项目实施、打造人工智能高质量数据集建设标杆示范”这类并列动宾，应各自抽为一个活动。\n  · 不要把“向集团报告”“第一时间处置”“梳理本企业使用开源智能体情况”这类同一动宾事项的状语/结果短语再拆成独立活动。\n- 包含“不得/必须/未经……不得/严禁/禁止”等要求的表述优先作为 OperationalConstraint，不应把其中的动作短语拆成 OperationalActivity。\n- 不要把风险描述中的“病毒”“内部系统”“邮箱”等普通名词都抽成 OperationalObject；只有公文中明确作为治理/建设/约束/交换对象的业务对象才需要抽取。\n\n公文表单/收文处理单规则：\n- “收文处理单”“表单”“审批单”等公文登记/流转材料本身不是 DocumentUnit 或独立业务实体，它是同一份公文的属性与处理信息载体；但表单文字中明确承担职责的部门/单位，以及明确的工作事项、要求、报送行为仍应正常抽取为 operational 实体。\n- 表单中的字段（收文号、来文字号、来文单位、收文日期、收文部门、拟办意见、领导批示、联系电话、主送、抄送、主办部门等）应作为对应 OfficialDocument 或相关主体的属性/证据，不应为字段名或字段值单独建实体。\n- 不要在审批流转记录中为每个“已阅/批示/签名”的人名单独创建 OperationalAgent，除非该人承担了 ontology 中明确要求抽取的主体职责。\n- 拟办意见、领导批示中明确承担职责的部门/单位/角色，以及明确的动宾工作事项、要求或报送/通知/反馈行为，应分别抽取为 OperationalAgent / OperationalActivity / OperationalConstraint / OperationalExchange；“已阅/签名”的个人姓名和纯流转记录不抽。\n- 遇到表单时优先抑制低价值候选：姓名、日期、联系方式、部门名单独出现但无明确主体职责时，不应成为实体。\n\n输出协议：JSONL。每行必须是独立完整的 JSON 对象，不要 Markdown 或解释。字符串中的换行必须转义为 \\n；禁止重复记录。每条记录独占一行，不要外层数组或集合键。没有记录时只输出一行 null。\n每行记录的字段约束：{\"type\": \"object\", \"properties\": {\"type\": {\"type\": \"string\", \"enum\": [\"DocumentUnit\", \"OfficialDocument\", \"OperationalActivity\", \"OperationalAgent\", \"OperationalConstraint\", \"OperationalExchange\", \"OperationalInformation\", \"OperationalObject\"]}, \"mention\": {\"type\": \"string\"}, \"start_char\": {\"type\": \"integer\"}, \"end_char\": {\"type\": \"integer\"}, \"evidence\": {\"type\": \"object\", \"properties\": {\"quote\": {\"type\": \"string\"}}, \"required\": [\"quote\"], \"additionalProperties\": false}}, \"required\": [\"type\", \"mention\", \"start_char\", \"end_char\", \"evidence\"], \"additionalProperties\": false}"
+      },
+      {
+        "role": "user",
+        "content": "## task\nentity\n\n## task discipline\n只提议实体候选，禁止输出关系。\n\n## resolved route\nkind=official_document; source=ontology; reasons=route.ontology.official.class, route.ontology.official.exchange, route.ontology.official.number_property, route.ontology.official.operation, route.ontology.official.receipt_property, route.ontology.official.title_property, route.ontology.official.unit, route.selected.official_document\n\n## ontology catalog\n- `公文结构单元` -> type `DocumentUnit`\n- `公文管理单元` -> type `OfficialDocument`\n- `任务活动` -> type `OperationalActivity`\n- `运行主体` -> type `OperationalAgent`\n- `运行约束条件` -> type `OperationalConstraint`\n- `运行交互` -> type `OperationalExchange`\n- `运行信息` -> type `OperationalInformation`\n- `公文业务对象` -> type `OperationalObject`\n\n## ontology feature catalog\n（实体任务不展示属性目录）\n\n## ontology relation signatures\n（实体任务不展示关系目录）\n\n## output protocol\n输出协议：JSONL。每行必须是独立完整的 JSON 对象，不要 Markdown 或解释。字符串中的换行必须转义为 \\n；禁止重复记录。每条记录独占一行，不要外层数组或集合键。没有记录时只输出一行 null。\n\n## record schema\n{\"additionalProperties\": false, \"properties\": {\"end_char\": {\"type\": \"integer\"}, \"evidence\": {\"additionalProperties\": false, \"properties\": {\"quote\": {\"type\": \"string\"}}, \"required\": [\"quote\"], \"type\": \"object\"}, \"mention\": {\"type\": \"string\"}, \"start_char\": {\"type\": \"integer\"}, \"type\": {\"enum\": [\"DocumentUnit\", \"OfficialDocument\", \"OperationalActivity\", \"OperationalAgent\", \"OperationalConstraint\", \"OperationalExchange\", \"OperationalInformation\", \"OperationalObject\"], \"type\": \"string\"}}, \"required\": [\"type\", \"mention\", \"start_char\", \"end_char\", \"evidence\"], \"type\": \"object\"}\n\n## output constraints\n\n- evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。\n - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。\n\n- 每项只能包含 type、mention、start_char、end_char、evidence.quote；禁止 name、properties 或其他键。\n- mention 可以是 current chunk.text 中逐字连续的原文片段，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。\n- start_char/end_char 是 chunk-relative、左闭右开区间；mention 无法逐字定位时填 0，系统会按 evidence.quote 兜底。\n- 数值、单位、标量属性值、字段标签和修饰词不是独立实体；同一 type + 完全相同 mention 每个 chunk 只输出一次。\n- 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。\n\n## known entities\n（实体任务不使用已知实体目录）\n\n## local context\n仅供辨识文件背景，不从本节新增事实：# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知\n\n## current chunk\n{\"chunk_id\": \"chunk-0001\", \"metadata\": {\"signal_source\": \"external\"}, \"text\": \"# 二、工作要求\\n\\n1.各领域负责部门按照方案任务内容和计划要求，全面启动本领域国资监管系统智能化升级工作任务。\\n\\n2.各子企业按照方案任务内容和计划要求，结合各领域工作任务和企业实际，制定向下穿透的实施方案，于8月15日前报数智办。\\n\\n联系人：马忠明，邮箱010099900481@crrcgc.cc。\\n\\n附件：1.中国中车国资监管系统智能化升级三年行动方案2.中国中车国资监管智能化升级系统指标清单3.中国中车国资监管智能化升级各业务领域分工\\n\\n\\n## 收⽂处理单\\n\\n\"}\n\n## repair issues\n（无）"
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "DocumentUnit",
+                  "OfficialDocument",
+                  "OperationalActivity",
+                  "OperationalAgent",
+                  "OperationalConstraint",
+                  "OperationalExchange",
+                  "OperationalInformation",
+                  "OperationalObject"
+                ]
+              },
+              "mention": {
+                "type": "string"
+              },
+              "start_char": {
+                "type": "integer"
+              },
+              "end_char": {
+                "type": "integer"
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "quote": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "quote"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "mention",
+              "start_char",
+              "end_char",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "entities"
+      ],
+      "additionalProperties": false
+    },
+    "status": "pending"
+  },
+  "reference_policy": "observed unique records are candidates, not gold; agent-reviewed provisional anchors separate; no independent human gold",
+  "reference_anchors": [
+    {
+      "type": "OfficialDocument",
+      "mention_contains": "三年行动方案"
+    },
+    {
+      "type": "OperationalAgent",
+      "mention_contains": "数智办"
+    },
+    {
+      "type": "OperationalActivity",
+      "mention_contains": "实施方案"
+    }
+  ],
+  "quality_labels": {
+    "expected_behavior": "finite grounded records; no repeated records or repeated substrings",
+    "coverage_warning": "short_chunk changes scope; compare covered text only",
+    "agent_review_status": "anchors only; unique outputs are not gold",
+    "independent_human_review": false,
+    "label_status": "agent-reviewed / provisional"
+  },
+  "source_model_config": {
+    "version": "v2",
+    "provider": "siliconflow",
+    "model": "deepseek-ai/DeepSeek-V4-Flash",
+    "max_tokens": null
+  },
+  "derivation": {
+    "source_case": "entity-loop",
+    "source_range": [
+      498,
+      734
+    ],
+    "source_total_chars": 734,
+    "context_title": "# 关于印发《中国中车国资监管系统智能化升级三年行动方案》的通知",
+    "target_load": "at most approximately 15–20 evidence-backed entities per semantic segment; provisional, checked against actual outputs",
+    "not_output_cap": true
+  }
+}

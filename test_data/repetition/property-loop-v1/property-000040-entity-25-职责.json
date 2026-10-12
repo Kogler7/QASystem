@@ -1,0 +1,87 @@
+{
+  "id": "property-000040-entity-25-职责",
+  "call": {
+    "recorded_at": "2026-10-11T11:49:04.780923+00:00",
+    "context": {
+      "pass_name": "property",
+      "chunk_id": "chunk-0000:batch-2.part-0",
+      "attempt_number": 1,
+      "response_mode": "frozen-wire",
+      "record_table": false
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "KNOWLEDGE_EXTRACT_V2_BASE_SYSTEM_PROMPT v5\n你是 ontology-bound 知识图谱抽取器。只能依据已编译 ontology 与当前上游 chunk/局部上下文抽取事实。\n只使用 ontology 中允许的 type/property/relation；禁止扩大 schema；输出遵循本轮 JSONL 协议，记录只能包含记录 schema 允许的字段。\n\n[核心原则]\n- 所有提取必须基于原文证据，不得凭空编造；但允许填写 ontology 已声明、且有公认标准编码表（如 ICS/CCS 分类）支撑的规范值。\n- mention 可以是原文中的连续字符串，也可以是对原文的忠实归纳（例如由多条记录归纳出的规则名）。\n- evidence.quote 尽量逐字引用原文；无法逐字对应时，给出最相关的原文片段作为来源，不得编造与原文无关的内容。\n- 在忠实原文的前提下尽量抽全：原文中符合 ontology 的事实不要因过度保守而漏抽，也不得臆造。\n\n[通用归类与粒度规则]\n- 使用最具体的类型；不要用父类/抽象类型重复表达同一实体。\n- 同一现实对象只保留一个实体：全称、简称、别名、编号不拆成多个；同一对象的不同表达应复用同一实体。\n- 结构实体只按实际标题层级创建；一个标题只用一个最合适的结构类型；段落、列表、条目类内容优先抽为结构单元，不要拆成零散活动。\n- 行为/工作事项以“一个动宾事项”为粒度：同一动宾短语连同其状语、否定词、结果短语聚合为一个；原文中并列出现的多个动宾事项必须分别抽取，不得只取其一或强行合并。\n- 字段缺失保持缺失，不要用模板标题、编号或其他字段填充；不要把普通名词都抽成业务对象，只有作为管理/治理/建设/约束/交换/引用对象出现的才抽取。\n\n[通用语义归类规则]\n- 属性类实体是事实：对对象、能力、状态或测量结果的客观陈述，回答是什么、值多少；约束类实体是规则：要求、限定、条件或允许范围，回答应当/必须/不得超过/不得低于/适用什么条件。\n- 规则句归约束，事实句归属性；同一特性可分别以事实和规则出现，不要合并或改名。\n- 义务/禁止性表述（应/不应/不得/严禁/禁止/未经……不得）优先归约束类实体，不要把其中的动作短语拆成独立活动；试验方法、操作步骤、单位、公式、计算过程不作为约束。\n- 同一范围内同一特性或同一规则的多个数值先合并为一条，再用属性记录最大值/最小值/范围/单位，不要按条件或测试项拆成多条。\n- 实体/属性名只写名词短语本身，不要带“要求/条件/方法/步骤/单位/计算/试验/计量”等结构词尾。\n\n[实体提取规则]\n- 优先提取显式命名的实体。\n- 避免抽象概念（除非 ontology 中定义）；原文以集合名词指代且 ontology 允许的对象（如“各相关单位”“办公设备”）应保留。\n- 同类型实体的 mention 长度应合理（避免截断或过度包含）。\n- 原文中并列出现的同类实体（如起草单位、附件、主送/收文单位列表）必须逐一抽取，不得只取首个或合并成一个。\n- 数值、单位、标量属性值、字段标签和修饰词不是独立实体。\n- 同一 type + 完全相同 mention 的实体，每个 chunk 只输出一次。\n- 输出预算：单次调用最多输出 60 个实体；候选很多时优先覆盖不同标题/条款，不要重复同一事实。\n- evidence.quote 只给最短可逐字定位的片段（建议不超过 80 字），不要整段复制正文；同一候选/同一证据不得重复输出。\n\n[关系提取规则]\n- 只提取原文明确表达的关系。\n- 避免推测性关系，不得虚构端点。\n- 关系必须符合 ontology 声明的签名。\n- 结构/证据类关系（如 HAS_PART、EVIDENCED_BY、sourceAgent、targetAgent）在 ontology 签名允许时应输出。\n\n[属性提取规则]\n- 字面属性（编号、名称、日期、数值、单位、原文引文等）必须逐字或按本体规范化值来自原文。\n- 描述、目的、职责、范围、类别、预期结果等语义属性可忠实归纳，但不得引入证据之外的新事实。\n- ICS/CCS 分类名称等公认标准编码值可依据规范编码表补全，但不得臆造编码或分类名。\n- 避免填充原文不支持的属性；原文确实为空/缺失时按本轮 schema 允许的空值表达，不要臆造。\n- 枚举属性多项时尽量全部提取。\n- 禁止补写常识、禁止猜测缺失字段；无证据时不得输出该事实。\n\n\nOFFICIAL_DOCUMENT_PROMPT_EXTENSION v10\n领域表达提示：若文本是公文/通知/意见/办法/方案，重点识别文件标题、文号、发文/来文单位、主送/抄送、正文条目、附件说明、办理动作、约束和交换对象。\n\n公文抽取精度规则：\n- 一份公文只保留一个 OfficialDocument（公文管理单元），name 使用文件标题；文号、收文号、来文字号、密级、收文日期等是属性或证据，不要作为单独的 OfficialDocument 或 OperationalInformation 实体。\n- 正文中的“正文开头段落、一、二、三、四、五等条目、报送要求段落、附件列表段落”都应优先抽取为 DocumentUnit（命名如：通知正文 / 排查要求一 / 报送要求 / 附件列表），用 单元标题/单元类型/原文内容/顺序号/原文位置 描述，而不是拆成多个 OperationalActivity。\n- 公文中明确提到的附件、材料、反馈表、报告等信息对象应抽取为 OperationalInformation，命名沿用原文（如“附件1 关于防范OpenClaw建议”“附件2 排查反馈表”），信息类型取 附件/报告/材料/依据 等。\n- 发布通知、报送反馈、协同落实、安全事件报告等明确传递/交互行为应抽取为 OperationalExchange，name 用动宾短语（如“发布专项排查通知”“报送排查反馈”“协同落实方案任务”），交互类型取 通知/报送/报告/协同/审批/反馈/监督/备案。\n- OperationalActivity 以动宾工作事项为粒度：name 用原文动宾短语（如“组织开展开源智能体专项排查”“落实办公网与互联网隔离”“健全项目管理机制”），并填写 活动名称/活动类型（排查/管理/防范/监测/报送/实施/建设等）/动作词（组织、排查、执行、禁止、论证、监测、处置、报送等）/优先级（重点/一般/紧急/长期）；同一动宾短语连同其状语、否定词、结果短语聚合成一个；原文并列出现的多个动宾事项必须分别抽取，不得只取其一或强行合并；不要把同一事项的状语/结果短语再拆成独立活动。\n- OperationalAgent：机构/部门/角色使用最具体粒度，name=主体名称，并填写 主体类型（组织/部门/岗位/角色/外部机构）、组织层级（集团/子公司/部门/集团部门/境外机构/项目组）、职责（该主体在文中明确承担的工作）；同一主体的不同表述复用同一实体。\n- OperationalConstraint：包含“不得/必须/应当/严禁/禁止/原则上/鼓励”等要求的表述优先作为 OperationalConstraint，name 用“主题+约束”，并填写 约束类型（时间/权限/安全/流程/质量/合规约束）、强制程度（必须/应当/原则上/鼓励/禁止）、约束原文（原文句子）；不要把其中的动作短语拆成 OperationalActivity。\n- OperationalObject：name 用原文对象名词短语（如“OpenClaw（龙虾）等开源智能体”“办公设备与终端”“等保三级及以上网络系统”），并填写 对象类型（平台/系统/数据/模型/项目/制度/场景/设备）、所属领域、对象描述；风险描述中的普通名词（病毒、内部系统、邮箱等）不要抽成 OperationalObject，只有作为治理/建设/约束/交换/使用对象的业务对象才抽取。\n\n公文表单/收文处理单规则：\n- “收文处理单”“表单”“审批单”“领导批示”不是文件标题；文件标题字段缺失时保持缺失，不用模板标题、编号或其他文件标题填充。表单本身不是 DocumentUnit 或独立业务实体。\n- 表单字段（收文号、来文字号、来文单位、收文日期、收文部门、拟办意见、领导批示、联系电话、主送、抄送、主办部门等）作为对应 OfficialDocument 的本体属性或证据，不要为字段名或字段值单独建实体。\n- 但表单文字中明确承担职责的部门/单位（如“请技术中心阅办，请规划运营部协同”“明确落实信息公司、数科公司相关工作承担部门与责任人”）应抽取为 OperationalAgent；明确的动宾工作事项（如“明确工作承担部门与责任人”）应抽取为 OperationalActivity；明确的协同/报送/通知行为（如“协同落实方案任务”）应抽取为 OperationalExchange；明确的要求/时限应抽取为 OperationalConstraint。\n- 不要在审批流转记录中为每个“已阅/批示/签名”的人名单独创建 OperationalAgent，除非该人/岗位在文中承担了明确职责。\n- 低价值候选抑制：姓名、日期、电话、邮箱、部门名单独出现且无明确职责/工作事项时，不建实体。\n- 表单中即使出现大量“已阅/签名”记录，也不要因此整体放弃该片段：必须检查来文单位、主办部门、拟办意见、领导批示中是否出现承担职责的单位、明确的工作事项或报送/协同行为，并把它们抽取出来。\n- 岗位/职务泛称（如 公司领导、工会副主席、纪委书记、总师级领导、部门负责人等）不是 OperationalAgent；只有文中明确给出该岗位承担的具体工作事项或职责时才抽取。\n\n输出协议：JSONL。每行必须是独立完整的 JSON 对象，不要 Markdown 或解释。字符串中的换行必须转义为 \\n；禁止重复记录。每条记录独占一行，不要外层数组或集合键。没有记录时只输出一行 null。每行只更新一个属性：properties 中只能有一个键；每行携带 entity_id 和该属性的 evidence。\n每行记录的字段约束：{\"type\": \"object\", \"properties\": {\"entity_id\": {\"type\": \"string\", \"enum\": [\"entity-25\"]}, \"properties\": {\"type\": \"object\", \"properties\": {\"职责\": {\"type\": \"string\"}}, \"minProperties\": 1, \"additionalProperties\": false}, \"evidence\": {\"type\": \"object\", \"properties\": {\"quote\": {\"type\": \"string\", \"minLength\": 1}}, \"required\": [\"quote\"], \"additionalProperties\": false}}, \"required\": [\"entity_id\", \"properties\", \"evidence\"], \"additionalProperties\": false}"
+      },
+      {
+        "role": "user",
+        "content": "## task\nproperty\n\n## task discipline\n只为给定的已接受实体补全缺失属性；实体集合、实体类型和关系集合均已冻结，不得创建、删除或重命名实体，不得输出关系。\n\n## resolved route\nkind=official_document; labels=official_document; source=chunks; reasons=route.chunks.official\n\n## ontology catalog\n- `公文结构单元` -> type `DocumentUnit` // 类定义：公文内部的章节、条、款、项、附件说明等结构单元，是公文内容解析和证据追溯的基本载体。\n  - `单元标识` -> `单元标识` (string) // 结构单元标识\n  - `单元标题` -> `单元标题` (string) // 单元标题\n  - `单元类型` -> `单元类型` (string) // 章、节、条、款、项、段落、附件\n  - `原文位置` -> `原文位置` (string) // 原文位置\n  - `原文内容` -> `原文内容` (string) // 原文内容\n  - `顺序号` -> `顺序号` (string) // 顺序号\n- `公文管理单元` -> type `OfficialDocument` // 类定义：公文的管理信息，一份公文只抽取出一个公文管理单元\n  - `领导批示` -> `领导批示` (string) // 领导指示，例如：请相关部门阅办\n  - `联系电话` -> `联系电话` (string) // 联系方式，例如：010-51862178\n  - `缓急` -> `缓急` (string) // 紧急程度，例如：特急/急/平急\n  - `来文字号` -> `来文字号` (string) // 公文原始编号，例如：中车集团办运营〔2026〕17号\n  - `来文单位` -> `来文单位` (string) // 公文来源单位，例如：中国中车集团有限公司\n  - `文件标题` -> `文件标题` (string) // 公文标题，例如：关于印发中国中车2026年数智转型工作要点的通知 [约束：管理单元数量约束 (CUSTOM_EXPRESSION，一篇公文只能抽取出一个公文管理单元) ]\n  - `文件备注` -> `文件备注` (string) // 备注信息\n  - `收文部门` -> `收文部门` (string) // 接收部门，例如：综合管理部\n  - `收文日期` -> `收文日期` (string) // 接收日期，例如：2026-03-18\n  - `收文号` -> `收文号` (string) // 公文接收编号，例如：信息公司收〔2026〕176号\n  - `拟办意见` -> `拟办意见` (string) // 拟办建议，例如：请领导阅批\n  - `抄送` -> `抄送` (string) // 抄送单位列表，例如：相关部门\n  - `密级` -> `密级` (string) // 保密级别，例如：绝密/机密/秘密/内部\n  - `主送` -> `主送` (string) // 主送单位列表，例如：各部门/各单位\n  - `主办部门` -> `主办部门` (string) // 主办部门，例如：信息公司技术中心\n- `任务活动` -> type `OperationalActivity` // 类定义：公文中提出的需要执行的任务、行动、建设内容、管理动作或工作安排。 示例： 建设人工智能平台、完善算法治理机制、开展试点应用、加强数据安全管理、建立模型评估机制。\n  - `活动名称` -> `活动名称` (string) // 活动名称\n  - `活动描述` -> `活动描述` (string) // 活动描述\n  - `活动标识` -> `活动标识` (string) // 活动标识\n  - `活动类型` -> `活动类型` (string) // 建设、管理、评估、报送、监督、实施、试点等\n  - `动作词` -> `动作词` (string) // 动作词，如建设、完善、推进、加强、组织\n  - `预期结果` -> `预期结果` (string) // 预期结果\n  - `优先级` -> `优先级` (string) // 重点、一般、长期、紧急\n- `运行主体` -> type `OperationalAgent` // 类定义：公文中出现的组织、部门、岗位、角色、单位、责任主体、协同主体等。\n  - `主体名称` -> `主体名称` (string) // 主体名称\n  - `主体标识` -> `主体标识` (string) // 主体标识\n  - `主体类型` -> `主体类型` (string) // 组织、部门、岗位、角色、外部机构\n  - `组织层级` -> `组织层级` (string) // 集团、子公司、部门、项目组\n  - `职责` -> `职责` (string) // 职责描述\n- `运行约束条件` -> type `OperationalConstraint` // 类定义：公文中规定的必须遵守的规则、限制、条件、标准、时间要求、合规要求和质量要求。 示例： 按期完成、不得违反数据安全要求、应符合集团统一技术规范、必须报送备案、原则上不得重复建设。\n  - `强制程度` -> `强制程度` (string) // 必须、应当、原则上、鼓励、禁止\n  - `约束原文` -> `约束原文` (string) // 约束原文\n  - `约束名称` -> `约束名称` (string) // 约束名称\n  - `约束标识` -> `约束标识` (string) // 约束标识\n  - `约束类型` -> `约束类型` (string) // 时间约束、权限约束、安全约束、流程约束、质量约束、合规约束\n  - `校验规则` -> `校验规则` (string) // 校验规则\n- `运行交互` -> type `OperationalExchange` // 类定义：公文中表达的主体之间、任务之间、信息之间的传递、协同、报送、审批、反馈、监督等关系。 示例： 子公司向集团报送试点进展；业务部门配合信息化部门开展平台建设；牵头部门组织相关单位完成评估。\n  - `交互类型` -> `交互类型` (string) // 报送、审批、反馈、协同、监督、通知、备案\n  - `交互标识` -> `交互标识` (string) // 交互标识\n  - `交互描述` -> `交互描述` (string) // 交互描述\n- `运行信息` -> type `OperationalInformation` // 类定义：公文中表达、传递、引用或要求形成的信息内容，包括术语、指标、材料、数据、报告、附件、政策依据等。 示例： 人工智能、算法治理、数据安全、应用场景、试点清单、工作报告、评估指标、政策依据、附件材料。\n  - `信息标识` -> `信息标识` (string) // 信息对象标识\n  - `信息名称` -> `信息名称` (string) // 信息名称\n  - `信息类型` -> `信息类型` (string) // 术语、指标、报告、材料、数据、附件、依据\n  - `定义` -> `定义` (string) // 定义说明\n  - `来源文本` -> `来源文本` (string) // 来源原文\n- `公文业务对象` -> type `OperationalObject` // 类定义：公文所作用、管理、建设、治理或规范的对象。 示例： 人工智能平台、算法模型、数据资源、业务系统、应用场景、智能化项目、管理制度、技术能力、试点工程。\n  - `对象类型` -> `对象类型` (string) // 平台、系统、数据、模型、项目、制度、场景\n  - `对象标识` -> `对象标识` (string) // 对象标识\n  - `对象描述` -> `对象描述` (string) // 对象描述\n  - `对象名称` -> `对象名称` (string) // 对象名称\n  - `所属领域` -> `所属领域` (string) // 所属业务领域\n\n## ontology feature catalog\n- `DocumentUnit`\n  - `单元标识` (string)\n  - `单元标题` (string)\n  - `单元类型` (string)\n  - `原文位置` (string)\n  - `原文内容` (string)\n  - `顺序号` (string)\n- `OfficialDocument`\n  - `领导批示` (string)\n  - `联系电话` (string)\n  - `缓急` (string)\n  - `来文字号` (string)\n  - `来文单位` (string)\n  - `文件标题` (string)\n  - `文件备注` (string)\n  - `收文部门` (string)\n  - `收文日期` (string)\n  - `收文号` (string)\n  - `拟办意见` (string)\n  - `抄送` (string)\n  - `密级` (string)\n  - `主送` (string)\n  - `主办部门` (string)\n- `OperationalActivity`\n  - `活动名称` (string)\n  - `活动描述` (string)\n  - `活动标识` (string)\n  - `活动类型` (string)\n  - `动作词` (string)\n  - `预期结果` (string)\n  - `优先级` (string)\n- `OperationalAgent`\n  - `主体名称` (string)\n  - `主体标识` (string)\n  - `主体类型` (string)\n  - `组织层级` (string)\n  - `职责` (string)\n- `OperationalConstraint`\n  - `强制程度` (string)\n  - `约束原文` (string)\n  - `约束名称` (string)\n  - `约束标识` (string)\n  - `约束类型` (string)\n  - `校验规则` (string)\n- `OperationalExchange`\n  - `交互类型` (string)\n  - `交互标识` (string)\n  - `交互描述` (string)\n- `OperationalInformation`\n  - `信息标识` (string)\n  - `信息名称` (string)\n  - `信息类型` (string)\n  - `定义` (string)\n  - `来源文本` (string)\n- `OperationalObject`\n  - `对象类型` (string)\n  - `对象标识` (string)\n  - `对象描述` (string)\n  - `对象名称` (string)\n  - `所属领域` (string)\n\n## ontology relation signatures\n（属性补全不开放关系目录）\n\n## output protocol\n输出协议：JSONL。每行必须是独立完整的 JSON 对象，不要 Markdown 或解释。字符串中的换行必须转义为 \\n；禁止重复记录。每条记录独占一行，不要外层数组或集合键。没有记录时只输出一行 null。每行只更新一个属性：properties 中只能有一个键；每行携带 entity_id 和该属性的 evidence。\n\n## record schema\n{\"additionalProperties\": false, \"properties\": {\"entity_id\": {\"enum\": [\"entity-25\"], \"type\": \"string\"}, \"evidence\": {\"additionalProperties\": false, \"properties\": {\"quote\": {\"minLength\": 1, \"type\": \"string\"}}, \"required\": [\"quote\"], \"type\": \"object\"}, \"properties\": {\"additionalProperties\": false, \"minProperties\": 1, \"properties\": {\"职责\": {\"type\": \"string\"}}, \"type\": \"object\"}}, \"required\": [\"entity_id\", \"properties\", \"evidence\"], \"type\": \"object\"}\n\n## output constraints\n\n- evidence.quote 尽量逐字来自 current chunk.text；无法逐字对应时给出最相关的原文片段。\n - type/property/relation 只能使用 ontology catalog/signatures 中的稳定标识。\n\n- entity_id 只能来自 known entities；properties 只能包含该实体 type 在 ontology 中声明且当前缺失的稳定属性标识。\n- 不得输出 name/type/relation，不得把属性值、同义词、修饰语或短语变成实体。\n- 属性值可以是对 current chunk 的忠实语义归纳，不要求属性值在 evidence.quote 中逐字出现。\n- 同一条 evidence.quote 可以同时支持本次的多个属性，但实体、属性集合和证据的整体语义必须一致。\n- 禁止引入 current chunk 之外的新事实、默认值或外部知识。\n- 原文中缺失或无法确定的属性必须省略；禁止用 null、空字符串或占位符表示已补全。\n- 同一个实体的所有记录中，一个属性只能出现一次；如果属性已有值，不要重复输出。\n- evidence.quote 必须是 current chunk.text 中最能支撑本次整体更新的原文片段。\n\n## known entities\n| id | type | name | properties | missing_properties |\n| --- | --- | --- | --- | --- |\n| `entity-25` | `OperationalAgent` | 集团科信部 | - | 职责(职责:string) |\n\n## local context\n[{\"chunk_id\": \"chunk-0001\", \"document_id\": \"document-0001\", \"end_offset\": 3825, \"metadata\": {\"content_kind\": \"record_table\", \"official_document_role\": \"body\", \"signal_source\": \"external\", \"table_count\": 1, \"tables\": [{\"columns\": [\"中国中车集团有限公司\", \"中国中车集团有限公司_2\", \"来文字号：\", \"中车集团办科信（2026）18号\", \"列5\"], \"row_count\": 11, \"table_index\": 0}]}, \"section_id\": \"document-0001::s001\", \"section_title\": \"中国中车集团有限公司办公室\", \"start_offset\": 980, \"text\": \"```json\\n{\\n  \\\"columns\\\": [\\n    \\\"中国中车集团有限公司\\\",\\n    \\\"中国中车集团有限公司_2\\\",\\n    \\\"来文字号：\\\",\\n    \\\"中车集团办科信（2026）18号\\\",\\n    \\\"列5\\\"\\n  ],\\n  \\\"rows\\\": [\\n    {\\n      \\\"中国中车集团有限公司\\\": \\\"72415\\\",\\n      \\\"中国中车集团有限公司_2\\\": \\\"72415\\\",\\n      \\\"来文字号：\\\": \\\"72415\\\",\\n      \\\"中车集团办科信（2026）18号\\\": \\\"72415\\\",\\n      \\\"列5\\\": \\\"72415\\\"\\n    },\\n    {\\n      \\\"中国中车集团有限公司\\\": \\\"\\\",\\n      \\\"中国中车集团有限公司_2\\\": \\\"缓急：\\\",\\n      \\\"来文字号：\\\": \\\"\\\",\\n      \\\"中车集团办科信（2026）18号\\\": \\\"收文日期：\\\",\\n      \\\"列5\\\": \\\"2026-03-27\\\"\\n    },\\n    {\\n      \\\"中国中车集团有限公司\\\": \\\"综合管理部（党群工作部、董事会办公室、企业文化部)\\\",\\n      \\\"中国中车集团有限公司_2\\\": \\\"综合管理部（党群工作部、董事会办公室、企业文化部)\\\",\\n      \\\"来文字号：\\\": \\\"综合管理部（党群工作部、董事会办公室、企业文化部)\\\",\\n      \\\"中车集团办科信（2026）18号\\\": \\\"综合管理部（党群工作部、董事会办公室、企业文化部)\\\",\\n      \\\"列5\\\": \\\"综合管理部（党群工作部、董事会办公室、企业文化部)\\\"\\n    },\\n    {\\n      \\\"中国中车集团有限公司\\\": \\\"请刘总阅批。任 白雪峰 2026-03-27 16:36\\\",\\n      \\\"中国中车集团有限公司_2\\\": \\\"请刘总阅批。任 白雪峰 2026-03-27 16:36\\\",\\n      \\\"来文字号：\\\"…（共2845字符，已截断）\"}]\n\n## current chunk\n{\"chunk_id\": \"chunk-0000\", \"document_id\": \"document-0001\", \"end_offset\": 980, \"metadata\": {\"official_document_role\": \"body\", \"signal_source\": \"external\"}, \"section_id\": \"document-0001::s001\", \"section_title\": \"中国中车集团有限公司办公室\", \"start_offset\": 0, \"text\": \"---\\nnoteId: \\\"382bffc3c48811f190ac39147c98f0ca\\\"\\ntags: []\\n\\n---\\n\\n中车集团办科信［2026]18号\\n内部事项\\n\\n# 中国中车集团有限公司办公室\\n\\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\\n\\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：\\n\\n国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。\\n\\n一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。\\n\\n二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。\\n\\n三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。\\n\\n四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。\\n\\n五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。\\n\\n各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。\\n\\n联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011。\\n\\n附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\\n\\n2．“龙虾”等开源智能体安全风险排查反馈表中国中车集团 公星10 1 0 8 1 580629\\n\\n抄送：公司领导，总师级领导，纪委副书记、工会副主席。\\n\\n\\n# 收文处理单\\n\\n抄 送：\\n\\n\"}\n\n## repair issues\n（无）"
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "properties": {
+        "updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entity_id": {
+                "type": "string",
+                "enum": [
+                  "entity-25"
+                ]
+              },
+              "properties": {
+                "type": "object",
+                "properties": {
+                  "职责": {
+                    "type": "string"
+                  }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "quote"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "entity_id",
+              "properties",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "updates"
+      ],
+      "additionalProperties": false
+    },
+    "status": "pending"
+  },
+  "reference_anchors": [],
+  "quality_labels": {
+    "label_status": "agent-reviewed / provisional; no independent human gold"
+  },
+  "derivation": {
+    "source_call": "000040",
+    "scope": "one entity and one property",
+    "entity_id": "entity-25",
+    "property": "职责",
+    "other_properties": "partitioned into other frozen tasks, not discarded"
+  }
+}

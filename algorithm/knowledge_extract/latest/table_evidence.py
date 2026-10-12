@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .structured_text import _is_record_payload
+from algorithm.table_jsonl import decode_records, row_boundaries
 
 
 @dataclass
@@ -101,12 +102,12 @@ def _fenced_ranges(text: str) -> list[tuple[int, int]]:
     while index + 1 < len(lines):
         opening, closing = lines[index], lines[index + 1]
         lang = opening.group("lang").lower()
-        if lang in {"", "json"}:
+        if lang in {"", "json", "jsonl"}:
             ranges.append((opening.end(), closing.start()))
         index += 2
     if len(lines) % 2:
         opening = lines[-1]
-        if opening.group("lang").lower() in {"", "json"}:
+        if opening.group("lang").lower() in {"", "json", "jsonl"}:
             ranges.append((opening.end(), len(text)))
     return ranges
 
@@ -116,9 +117,29 @@ def _source_roots(text: str) -> list[_Node]:
     ranges = _fenced_ranges(text)
     if ranges:
         for start, end in ranges:
-            node = _parse_node(text, start, end)
-            if node is not None and not text[node.end:end].strip() and _is_record_payload(json.loads(text[node.start:node.end])):
-                roots.append(node)
+            body = text[start:end]
+            if decode_records(body) is not None:
+                position = start
+                for line in body.splitlines(keepends=True):
+                    if line.strip():
+                        node = _parse_node(text, position, position + len(line))
+                        if node is not None:
+                            roots.append(node)
+                    position += len(line)
+            else:
+                node = _parse_node(text, start, end)
+                if node is not None and not text[node.end:end].strip() and _is_record_payload(json.loads(text[node.start:node.end])):
+                    roots.append(node)
+        if roots:
+            return roots
+    if row_boundaries(text) is not None:
+        position = 0
+        for line in text.splitlines(keepends=True):
+            if decode_records(line) is not None:
+                node = _parse_node(text, position, position + len(line))
+                if node is not None:
+                    roots.append(node)
+            position += len(line)
         if roots:
             return roots
     # Match structured_text's batch heading tolerance while preserving source

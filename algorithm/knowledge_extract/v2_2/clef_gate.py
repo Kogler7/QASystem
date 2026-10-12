@@ -13,6 +13,7 @@ from collections import OrderedDict
 from typing import Any
 
 from ._logging import get_step_logger
+from .relation_resolver import pair_relation_ids
 
 
 logger = get_step_logger(__name__)
@@ -20,6 +21,7 @@ logger = get_step_logger(__name__)
 _SENTENCE = re.compile(r"[^。！？\n]+[。！？\n]?")
 _STAT_KEYS = (
     "relation_seen",
+    "relation_pruned_no_cooccurrence",
     "relation_dropped",
     "relation_positive",
     "relation_uncertain",
@@ -29,7 +31,18 @@ _STAT_KEYS = (
     "verification_by_clef",
     "verification_fallback_llm",
     "unavailable",
+    "repair_required_relation_skipped",
 )
+
+
+def sentence_cooccurrence(text: str, left: str, right: str) -> bool:
+    """两端名称是否出现在同一句（用于裁掉无局部证据的笛卡尔 pair）。"""
+    if not text or not left or not right or left not in text or right not in text:
+        return False
+    for sentence in _SENTENCE.findall(text):
+        if left in sentence and right in sentence:
+            return True
+    return False
 
 
 def cooccurrence_quote(text: str, left: str, right: str, *, max_len: int = 400) -> str | None:
@@ -86,7 +99,11 @@ def mention_window(text: str, left: str, right: str, limit: int) -> tuple[str, b
 
 
 class ClefGate:
-    """一次抽取共用的 Clef 客户端。调用在进程内串行，避免打满单卡队列。"""
+    """一次抽取共用的 Clef 客户端。
+
+    默认最多 ``max_inflight`` 路并发（受服务 ``CLEF_MAX_QUEUE_SIZE=4`` 约束），
+    避免打满单卡推理队列；设为 1 即完全串行。
+    """
 
     def __init__(
         self,
@@ -94,21 +111,24 @@ class ClefGate:
         *,
         enabled: bool = False,
         accept: float = 0.9,
-        max_questions: int = 8,
+        max_questions: int = 16,
         timeout: float = 10.0,
         max_calls: int = 512,
         state_chars: int = 800,
+        max_inflight: int = 2,
     ) -> None:
         self.client = client
         self.enabled = bool(enabled and client is not None)
         self.accept = accept if 0.5 < accept <= 1.0 else 0.9
-        self.max_questions = min(8, max(1, int(max_questions)))
+        self.max_questions = min(16, max(1, int(max_questions)))
         self.timeout = timeout if timeout > 0 else 10.0
         self.max_calls = max(1, int(max_calls))
         self.state_chars = max(64, int(state_chars))
+        self.max_inflight = min(4, max(1, int(max_inflight)))
         self.disabled_reason = ""
         self._calls = 0
         self._lock = threading.Lock()
+        self._inflight = threading.BoundedSemaphore(self.max_inflight)
         self._stats = {key: 0 for key in _STAT_KEYS}
         self._timeout_keyword = False
         if client is not None:
@@ -149,6 +169,7 @@ class ClefGate:
             timeout=config["timeout"],
             max_calls=config["max_calls"],
             state_chars=config["state_chars"],
+            max_inflight=config["max_inflight"],
         )
 
     def note(self, **counts: int) -> None:
@@ -165,6 +186,8 @@ class ClefGate:
             "disabled_reason": self.disabled_reason,
             "calls": calls,
             "accept": self.accept,
+            "max_questions": self.max_questions,
+            "max_inflight": self.max_inflight,
             **stats,
         }
 
@@ -190,14 +213,14 @@ class ClefGate:
             )
             grouped.setdefault(window, []).append(pair)
             visible[str(pair.get("pair_id") or "")] = both
-        status: dict[str, str] = {}
+        status: dict[str, tuple[str, str]] = {}
         for window, group in grouped.items():
             questions: dict[str, dict[str, Any]] = {}
             for pair in group:
                 question = _relation_question(pair)
                 pair_id = str(pair.get("pair_id") or "")
                 if question is None or not pair_id:
-                    status[pair_id] = "uncertain"
+                    status[pair_id] = ("uncertain", "")
                     continue
                 questions[pair_id] = question
             answers = self._complete(
@@ -209,21 +232,29 @@ class ClefGate:
                     continue
                 status[pair_id] = _relation_status(
                     answers.get(pair_id),
-                    relation_id=str(pair.get("relation_id") or ""),
+                    relation_ids=pair_relation_ids(pair),
                     accept=self.accept,
                     both_names_visible=visible.get(pair_id, False),
+                    preserve=bool(pair.get("preserve_on_none")),
                 )
         grounded: list[tuple[dict[str, Any], str]] = []
         pending: list[dict[str, Any]] = []
         dropped = positive = uncertain = 0
         for pair in pairs:
             pair_id = str(pair.get("pair_id") or "")
-            label = status.get(pair_id, "uncertain")
+            label, chosen = status.get(pair_id, ("uncertain", ""))
+            relation_id = chosen or (pair_relation_ids(pair)[:1] or [""])[0]
             if label == "drop":
                 dropped += 1
                 continue
             if label == "positive":
                 positive += 1
+                pair = {**pair, "relation_id": relation_id}
+                # RELATED_TO 过于宽泛，Clef 正例直接落地易灌假阳；交给生成式写证据。
+                if _is_related_to(relation_id):
+                    uncertain += 1
+                    pending.append(pair)
+                    continue
                 quote = cooccurrence_quote(
                     text,
                     str(pair.get("source_name") or ""),
@@ -345,29 +376,36 @@ class ClefGate:
         )
         return {}
 
-    def _invoke(self, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    def _reserve_call(self) -> bool:
         with self._lock:
             if self._calls >= self.max_calls:
-                return None, "call_budget_exhausted"
+                return False
             self._calls += 1
+            return True
+
+    def _invoke(self, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+        if not self._reserve_call():
+            return None, "call_budget_exhausted"
+        kwargs = {"timeout": self.timeout} if self._timeout_keyword else {}
+        self._inflight.acquire()
+        try:
             try:
-                kwargs = {"timeout": self.timeout} if self._timeout_keyword else {}
                 body = self.client.systemone(payload, **kwargs)
             except Exception as exc:
                 kind = str(getattr(exc, "error_kind", "") or "client_error")
                 retryable = bool(getattr(exc, "retryable", False))
                 retry_after = getattr(exc, "retry_after", None)
-                if retryable and self._calls < self.max_calls:
+                if retryable and self._reserve_call():
                     delay = retry_after if isinstance(retry_after, (int, float)) and retry_after > 0 else 0.05
                     time.sleep(min(1.0, float(delay)))
-                    self._calls += 1
                     try:
-                        kwargs = {"timeout": self.timeout} if self._timeout_keyword else {}
                         body = self.client.systemone(payload, **kwargs)
                     except Exception as retry_exc:
                         return None, str(getattr(retry_exc, "error_kind", "") or "client_error")
                 else:
                     return None, kind
+        finally:
+            self._inflight.release()
         if not isinstance(body, dict):
             return None, "invalid_response"
         return body, None
@@ -387,47 +425,61 @@ def resolve_clef(clef: Any) -> ClefGate:
 
 
 def _relation_question(pair: dict[str, Any]) -> dict[str, Any] | None:
-    relation = str(pair.get("relation_id") or "")
+    relations = pair_relation_ids(pair)
     source = str(pair.get("source_name") or "")
     target = str(pair.get("target_name") or "")
-    if not relation or relation == "NONE" or not source or not target:
+    if not relations or not source or not target:
         return None
+    if len(relations) == 1:
+        relation = relations[0]
+        instructions = f"只根据原文，{source}与{target}之间是否存在关系「{relation}」？"
+        none_text = "原文不支持这条关系"
+    else:
+        listed = "、".join(relations)
+        instructions = f"只根据原文，{source}与{target}之间应选择哪个关系：{listed}？"
+        none_text = "原文不支持这些关系中的任何一个"
     return {
         "type": "choice",
-        "instructions": f"只根据原文，{source}与{target}之间是否存在关系「{relation}」？",
+        "instructions": instructions,
         "criteria": {
-            relation: f"原文支持{source}与{target}的{relation}",
-            "NONE": "原文不支持这条关系",
+            **{relation: f"原文支持{source}与{target}的{relation}" for relation in relations},
+            "NONE": none_text,
         },
     }
+
+
+def _is_related_to(relation_id: str) -> bool:
+    return "".join(ch for ch in str(relation_id).casefold() if ch.isalnum()) == "relatedto"
 
 
 def _relation_status(
     answer: Any,
     *,
-    relation_id: str,
+    relation_ids: list[str],
     accept: float,
     both_names_visible: bool,
-) -> str:
+    preserve: bool = False,
+) -> tuple[str, str]:
     if not isinstance(answer, dict) or answer.get("type") != "choice":
-        return "uncertain"
+        return "uncertain", ""
     choice = answer.get("choice")
     if not isinstance(choice, str):
-        return "uncertain"
+        return "uncertain", ""
     confidence = answer.get("confidence")
     probabilities = answer.get("probabilities")
     if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
         if isinstance(probabilities, dict) and isinstance(probabilities.get(choice), (int, float)):
             confidence = probabilities[choice]
         else:
-            return "uncertain"
+            return "uncertain", ""
     if float(confidence) < accept:
-        return "uncertain"
-    if choice == relation_id:
-        return "positive"
-    if choice == "NONE" and both_names_visible:
-        return "drop"
-    return "uncertain"
+        return "uncertain", ""
+    if choice in relation_ids:
+        return "positive", choice
+    # 文档锚点等保留 pair：Clef 高置信 NONE 仍回退生成式，避免误杀 APPLIES_TO 等公文关系。
+    if choice == "NONE" and both_names_visible and not preserve:
+        return "drop", "NONE"
+    return "uncertain", ""
 
 
 def _support_instruction(item: dict[str, Any]) -> str:

@@ -9,9 +9,9 @@ from typing import Any
 
 import yaml
 
-STAGES = frozenset({"entity", "property", "relation", "repair"})
+STAGES = frozenset({"entity", "property", "repair"})
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
-_SECTION = re.compile(r"^## rules:(all|entity|property|relation|repair)[ \t]*$", re.MULTILINE)
+_SECTION = re.compile(r"^## rules:(all|entity|property|repair)[ \t]*$", re.MULTILINE)
 
 
 class SkillConfigurationError(ValueError):
@@ -99,7 +99,7 @@ class SkillRegistry:
                 for s in self._skills.values() if s.available_sections(stage)]
 
     def matching_catalog(self, stage: str, kind: str) -> list[dict[str, Any]]:
-        """Only the first-chunk document family is eligible, including custom IDs."""
+        """Only the program-selected document family is eligible, including custom IDs."""
         if kind in {"generic", "simple"}:
             return []
         return [entry for entry in self.catalog(stage)

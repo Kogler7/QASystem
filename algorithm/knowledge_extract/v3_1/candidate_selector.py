@@ -216,57 +216,6 @@ def _warn(
         )
 
 
-def _relation_endpoints(relation: Any) -> tuple[str, str]:
-    if isinstance(relation, dict):
-        return (
-            str(
-                relation.get("from_candidate_id")
-                or relation.get("from_id")
-                or relation.get("source_id")
-                or ""
-            ),
-            str(
-                relation.get("to_candidate_id")
-                or relation.get("to_id")
-                or relation.get("target_id")
-                or ""
-            ),
-        )
-    return (
-        str(
-            getattr(relation, "from_candidate_id", "")
-            or getattr(relation, "source_id", "")
-            or ""
-        ),
-        str(
-            getattr(relation, "to_candidate_id", "")
-            or getattr(relation, "target_id", "")
-            or ""
-        ),
-    )
-
-
-def _relation_accepted(relation: Any) -> bool:
-    if isinstance(relation, dict):
-        return str(relation.get("mapping_status") or "accepted") == "accepted"
-    return str(getattr(relation, "mapping_status", "accepted")) == "accepted"
-
-
-def _relation_type(relation: Any) -> str:
-    if isinstance(relation, dict):
-        return str(
-            relation.get("canonical_relation")
-            or relation.get("rel_type")
-            or relation.get("proposed_relation")
-            or ""
-        )
-    return str(
-        getattr(relation, "canonical_relation", "")
-        or getattr(relation, "proposed_relation", "")
-        or ""
-    )
-
-
 def _heading_types(plan: Any) -> tuple[str, str] | None:
     resolver = getattr(plan, "resolve_relation", None)
     signatures = tuple(resolver("hasSubClause")) if callable(resolver) else tuple(
@@ -315,7 +264,7 @@ def _math_atom(value: str) -> bool:
 
 
 class CandidateSelector:
-    """Apply cheap pre-relation and support-aware post-relation rejection."""
+    """Select grounded entity candidates before property enrichment."""
 
     def __init__(
         self,
@@ -327,7 +276,7 @@ class CandidateSelector:
         self.manager = manager
         self.warnings = warnings
 
-    def pre_relation(self, candidates: Iterable[Any]) -> list[Any]:
+    def select_entities(self, candidates: Iterable[Any]) -> list[Any]:
         items = list(candidates)
         self._structured_document_dominance(items)
         self._semantic_source_dominance(items)
@@ -574,128 +523,14 @@ class CandidateSelector:
                     self.warnings,
                 )
 
-    def post_relation(
-        self,
-        candidates: Iterable[Any],
-        relations: Iterable[Any],
-    ) -> tuple[list[Any], list[Any]]:
-        items = list(candidates)
-        relation_items = list(relations)
-        supporting_relations: dict[str, list[Any]] = defaultdict(list)
-        for relation in relation_items:
-            if _relation_accepted(relation):
-                source_id, target_id = _relation_endpoints(relation)
-                supporting_relations[source_id].append(relation)
-                supporting_relations[target_id].append(relation)
 
-        for candidate in items:
-            if getattr(candidate, "mapping_status", "accepted") != "accepted":
-                continue
-            candidate_id = str(getattr(candidate, "candidate_id", "") or "")
-            type_id = _type(candidate)
-            lineage = _lineage_text(self.plan, type_id)
-            type_identifiers, type_display = _own_type_text(self.plan, type_id)
-            window = _support_window(candidate, self.manager)
-            candidate_relations = supporting_relations.get(candidate_id, [])
-            relation_support = bool(candidate_relations)
-
-            is_information_form = any(
-                token in lineage
-                for token in ("informationform", "information form", "信息单元表述形式")
-            )
-            is_external = any(
-                token in lineage
-                for token in ("externalresource", "external resource", "外部约束", "外部资源")
-            )
-            is_additional = any(
-                token in lineage
-                for token in ("additionalinformation", "additional information", "附加信息")
-            )
-
-            if is_information_form:
-                if any(token in type_identifiers for token in ("figure", "diagram", "image")) or type_display == "图":
-                    structural_support = bool(_IMAGE.search(window))
-                elif "table" in type_identifiers or type_display == "表":
-                    structural_support = bool(
-                        _TABLE.search(window)
-                        or _TABLE.search(_following_paragraph(candidate, self.manager))
-                    )
-                elif any(token in type_identifiers for token in ("equation", "formula", "math")) or type_display == "数学公式":
-                    structural_support = bool(_EQUATION.search(window)) and not _math_atom(
-                        str(getattr(candidate, "name", "") or "")
-                    )
-                elif "annex" in type_identifiers or type_display == "附录":
-                    structural_support = bool(_ANNEX.search(window))
-                elif "reference" in type_identifiers or type_display == "引用":
-                    structural_support = bool(_REFERENCE.search(window))
-                else:
-                    structural_support = any(
-                        canonical_name(_relation_type(relation))
-                        in {"hasnote", "hasexample"}
-                        for relation in candidate_relations
-                    )
-                # A generic relation cannot turn a caption, variable, heading,
-                # or prose label into a representation entity.  The source
-                # document must contain the matching representation form.
-                if not structural_support:
-                    _warn(
-                        candidate,
-                        "CANDIDATE_UNSUPPORTED_INFORMATION_FORM",
-                        "信息表述形式候选缺少匹配的文档结构或 ontology 关系支撑",
-                        self.warnings,
-                    )
-            elif (is_external or is_additional) and not relation_support:
-                _warn(
-                    candidate,
-                    "CANDIDATE_UNSUPPORTED_INFORMATION",
-                    "外部/附加信息候选缺少 ontology 关系支撑",
-                    self.warnings,
-                )
-
-        rejected_ids = {
-            str(getattr(candidate, "candidate_id", "") or "")
-            for candidate in items
-            if getattr(candidate, "mapping_status", "accepted") == "rejected"
-        }
-        for relation in relation_items:
-            source_id, target_id = _relation_endpoints(relation)
-            if source_id not in rejected_ids and target_id not in rejected_ids:
-                continue
-            if isinstance(relation, dict):
-                relation["mapping_status"] = "rejected"
-                relation_id = str(relation.get("candidate_id") or "")
-            else:
-                relation.mapping_status = "rejected"
-                relation_id = str(getattr(relation, "candidate_id", "") or "")
-            if self.warnings is not None:
-                self.warnings.append(
-                    {
-                        "code": "RELATION_REJECTED_ENDPOINT",
-                        "message": "关系端点已被候选选择器拒绝",
-                        "path": f"relations.{relation_id}" if relation_id else "relations",
-                        "value": {"from_id": source_id, "to_id": target_id},
-                    }
-                )
-        return items, relation_items
-
-
-def select_pre_relation(
+def select_entities(
     candidates: Iterable[Any],
     plan: Any,
     manager: Any | None = None,
     warnings: list[dict[str, Any]] | None = None,
 ) -> list[Any]:
-    return CandidateSelector(plan, manager, warnings).pre_relation(candidates)
+    return CandidateSelector(plan, manager, warnings).select_entities(candidates)
 
 
-def select_post_relation(
-    candidates: Iterable[Any],
-    relations: Iterable[Any],
-    plan: Any,
-    manager: Any | None = None,
-    warnings: list[dict[str, Any]] | None = None,
-) -> tuple[list[Any], list[Any]]:
-    return CandidateSelector(plan, manager, warnings).post_relation(candidates, relations)
-
-
-__all__ = ["CandidateSelector", "select_post_relation", "select_pre_relation"]
+__all__ = ["CandidateSelector", "select_entities"]

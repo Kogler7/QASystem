@@ -889,3 +889,16 @@ def test_v3_failed_status_fails_every_chunk(monkeypatch):
     assert all(item["error_code"] == "EXTRACTION_EXCEPTION" for item in items)
     assert all(item["quality"]["status"] == "failed" for item in items)
     assert all(item["quality"]["graph_publishable"] is False for item in items)
+
+
+def test_jsonl_chunks_keep_sheet_and_data_row_provenance():
+    from algorithm.preproc.preproc_src.table_json import render_json_block
+    from algorithm.knowledge_pipeline.chunking import chunk_document_items
+    text = "## Sheet-2\n" + render_json_block({"columns": ["编号"], "rows": [{"编号": str(i)} for i in range(45)]})
+    items = chunk_document_items(text, chunk_size=4000)
+    chunks = adapter.build_chunks([item["text"] for item in items], metadata=[
+        {**item["metadata"], "source_file": "book.xlsx", "source_type": "xlsx"} for item in items])
+    assert [chunk.metadata["sheet_name"] for chunk in chunks] == ["Sheet-2"] * 3
+    assert [chunk.metadata["source_row_start"] for chunk in chunks] == [2, 22, 42]
+    assert [chunk.metadata["source_row_end"] for chunk in chunks] == [21, 41, 46]
+    assert [chunk.metadata["tables"][0]["row_count"] for chunk in chunks] == [20, 20, 5]

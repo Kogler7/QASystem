@@ -1,0 +1,5059 @@
+{
+  "version": 1,
+  "repetitions": 3,
+  "independent_human_review": false,
+  "source_text_reviewed": false,
+  "labels": "agent-reviewed provisional; identity equivalence only",
+  "cases": {
+    "official__official_01": {
+      "entities": {
+        "golden": [
+          {
+            "type": "OfficialDocument",
+            "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "properties": {
+              "领导批示": "请公司领导阅,各中心和各事业部阅。请韩总指导资源服务中心组织排查,及时修正存在的风险隐患;同时组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施,保证开发、应用智能体期间的数据安全。刘春明 2026-03-28 07:51",
+              "联系电话": "72415",
+              "缓急": "",
+              "来文字号": "中车集团办科信〔2026〕18号",
+              "来文单位": "中国中车集团有限公司",
+              "文件标题": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+              "文件备注": "",
+              "收文部门": "综合管理部（党群工作部、董事会办公室、企业文化部）",
+              "收文日期": "2026-03-27",
+              "收文号": "信息公司收〔2026〕209号",
+              "拟办意见": "请刘总阅批。白雪峰 2026-03-27 16:36",
+              "抄送": "公司领导，总师级领导，纪委副书记，工会副主席",
+              "密级": "内部",
+              "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+              "主办部门": ""
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "第1段",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "第1段",
+              "单元类型": "段落",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》正文",
+              "原文内容": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。",
+              "顺序号": ""
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "排查要求一",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "全面组织开展排查",
+              "单元类型": "条",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》一",
+              "原文内容": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+              "顺序号": "一"
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "排查要求二",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "办公网络内外网隔离与智能体安装管控",
+              "单元类型": "条",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》二",
+              "原文内容": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+              "顺序号": "二"
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "排查要求三",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "高等级网络系统部署管控",
+              "单元类型": "条",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》三",
+              "原文内容": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+              "顺序号": "三"
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "排查要求四",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "其他网络系统风险防范",
+              "单元类型": "条",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》四",
+              "原文内容": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+              "顺序号": "四"
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "排查要求五",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "安全监测与事件处置",
+              "单元类型": "条",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》五",
+              "原文内容": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+              "顺序号": "五"
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "报送要求",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "排查情况报送要求",
+              "单元类型": "段落",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》报送要求段落",
+              "原文内容": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crccgc.cc）。",
+              "顺序号": ""
+            }
+          },
+          {
+            "type": "DocumentUnit",
+            "name": "附件列表",
+            "properties": {
+              "单元标识": "",
+              "单元标题": "附件列表",
+              "单元类型": "附件",
+              "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》附件",
+              "原文内容": "附件：1. 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议；2. “龙虾”等开源智能体安全风险排查反馈表。",
+              "顺序号": ""
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "中国中车集团有限公司",
+            "properties": {
+              "主体名称": "中国中车集团有限公司",
+              "主体标识": "",
+              "主体类型": "组织",
+              "组织层级": "集团",
+              "职责": "发布专项排查通知，组织集团及各子企业开展开源智能体安全风险排查"
+            }
+          },
+          {
+            "type": "OperationalObject",
+            "name": "OpenClaw（“龙虾”）等开源智能体",
+            "properties": {
+              "对象类型": "模型",
+              "对象标识": "",
+              "对象描述": "存在较高安全风险的开源智能体及相关衍生组件，被引入内部系统后极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒",
+              "对象名称": "OpenClaw（“龙虾”）等开源智能体",
+              "所属领域": "网络安全"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "组织开展开源智能体专项排查",
+            "properties": {
+              "活动名称": "组织开展开源智能体专项排查",
+              "活动描述": "梳理本企业使用开源智能体情况，摸清安全风险底数",
+              "活动标识": "",
+              "活动类型": "排查",
+              "动作词": "组织、排查",
+              "预期结果": "梳理本企业使用开源智能体情况，摸清安全风险底数",
+              "优先级": ""
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "落实办公网与互联网隔离",
+            "properties": {
+              "活动名称": "落实办公网与互联网隔离",
+              "活动描述": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+              "活动标识": "",
+              "活动类型": "管理",
+              "动作词": "执行、禁止",
+              "预期结果": "办公设备内、外网有效隔离，严控各类风险",
+              "优先级": ""
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "高等级网络系统部署管控",
+            "properties": {
+              "活动名称": "高等级网络系统部署管控",
+              "活动描述": "对等保三级及以上或存储重要、核心数据的网络系统，未经充分论证、安全测试和集团批准不得部署开源智能体",
+              "活动标识": "",
+              "活动类型": "管理",
+              "动作词": "论证、测试、审批",
+              "预期结果": "未经本企业充分论证和安全测试、未经集团批准，不得部署安装各类开源智能体",
+              "优先级": ""
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "其他网络系统风险防范",
+            "properties": {
+              "活动名称": "其他网络系统风险防范",
+              "活动描述": "对其他网络系统谨慎使用，参照附件1《六要六不要建议》做好针对性风险防范",
+              "活动标识": "",
+              "活动类型": "防范",
+              "动作词": "参照、防范",
+              "预期结果": "参照附件1《六要六不要建议》做好针对性风险防范",
+              "优先级": ""
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "安全监测与事件处置",
+            "properties": {
+              "活动名称": "安全监测与事件处置",
+              "活动描述": "加强网络和数据安全监测，发现开源智能体引发的安全事件第一时间处置并向集团报告",
+              "活动标识": "",
+              "活动类型": "监测",
+              "动作词": "监测、处置、报告",
+              "预期结果": "发现或获知开源智能体引发的本企业安全事件，第一时间处置并向集团报告",
+              "优先级": ""
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "报送排查反馈表",
+            "properties": {
+              "活动名称": "报送排查反馈表",
+              "活动描述": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+              "活动标识": "",
+              "活动类型": "报送",
+              "动作词": "报送",
+              "预期结果": "2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+              "优先级": ""
+            }
+          },
+          {
+            "type": "OperationalInformation",
+            "name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+            "properties": {
+              "信息标识": "",
+              "信息名称": "关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+              "信息类型": "附件",
+              "定义": "其他网络系统风险防范参照的规范建议",
+              "来源文本": "通知附件1"
+            }
+          },
+          {
+            "type": "OperationalInformation",
+            "name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
+            "properties": {
+              "信息标识": "",
+              "信息名称": "“龙虾”等开源智能体安全风险排查反馈表",
+              "信息类型": "附件",
+              "定义": "各企业报送排查情况使用的反馈表",
+              "来源文本": "通知附件2"
+            }
+          },
+          {
+            "type": "OperationalInformation",
+            "name": "排查情况反馈信息",
+            "properties": {
+              "信息标识": "",
+              "信息名称": "开源智能体安全风险排查情况",
+              "信息类型": "报告",
+              "定义": "各企业于2026年4月10日前通过内网办公邮箱报送的排查情况",
+              "来源文本": "通知报送要求"
+            }
+          },
+          {
+            "type": "OperationalExchange",
+            "name": "发布专项排查通知",
+            "properties": {
+              "交互类型": "通知",
+              "交互标识": "",
+              "交互描述": "中国中车集团有限公司向各一级子公司发布关于开展开源智能体安全风险排查工作的通知"
+            }
+          },
+          {
+            "type": "OperationalExchange",
+            "name": "报送排查反馈",
+            "properties": {
+              "交互类型": "报送",
+              "交互标识": "",
+              "交互描述": "各一级子公司于2026年4月10日前通过内网办公邮箱向集团科信部报送排查反馈表"
+            }
+          },
+          {
+            "type": "OperationalExchange",
+            "name": "安全事件报告",
+            "properties": {
+              "交互类型": "报送",
+              "交互标识": "",
+              "交互描述": "发现或获知开源智能体引发的本企业安全事件后第一时间处置，并向集团报告"
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "办公网络内外网隔离约束",
+            "properties": {
+              "强制程度": "必须",
+              "约束原文": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用",
+              "约束名称": "办公网络内外网隔离约束",
+              "约束标识": "",
+              "约束类型": "安全约束",
+              "校验规则": ""
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "境外机构与人员智能体安装管控约束",
+            "properties": {
+              "强制程度": "禁止",
+              "约束原文": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+              "约束名称": "境外机构与人员智能体安装管控约束",
+              "约束标识": "",
+              "约束类型": "权限约束",
+              "校验规则": ""
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "高等级网络系统部署约束",
+            "properties": {
+              "强制程度": "禁止",
+              "约束原文": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+              "约束名称": "高等级网络系统部署约束",
+              "约束标识": "",
+              "约束类型": "安全约束",
+              "校验规则": ""
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "排查反馈报送时限约束",
+            "properties": {
+              "强制程度": "必须",
+              "约束原文": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+              "约束名称": "排查反馈报送时限约束",
+              "约束标识": "",
+              "约束类型": "时间约束",
+              "校验规则": ""
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "齐希同",
+            "properties": {
+              "主体名称": "齐希同",
+              "主体标识": "",
+              "主体类型": "角色",
+              "组织层级": "部门",
+              "职责": "集团科信部联系人，负责排查情况报送对接（联系电话 17707336697）"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "境外企业",
+            "properties": {
+              "主体名称": "境外企业",
+              "主体标识": "",
+              "主体类型": "外部机构",
+              "组织层级": "项目组",
+              "职责": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "境外人员",
+            "properties": {
+              "主体名称": "境外人员",
+              "主体标识": "",
+              "主体类型": "角色",
+              "组织层级": "项目组",
+              "职责": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "中国中车集团有限公司各一级子公司",
+            "properties": {
+              "主体名称": "中国中车集团有限公司各一级子公司",
+              "主体标识": "",
+              "主体类型": "组织",
+              "组织层级": "子公司",
+              "职责": "落实通知要求，梳理本企业开源智能体使用情况，于2026年4月10日前报送排查反馈表"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "中国中车股份有限公司各一级子公司",
+            "properties": {
+              "主体名称": "中国中车股份有限公司各一级子公司",
+              "主体标识": "",
+              "主体类型": "组织",
+              "组织层级": "子公司",
+              "职责": "落实通知要求，梳理本企业开源智能体使用情况，于2026年4月10日前报送排查反馈表"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "总部各部门",
+            "properties": {
+              "主体名称": "总部各部门",
+              "主体标识": "",
+              "主体类型": "部门",
+              "组织层级": "部门",
+              "职责": ""
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "张振威",
+            "properties": {
+              "主体名称": "张振威",
+              "主体标识": "",
+              "主体类型": "角色",
+              "组织层级": "子公司",
+              "职责": "信息公司联系人，负责排查情况报送对接（联系电话 18600540011）"
+            }
+          }
+        ],
+        "predicted": [
+          {
+            "type": "DocumentUnit",
+            "name": "通知正文",
+            "properties": {
+              "单元标识": "通知正文",
+              "单元类型": "正文",
+              "单元标题": "",
+              "原文内容": "```json\n{\n\"columns\": [\n\"中国中车集团有限公司\",\n\"中国中车集团有限公司_2\",\n\"来文字号：\",\n\"中车集团办科信（2026）18号\",\n\"列5\"\n],\n\"rows\": [\n{\n\"中国中车集团有限公司\": \"72415\",\n\"中国中车集团有限公司_2\": \"72415\",\n\"来文字号：\": \"72415\",\n\"中车集团办科信（2026）18号\": \"72415\",\n\"列5\": \"72415\"\n},\n{\n\"中国中车集团有限公司\": \"\",\n\"中国中车集团有限公司_2\": \"缓急：\",\n\"来文字号：\": \"\",\n\"中车集团办科信（2026）18号\": \"收文日期：\",\n\"列5\": \"2026-03-27\"\n},\n{\n\"中国中车集团有限公司\": \"综合管理部（党群工作部、董事会办公室、企业文化部)\",\n\"中国中车集团有限公司_2\": \"综合管理部（党群工作部、董事会办公室、企业文化部)\",\n\"来文字号：\": \"综合管理部（党群工作部、董事会办公室、企业文化部)\",\n\"中车集团办科信（2026）18号\": \"综合管理部（党群工作部、董事会办公室、企业文化部)\",\n\"列5\": \"综合管理部（党群工作部、董事会办公室、企业文化部)\"\n},\n{\n\"中国中车集团有限公司\": \"请刘总阅批。任 白雪峰 2026-03-27 16:36\",\n\"中国中车集团有限公司_2\": \"请刘总阅批。任 白雪峰 2026-03-27 16:36\",\n\"来文字号：\": \"请刘总阅批。任 白雪峰 2026-03-27 16:36\",\n\"中车集团办科信（2026）18号\": \"请刘总阅批。任 白雪峰 2026-03-27 16:36\",\n\"列5\": \"请刘总阅批。任 白雪峰 2026-03-27 16:36\"\n},\n{\n\"中国中车集团有限公司\": \"请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。\",\n\"中国中车集团有限公司_2\": \"请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。\",\n\"来文字号：\": \"请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。\",\n\"中车集团办科信（2026）18号\": \"请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。\",\n\"列5\": \"请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。\"\n},\n{\n\"中国中车集团有限公司\": \"已阅。\",\n\"中国中车集团有限公司_2\": \"已阅。\",\n\"来文字号：\": \"刘春明2026-03-28 07:51\",\n\"中车集团办科信（2026）18号\": \"刘春明2026-03-28 07:51\",\n\"列5\": \"\"\n},\n{\n\"中国中车集团有限公司\": \"已阅。请部门员工阅，按照集团规范要求开展开源智能体部署安装。\",\n\"中国中车集团有限公司_2\": \"已阅。请部门员工阅，按照集团规范要求开展开源智能体部署安装。\",\n\"来文字号：\": \"李鹏2026-03-30 09:25\",\n\"中车集团办科信（2026）18号\": \"李鹏2026-03-30 09:25\",\n\"列5\": \"\"\n},\n{\n\"中国中车集团有限公司\": \"王元元2026-03-3009:26 请技术中心牵头、安全中心配合，组织公司自建自用信息系统和员工\",\n\"中国中车集团有限公司_2\": \"王元元2026-03-3009:26 请技术中心牵头、安全中心配合，组织公司自建自用信息系统和员工\",\n\"来文字号：\": \"\",\n\"中车集团办科信（2026）18号\": \"\",\n\"列5\": \"\"\n},\n{\n\"中国中车集团有限公司\": \"电脑终端安装使用开源智能体风险排查工作，填报反馈表经公司领导 审核后报集团，并修订有关制度，从技术和管理两方面着手，严格杜 绝此类现象发生。韩毅斌2026-03-30 09:27\",\n\"中国中车集团有限公司_2\": \"电脑终端安装使用开源智能体风险排查工作，填报反馈表经公司领导 审核后报集团，并修订有关制度，从技术和管理两方面着手，严格杜 绝此类现象发生。韩毅斌2026-03-30 09:27\",\n\"来文字号：\": \"\",\n\"中车集团办科信（2026）18号\": \"\",\n\"列5\": \"\"\n},\n{\n\"中国中车集团有限公司\": \"已閲。\",\n\"中国中车集团有限公司_2\": \"已閲。\",\n\"来文字号：\": \"已閲。\",\n\"中车集团办科信（2026）18号\": \"已閲。\",\n\"列5\": \"\"\n},\n{\n\"中国中车集团有限公司\": \"王龙龙2026-03-3009:29\",\n\"中国中车集团有限公司_2\": \"王龙龙2026-03-3009:29\",\n\"来文字号：\": \"王龙龙2026-03-3009:29\",\n\"中车集团办科信（2026）18号\": \"王龙龙2026-03-3009:29\",\n\"列5\": \"\"\n}\n]\n}\n```",
+              "顺序号": "",
+              "原文位置": "《》正文",
+              "name": "通知正文"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "修订有关制度",
+            "properties": {
+              "活动名称": "修订有关制度",
+              "活动描述": "从技术和管理两方面着手，修订有关制度，严格杜绝此类现象发生",
+              "活动类型": "管理",
+              "动作词": "修订",
+              "预期结果": "严格杜绝此类现象发生",
+              "name": "修订有关制度"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "填报反馈表经公司领导审核后报集团",
+            "properties": {
+              "活动名称": "填报反馈表经公司领导审核后报集团",
+              "活动描述": "在电脑终端安装使用开源智能体风险排查工作中，填报反馈表并经公司领导审核后报集团",
+              "活动类型": "报送",
+              "动作词": "填报",
+              "name": "填报反馈表经公司领导审核后报集团"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "按照集团规范要求开展开源智能体部署安装",
+            "properties": {
+              "活动名称": "按照集团规范要求开展开源智能体部署安装",
+              "活动描述": "部门员工按照集团规范要求开展开源智能体部署安装",
+              "活动类型": "实施",
+              "动作词": "部署安装",
+              "name": "按照集团规范要求开展开源智能体部署安装"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+            "properties": {
+              "name": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施",
+            "properties": {
+              "活动名称": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施",
+              "活动描述": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施，保证开发、应用智能体期间的数据安全",
+              "动作词": "研讨制定",
+              "预期结果": "保证开发、应用智能体期间的数据安全",
+              "name": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "组织排查，及时修正存在的风险隐患",
+            "properties": {
+              "活动名称": "组织排查，及时修正存在的风险隐患",
+              "活动描述": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+              "活动类型": "排查",
+              "动作词": "组织排查",
+              "预期结果": "及时修正存在的风险隐患",
+              "name": "组织排查，及时修正存在的风险隐患"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "中国中车集团有限公司",
+            "properties": {
+              "主体名称": "中国中车集团有限公司",
+              "主体类型": "组织",
+              "组织层级": "集团",
+              "name": "中国中车集团有限公司"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "安全中心",
+            "properties": {
+              "主体名称": "安全中心",
+              "主体类型": "部门",
+              "职责": "配合技术中心组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+              "name": "安全中心"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "技术中心",
+            "properties": {
+              "主体名称": "技术中心",
+              "主体类型": "部门",
+              "组织层级": "部门",
+              "职责": "牵头组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+              "name": "技术中心"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+            "properties": {
+              "主体名称": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+              "主体类型": "部门",
+              "组织层级": "部门",
+              "name": "综合管理部（党群工作部、董事会办公室、企业文化部)"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "资源服务中心",
+            "properties": {
+              "主体名称": "资源服务中心",
+              "职责": "组织排查开源智能体风险隐患，及时修正存在的风险隐患",
+              "name": "资源服务中心"
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "严格杜绝此类现象发生",
+            "properties": {
+              "约束原文": "严格杜绝此类现象发生",
+              "约束名称": "严格杜绝此类现象发生",
+              "约束类型": "安全约束",
+              "强制程度": "禁止",
+              "name": "严格杜绝此类现象发生"
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "保证开发、应用智能体期间的数据安全",
+            "properties": {
+              "约束原文": "保证开发、应用智能体期间的数据安全",
+              "约束名称": "保证开发、应用智能体期间的数据安全",
+              "约束类型": "安全约束",
+              "name": "保证开发、应用智能体期间的数据安全"
+            }
+          },
+          {
+            "type": "OperationalConstraint",
+            "name": "按照集团规范要求开展开源智能体部署安装",
+            "properties": {
+              "约束原文": "按照集团规范要求开展开源智能体部署安装",
+              "约束名称": "按照集团规范要求开展开源智能体部署安装",
+              "约束类型": "合规约束",
+              "强制程度": "应当",
+              "name": "按照集团规范要求开展开源智能体部署安装"
+            }
+          },
+          {
+            "type": "OperationalExchange",
+            "name": "填报反馈表经公司领导审核后报集团",
+            "properties": {
+              "交互类型": "报送",
+              "交互标识": "填报反馈表经公司领导审核后报集团",
+              "交互描述": "技术中心牵头、安全中心配合组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作后，填报反馈表经公司领导审核后报集团。",
+              "name": "填报反馈表经公司领导审核后报集团"
+            }
+          },
+          {
+            "type": "OperationalInformation",
+            "name": "反馈表",
+            "properties": {
+              "信息名称": "反馈表",
+              "信息类型": "材料",
+              "定义": "用于填报公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查情况，经公司领导审核后报集团的表格材料。",
+              "来源文本": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作，填报反馈表经公司领导 审核后报集团",
+              "name": "反馈表"
+            }
+          },
+          {
+            "type": "OperationalObject",
+            "name": "公司自建自用信息系统",
+            "properties": {
+              "对象名称": "公司自建自用信息系统",
+              "对象类型": "系统",
+              "对象描述": "公司自建自用信息系统，需开展安装使用开源智能体风险排查工作",
+              "name": "公司自建自用信息系统"
+            }
+          },
+          {
+            "type": "OperationalObject",
+            "name": "员工电脑终端",
+            "properties": {
+              "对象名称": "员工电脑终端",
+              "对象类型": "设备",
+              "对象描述": "员工电脑终端，需开展安装使用开源智能体风险排查工作",
+              "name": "员工电脑终端"
+            }
+          },
+          {
+            "type": "OperationalObject",
+            "name": "开源智能体",
+            "properties": {
+              "对象名称": "开源智能体",
+              "对象描述": "公司部署、使用开源智能体，需制定规范、安全措施并开展风险排查，保证开发、应用智能体期间的数据安全",
+              "name": "开源智能体"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "已传阅部门主管和骨干员工阅",
+            "properties": {
+              "活动名称": "已传阅部门主管和骨干员工阅",
+              "活动描述": "将文件传阅给部门主管和骨干员工阅知",
+              "活动类型": "传阅",
+              "动作词": "传阅",
+              "name": "已传阅部门主管和骨干员工阅"
+            }
+          },
+          {
+            "type": "OperationalActivity",
+            "name": "请韩秘蜜阅办",
+            "properties": {
+              "活动名称": "请韩秘蜜阅办",
+              "活动描述": "请韩秘蜜对文件进行阅办处理",
+              "活动类型": "阅办",
+              "动作词": "阅办",
+              "name": "请韩秘蜜阅办"
+            }
+          },
+          {
+            "type": "OperationalAgent",
+            "name": "韩秘蜜",
+            "properties": {
+              "主体名称": "韩秘蜜",
+              "职责": "阅办文件",
+              "name": "韩秘蜜"
+            }
+          },
+          {
+            "type": "OperationalObject",
+            "name": "部门主管和骨干员工",
+            "properties": {
+              "对象名称": "部门主管和骨干员工",
+              "对象类型": "角色",
+              "对象描述": "公文传阅对象，由部门主管和骨干员工组成，接收已阅文件进行传阅",
+              "所属领域": "公文传阅",
+              "name": "部门主管和骨干员工"
+            }
+          },
+          {
+            "type": "OfficialDocument",
+            "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "properties": {
+              "文件标题": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+              "来文字号": "中车集团办科信［2026]18号",
+              "来文单位": "中国中车集团有限公司办公室",
+              "密级": "内部事项",
+              "主送": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+              "抄送": "公司领导，总师级领导，纪委副书记、工会副主席",
+              "联系电话": "集团科信部齐希同，17707336697；信息公司张振威，18600540011",
+              "领导批示": "请李欣华配合，做好风险排查工作。",
+              "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知"
+            }
+          }
+        ]
+      },
+      "relations": {
+        "golden": [
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "第1段"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求一"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求二"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求三"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求四"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求五"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "报送要求"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_PART",
+            "to_type": "DocumentUnit",
+            "to_name": "附件列表"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "ISSUED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "APPLIES_TO",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "APPLIES_TO",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "APPLIES_TO",
+            "to_type": "OperationalAgent",
+            "to_name": "总部各部门"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "CONCERNS_OBJECT",
+            "to_type": "OperationalObject",
+            "to_name": "OpenClaw（“龙虾”）等开源智能体"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "DEFINES",
+            "to_type": "OperationalInformation",
+            "to_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "DEFINES",
+            "to_type": "OperationalInformation",
+            "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_KEY_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "排查情况反馈信息"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "REQUIRES_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "组织开展开源智能体专项排查"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "REQUIRES_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "落实办公网与互联网隔离"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "REQUIRES_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "高等级网络系统部署管控"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "REQUIRES_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "其他网络系统风险防范"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "REQUIRES_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "安全监测与事件处置"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "REQUIRES_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "报送排查反馈表"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_EXCHANGE",
+            "to_type": "OperationalExchange",
+            "to_name": "发布专项排查通知"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_EXCHANGE",
+            "to_type": "OperationalExchange",
+            "to_name": "报送排查反馈"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_EXCHANGE",
+            "to_type": "OperationalExchange",
+            "to_name": "安全事件报告"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织开展开源智能体专项排查",
+            "rel_type": "ACTS_ON",
+            "to_type": "OperationalObject",
+            "to_name": "OpenClaw（“龙虾”）等开源智能体"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织开展开源智能体专项排查",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织开展开源智能体专项排查",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "报送排查反馈表",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "报送排查反馈表",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织开展开源智能体专项排查",
+            "rel_type": "PRECEDES",
+            "to_type": "OperationalActivity",
+            "to_name": "报送排查反馈表"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "其他网络系统风险防范",
+            "rel_type": "USES_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "报送排查反馈表",
+            "rel_type": "USES_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "报送排查反馈表",
+            "rel_type": "PRODUCES",
+            "to_type": "OperationalInformation",
+            "to_name": "排查情况反馈信息"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "办公网络内外网隔离约束",
+            "rel_type": "CONSTRAINS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "落实办公网与互联网隔离"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "境外机构与人员智能体安装管控约束",
+            "rel_type": "CONSTRAINS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "落实办公网与互联网隔离"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "高等级网络系统部署约束",
+            "rel_type": "CONSTRAINS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "高等级网络系统部署管控"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "排查反馈报送时限约束",
+            "rel_type": "CONSTRAINS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "报送排查反馈表"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "办公网络内外网隔离约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "办公网络内外网隔离约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "境外机构与人员智能体安装管控约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "境外企业"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "境外机构与人员智能体安装管控约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "境外人员"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "高等级网络系统部署约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "高等级网络系统部署约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "排查反馈报送时限约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "排查反馈报送时限约束",
+            "rel_type": "CONSTRAINS_AGENT",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织开展开源智能体专项排查",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求一"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "落实办公网与互联网隔离",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求二"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "高等级网络系统部署管控",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求三"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "其他网络系统风险防范",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求四"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "安全监测与事件处置",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求五"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "报送排查反馈表",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "报送要求"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "办公网络内外网隔离约束",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求二"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "境外机构与人员智能体安装管控约束",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求二"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "高等级网络系统部署约束",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求三"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "排查反馈报送时限约束",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "报送要求"
+          },
+          {
+            "from_type": "OperationalAgent",
+            "from_name": "中国中车集团有限公司各一级子公司",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "第1段"
+          },
+          {
+            "from_type": "OperationalAgent",
+            "from_name": "中国中车股份有限公司各一级子公司",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "第1段"
+          },
+          {
+            "from_type": "OperationalAgent",
+            "from_name": "总部各部门",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "第1段"
+          },
+          {
+            "from_type": "OperationalInformation",
+            "from_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "附件列表"
+          },
+          {
+            "from_type": "OperationalInformation",
+            "from_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "附件列表"
+          },
+          {
+            "from_type": "OperationalObject",
+            "from_name": "OpenClaw（“龙虾”）等开源智能体",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "第1段"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "发布专项排查通知",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "第1段"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "报送排查反馈",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "报送要求"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "安全事件报告",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "排查要求五"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "发布专项排查通知",
+            "rel_type": "sourceAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "发布专项排查通知",
+            "rel_type": "targetAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "发布专项排查通知",
+            "rel_type": "targetAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "发布专项排查通知",
+            "rel_type": "targetAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "总部各部门"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "报送排查反馈",
+            "rel_type": "sourceAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "报送排查反馈",
+            "rel_type": "sourceAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "报送排查反馈",
+            "rel_type": "targetAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "齐希同"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "安全事件报告",
+            "rel_type": "sourceAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "安全事件报告",
+            "rel_type": "sourceAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车股份有限公司各一级子公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "安全事件报告",
+            "rel_type": "targetAgent",
+            "to_type": "OperationalAgent",
+            "to_name": "中国中车集团有限公司"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "报送排查反馈",
+            "rel_type": "EXCHANGES_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "发布专项排查通知",
+            "rel_type": "SUPPORTS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "组织开展开源智能体专项排查"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "报送排查反馈",
+            "rel_type": "SUPPORTS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "报送排查反馈表"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "安全事件报告",
+            "rel_type": "SUPPORTS_ACTIVITY",
+            "to_type": "OperationalActivity",
+            "to_name": "安全监测与事件处置"
+          },
+          {
+            "from_type": "OperationalInformation",
+            "from_name": "附件1 关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+            "rel_type": "RELATED_TO",
+            "to_type": "OperationalInformation",
+            "to_name": "附件2 “龙虾”等开源智能体安全风险排查反馈表"
+          }
+        ],
+        "predicted": [
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "PRECEDES",
+            "to_type": "OperationalActivity",
+            "to_name": "修订有关制度"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "PRODUCES",
+            "to_type": "OperationalInformation",
+            "to_name": "反馈表"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "USES_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "反馈表"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "安全中心"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "技术中心"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施",
+            "rel_type": "ACTS_ON",
+            "to_type": "OperationalObject",
+            "to_name": "开源智能体"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "通知正文"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织排查，及时修正存在的风险隐患",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "资源服务中心"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "组织排查，及时修正存在的风险隐患",
+            "rel_type": "PRECEDES",
+            "to_type": "OperationalActivity",
+            "to_name": "组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安全措施"
+          },
+          {
+            "from_type": "OperationalAgent",
+            "from_name": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "通知正文"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "按照集团规范要求开展开源智能体部署安装",
+            "rel_type": "CONSTRAINS_OBJECT",
+            "to_type": "OperationalObject",
+            "to_name": "开源智能体"
+          },
+          {
+            "from_type": "OperationalConstraint",
+            "from_name": "按照集团规范要求开展开源智能体部署安装",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "通知正文"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "通知正文"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "EXCHANGES_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "反馈表"
+          },
+          {
+            "from_type": "OperationalInformation",
+            "from_name": "反馈表",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "通知正文"
+          },
+          {
+            "from_type": "OperationalObject",
+            "from_name": "开源智能体",
+            "rel_type": "EVIDENCED_BY",
+            "to_type": "DocumentUnit",
+            "to_name": "通知正文"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "已传阅部门主管和骨干员工阅",
+            "rel_type": "ACTS_ON",
+            "to_type": "OperationalObject",
+            "to_name": "部门主管和骨干员工"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "已传阅部门主管和骨干员工阅",
+            "rel_type": "PRECEDES",
+            "to_type": "OperationalActivity",
+            "to_name": "请韩秘蜜阅办"
+          },
+          {
+            "from_type": "OperationalActivity",
+            "from_name": "请韩秘蜜阅办",
+            "rel_type": "PERFORMED_BY",
+            "to_type": "OperationalAgent",
+            "to_name": "韩秘蜜"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "CONCERNS_OBJECT",
+            "to_type": "OperationalObject",
+            "to_name": "开源智能体"
+          },
+          {
+            "from_type": "OfficialDocument",
+            "from_name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+            "rel_type": "HAS_KEY_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "反馈表"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "PRECEDES",
+            "to_type": "OperationalActivity",
+            "to_name": "修订有关制度"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "PRODUCES",
+            "to_type": "OperationalInformation",
+            "to_name": "反馈表"
+          },
+          {
+            "from_type": "OperationalExchange",
+            "from_name": "填报反馈表经公司领导审核后报集团",
+            "rel_type": "USES_INFORMATION",
+            "to_type": "OperationalInformation",
+            "to_name": "反馈表"
+          }
+        ]
+      }
+    },
+    "trouble__trouble_mini": {
+      "entities": {
+        "golden": [
+          {
+            "type": "FaultComponent",
+            "name": "A节大闸",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "A节大闸"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "93阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "93阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "283KP压力开关",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "283KP压力开关"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "A节大闸不缓解",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "A节大闸不缓解",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "换端后A节大闸不能正常缓解。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "重新转动93阀",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "重新转动93阀",
+              "MethodType": "调整",
+              "MethodStrategy": "纠正性",
+              "MethodDescription": "重新转93阀，但故障未消除。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "大复位",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "大复位",
+              "MethodType": "复位",
+              "MethodStrategy": "纠正性",
+              "MethodDescription": "执行大复位后状态恢复正常。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换283KP压力开关",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换283KP压力开关",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换283KP压力开关。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "283KP状态数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "283KP状态数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载运行数据并分析283KP压力开关状态。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "283KP压力开关断开检测结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "283KP压力开关断开",
+              "ResultStatus": "异常",
+              "ResultDescription": "下载数据分析发现283KP压力开关处于断开状态。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "大闸缓解功能验证试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "大闸缓解功能验证试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "大复位后观察大闸缓解状态，并进行库内试验。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "大闸缓解功能验证结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "大闸缓解功能恢复",
+              "ResultStatus": "正常",
+              "ResultDescription": "大复位后状态正常，库内试验正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "LTE-A网",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "LTE-A网"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "A网通信模块",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "A网通信模块"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "OCE",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "OCE"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "LTE-A网间歇性脱网",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "LTE-A网间歇性脱网",
+              "FaultCategory": "通信故障",
+              "FaultDescription": "4:58分运行至541KM+800M处LTE-A网脱网5:00恢复；5:50运行至482KM+900M处A网闪红5:51恢复；6:11分运行至457KM+890M处，A网脱网6:14恢复。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换A网通信模块",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换A网通信模块",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换A网通信模块。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "LTE与OCE通信数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "LTE与OCE通信数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载主车7002的LTE、OCE数据，并在神池入库后下载从车7079数据进行分析。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "列车管",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "列车管"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "A节中继阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "A节中继阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "181遮断阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "181遮断阀"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "列车管不缓解",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "列车管不缓解",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "A节操纵，大闸运转位均缸缓解正常，列车管不缓解。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换A节中继阀",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换A节中继阀",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换A节中继阀。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换181遮断阀",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换181遮断阀",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换181遮断阀。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "列车管缓解数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "列车管缓解数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载运行数据分析列车管缓解异常。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "列车管缓解功能验证试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "列车管缓解功能验证试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "更换相关阀件后进行多次列车管缓解试验。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "列车管缓解功能验证结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "列车管缓解功能恢复",
+              "ResultStatus": "正常",
+              "ResultDescription": "多次试验均正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "BCU",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "BCU"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "流量计",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "流量计"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "253YV",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "253YV"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "制动机",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "制动机"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "列车管充风异常",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "列车管充风异常",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "列车管压力上升缓慢，且故障时未正常充风。"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "列车管减压异常",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "列车管减压异常",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "主车制动时从车列车管减压缓慢。"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "流量计无显示",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "流量计无显示",
+              "FaultCategory": "其他",
+              "FaultDescription": "从车流量计无显示。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "主从控BCU数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "主从控BCU数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "均缸缓解状态检测结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "均缸缓解正常",
+              "ResultStatus": "正常",
+              "ResultDescription": "故障时刻均缸缓解正常。"
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "总风压力变化检测结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "总风压力无下降",
+              "ResultStatus": "正常",
+              "ResultDescription": "故障时刻总风压力无下降。"
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "流量计显示检测结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "流量计无显示",
+              "ResultStatus": "异常",
+              "ResultDescription": "BCU数据分析显示流量计无显示。"
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "列车管充风状态检测结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "列车管未充风",
+              "ResultStatus": "异常",
+              "ResultDescription": "BCU数据分析判断故障时刻列车管未充风。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换253YV",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换253YV",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换7002A节253YV，181遮断阀。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "制动机功能试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "制动机功能试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "更换相关阀件后试验制动机功能。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "制动机功能试验结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "制动机正常",
+              "ResultStatus": "正常",
+              "ResultDescription": "试验制动机功能正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节TCU1M2A相下管",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节TCU1M2A相下管"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "IGBT",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "IGBT"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "门极驱动板",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "门极驱动板"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节TCU1M2A相下管故障",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "B节TCU1M2A相下管故障",
+              "FaultCategory": "电气故障",
+              "FaultDescription": "B节TCU1的M2单元A相下管发生故障。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "TCU故障数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "TCU故障数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载运行数据，分析B节TCU1M2A相下管故障记录。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "A相下管故障诊断结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "B节TCU1M2A相下管故障",
+              "ResultStatus": "异常",
+              "ResultDescription": "数据分析确认B节TCU1M2A相下管故障。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "IGBT阻值测量",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "IGBT阻值测量",
+              "ExperimentType": "电气测量",
+              "ExperimentProcedure": "上车测量IGBT阻值。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "IGBT阻值测量结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "IGBT阻值正常",
+              "ResultStatus": "正常",
+              "ResultDescription": "IGBT阻值测量结果正常。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换门极驱动板",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换门极驱动板",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换门极驱动板。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "TCU功率单元库内功能试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "TCU功率单元库内功能试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "更换门极驱动板后进行库内功能试验。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "TCU功率单元库内试验结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "未复现A相下管故障",
+              "ResultStatus": "正常",
+              "ResultDescription": "库内试验正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "压缩机",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "压缩机"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "287KP",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "287KP"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "压缩机未自动打风",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "压缩机未自动打风",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "总风压力低于750kPa时，压缩机未按预期自动打风。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "压缩机自动打风功能试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "压缩机自动打风功能试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "在总风压力低于750kPa时，多次试验AB节压缩机自动打风情况。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "压缩机自动打风试验结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "总风低于750kPa时AB节压缩机自动打风",
+              "ResultStatus": "正常",
+              "ResultDescription": "上车多次试验时，AB节压缩机均能自动打风。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换287KP",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换287KP",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换287KP。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节压缩机",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节压缩机"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节压缩机滤清筒",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节压缩机滤清筒"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节干燥塔进出气止回阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节干燥塔进出气止回阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节进气阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节进气阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节最小压力维持阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节最小压力维持阀"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节压缩机不打风",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "B节压缩机不打风",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "B节压缩机不能正常打风。"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节压缩机滤清筒异常排风",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "B节压缩机滤清筒异常排风",
+              "FaultCategory": "气路故障",
+              "FaultDescription": "B节压缩机滤清筒向外异常排风。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "压缩机故障数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "压缩机故障数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载运行数据，分析B节压缩机不打风及滤清筒异常排风。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "干燥塔止回阀拆解检查",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "干燥塔止回阀拆解检查",
+              "ExperimentType": "拆解检查",
+              "ExperimentProcedure": "拆解检查B节干燥塔进出气止回阀。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "干燥塔止回阀拆解检查结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "进出气止回阀正常",
+              "ResultStatus": "正常",
+              "ResultDescription": "拆解检查表明B节干燥塔进出气止回阀正常。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换B节进气阀",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换B节进气阀",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换B节进气阀。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换B节最小压力维持阀",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换B节最小压力维持阀",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换B节最小压力维持阀。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "压缩机库内反复功能试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "压缩机库内反复功能试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "在库内对B节压缩机及滤清筒状态进行试验，并在更换阀件后反复验证。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "压缩机库内反复试验结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "未复现不打风及异常排风",
+              "ResultStatus": "正常",
+              "ResultDescription": "库内试验及更换后的反复试验均正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节空调",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "AB节空调"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节空调蒸发器",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "AB节空调蒸发器"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节EM231模块",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "AB节EM231模块"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节CPU模块",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "AB节CPU模块"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "AB节空调制冷不佳",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "AB节空调制冷不佳",
+              "FaultCategory": "热故障",
+              "FaultDescription": "A、B节空调制冷效果不佳。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "AB节空调状态检查",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "AB节空调状态检查",
+              "ExperimentType": "其他",
+              "ExperimentProcedure": "检查AB节空调蒸发器以及EM231、CPU模块的工作状态。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "空调蒸发器检查结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "AB节空调蒸发器未结冰",
+              "ResultStatus": "未判定",
+              "ResultDescription": "上车检查发现AB节空调蒸发器未结冰。"
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "空调控制模块检查结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "EM231及CPU模块工作正常",
+              "ResultStatus": "正常",
+              "ResultDescription": "检查时EM231及CPU模块工作正常。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换AB节EM231模块",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换AB节EM231模块",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换A、B节EM231模块。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "AB节空调制冷性能试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "AB节空调制冷性能试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "测量环境温度和出风口温度，并长时间试验AB节空调制冷情况。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "环境温度测量结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "32℃",
+              "ResultStatus": "未判定",
+              "ResultDescription": "试验时环境温度为32度。"
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "出风口温度测量结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "14℃",
+              "ResultStatus": "未判定",
+              "ResultDescription": "试验时出风口温度为14度。"
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "空调长时间制冷试验结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "AB节空调制冷正常",
+              "ResultStatus": "正常",
+              "ResultDescription": "长时间试验后AB节空调制冷正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节制动显示屏",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节制动显示屏"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节紧急阀",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "B节紧急阀"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节制动显示屏A7故障报警",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "B节制动显示屏A7故障报警",
+              "FaultCategory": "其他",
+              "FaultDescription": "B节制动显示屏显示A7故障报警。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换B节紧急阀",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换B节紧急阀",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换B节紧急阀。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "制动系统功能验证试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "制动系统功能验证试验",
+              "ExperimentType": "功能测试",
+              "ExperimentProcedure": "进行上车试验，并在更换B节紧急阀后进行库内试验。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "制动系统功能试验结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "未复现A7故障报警",
+              "ResultStatus": "正常",
+              "ResultDescription": "上车试验正常，更换B节紧急阀后库内试验正常。"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "LTE-B网",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "LTE-B网"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节OCE",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "AB节OCE"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "OCE到交换机的线路",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "OCE到交换机的线路"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节CPU板卡",
+            "properties": {
+              "ComponentId": "",
+              "ComponentName": "AB节CPU板卡"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "LTE-B网间歇性脱网",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "LTE-B网间歇性脱网",
+              "FaultCategory": "通信故障",
+              "FaultDescription": "主车8016B节 从车7005A节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢复；2.192km21:24又脱网，21:34 204km 300m恢复；3.207km 600m又脱网，21：41 208km 300m恢复\n4.231km 160m22：15又脱网，运行至西柏坡站分解"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "AB节OCE通信中断",
+            "properties": {
+              "FaultTypeId": "",
+              "FaultTypeName": "AB节OCE通信中断",
+              "FaultCategory": "通信故障",
+              "FaultDescription": "下载数据分析发现A、B节OCE通信中断。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "OCE通信数据分析",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "OCE通信数据分析",
+              "ExperimentType": "数据分析",
+              "ExperimentProcedure": "下载运行数据，分析LTE-B网脱网及AB节OCE通信状态。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "OCE通信中断诊断结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "AB节OCE通讯中断",
+              "ResultStatus": "异常",
+              "ResultDescription": "数据分析发现AB节OCE通讯中断。"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "OCE到交换机线路检查",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "OCE到交换机线路检查",
+              "ExperimentType": "线路检查",
+              "ExperimentProcedure": "检查OCE到交换机的线路状态。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "OCE到交换机线路检查结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "OCE到交换机的线路良好",
+              "ResultStatus": "正常",
+              "ResultDescription": "检查确认OCE到交换机的线路良好。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "更换AB节CPU板卡",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "更换AB节CPU板卡",
+              "MethodType": "更换",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "预防性更换AB节CPU板卡。"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "刷新AB节OCE底层程序",
+            "properties": {
+              "MethodId": "",
+              "MethodName": "刷新底层程序",
+              "MethodType": "软件处理",
+              "MethodStrategy": "预防性",
+              "MethodDescription": "刷新底层程序后试验正常"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "OCE通信功能验证试验",
+            "properties": {
+              "ExperimentId": "",
+              "ExperimentName": "OCE通信功能验证试验",
+              "ExperimentType": "通信测试",
+              "ExperimentProcedure": "更换CPU板卡并刷新底层程序后进行通信功能试验。",
+              "ExpectedResult": null
+            }
+          },
+          {
+            "type": "ExperimentResult",
+            "name": "OCE通信功能验证结果",
+            "properties": {
+              "ResultId": "",
+              "ResultValue": "OCE通信功能恢复",
+              "ResultStatus": "正常",
+              "ResultDescription": "刷新底层程序后试验正常。"
+            }
+          }
+        ],
+        "predicted": [
+          {
+            "type": "FaultComponent",
+            "name": "一级配件",
+            "properties": {
+              "部件名称": "一级配件",
+              "name": "一级配件"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "二级配件",
+            "properties": {
+              "部件名称": "二级配件",
+              "name": "二级配件"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "子系统",
+            "properties": {
+              "部件名称": "子系统",
+              "name": "子系统"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "机车",
+            "properties": {
+              "部件名称": "机车",
+              "name": "机车"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "部件",
+            "properties": {
+              "部件名称": "部件",
+              "name": "部件"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "处理方法",
+            "properties": {
+              "方法名称": "预防性更换283KP压力开关",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常",
+              "name": "处理方法"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "故障内容",
+            "properties": {
+              "故障类型名称": "故障内容",
+              "故障描述": "换端后A节大闸不缓解，重新转93阀无效，大复位后正常",
+              "name": "故障内容"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "故障标签",
+            "properties": {
+              "故障类型名称": "故障标签",
+              "故障描述": "故障标签为预防",
+              "name": "故障标签"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "181遮断阀",
+            "properties": {
+              "部件名称": "181遮断阀",
+              "name": "181遮断阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "253YV",
+            "properties": {
+              "部件名称": "253YV",
+              "name": "253YV"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "283KP压力开关",
+            "properties": {
+              "部件名称": "283KP压力开关",
+              "name": "283KP压力开关"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "287KP",
+            "properties": {
+              "部件名称": "287KP",
+              "name": "287KP"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "AB节CPU板卡",
+            "properties": {
+              "部件名称": "AB节CPU板卡",
+              "部件标识": "CPU",
+              "name": "AB节CPU板卡"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "A网通信模块",
+            "properties": {
+              "部件名称": "A网通信模块",
+              "name": "A网通信模块"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "A节中继阀",
+            "properties": {
+              "部件名称": "A节中继阀",
+              "name": "A节中继阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节最小压力阀进气阀",
+            "properties": {
+              "部件名称": "B节最小压力阀进气阀",
+              "name": "B节最小压力阀进气阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "B节紧急阀",
+            "properties": {
+              "部件名称": "B节紧急阀",
+              "name": "B节紧急阀"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "EM231模块",
+            "properties": {
+              "部件名称": "EM231模块",
+              "name": "EM231模块"
+            }
+          },
+          {
+            "type": "FaultComponent",
+            "name": "门极驱动板",
+            "properties": {
+              "部件名称": "门极驱动板",
+              "name": "门极驱动板"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换283KP压力开关",
+            "properties": {
+              "方法名称": "预防性更换283KP压力开关",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "下载数据分析283KP压力开关断开后，预防性更换283KP压力开关，库内试验正常",
+              "name": "预防性更换283KP压力开关"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换287KP",
+            "properties": {
+              "方法名称": "预防性更换287KP",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "总风低于750KPA压缩机未自动打风，上车多次试验后预防性更换287KP，请示周少游继续运行",
+              "name": "预防性更换287KP"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换7002A节253YV，181遮断阀",
+            "properties": {
+              "方法名称": "预防性更换7002A节253YV，181遮断阀",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "下载主从控BCU数据分析判断为列车管未充风后，预防性更换7002A节253YV，181遮断阀，试验制动机正常",
+              "name": "预防性更换7002A节253YV，181遮断阀"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换AB节CPU板卡",
+            "properties": {
+              "方法名称": "预防性更换AB节CPU板卡",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "AB节OCE通讯中断，检查OCE到交换机的线路良好后预防性更换AB节CPU板卡，刷新底层程序后试验正常",
+              "name": "预防性更换AB节CPU板卡"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换AB节EM231模块",
+            "properties": {
+              "方法名称": "预防性更换AB节EM231模块",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "AB节空调制冷不佳，上车检查蒸发器未结冰、EM231及CPU模块工作正常后，预防性更换AB节EM231模块，试验测量环温32度、出风口温度14度，长时间试验制冷正常",
+              "name": "预防性更换AB节EM231模块"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换A网通信模块",
+            "properties": {
+              "方法名称": "预防性更换A网通信模块",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "下载主车7002LTE数据、OCE数据后，预防性更换A网通信模块",
+              "name": "预防性更换A网通信模块"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换A节中继阀、181遮断阀",
+            "properties": {
+              "方法名称": "预防性更换A节中继阀、181遮断阀",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "下载数据分析后，预防性更换A节中继阀、181遮断阀，多次试验正常",
+              "name": "预防性更换A节中继阀、181遮断阀"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换B节最小压力阀进气阀",
+            "properties": {
+              "方法名称": "预防性更换B节最小压力阀进气阀",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "B节压缩机不打风，下载数据分析、库内试验正常，拆解B节干燥塔进出气止回阀正常后，预防性更换B节最小压力阀进气阀，反复试验正常",
+              "name": "预防性更换B节最小压力阀进气阀"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换B节紧急阀",
+            "properties": {
+              "方法名称": "预防性更换B节紧急阀",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "B节制动显示屏显示A7故障，上车试验正常后预防性更换B节紧急阀，库内试验正常",
+              "name": "预防性更换B节紧急阀"
+            }
+          },
+          {
+            "type": "FaultHandlingMethod",
+            "name": "预防性更换门极驱动板",
+            "properties": {
+              "方法名称": "预防性更换门极驱动板",
+              "方法类型": "更换",
+              "处理策略": "预防性",
+              "方法描述": "B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常后，预防性更换门极驱动板，库内试验正常",
+              "name": "预防性更换门极驱动板"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "AB节OCE通讯中断",
+            "properties": {
+              "故障类型名称": "AB节OCE通讯中断",
+              "故障描述": "AB节OCE通讯中断，表现为LTE网络脱网",
+              "name": "AB节OCE通讯中断"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "AB节空调制冷不佳",
+            "properties": {
+              "故障类型名称": "AB节空调制冷不佳",
+              "故障描述": "AB节空调制冷不佳",
+              "name": "AB节空调制冷不佳"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "A网闪红",
+            "properties": {
+              "故障类型名称": "A网闪红",
+              "故障类别": "通信故障",
+              "故障描述": "运行中A网闪红，随后恢复",
+              "name": "A网闪红"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "A节大闸不缓解",
+            "properties": {
+              "故障类型名称": "A节大闸不缓解",
+              "故障描述": "换端后A节大闸不缓解，重新转93阀无效，大复位后恢复正常",
+              "name": "A节大闸不缓解"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节TCU1M2A相下管故障",
+            "properties": {
+              "故障类型名称": "B节TCU1M2A相下管故障",
+              "故障描述": "B节TCU1M2A相下管故障，发生于22:51:58-22:53:31、2:10:30-2:10-31",
+              "name": "B节TCU1M2A相下管故障"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节制动显示屏显示A7故障",
+            "properties": {
+              "故障类型名称": "B节制动显示屏显示A7故障",
+              "故障类别": "制动故障",
+              "故障描述": "B节制动显示屏显示A7故障，属于制动机相关故障现象",
+              "name": "B节制动显示屏显示A7故障"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "B节压缩机不打风",
+            "properties": {
+              "故障类型名称": "B节压缩机不打风",
+              "故障描述": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+              "name": "B节压缩机不打风"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "LTE B网脱网",
+            "properties": {
+              "故障类型名称": "LTE B网脱网",
+              "故障类别": "通信故障",
+              "故障描述": "LTE B网脱网，运行中多次脱网后恢复",
+              "name": "LTE B网脱网"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "LTE-A网脱网",
+            "properties": {
+              "故障类型名称": "LTE-A网脱网",
+              "故障类别": "通信故障",
+              "故障描述": "运行中LTE-A网脱网，随后恢复",
+              "name": "LTE-A网脱网"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "从车列车管减压慢",
+            "properties": {
+              "故障类型名称": "从车列车管减压慢",
+              "故障类别": "气路故障",
+              "故障描述": "编组试风缓解后，从车列车管减压慢，均缸正常，从车没有流量显示",
+              "name": "从车列车管减压慢"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "列车管不缓解",
+            "properties": {
+              "故障类型名称": "列车管不缓解",
+              "故障类别": "气路故障",
+              "故障描述": "A节操纵时大闸运转位均缸缓解正常，但列车管不缓解",
+              "name": "列车管不缓解"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "列车管压力上升慢",
+            "properties": {
+              "故障类型名称": "列车管压力上升慢",
+              "故障描述": "编组试风缓解后列车管压力上升慢，均缸正常，从车无流量显示，充满后主车制动、从车列车管减压慢",
+              "name": "列车管压力上升慢"
+            }
+          },
+          {
+            "type": "FaultType",
+            "name": "总风低于750KPA，压缩机未自动打风",
+            "properties": {
+              "故障类型名称": "总风低于750KPA，压缩机未自动打风",
+              "故障类别": "气路故障",
+              "故障描述": "17034次，A节运行至55KM处（6:12）、75KM处（6:31）时总风低于750KPA，压缩机未自动打风",
+              "name": "总风低于750KPA，压缩机未自动打风"
+            }
+          },
+          {
+            "type": "TroubleshootingExperiment",
+            "name": "下载数据分析",
+            "properties": {
+              "实验名称": "下载数据分析",
+              "实验类型": "数据分析",
+              "实验过程": "下载数据并分析283KP压力开关断开",
+              "name": "下载数据分析"
+            }
+          }
+        ]
+      },
+      "relations": {
+        "golden": [
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "A节大闸"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "重新转动93阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "重新转动93阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "93阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "大复位"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换283KP压力开关"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换283KP压力开关",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "283KP压力开关"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "283KP状态数据分析"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "283KP状态数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "283KP压力开关"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "283KP状态数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "283KP压力开关断开检测结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "大闸缓解功能验证试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "大闸缓解功能验证试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "A节大闸"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "大闸缓解功能验证试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "大闸缓解功能验证结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-A网间歇性脱网",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "LTE-A网"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-A网间歇性脱网",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换A网通信模块"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换A网通信模块",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "A网通信模块"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-A网间歇性脱网",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "LTE与OCE通信数据分析"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "LTE与OCE通信数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "LTE-A网"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "LTE与OCE通信数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "OCE"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "列车管"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换A节中继阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换A节中继阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "A节中继阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换181遮断阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换181遮断阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "181遮断阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "列车管缓解数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "列车管缓解功能验证试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "列车管缓解功能验证试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "列车管"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "列车管缓解功能验证试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "列车管缓解功能验证结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管充风异常",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "主从控BCU数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管减压异常",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "主从控BCU数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "流量计无显示",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "主从控BCU数据分析"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "主从控BCU数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "BCU"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "主从控BCU数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "均缸缓解状态检测结果"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "主从控BCU数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "总风压力变化检测结果"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "主从控BCU数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "流量计显示检测结果"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "主从控BCU数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "列车管充风状态检测结果"
+          },
+          {
+            "from_type": "ExperimentResult",
+            "from_name": "流量计显示检测结果",
+            "rel_type": "INDICATES",
+            "to_type": "FaultType",
+            "to_name": "流量计无显示"
+          },
+          {
+            "from_type": "ExperimentResult",
+            "from_name": "列车管充风状态检测结果",
+            "rel_type": "INDICATES",
+            "to_type": "FaultType",
+            "to_name": "列车管充风异常"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管充风异常",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "列车管"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管减压异常",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "列车管"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "流量计无显示",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "流量计"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管充风异常",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换253YV"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换253YV",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "253YV"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管充风异常",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换181遮断阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管充风异常",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "制动机功能试验"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管减压异常",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "制动机功能试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "制动机功能试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "制动机"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "制动机功能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "制动机功能试验结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节TCU1M2A相下管"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "TCU故障数据分析"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "TCU故障数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节TCU1M2A相下管"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "TCU故障数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "A相下管故障诊断结果"
+          },
+          {
+            "from_type": "ExperimentResult",
+            "from_name": "A相下管故障诊断结果",
+            "rel_type": "INDICATES",
+            "to_type": "FaultType",
+            "to_name": "B节TCU1M2A相下管故障"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "IGBT阻值测量"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "IGBT阻值测量",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "IGBT"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "IGBT阻值测量",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "IGBT阻值测量结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换门极驱动板"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换门极驱动板",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "门极驱动板"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "TCU功率单元库内功能试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "TCU功率单元库内功能试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节TCU1M2A相下管"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "TCU功率单元库内功能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "TCU功率单元库内试验结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "压缩机未自动打风",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "压缩机"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "压缩机未自动打风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "压缩机自动打风功能试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机自动打风功能试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "压缩机"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机自动打风功能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "压缩机自动打风试验结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "压缩机未自动打风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换287KP"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换287KP",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "287KP"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "压缩机故障数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "干燥塔止回阀拆解检查"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "压缩机库内反复功能试验"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换B节进气阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换B节最小压力维持阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机滤清筒异常排风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "压缩机故障数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机滤清筒异常排风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "干燥塔止回阀拆解检查"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机滤清筒异常排风",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "压缩机库内反复功能试验"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机滤清筒异常排风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换B节进气阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机滤清筒异常排风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换B节最小压力维持阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节压缩机"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机滤清筒异常排风",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节压缩机滤清筒"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机故障数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节压缩机"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机故障数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节压缩机滤清筒"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "干燥塔止回阀拆解检查",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节干燥塔进出气止回阀"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "干燥塔止回阀拆解检查",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "干燥塔止回阀拆解检查结果"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换B节进气阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节进气阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换B节最小压力维持阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节最小压力维持阀"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机库内反复功能试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节压缩机"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机库内反复功能试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "B节压缩机滤清筒"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "压缩机库内反复功能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "压缩机库内反复试验结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节空调制冷不佳",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节空调"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节空调制冷不佳",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "AB节空调状态检查"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调状态检查",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "AB节空调蒸发器"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调状态检查",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "AB节EM231模块"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调状态检查",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "AB节CPU模块"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调状态检查",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "空调蒸发器检查结果"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调状态检查",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "空调控制模块检查结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节空调制冷不佳",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换AB节EM231模块"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换AB节EM231模块",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节EM231模块"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节空调制冷不佳",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "AB节空调制冷性能试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调制冷性能试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "AB节空调"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调制冷性能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "环境温度测量结果"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调制冷性能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "出风口温度测量结果"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "AB节空调制冷性能试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "空调长时间制冷试验结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节制动显示屏A7故障报警",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节制动显示屏"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节制动显示屏A7故障报警",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换B节紧急阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换B节紧急阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节紧急阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节制动显示屏A7故障报警",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "制动系统功能验证试验"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "制动系统功能验证试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "制动系统功能试验结果"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-B网间歇性脱网",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "LTE-B网"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通信中断",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节OCE"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-B网间歇性脱网",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "OCE通信数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-B网间歇性脱网",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "OCE到交换机线路检查"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-B网间歇性脱网",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "OCE通信功能验证试验"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-B网间歇性脱网",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换AB节CPU板卡"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-B网间歇性脱网",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "刷新AB节OCE底层程序"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通信中断",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "OCE通信数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通信中断",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "OCE到交换机线路检查"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通信中断",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "OCE通信功能验证试验"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通信中断",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "更换AB节CPU板卡"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通信中断",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "刷新AB节OCE底层程序"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "OCE通信数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "AB节OCE"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "OCE通信数据分析",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "OCE通信中断诊断结果"
+          },
+          {
+            "from_type": "ExperimentResult",
+            "from_name": "OCE通信中断诊断结果",
+            "rel_type": "INDICATES",
+            "to_type": "FaultType",
+            "to_name": "AB节OCE通信中断"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "OCE到交换机线路检查",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "OCE到交换机的线路"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "OCE到交换机线路检查",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "OCE到交换机线路检查结果"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "更换AB节CPU板卡",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节CPU板卡"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "刷新AB节OCE底层程序",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节OCE"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "OCE通信功能验证试验",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "AB节OCE"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "OCE通信功能验证试验",
+            "rel_type": "PRODUCES",
+            "to_type": "ExperimentResult",
+            "to_name": "OCE通信功能验证结果"
+          }
+        ],
+        "predicted": [
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换283KP压力开关",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "283KP压力开关"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换287KP",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "287KP"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换7002A节253YV，181遮断阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "181遮断阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换7002A节253YV，181遮断阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "253YV"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换AB节CPU板卡",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节CPU板卡"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换AB节EM231模块",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "EM231模块"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换A网通信模块",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "A网通信模块"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换A节中继阀、181遮断阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "A节中继阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换B节最小压力阀进气阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节最小压力阀进气阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换B节紧急阀",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节紧急阀"
+          },
+          {
+            "from_type": "FaultHandlingMethod",
+            "from_name": "预防性更换门极驱动板",
+            "rel_type": "ACTS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "门极驱动板"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通讯中断",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换AB节CPU板卡"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节OCE通讯中断",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "AB节CPU板卡"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节空调制冷不佳",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换AB节EM231模块"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "AB节空调制冷不佳",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "EM231模块"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "处理方法"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换283KP压力开关"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "A节大闸不缓解",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "283KP压力开关"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "DIAGNOSED_BY",
+            "to_type": "TroubleshootingExperiment",
+            "to_name": "下载数据分析"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换门极驱动板"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节TCU1M2A相下管故障",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "门极驱动板"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节制动显示屏显示A7故障",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换B节紧急阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节制动显示屏显示A7故障",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节紧急阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换B节最小压力阀进气阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "B节压缩机不打风",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "B节最小压力阀进气阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "LTE-A网脱网",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换A网通信模块"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换A节中继阀、181遮断阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管不缓解",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "A节中继阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管压力上升慢",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换7002A节253YV，181遮断阀"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "列车管压力上升慢",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "253YV"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "总风低于750KPA，压缩机未自动打风",
+            "rel_type": "HANDLED_BY",
+            "to_type": "FaultHandlingMethod",
+            "to_name": "预防性更换287KP"
+          },
+          {
+            "from_type": "FaultType",
+            "from_name": "总风低于750KPA，压缩机未自动打风",
+            "rel_type": "OCCURS_ON",
+            "to_type": "FaultComponent",
+            "to_name": "287KP"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "下载数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "181遮断阀"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "下载数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "283KP压力开关"
+          },
+          {
+            "from_type": "TroubleshootingExperiment",
+            "from_name": "下载数据分析",
+            "rel_type": "TARGETS",
+            "to_type": "FaultComponent",
+            "to_name": "A节中继阀"
+          }
+        ]
+      }
+    },
+    "rule__rule_01": {
+      "entities": {
+        "golden": [
+          {
+            "type": "RuleType",
+            "name": "ATP B通道5V电源板不稳定引发车载显示与ATO异常",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "ATP B通道5V电源板不稳定引发车载显示与ATO异常",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "ATP的B通道5V电源板块工作不稳定",
+              "consequent": "信号屏出现黑屏、ATO灯不亮，并出现车门自动关闭等异常",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换ATP B通道5V电源板后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换ATP B通道5V电源板后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "更换工作不稳定的ATP B通道5V电源板块",
+              "consequent": "故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "重启RTU后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "重启RTU后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "RTU出现异常并执行重启RTU操作",
+              "consequent": "RTU故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "接收端轨旁盒潮湿引发轨道电路异常",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "接收端轨旁盒潮湿引发轨道电路异常",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "接收端轨旁盒内较为潮湿",
+              "consequent": "轨道电路区段出现红光带或粉红光带异常",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "CPU850工作不稳定导致屏蔽门不能联动",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "CPU850工作不稳定导致屏蔽门不能联动",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "多路接收器CPU850工作不稳定",
+              "consequent": "屏蔽门不能与列车车门正常联动打开或关闭",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "紧制代码39指示ATO超速紧制",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "紧制代码39指示ATO超速紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现紧制代码39",
+              "consequent": "判定为ATO超速紧制",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "紧制后降级RM导致折返线无法动车",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "紧制后降级RM导致折返线无法动车",
+              "RuleTypeBody": "CompositeRuleType",
+              "RuleTemplate": "CompositeRuleType： 当先发生 [条件1]，并且随后出现 [条件2] 时，那么 [综合结论]",
+              "antecedent": "先发生列车紧制，并且随后列车自动降级为RM模式",
+              "consequent": "列车在折返线无法动车",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "故障代码45指示计算机通道中断与ATP安全关机",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "故障代码45指示计算机通道中断与ATP安全关机",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现故障代码45",
+              "consequent": "计算机通道中断并触发ATP安全关机",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "故障代码45指示车载ATP测速溢出安全关断",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "故障代码45指示车载ATP测速溢出安全关断",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现故障代码45",
+              "consequent": "车载ATP检测测速溢出并触发安全关断",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "复位ATP后安全关断故障恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "复位ATP后安全关断故障恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "ATP发生安全关断后执行ATP复位",
+              "consequent": "ATP恢复正常工作",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "LITR模块故障导致UPS供电故障",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "LITR模块故障导致UPS供电故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "整流逆变器模块LITR发生故障",
+              "consequent": "UPS供电发生故障",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "接收1板不稳定导致轨道区段粉红光带",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "接收1板不稳定导致轨道区段粉红光带",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "轨道电路接收1板工作不稳定",
+              "consequent": "相关轨道区段出现粉红光带",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码186对应ATP STELA通道及接点故障",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "代码186对应ATP STELA通道及接点故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现代码186",
+              "consequent": "ATP STELA板A、B、C通道故障并出现ATP接点故障",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "RTU程序错误导致RTU异常",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "RTU程序错误导致RTU异常",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "RTU程序出现错误",
+              "consequent": "RTU设备出现异常",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "重启SICAS ATP后故障恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "重启SICAS ATP后故障恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "SICAS ATP出现STELA板或相关ATP故障并执行重启SICAS ATP操作",
+              "consequent": "故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码161指示24号电磁锁故障",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "代码161指示24号电磁锁故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现代码161",
+              "consequent": "指向24号电磁锁故障",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码70指示DTRO锁头故障",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "代码70指示DTRO锁头故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现代码70",
+              "consequent": "指向DTRO锁头故障",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "PTI报文不齐全用于判断列车对标不准",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "PTI报文不齐全用于判断列车对标不准",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "读取PTI报文时发现列车报文不齐全",
+              "consequent": "判断列车存在对标不准",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "对标超出联动范围导致车门屏蔽门不能联动",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "对标超出联动范围导致车门屏蔽门不能联动",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车对标位置超出信号联动范围",
+              "consequent": "车门与屏蔽门不能正常联动",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "TC2830复示继电器板故障导致STEKOP板死机",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "TC2830复示继电器板故障导致STEKOP板死机",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "TC2830轨道区段复示继电器板发生故障",
+              "consequent": "STEKOP板死机",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "STEKOP板死机导致轨道区段红光带",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "STEKOP板死机导致轨道区段红光带",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "STEKOP板死机",
+              "consequent": "TC2823和TC2830轨道区段出现红光带",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "TC1414继电器板不稳定导致反复粉红光带",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "TC1414继电器板不稳定导致反复粉红光带",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "TC1414继电器板工作不稳定",
+              "consequent": "相关轨道区段反复出现粉红光带",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "紧制代码32指示人工驾驶超速紧制",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "紧制代码32指示人工驾驶超速紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现紧制代码32",
+              "consequent": "判定为司机人工驾驶产生的超速紧制，属于非设备类故障",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "紧制代码30指向站台屏蔽门非信号故障",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "紧制代码30指向站台屏蔽门非信号故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现紧制代码30",
+              "consequent": "故障指向站台屏蔽门，属于非信号故障",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "机电屏蔽门故障触发ATP STELA板报警",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "机电屏蔽门故障触发ATP STELA板报警",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "机电屏蔽门发生故障",
+              "consequent": "信号设备ATP STELA板产生报警，且该事件判定为非信号故障",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码121指示两车头内部传输超时",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "代码121指示两车头内部传输超时",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现故障代码121",
+              "consequent": "两车头内部传输时间超时",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "MMI执行列车换向后折返信号故障恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "MMI执行列车换向后折返信号故障恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车停稳后没有收到折返信号，并在MMI执行列车换向",
+              "consequent": "折返信号相关故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "UPS维修旁路下市电故障导致相关信号设备失电受影响",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "UPS维修旁路下市电故障导致相关信号设备失电受影响",
+              "RuleTypeBody": "CompositeRuleType",
+              "RuleTemplate": "CompositeRuleType： 如果同时满足 [条件1] 和 [条件2]，那么 [综合结论]",
+              "antecedent": "UPS处于维修旁路模式并由市电直接供电，同时市电供电发生故障",
+              "consequent": "白云公园PTI、同步环线，以及飞翔公园S2201、X2202、X2204和白云公园X2302、S2301、S2303等信号设备受到供电影响",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "屏蔽门故障引起列车紧制并判为非信号故障",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "屏蔽门故障引起列车紧制并判为非信号故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "屏蔽门发生故障",
+              "consequent": "列车产生紧制，并判定为非信号故障",
+              "connectionSymbol": "导致"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "紧制代码35指示ATO超速紧制",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "紧制代码35指示ATO超速紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "出现紧制代码35",
+              "consequent": "判定为ATO超速紧制",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "轨道区段粉红光带执行逻空后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "轨道区段粉红光带执行逻空后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "轨道区段出现粉红光带，车站确认安全并执行逻空操作",
+              "consequent": "轨道区段显示恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "无折返信号时换端后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "无折返信号时换端后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车下行收不到折返信号并执行换端操作",
+              "consequent": "折返信号相关故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "紧制代码161指示运行中屏蔽门打开触发紧制",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "紧制代码161指示运行中屏蔽门打开触发紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车运行、进站或出站过程中检测到屏蔽门打开，并出现紧制代码161",
+              "consequent": "列车产生紧制，且判定为非信号设备故障",
+              "connectionSymbol": "指示"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换TC2830复示继电器板后轨道电路恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换TC2830复示继电器板后轨道电路恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "TC2830轨道区段复示继电器板故障，更换复示继电器板",
+              "consequent": "TC2823、TC2830轨道区段红光带恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换TC1414区段继电器板后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换TC1414区段继电器板后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "TC1414区段继电器板工作不稳定，更换该区段继电器板",
+              "consequent": "TC1412、TC1414、TC1508轨道区段反复粉红光带恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换发送端、接收端转换单元及调谐单元后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换发送端、接收端转换单元及调谐单元后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "轨道区段出现粉红光带（车过后粉红），更换发送端、接收端转换单元和发送端调谐单元",
+              "consequent": "轨道电路故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换接收端调谐单元、转换单元后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换接收端调谐单元、转换单元后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "轨道区段出现红光带转粉红光带，接收端轨旁盒内潮湿，更换接收端调谐单元、转换单元",
+              "consequent": "轨道电路故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换同步环线检测板后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换同步环线检测板后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车以ATO模式对标偏差（+50cm/-40cm），车门正常打开但屏蔽门没有联动打开，更换同步环线检测板",
+              "consequent": "故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "更换同步环线报警板后恢复",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "更换同步环线报警板后恢复",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车以ATO模式下行对标-40cm，没有收到开门使能信号，更换同步环线报警板",
+              "consequent": "故障恢复正常",
+              "connectionSymbol": "处置后恢复"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "UPS主机故障后改用维修旁路模式替代供电",
+            "properties": {
+              "RuleID": "",
+              "RuleName": "UPS主机故障后改用维修旁路模式替代供电",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "ImplicationRuleType： 如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "UPS发生故障，初步判断为UPS主机故障",
+              "consequent": "改用维修旁路模式，由市电直接供电，替代UPS原有功能（设备使用不受影响）",
+              "connectionSymbol": "处置后恢复"
+            }
+          }
+        ],
+        "predicted": [
+          {
+            "type": "RuleType",
+            "name": "紧制代码39（ATO超速紧制），列车紧制后自动降级为RM模式导致列车在折返线无法动车。",
+            "properties": {
+              "RuleID": "12",
+              "RuleName": "紧制代码39（ATO超速紧制）导致列车紧制后自动降级为RM模式，列车在折返线无法动车",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "紧制代码39（ATO超速紧制）",
+              "connectionSymbol": "导致",
+              "consequent": "列车紧制后自动降级为RM模式，列车在折返线无法动车",
+              "name": "紧制代码39（ATO超速紧制），列车紧制后自动降级为RM模式导致列车在折返线无法动车。"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "故障代码“45”：计算机通道中断，ATP安全关机，复位后恢复正常。",
+            "properties": {
+              "RuleID": "13",
+              "RuleName": "故障代码45导致ATP安全关机",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "计算机通道中断",
+              "connectionSymbol": "导致",
+              "consequent": "ATP安全关机",
+              "name": "故障代码“45”：计算机通道中断，ATP安全关机，复位后恢复正常。"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "若市电中止供电将导致三元里联锁区SICAS故障。",
+            "properties": {
+              "RuleID": "14",
+              "RuleName": "市电中止供电导致三元里联锁区SICAS故障",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "市电中止供电",
+              "connectionSymbol": "导致",
+              "consequent": "三元里联锁区SICAS故障",
+              "name": "若市电中止供电将导致三元里联锁区SICAS故障。"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "接收1板不稳定",
+            "properties": {
+              "RuleID": "16",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "接收1板不稳定",
+              "consequent": "TC2208轨道区段粉红光带",
+              "name": "接收1板不稳定"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "ATP的B通道5V电源板块工作不稳定，更换后恢复正常。",
+            "properties": {
+              "RuleID": "2",
+              "RuleName": "ATP的B通道5V电源板块工作不稳定导致信号屏黑屏、ATO灯不亮、车门自动关闭",
+              "antecedent": "ATP的B通道5V电源板块工作不稳定",
+              "connectionSymbol": "导致",
+              "consequent": "信号屏出现黑屏、ATO灯不亮、车门自动关闭",
+              "name": "ATP的B通道5V电源板块工作不稳定，更换后恢复正常。"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "RTU程序出现错误",
+            "properties": {
+              "RuleID": "22",
+              "RuleName": "RTU程序出现错误导致RTU设备异常",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "RTU程序出现错误",
+              "connectionSymbol": "导致",
+              "consequent": "RTU设备有异常情况",
+              "name": "RTU程序出现错误"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "车过后粉红",
+            "properties": {
+              "RuleID": "23",
+              "RuleName": "车过后粉红导致轨道区段粉红光带",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "车过后粉红",
+              "connectionSymbol": "导致",
+              "name": "车过后粉红"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码161,24号电磁锁故障",
+            "properties": {
+              "RuleID": "24",
+              "RuleName": "代码161,24号电磁锁故障导致紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "代码161,24号电磁锁故障",
+              "name": "代码161,24号电磁锁故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码70指向DTRO锁头故障",
+            "properties": {
+              "RuleID": "27",
+              "RuleName": "代码70指向DTRO锁头故障",
+              "connectionSymbol": "指向",
+              "consequent": "DTRO锁头故障",
+              "name": "代码70指向DTRO锁头故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "读取PTI报文分析到列车报文不齐全，判断为列车对标不准导致不联动。",
+            "properties": {
+              "RuleID": "28",
+              "RuleName": "列车对标不准导致屏蔽门不联动",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车对标不准",
+              "connectionSymbol": "导致",
+              "consequent": "屏蔽门不联动",
+              "name": "读取PTI报文分析到列车报文不齐全，判断为列车对标不准导致不联动。"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "接收端轨旁盒内较为潮湿",
+            "properties": {
+              "RuleID": "5",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "接收端轨旁盒内较为潮湿",
+              "consequent": "TC572轨道区段红光带",
+              "name": "接收端轨旁盒内较为潮湿"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "多路接收器CPU850工作不稳定导致。",
+            "properties": {
+              "RuleID": "9",
+              "RuleName": "多路接收器CPU850工作不稳定导致屏蔽门不能联动",
+              "antecedent": "多路接收器CPU850工作不稳定",
+              "connectionSymbol": "导致",
+              "consequent": "屏蔽门不能联动",
+              "name": "多路接收器CPU850工作不稳定导致。"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "2A013014、2A045046、8A107108都分别有故障代码121（两车头内部传输时间超时）",
+            "properties": {
+              "RuleID": "121",
+              "RuleName": "故障代码121（两车头内部传输时间超时）",
+              "antecedent": "两车头内部传输时间超时",
+              "consequent": "列车产生故障代码121",
+              "name": "2A013014、2A045046、8A107108都分别有故障代码121（两车头内部传输时间超时）"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "TC2830轨道区段复示继电器板故障造成STEKOP板死机，导致TC2823、TC2830轨道区段红光带",
+            "properties": {
+              "RuleID": "31",
+              "RuleName": "TC2830轨道区段复示继电器板故障造成STEKOP板死机，导致TC2823、TC2830轨道区段红光带",
+              "antecedent": "TC2830轨道区段复示继电器板故障造成STEKOP板死机",
+              "connectionSymbol": "导致",
+              "consequent": "TC2823、TC2830轨道区段红光带",
+              "name": "TC2830轨道区段复示继电器板故障造成STEKOP板死机，导致TC2823、TC2830轨道区段红光带"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "TC1414继电器板工作不稳定",
+            "properties": {
+              "RuleID": "32",
+              "RuleName": "TC1414继电器板工作不稳定",
+              "antecedent": "TC1414继电器板工作不稳定",
+              "name": "TC1414继电器板工作不稳定"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "接收1板（备件）不稳定",
+            "properties": {
+              "RuleID": "34",
+              "name": "接收1板（备件）不稳定"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "车载ATP检测测速溢出触发安全关断，复位后工作正常",
+            "properties": {
+              "RuleID": "35",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "车载ATP检测测速溢出",
+              "connectionSymbol": "触发",
+              "consequent": "安全关断，复位后工作正常",
+              "name": "车载ATP检测测速溢出触发安全关断，复位后工作正常"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "代码类容指向站台屏蔽门，非信号故障",
+            "properties": {
+              "RuleID": "36",
+              "RuleName": "代码类容指向站台屏蔽门，非信号故障",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "紧制代码30",
+              "connectionSymbol": "指向",
+              "consequent": "站台屏蔽门，非信号故障",
+              "name": "代码类容指向站台屏蔽门，非信号故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "列车对标超出信号联动范围，造成车门屏蔽门不能联动",
+            "properties": {
+              "RuleID": "38",
+              "RuleName": "列车对标超出信号联动范围，造成车门屏蔽门不能联动",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车对标超出信号联动范围",
+              "connectionSymbol": "造成",
+              "consequent": "车门屏蔽门不能联动",
+              "name": "列车对标超出信号联动范围，造成车门屏蔽门不能联动"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "列车出站过程中检测到屏蔽门打开，产生紧制，非信号故障",
+            "properties": {
+              "RuleID": "39",
+              "RuleName": "列车出站过程中检测到屏蔽门打开产生紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车出站过程中检测到屏蔽门打开",
+              "connectionSymbol": "导致",
+              "consequent": "产生紧制，非信号故障",
+              "name": "列车出站过程中检测到屏蔽门打开，产生紧制，非信号故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "江泰路下行机电屏蔽门故障导致信号设备ATP STELA板报警，非信号故障",
+            "properties": {
+              "RuleID": "40",
+              "RuleName": "江泰路下行机电屏蔽门故障导致信号设备ATP STELA板报警",
+              "antecedent": "江泰路下行机电屏蔽门故障",
+              "connectionSymbol": "导致",
+              "consequent": "信号设备ATP STELA板报警，非信号故障",
+              "name": "江泰路下行机电屏蔽门故障导致信号设备ATP STELA板报警，非信号故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "列车进站过程中检测到屏蔽门打开，产生了紧制，非信号故障",
+            "properties": {
+              "RuleID": "41",
+              "RuleName": "列车进站过程中检测到屏蔽门打开产生紧制",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "列车进站过程中检测到屏蔽门打开",
+              "connectionSymbol": "导致",
+              "consequent": "产生了紧制，非信号故障",
+              "name": "列车进站过程中检测到屏蔽门打开，产生了紧制，非信号故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "假如市电供电故障导致影响的设备及范围为：白云公园PTI、同步环线，飞翔公园S2201、X2202、X2204信号机，白云公园X2302、S2301、S2303信号机",
+            "properties": {
+              "RuleID": "46",
+              "RuleName": "市电供电故障影响设备及范围",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "市电供电故障",
+              "connectionSymbol": "导致",
+              "consequent": "影响的设备及范围为：白云公园PTI、同步环线，飞翔公园S2201、X2202、X2204信号机，白云公园X2302、S2301、S2303信号机",
+              "name": "假如市电供电故障导致影响的设备及范围为：白云公园PTI、同步环线，飞翔公园S2201、X2202、X2204信号机，白云公园X2302、S2301、S2303信号机"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "因屏蔽门故障引起，非信号故障",
+            "properties": {
+              "RuleID": "48",
+              "RuleName": "屏蔽门故障引起紧制",
+              "RuleTypeBody": "ImplicationRuleType",
+              "RuleTemplate": "如果 [前提条件]，那么 [结论或结果]",
+              "antecedent": "屏蔽门故障",
+              "connectionSymbol": "引起",
+              "consequent": "列车产生不明原因紧制，非信号故障",
+              "name": "因屏蔽门故障引起，非信号故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "列车有紧制代码161（列车在运行过程中检测到有屏蔽门打开产生紧制）非信号设备故障",
+            "properties": {
+              "RuleID": "49",
+              "RuleName": "列车运行中检测到屏蔽门打开产生紧制代码161",
+              "antecedent": "列车在运行过程中检测到有屏蔽门打开",
+              "connectionSymbol": "产生",
+              "consequent": "产生紧制代码161",
+              "name": "列车有紧制代码161（列车在运行过程中检测到有屏蔽门打开产生紧制）非信号设备故障"
+            }
+          },
+          {
+            "type": "RuleType",
+            "name": "列车有紧制代码35（ATO超速紧制）",
+            "properties": {
+              "RuleID": "50",
+              "RuleName": "ATO超速紧制代码35",
+              "antecedent": "ATO超速",
+              "name": "列车有紧制代码35（ATO超速紧制）"
+            }
+          }
+        ]
+      },
+      "relations": {
+        "golden": [],
+        "predicted": []
+      }
+    }
+  },
+  "pairs": [
+    {
+      "id": "q01",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 0,
+      "p": 24,
+      "label": "yes",
+      "reason": "identical document"
+    },
+    {
+      "id": "q02",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 9,
+      "p": 7,
+      "label": "yes",
+      "reason": "identical organization"
+    },
+    {
+      "id": "q03",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 10,
+      "p": 19,
+      "label": "yes",
+      "reason": "contextual agent-object alias, provisional"
+    },
+    {
+      "id": "q04",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 21,
+      "p": 15,
+      "label": "yes",
+      "reason": "feedback-reporting exchange alias"
+    },
+    {
+      "id": "q05",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 11,
+      "p": 1,
+      "label": "no",
+      "reason": "inspection is not policy revision"
+    },
+    {
+      "id": "q06",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 12,
+      "p": 5,
+      "label": "no",
+      "reason": "network isolation is not policy workshop"
+    },
+    {
+      "id": "q07",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 11,
+      "p": 5,
+      "label": "no",
+      "reason": "inspection is not policy workshop"
+    },
+    {
+      "id": "q08",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 9,
+      "p": 8,
+      "label": "no",
+      "reason": "group organization is not safety center"
+    },
+    {
+      "id": "q09",
+      "case": "official__official_01",
+      "collection": "entities",
+      "g": 30,
+      "p": 7,
+      "label": "no",
+      "reason": "subsidiaries are not parent group"
+    },
+    {
+      "id": "q10",
+      "case": "official__official_01",
+      "collection": "relations",
+      "g": 12,
+      "p": 19,
+      "label": "yes",
+      "reason": "same document and contextual object alias"
+    },
+    {
+      "id": "q11",
+      "case": "official__official_01",
+      "collection": "relations",
+      "g": 32,
+      "p": 2,
+      "label": "yes",
+      "reason": "reporting activity and feedback form aliases"
+    },
+    {
+      "id": "q12",
+      "case": "official__official_01",
+      "collection": "relations",
+      "g": 25,
+      "p": 5,
+      "label": "no",
+      "reason": "different source activity"
+    },
+    {
+      "id": "q13",
+      "case": "official__official_01",
+      "collection": "relations",
+      "g": 47,
+      "p": 6,
+      "label": "no",
+      "reason": "different activity and evidence unit"
+    },
+    {
+      "id": "q14",
+      "case": "official__official_01",
+      "collection": "relations",
+      "g": 58,
+      "p": 9,
+      "label": "no",
+      "reason": "headquarters departments not one department; section not full text"
+    },
+    {
+      "id": "q15",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 95,
+      "p": 5,
+      "label": "yes",
+      "reason": "EM231 component and handling aliases"
+    },
+    {
+      "id": "q16",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 56,
+      "p": 10,
+      "label": "yes",
+      "reason": "gate-drive-board handling alias"
+    },
+    {
+      "id": "q17",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 5,
+      "p": 0,
+      "label": "yes",
+      "reason": "283KP handling alias"
+    },
+    {
+      "id": "q18",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 4,
+      "p": 16,
+      "label": "yes",
+      "reason": "same fault and handling alias"
+    },
+    {
+      "id": "q19",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 5,
+      "p": 1,
+      "label": "no",
+      "reason": "283KP is not 287KP"
+    },
+    {
+      "id": "q20",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 95,
+      "p": 4,
+      "label": "no",
+      "reason": "EM231 is not CPU board"
+    },
+    {
+      "id": "q21",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 0,
+      "p": 17,
+      "label": "no",
+      "reason": "brake valve is not pressure switch"
+    },
+    {
+      "id": "q22",
+      "case": "trouble__trouble_mini",
+      "collection": "relations",
+      "g": 2,
+      "p": 33,
+      "label": "no",
+      "reason": "different relation and subject signature"
+    },
+    {
+      "id": "q23",
+      "case": "rule__rule_01",
+      "collection": "entities",
+      "g": 0,
+      "p": 4,
+      "label": "granularity",
+      "reason": "fault and repair combined in one predicted label"
+    },
+    {
+      "id": "q24",
+      "case": "rule__rule_01",
+      "collection": "entities",
+      "g": 1,
+      "p": 4,
+      "label": "granularity",
+      "reason": "repair and fault combined; one-to-one boundary"
+    }
+  ]
+}

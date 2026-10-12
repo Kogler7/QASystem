@@ -198,7 +198,50 @@ class PromptTest(unittest.TestCase):
         self.assertIn(pairs[0]["pair_id"], prompt)
         self.assertIn("entity-0", prompt)
         self.assertIn("hassubrule", prompt)
-        self.assertIn("只分类给定 relation pair；不得创建新端点、不得输出未列出的关系", prompt)
+        self.assertIn("CR-001", prompt)
+        self.assertIn("R-001", prompt)
+        self.assertIn("只判断本体已经允许的实体对；不得创建新端点，不得输出该对未列出的关系", prompt)
+
+    def test_relation_pairs_are_screened_by_ontology_endpoints(self) -> None:
+        ontology = (ONTOLOGIES_DIR / "official_document_ontology.puml").read_text(encoding="utf-8")
+        plan = SE.compile_plan(ontology)
+        entities = [
+            {"id": "doc", "type": "OfficialDocument", "name": "关于开展排查的通知"},
+            {"id": "agent", "type": "OperationalAgent", "name": "各一级子公司"},
+            {"id": "unit", "type": "DocumentUnit", "name": "排查要求一"},
+            {"id": "activity", "type": "OperationalActivity", "name": "组织开展排查"},
+            {"id": "info", "type": "OperationalInformation", "name": "排查反馈表"},
+        ]
+        pairs = RR.enumerate_relation_pairs(
+            plan,
+            entities,
+            skip_tokens=RR.withheld_relation_tokens("official_document"),
+        )
+        by_ends = {(pair["source_id"], pair["target_id"]): RR.pair_relation_ids(pair) for pair in pairs}
+        # 同一对端点只保留本体允许的关系，多条签名合成一次判断。
+        self.assertEqual(by_ends[("doc", "agent")], ["applies_to", "issued_by"])
+        self.assertEqual(by_ends[("activity", "info")], ["produces", "uses_information"])
+        # HAS_PART / EVIDENCED_BY 由结构组装，不进入关系分类。
+        self.assertNotIn(("doc", "unit"), by_ends)
+        self.assertNotIn(("agent", "unit"), by_ends)
+        # 没有从主体指向公文的本体关系。
+        self.assertNotIn(("agent", "doc"), by_ends)
+        self.assertTrue(all(pair["source_id"] != pair["target_id"] for pair in pairs))
+        chunk = CC.ExtractionChunk(chunk_id="chunk-0", text="各一级子公司组织开展排查，并填写排查反馈表。")
+        route = PR.resolve_document_route(plan, [chunk])
+        prompt = PR.build_chat_messages(
+            task="relation",
+            plan=plan,
+            route=route,
+            chunk=chunk,
+            known_entities=entities,
+            output_schema=CG.relation_pair_decision_schema(pairs),
+            relation_pairs=pairs,
+        )[1]["content"]
+        self.assertIn("各一级子公司", prompt)
+        self.assertIn("applies_to|issued_by", prompt)
+        self.assertIn("发布主体", prompt)
+        self.assertIn("适用主体", prompt)
 
 
 class TwoPassPipelineTest(unittest.TestCase):
@@ -212,6 +255,7 @@ class TwoPassPipelineTest(unittest.TestCase):
             RULE_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)],
             llm=llm,
+            clef=False,
         )
         raw = result["raw"]
         self.assertEqual(

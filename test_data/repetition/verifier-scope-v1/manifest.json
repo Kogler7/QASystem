@@ -1,0 +1,20 @@
+{
+  "cases": [
+    {
+      "id": "historical-1",
+      "sha256": "a7c3bc5a56858b58b36237068810703bbbf9c270d886bd7430a76971bbfe65e0"
+    },
+    {
+      "id": "historical-2",
+      "sha256": "d776f6c970f21fa50132f851fbd58a1234b4af858c8bb1104f47632a735b1b5f"
+    },
+    {
+      "id": "synthetic-scope-control",
+      "sha256": "bc60f5242cb83372f77ce37f35283f232e4bbe888fc97495c03b4a191495e9c6"
+    }
+  ],
+  "planned_calls": 24,
+  "execution": "not started; wait for main matrix and infrastructure reruns",
+  "max_output_tokens": 8192,
+  "temperature": 0
+}

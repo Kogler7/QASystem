@@ -12,6 +12,25 @@ tags: []
 
 抽取算法版本默认由 Backend 的 `KG_EXTRACT_ALGO_VERSION` 控制。现在也可在脚本中传 `--extract-version v2/v3/v3.1/latest`、`--extract-provider <服务端配置名>`、`--extract-model <模型>` 和超时覆盖项，在同一个 Backend 上逐次选择配置，无需重启。完整规则和供应商登记方式见 [抽取请求配置覆盖](../docs/接口/抽取请求配置覆盖.md)。MCP 工具仍使用服务端默认配置。
 
+## 两套评测
+
+正式评测有两个入口，评分、门禁和结论文档是同一套。每次运行结束都会在 `tmp/eval/runs/<时间戳>/report.md` 写下三层 P、R、F1，实体和关系分开：
+
+| 层次 | 含义 |
+| --- | --- |
+| 整体 | 本次全部有效评分按 TP/FP/FN 累加 |
+| 分类型 | `official`、`rule`、`simple` 等类型目录各自累加 |
+| 单个文件 | 每个 case（`类型/case`，一份文档，可含多个附件）对照自己的 golden |
+
+| | mini-eval | eval |
+| --- | --- | --- |
+| 用途 | 改完抽取或评分后先看一小批 | 发布前的全量门禁，也用于按路径或类型抽查 |
+| 入口 | `python3 eval/mini_eval.py`，或 `bash eval/mini_eval.sh` | `python3 eval/run.py`，或 `./eval/run.sh` |
+| 范围 | 每类 1–2 个 case，由 `eval/params.yaml` 的 `mini_eval` 决定。当前默认是 `official_01`、`official_02`，以及 rule、simple 各 1 个，共 4 个 | `test_data/eval/` 下全部 case。当前是 official 5 个、rule 1 个、simple 1 个，共 7 个 |
+| 结果 | `report.md` 里的整体、分类型、单个文件 | 同一份结论文档结构 |
+
+发布前的全量门禁用 eval。mini-eval 走同一个 `run.py`，只是先按类型抽样。下面「如何使用」分别给出命令。`quick_eval.py` 是另外的诊断入口，固定三个公文 case，不算这两套评测。
+
 ## 做了什么
 
 **评测集。** 按文档类型放 case，每个 case 有原文件和标准答案：
@@ -84,7 +103,7 @@ summary 里另附 identity（type+name 精确集合）对照。judge 失败仍�
 
 88 机 `official_01` 初评暴露了裁判把部门与活动/交互配对、缺少端点上下文时 8 个关系窗口全部返回空数组的问题。因此该次 F1 不能直接归因于抽取算法。类型硬约束、属性归一化和端点上下文均已改变评分口径，需要重新评分并建立新基线，不能沿用初评数值作版本优劣结论。
 
-评分客户端调用 Chat Completions 接口。`eval.judge_response_format: auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
+Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 yes/no 选择，缺失或异常选择使评分失败。`eval.judge_response_format: auto` 会为官方 `api.deepseek.com` 选择 `json_object → plain`；其他兼容服务使用 `json_schema → json_object → plain`。仅在服务端明确拒绝当前格式时尝试下一个格式；认证错误、限流、超时、服务端故障及返回内容无效会直接记录评分失败。可设为 `json_object` 或 `json_schema` 显式指定起始格式。DeepSeek 的 Chat 接口只声明支持 `text` / `json_object`；其 Responses 接口使用另一套参数，本客户端未接入。参见 [DeepSeek Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。
 
 `eval.judge_disable_thinking: true` 向官方 DeepSeek 发送 `thinking: {type: disabled}`，向官方 SiliconFlow（`api.siliconflow.cn` / `api.siliconflow.com`）发送 `enable_thinking: false`，其他兼容服务不附加这些厂商参数。参见 [SiliconFlow Chat API](https://docs.siliconflow.cn/docs/api/chat-completions-post)。评分只解析最终 `content`，不会用 `reasoning_content` 代替答案；空内容或被截断的回答判为评分失败。提示词明确索引范围、候选边数量上限与输出结束条件。每条输入显式标注 `golden_index` / `predicted_index`，索引是**窗口内**下标；评分代码通过窗口保存的原索引列表回填全局下标，即使列表不连续也不使用起点加偏移代替映射。所有格式均检查数组结构、整数类型与索引边界；越界响应使评分失败。`judge_batches` 保留每次尝试的格式、状态、响应 ID、结束原因、token 用量及内容长度，不保存模型原始文本或鉴权信息；失败时保留已完成调用的诊断。
 
@@ -97,7 +116,7 @@ summary 里另附 identity（type+name 精确集合）对照。judge 失败仍�
 ### 准备
 
 1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
-2. 默认 LLM-judge 需要有效的评分地址。地址和模型按 `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → `KG_EXTRACT_LLM_BASE_URL/MODEL` 读取；API key 按 `QASYSTEM_JUDGE_API_KEY` → `KG_EXTRACT_LLM_API_KEY` 读取。独立变量示例位于根 `.env.example`。未配地址时，实际 LLM 评测一律按配置错误退出 1；只检查链路时显式指定 `--match-mode identity`。`--dry-run` 不调用或要求 judge。
+2. 默认 LLM-judge 使用 Clef，需要能访问其服务。地址和模型按命令行 → `QASYSTEM_JUDGE_BASE_URL/MODEL` → `eval.judge_base_url/judge_model` → Clef 默认值读取，不再随抽取供应商变化。Chat API key 可兼容 `KG_EXTRACT_LLM_API_KEY`；不把抽取 API key 发给默认 Clef。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
 3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
 地址也可用 `QASYSTEM_BACKEND_URL` / `QASYSTEM_MCP_URL`，或改 `params.yaml`。流水线选项在 `params.yaml` 的 `options`，与生产 `PipelineOptions` 对齐。不要把密钥写进 YAML。
@@ -274,6 +293,34 @@ python3 eval/run.py --stage backend --mode extract \
 
 ---
 
+**替换抽取模型和裁判模型**
+
+普通评测与快速评测默认裁判为 `clef-flash`，使用 `/v1/systemone` 逐候选对选择判断；语义规则、关系端点上下文、最终一对一匹配和裁判失败门禁继续由统一评分器维护。
+默认地址取 `CLEF_SERVICE_URL`，未设置则为 `http://127.0.0.1:8188`。88 的 Clef 当前位于 Compose 内部网络：在同网络容器中用 `http://clef:8188`；宿主机或开发机运行评测时，须指定实际可达的服务地址，不要将未开放的宿主端口当成可用地址。
+
+抽取模型和裁判独立配置。例如使用已在 Backend 注册的供应商与模型，并切换到 API 裁判：
+
+```bash
+python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批次> \
+  --extract-version v3 --extract-provider siliconflow --extract-model deepseek-ai/DeepSeek-V4-Flash \
+  --judge-adapter chat --judge-model deepseek-flash --judge-base-url https://api.deepseek.com/v1 \
+  --judge-key-env QASYSTEM_JUDGE_API_KEY --case-attempts 1
+```
+
+换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > `QASYSTEM_JUDGE_*` > YAML > Clef 默认值；密钥仅从环境变量读取，默认 `QASYSTEM_JUDGE_API_KEY`，Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。
+
+组合实验先固定切片、golden、本体和预算，再更换抽取模型。测试不同裁判时可复用同一批预测重新评分，避免重复抽取消耗；更换抽取模型时不能复用旧预测。裁判改变后须分别建立基线，不能用不同裁判的分数直接证明抽取质量提升。manifest 保存抽取配置与裁判 model/base_url/adapter，不包含密钥。
+
+**固定切片的模型组合评测**
+
+完整操作与边界见 [固定切片与模型组合评测](../docs/算法/固定切片与模型组合评测.md)：包含准备/执行分离、四模型方案、更换 judge 补评、切片策略实验、并发和产物说明。
+
+`python -m eval.model_matrix --workspace test_data/eval --params eval/params.yaml --plan <方案.json> --output tmp/eval/matrix/<批次> --workers 4` 会先统一准备切片，再经 `eval/run.py` 比较多个抽取模型。`--prepare-only` 仅准备输入；之后用 `--prepared <准备批次>/inputs` 复用同一份切片。准备阶段遇到解析部分失败或切片兜底会停止，避免悄悄改变比较输入。
+
+方案 JSON 包含 `cases`、`extractors`、`judge` 与可选 `comparison`。每个 extractor 填 `id/provider/model/version`，本地模型可填 `health_url` 等待就绪；judge 填 `id/adapter/model/base_url`，API key 仅用 `key_env` 指定变量名。`comparison` 填 `extractor` ID 与另一套 `judge`，只重新评分已保存预测，缺失预测另存覆盖清单，不重新抽取。每个组合各有独立日志、manifest、summary 和退出码；某模型启动失败不作为正常抽取质量结果。
+
+评测驱动可在 `qasystem_backend` 内执行，模型与 Clef 使用同一 Docker 网络的服务名。本轮本地服务统一采用 `qasystem-env-v1`，模型目录只读挂载，记录真实上下文容量及输出预算；测试结果不纳入运行时源码包。
+
 **精确匹配打分**
 
 ```bash
@@ -351,7 +398,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
   params.resolved.json        # 解析后的地址 / 阶段 / 模式 / 评分口径
   manifest.json               # 输入与评测代码 SHA256、评分契约、选项；不包含密钥
   summary.json                # 整次运行总览：状态、P/R/F1、耗时、extract_versions（服务端回报的抽取算法版本）
-  report.md                   # 本次评测详细报告：运行信息 / 门禁与退出码 / 总览 / 逐 case / 问题清单 / 最慢 case Top5
+  report.md                   # 本次评测报告：运行信息，以及 LLM-as-Judge 的 Average / 分类型 / 单个文件指标
   <类型>/<case>/
     parse_<文件名>.json       # 后台解析接口回包
     document.md               # 拼好的 Markdown（--from-run 的 chunk-extract 模式复用它跳过解析）
@@ -366,7 +413,7 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 
 | 文件 | 看什么 |
 | --- | --- |
-| `report.md` | 批次详细报告（每批结束自动生成，含 resume/复用与中断批次）：头部的运行信息（起止时间、backend、评分口径、judge 降级摘要、抽取版本）、门禁与退出码语义（empty_failures、F1/耗时阈值与实际值）、总览表（实体/关系的 golden/predicted/P/R/F1）、逐 case 明细（状态、P/R/F1、parse/chunk/extract 各阶段耗时、总耗时、抽取版本、失败原因）、问题清单（失败/空抽取/judge 降级/超预算）、最慢 case Top5 |
+| `report.md` | 批次结论文档（每批结束自动生成，含 resume/复用与中断批次）。只含运行信息和指标结论。指标结论三个二级标题为 Average、分类型（official、rule、simple 等）、单个文件，均标注 LLM-as-Judge；实体和关系分开，并带 golden/predicted。门禁、覆盖率、基线、逐 case 耗时和问题清单在 `summary.json` |
 | `summary.json` | 各 case 成败和 P/R/F1/Jaccard；`started_at` / `finished_at` / `elapsed_seconds` 是整次运行耗时，每个 case 完成后更新。`overall` 是有效同口径 micro，`quality` 包含覆盖率、case/group 均值与分组结果；`overall_identity` 单列精确对照。`gate` 记录空抽取、实体 F1、耗时和 `quality` 评分有效性/关系阈值检查；`baseline_comparison` 是同口径基线判定与逐项差异 |
 | `manifest.json` | 源文件、golden、本体，以及实际复用 Markdown/切片的 SHA256；`evaluator` 记录 `run.py`、`quality.py`、`provenance.py` 的内容哈希（包含未提交修改）；`settings` 与 `scoring_contract` 记录安全配置和评分契约，不记录 API key / Authorization。同一内容也嵌入 `summary.manifest` |
 | `scores.json` | 单案明细。`attempts` 是本 case 实际尝试次数；重试耗尽为 `skipped_after_retries: true`。`elapsed_seconds` 是该案墙钟时间；`backend.modules.parse/chunk/extract.elapsed_seconds` 是各接口耗时；抽取/沉淀/插件另有 `score_elapsed_seconds`（对照 golden 打分，LLM-judge 时会明显变长）。`empty_extraction` 标记已评分但抽取预测为 0 节点（配合 `--fail-on-empty` 时该案 `status=failed`、`error=empty_extraction`）。多附件 case 的 parse / 沉淀有 `per_file` 数组：逐文件状态、耗时、尝试次数、产出规模（解析字数 / 图谱节点关系数），失败带 `error` |
@@ -405,7 +452,10 @@ tmp/eval/runs/<YYYYMMDD-HHMMSS>/
 ### 已下线版本的对照说明
 
 `v3.2`（单通用提示词联合抽取）与旧 `v3.1`（V2 副本 + prompt router）实现已从代码库移除，对应的提示词对照评测无法再运行；历史结论保留在 [V3.2 提示词与评测](../docs/算法/知识抽取V3.2通用提示词与评测.md)。当前 `v3.1` 指语义 harness，评测方式见 [V3.1 语义 Harness 与评测](../docs/算法/知识抽取V3.1语义Harness与评测.md)。
-# 小规模诊断评测
+
+## 诊断评测（quick_eval）
+
+上面的 mini-eval 和 eval 是两套正式评测。本节是固定样本的诊断入口。
 
 `python3 eval/quick_eval.py --extract-version v3` 使用 `eval/quick_params.yaml`，固定选择
 `official_01`、`official_03`、`official_04` 三个完整用例，覆盖普通公文、短公文和密集表格/截断压力。
@@ -438,3 +488,27 @@ python3 eval/quick_eval.py --dry-run
 
 统一入口也支持直接传 `python3 eval/run.py ... --case-attempts 1`，默认仍为 3 次，
 该参数只影响外层整篇尝试，不改变传输重试。
+
+
+### 冻结 JSON / JSONL / 自适应切片对照
+
+`eval/tools/chunk_variants.py` 读取既有冻结批次的 `document.md`，只将合法的
+`columns/rows` 非空记录表序列化成一行一个对象的 JSONL；正文、表单、空表保留。
+含额外表级字段时明确失败，避免静默丢失信息。三个方案都调用现有 Backend 的
+公共切片接口，切片失败则中止冻结，不按整篇兜底冒充成功。输出只写 `tmp/`，
+保存原始/新 Markdown 哈希、切片哈希、片数/长度/范围、配置和源码提交。
+
+```bash
+python3 -m eval.tools.chunk_variants --source <冻结inputs目录> --output tmp/chunk-compare/jsonl-adaptive \
+  --params <评测参数文件> --variant jsonl-adaptive --source-commit <Backend源码提交> \
+  --cases official/official_01 official/official_02 rule/rule_01 simple/Simple_故障规则的诊断 trouble/trouble_mini
+```
+
+`--variant json` 保留旧 JSON 表；`jsonl` 转换格式并关闭自适应；`jsonl-adaptive`
+转换格式并显式开启 Clef 实体计数。`size/strategy/chunk_overlap` 沿用参数文件，
+不传已删除的 `chunk_threshold`。随后用 `eval/model_matrix.py --prepared <该inputs>`
+为每个抽取模型复用同一批次、同一本体和 golden，单独指定 judge。
+这是格式/切片对照，复用原解析产物；不能宣称重新验证了解析器或PDF语义质量。
+
+直接抽取和 `--from-run` 复用路径保留切片 `metadata`，将 `range` 映射为公共抽取
+接口的 `ranges`；不再只发送文本，JSONL 工作表标题、数据行号和字符偏移可到达抽取层。

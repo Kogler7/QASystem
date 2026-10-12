@@ -111,7 +111,27 @@ class ScheduledClient:
                 if remaining <= 0:
                     raise TimeoutError("Extraction request budget exhausted")
                 kwargs["timeout"] = remaining
-                response = method(**kwargs)
+                request_record = None
+                if isinstance(trace, ExtractionTrace):
+                    request_record = trace.event("http-request", {
+                        "call_id": getattr(trace.local, "call_id", None),
+                        "request": {key: value for key, value in kwargs.items() if key in {
+                            "model", "messages", "input", "instructions", "response_format",
+                            "text", "temperature", "max_tokens", "max_output_tokens", "extra_body"}},
+                    })
+                try:
+                    response = method(**kwargs)
+                except Exception as exc:
+                    if request_record:
+                        trace.write(request_record + "-response", {"status": "failed", "exception_type": type(exc).__name__})
+                    raise
+                if request_record:
+                    try:
+                        body = response if isinstance(response, dict) else response.model_dump(mode="json")
+                        trace.write(request_record + "-response", {"status": "returned", "body": body})
+                    except Exception:
+                        # Trace serialization must never change the generation result.
+                        trace.write(request_record + "-response", {"status": "unserializable"})
                 if time.monotonic() >= call_deadline:
                     raise TimeoutError("Extraction response arrived after deadline")
                 return response

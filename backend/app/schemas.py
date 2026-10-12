@@ -45,7 +45,8 @@ class ChunkOptions(StrictModel):
     chunk_overlap: int = Field(default=50, ge=0)
     size_unit: Literal["char", "token"] = "char"
     breakpoint_method: Literal["percentile", "stddev", "none"] = "percentile"
-    chunk_threshold: int = Field(default=12000, ge=0)
+    adaptive_entity_count: bool = False
+    entity_count_model: Literal["clef-flash", "nanojev"] = "clef-flash"
 
     @model_validator(mode="after")
     def validate_overlap_lt_size(self):

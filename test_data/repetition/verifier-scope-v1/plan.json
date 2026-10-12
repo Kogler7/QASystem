@@ -1,0 +1,146 @@
+[
+  {
+    "case": "historical-1",
+    "provider": "matrix-deepseek",
+    "arm": "old",
+    "repeat": 1
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-deepseek",
+    "arm": "fixed",
+    "repeat": 1
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-qwen35",
+    "arm": "old",
+    "repeat": 1
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-qwen35",
+    "arm": "fixed",
+    "repeat": 1
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-deepseek",
+    "arm": "old",
+    "repeat": 1
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-deepseek",
+    "arm": "fixed",
+    "repeat": 1
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-qwen35",
+    "arm": "old",
+    "repeat": 1
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-qwen35",
+    "arm": "fixed",
+    "repeat": 1
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-deepseek",
+    "arm": "old",
+    "repeat": 1
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-deepseek",
+    "arm": "fixed",
+    "repeat": 1
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-qwen35",
+    "arm": "old",
+    "repeat": 1
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-qwen35",
+    "arm": "fixed",
+    "repeat": 1
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-deepseek",
+    "arm": "fixed",
+    "repeat": 2
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-deepseek",
+    "arm": "old",
+    "repeat": 2
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-qwen35",
+    "arm": "fixed",
+    "repeat": 2
+  },
+  {
+    "case": "historical-1",
+    "provider": "matrix-qwen35",
+    "arm": "old",
+    "repeat": 2
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-deepseek",
+    "arm": "fixed",
+    "repeat": 2
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-deepseek",
+    "arm": "old",
+    "repeat": 2
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-qwen35",
+    "arm": "fixed",
+    "repeat": 2
+  },
+  {
+    "case": "historical-2",
+    "provider": "matrix-qwen35",
+    "arm": "old",
+    "repeat": 2
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-deepseek",
+    "arm": "fixed",
+    "repeat": 2
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-deepseek",
+    "arm": "old",
+    "repeat": 2
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-qwen35",
+    "arm": "fixed",
+    "repeat": 2
+  },
+  {
+    "case": "synthetic-scope-control",
+    "provider": "matrix-qwen35",
+    "arm": "old",
+    "repeat": 2
+  }
+]

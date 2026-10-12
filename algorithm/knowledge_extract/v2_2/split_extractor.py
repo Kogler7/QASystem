@@ -19,6 +19,8 @@ LLM 通过标准 chat messages 调用，本模块不依赖 openai；live 环境�
 """
 from __future__ import annotations
 
+from algorithm.knowledge_extract.repair_scope import relation_repair_scope
+
 import json
 import re
 import time
@@ -885,6 +887,20 @@ def extract_split(
             "relation_candidates",
             {str(entry.get("type") or "") for entry in repair_catalog},
         )
+        repair_scope = relation_repair_scope(plan, repair_catalog, issue_rows, output_schema)
+        for skipped in repair_scope.skipped:
+            _append_warning(
+                warnings,
+                "REPAIR_ISSUE_OUT_OF_SCOPE",
+                "关系修复问题缺少当前目录中的合法端点/签名，保留未修复状态并跳过模型调用",
+                f"repair[{payload['round']}]",
+                skipped,
+            )
+        issue_rows = repair_scope.issues
+        output_schema = repair_scope.schema
+        if not issue_rows:
+            return {"entities": [], "relations": []}
+
         def build_repair_request(issue_batch):
             messages = build_chat_messages(
                 task="repair",
@@ -912,12 +928,30 @@ def extract_split(
     resolved_repairer = repairer or builtin_repair
 
     def request_repair(current_pool: CandidatePool, issues, round_number: int):
+        # Clef 已对枚举 pair 做过封闭判定；再对 REQUIRED_RELATION_MISSING 开
+        # 生成式修复只会重复烧 token，且易引入无证据关系（official 上曾占修复大头）。
+        active_issues = list(issues)
+        if clef_gate.enabled:
+            skipped = [issue for issue in active_issues if issue.repair_type == "required_relation"]
+            if skipped:
+                active_issues = [
+                    issue for issue in active_issues if issue.repair_type != "required_relation"
+                ]
+                clef_gate.note(repair_required_relation_skipped=len(skipped))
+                _append_warning(
+                    warnings,
+                    "REPAIR_SKIPPED_REQUIRED_RELATION_AFTER_CLEF",
+                    f"Clef 已预判关系候选，跳过 {len(skipped)} 条 required_relation 生成式修复",
+                    f"repair[{round_number}]",
+                )
+            if not active_issues:
+                return {"entities": [], "relations": []}
         model = build_intermediate_model(current_pool, plan, run_id=resolved_run_id)
         current_raw = GraphAssembler().compat_raw(model["objects"], model["relations"])
         return resolved_repairer(
             {
                 "round": round_number,
-                "issues": [issue.to_dict() for issue in issues],
+                "issues": [issue.to_dict() for issue in active_issues],
                 "entities": current_pool.entity_catalog(),
                 "relations": current_raw["relations"],
                 "chunks": [chunk.to_dict() for chunk in manager],

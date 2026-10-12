@@ -37,6 +37,7 @@ Two deliberate choices worth knowing about for the V2 path:
 from __future__ import annotations
 
 import json
+from algorithm.table_jsonl import decode_records, row_boundaries
 import logging
 import os
 import re
@@ -51,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 CHUNK_ID_PREFIX = "chunk-"
 _JSON_FENCE = re.compile(
-    r"(?ims)^[ \t]*```[ \t]*json[ \t]*\r?\n(?P<body>.*?)^[ \t]*```[ \t]*$"
+    r"(?ims)^[ \t]*```[ \t]*json(?:l)?[ \t]*\r?\n(?P<body>.*?)^[ \t]*```[ \t]*$"
 )
 _HEADING = re.compile(r"(?m)^\s{0,3}#{1,6}\s+(?P<title>.+?)\s*$")
 _BATCH_FILE_HEADING = re.compile(r"^文件\s*[:：]\s*(?P<name>.+?)\s*$")
@@ -133,6 +134,8 @@ def _chunk_id(position: int) -> str:
 
 
 def _table_payload(value: Any) -> tuple[list[str], list[Any]] | None:
+    if isinstance(value, list) and value and all(isinstance(row, dict) for row in value):
+        return list(dict.fromkeys(str(key) for row in value for key in row)), value
     if not isinstance(value, dict) or not isinstance(value.get("rows"), list):
         return None
     columns = value.get("columns")
@@ -167,11 +170,19 @@ def _infer_table_metadata(text: str, metadata: dict[str, Any]) -> dict[str, Any]
     worksheet name.
     """
     tables: list[dict[str, Any]] = []
-    for index, match in enumerate(_JSON_FENCE.finditer(text or "")):
+    if row_boundaries(text) is not None:
+        rows = [json.loads(line) for line in text.splitlines() if decode_records(line) is not None]
+        if rows and (metadata.get("table_format") == "jsonl" or "```jsonl" in text.lower() or len(rows) > 1):
+            tables.append({"table_index": 0, "title": metadata.get("section_title") or _nearest_heading(text, len(text)),
+                           "source_file": metadata.get("source_file") or _nearest_source_file(text, len(text)),
+                           "columns": list(dict.fromkeys(key for row in rows for key in row)), "row_count": len(rows)})
+    for index, match in enumerate([] if tables else _JSON_FENCE.finditer(text or "")):
         try:
             parsed = json.loads(match.group("body"))
         except (TypeError, ValueError):
-            continue
+            parsed = decode_records(match.group("body"))
+        if "```jsonl" in match.group(0).lower():
+            parsed = decode_records(match.group("body"))
         table = _table_payload(parsed)
         if table is None:
             continue
@@ -218,8 +229,8 @@ def _infer_table_metadata(text: str, metadata: dict[str, Any]) -> dict[str, Any]
         if table_is_spreadsheet:
             table["sheet_name"] = table.pop("title", None)
             if table["row_count"]:
-                table["source_row_start"] = 2
-                table["source_row_end"] = 1 + int(table["row_count"])
+                table["source_row_start"] = int(metadata.get("table_data_row_start", 1)) + 1
+                table["source_row_end"] = table["source_row_start"] + int(table["row_count"]) - 1
         elif table.get("title") is None:
             table.pop("title", None)
         if table.get("source_file") is None:
@@ -404,10 +415,10 @@ def _object_buckets(
     model = result.get("intermediate_model") or {}
     object_positions: dict[str, set[int]] = {}
     uid_by_object: dict[str, str] = {}
-    for obj in model.get("objects") or []:
+    for object_index, obj in enumerate(model.get("objects") or []):
         if not isinstance(obj, dict):
             continue
-        object_id = str(obj.get("id") or "")
+        object_id = str(obj.get("id") or f"row:{object_index}")
         uid_by_object[object_id] = _uid_for(
             obj.get("type"),
             obj.get("identity") or obj.get("display_name"),

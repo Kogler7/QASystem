@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from langchain_core.documents import Document
 
@@ -166,6 +167,12 @@ def _chunk_units(
     表格片不经拆分器改写（既不重新序列化、也不会丢掉半截围栏），并带上精确的
     ``__source_range``，保证下游 ``chunk_document_items`` 与 evidence 始终指回原文。
     """
+    from algorithm.table_jsonl import pack_ranges, row_boundaries
+
+    # Bare row windows (including windows carrying only one fence edge).
+    if row_boundaries(content) is not None and "```jsonl" not in content.lower() and len(content.splitlines()) > 1:
+        return [Document(page_content=content[a:b], metadata={"__source_range": [a, b]})
+                for a, b in pack_ranges(content, chunk_size, chunk_overlap)]
     segments = _table_aware_spans(content)
     if segments is None:
         documents = _dispatch(
@@ -179,9 +186,20 @@ def _chunk_units(
     for is_table, start, end in segments:
         if is_table:
             table_count += 1
-            units.append(
-                Document(page_content=content[start:end], metadata={"__source_range": [start, end]})
-            )
+            table_text = content[start:end]
+            ranges = (pack_ranges(table_text, chunk_size, chunk_overlap)
+                      if "```jsonl" in table_text.lower() and row_boundaries(table_text) is not None
+                      else [[0, len(table_text)]])
+            boundaries = row_boundaries(table_text) if "```jsonl" in table_text.lower() else None
+            headings = re.findall(r"(?m)^#{1,6}\s+(.+)$", table_text[:table_text.find("```")])
+            for a, b in ranges:
+                metadata = {"__source_range": [start + a, start + b]}
+                if boundaries is not None:
+                    metadata.update(table_format="jsonl", table_data_row_start=boundaries.index(a)+1,
+                                    table_data_row_end=boundaries.index(b))
+                    if headings:
+                        metadata["section_title"] = headings[-1]
+                units.append(Document(page_content=table_text[a:b], metadata=metadata))
             continue
         for doc in _chunk_units(
             content[start:end], chunk_type, chunk_size, chunk_characters,
@@ -283,7 +301,10 @@ def chunk_document_items(
                 and 0 <= source_range[0] <= source_range[1] <= len(content)
                 and content[source_range[0]:source_range[1]] == text):
             start, end = source_range
-            items.append({"text": text, "range": [start, end]})
+            item = {"text": text, "range": [start, end]}
+            if doc.metadata.get("table_format") == "jsonl":
+                item["metadata"] = {key: value for key, value in doc.metadata.items() if key != "__source_range"}
+            items.append(item)
             cursor = end
             continue
         start = content.find(text, cursor)

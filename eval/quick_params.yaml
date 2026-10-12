@@ -14,8 +14,9 @@ options:
     persist_graph: false
 eval:
   match_mode: llm
-  judge_base_url: https://api.deepseek.com/v1
-  judge_model: deepseek-flash
+  judge_base_url: null
+  judge_model: clef-flash
+  judge_adapter: auto
   judge_timeout_seconds: 30
   judge_max_tokens: 4096
   judge_max_concurrency: 4
