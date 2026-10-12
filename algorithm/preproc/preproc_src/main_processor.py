@@ -123,9 +123,8 @@ class DocumentProcessor:
 
             processor = DocxProcessor(libreoffice_path=self.libreoffice_path)
         elif engine in {"mineru", "vlm"}:
-            # MinerU 2.x 已退役：这两个引擎名一律由 4.x 适配层承接（主解释器里没有 4.x
-            # 时，适配层会用独立 venv 的子进程解析，失败时给出明确错误）。不允许静默
-            # 降级到 2.x 的 OCRProcessor。
+            # MinerU 2.x 已退役：统一由主 Python 环境的 4.x 适配层承接，
+            # 模型初始化与解析在同一解释器的子进程中执行。
             from .processors.mineru4_processor import Mineru4Processor
 
             processor = Mineru4Processor(engine_name=engine)
@@ -265,21 +264,10 @@ class DocumentProcessor:
         return profile
 
     def _local_mineru4_available(self) -> bool:
-        """本地是否能跑 MinerU 4.x（判定本地解析回退是否可用）。
+        """按主解释器的安装版本判断可用性；实际导入与推理由子进程验证。"""
+        from .processors.mineru4_processor import mineru_major_version
 
-        MinerU 2.x 已退役，本地回退目标是 4.x。两种运行方式都算数：主解释器里装了
-        4.x（镜像默认布局），或存在 4.x 独立 venv 解释器（``MINERU4_PYTHON``，
-        默认 ``/opt/mineru4/venv/bin/python``）。判定只做可导入/可执行检查，不在这里
-        初始化模型。
-        """
-        try:
-            from .processors.mineru4_processor import mineru_major_version
-        except Exception:
-            return False
-        if (mineru_major_version() or 0) >= 4:
-            return True
-        interpreter = os.getenv("MINERU4_PYTHON") or "/opt/mineru4/venv/bin/python"
-        return Path(interpreter).is_file()
+        return mineru_major_version() == 4
 
     @staticmethod
     def _vlm_server_url() -> str:

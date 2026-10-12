@@ -131,9 +131,9 @@ def test_subprocess_mode_is_recorded(pdf_file, fake_mineru, monkeypatch):
     assert result["metadata"]["mineru4_options"]["version"] == "4.0.4"
 
 
-def test_falls_back_to_subprocess_when_in_process_has_2x(pdf_file, fake_mineru, monkeypatch):
-    """镜像里装的是 2.x 时，应改走独立 venv 子进程，而不是直接失败。"""
-    _fake_version(monkeypatch, "2.7.6")
+def test_subprocess_preserves_parse_options(pdf_file, fake_mineru, monkeypatch):
+    """统一主环境的子进程解析保留调用参数。"""
+    _fake_version(monkeypatch, "4.0.4")
     calls: list[dict] = []
 
     def fake_subprocess(path, *, tier, ocr_mode, page_range):
@@ -150,12 +150,14 @@ def test_falls_back_to_subprocess_when_in_process_has_2x(pdf_file, fake_mineru, 
     assert "中 华 人 民 共 和 国 国 家 标 准" in result["content"]
 
 
-def test_missing_venv_interpreter_reports_clear_error(pdf_file, fake_mineru, monkeypatch, tmp_path):
-    _fake_version(monkeypatch, "2.7.6")
-    monkeypatch.setenv("MINERU4_PYTHON", str(tmp_path / "not-there" / "python"))
-    result = Mineru4Processor().process(pdf_file, keep_page_edges="off")
-    assert result["content"] == ""
-    assert "MINERU4_PYTHON" in result["metadata"]["error"]
+@pytest.mark.parametrize("major, expected", [(None, False), (2, False), (4, True), (5, False)])
+def test_mineru_availability_uses_main_environment_only(tmp_path, monkeypatch, major, expected):
+    interpreter = tmp_path / "legacy-python"
+    interpreter.touch()
+    monkeypatch.setenv("MINERU4_PYTHON", str(interpreter))
+    monkeypatch.setattr(mineru4_processor, "mineru_major_version", lambda: major)
+    processor = _real_main_processor().DocumentProcessor(output_dir=str(tmp_path / "out"))
+    assert processor._local_mineru4_available() is expected
 
 
 # -------------------------------------------------------------- 参数换算
@@ -355,7 +357,7 @@ def test_legacy_engine_names_are_backed_by_mineru4(tmp_path, monkeypatch):
 
 
 def test_legacy_engine_never_falls_back_to_2x_processor(tmp_path, monkeypatch):
-    """MinerU 2.x 已退役：主解释器里是 2.x 时也只用 4.x 适配层（子进程模式）。"""
+    """MinerU 2.x 已退役：主解释器里是 2.x 时也只用 4.x 适配层明确报错。"""
     monkeypatch.setattr(mineru4_processor, "mineru_major_version", lambda: 2)
 
     class _LegacyOCR:
@@ -417,7 +419,7 @@ def test_ofd_conversion_failure_falls_back_to_mineru4(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('mode,expected', [('auto','auto'),('on','ocr'),('off','txt')])
 def test_subprocess_uses_current_python_and_canonical_ocr_mode(pdf_file, monkeypatch, tmp_path, mode, expected):
-    monkeypatch.delenv('MINERU4_PYTHON', raising=False)
+    monkeypatch.setenv('MINERU4_PYTHON', '/nonexistent/legacy/python')
     monkeypatch.setattr(mineru4_processor, 'mineru_major_version', lambda: 4)
     def child(cmd, **kwargs):
         assert cmd[0] == sys.executable
@@ -432,7 +434,6 @@ def test_subprocess_uses_current_python_and_canonical_ocr_mode(pdf_file, monkeyp
 
 
 def test_native_child_failure_is_returned_as_parse_error(pdf_file, monkeypatch):
-    monkeypatch.setattr(Mineru4Processor, '_venv_python', staticmethod(lambda: sys.executable))
     monkeypatch.setattr(mineru4_processor.subprocess, 'run', lambda *a, **k: types.SimpleNamespace(returncode=-11, stderr='native crash'))
     result = Mineru4Processor().process(pdf_file, keep_page_edges='off')
     assert result['content'] == ''
@@ -440,6 +441,7 @@ def test_native_child_failure_is_returned_as_parse_error(pdf_file, monkeypatch):
 
 
 def test_worker_omits_image_bytes_but_keeps_ocr_text(tmp_path, monkeypatch):
+    _fake_version(monkeypatch, "4.0.4")
     from algorithm.preproc.preproc_src.processors import mineru4_worker
     class Result:
         def markdown(self, *, image_renderer):
@@ -452,3 +454,28 @@ def test_worker_omits_image_bytes_but_keeps_ocr_text(tmp_path, monkeypatch):
     text=(out/'markdown.md').read_text()
     assert 'base64' not in text
     assert '印章文字' in text and '截止日期2026年4月10日' in text
+
+
+@pytest.mark.parametrize("version", ["2.7.6", "5.0.0", ""])
+def test_worker_rejects_unsupported_mineru_version(tmp_path, monkeypatch, version):
+    from algorithm.preproc.preproc_src.processors import mineru4_worker
+    calls = []
+    monkeypatch.setitem(sys.modules, "mineru", types.SimpleNamespace(parse=lambda *a, **k: calls.append(1)))
+    _fake_version(monkeypatch, version)
+    out = tmp_path / "worker"
+    assert mineru4_worker.main(["--pdf", "fake.pdf", "--out-dir", str(out)]) == 1
+    report = json.loads((out / "result.json").read_text(encoding="utf-8"))
+    assert "需要 MinerU 4.x" in report["error"]
+    assert calls == []
+
+
+def test_worker_preserves_actual_parse_failure(tmp_path, monkeypatch):
+    from algorithm.preproc.preproc_src.processors import mineru4_worker
+    def fail(*args, **kwargs):
+        raise RuntimeError("model load failed")
+    monkeypatch.setitem(sys.modules, "mineru", types.SimpleNamespace(parse=fail))
+    _fake_version(monkeypatch, "4.0.4")
+    out = tmp_path / "worker"
+    assert mineru4_worker.main(["--pdf", "fake.pdf", "--out-dir", str(out)]) == 1
+    report = json.loads((out / "result.json").read_text(encoding="utf-8"))
+    assert report["error"] == "RuntimeError: model load failed"

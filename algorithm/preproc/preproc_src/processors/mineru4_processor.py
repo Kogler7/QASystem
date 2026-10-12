@@ -24,8 +24,6 @@ from ..table_json import convert_tables
 
 # 4.0 档位；默认 standard（4.0 自身默认），部署可用 MINERU4_TIER 覆盖。
 DEFAULT_TIER = "standard"
-# 兼容独立 venv；主环境已装 4.x 时复用 sys.executable
-DEFAULT_VENV_PYTHON = "/opt/mineru4/venv/bin/python"
 # 子进程解析超时（秒），大文档可调
 DEFAULT_TIMEOUT_SECONDS = 1800
 WORKER_NAME = "mineru4_worker.py"
@@ -43,7 +41,7 @@ PAGE_RANGE_SUFFIXES = frozenset({"pdf"})
 
 
 def mineru_major_version() -> int | None:
-    """返回当前解释器里 MinerU 的主版本号；不可导入或读不到版本时返回 None。"""
+    """返回当前解释器里 MinerU 的安装主版本号；读不到版本时返回 None。"""
     try:
         from importlib.metadata import version as _dist_version
 
@@ -137,16 +135,6 @@ class Mineru4Processor(BaseProcessor):
 
     # ------------------------------------------------------------ 内部工具
 
-    @staticmethod
-    def _venv_python() -> str:
-        # Inspect distribution metadata without importing native model code in the API worker.
-        explicit = os.getenv("MINERU4_PYTHON")
-        if explicit:
-            return explicit
-        if (mineru_major_version() or 0) >= 4:
-            return sys.executable
-        return DEFAULT_VENV_PYTHON
-
     def _run_in_subprocess(
         self,
         file_path: str,
@@ -156,12 +144,7 @@ class Mineru4Processor(BaseProcessor):
         page_range: str,
     ) -> tuple[str, dict, dict]:
         """在隔离子进程解析，返回 (markdown, structured, info)。"""
-        python = self._venv_python()
-        if not os.path.exists(python):
-            raise RuntimeError(
-                f"当前环境没有可 import 的 MinerU 4.x，且 MINERU4_PYTHON 指向的解释器不存在：{python}；"
-                "镜像需包含 /opt/mineru4/venv，或显式设置 MINERU4_PYTHON"
-            )
+        python = sys.executable
         worker = Path(__file__).with_name(WORKER_NAME)
         if not worker.is_file():
             raise RuntimeError(f"缺少 4.x 子进程 worker：{worker}")

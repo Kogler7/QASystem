@@ -13,7 +13,7 @@ from algorithm.runtime_profile import is_remote_only
 MODEL_PATHS = {
     "docling": Path("/models/docling-models"),
     # MinerU 2.x 已退役：本地解析回退层是 4.x，可用性由 main_processor 的
-    # _local_mineru4_available（主解释器 4.x 或 MINERU4_PYTHON）判定；
+    # _local_mineru4_available（主解释器安装版本为 4.x）判定；
     # 4.0 模型目录另见 runtime_checks 的 mineru4 检查。
     "mineru_pipeline": Path("/models/mineru/pipeline"),
 }
@@ -64,9 +64,16 @@ def _required_url_tcp_check(name: str, value: str, default_port: int) -> dict[st
 
 
 def runtime_checks() -> dict[str, Any]:
+    from algorithm.preproc.preproc_src.processors.mineru4_processor import mineru_major_version
+
+    mineru_major = mineru_major_version()
     checks = {
         "docling_module": {"ok": importlib.util.find_spec("docling") is not None},
-        "mineru_module": {"ok": importlib.util.find_spec("mineru") is not None},
+        "mineru_module": {
+            "ok": mineru_major == 4,
+            "major_version": mineru_major,
+            "reason": None if mineru_major == 4 else "主 Python 环境未安装受支持的 MinerU 4.x",
+        },
         "libreoffice": {"ok": shutil.which("soffice") is not None},
         "java": {"ok": shutil.which("java") is not None},
         "ofd_converter": {"ok": Path("/opt/qasystem/ofdrw/ofd-to-pdf.jar").is_file()},

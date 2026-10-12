@@ -59,3 +59,16 @@ def test_dependency_checks_reports_unreachable_configured_service(monkeypatch):
 
     assert checks["mysql"]["ok"] is False
     assert checks["mysql"]["reason"] == "connection refused"
+
+
+
+def test_runtime_health_requires_mineru4_in_main_python(monkeypatch):
+    from algorithm.preproc.preproc_src.processors import mineru4_processor
+    monkeypatch.setenv("MINERU4_PYTHON", "/unused/legacy/python")
+    monkeypatch.setattr(health, "_directory_check", lambda path: {"ok": True})
+    monkeypatch.setattr(health, "_optional_directory_check", lambda name: {"ok": True})
+    for major in (None, 2, 4, 5):
+        monkeypatch.setattr(mineru4_processor, "mineru_major_version", lambda: major)
+        check = health.runtime_checks()["mineru_module"]
+        assert check["ok"] is (major == 4)
+        assert check["major_version"] == major

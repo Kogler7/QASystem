@@ -238,105 +238,40 @@ MINERU4_TIER=advanced     # 需要回落时改回 standard
 结论：advanced 在 CPU 上约慢 5 倍，对这份"原生数字、文本层完好"的标准 PDF 没有质量增益
 （输出与 standard 基本一致）；建议默认 `standard`，疑难版面（扫描件、复杂表格）再按需切 advanced。
 
-### 7.2 镜像重建改动
+### 7.2 当前部署契约（2026-10-12）
 
-> **⚠️ 本节早先描述的「独立 venv 并存」方案已被取代。**最终采用**单环境合并**：
-> `docling==2.129.0` + `docling-ibm-models 4.0.3` + `sentence-transformers==6.1.0` +
-> `transformers==5.17.0` + `numpy==2.2.6` + `mineru[torch]==4.0.4` 装在同一环境，
-> MinerU 2.x 退役（`engine=mineru`/`vlm` 由 4.x 适配层承接）。
-> 最终改动清单与验收结果见 `docs/MinerU4.0-README-已完成.md`；
-> 适配层保留的「子进程模式」仅作为**仍是 2.x 的旧环境**的兼容回退，镜像不再自带 venv。
-> 下面保留该方案的过程记录，供回溯。
+环境镜像 `qasystem-env-v1` 在主 Python 环境安装 `mineru[torch]==4.0.4`，
+与 Docling、Torch、Transformers 共用依赖。MinerU 2.x 已退役。
+此前独立 venv 并存方案属于历史实验，不再用于运行时部署。
 
-**为什么不直接把主环境的 mineru 升到 4.0**：4.0 要 `transformers>=5.10.1`，而主环境
-`docling-ibm-models==3.11.0` / `sentence-transformers==5.1.2` 要 `<5.0`；实测把 docling 升到兼容版
-（2.129.0）后，它的 OCR 模型布局也变了（新版要 `RapidOcr/PP-OCRv6_*`，现有 `docling-models` 是
-PP-OCRv4），**必须重新下载 docling 模型**并回归整条 docling 路线；另外 4.0 与 2.x 的 `pypdfium2`
-互斥，切换是单向的、影响面最大。
+`engine=mineru4`、`mineru`、`vlm` 均由 4.x 适配层承接。为避免模型初始化
+阻塞 API worker 心跳，解析始终在 `sys.executable` 启动的子进程执行，
+子进程与主进程使用同一个 Python 环境。没有硬编码的 venv 路径。
 
-所以镜像一度采用**并存**方案（主环境一行不动）；该方案**最终被单环境合并取代**，下表为过程记录：
+`MINERU4_PYTHON` 已废弃且不再读取，旧 `.env` 中的该变量应删除。
+`MINERU4_TIMEOUT_SECONDS` 仍控制解析超时，模型目录继续使用
+`MINERU_MODEL_BASE_DIR`，模型保持宿主机外置只读挂载。
+主环境缺包、版本不支持、模型加载或推理失败均明确返回原始错误，不回退到旧环境。
 
-| 文件 | 当时改动 | 最终状态 |
-|---|---|---|
-| `backend/requirements.txt` | 不改，仍 `docling==2.76.0` / `mineru==2.7.6` | **已改**：`docling==2.129.0` / `sentence-transformers==6.1.0` / `transformers==5.17.0` / `numpy==2.2.6`，移除 `mineru==2.7.6` |
-| `backend/requirements.mineru4-venv.txt` | 新增 venv 依赖 | **已删除**（改为单环境，见 `backend/requirements.mineru-extras.txt` 的 `mineru[torch]==4.0.4`） |
-| `Dockerfile` | 加 `python3-venv` + 建 `/opt/mineru4/venv` | **已回到单环境**：不建 venv；最终校验断言 `mineru` 4.x、`transformers` 5.x、`from mineru import parse` 可用 |
-| `.env.example` | 4.0 变量（`MINERU_HOME`/`MINERU_MODEL_BASE_DIR`/`MINERU4_TIER`/`MINERU4_LOCK_DIR` 等），并移除 2.x 变量 | 相同（另去掉 venv 专用的 `MINERU4_PYTHON`/`MINERU4_TIMEOUT_SECONDS`） |
-| `processors/mineru4_worker.py` | **新增**：在 venv 解释器里跑一次解析，产出 `markdown.md` / `structured.json` / `result.json` | 保留（作为仍是 2.x 的旧环境的子进程回退能力） |
-| `processors/mineru4_processor.py` | 增加**子进程模式**：主环境有 4.x 就进程内调用，否则用 `MINERU4_PYTHON` 调 worker；对外契约不变，元数据记录 `mineru4_options.mode` |
+## 8. 交付与验收
 
-镜像内布局：
+这次清理只修改源码，不改变环境依赖，无需重建环境镜像。
+重新运行 `package-deploy.ps1` 生成源码交付包，不复用旧的 `deploy/runtime`。
+替换外置源码目录后重启 Backend/Agent；如同时修改 `.env`，需重新创建容器加载变量。
 
-```text
-python3                        → mineru 2.7.6 + docling 2.76.0（现有链路不变）
-/opt/mineru4/venv/bin/python   → mineru 4.0.4 + transformers 5.17（仅 engine=mineru4 使用）
-/models/mineru4/               → 4.0 模型（宿主已暂存 2.0GB）+ 可写 .locks
-```
-
-**已按镜像布局验证**（系统 python 里是 2.7.6，用 `MINERU4_PYTHON` 指向 4.0 venv）：
-
-| 用例 | 结果 |
-|---|---|
-| 封面 | `success=True`，222 字符，`mode=subprocess`、`version=4.0.4`，含 `ICS01.120`/`CCS A00` |
-| 正文第 7 页 | 863 字符，`4.1 概述` ✅ |
-| 附录 14–16 页 | 11109 字符，**9 张表全部转 JSON**，`<table>` 残留 0 |
-
-### 7.3 重建后的验收
+先确认目标容器的环境契约：
 
 ```bash
-python -c "from importlib.metadata import version; assert version('mineru').startswith('2.')"
-/opt/mineru4/venv/bin/python -c "from importlib.metadata import version; assert version('mineru').startswith('4.')"
-/opt/mineru4/venv/bin/python /app/algorithm/preproc/preproc_src/processors/mineru4_worker.py \
-    --pdf "<测试 PDF>" --out-dir /tmp/w4 --tier standard --page-range 1
-python -c "import sys; sys.path.insert(0,'/app'); from algorithm.preproc.preproc_src.main_processor import DocumentProcessor as D; print(D(output_dir='/tmp/v').process_file('<测试 PDF>', model_name='mineru4', force=True, start_page_id=0, end_page_id=0)['metadata']['mineru4_options'])"
+docker exec qasystem_backend python -c "import sys; from importlib.metadata import version; print(sys.executable); assert version('mineru').startswith('4.'); from mineru import parse"
 ```
 
-### 7.4 备选方案（以后要退役 2.x 时）
+导入成功只证明依赖入口可用，不替代 PDF 解析、模型加载和 GPU 推理验证。
+线上发布仍必须通过仓库规定的单元测试、全量评测、基线对比和生产观测门禁。
 
-把主环境的 `mineru` 直接升到 4.0 可行，但要一并完成：`docling==2.129.0`（+ `docling-slim==2.129.0`、
-`docling-ibm-models==4.0.3`、`docling-core==2.97.1`、`docling-parse==7.20.0`）、
-`sentence-transformers==6.1.0`、`transformers==5.17.0`、`numpy<2.3`，并**重新下载 docling 模型**
-（新版要 `RapidOCR/PP-OCRv6_*`）、回归 docling 路线、确认 `pip check` 干净。
+## 9. 历史评估说明
 
-## 8. 迁移步骤与当前状态
-
-| 步骤 | 状态 |
-|---|---|
-| 1. 本地部署 4.0（独立 venv）+ 下载 basic/standard 模型（2.0GB） | ✅ 已完成（第 4 节） |
-| 2. 新旧对比测试（`test_mineru_version_compare.py`）+ 实测三档 | ✅ 已完成（第 1、7.1 节） |
-| 3. 4.0 模型暂存到交付目录 `/mnt/data3/qasys/models/mineru4`（含可写 `.locks`）+ 部署 `.env` | ✅ 已完成（第 5 节） |
-| 4. 适配层 `engine=mineru4`（进程内 + 子进程双模式），契约不变 | ✅ 已完成（第 6 节） |
-| 5. 镜像重建改动（venv 层 + 校验 + `.env.example`） | ✅ 已准备好（第 7.2 节），**尚未真正重建镜像** |
-| 6. 重建 `qasystem-env-v1` 并重建 Backend 容器 | ⏳ 待执行（需要构建机执行 `build-image.ps1`） |
-| 7. 线上灰度：解析接口分别用 `engine=mineru4`（4.0）与 `engine=mineru`（2.7.6）做 A/B | ⏳ 待执行 |
-
-回归口径：同一批样本上确认**条款号、交叉引用、中文标点、表格转 JSON** 四项指标不回退
-（对比脚本见第 9 节）。
-
-注意：适配层虽然已就绪，但**当前运行的容器与镜像仍是 MinerU 2.7.6**：
-`engine=mineru4` 在既没有 4.x、也没有可用的子进程解释器（`MINERU4_PYTHON`）时会返回明确错误，
-不会影响既有链路。
-
-## 9. 复现本次评估
-
-```bash
-# 1) 独立 venv + 4.0（不污染系统 python 的 2.7.6）
-python3 -m venv --system-site-packages work/mineru4/venv
-work/mineru4/venv/bin/pip install "mineru[torch]==4.0.4"
-
-# 2) 下载 basic 档模型（缓存/凭据指到工作区）
-export MINERU_HOME=$PWD/work/mineru4/home
-export MODELSCOPE_CACHE=$PWD/work/mineru4/ms-cache
-export MODELSCOPE_CREDENTIALS_PATH=$PWD/work/mineru4/ms-credentials
-export HF_HOME=$PWD/work/mineru4/hf-home
-work/mineru4/venv/bin/mineru-models-download --tier basic --small-backend onnx -s modelscope
-
-# 3) 新旧对比（旧版走系统 python + 仓库 preproc，新版走 venv）
-python3 tests/algorithm/preproc/test_mineru_version_compare.py --pages 7 --tier basic
-python3 tests/algorithm/preproc/test_mineru_version_compare.py --pages 14-16 --tier basic
-```
-
-报告与产物：`work/mineru4/compare/report_*.json`、`work/mineru4/compare/{old,new}_*.md`。
+第 1–7.1 节记录的 2.x 与 4.x 对比是历史实验结果；实验曾使用临时独立环境，
+不代表当前镜像布局，也不应按历史实验步骤配置生产解释器。
 
 ## 10. 尚未覆盖
 

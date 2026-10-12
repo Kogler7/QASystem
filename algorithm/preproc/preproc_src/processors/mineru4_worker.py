@@ -2,11 +2,11 @@
 """在 MinerU 4.x 所在的解释器里执行一次解析（供适配层以子进程方式调用）。
 
 模型加载和推理始终在子进程执行，避免原生代码阻塞 API worker 心跳。
-优先复用已安装 MinerU 4.x 的主解释器，也支持 MINERU4_PYTHON 指定解释器。
+始终复用主进程的 Python 解释器，不支持独立环境或解释器路径覆盖。
 
 用法：
 
-    /opt/mineru4/venv/bin/python mineru4_worker.py \\
+    python mineru4_worker.py \\
         --pdf /path/in.pdf --out-dir /tmp/xxx \\
         --tier standard --ocr-mode auto --page-range 1-3
 
@@ -48,6 +48,12 @@ def main(argv: list[str] | None = None) -> int:
             mineru_version = _dist_version("mineru")
         except Exception:
             mineru_version = getattr(mineru, "__version__", "")
+
+        if str(mineru_version).split(".", 1)[0] != "4":
+            raise RuntimeError(
+                f"当前 Python 环境需要 MinerU 4.x，实际版本为 {mineru_version or '未知'}；"
+                "请使用包含 MinerU 4.x 的 qasystem-env-v1 环境镜像"
+            )
 
         result = mineru.parse(
             args.pdf,

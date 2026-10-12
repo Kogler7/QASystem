@@ -49,6 +49,7 @@ MODULES = (
 )
 
 EXPECTED_DISTRIBUTIONS = {
+    "mineru": "4.0.4",
     "opencv-python": "4.13.0.92",
     "opencv-python-headless": "4.13.0.92",
     "vllm": "0.31.0",
