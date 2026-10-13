@@ -151,6 +151,10 @@ class CoverageAuditor:
         entities: list[dict[str, Any]],
     ) -> list[CoverageGap]:
         gaps: list[CoverageGap] = []
+        bound_ids = {cid for entity in entities for evidence in
+                     [entity.get("evidence") or {}, *entity.get("evidences", [])]
+                     for cid in evidence.get("source_block_ids", [])}
+        unbound = [e for e in entities if not (e.get("evidence") or {}).get("source_block_ids")]
         for chunk in manager:
             if not (
                 chunk.clause_number
@@ -158,7 +162,7 @@ class CoverageAuditor:
                 or (chunk.metadata or {}).get("unit")
             ):
                 continue
-            if any(_entity_bound_to_chunk(entity, chunk) for entity in entities):
+            if chunk.chunk_id in bound_ids or any(_entity_bound_to_chunk(entity, chunk) for entity in unbound):
                 continue
             gaps.append(
                 self._next_gap(

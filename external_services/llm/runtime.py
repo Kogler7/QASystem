@@ -155,5 +155,3 @@ class ScheduledClient:
 
     def _responses(self, **kwargs):
         return self._call(self.client.responses.create, **kwargs)
-
-

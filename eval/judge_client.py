@@ -329,5 +329,3 @@ class JudgeClient:
         result = {collection: pairs}
         _validate_judge_result(result, schema)
         return result
-
-

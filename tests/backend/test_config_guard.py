@@ -106,7 +106,7 @@ def test_compose_startup_runs_guard_for_all_application_services():
         assert service['entrypoint'][1] == '/app/docker/config_guard.py'
         assert service['entrypoint'][-1] == '--exec'
         assert './.env:/app/.env:ro' in service['volumes']
-        assert '${QASYSTEM_RUNTIME_CONFIG_DIR:-./runtime-config}:/app/runtime-config:ro' in service['volumes']
+        assert '${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}:/app/runtime-config:ro' in service['volumes']
 
 
 def test_runtime_rejects_unapproved_and_modified_hot_configuration(project):

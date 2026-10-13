@@ -430,7 +430,7 @@ def _object_buckets(
         if not isinstance(obj, dict):
             continue
         object_id = str(obj.get("id") or f"row:{object_index}")
-        uid_by_object[object_id] = _uid_for(
+        uid_by_object[object_id] = str(obj.get("uid") or "") or _uid_for(
             obj.get("type"),
             obj.get("identity") or obj.get("display_name"),
         )

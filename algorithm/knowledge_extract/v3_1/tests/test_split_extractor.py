@@ -31,7 +31,6 @@ TESTS_DIR = PACKAGE_DIR / "tests"
 
 from .. import split_extractor as SE
 from .. import chunk_context as CC
-from .. import graph_assembler as GA
 from .. import graph_utils as GU
 from .. import prompt_router as PR
 from .. import output_contracts as OUT
@@ -116,7 +115,7 @@ class PromptTest(unittest.TestCase):
         route = PR.resolve_document_route(plan, [chunk])
         messages = PR.build_chat_messages(task="entity", plan=plan, route=route, chunk=chunk)
         prompt = messages[1]["content"]
-        self.assertIn("只提议实体候选，禁止输出关系", prompt)
+        self.assertIn("同时提取实体候选和当前片段支持的本体属性，禁止输出关系", prompt)
         self.assertIn("`SimpleRule`", prompt)  # 父类子类展开进类型目录
         self.assertIn("`CompositeRule`", prompt)
         self.assertNotIn("relation_signatures", prompt)
@@ -129,6 +128,7 @@ class TwoPassPipelineTest(unittest.TestCase):
         llm = StubLLM(
             entity_handler=composite_entity_handler,
             property_handler=composite_property_handler,
+            verification_handler=lambda item, chunk: "yes" if item["value"] in [COMPOSITE_TEXT, "AND", *MEMBER_RULE_TEXTS, *MEMBER_MENTIONS, "不得部署安装各类开源智能体"] else "no",
         )
         result = SE.extract_split(
             RULE_ONTOLOGY,
@@ -159,13 +159,13 @@ class TwoPassPipelineTest(unittest.TestCase):
         model = result["intermediate_model"]
         self.assertEqual(len(model["objects"]), 3)
         self.assertEqual(model["relations"], [])
-        self.assertEqual(model["objects"][0]["mapping"]["status"], "accepted")
+        self.assertEqual(model["objects"][0]["mapping"]["status"], result["mapping"]["entities"][0]["status"])
         self.assertEqual(model["objects"][0]["identity"], COMPOSITE_TEXT)
         # 证据覆盖
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
         self.assertEqual(result["evidence_coverage"]["relations"]["rate"], 1.0)
         # 实体 -> 属性 -> 关系候选 -> 独立关系语义核验
-        self.assertEqual([task for task, _ in llm.calls], ["entity", "property", "property"])
+        self.assertEqual([task for task, _ in llm.calls], ["entity", "property", "evidence_verification", "property", "evidence_verification", "property", "evidence_verification"])
         # 无 schema/证据告警
         self.assertEqual(result["warnings"], [])
         self.assertIsNone(result["error_code"])
@@ -186,7 +186,7 @@ class "术语" as Terminology <<KnowledgeUnit>> {
         ]
 
         def entity_handler(prompt: str, chunk: dict) -> list[dict]:
-            if chunk.get("chunk_id") == "c2":
+            if chunk.get("text") == "主数据治理是数据治理的核心。":
                 return [span_item("Terminology", "主数据治理", quote="主数据治理是数据治理的核心")]
             return [span_item("Terminology", "主数据治理", quote="开展关键主数据治理（也称主数据管理）")]
 
@@ -200,13 +200,15 @@ class "术语" as Terminology <<KnowledgeUnit>> {
                             "TermDefinition": "对主数据的识别、采集、校验等治理活动",
                             "Synonyms": ["主数据管理"],
                         },
-                        "evidence": {"quote": "开展关键主数据治理（也称主数据管理）"},
+                        "evidence": {"quote": chunks[0].text},
                     }
                     for row in parse_known_entities(prompt)
                 ]
             }
 
-        llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler)
+        llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler,
+                      verification_handler=lambda item, chunk: "yes" if item["property"] in
+                      {"TermName", "TermDefinition", "Synonyms"} else "uncertain")
         result = SE.extract_split(terminology_ontology, chunks=chunks, llm=llm)
         entities = result["raw"]["entities"]
         self.assertEqual(len(entities), 1)
@@ -215,12 +217,12 @@ class "术语" as Terminology <<KnowledgeUnit>> {
         self.assertEqual(properties["TermDefinition"], "对主数据的识别、采集、校验等治理活动")
         self.assertEqual(properties["Synonyms"], ["主数据管理"])
         # 两条 evidence（不同 chunk span）都保留
-        self.assertEqual(len(result["intermediate_model"]["objects"][0]["evidence"]), 1)
+        self.assertEqual({cid for e in result["intermediate_model"]["objects"][0]["evidence"] for cid in e["source_block_ids"]}, {"c1", "c2"})
         self.assertEqual(len([t for t, _ in llm.calls if t == "property"]), 1)
         import json
         payload = json.loads(next(p for t, p in llm.calls if t == "property"))
-        self.assertEqual([d["current_chunk"]["chunk_id"] for d in payload["documents"]], ["c1", "c2"])
-        self.assertEqual(len(payload["task"]["known_entities"][0]["occurrences"]), 2)
+        self.assertEqual([d["text"] for d in payload["documents"]], [c.text for c in chunks])
+        self.assertEqual(len(payload["stage_context"]["known_entities"][0]["occurrences"]), 2)
 
     def test_out_of_scope_entity_rejected(self) -> None:
         # 重构后 entity pass 的 output schema enum 已限定在目标范围内，范围外类型
@@ -274,16 +276,19 @@ class FailureAndEdgeTest(unittest.TestCase):
         self.assertEqual(result["profile"]["chunks"], 0)
 
     def test_uid_stable_regardless_of_properties(self) -> None:
-        objects = [
-            {"id": "entity-0", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "A"}},
-            {"id": "entity-1", "type": "SimpleRule", "identity": "R-001", "properties": {"action": "B"}},
-        ]
-        graph = GA.GraphAssembler().build_graph(objects, [])
-        self.assertEqual(len(graph["nodes"]), 1)  # 同一 identity 合并为同一 UID
-        self.assertEqual(
-            graph["nodes"][0]["uid"],
-            GU.entity_uid("SimpleRule", "R-001", None),
-        )
+        def run(value):
+            def properties(prompt, chunk):
+                return {"entities": [{"type": e["type"], "name": e["name"],
+                    "properties": {"ruleText": value}, "evidence": {"quote": "规则内容：" + value}}
+                    for e in parse_known_entities(prompt)]}
+            return SE.extract_split(RULE_ONTOLOGY, chunks=[CC.ExtractionChunk("c", "规则内容：" + value)],
+                llm=StubLLM(entity_handler=lambda p, c: [span_item("SimpleRule", "规则")],
+                            property_handler=properties,
+                            verification_handler=lambda item, chunk: 'yes' if item['value'] == value else 'no'))
+        first, second = run("A"), run("B")
+        self.assertEqual(first["graph"]["nodes"][0]["uid"], second["graph"]["nodes"][0]["uid"])
+        self.assertNotEqual(first["raw"]["entities"][0]["properties"], second["raw"]["entities"][0]["properties"])
+
 
 
 class BenchmarkSmokeTest(unittest.TestCase):

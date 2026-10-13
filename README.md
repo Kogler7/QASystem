@@ -88,7 +88,7 @@ QASystem 是一个**知识图谱驱动的问答/求解系统**：先把文档解
 | `app/services/` | 路由对应的业务编排 |
 | `app/execution/` | 异步执行框架：任务提交与调度（`manager.py`）、Worker 消费（`worker.py`）、队列与存储（`queue.py`/`store.py`）、事件推送（`hub.py`）、操作映射（`operations.py`）、资源分类（`resources.py`）、监督（`supervisor.py`） |
 | `app/schemas.py` | 请求/响应模型 |
-| `app/environment.py` | 统一加载仓库根 `.env` |
+| `app/environment.py` | 本地启动的 dotenv 引导；容器环境由 Compose 注入，业务统一从 `docker.configuration` 读取 |
 
 **资源类**（如 `io.graph`、`io.llm`、`io.db`、`cpu.chart`、`gpu.*`）决定任务进入哪个队列；
 `operations.py` 把 MCP 工具名映射为 Worker 可执行的操作。
@@ -148,3 +148,11 @@ QASystem 是一个**知识图谱驱动的问答/求解系统**：先把文档解
 - **HTTP v1**：文档解析/切片、图谱抽取/合并、文本与图谱向量化、知识沉淀流水线、置信度（保留）、
   任务状态/结果/取消与 SSE；
 - **健康检查**：`GET /health`。
+
+## 配置和日常运维
+
+应用配置统一通过 `ops config` 审核；部署默认值在根 `.env.example`，声明、消费者和迁移随版本维护。业务热参数及模型计划保存在 `runtime-config/config.json`，启动参数和密钥保存在部署 `.env`。Compose 维护服务结构，不再维护第二套默认值。
+
+常用入口为 `ops check`、`ops reload`、`ops deploy`、`ops status` 和 `ops history`。`reload` 不重启容器，`deploy` 应用审核后的启动计划；改 `.env` 需要 recreate，不需要重建环境镜像。评测使用本轮命令行参数，不保留默认评测文件。
+
+完整说明见 [配置体系说明](docs/部署/配置体系说明.md)、[配置迁移](docs/部署/配置清理与标准名称迁移.md)、[小模型部署](docs/部署/小模型统一部署.md) 和 [评测入口](eval/README.md)。尚未安装 `ops` 时使用 `python3 ops.py --project-dir . install`；交付包使用 `python3 runtime/ops.py`。

@@ -27,62 +27,44 @@ result = extract(
 - `skills/*/SKILL.md`：用户维护的领域规则；`skill_registry.py` 和 `skill_planner.py` 负责发现、读取与请求内一次性编译。
 - `domain_skills.py`：无模型的低层兼容预览，只从 Markdown 读取策略正文。
 - `output_contracts.py`：所有阶段的输出约束及动态 schema 构造。
-- `object_identity.py`：依据原文 object 声明统一名称与引用，保留文档范围和对象编号。
 
-User 固定为 `task`、`output_contract`、`domain_policy`、`ontology`、`documents`。第一步只输出 `type + mention + evidence.quote`，只读取当前 chunk；后续阶段按原有规则使用已接受实体、属性和局部上下文。`name / properties` 是后处理结果，不是第一步模型字段。
+全部阶段使用两条消息 `system + user`。User 固定为 `task`、`domain_policy`、`ontology`、`documents`、`stage_context`、`output_contract`，重试时追加 `retry_feedback`。第一步输出 `type + mention + properties + evidence`，同时抽取当前请求窗口支持的本体属性；`mention` 直接成为原文 `name`。`evidence.property_quotes` 按属性记录引文。为兼容旧输出，省略 properties 的候选仍会进入补全。JSONL 逐行解析及所有普通文本调用保持不变。
 
-公共入口自动执行“模型请求读 skill → 模型生成计划 → 程序保真装配”。通过 `skills_dir` 参数可替换技能目录；默认使用本包的 `skills/`。维护方式与运行边界见下文。
+公共入口自动执行“程序确定领域 → 读取 skill 固定快照 → 按阶段编译并装配规则”，不调用模型选择领域或规划技能。发送给模型的 `domain_policy.rule_blocks` 保留每段的 `skill_id / version / section / text`，无适用技能时为空数组。按同一技能、版本和规则段去重，不再逐行拼接去重。通过 `skills_dir` 参数可替换技能目录；默认使用本包的 `skills/`。维护方式与运行边界见下文。
 
-User 保持原五段 JSON 模板；各顶层及嵌套字段的含义见[User 字段字典](../../../docs/算法/知识抽取V3.1提示词与文档路由.md#11-user-原模板与字段字典)。
+已知实体、核验候选及修复问题放在 `stage_context`，不能作为新的原文证据。抽取、补全和修复继续输出 JSONL，独立核验继续输出 JSON object；均为普通文本调用。字段字典及四阶段样例见[消息与文档路由](../../../docs/算法/知识抽取V3.1提示词与文档路由.md)。
 
 完整说明、精简清单、用法和真实模型样例见[提示词与文档路由](../../../docs/算法/知识抽取V3.1提示词与文档路由.md)。
 
-## 测试与评测
+## 当前执行与可信边界
 
-测试统一在 88，使用现有 `qasystem_backend`，不另建评测 Backend：
+1. 深拷贝输入切片，物化目标类型迭代器，确定文档路由并加载请求内固定技能快照。`profile.input_manifest` 记录各切片内容及元数据的 SHA-256；它用于核对输入，不是模型结果缓存键。
+2. 按类型和有界来源窗口提取 JSONL 候选。名称及引文都无法定位时进入带反馈重试；不能接受无来源实体。模型不提供可信字符偏移，程序定位后回映原切片。
+3. 对每个新属性先定位其引文，再独立调用语义核验。实体名和值共现不能证明属性含义；仅 `yes` 接受，`no`、`uncertain` 或核验失败均移除该新值。此前已经核验且未改变的属性可复用本次运行的收据。核验上下文为引文及前后各 200 字，仍受完整请求预算约束。
+4. 按完全相同的 `type + name` 合并出现记录。相同属性值保留全部来源收据；不同值需模型综合，未解决冲突保留告警并返回部分/失败状态。改值不能继承旧值的无关支持收据。已扫描、无冲突、无待处理邻片的实体跳过补全。
+5. 补全按单键和来源窗口流式处理。模型必须恰好返回请求中的实体键；不得增键、漏键、重复、改名或改类型。名称的大小写、全半角、内部空格保持原样，UID 使用原始键的稳定哈希。
+6. 最终逐项校验本体、实体与属性收据的来源、字符偏移、引文和 span ID。修复遍历全部相关切片，不再静默限制为前 3 片；无进展、耗尽轮数或硬校验失败均如实写入停止原因。`verification.valid` 表示没有硬错误，`coverage_complete` 另行表示是否仍有覆盖缺口。
 
-```bash
-python -m pytest -q algorithm/knowledge_extract/v3_1/tests
-```
+模型适配器每次收到独立的 schema/messages 副本，不能修改本地校验契约或下一次重试的原文。局部上下文遇到文档、受限章节边界立即停止，环路不重复引用；`chunk_id` 必须是非空且无首尾空白的字符串。编码与名称的对应关系也需要所提供原文支持，不能凭模型记忆补全。
 
-2026-10-11 删除关系抽取后的相关算法及 Backend 契约测试：本地 265 passed、1 skipped（缺少标准本体）。本次未部署到 88。完整发布门禁仍按根目录 `AGENTS.md` 执行。
+修复只接收问题涉及的实体键；`uncovered_block` 对应切片才允许发现新实体。自定义 `repairer` 输入完全深拷贝，候选经过同一本体契约校验，来源坐标与属性收据由程序重建。无效响应或异常按 schema/request/timeout 记录终态。
 
-基准数据放 `test_data/`，线上链路评测统一走 `eval/run.py`，输出放 `tmp/`。历史 benchmark lint 公共工具保留在 `algorithm.knowledge_extract.v2.benchmark_lint`；v3.1 不再重复维护同一工具。
+独立语义核验使用同一运行时 LLM，并未接入 Clef。它能约束接受条件，但不是事实正确性的形式化证明；新增核验会增加模型调用量。映射评分是完整性等规则分数，不是事实真实性概率；诊断对象保留实际评分状态。
 
----
-noteId: "1dbff8b0c54d11f192edfbc308186266"
-tags: []
+单一 `evidence` 保留兼容，全部来源存于 `evidences` 和 `property_evidence`。聚合接口可在 `best_effort` 下保留部分事实，但有硬错误时不能报告成功；Backend 不因属性核验失败删除已定位实体，输入预算失败则按对应实体切片归因。
 
----
+## 长文本请求预算
 
-### 用户维护 Skill 与 User 装配
+- `KG_EXTRACT_V31_WINDOW_CHARS=2000`：上游切片内部的请求窗口，重叠 100 字符（小窗口不超过四分之一）；不改上游 chunk ID，证据偏移回映原切片。所有字符都被覆盖，不再使用 repair 的 `[:8000]` 静默截断。
+- `KG_EXTRACT_V31_MAX_INPUT_BYTES=48000`：完整序列化消息的上限，含 System、skill、本体、元数据、来源和累计状态。UTF-8 字节数用作保守 token 上界，并取请求/环境 `max_input_tokens` 的较小值，另留 2048 字节重试空间。
+- 窗口还参考模型输出 token 上限；单次超时、输出截断或上下文超限会拆分来源/类型后重试，最多递归 12 层；文档总 deadline 耗尽后不再发起调用或递归拆分。大本体按类型分批访问全部允许类型，不因文本未命中词面提示而删掉某类。
+- 累计属性及其证据本身超过最小请求预算时，明确返回 `LLM_INPUT_BUDGET_EXCEEDED` 并保留已有事实，不截断证据、不无限重试。不能保证任意大实体或任意小模型上下文均能完整抽取。
+- 按请求窗口并发，单个超长切片也能使用配置的 worker 数；惰性生成窗口，至多预提交 `2 * max_workers` 个任务。完整提示词仅保留前 `KG_EXTRACT_V31_TRACE_CALLS=32` 次。其余调用保留输入字节数、耗时、状态及 usage，避免长文诊断信息无限复制输入。
 
-更新时间：2026-10-11。实现范围是用户维护 Markdown 技能、程序按 V2 路由编译一次、保真填充 User。当前接入 v3.1 公共 Python 入口；尚未部署到 Backend。全部本轮源码、测试、技能与说明均位于 v3.1，未改公共运行层和其它算法版本。
 
-### 1. 执行流程与职责
+调度器的并发等待、QPM 等待及重试退避都受文档 deadline 限制；取得调度名额后、模型/修复回调返回后再次检查，迟到结果不按成功接受。任意自定义同步 LLM 或回调的内部执行仍需其自身实现调用超时。模型提供方异常只保留分类后的诊断信息，不将原始异常中的认证头、请求体写入结果或日志。
 
-```text
-用户维护若干 SKILL.md
-        ↓ 每个抽取请求读取一份固定内容快照
-V2 规则确定类型（本体优先，必要时结合前 12 片的受限正文与元数据）
-        ↓ 按类型匹配技能
-程序一次性预编译各阶段规则，记录版本和 SHA256
-        ↓ 各切片、批次复用，只填充 domain_policy
-公共抽取 System + 阶段约束 + 五段 JSON User
-        ↓ 原有抽取链路
-分片实体候选 → 按 type + name 集中来源 → LLM 跨片合并与属性补全 → 实体校验与修复 → 输出实体
-```
-
-装配过程不调用模型。请求内持有固定规则快照，各阶段、切片和批次只复制对应策略，输入变化不会触发重新选择或编译。
-
-抽取 System 使用公共规则加阶段约束：实体、属性各自接收对应规则，实体修复另有限定问题范围。程序原样保留以下四段，只替换 `domain_policy`：
-
-- `task`：当前阶段、已知实体、修复问题及允许的范围。
-- `output_contract`：独立构建的输出契约及 schema。
-- `ontology`：该阶段已裁剪的本体目录。
-- `documents`：当前 chunk 与该阶段原有允许的邻居。
-
-第一步仍只输出 `type + mention + evidence.quote`，不输出 `name`、属性或关系。原文位置由实际文档和既有后处理决定，技能编译不计算或改写位置。
+## 维护领域 Skill
 
 ### 2. 用户维护哪些文件
 
@@ -132,7 +114,7 @@ route_hints: [trouble]
 | `name` | 唯一技能 ID，小写字母开头，之后允许字母、数字、下划线、短横线，最长 64 字符。 |
 | `description` | 供维护者阅读的描述；说明适用内容和抽取目标。 |
 | `version` | 非空字符串，请用引号；语义修改后更新版本。程序另记录真实内容 SHA256。 |
-| `stages` | 支持的阶段，从 `entity / property / repair` 选择。实体修复沿用 entity 的领域规则。 |
+| `stages` | 支持的阶段，从 `entity / property / repair` 选择。实体修复组合 entity、property 和 repair 的适用规则段。 |
 | `## rules:all` | 跨该技能所声明阶段适用的规则段。 |
 | `## rules:entity` 等 | 对应阶段规则段；程序组合 `all` 与当前策略阶段的段。 |
 | `route_hints` | 可选字符串数组。声明绑定的文档类型；名称或该字段匹配才被程序选中。simple/generic 始终禁用技能。 |
@@ -141,87 +123,23 @@ route_hints: [trouble]
 
 ### 4. 请求内只编译一次
 
-程序按 V2 同等逻辑，根据本体和受限切片上下文确定路由一次，再按 skill 名称或 `route_hints` 匹配规则文件。一次性预编译 entity、property、repair 阶段的 `all` 与阶段规则；实体修复仍复用 entity 规则。
+程序按 V2 同等逻辑，根据本体和受限切片上下文确定路由一次，再按 skill 名称或 `route_hints` 匹配规则文件。一次性预编译 entity、property、repair 阶段的 `all` 与阶段规则；实体候选与核验组合 entity/property 规则，属性补全使用 property 规则，实体修复还追加 repair 专用规则；all 段只发送一次。
 
 不再发送 `read_skills` / `assemble` 模型请求。所有切片、批次及重试复用已编译策略，且每次独立抽取请求仍在 `domain_policy` 中携带一份适用规则。任务、本体、原文、输出契约保持各请求自身的内容，不参与技能缓存键。
 
 审计 `profile.prompt_assembly` 的 mode 为 `deterministic_skill_compile`，`plans` 只有一条请求级记录，包含 route、read_skills（ID、版本和原始文件 SHA256）及 stages（各阶段选中规则段）；calls 和 attempts 固定为空。技能配置错误显式失败，不回退成空结果。
 
-### 5. 如何调用
 
-既有公共调用自动启用确定性编译：
-
-```python
-from algorithm.knowledge_extract.v3_1 import extract_harness
-from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
-
-result = extract_harness(
-    ontology=ontology_text,
-    chunks=[ExtractionChunk(chunk_id="example-1", text=chunk_text)],
-    llm=runtime_llm,  # 应用注入的模型运行接口
-    use_scheduler=False,  # 仅当 runtime_llm 已统一管理调度时使用
-)
-plans = result["profile"]["prompt_assembly"]["plans"]
-```
-
-`extract()`、`extract_aggregate()` 都经该入口启用编译。`extract()` 只保留最终公共图结果，调试时用 `extract_harness()` 查看请求级编译审计和技能哈希。
-
-直接调用低层 `extract_split()` 同样按请求编译一次；单独调用 `build_chat_messages()` 时默认生成一次性预览，也可传入请求内共用的 `assembly_planner`。
-
-可注入独立规划器：
-
-```python
-from algorithm.knowledge_extract.v3_1.skill_registry import SkillRegistry
-from algorithm.knowledge_extract.v3_1.skill_planner import SkillAssemblyPlanner
-
-# 每个抽取任务创建新实例，不再接受 LLM runner。
-planner = SkillAssemblyPlanner(SkillRegistry("/path/to/skills"))
-result = extract_harness(
-    ontology=ontology_text, chunks=chunks, llm=runtime_llm,
-    assembly_planner=planner, use_scheduler=False,
-)
-```
-
-规划器按请求创建，不跨请求复用。全部阶段预编译一次，不随 chunk 或实体批次重新编译；技能文件在请求开始时加载，运行过程中不会因文件编辑而更换规则。
-
-### 6. 与底层调度的边界
-
-`skill_registry.py`、`skill_planner.py` 不导入其它算法版本，不创建模型客户端或调用模型。实际抽取仍沿用既有 `generate_structured()` 调度与重试路径。
-
-**技能装配层不等于全系统调度解耦。**版本目录下原有 scheduler/client 和共享 `request_runtime` 对版本客户端的依赖仍然存在。合并后的 Backend 适配器已将输入转换为 v3.1 自身的 `ExtractionChunk`；算法与 Backend 接口回归测试通过，但不代表运行中服务已部署或通过完整发布门禁。
-
-### 7. 验证与成本
-
-历史首片路由与 benchmark 分类调整（本次已替换为 V2 规则）在本地 `.venv/bin/python -m pytest -q algorithm/knowledge_extract/v3_1/tests` 验证：188 passed、1 skipped（缺少标准本体）。覆盖五份公文 benchmark 首片、JSON 表单、类型隔离、空目录、simple 空技能与跨 chunk 不改路由。
-
-上述本地验证时，全仓测试收集曾因缺少 `docling` 和旧 `algorithm.knowledge_extract.v3_1.decisions` 引用失败；合并后的受版本控制 Python 源码已无该旧模块引用。尚未执行本次改动的运行中 Backend 全量评测、基线对比和部署，不能视为已通过发布门禁。
-
-2026-10-11 冲突修复后，在 88 的现有 `qasystem_backend` 中使用独立源码快照验证 v3.1 全部单测，以及 Backend 的 `test_knowledge_extract_v31.py`、`test_knowledge_extract_adapter.py`、`test_extraction_request_config.py`、`test_extraction_quality.py`：267 passed、1 skipped（仓库缺少标准本体）。保留了换行符/BOM 与原始文件哈希测试、文档类型隔离测试和公文实体阶段规则。日志归档于 `tmp/v31-conflict-fix-20261011/`，未替换运行服务源码。
-
-以下为此前装配层在 88 上的历史验证记录，不代表本次修改已在服务器验证：
-
-测试统一在 88 的现有 `qasystem_backend` 内，独立快照 `/app/tmp/v3_1-skills-local-20261011-miuTD2`。相关命令：
+## 测试、参考与发布状态
 
 ```bash
-python -m pytest -q -p no:cacheprovider \
-  algorithm/knowledge_extract/v3_1/tests
+python -m pytest -q algorithm/knowledge_extract/v3_1/tests \
+  tests/backend/test_knowledge_extract_v31.py \
+  tests/backend/test_knowledge_extract_adapter.py \
+  tests/backend/test_extraction_request_config.py \
+  tests/backend/test_extraction_quality.py
 ```
 
-结果：165 passed、1 skipped、15 subtests passed。跳过原因仍是缺少既有标准本体 fixture。覆盖自定义技能发现、文件编辑生效、请求内快照、规则段选择、非法计划拒绝、原文与契约保真、四阶段消息装配、公共入口接线及并发重复规划合并。
+2026-10-12 提交前，上述算法与 Backend 测试合计 **387 passed、1 skipped**；跳过项缺少 `test_data/eval/standard/ontology/Standard_Ontology.puml`。本轮只完成本地回归并同步 88 Git 仓库的 `develop`，未部署服务、未验证真实模型效果与耗时。此前 88 测试属于[历史 P1/P2 记录](../../../docs/算法/知识抽取V3.1-P1P2修复与88验证-20261012.md)，不能作为本轮发布证明。
 
-真实模型初测发现服务商可能退回 `json_object` 模式：规划提示词必须显式携带自己的 `response_schema`，不能只通过 SDK 参数传入。本次已补齐并加入回归断言。规划契约与后续抽取契约明确区分。
-
-采用模型规划会增加推理成本：有相关技能时通常新增两轮请求（选读和计划），类型无技能时不增加规划调用；有候选技能但模型选空时新增一轮。请求内仅对完全相同输入复用计划，不声称整体提速。尚未执行全量效果评测或实际服务发布。
-
-
-真实模型 `deepseek-ai/DeepSeek-V4-Flash` 已完成选读公文技能、生成计划和实体抽取三轮调用，本次耗时 4.562 秒。输入为“关于开展设备巡检的通知\n设备部负责开展设备巡检。”，选用 `official_document` 的 `all` 规则段，返回公文标题、设备部、开展设备巡检三个实体，流程状态 succeeded。输入与第一步契约保留原样，三个实体的模型原始 offset 均触发既有纠正逻辑；简化本体还产生三条缺少 identity 的告警。此样例只验证单段算法包链路，不代表 Backend HTTP 整链或全量效果门禁通过。
-
-本次验证产物保存在根目录 `tmp/v3_1-skill-builder/88-version-local/`，其中 `v3_1-skills-local-results.xml` 是测试结果，`v3_1-skills-local-live/` 包含真实 System、User、模型首步原始输出、调用记录和最终结果。它们是测试产物，不进入运行源码包。
-
-### 按 type + name 完成实体
-
-属性调用以完全相同的 `type + name` 为键，每个键只进入一个批次（同一类型默认每批 24 个唯一键），相关切片完整放入 `documents`。`task.known_entities[].occurrences` 保留每次出现的切片 ID、原始属性与证据，不预先拼接或覆盖属性值。LLM 结合全部来源，为每个键返回一个完整的 `type`、`name`、`properties` 与 `evidence.quote`。同名不同类型分开；不做别名、模糊名称归并。
-
-程序校验键集合、唯一性、本体属性和证据，再收集模型结果；不生成抽取实体 ID，不执行属性 updates 或程序属性合并。旧 Backend 图输出协议所需的 `uid` 仅在兼容输出边界计算，不进入 LLM message 或公开实体 JSON。`output_contract` 不含 `version`、`status`。候选非空时，属性响应不得返回空实体集合。
-
-User 的诊断字段在序列化边界移除：ontology 只发 catalog，domain_policy 只发 profiles 下的 extraction_rules，task 不再发送 input_scope。技能选择与版本审计仍保留。属性 schema 按单一类型生成，避免跨类型属性混用；实体和修复保持 span 候选结构，属性返回完整实体结构。
+基准数据放 `test_data/`，线上评测走 `eval/run.py`，输出放 `tmp/`；完整发布门禁按根目录 `AGENTS.md` 执行。技能随外部源码交付；本轮未增加生产依赖，不需要重建环境镜像。

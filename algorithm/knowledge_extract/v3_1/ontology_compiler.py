@@ -180,19 +180,8 @@ class ExtractionPlan:
         return self.target_scope.allows(class_id)
 
     def relevant_types(self, text: str) -> frozenset[str]:
-        """Select connected schema partitions using ontology-owned lexical cues."""
-        normalized = canonical_name(text)
-        selected: set[str] = set()
-        for partition in self.schema_partitions:
-            cues: set[str] = set()
-            for class_id in partition.class_ids:
-                spec = self.class_specs[class_id]
-                cues.update((canonical_name(class_id), canonical_name(spec.display_name)))
-                for prop in spec.properties:
-                    cues.update((canonical_name(prop.identifier), canonical_name(prop.display_name)))
-            if any(cue and cue in normalized for cue in cues):
-                selected.update(partition.class_ids)
-        return frozenset(selected or self.allowed_types)
+        """Lexical cues cannot rule out a type; only caller scope is binding."""
+        return self.allowed_types
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypedDict
 
 from .prompt_templates import BASE_SYSTEM_PROMPT, build_system_prompt, render_user
-from .domain_skills import select_domain_policy
+from .skill_planner import compose_domain_policy
+from .prompt_templates import document_payload
 from .output_contracts import build_output_contract
 from .chunk_context import ExtractionChunk
 from .structured_text import is_structured_payload
@@ -276,9 +277,9 @@ def resolve_document_route(plan: ExtractionPlan, chunks: list[ExtractionChunk]) 
     )
 
 
-def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False) -> str:
+def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False, type_ids=None) -> str:
     lines: list[str] = []
-    for type_id in sorted(plan.allowed_types):
+    for type_id in sorted(plan.allowed_types if type_ids is None else type_ids):
         spec = plan.class_specs.get(type_id)
         if spec is None:
             continue
@@ -305,18 +306,6 @@ def _type_catalog_text(plan: ExtractionPlan) -> str:
     return "\n".join(lines) if lines else "（无本体类目录）"
 
 
-def _feature_text(plan: ExtractionPlan) -> str:
-    lines: list[str] = []
-    for type_id in sorted(plan.allowed_types):
-        intrinsic = [spec for spec in plan.feature_specs.get(type_id, ()) if spec.kind == "intrinsic"]
-        if not intrinsic:
-            continue
-        lines.append(f"- `{type_id}`")
-        for spec in intrinsic:
-            lines.append(f"  - `{spec.identifier}` ({spec.datatype})")
-    return "\n".join(lines) if lines else "（无 intrinsic feature）"
-
-
 def _known_entities_payload(
     known_entities: list[dict[str, Any]] | None, *, task: str,
 ) -> list[dict[str, Any]]:
@@ -326,13 +315,28 @@ def _known_entities_payload(
     if task == "repair":
         entries = entries[:25]
         fields = fields[:-1]
-    return [{key: entry[key] for key in fields if key in entry} for entry in entries]
+    result = []
+    for entry in entries:
+        item = {key: entry[key] for key in fields
+                if key in entry and entry[key] not in (None, "", {}, [])}
+        if "occurrences" in item:
+            item["occurrences"] = [
+                {key: value for key, value in {
+                    "properties": occurrence.get("properties"),
+                    "evidence": {"quote": occurrence["evidence"]["quote"]}
+                        if (occurrence.get("evidence") or {}).get("quote") else None,
+                }.items() if value not in (None, "", {}, [])}
+                for occurrence in item["occurrences"]
+            ]
+            item["occurrences"] = [o for o in item["occurrences"] if o]
+            if not item["occurrences"]:
+                item.pop("occurrences")
+        result.append(item)
+    return result
 
 
 def _chunk_payload(chunk: ExtractionChunk, *, task: str) -> dict[str, Any]:
-    if task == "repair":
-        return {"chunk_id": chunk.chunk_id, "text": (chunk.text or "")[:8000]}
-    return chunk.to_dict()
+    return document_payload(chunk)
 
 
 def _looks_like_record_table(chunk: ExtractionChunk) -> bool:
@@ -357,7 +361,6 @@ def build_chat_messages(
     plan: ExtractionPlan,
     route: DocumentRoute,
     chunk: ExtractionChunk,
-    local_context: str = "",
     source_chunks: list[ExtractionChunk] | None = None,
     known_entities: list[dict[str, Any]] | None = None,
     output_schema: dict[str, Any] | None = None,
@@ -379,15 +382,17 @@ def build_chat_messages(
     if task == "repair":
         discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
     elif entity_task:
-        discipline = "只提议实体候选，禁止输出关系。"
+        discipline = "同时提取实体候选和当前片段支持的本体属性，禁止输出关系；按属性说明理解字段，不得因处于候选阶段而省略已知属性。"
     elif task == "property":
-        discipline = "按给定实体的 type + name 补全属性并返回完整 entities；跨切片相同 type + name 统一输出一个实体，不同 type 的同名实体分开；不得新增、遗漏或重命名实体，不得输出关系。"
+        discipline = "按给定实体的 type + name 补全属性并以 JSONL 逐行返回完整实体；跨切片相同 type + name 统一输出一个实体，不同 type 的同名实体分开；不得新增、遗漏或重命名实体，不得输出关系。"
     else:
         raise ValueError(f"Unsupported extraction task: {task}")
 
     record_table = _looks_like_record_table(chunk)
-    ontology_section = _type_catalog_text(plan) if entity_task else _catalog_text(plan, include_comments=record_table)
-    feature_section = "（实体任务不展示属性目录）" if entity_task else _feature_text(plan)
+    type_ids = output_schema["properties"]["entities"]["items"]["properties"]["type"]["enum"]
+    # Every stage now extracts properties. Their meaning must survive source
+    # windowing, even when a window no longer forms a complete JSON table.
+    ontology_section = _catalog_text(plan, include_comments=True, type_ids=type_ids)
     known = [] if entity_task else _known_entities_payload(known_entities, task=task)
     contract = build_output_contract(output_schema, entity_task=entity_task,
                                      task=task)
@@ -395,28 +400,18 @@ def build_chat_messages(
         task={
             "operation": task,
             "discipline": discipline,
-            "input_scope": "provided_segments",
-            "known_entities": known,
-            "repair_issues": repair_issues or [],
         },
         output_contract=contract,
-        domain_policy={"route": route.to_dict()} if assembly_planner is not None else select_domain_policy(
-            kind=route.kind, route=route.to_dict(),
-            task="entity" if entity_task else task,
-        ),
+        domain_policy=compose_domain_policy(route.to_dict(),
+            ("entity", "property", "repair") if task == "repair" else
+            ("entity", "property") if entity_task else ("property",), assembly_planner),
+        stage_context={**({"known_entities": known} if not entity_task else {}),
+                       **({"repair_issues": repair_issues or []} if task == "repair" else {})},
         ontology={
-            "format": "compiled_task_catalog",
-            "ontology_id": plan.ontology_id,
             "catalog": ontology_section,
-            "feature_catalog": feature_section,
         },
-        documents=[{
-            "current_chunk": _chunk_payload(source, task=task),
-            "local_context": "" if entity_task else local_context,
-        } for source in (source_chunks or [chunk])],
+        documents=[_chunk_payload(source, task=task) for source in (source_chunks or [chunk])],
     )
-    if assembly_planner is not None:
-        payload = assembly_planner.assemble(payload, stage="entity" if entity_task else task)
     user = render_user(**payload)
     return [
         {"role": "system", "content": build_system_prompt(

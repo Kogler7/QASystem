@@ -4,6 +4,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_compose_has_no_second_defaults_catalog_and_all_variables_are_declared():
+    import json
+    import re
+    compose = (ROOT / 'docker-compose.yml').read_text(encoding='utf8')
+    catalog = json.loads((ROOT / 'docker/config-declarations.json').read_text(encoding='utf8'))
+    assert not re.search(r'\$\{[A-Z][A-Z0-9_]*:-', compose)
+    assert set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', compose)) <= catalog['items'].keys()
+
+
 def test_root_is_the_only_configuration_source():
     assert (ROOT / ".env.example").is_file()
     assert (ROOT / "Dockerfile").is_file()
@@ -67,8 +76,8 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "vllm-0:" not in compose
     assert "AGENT_MCP_URL=http://agent-mcp:9181/mcp" in template
     assert "environment:" not in compose
-    assert "${QASYSTEM_SOURCE_DIR:-.}:/app:ro" in compose
-    assert "${AGENT_HOST_PORT:-9180}:9180" in compose
+    assert "${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro" in compose
+    assert "${AGENT_HOST_PORT:?Run ops config to generate configuration}:9180" in compose
     assert "MCP_PORT" not in env_keys
     assert "AGENT_MCP_PORT" in env_keys
 

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.12.2",
+  "version": "2026.10.13.1",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -1610,12 +1610,21 @@
           "path": "backend/app/services/extraction_config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
         }
       ],
       "fallbacks": [
         {
           "path": "backend/app/services/extraction_config.py",
           "expression": "'65536'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "expression": "None"
         }
       ]
     },
@@ -6527,6 +6536,76 @@
           "expression": "'300'"
         }
       ]
+    },
+    "KG_EXTRACT_V31_MAX_INPUT_BYTES": {
+      "desc": "完整提示词的保守字节预算，超限再分窗",
+      "default": "48000",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_MAX_INPUT_BYTES"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "expression": "'48000'"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_WINDOW_CHARS": {
+      "desc": "v3.1 单次请求窗口字符上限",
+      "default": "2000",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_WINDOW_CHARS"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "expression": "'2000'"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_TRACE_CALLS": {
+      "desc": "保存完整提示词的调用数上限，其余只存统计",
+      "default": "32",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_TRACE_CALLS"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "expression": "'32'"
+        }
+      ]
+    },
+    "AGENT_BIND": {
+      "desc": "Agent 对外监听地址；0.0.0.0 监听全部 IPv4 网卡。",
+      "default": "0.0.0.0",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "docker-compose.yml",
+          "kind": "external",
+          "token": "AGENT_BIND"
+        }
+      ]
     }
   },
   "reader_contracts": {
@@ -6958,6 +7037,9 @@
       "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
       "_env('KG_EXTRACT_EVIDENCE_ADMISSION', default='warn')"
     ],
+    "algorithm/knowledge_extract/v3_1/candidate_generation.py": [
+      "config_getenv('KG_EXTRACT_V31_TRACE_CALLS', '32')"
+    ],
     "algorithm/knowledge_extract/v3_1/config.py": [
       "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
@@ -6969,6 +7051,11 @@
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "config_getenv(k)"
+    ],
+    "algorithm/knowledge_extract/v3_1/request_budget.py": [
+      "config_getenv('KG_EXTRACT_LLM_MAX_INPUT_TOKENS')",
+      "config_getenv('KG_EXTRACT_V31_MAX_INPUT_BYTES', '48000')",
+      "config_getenv('KG_EXTRACT_V31_WINDOW_CHARS', '2000')"
     ],
     "algorithm/preproc/preproc_src/main_processor.py": [
       "config_getenv('MINERU_CONFIG_PATH')",

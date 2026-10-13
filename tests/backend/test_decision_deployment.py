@@ -42,8 +42,8 @@ def test_clef_deployment_uses_shared_image_and_read_only_external_assets():
     service = compose["services"]["clef"]
     assert service["image"] == compose["services"]["backend"]["image"]
     assert service["profiles"] == ["decisions"]
-    assert "${QASYSTEM_SOURCE_DIR:-.}:/app:ro" in service["volumes"]
-    assert "${HOST_MODELS_DIR:-./deploy/models}:/models:ro" in service["volumes"]
+    assert "${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro" in service["volumes"]
+    assert "${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro" in service["volumes"]
     assert "ports" not in service
     assert "exec python -m clef_service" in service["command"][-1]
     assert "clef_service" in (ROOT / "package-deploy.ps1").read_text(encoding="utf-8")

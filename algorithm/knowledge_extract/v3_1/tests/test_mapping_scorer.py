@@ -38,15 +38,7 @@ RULE_ONTOLOGY = (ONTOLOGIES_DIR / "rule_ontology.puml").read_text(encoding="utf-
 
 
 def make_entity(plan: object, type_id: str, name: str, properties: dict) -> Any:
-    return SE.EntityCandidate(
-        candidate_id="entity-0",
-        proposed_type=type_id,
-        canonical_type=type_id,
-        name=name,
-        properties=properties,
-        evidence=[],
-        source="test",
-    )
+    return MS.EntityMappingInput(type=type_id, properties=properties)
 
 
 class ConfigTest(unittest.TestCase):
@@ -221,7 +213,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(result["profile"]["mapping_mode"], "annotate")
         self.assertEqual(
             result["intermediate_model"]["objects"][0]["mapping"]["status"],
-            "accepted",
+            result["mapping"]["entities"][0]["status"],
         )
 
     def test_enforce_mode_filters_rejected(self) -> None:

@@ -34,8 +34,7 @@ def gold(case_id: str) -> dict:
 class IntegrationTest(unittest.TestCase):
     """新管线集成：extract_split 不再调用策略的 deterministic_extraction /
 
-    coverage_audit（该接线已在重构中移除，确定性补充由 document_entities /
-    structure_entities 等承担）。这里验证公文路由与 span-first 抽取链路。"""
+    coverage_audit（旧接线与确定性实体补充已移除）。这里验证公文路由与原文名称抽取链路。"""
 
     def test_official_document_route_and_span_extraction(self) -> None:
         case_id = "02_official_document"

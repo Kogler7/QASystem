@@ -129,7 +129,7 @@ def test_v31_real_harness_retains_healthy_chunk_when_another_source_cannot_compl
     texts = ["甲组每晚检查机房。", "乙组每早检查泵房。"]
 
     def entities(prompt, chunk):
-        if chunk["chunk_id"] == "chunk-0001":
+        if chunk["text"] == texts[1]:
             raise TimeoutError("second original source timed out")
         return [span_item("Assignment", "甲组每晚检查机房")]
 
@@ -158,7 +158,7 @@ def test_v31_real_harness_returns_entities_without_relations(monkeypatch):
     texts = ["甲组已经设立。", "甲组承担巡检。"]
 
     def entities(prompt, chunk):
-        return [span_item("Team", "甲组")] if chunk["chunk_id"] == "chunk-0000" else [span_item("Work", "巡检")]
+        return [span_item("Team", "甲组")] if chunk["text"] == texts[0] else [span_item("Work", "巡检")]
 
 
     generation = StubLLM(entity_handler=entities)
@@ -174,7 +174,24 @@ def test_v31_real_harness_returns_entities_without_relations(monkeypatch):
     assert all(item["quality"]["status"] == "succeeded" for item in items)
     assert items[0]["graph"]["relationships"] == []
     assert items[1]["graph"]["relationships"] == []
-    assert {task for task, _ in generation.calls} == {"entity", "property"}
+    assert {task for task, _ in generation.calls} == {"entity"}  # neither type declares properties
     nodes = {node["label"]: node for item in items for node in item["graph"]["nodes"]}
     assert nodes["Team"]["chunk_indices"] == [0]
     assert nodes["Work"]["chunk_indices"] == [1]
+
+
+@pytest.mark.parametrize('names', [('ABC', 'abc'), ('ABC', 'ＡＢＣ'), ('张 三', '张三'), ('A  B', 'A B')])
+def test_exact_name_keys_survive_backend_projection_and_batch_merge(names):
+    texts = [f'登记名称：{name}。' for name in names]
+    llm = StubLLM(entity_handler=lambda prompt, chunk: [span_item('Assignment',
+        names[texts.index(chunk['text'])], quote=chunk['text'])])
+    result = v3_1.extract_harness(ontology=ONTOLOGY,
+        chunks=[ExtractionChunk(f'chunk-{i:04}', text) for i, text in enumerate(texts)],
+        llm=llm, use_scheduler=False)
+    items = adapter.project_items(result, texts=texts)
+    assert len(result['graph']['nodes']) == 2
+    assert len({node['uid'] for node in result['graph']['nodes']}) == 2
+    assert [item['graph']['nodes'][0]['properties']['name'] for item in items] == list(names)
+    assert [item['graph']['nodes'][0]['chunk_indices'] for item in items] == [[0], [1]]
+    merged = v3_1.deduplicate_chunk_graphs(items)
+    assert {node['properties']['name'] for node in merged['nodes']} == set(names)

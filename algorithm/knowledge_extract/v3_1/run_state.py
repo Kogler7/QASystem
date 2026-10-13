@@ -127,6 +127,7 @@ class RunAttempt:
 
 
 _FAILURE_PRIORITY = {
+    "input_budget": ("LLM_INPUT_BUDGET_EXCEEDED", "请求超过输入预算"),
     "incomplete": ("LLM_RESPONSE_INCOMPLETE", "LLM 响应不完整"),
     "empty": ("LLM_EMPTY_RESPONSE", "LLM 返回为空"),
     "timeout": ("LLM_TIMEOUT", "LLM 请求超时"),
@@ -236,6 +237,7 @@ class ExtractionRun:
     def primary_failure(self) -> tuple[str, str] | None:
         error_types = {attempt.error_type for attempt in self.attempts if attempt.terminal}
         for failure_type in (
+            "input_budget",
             "incomplete",
             "empty",
             "timeout",

@@ -19,15 +19,16 @@ class Work {
 @enduml'''
 
 
-def complete(handler, *, batch_size=1):
+def complete(handler, *, batch_size=24):
     chunks = [ExtractionChunk('a', '巡检：人员负责检查。'), ExtractionChunk('b', '巡检：人员负责记录。')]
     plan = compile_plan(ONTOLOGY)
-    llm = StubLLM(property_handler=handler)
+    llm = StubLLM(property_handler=handler, verification_handler=lambda item, chunk:
+                  "yes" if item["value"] in ("检查并记录", "检查", "记录", "巡检") else "no")
     attempts = []
     rows, stats = enrich_entity_properties([
-        ('a', [{'type': 'Person', 'name': '巡检', 'properties': {'duty': '检查'}},
+        ('a', [{'type': 'Person', 'name': '巡检', 'properties': {'duty': '检查'}, 'evidence': {'quote': chunks[0].text}},
                {'type': 'Work', 'name': '巡检', 'properties': {}}]),
-        ('b', [{'type': 'Person', 'name': '巡检', 'properties': {'duty': '记录'}}]),
+        ('b', [{'type': 'Person', 'name': '巡检', 'properties': {'duty': '记录'}, 'evidence': {'quote': chunks[1].text}}]),
     ], ChunkContextManager(chunks), plan, llm, route=resolve_document_route(plan, chunks),
        attempts=attempts, warnings=[], batch_size=batch_size, max_attempts=1)
     return rows, attempts, llm
@@ -36,24 +37,24 @@ def complete(handler, *, batch_size=1):
 def test_key_group_never_split_and_model_owns_consolidated_properties():
     def handler(prompt, chunk):
         payload = json.loads(prompt)
-        known = payload['task']['known_entities']
+        known = payload['stage_context']['known_entities']
         assert len(known) == 1
         entity = known[0]
         assert 'id' not in entity
         if entity['type'] == 'Person':
-            assert [d['current_chunk']['chunk_id'] for d in payload['documents']] == ['a', 'b']
+            assert [d['text'] for d in payload['documents']] == ['巡检：人员负责检查。', '巡检：人员负责记录。']
             assert [o['properties'] for o in entity['occurrences']] == [{'duty': '检查'}, {'duty': '记录'}]
             properties = {'duty': '检查并记录'}
         else:
-            properties = {'description': '巡检工作'}
+            properties = {'description': '巡检'}
         return {'entities': [{'type': entity['type'], 'name': entity['name'],
-                              'properties': properties, 'evidence': {'quote': '巡检'}}]}
+                              'properties': properties, 'evidence': {'quote': '巡检：人员负责检查。', 'property_quotes': {'duty': ['巡检：人员负责检查。', '巡检：人员负责记录。']} if entity['type'] == 'Person' else {}}}]}
     rows, attempts, llm = complete(handler)
     assert not attempts
-    assert len(llm.calls) == 2
+    assert len([t for t, _ in llm.calls if t == "property"]) == 2
     assert [(r['type'], r['name']) for r in rows] == [('Person', '巡检'), ('Work', '巡检')]
     assert rows[0]['properties'] == {'duty': '检查并记录'}
-    assert rows[1]['properties'] == {'description': '巡检工作'}
+    assert rows[1]['properties'] == {'description': '巡检'}
     assert all('id' not in r for r in rows)
 
 
@@ -61,7 +62,7 @@ def test_key_group_never_split_and_model_owns_consolidated_properties():
 def test_rejects_invalid_model_consolidation(bad):
     def handler(prompt, chunk):
         entities = []
-        for e in json.loads(prompt)['task']['known_entities']:
+        for e in json.loads(prompt)['stage_context']['known_entities']:
             entities.append({'type': e['type'], 'name': e['name'], 'properties': {}, 'evidence': {'quote': '巡检'}})
         if bad == 'duplicate':
             entities.append(dict(entities[0]))
@@ -71,7 +72,9 @@ def test_rejects_invalid_model_consolidation(bad):
             entities[0]['properties'] = {'unknown': '其他类型属性'}
         return {'entities': entities}
     rows, attempts, _ = complete(handler, batch_size=24)
-    assert rows == []
+    assert len(rows) == 2
+    assert rows[0]["properties"] == {}  # conflicting values cannot be chosen by Python
+    assert rows[1]["properties"] == {}
     assert any(a.get('terminal') for a in attempts)
 
 
@@ -110,7 +113,7 @@ def test_contract_rejects_old_updates_and_wrong_stage():
         build_output_contract(plan.output_schemas['entity_candidates'], entity_task=False, task='property')
     schema = property_entity_schema([{'type': 'Person', 'name': '甲'}], plan)
     contract = build_output_contract(schema, entity_task=False, task='property')
-    assert '不能返回空集合' in contract['constraints']
+    assert '不能返回空结果' in contract['constraints']
     assert '无结果时使用' not in contract['constraints']
 
 
@@ -141,5 +144,5 @@ def test_unlocated_quote_does_not_manufacture_offsets():
     rows = _normalize_span_entities({'entities': [{'type': 'Person', 'mention': '不存在',
         'evidence': {'quote': '没有此原文'}}]}, chunk=chunk, schema=OntologySchema.parse(ONTOLOGY),
         target_types=None, warnings=[])
-    evidence = bind_entity_evidence(rows, ChunkContextManager([chunk]))[0]['evidence']
-    assert evidence == {'quote': '没有此原文'}
+    assert rows == []  # no source means no accepted fact, not an unbound node
+    assert bind_entity_evidence(rows, ChunkContextManager([chunk])) == []

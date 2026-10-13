@@ -57,6 +57,7 @@ class VerificationReport:
     def to_dict(self) -> dict[str, Any]:
         return {
             "valid": self.valid,
+            "coverage_complete": not self.coverage_gaps,
             "hard_issue_count": len(self.hard_issues),
             "repairable_issue_count": len(self.repairable_issues),
             "issues": [issue.to_dict() for issue in self.issues],
@@ -115,6 +116,17 @@ class ExtractionVerifier:
                     )
                 )
             entity_keys.add(key)
+            spans = [entity.get('evidence') or {}, *(entity.get('evidences') or [])]
+            if any(not _valid_source_span(span, manager) for span in spans):
+                issues.append(VerificationIssue(code='EVIDENCE_INVALID',
+                    message='实体证据的来源、偏移或引文不一致', path=f'entities[{index}]'))
+            for prop, value in (entity.get("properties") or {}).items():
+                receipt = (entity.get("property_evidence") or {}).get(prop) or {}
+                spans = receipt.get("sources") or []
+                if (receipt.get("value") != value or receipt.get("support") not in {"literal", "llm"}
+                        or not spans or any(not _valid_source_span(span, manager) for span in spans)):
+                    issues.append(VerificationIssue(code="PROPERTY_EVIDENCE_INVALID",
+                        message="属性缺少与当前值一致且可定位的支持证据", path=f"entities[{index}].properties.{prop}"))
 
         for verdict in verify_evidence(raw, manager):
             if verdict.status == "fail":
@@ -123,7 +135,7 @@ class ExtractionVerifier:
                         code="EVIDENCE_INVALID",
                         message=verdict.message,
                         path=verdict.ref,
-                        severity="warning",
+                        severity="error",
                     )
                 )
 
@@ -149,6 +161,18 @@ class ExtractionVerifier:
             )
 
         return VerificationReport(tuple(_deduplicate_issues(issues)), coverage_gaps)
+
+
+def _valid_source_span(span: dict[str, Any], manager: Any) -> bool:
+    """Verify exact coordinates, not just another occurrence of the same text."""
+    ids = span.get('source_block_ids') or []
+    start, end = span.get('start_char'), span.get('end_char')
+    if (len(ids) != 1 or not manager.has_chunk(ids[0])
+            or type(start) is not int or type(end) is not int):
+        return False
+    text = manager.get_chunk(ids[0]).text
+    return (0 <= start < end <= len(text) and text[start:end] == span.get('quote')
+            and span.get('span_id') == f'{ids[0]}:{start}:{end}')
 
 
 def _coverage_issue(gap: CoverageGap, plan: Any) -> VerificationIssue | None:
