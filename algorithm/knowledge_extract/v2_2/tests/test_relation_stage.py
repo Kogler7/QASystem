@@ -37,7 +37,7 @@ Department --> Work : responsibleFor
 """
 
 
-def _entity(chunk_id: str, entity_id: str, type_name: str, name: str):
+def _entity(chunk_id: str, entity_id: str, type_name: str, name: str, *, source: str = ""):
     return types.SimpleNamespace(
         candidate_id=entity_id,
         canonical_type=type_name,
@@ -45,7 +45,7 @@ def _entity(chunk_id: str, entity_id: str, type_name: str, name: str):
         name=name,
         mentions=[],
         properties={},
-        source="",
+        source=source,
         evidence=[
             EV.Evidence(
                 span_id=f"{chunk_id}:0:1",
@@ -331,6 +331,102 @@ class Person { name: String }
         self.assertEqual(relations, [])
         self.assertEqual(llm.calls, [])
         self.assertIn("RELATION_NO_SCHEMA", {warning["code"] for warning in warnings})
+
+    def test_related_to_is_not_recalled(self) -> None:
+        ontology = """@startuml
+class Info { name: String }
+Info --> Info : RELATED_TO
+@enduml
+"""
+        text = "反馈表与开源智能体说明写在同一段。"
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        entities = [
+            _entity("c0", "a", "Info", "反馈表"),
+            _entity("c0", "b", "Info", "开源智能体"),
+        ]
+        relations, warnings, llm = _run(ontology, [chunk], entities, _support_all(text))
+        self.assertEqual(relations, [])
+        self.assertEqual(llm.calls, [])
+        self.assertIn("RELATION_NO_SCHEMA", {warning["code"] for warning in warnings})
+
+    def test_issued_by_keeps_office_and_skips_recipients(self) -> None:
+        ontology = """@startuml
+class OfficialDocument { name: String }
+class OperationalAgent { name: String }
+OfficialDocument --> OperationalAgent : ISSUED_BY
+OfficialDocument --> OperationalAgent : APPLIES_TO
+@enduml
+"""
+        text = (
+            "中国中车集团有限公司办公室印发通知。"
+            "主送中国中车集团有限公司各一级子公司。"
+            "联系人：信息公司张振威，电话18600540011。"
+        )
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        doc = _entity(
+            "c0",
+            "doc",
+            "OfficialDocument",
+            "关于开展排查工作的通知",
+            source="document_anchor",
+        )
+        entities = [
+            doc,
+            _entity("c0", "office", "OperationalAgent", "中国中车集团有限公司办公室"),
+            _entity("c0", "sub", "OperationalAgent", "中国中车集团有限公司各一级子公司"),
+            _entity("c0", "contact", "OperationalAgent", "信息公司张振威"),
+        ]
+
+        def handler(prompt, pairs, _chunk):
+            decisions = []
+            for pair in pairs:
+                line = next(item for item in prompt.splitlines() if f"`{pair['pair_id']}`" in item)
+                if "办公室" in line:
+                    quote = "中国中车集团有限公司办公室印发通知。"
+                elif "各一级子公司" in line:
+                    quote = "主送中国中车集团有限公司各一级子公司。"
+                else:
+                    quote = "联系人：信息公司张振威，电话18600540011。"
+                decisions.append({
+                    "pair_id": pair["pair_id"],
+                    "label": pair["relation_id"],
+                    "evidence": {"quote": quote},
+                })
+            return decisions
+
+        relations, _warnings, llm = _run(ontology, [chunk], entities, handler)
+        facts = {(item["from_id"], item["rel_type"], item["to_id"]) for item in relations}
+        self.assertIn(("doc", "ISSUED_BY", "office"), facts)
+        self.assertIn(("doc", "APPLIES_TO", "sub"), facts)
+        self.assertNotIn(("doc", "ISSUED_BY", "sub"), facts)
+        self.assertNotIn(("doc", "ISSUED_BY", "contact"), facts)
+        self.assertNotIn(("doc", "APPLIES_TO", "contact"), facts)
+        # 联系人句若仍被召回，分类也不应落地；召回阶段通常已跳过。
+        self.assertFalse(any(item["to_id"] == "contact" for item in relations))
+        self.assertGreaterEqual(len([call for call in llm.calls if call[0] == "relation"]), 1)
+
+    def test_quote_must_cover_both_endpoint_names(self) -> None:
+        text = "张三就职于示例单位。另写示例单位要整改。"
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        entities = [
+            _entity("c0", "e1", "Person", "张三"),
+            _entity("c0", "e2", "Organization", "示例单位"),
+        ]
+        ontology = """@startuml
+class Person { name: String }
+class Organization { name: String }
+Person --> Organization : worksAt
+@enduml
+"""
+        relations, warnings, _llm = _run(
+            ontology,
+            [chunk],
+            entities,
+            _support_all("另写示例单位要整改。"),
+        )
+        self.assertEqual(relations, [])
+        codes = {warning["code"] for warning in warnings}
+        self.assertTrue(codes & {"RELATION_EVIDENCE_ENDPOINT_MISS", "RELATION_EVIDENCE_INVALID"})
 
 
 if __name__ == "__main__":

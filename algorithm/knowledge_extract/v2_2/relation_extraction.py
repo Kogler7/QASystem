@@ -121,6 +121,30 @@ def _bind_quote(manager: ChunkContextManager, candidate: RelationCandidate, quot
     return None
 
 
+def _quote_covers_endpoints(candidate: RelationCandidate, quote: str) -> bool:
+    """端点字面门禁：同片局部要两端都在引文里；锚点/跨片允许引文只点明一侧。"""
+    quote = quote or ""
+    source_name = (candidate.source_name or "").strip()
+    target_name = (candidate.target_name or "").strip()
+    source_hit = bool(source_name) and source_name in quote
+    target_hit = bool(target_name) and target_name in quote
+    if candidate.anchor or candidate.scope_kind == "anchor":
+        return source_hit or target_hit
+    if candidate.scope_kind in {"adjacent", "cross_reference"}:
+        # 同片合并成一条连续邻接片段时，视同局部，仍要求引文覆盖两端。
+        cross_chunk = len({item.chunk_id for item in candidate.fragments}) > 1
+        if not cross_chunk and len(candidate.fragments) == 1:
+            return source_hit and target_hit
+        # 跨片邻接/条款引用常靠「该部门」指代，另一端只在配对片段中出现。
+        fragment_text = "\n".join(item.text for item in candidate.fragments)
+        if source_name and source_name not in fragment_text:
+            return False
+        if target_name and target_name not in fragment_text:
+            return False
+        return source_hit or target_hit
+    return source_hit and target_hit
+
+
 def _apply_decisions(
     parsed: dict[str, Any] | None,
     candidates: list[RelationCandidate],
@@ -156,14 +180,26 @@ def _apply_decisions(
         for item in decision.get("evidence") or []:
             if not isinstance(item, dict):
                 continue
-            bound = _bind_quote(manager, candidate, str(item.get("quote") or ""))
-            if bound is not None:
-                break
+            quote = str(item.get("quote") or "")
+            bound = _bind_quote(manager, candidate, quote)
+            if bound is None:
+                continue
+            if not _quote_covers_endpoints(candidate, bound["quote"]):
+                _append_warning(
+                    warnings,
+                    "RELATION_EVIDENCE_ENDPOINT_MISS",
+                    "supported 的引文未覆盖关系两端名称",
+                    path,
+                    candidate_id,
+                )
+                bound = None
+                continue
+            break
         if bound is None:
             _append_warning(
                 warnings,
                 "RELATION_EVIDENCE_INVALID",
-                "supported 的引文不在本次证据片段中",
+                "supported 的引文不在本次证据片段中，或未覆盖端点名称",
                 path,
                 candidate_id,
             )
@@ -408,7 +444,7 @@ def run_relation_stage(
 
     for candidate, quote in grounded:
         bound = _bind_quote(manager, candidate, quote)
-        if bound is None:
+        if bound is None or not _quote_covers_endpoints(candidate, bound["quote"]):
             continue
         _emit({
             "from_id": candidate.source_id,

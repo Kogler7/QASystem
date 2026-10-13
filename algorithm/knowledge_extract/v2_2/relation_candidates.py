@@ -15,6 +15,17 @@ from .relation_context import RelationIndex, TextUnit, cited_units, clause_refs
 from .relation_resolver import relation_token, withheld_relation_tokens
 
 
+# 弱共现边：评测里几乎全是多抽，召回阶段直接跳过，不进模型。
+_WEAK_RELATION_TOKENS = frozenset({"relatedto"})
+
+# 签发 / 适用类边：锚点或局部共现时按原文角色线索过滤，避免收文对象、联系人挂成签发方。
+_ISSUED_BY_TARGET_CUES = ("办公室", "办公厅", "秘书处")
+_ISSUED_BY_TEXT_CUES = ("签发", "印发", "来文单位", "发文", "发布")
+_APPLIES_TO_TARGET_CUES = ("各", "子公司", "所属", "单位", "部门", "企业")
+_APPLIES_TO_TEXT_CUES = ("主送", "抄送", "报送", "适用于", "贯彻执行", "落实")
+_CONTACT_NOISE = ("联系人", "联系电话", "电话：", "电话:")
+
+
 @dataclass(frozen=True)
 class EvidenceFragment:
     fragment_id: str
@@ -97,8 +108,8 @@ def _assignable(keys: frozenset[str], expected: str) -> bool:
 
 
 def active_signatures(plan: ExtractionPlan, route_kind: str) -> list[RelationSpec]:
-    """本体允许的签名都进入关系阶段。结构组装已经负责的边继续跳过，避免重复建边。"""
-    skip = withheld_relation_tokens(route_kind)
+    """本体允许的签名进入关系阶段。结构组装边与弱共现边跳过，避免重复或低质建边。"""
+    skip = withheld_relation_tokens(route_kind) | _WEAK_RELATION_TOKENS
     specs: list[RelationSpec] = []
     seen: set[tuple[str, str, str]] = set()
     for group in plan.relation_specs.values():
@@ -111,6 +122,54 @@ def active_signatures(plan: ExtractionPlan, route_kind: str) -> list[RelationSpe
             seen.add(key)
             specs.append(spec)
     return specs
+
+
+def _evidence_text(left: TextUnit, right: TextUnit | None) -> str:
+    if right is None or (left.chunk_id == right.chunk_id and left.start == right.start and left.end == right.end):
+        return left.text
+    if left.chunk_id == right.chunk_id:
+        return f"{left.text}\n{right.text}"
+    return f"{left.text}\n{right.text}"
+
+
+def _looks_like_contact(name: str, text: str) -> bool:
+    compact = " ".join((name or "").split())
+    if any(token in compact for token in ("联系人", "联系电话")):
+        return True
+    if not any(token in text for token in _CONTACT_NOISE):
+        return False
+    # 原文出现联系人栏时，拒绝不像组织全称的短署名（如「信息公司张振威」）。
+    if any(cue in compact for cue in ("办公室", "办公厅", "各", "子公司", "集团有限公司", "股份有限公司")):
+        return False
+    return 2 <= len(compact) <= 16
+
+
+def _role_gate(spec: RelationSpec, *, text: str, source_name: str, target_name: str) -> bool:
+    """对易混角色边做原文线索门禁。其他签名一律放行，避免误伤召回。"""
+    token = relation_token(spec.relation_id)
+    if token == "issuedby":
+        if _looks_like_contact(target_name, text):
+            return False
+        if any(cue in target_name for cue in _ISSUED_BY_TARGET_CUES):
+            return True
+        if any(cue in text for cue in _ISSUED_BY_TEXT_CUES):
+            # 有签发线索时仍拒绝明显收文对象。
+            if "各" in target_name and ("公司" in target_name or "企业" in target_name or "单位" in target_name):
+                return False
+            return True
+        return False
+    if token == "appliesto":
+        if _looks_like_contact(target_name, text):
+            return False
+        # 办公室等签发主体不当适用对象。
+        if any(cue in target_name for cue in _ISSUED_BY_TARGET_CUES):
+            return False
+        if any(cue in target_name for cue in _APPLIES_TO_TARGET_CUES):
+            return True
+        if any(cue in text for cue in _APPLIES_TO_TEXT_CUES):
+            return True
+        return False
+    return True
 
 
 def _fragments_for(index: RelationIndex, left: TextUnit, right: TextUnit | None = None) -> tuple[EvidenceFragment, ...]:
@@ -152,6 +211,9 @@ def _add(
     if source is None or target is None:
         return
     if not _assignable(keys[source_id], spec.source) or not _assignable(keys[target_id], spec.target):
+        return
+    text = _evidence_text(left, right)
+    if not _role_gate(spec, text=text, source_name=source.name, target_name=target.name):
         return
     fragments = _fragments_for(index, left, right)
     relation_key = canonical_name(spec.relation_id)
@@ -229,6 +291,7 @@ def recall_candidates(
         if left.scope != right.scope:
             continue
         same_chunk = left.chunk_id == right.chunk_id
+        # 跨片邻接只保留相邻切片，避免远距离共现；同片相邻句/行保持，以稳住召回。
         if not same_chunk and (left.chunk_id, right.chunk_id) not in index.neighbor_chunks:
             continue
         left_ids = set(index.unit_entities.get(left.unit_id, []))

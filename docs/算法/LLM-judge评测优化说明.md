@@ -1,82 +1,52 @@
-# LLM-judge 评测优化说明
+# LLM-judge 评测逻辑与配置
 
-面向知识抽取评测（`eval/`）的匹配与判分：**全权采用方案 B**（批次 `eval-scripts-20261008-164454`）：双侧窗口扫全图 + NFKC 自动候选 + 类型硬过滤 + 最大基数一对一匹配。方案 A（embedding 短名单 / 封闭判别）已弃用，不再作为默认或对照路径。
+默认 `--match-mode llm`，使用 API judge。抽取模型与 judge 独立选择；每次评测的 judge 参数来自该轮命令行，不再读持久化评测 YAML 或应用中的 judge 默认参数。
 
-## 问题回顾
+## 实际评分过程
 
-旧 judge 让模型在大批量条目上「发明」匹配索引，易出现：
+1. 对预测和 golden 做类型、名称及属性检查，生成满足约束的确定性自动候选边。
+2. 剩余候选按 golden × predicted 双侧窗口扫描。默认窗口为 40 × 20；每次模型返回窗口内匹配索引，不直接返回全局 F1。
+3. 检查响应字段、索引范围、类型约束及问题覆盖，合并有效候选边。
+4. 对全局候选边做一对一最大匹配，计算 TP、FP、FN，再分别计算实体和关系的 P/R/F1。
 
-- 索引幻觉（越界、重复、自造 pair）
-- 单侧窗口把全部 golden 塞进 prompt，standard 类 case 易空数组静默漏判
-- 互指（mutual nearest）在多候选下会少算 TP；应使用最大基数一对一匹配
-- 容器内抽取占用 `KG_EXTRACT_LLM_*` 时，judge 与抽取抢同一上游
+`llm` 模式也包含受约束的自动候选优化，已能确定匹配的窗口可能不调用模型；不能仅按 case 或实体数量估算调用次数。`identity` 是另一种明确指定的确定性评测模式，不能当作正式 API judge 的等价对照。
 
-## B 方案行为
+关系评分需要端点上下文。失败、截断、非法索引或缺失响应不能当成成功的空匹配；API 与本地模型对比必须走同一套候选、提示词、窗口和全局匹配逻辑。
 
-| 能力 | 行为 |
-| --- | --- |
-| NFKC 自动候选 | 类型硬一致 + 属性无冲突才免费用边；缺失属性不算冲突 |
-| 类型硬过滤 | 本体 type / rel_type 不可语义同义推断；LLM 回边后再机检剔除 |
-| 双侧窗口 | golden × predicted 窗口扫全图；本地匹配饱和可跳过 judge |
-| 最大匹配 | Kuhn/BFS 增广；自动边与 LLM 边合并后统一分配 |
-| 关系端点上下文 | judge 可见 endpoint context；对齐关系为诊断指标 |
-| 门禁 / provenance | `identity_fallback` 使质量门失败；manifest 记录 judge 配置 |
-| Judge 配置隔离 | `QASYSTEM_JUDGE_*` > `params.eval` > `KG_EXTRACT_LLM_*` |
-| 本地 vLLM 兼容 | 自动补 `/v1`；关 thinking（`chat_template_kwargs`）；`max_tokens` 默认 2048、上限 4096 |
+## 本轮命令行
 
-流程：
-
-1. 本地自动候选 → 最大匹配；饱和则跳过 LLM  
-2. 未饱和：双侧窗口扫图，模型只回报窗口内 pair 索引  
-3. 类型硬过滤 → 与自动边合并 → 最大匹配  
-
-## 代码位置
-
-| 模块 | 职责 |
-| --- | --- |
-| `eval/run.py` | JudgeClient、窗口扫图、最大匹配、门禁与评分入口 |
-| `eval/judge_client.py` | 裁判 HTTP/SystemOne 适配、严格 JSON 校验与安全诊断 |
-| `external_services/llm/` | 与抽取共用的聊天请求、JSONL 工具和进程内配额调度；裁判保留 JSON 协议 |
-| `eval/quality.py` / `provenance.py` / `report.py` | 质量门、清单、报告 |
-| `eval/rejudge_run.py` | 复用 `backend_extract.json` 只重跑 judge（含 `judge_view.md`） |
-| `eval/params.yaml` | 窗口大小、超时、并发、`judge_max_tokens` 等 |
-
-## 配置要点
-
-```yaml
-eval:
-  match_mode: llm
-  judge_max_tokens: 2048
-  judge_batch_size: 20
-  judge_golden_batch_size: 40
-  judge_max_concurrency: 4
-  judge_disable_thinking: true
-```
-
-环境变量：
-
-- `QASYSTEM_JUDGE_BASE_URL` / `QASYSTEM_JUDGE_MODEL` / `QASYSTEM_JUDGE_API_KEY`
-- `QASYSTEM_JUDGE_MAX_TOKENS`（可选，覆盖 params）
-
-## 使用
-
-```bash
-# 全量评测（线上链路）
+```sh
 python3 eval/run.py --match-mode llm --fail-on-empty --min-f1 0.5
 
-# 只重跑 judge（不抽取）；每类取 2 个 case
-python3 -m eval.rejudge_run \
-  --workspace test_data/eval-v2 \
-  --from-run tmp/eval/runs/eval-v2-extracts-20261003 \
-  --match-mode llm \
-  --cases-per-type 2 \
-  --out-run rejudge-eval-v2-B-window
+python3 eval/run.py --match-mode llm   --judge-base-url http://127.0.0.1:9998/v1   --judge-model Qwen/Qwen3.5-4B   --judge-adapter chat --judge-max-tokens 8192
 ```
 
-单测：`python3 -m pytest tests/eval -q`。
+命令从宿主机运行时使用模型宿主端口；容器内用相应 Compose 服务名和内部端口。服务模型名、可用地址、密钥与连接位置以实际部署为准；上述地址仅演示配置方法。
 
-调用层与协议边界见 [LLM 公共调用层](./LLM公共调用层.md)。裁判没有切换成抽取侧的 JSONL；已有结果重评分仍可以独立于 Backend 运行。
+judge 地址、模型、adapter、输出上限、超时和并发只用于本轮。密钥由 `--judge-key-env` 指定变量名，默认可使用现有 `QASYSTEM_JUDGE_API_KEY`；官方默认 DeepSeek 可使用 `DEEPSEEK_API_KEY`。不要把密钥写在命令、报告、数据集或请求产物中。
 
-## 共享部署注意
+旧 `QASYSTEM_JUDGE_BASE_URL/MODEL/ADAPTER/MAX_TOKENS` 已删除，不再覆盖本轮参数。完整参数以 `python3 eval/run.py --help` 为准，常用步骤见 [eval README](../../eval/README.md)。
 
-Judge 与抽取应使用独立上游（本地 Qwen / 独立 API），避免与 `KG_EXTRACT_LLM_*` 抢配额。详见 [评测四档效果对比](./评测四档效果对比.md)。
+## 模型协议与可靠性
+
+抽取使用 JSONL；judge 仍使用单个 JSON 对象，实体任务返回 `entity_matches`，关系任务返回 `relation_matches`。共享底层调用代码不意味着两者输出协议相同。
+
+chat 的 `auto` 模式按服务能力选择格式；官方 DeepSeek 优先 `json_object`，其他兼容服务优先 `json_schema`。只有明确的格式不支持错误才切换，不因超时、鉴权失败或非法成功响应而降级。SystemOne 适配器供 Clef/NanoJev 使用，其问题覆盖和分窗要求单独校验。
+
+公共调用层只对明确不支持 thinking 参数的错误做一次兼容重试。官方 DeepSeek、SiliconFlow 和本地服务的参数选择不同，不能仅按模型名称猜测供应商。
+
+本地小模型不能只看速度或单对题准确率。真实多候选窗口还需检查索引合法性、漏匹配、顺序敏感、同输入漂移和失败率。当前四模型实验见 [LLM 多候选 judge 对比](LLM多候选Judge对比20261012.md)；其代理复核标签并非独立人工真值，不可用实验窗口的数字替代正式全量抽取 F1。
+
+## 代码与产物
+
+| 位置 | 作用 |
+| --- | --- |
+| `eval/run.py` | 提示词、候选窗口、类型约束、最大匹配、指标与门禁 |
+| `eval/judge_client.py` | HTTP/SystemOne、严格响应校验、脱敏诊断 |
+| `external_services/llm/` | 共享请求构造、JSONL 工具及进程内配额机制 |
+| `eval/rejudge_run.py` | 对已有预测重新 judge，避免再次抽取 |
+| `eval/tools/judge_window_compare.py` | 同输入重复/反序的探索实验 |
+| `test_data/judge_windows/v1/` | 冻结多候选实验输入与复核标签 |
+| `tmp/eval/` | 评测输出、参数快照和实验报告；不作为下次默认配置 |
+
+裁判使用本轮窗口并发，不自动接入 Backend 任务队列，也不与抽取进程共享跨进程账号限流。详情见 [LLM 公共调用层](LLM公共调用层.md)。部署配置见 [配置体系说明](../部署/配置体系说明.md)。

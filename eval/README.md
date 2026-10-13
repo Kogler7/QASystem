@@ -535,3 +535,13 @@ python3 -m eval.tools.chunk_variants --source <冻结inputs目录> --output tmp/
 
 直接抽取和 `--from-run` 复用路径保留切片 `metadata`，将 `range` 映射为公共抽取
 接口的 `ranges`；不再只发送文本，JSONL 工作表标题、数据行号和字符偏移可到达抽取层。
+
+## 配置架构与 2026-10-13 更新
+
+每次评测使用本轮命令行参数；不读取评测 YAML/profile，也不读取应用配置里的 `QASYSTEM_JUDGE_BASE_URL/MODEL/ADAPTER/MAX_TOKENS`。保留的密钥环境变量只提供凭据。judge 地址、模型、适配器和预算通过 `--judge-*` 选择，评测 UI 是临时命令构造入口，退出不会保存默认计划。
+
+抽取通过既有 Backend 执行，服务端默认参数来自已审核的应用配置；请求级 `--extract-*` 覆盖只影响本轮请求。抽取与 judge 可以分别选模型。共享调用层负责 HTTP/SDK 参数构造及限定的兼容重试，judge 窗口策略与全局匹配仍在本评测脚本。详情见 [LLM 公共调用层](../docs/算法/LLM公共调用层.md)。
+
+已保存结果可以重新做 judge 比较，不重新解析/抽取。探索实验入口为 `python3 -m eval.tools.judge_window_compare --help`；测试数据在 `test_data/judge_windows/v1/`，输出必须在 `tmp/`。这类窗口实验用于分析稳定性，不是端到端抽取质量的正式全量门禁。标签口径、失败与速度条件见 [四模型 judge 报告](../docs/算法/LLM多候选Judge对比20261012.md)。
+
+配置及部署更新使用 `ops`，评测不修改运行环境，也不能代替用户批准配置版本。见 [配置体系说明](../docs/部署/配置体系说明.md)。
