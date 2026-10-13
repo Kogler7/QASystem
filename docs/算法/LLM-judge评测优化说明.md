@@ -35,6 +35,8 @@
 | 模块 | 职责 |
 | --- | --- |
 | `eval/run.py` | JudgeClient、窗口扫图、最大匹配、门禁与评分入口 |
+| `eval/judge_client.py` | 裁判 HTTP/SystemOne 适配、严格 JSON 校验与安全诊断 |
+| `external_services/llm/` | 与抽取共用的聊天请求、JSONL 工具和进程内配额调度；裁判保留 JSON 协议 |
 | `eval/quality.py` / `provenance.py` / `report.py` | 质量门、清单、报告 |
 | `eval/rejudge_run.py` | 复用 `backend_extract.json` 只重跑 judge（含 `judge_view.md`） |
 | `eval/params.yaml` | 窗口大小、超时、并发、`judge_max_tokens` 等 |
@@ -72,6 +74,8 @@ python3 -m eval.rejudge_run \
 ```
 
 单测：`python3 -m pytest tests/eval -q`。
+
+调用层与协议边界见 [LLM 公共调用层](./LLM公共调用层.md)。裁判没有切换成抽取侧的 JSONL；已有结果重评分仍可以独立于 Backend 运行。
 
 ## 共享部署注意
 
