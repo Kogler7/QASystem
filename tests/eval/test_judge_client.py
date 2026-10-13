@@ -301,6 +301,90 @@ def test_invalid_judge_configuration_is_rejected(options):
         _client(**options)
 
 
+@pytest.mark.parametrize("base_url", [
+    "http://127.0.0.1:9999/v1",
+    "http://host.docker.internal:9999/v1",
+    "http://127.0.0.1:9999/v1/chat/completions",
+    "http://18.22.51.6:62202/proxy/sync/v1",
+])
+def test_local_and_proxy_models_preserve_json_judge_protocol(monkeypatch, base_url):
+    requests = _stub_http(monkeypatch, [_reply('{"entity_matches": [{"golden_index": 0, "predicted_index": 0}]}')])
+    pairs, info = _judge(_client(base_url=base_url, model="deepseekv4-flash"))
+    assert pairs == [(0, 0)]
+    expected_url = base_url if base_url.endswith("/chat/completions") else base_url + "/chat/completions"
+    assert requests[0]["url"] == expected_url
+    assert requests[0]["payload"]["response_format"]["type"] == "json_schema"
+    assert "thinking" not in requests[0]["payload"]
+    assert "enable_thinking" not in requests[0]["payload"]
+    assert info["response_mode"] == "json_schema"
+
+
+def test_thinking_rejection_reuses_shared_compatibility_without_changing_format(monkeypatch):
+    requests = _stub_http(monkeypatch, [
+        (400, {"error": {"message": "thinking is unsupported"}}), _reply(),
+    ])
+    _, info = _judge(_client())
+    assert len(requests) == 2
+    assert requests[0]["payload"]["response_format"] == requests[1]["payload"]["response_format"]
+    assert "thinking" not in requests[1]["payload"]
+    assert info["attempts"][0]["thinking_fallback"] is True
+
+
+def test_local_model_can_fall_back_to_plain_json_without_switching_to_jsonl(monkeypatch):
+    requests = _stub_http(monkeypatch, [
+        (400, {"error": {"message": "json_schema is unsupported"}}),
+        (422, {"error": {"message": "json_object is not supported"}}),
+        _reply('{"entity_matches": [{"golden_index": 0, "predicted_index": 0}]}'),
+    ])
+    pairs, info = _judge(_client(base_url="http://127.0.0.1:9999/v1"))
+    assert pairs == [(0, 0)]
+    assert [r["payload"].get("response_format", {}).get("type") for r in requests] == [
+        "json_schema", "json_object", None,
+    ]
+    assert all(r["payload"]["messages"] == requests[0]["payload"]["messages"] for r in requests)
+    assert info["response_mode"] == "plain"
+
+
+def test_wrong_fields_from_proxy_are_not_reinterpreted_as_jsonl_or_retried(monkeypatch):
+    requests = _stub_http(monkeypatch, [_reply('{"golden_index": 0, "predicted_index": 0}')])
+    with pytest.raises(run.JudgeBatchError, match="必须且只能包含字段 entity_matches"):
+        _judge(_client(base_url="http://127.0.0.1:9999/v1"))
+    assert len(requests) == 1
+
+
+def test_standalone_judge_uses_real_loopback_http_without_backend():
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    import threading
+
+    requests = []
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            requests.append({"path": self.path, "payload": json.loads(self.rfile.read(int(self.headers["Content-Length"])))})
+            body = json.dumps(_reply('{"entity_matches": [{"golden_index": 0, "predicted_index": 0}]}')).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        pairs, _ = _judge(_client(base_url=f"http://127.0.0.1:{server.server_port}/v1", api_key=""))
+        assert pairs == [(0, 0)]
+        assert requests[0]["path"] == "/v1/chat/completions"
+        assert requests[0]["payload"]["response_format"]["type"] == "json_schema"
+        assert "thinking" not in requests[0]["payload"]
+    finally:
+        server.shutdown()
+        worker.join(timeout=2)
+        server.server_close()
+
+
 @pytest.mark.parametrize("collection,golden_count,predicted_count", [
     ("entity_matches", 34, 20), ("relation_matches", 2, 7), ("entity_matches", 1, 1),
 ])

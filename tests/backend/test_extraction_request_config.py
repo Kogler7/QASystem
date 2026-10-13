@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from backend.app.schemas import ExtractionOptions
 from backend.app.services import extraction_config as config
 from algorithm.knowledge_extract import request_runtime as runtime
+from external_services.llm import runtime as llm_runtime
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def test_oversized_input_never_consumes_quota_or_calls_provider(providers, monke
     from algorithm.token_budget import InputTokenLimitError
     chosen = config.resolve_config({'version': 'v3', 'provider': 'siliconflow'})
     chosen['max_input_tokens'] = 300
-    monkeypatch.setattr(runtime, '_pools', {})
+    monkeypatch.setattr(llm_runtime, '_pools', {})
     calls = []
     sdk = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: calls.append(kw))))
     client = runtime.ScheduledClient(sdk, chosen)
@@ -174,7 +175,7 @@ def test_concurrent_versions_do_not_cross_contaminate(providers, monkeypatch):
 
 
 def test_quota_pool_is_shared_across_models_and_wait_is_bounded(providers, monkeypatch):
-    monkeypatch.setattr(runtime, "_pools", {})
+    monkeypatch.setattr(llm_runtime, "_pools", {})
     c = config.resolve_config({"provider": "siliconflow"})
     c["max_concurrency"] = 1
     pool = runtime.get_pool(c["quota_group"], c)
@@ -189,7 +190,7 @@ def test_quota_pool_is_shared_across_models_and_wait_is_bounded(providers, monke
 
 
 def test_http_deadline_and_provider_thinking_parameter(providers, monkeypatch):
-    monkeypatch.setattr(runtime, "_pools", {})
+    monkeypatch.setattr(llm_runtime, "_pools", {})
     seen = []
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: seen.append(kw))))
     chosen = config.resolve_config({"provider": "siliconflow", "document_timeout": 2.0})
@@ -204,7 +205,7 @@ def test_http_deadline_and_provider_thinking_parameter(providers, monkeypatch):
 
 
 def test_provider_json_format_override_is_request_local(providers, monkeypatch):
-    monkeypatch.setattr(runtime, "_pools", {})
+    monkeypatch.setattr(llm_runtime, "_pools", {})
     seen = []
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: seen.append(kw))))
     chosen = config.resolve_config({"provider": "siliconflow"})
@@ -233,7 +234,7 @@ def test_live_client_configuration_uses_chat_only_without_network(providers, mon
         assert kwargs["base_url"] == "https://provider.example/v1"
         return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     monkeypatch.setattr(openai, "OpenAI", sdk)
-    monkeypatch.setattr(runtime, "_pools", {})
+    monkeypatch.setattr(llm_runtime, "_pools", {})
     llm = runtime.create_request_llm(config.resolve_config({"version": version, "provider": "siliconflow"}))
     result = llm.generate_structured({"type": "object"}, [{"role": "user", "content": "x"}])
     assert result.finish_reason == "stop"
