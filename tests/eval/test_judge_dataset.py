@@ -26,8 +26,12 @@ def test_frozen_corpus_integrity_and_real_provenance():
     assert all('type_constraint' not in r['capabilities'] for r in rows)
     assert not list(read_jsonl(DATASET/'windows.jsonl'))
     manifest=json.loads((DATASET/'manifest.json').read_text())
-    assert manifest['version']=='1.1.0'
+    assert manifest['version']=='1.1.1'
     assert manifest['summary']['pairs']==len(rows)==103
+
+
+def test_frozen_exclusions_use_cross_platform_lf_bytes():
+    assert b'\r\n' not in (DATASET / 'excluded_samples.json').read_bytes()
 
 
 def test_hash_tampering_is_rejected(tmp_path):

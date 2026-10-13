@@ -1,4 +1,6 @@
 # Judge corpus hashes are over exact bytes on every platform.
 test_data/judge/** text eol=lf
+test_data/repetition/verifier-scope-v1/** text eol=lf
+test_data/judge_windows/** text eol=lf
 # The Linux control launcher must retain a valid shebang after Windows checkout.
 ops text eol=lf

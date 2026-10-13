@@ -1,6 +1,6 @@
 {
   "schema_version": "judge-corpus-v1",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "created_date": "2026-10-11",
   "label_contract": "eval/run.py _build_judge_messages: reference-relative semantic matching",
   "adjudication": "agent-reviewed initial calibration labels + deterministic contract slice; no independent human verification yet; historical judge choices never become labels",
@@ -71,12 +71,13 @@
     "windows.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "review_queue.jsonl": "2b4e34a9d3654ef1289fbb22b556a7a6458ae8f20db3e7e1dcbd96bec748a5f8",
     "sources.json": "d5f571263006d54bfcb1b6e7b9d7b1d2f7d94d585ec90310893003f79aa590d1",
-    "excluded_samples.json": "02d899eb6a915d450109c2271a2c7fdb4c98b2972409923762dfd24ce327e52a"
+    "excluded_samples.json": "15615fd0d8d20bd17f3248f5d9e9a0d2a06ab3761fe909045dd4421129bc2935"
   },
   "revision": {
     "removed_pairs": 28,
     "removed_windows": 4,
     "contract_fixture": "test_data/eval/judge-type-contract",
     "retained_pair_content_labels_order_split": "unchanged"
-  }
+  },
+  "byte_contract": "LF on every platform; 1.1.1 changes only excluded_samples line endings, not labels or exclusions"
 }
