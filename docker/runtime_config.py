@@ -79,7 +79,7 @@ def read_document(path: Path | None = None, *, root: Path | None = None, env=Non
 
 
 def _validate_document(data):
-    if not isinstance(data, dict) or set(data) - {"settings", "models", "services", "routes"}:
+    if not isinstance(data, dict) or set(data) - {"settings", "models", "services", "routes", "accounts"}:
         raise ValueError("Invalid runtime configuration structure")
     settings, models = data.get("settings", {}), data.get("models", {})
     if not isinstance(settings, dict) or any(k not in HOT_KEYS or not isinstance(v, str) for k, v in settings.items()):
@@ -126,9 +126,10 @@ def _validate_document(data):
         raise ValueError('Invalid service routes')
     for service in services.values():
         allowed = {'kind', 'model', 'api_key_env'} if service.get('kind') == 'local' else {'kind', 'model', 'api_key_env', 'adapter', 'base_url'}
+        allowed |= {'limits', 'capabilities', 'account_id'}
         if set(service) - allowed or service.get('kind') not in {'local', 'api', 'worker'}:
             raise ValueError('Invalid service record keys')
-        if any(not isinstance(v, str) for v in service.values()): raise ValueError('Invalid service values')
+        if any(not isinstance(v, str) for k, v in service.items() if k not in {'limits', 'capabilities'}): raise ValueError('Invalid service values')
         if service.get('kind') == 'api':
             url = urlsplit(service.get('base_url', ''))
             if url.scheme not in {'http', 'https'} or not url.hostname or url.username or url.password or url.query or url.fragment:
@@ -136,7 +137,10 @@ def _validate_document(data):
         if service.get('api_key_env'):
             import re
             if not re.fullmatch(r'[A-Z][A-Z0-9_]*', service['api_key_env']): raise ValueError('Invalid credential reference')
-    return {"settings": settings, "models": models, 'services': services, 'routes': routes}
+    accounts = data.get('accounts', {})
+    from docker.api_services import validate_api_registry
+    validate_api_registry(services, accounts, routes)
+    return {"settings": settings, "models": models, 'services': services, 'routes': routes, 'accounts': accounts}
 
 
 def read_registry(path: Path | None = None, *, root: Path | None = None, env=None, with_revision=False):

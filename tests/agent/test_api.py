@@ -124,6 +124,21 @@ class TestStreamEndpoint:
 
 
 class TestPool:
+    def test_standard_pool_follows_concurrency_and_ignores_retired_env(self, monkeypatch):
+        import importlib
+        from agentcode import api
+        monkeypatch.setenv('AGENT_WORKER_CONCURRENCY', '6')
+        monkeypatch.setenv('AGENT_WORKER_POOL_SIZE', '99')
+        monkeypatch.setenv('AGENT_API_WORKERS', '99')
+        importlib.reload(api)
+        try:
+            assert api._WORKER_CONCURRENCY == 6
+            assert api._WORKER_POOL_SIZE == 6
+            assert api._API_WORKERS == 1
+        finally:
+            monkeypatch.setenv('AGENT_WORKER_CONCURRENCY', '4')
+            importlib.reload(api)
+
     def test_import_pool(self) -> None:
         """验证 pool 模块可正常导入。"""
         from agentcode.pool import ToolManagerPool
@@ -132,7 +147,7 @@ class TestPool:
     def test_multi_process_mode_requires_redis(self, monkeypatch) -> None:
         from agentcode import api, task_store
         monkeypatch.setattr(task_store, "_QUEUE", task_store._MemoryQueue())
-        monkeypatch.setenv("AGENT_API_WORKERS", "2")
+        monkeypatch.setattr(api, "_API_WORKERS", 2)
         with pytest.raises(RuntimeError, match="Redis is required"):
             api._start_workers()
 

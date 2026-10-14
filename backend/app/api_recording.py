@@ -5,14 +5,14 @@
   ``ontology.txt``、``stage_parse/``、``stage_chunk/``、``stage_extract/`` 等中间
   产物、``response.json``、``timing.json``（各阶段耗时 + 总耗时）、``run.log``
   （请求处理期间的详细日志）。
-- 配置：``KG_API_RECORD_ENABLED``（默认 1 开）、``KG_API_RECORD_DIR``（默认
-  ``backend/data/api_records``，容器内位于可写的 backend-data 卷）、
-  ``KG_API_RECORD_RETENTION_DAYS``（默认 7，<=0 不清理）。
+- 配置：``API_RECORD_ENABLED``（默认 1 开）、固定目录
+  ``backend/data/api_records``（容器内可写的 backend-data 卷）、
+  ``API_RECORD_RETENTION_DAYS``（默认 7，<=0 不清理）。
 - 清理：lifespan 启动时与每次新建记录前各执行一次，只删记录根目录下符合
   ``<8位日期>-<6位时间>_*`` 命名且时间戳（取目录名，取不到用 mtime）超过保留期
   的目录。
 - 红线：只写显式传入的参数与产物，从不触碰请求头，Authorization 等鉴权内容
-  不会进入任何记录文件。所有落盘逻辑整体兜底：任何失败只告警，绝不影响响应。
+  通过敏感字段与Bearer脱敏；原始上传仍属于业务数据。记录失败只告警，不影响响应。
 """
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
@@ -28,8 +28,10 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Iterator
+from uuid import uuid4
 
 from backend.app import observability
+from algorithm.extraction_trace import ExtractionTrace
 
 logger = logging.getLogger(__name__)
 
@@ -39,28 +41,42 @@ _CHUNK_SIZE = 1024 * 1024
 _RECORD_DIR_RE = re.compile(r"^(\d{8}-\d{6})_")
 _UNSAFE_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]+')
 _FALSE_VALUES = {"0", "false", "no", "off"}
+_PRIVATE_FIELDS = re.compile(r"authorization|api.?key|credential|password|secret|access.?token|refresh.?token|headers", re.I)
+
+
+def sanitize_record(value: Any) -> Any:
+    """Record data only; never persist authentication fields or SDK objects."""
+    if isinstance(value, dict):
+        return {str(k): "[REDACTED]" if _PRIVATE_FIELDS.search(str(k)) else sanitize_record(v)
+                for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [sanitize_record(v) for v in value]
+    if isinstance(value, str):
+        value = re.sub(r'(?i)Bearer\s+[^\s"\']+', 'Bearer [REDACTED]', value)
+        return re.sub(r'(?i)(authorization|api[_-]?key|password|secret)\s*[:=]\s*["\']?[^\s,"\'\]}]+',
+                      r'\1=[REDACTED]', value)
+    if value is None or isinstance(value, (int, float, bool)):
+        return value
+    return f"<object:{type(value).__name__}>"
 
 
 def recording_enabled() -> bool:
-    """KG_API_RECORD_ENABLED：默认开；仅显式 0/false/no/off 关闭。"""
-    return config_getenv("KG_API_RECORD_ENABLED", "1").strip().lower() not in _FALSE_VALUES
+    """API_RECORD_ENABLED：默认开；仅显式 0/false/no/off 关闭。"""
+    return config_getenv("API_RECORD_ENABLED", "1").strip().lower() not in _FALSE_VALUES
 
 
 def record_root() -> Path:
-    """记录根目录：KG_API_RECORD_DIR，默认 backend/data/api_records（容器可写卷）。"""
-    configured = config_getenv("KG_API_RECORD_DIR", "").strip()
-    if configured:
-        return Path(configured)
+    """固定 backend-data 卷路径；不接受独立环境变量目录。"""
     return Path(__file__).resolve().parents[1] / "data" / "api_records"
 
 
 def record_retention_days() -> float:
-    """KG_API_RECORD_RETENTION_DAYS：默认 7；非法值按默认；<=0 表示不清理。"""
-    raw = config_getenv("KG_API_RECORD_RETENTION_DAYS", "7").strip()
+    """API_RECORD_RETENTION_DAYS：默认 7；非法值按默认；<=0 表示不清理。"""
+    raw = config_getenv("API_RECORD_RETENTION_DAYS", "7").strip()
     try:
         return float(raw)
     except ValueError:
-        logger.warning("[API记录] KG_API_RECORD_RETENTION_DAYS 无效（%s），按 7 天处理", raw)
+        logger.warning("[API记录] API_RECORD_RETENTION_DAYS 无效，按 7 天处理")
         return 7.0
 
 
@@ -112,6 +128,11 @@ class _RequestIdFilter(logging.Filter):
         return observability.get_request_id() == self._request_id
 
 
+class _SafeFormatter(logging.Formatter):
+    def format(self, record):
+        return sanitize_record(super().format(record))
+
+
 class RequestRecorder:
     """单次 API 请求的记录器；目录不可用时整体降级为 no-op。
 
@@ -144,7 +165,8 @@ class RequestRecorder:
             cleanup_old_records(root)
             stamp = self.started_at.strftime("%Y%m%d-%H%M%S")
             safe_id = _UNSAFE_CHARS.sub("_", self.request_id)[:64] or "unknown"
-            directory = root / f"{stamp}_{safe_id}"
+            suffix = f"_worker_{uuid4().hex[:12]}" if self.method == "WORKER" else ""
+            directory = root / f"{stamp}_{safe_id}{suffix}"
             directory.mkdir(parents=True, exist_ok=True)
             self.directory = directory
             self.enabled = True
@@ -176,11 +198,11 @@ class RequestRecorder:
                 f"# {self.method} {self.endpoint}\n"
                 f"# started_at={self.started_at.isoformat(timespec='seconds')}\n"
                 "# 覆盖范围：本进程内、记录挂载时已存在的 logger 上 request_id 上下文匹配的日志；\n"
-                "# 异步执行模式下 worker 进程日志、请求中途新建的 propagate=False logger 不在覆盖范围。\n",
+                "# 当前目录仅覆盖所在进程；worker有独立目录，按同一request_id关联。请求中途新建的 propagate=False logger 不覆盖。\n",
                 encoding="utf-8",
             )
             handler = logging.FileHandler(path, mode="a", encoding="utf-8")
-            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+            handler.setFormatter(_SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
             handler.addFilter(_RequestIdFilter(self.request_id))
             targets = [logging.getLogger()]
             for existing in list(logging.Logger.manager.loggerDict.values()):
@@ -260,7 +282,7 @@ class RequestRecorder:
         if not self.enabled:
             return None
         try:
-            text = json.dumps(value, ensure_ascii=False, indent=2, default=str)
+            text = json.dumps(sanitize_record(value), ensure_ascii=False, indent=2)
         except Exception as exc:  # noqa: BLE001 - 序列化失败只告警
             logger.error("[API记录] JSON 序列化失败 %s: %s", relative, exc)
             return None
@@ -324,7 +346,10 @@ class RequestRecorder:
             body = getattr(response, "body", None)
             target = self._resolve("response.json")
             if target is not None and isinstance(body, (bytes, bytearray)):
-                self._write_bytes(target, bytes(body))
+                try:
+                    self.write_json("response.json", json.loads(body))
+                except (ValueError, TypeError):
+                    self._write_bytes(target, sanitize_record(bytes(body).decode("utf-8", errors="replace")).encode("utf-8"))
         except Exception as exc:  # noqa: BLE001
             logger.error("[API记录] 响应落盘失败: %s", exc)
 
@@ -378,13 +403,41 @@ def current_recorder() -> RequestRecorder:
     return _active_recorder.get() or _NULL_RECORDER
 
 
+def create_extraction_trace(*, config=None, secrets=()):
+    """Raw model calls share the request's enable switch and retention directory."""
+    recorder = _active_recorder.get()
+    if recorder is None:
+        # Direct algorithm calls have no HTTP context but still receive an ID
+        # and the same writable data-volume retention policy.
+        recorder = RequestRecorder("INTERNAL", "extraction").start()
+        recorder.finalize()
+    if not recorder.enabled or recorder.directory is None:
+        return None
+    return ExtractionTrace(recorder.directory / "model_calls", config=config, secrets=secrets,
+                           request_id=recorder.request_id, flat=True)
+
+
+@contextmanager
+def record_operation(operation: str, payload: dict[str, Any]):
+    """Worker recording boundary; inline handlers reuse their HTTP recorder."""
+    if _active_recorder.get() is not None:
+        yield current_recorder()
+        return
+    execution = payload.get("__execution") or {}
+    request_id = payload.get("__api_record_request_id") or execution.get("job_id")
+    with observability.request_id_scope(str(request_id) if request_id else None):
+        with record_request("WORKER", operation) as recorder:
+            recorder.set_params(operation=operation, execution=execution, payload=payload)
+            yield recorder
+            recorder._status = "succeeded"
+
+
 @contextmanager
 def record_request(method: str, endpoint: str) -> Iterator[RequestRecorder]:
     """HTTP 入口的记录上下文：进入建目录挂日志，退出写 params/timing 并摘挂。
 
     contextvars 传播覆盖 inline 执行（anyio 线程池带上下文）；异步队列模式下
-    worker 进程内的服务层钩子自动落空，网关侧产物（uploads/params/response/
-    timing 总耗时）不受影响。
+    worker通过 record_operation 单独挂载执行记录，按入队的 request_id 与网关记录关联。
     """
     recorder = RequestRecorder(method, endpoint).start()
     token = _active_recorder.set(recorder)

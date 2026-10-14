@@ -153,6 +153,11 @@ class Configuration:
         self.models, self.services, self.routes, conflicts = migrate_inference(
             {**helper.read_env(self.original), **document['settings']}, self.models, document['services'], document['routes'])
         self.migration_conflicts.update(conflicts)
+        self.accounts = document.get('accounts', {})
+        from docker.api_services import migrate_api_services
+        self.services, self.accounts, self.routes, api_conflicts = migrate_api_services(
+            {**helper.read_env(self.original), **document['settings']}, self.services, self.accounts, self.routes)
+        self.migration_conflicts.update(api_conflicts)
         known = {m['repo'] for m in self.catalog}
         from docker.model_services import BUILTIN_MODELS
         for model_id, defaults in BUILTIN_MODELS.items():
@@ -311,10 +316,13 @@ class Configuration:
                         default=self.model_defaults[repo][key],
                         description=('[冲突] 请编辑本项确认取值。' if conflict else '') + MODEL_DESCRIPTIONS[key],
                         display_value=('! ' if conflict else '') + (str(state[key]) or '(空)'), label=f"    {name}: {state[key]}"))
-        for name, value in [('services', self.services), ('routes', self.routes)]:
-            rows.append(dict(kind='registry', key=name, display_name='[审核] ' + name,
-                display_value=json.dumps(value, ensure_ascii=False), label=name,
-                description='集中服务登记与用途路由；输入 JSON，无凭据值，仅引用已有 key 环境变量名。'))
+        from docker.api_services import ui_rows
+        rows.extend(ui_rows(self))
+        for conflict, details in self.migration_conflicts.items():
+            if isinstance(details, dict) and conflict not in self.resolved_migrations:
+                rows.append(dict(kind='migration_review', key=conflict, label=conflict,
+                    display_name='[迁移冲突] ' + conflict, display_value='需人工选择',
+                    description='登记记录与旧配置不同；Enter 选择保留当前或迁移旧值，不自动覆盖。'))
         for field in self.fields:
             if field["key"] in LEGACY_MODEL_KEYS: continue
             value = self.values.get(field["key"], "")
@@ -392,8 +400,10 @@ class Configuration:
                     if not math.isfinite(number) or number < 0 or (number == 0 and not key.endswith(("QPS", "QPM"))): raise ValueError()
                     if "TIMEOUT" not in key and not number.is_integer(): raise ValueError()
                 except ValueError: errors.append(f"{key} 数值无效")
+        from docker.api_services import validate_api_registry
+        validate_api_registry(self.services, self.accounts, self.routes)
         from external_services.model_routes import resolve_service
-        proposed = {'models': self.models, 'services': self.services, 'routes': self.routes}
+        proposed = {'models': self.models, 'services': self.services, 'routes': self.routes, 'accounts': self.accounts}
         from docker.runtime_config import _validate_document
         try: _validate_document({'settings': {}, **proposed})
         except ValueError as exc: errors.append(str(exc))
@@ -460,7 +470,7 @@ class Configuration:
         settings = dict(self.persisted_hot)
         settings.update({k: v for k, v in self.values.items() if k in HOT_KEYS and self.initial_hot.get(k) != v})
         return {self.root / '.env': env, self.root / '.env.example': self.template,
-                self.directory / 'config.json': json.dumps({'settings': settings, 'models': self.models, 'services': self.services, 'routes': self.routes}, ensure_ascii=False, indent=2) + '\n',
+                self.directory / 'config.json': json.dumps({'settings': settings, 'models': self.models, 'services': self.services, 'routes': self.routes, 'accounts': self.accounts}, ensure_ascii=False, indent=2) + '\n',
                 self.directory / 'models.compose.json': json.dumps(self.compose(), ensure_ascii=False, indent=2) + '\n'}
 
     def save(self) -> None:
@@ -656,14 +666,14 @@ def review_save(config: Configuration) -> bool:
 
 def _ui(config: Configuration) -> None:
     index, query, notice, selected = 0, "", "原配置已备份。保存、校验、部署分别操作。", 0
-    baseline = json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
+    baseline = json.dumps([config.values, config.models, config.services, config.routes, config.accounts], sort_keys=True)
     while True:
         category = screen.SECTIONS[selected]
         rows = screen.filter_rows(config.rows(query), category)
         index = min(index, max(0, len(rows) - 1))
         columns, lines = shutil.get_terminal_size((100, 28))
         height = screen.page_size(columns, lines)
-        dirty = baseline != json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
+        dirty = baseline != json.dumps([config.values, config.models, config.services, config.routes, config.accounts], sort_keys=True)
         frame = screen.render(config, rows, index, category, query, notice, columns, lines,
                               dirty=dirty, color="NO_COLOR" not in os.environ)
         print("\x1b[H" + frame + "\x1b[J", end="", flush=True)
@@ -705,11 +715,24 @@ def _ui(config: Configuration) -> None:
                 if row['kind'] == 'runtime':
                     notice = "此行为运行中的实际服务；启用计划请切换到“模型”分区编辑。"
                     continue
-                if row['kind'] == 'registry':
+                if row['kind'] == 'migration_review':
+                    conflict = row['key']
+                    choice = input('冲突 ' + conflict + '：输入 keep 保留登记值，legacy 采用旧配置，其他取消: ').strip()
+                    if choice not in {'keep', 'legacy'}: continue
+                    if choice == 'legacy':
+                        details = config.migration_conflicts[conflict]
+                        registry, rest = conflict.split('.', 1)
+                        if registry == 'accounts': config.accounts[rest] = deepcopy(details['legacy'])
+                        else:
+                            name, field = rest.rsplit('.', 1)
+                            if field == 'legacy_api': config.services[name] = deepcopy(details['legacy'])
+                            else: config.services[name][field] = deepcopy(details['legacy'])
+                    config.resolved_migrations.add(conflict)
+                    continue
+                if row['kind'] == 'api_registry':
                     if key != ' ':
-                        value = json.loads(input(row['key'] + ' JSON → ').strip())
-                        if not isinstance(value, dict): raise ValueError('服务/路由必须为 JSON 对象')
-                        setattr(config, row['key'], value)
+                        from docker.api_services import edit_field
+                        edit_field(config, row, screen)
                     continue
                 if row["kind"] == "model":
                     state = config.models[row["repo"]]
@@ -729,7 +752,7 @@ def _ui(config: Configuration) -> None:
                     if key != " ": config.resolved_migrations.add(name)
             elif key == "s":
                 if review_save(config):
-                    baseline = json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
+                    baseline = json.dumps([config.values, config.models, config.services, config.routes, config.accounts], sort_keys=True)
                     notice = '配置已审核、保存并记录版本；没有启动模型。'
                 else:
                     notice = '已取消审核，文件未修改。'
@@ -744,7 +767,7 @@ def _ui(config: Configuration) -> None:
                         notice = '已取消审核；未部署。'
                         continue
                     config.apply()
-                    baseline = json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
+                    baseline = json.dumps([config.values, config.models, config.services, config.routes, config.accounts], sort_keys=True)
                     input("回车返回配置界面。")
         except (ValueError, OSError, RuntimeError) as exc: notice = str(exc)
 

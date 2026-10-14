@@ -69,6 +69,7 @@ class ClefFlashClient:
         if resolve_registered and service is None and base_url is None:
             from .model_routes import resolve_adapter_service
             service = resolve_adapter_service('nanojev' if env_prefix == 'NANOJEV' else 'clef', purpose=purpose)
+        self.service_snapshot = service if service and service.get('kind') != 'legacy' else None
         self.base_url = (service['base_url'] if service is not None else
             base_url if base_url is not None else getenv(f"{env_prefix}_SERVICE_URL", "")
         ).strip().rstrip("/")
@@ -113,7 +114,8 @@ class ClefFlashClient:
             headers["authorization"] = f"Bearer {self.api_key}"
 
         try:
-            with httpx.Client(timeout=request_timeout, trust_env=False) as client:
+            from .llm.service import model_call
+            with model_call(self.service_snapshot, payload, timeout=request_timeout) as remaining, httpx.Client(timeout=remaining, trust_env=False) as client:
                 response = client.request(
                     self.method,
                     f"{self.base_url}{self.path}",

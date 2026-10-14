@@ -90,11 +90,12 @@ _worker_threads: list[threading.Thread] = []
 _worker_pool: ToolManagerPool | None = None
 
 # 每进程的工作线程数（--concurrency / AGENT_WORKER_CONCURRENCY）
-_WORKER_CONCURRENCY = int(config_getenv("AGENT_WORKER_CONCURRENCY", "1"))
+_WORKER_CONCURRENCY = int(config_getenv("AGENT_WORKER_CONCURRENCY", "4"))
 
 # 每进程的 ToolManager 连接池大小（--pool-size / AGENT_WORKER_POOL_SIZE）
 # 默认等于 _WORKER_CONCURRENCY，保证每个线程配一个连接，无需排队
-_WORKER_POOL_SIZE = int(config_getenv("AGENT_WORKER_POOL_SIZE", str(_WORKER_CONCURRENCY)))
+_WORKER_POOL_SIZE = _WORKER_CONCURRENCY
+_API_WORKERS = 1
 
 
 def _start_workers() -> None:
@@ -111,7 +112,7 @@ def _start_workers() -> None:
     """
     global _worker_stop_event, _worker_threads, _worker_pool
 
-    api_workers = int(config_getenv("AGENT_API_WORKERS", "1"))
+    api_workers = _API_WORKERS
     if api_workers > 1 and not task_store.is_distributed():
         raise RuntimeError("Redis is required when AGENT_API_WORKERS > 1")
 
@@ -410,7 +411,7 @@ async def stream_task(task_id: str, request: Request, cursor: str | None = None)
 # ═══════════════════════════════════════════════════════
 
 def main():
-    global _WORKER_CONCURRENCY, _WORKER_POOL_SIZE
+    global _WORKER_CONCURRENCY, _WORKER_POOL_SIZE, _API_WORKERS
     import argparse
     parser = argparse.ArgumentParser(
         description="agentcode HTTP API server (内嵌 worker，支持多进程)",
@@ -436,7 +437,7 @@ def main():
     parser.add_argument("--host", default="0.0.0.0", help="绑定地址 (默认: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=9180, help="端口 (默认: 9180)")
     parser.add_argument("--workers", type=int, default=0,
-                        help="uvicorn worker 进程数 (默认: env AGENT_API_WORKERS or 1)")
+                        help="独立开发启动进程数，标准部署固定为1")
     parser.add_argument("--concurrency", type=int, default=0,
                         help="每进程工作线程数 (默认: env AGENT_WORKER_CONCURRENCY or 1)")
     parser.add_argument("--pool-size", type=int, default=0,
@@ -448,13 +449,12 @@ def main():
         os.environ["AGENT_WORKER_CONCURRENCY"] = str(args.concurrency)
         _WORKER_CONCURRENCY = args.concurrency
     if args.pool_size:
-        os.environ["AGENT_WORKER_POOL_SIZE"] = str(args.pool_size)
         _WORKER_POOL_SIZE = args.pool_size
     elif args.concurrency:
         _WORKER_POOL_SIZE = args.concurrency
 
-    api_workers = args.workers or int(config_getenv("AGENT_API_WORKERS", "1"))
-    os.environ["AGENT_API_WORKERS"] = str(api_workers)
+    api_workers = args.workers or 1
+    _API_WORKERS = api_workers
 
     import uvicorn
 
@@ -463,7 +463,7 @@ def main():
         logger.info("启动 API: host=%s port=%s api_workers=%d concurrency=%s pool_size=%s",
                     args.host, args.port, api_workers,
                     config_getenv("AGENT_WORKER_CONCURRENCY", "1"),
-                    config_getenv("AGENT_WORKER_POOL_SIZE", "1"))
+                    _WORKER_POOL_SIZE)
         uvicorn.run(
             "agentcode.api:app",
             host=args.host,
@@ -476,7 +476,7 @@ def main():
         logger.info("启动 API: host=%s port=%s api_workers=1 concurrency=%s pool_size=%s",
                     args.host, args.port,
                     config_getenv("AGENT_WORKER_CONCURRENCY", "1"),
-                    config_getenv("AGENT_WORKER_POOL_SIZE", "1"))
+                    _WORKER_POOL_SIZE)
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 

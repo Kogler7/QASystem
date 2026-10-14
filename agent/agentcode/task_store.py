@@ -21,7 +21,9 @@ from typing import Any
 
 logger = logging.getLogger("agentcode.task_store")
 
-_REDIS_URL = config_getenv("TASK_STORE_REDIS_URL", "redis://localhost:6379/0")
+from docker.startup_contract import internal_redis_url
+
+_REDIS_URL = internal_redis_url(0)
 _KEY_PREFIX = config_getenv("TASK_STORE_KEY_PREFIX", "agentcode:task")
 _TASK_TTL = int(config_getenv("TASK_STORE_TASK_TTL", 86400))
 _MAX_QUEUE_SIZE = int(config_getenv("TASK_STORE_MAX_QUEUE", 50000))

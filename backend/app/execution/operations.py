@@ -375,4 +375,8 @@ def run_operation(operation: str, payload: dict[str, Any]) -> Any:
         handler = _OPERATIONS[operation]
     except KeyError as exc:
         raise ValueError(f"unknown execution operation: {operation}") from exc
-    return handler(payload)
+    from backend.app.api_recording import record_operation
+    with record_operation(operation, payload) as recorder:
+        result = handler(payload)
+        recorder.write_json("worker_result.json", result)
+        return result

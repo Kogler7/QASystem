@@ -30,9 +30,9 @@ def create_request_llm(config: dict[str, Any]):
     llm.api_mode = config.get("api_mode", "auto")
     llm.max_input_tokens = int(config.get("max_input_tokens", 65536))
     llm.max_output_tokens = int(config.get("max_output_tokens") or config["max_tokens"])
-    from algorithm.extraction_trace import ExtractionTrace
-    trace_root = config_getenv("KG_EXTRACT_TRACE_DIR", "tmp/extraction-traces").strip()
-    if trace_root:
-        llm.extraction_trace = ExtractionTrace(trace_root, config=config, secrets=(credential,))
+    from backend.app.api_recording import create_extraction_trace
+    trace = create_extraction_trace(config=config, secrets=(credential,))
+    if trace is not None:
+        llm.extraction_trace = trace
         llm.client.extraction_trace = llm.extraction_trace
     return llm

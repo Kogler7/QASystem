@@ -83,8 +83,10 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         if key in hot:
             defaults[field] = cast(hot[key])
     provider = options.get("provider") or "default"
-    routed = resolve_service('extract', registry=document, revision=revision) if provider == 'default' else None
-    if provider == "default":
+    routed = resolve_service('extract', registry=document, revision=revision,
+        service_id=provider if provider in document.get('services', {}) else None) if (
+        provider == 'default' or provider in document.get('services', {})) else None
+    if provider == "default" or routed:
         values = {key: defaults[key] for key in (
             "base_url", "model", "max_tokens", "request_timeout", "disable_thinking",
             "max_concurrency", "qps", "qpm",
@@ -100,6 +102,9 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         if routed:
             values.update(base_url=routed['base_url'], model=routed['model'],
                           api_key_env=routed['api_key_env'])
+            for field, value in (routed.get('capabilities') or {}).items():
+                if field in {'api_mode', 'thinking_parameter', 'response_format'}:
+                    values[field] = value
             if routed['kind'] == 'api' and not setting(routed['api_key_env'], '').strip():
                 raise ValueError('Extraction service credential is not configured')
     else:
@@ -126,7 +131,7 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     values.update(version=version, provider=provider, document_timeout=document_timeout)
     if routed:
         values.update(model_service=routed['service_id'], config_revision=revision,
-                      credential_required=routed['kind'] == 'api')
+                      credential_required=routed['kind'] == 'api', service_snapshot=routed)
     for key in ("model", "request_timeout", "document_timeout"):
         if options.get(key) is not None:
             values[key] = options[key]

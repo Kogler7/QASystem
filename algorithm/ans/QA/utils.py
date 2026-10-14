@@ -26,6 +26,12 @@ def run_llm(
     }
     retries = max(1, int(config_getenv("GRAPH_LLM_RETRIES", "3")))
     timeout = float(config_getenv("GRAPH_LLM_TIMEOUT_SECONDS", "60"))
+    from external_services.llm.service import resolve_chat_service, model_call
+    routed = resolve_chat_service('graph')
+    service = None
+    if routed:
+        service, key = routed
+        base_url, model = service['base_url'], service['model']
     messages = [
         {
             "role": "system",
@@ -43,13 +49,15 @@ def run_llm(
     for attempt in range(retries):
         try:
             with httpx.Client(verify=verify_ssl, timeout=timeout) as http_client:
-                client = OpenAI(base_url=base_url, api_key=key, http_client=http_client)
-                response = client.chat.completions.create(
+                client = OpenAI(base_url=base_url, api_key=key, http_client=http_client, max_retries=0)
+                payload = dict(
                     model=model,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
+                with model_call(service, payload, timeout=timeout) as remaining:
+                    response = client.chat.completions.create(**payload, timeout=remaining)
             message = response.choices[0].message
             content = getattr(message, "content", None)
             if content and content.strip():

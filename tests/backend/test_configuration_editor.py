@@ -323,7 +323,7 @@ def test_canonical_runtime_file_does_not_overlay_old_files(editor):
     from docker.runtime_config import read_document
     (editor.directory / 'config.json').write_text('{"settings": {}, "models": {}}')
     (editor.directory / 'settings.json').write_text('{"KG_EXTRACT_LLM_MODEL":"stale"}')
-    assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}, 'services': {}, 'routes': {}}
+    assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}, 'services': {}, 'routes': {}, 'accounts': {}}
 
 
 @pytest.mark.parametrize('filename', ['settings.json', 'models.json'])

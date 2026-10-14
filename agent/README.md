@@ -189,7 +189,7 @@ worker 领取任务后先经过 `decompose.run_orchestrated` 入口（`agentcode
 
 SSE 事件为增量标注：新增 `decompose`（计划）、`subtask_status`（子问题状态）事件类型，并行子问题的 `token`/`reasoning`/`tool_result`/`trace` 事件额外携带 `subtask` 字段；`spent` 新增 `subtasks` 明细。关闭开关后事件流与原先逐字节等价。
 
-**要获得实际加速需让池大于并发**：并行子问题各需独占一个 ToolManager，`AGENT_WORKER_POOL_SIZE` 应大于 `AGENT_WORKER_CONCURRENCY`（建议 3）；池不足时自动降级为串行子问题，正确性不变、只是不提速。
+标准部署固定一个 API 进程，ToolManager 池大小从 `AGENT_WORKER_CONCURRENCY` 推导；连接不足时子问题自动串行。独立开发可显式通过 CLI 调整进程和池大小，不再通过部署环境变量维护重复配置。
 
 ## 任务状态
 
@@ -241,13 +241,10 @@ result = runtime.run_session(
 | `AGENT_LLM_API_KEY` | 空 | 模型 API Key |
 | `AGENT_LLM_MODEL` | `Qwen/Qwen3-8B` | 模型名 |
 | `AGENT_TEMPLATE_TIMEOUT_SECONDS` | `120` | 单次模型请求超时 |
-| `AGENT_API_WORKERS` | `1` | API 进程数 |
-| `AGENT_WORKER_CONCURRENCY` | `1` | 每个 API 进程的 Worker 线程数 |
-| `AGENT_WORKER_POOL_SIZE` | 等于 concurrency | 每进程 MCP 连接池大小；启用问题分解时建议大于并发数（如 3） |
+| `AGENT_WORKER_CONCURRENCY` | `4` | 每个 API 进程的 Worker 线程数 |
 | `AGENT_DECOMPOSITION_ENABLED` | `1` | 问题分解开关；`0` 时所有任务走直连路径 |
 | `AGENT_DECOMPOSE_MAX_SUBPROBLEMS` | `4`（钳 2..8） | 单次分解最多子问题数 |
 | `AGENT_DECOMPOSE_MAX_PARALLEL` | `3`（钳 1..8） | 子问题最大并行宽度 |
-| `TASK_STORE_REDIS_URL` | `redis://localhost:6379/0` | Redis 地址；多进程必需 |
 | `TASK_STORE_VISIBILITY_TIMEOUT` | `1500` | Worker 失联后的任务回收时间 |
 | `TASK_STORE_TASK_TTL` | `86400` | 任务和结果保留时间 |
 | `TASK_STORE_EVENT_MAXLEN` | `10000` | 每任务最大事件数 |

@@ -26,9 +26,9 @@ except Exception:  # noqa: BLE001
 @pytest.fixture
 def record_root(tmp_path, monkeypatch):
     root = tmp_path / "records"
-    monkeypatch.setenv("KG_API_RECORD_DIR", str(root))
-    monkeypatch.setenv("KG_API_RECORD_ENABLED", "1")
-    monkeypatch.setenv("KG_API_RECORD_RETENTION_DAYS", "7")
+    monkeypatch.setattr(api_recording, "record_root", lambda: root)
+    monkeypatch.setenv("API_RECORD_ENABLED", "1")
+    monkeypatch.setenv("API_RECORD_RETENTION_DAYS", "7")
     return root
 
 
@@ -45,6 +45,69 @@ def test_record_directory_named_with_timestamp_and_request_id(record_root):
             assert recorder.directory.parent == record_root
             assert re.fullmatch(r"\d{8}-\d{6}_req-abc123", recorder.directory.name)
             assert recorder.request_id == "req-abc123"
+
+
+def test_model_calls_use_request_directory_and_sanitize_credentials(record_root):
+    with observability.request_id_scope("linked-request"):
+        with api_recording.record_request("POST", "/api/v1/graphs/extract") as recorder:
+            trace = api_recording.create_extraction_trace(config={"model": "local"}, secrets=("credential-value",))
+            trace.event("call", {"messages": [{"content": "credential-value", "Authorization": "private"}]})
+            recorder.set_params(Authorization="private", options={"api_key": "private"})
+            recorder.capture_response(JSONResponse({"password": "private", "text": "Bearer private"}))
+    assert trace.directory.parent == recorder.directory / "model_calls"
+    manifest = json.loads((trace.directory / "manifest.json").read_text())
+    assert manifest["request_id"] == "linked-request"
+    stored = "".join(p.read_text(encoding="utf-8") for p in recorder.directory.rglob("*.json"))
+    assert "credential-value" not in stored and '"private"' not in stored
+
+
+def test_worker_records_retain_originating_request_id(record_root, monkeypatch):
+    from backend.app.execution import operations
+    monkeypatch.setitem(operations._OPERATIONS, "test.record", lambda payload: {"value": 3})
+    result = operations.run_operation("test.record", {"__api_record_request_id": "origin-id", "__execution": {"job_id": "job-id"}})
+    assert result == {"value": 3}
+    directory = next(record_root.iterdir())
+    assert json.loads((directory / "params.json").read_text())["request_id"] == "origin-id"
+    assert json.loads((directory / "worker_result.json").read_text()) == result
+
+
+def test_submission_persists_request_link_without_authentication(record_root, tmp_path):
+    from backend.app.execution.manager import ExecutionManager
+    from backend.app.execution.store import MemoryExecutionStore
+    from backend.app.execution.hub import ExecutionEventHub
+    from backend.app.execution.artifacts import ArtifactStore
+    store = MemoryExecutionStore()
+    manager = ExecutionManager(store=store, hub=ExecutionEventHub(store), artifacts=ArtifactStore(tmp_path / "execution"))
+    manager.mode = "inline"  # Explicit test-only instance; no deployment approval.
+    with observability.request_id_scope("originating-request"):
+        submission = manager.submit(operation="unit.echo", resource_class="cpu.default", payload={"value": 1})
+    job = store.get_job(submission.job_id)
+    payload = manager.read_payload(job["payload_ref"])
+    assert payload["__api_record_request_id"] == "originating-request"
+    assert payload["value"] == 1
+    assert "Authorization" not in payload
+
+
+def test_multiple_worker_attempts_do_not_overwrite_each_other(record_root):
+    payload = {"__api_record_request_id": "same-origin", "__execution": {"job_id": "same-job"}}
+    with api_recording.record_operation("unit.echo", payload) as first:
+        first.write_json("worker_result.json", {"attempt": 1})
+    with api_recording.record_operation("unit.echo", payload) as second:
+        second.write_json("worker_result.json", {"attempt": 2})
+    assert first.directory != second.directory
+    assert json.loads((first.directory / "worker_result.json").read_text()) == {"attempt": 1}
+
+
+def test_disabling_recording_disables_raw_model_calls(record_root, monkeypatch):
+    monkeypatch.setenv("API_RECORD_ENABLED", "0")
+    monkeypatch.setenv("KG_API_RECORD_ENABLED", "1")
+    assert api_recording.create_extraction_trace(config={}) is None
+    assert not record_root.exists()
+
+
+def test_old_directory_configuration_does_not_override_fixed_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("KG_API_RECORD_DIR", str(tmp_path / "legacy"))
+    assert api_recording.record_root() == Path(api_recording.__file__).resolve().parents[1] / "data" / "api_records"
 
 
 def test_record_directory_sanitizes_request_id(record_root):
@@ -225,7 +288,7 @@ def test_cleanup_uses_mtime_when_name_timestamp_unparseable(record_root):
 
 
 def test_disabled_recording_creates_nothing(record_root, monkeypatch):
-    monkeypatch.setenv("KG_API_RECORD_ENABLED", "0")
+    monkeypatch.setenv("API_RECORD_ENABLED", "0")
     with observability.request_id_scope("req-off"):
         with api_recording.record_request("POST", "/x") as recorder:
             assert not recorder.enabled
@@ -250,7 +313,7 @@ def test_null_recorder_outside_request_scope_is_noop():
 def test_unwritable_root_degrades_without_raising(record_root, tmp_path, monkeypatch):
     blocker = tmp_path / "blocker"
     blocker.write_text("file", encoding="utf-8")
-    monkeypatch.setenv("KG_API_RECORD_DIR", str(blocker))
+    monkeypatch.setattr(api_recording, "record_root", lambda: blocker)
     with observability.request_id_scope("req-nowrite"):
         with api_recording.record_request("POST", "/x") as recorder:
             assert not recorder.enabled
@@ -362,7 +425,7 @@ def test_extract_request_records_ontology_and_result(recorded_app, record_root):
 
 
 def test_disabled_recording_produces_no_directory(recorded_app, record_root, monkeypatch):
-    monkeypatch.setenv("KG_API_RECORD_ENABLED", "0")
+    monkeypatch.setenv("API_RECORD_ENABLED", "0")
     response = recorded_app.post(
         "/api/v1/documents/chunk",
         json={"file_name": "sample.md", "markdown": "第一段。第二段。", "options": {"size": 500}},
@@ -374,7 +437,7 @@ def test_disabled_recording_produces_no_directory(recorded_app, record_root, mon
 def test_recording_failure_does_not_affect_response(recorded_app, record_root, tmp_path, monkeypatch):
     blocker = tmp_path / "blocker"
     blocker.write_text("file", encoding="utf-8")
-    monkeypatch.setenv("KG_API_RECORD_DIR", str(blocker))
+    monkeypatch.setattr(api_recording, "record_root", lambda: blocker)
     response = recorded_app.post(
         "/api/v1/documents/chunk",
         json={"file_name": "sample.md", "markdown": "第一段。第二段。", "options": {"size": 500}},

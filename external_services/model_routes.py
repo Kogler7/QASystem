@@ -45,16 +45,29 @@ def resolve_service(
         adapter = service.get('adapter', 'chat')
     else:
         raise ModelRouteError('此路由不支持 worker 或未知服务类型')
-    if purpose == 'extract' and adapter != 'chat':
+    if purpose in {'extract', 'graph', 'agent'} and adapter != 'chat':
         raise ModelRouteError('抽取路由必须指向聊天推理服务')
     if purpose == 'entity_count' and adapter not in {'clef', 'nanojev'}:
         raise ModelRouteError('实体数量路由必须指向 Clef 或 NanoJev')
+    capabilities = deepcopy(service.get('capabilities', {}))
+    if kind == 'local' and adapter == 'chat':
+        from docker.runtime_config import MODEL_DEFAULTS
+        actual_context = int(record.get('context', MODEL_DEFAULTS['context']))
+        capabilities['context_tokens'] = min(capabilities.get('context_tokens', actual_context), actual_context)
     snapshot = {
         'service_id': selected, 'kind': kind, 'adapter': adapter,
         'base_url': base_url, 'model': model,
         'api_key_env': service.get('api_key_env', ''),
         'revision': revision,
+        'capabilities': capabilities,
+        'limits': service.get('limits', {}),
+        'account_id': service.get('account_id', ''),
     }
+    if snapshot['account_id']:
+        account = registry.get('accounts', {}).get(snapshot['account_id'])
+        if not isinstance(account, dict):
+            raise ModelRouteError('服务引用了未登记账号额度')
+        snapshot['account_limits'] = account
     return deepcopy(snapshot)
 
 

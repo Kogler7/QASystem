@@ -41,7 +41,7 @@ class MemoryCompactor:
     def __init__(
         self,
         threshold: int = DEFAULT_THRESHOLD,
-        model: str = DEFAULT_MODEL,
+        model: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
         transcript_dir: str | None = None,
@@ -59,11 +59,19 @@ class MemoryCompactor:
 
         self._encoding = tiktoken.get_encoding("cl100k_base")
 
-        api_key = api_key or config_getenv("AGENT_LLM_API_KEY", "")
-        base_url = base_url or config_getenv("AGENT_LLM_BASE_URL", "http://localhost:9999")
+        from external_services.llm.service import resolve_chat_service
+        routed = resolve_chat_service('agent') if api_key is None and base_url is None else None
+        self._service_snapshot = None
+        if routed:
+            self._service_snapshot, api_key = routed
+            base_url = self._service_snapshot['base_url']
+            model = model or self._service_snapshot['model']
+        else:
+            api_key = api_key or config_getenv("AGENT_LLM_API_KEY", "")
+            base_url = base_url or config_getenv("AGENT_LLM_BASE_URL", "http://localhost:9999")
         self._client: OpenAI | None = None
-        if api_key:
-            self._client = OpenAI(base_url=base_url, api_key=api_key)
+        if api_key or self._service_snapshot:
+            self._client = OpenAI(base_url=base_url, api_key=api_key or 'not-needed', max_retries=0)
         self._model = model or config_getenv("AGENT_LLM_MODEL", "") or DEFAULT_MODEL
 
         self._transcript_dir = Path(transcript_dir) if transcript_dir else None
@@ -254,10 +262,13 @@ class MemoryCompactor:
         )
 
         try:
-            response = self._client.chat.completions.create(
+            from external_services.llm.service import model_call
+            payload = dict(
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],
             )
+            with model_call(self._service_snapshot, payload, timeout=120) as remaining:
+                response = self._client.chat.completions.create(**payload, timeout=remaining)
             return response.choices[0].message.content or "No summary generated."
         except Exception as exc:
             logger.warning(

@@ -17,14 +17,14 @@ _PRIVATE = re.compile(r"authorization|api.?key|credential|password|secret|access
 
 
 class ExtractionTrace:
-    def __init__(self, root, *, config=None, secrets=()):
+    def __init__(self, root, *, config=None, secrets=(), request_id=None, flat=False):
         self.trace_id = uuid4().hex
-        self.directory = Path(root) / datetime.now(timezone.utc).strftime('%Y%m%d') / self.trace_id
+        self.directory = Path(root) / self.trace_id if flat else Path(root) / datetime.now(timezone.utc).strftime('%Y%m%d') / self.trace_id
         self.secrets = tuple(s for s in secrets if s)
         self.lock = threading.Lock()
         self.local = threading.local()
         self.counter = 0
-        self.write('manifest', {'trace_id': self.trace_id, 'started_at': datetime.now(timezone.utc).isoformat(),
+        self.write('manifest', {'trace_id': self.trace_id, 'request_id': request_id, 'started_at': datetime.now(timezone.utc).isoformat(),
                                 'config': {k: v for k, v in (config or {}).items() if k in {
                                     'version', 'provider', 'model', 'max_input_tokens', 'max_output_tokens',
                                     'document_timeout', 'request_timeout'}}})

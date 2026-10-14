@@ -210,6 +210,9 @@ class ExecutionManager:
         from backend.app.services.extraction_config import snapshot_payload
 
         payload = snapshot_payload(operation, payload)
+        from backend.app import observability
+        if isinstance(payload, dict) and observability.get_request_id():
+            payload = {**payload, "__api_record_request_id": observability.get_request_id()}
         job_id = uuid.uuid4().hex
         auth_context_id = None
         from external_services.application import get_user_headers

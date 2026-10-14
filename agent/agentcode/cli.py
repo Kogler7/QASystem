@@ -87,7 +87,9 @@ class _StreamingLLM(LLMBackend):
 
         try:
             with httpx.Client(timeout=self.cfg["timeout_s"]) as client:
-                with client.stream("POST", self.url, json=payload, headers=headers) as resp:
+                from external_services.llm.service import model_call
+                with model_call(self.cfg.get('service_snapshot'), payload,
+                                timeout=self.cfg['timeout_s']) as remaining, client.stream("POST", self.url, json=payload, headers=headers, timeout=remaining) as resp:
                     resp.raise_for_status()
                     for line in resp.iter_lines():
                         if not line.startswith("data: "):

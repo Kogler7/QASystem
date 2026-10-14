@@ -1,12 +1,14 @@
 {
   "schema": 1,
-  "version": "2026.10.14.4",
+  "version": "2026.10.14.5",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
   ],
   "retired": [
+    "AGENT_API_WORKERS",
     "AGENT_MEMORY_LIMIT",
+    "AGENT_WORKER_POOL_SIZE",
     "BACKEND_MEMORY_LIMIT",
     "CLEF_BIND",
     "CLEF_CPU_THREADS",
@@ -32,6 +34,9 @@
     "EMBEDDING_MODEL_VERSION",
     "EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS",
     "FILE_SERVICE_URL",
+    "KG_API_RECORD_DIR",
+    "KG_API_RECORD_ENABLED",
+    "KG_API_RECORD_RETENTION_DAYS",
     "KG_EXTRACT_API_KEY",
     "KG_EXTRACT_API_URL",
     "KG_EXTRACT_JEV_BASE_URL",
@@ -44,6 +49,7 @@
     "KG_EXTRACT_MODEL",
     "KG_EXTRACT_THINKING_MAX_TOKENS",
     "KG_EXTRACT_THINKING_PASSES",
+    "KG_EXTRACT_TRACE_DIR",
     "KG_EXTRACT_USE_ROUTER",
     "KG_EXTRACT_V31_ALTERNATE_THRESHOLD",
     "KG_EXTRACT_V31_CLEF_MAX_CALLS",
@@ -93,6 +99,7 @@
     "QASYSTEM_RUNTIME_SETTINGS_FILE",
     "REDIS_MEMORY_LIMIT",
     "SOFFICE_PATH",
+    "TASK_STORE_REDIS_URL",
     "VLLM_BASE_PORT",
     "VLLM_ENABLED",
     "VLLM_EXTRA_ARGS",
@@ -1556,25 +1563,6 @@
         }
       ]
     },
-    "KG_EXTRACT_TRACE_DIR": {
-      "desc": "本地中间结果目录；空值关闭。含文档内容，必须指向受控可写卷（相对路径基于进程 cwd）。",
-      "default": "tmp/extraction-traces",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/request_runtime.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_TRACE_DIR"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/knowledge_extract/request_runtime.py",
-          "expression": "'tmp/extraction-traces'"
-        }
-      ]
-    },
     "KG_EXTRACT_ENTITY_SEGMENT_OVERLAP": {
       "desc": "v3 抽取恢复子片与上游共用分隔符切片器；默认 overlap=50 字符。",
       "default": "50",
@@ -2875,29 +2863,6 @@
         }
       ]
     },
-    "AGENT_API_WORKERS": {
-      "desc": "部署参数 AGENT_API_WORKERS",
-      "default": "1",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/api.py",
-          "kind": "read",
-          "token": "AGENT_API_WORKERS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/api.py",
-          "expression": "'1'"
-        },
-        {
-          "path": "agent/agentcode/api.py",
-          "expression": "'1'"
-        }
-      ]
-    },
     "AGENT_MCP_URL": {
       "desc": "Agent 专属 MCP 服务（compose 内网地址；本地开发用 http://127.0.0.1:9181/mcp）",
       "default": "http://agent-mcp:9181/mcp",
@@ -3004,33 +2969,6 @@
         }
       ]
     },
-    "AGENT_WORKER_POOL_SIZE": {
-      "desc": "部署参数 AGENT_WORKER_POOL_SIZE",
-      "default": "4",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/api.py",
-          "kind": "read",
-          "token": "AGENT_WORKER_POOL_SIZE"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/api.py",
-          "expression": "str(_WORKER_CONCURRENCY)"
-        },
-        {
-          "path": "agent/agentcode/api.py",
-          "expression": "'1'"
-        },
-        {
-          "path": "agent/agentcode/api.py",
-          "expression": "'1'"
-        }
-      ]
-    },
     "AGENT_MCP_CONFIG": {
       "desc": "部署参数 AGENT_MCP_CONFIG",
       "default": "/app/agent/agentcode/tools/mcp_tools/mcp_config.json",
@@ -3051,25 +2989,6 @@
         {
           "path": "agent/agentcode/adapter.py",
           "expression": "None"
-        }
-      ]
-    },
-    "TASK_STORE_REDIS_URL": {
-      "desc": "部署参数 TASK_STORE_REDIS_URL",
-      "default": "redis://redis:6379/0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/task_store.py",
-          "kind": "read",
-          "token": "TASK_STORE_REDIS_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/task_store.py",
-          "expression": "'redis://localhost:6379/0'"
         }
       ]
     },
@@ -3876,63 +3795,6 @@
           "path": "backend/app/observability.py",
           "kind": "reference",
           "token": "QASYSTEM_ALERT_STAGE_SLOW_EXTRACT_SECONDS"
-        }
-      ]
-    },
-    "KG_API_RECORD_ENABLED": {
-      "desc": "API 请求完整记录（普通 API 测试落盘） / 开启后每次 API 请求在记录根目录下新建 <日期时间戳>_<request_id>/ 文件夹，保存上传文件 / 原文、请求参数、本体、中间产物（解析 markdown / 切片 / 抽取结果）、最终响应、各阶段耗时 / 与处理期间的详细日志；记录失败只告警，绝不影响接口响应。0/false/no/off 关闭。",
-      "default": "1",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/api_recording.py",
-          "kind": "read",
-          "token": "KG_API_RECORD_ENABLED"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/api_recording.py",
-          "expression": "'1'"
-        }
-      ]
-    },
-    "KG_API_RECORD_DIR": {
-      "desc": "记录根目录；留空默认 backend/data/api_records（容器内位于可写的 backend-data 卷， / 源码目录为只读挂载，不会往里写）。目录不可创建时该次请求自动降级为不记录。",
-      "default": "",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/api_recording.py",
-          "kind": "read",
-          "token": "KG_API_RECORD_DIR"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/api_recording.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "KG_API_RECORD_RETENTION_DAYS": {
-      "desc": "记录保留天数：服务启动时与每次新建记录前自动清理超期的记录目录；<=0 表示不清理。",
-      "default": "7",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/api_recording.py",
-          "kind": "read",
-          "token": "KG_API_RECORD_RETENTION_DAYS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/api_recording.py",
-          "expression": "'7'"
         }
       ]
     },
@@ -6024,13 +5886,50 @@
           "expression": "'16'"
         }
       ]
+    },
+    "API_RECORD_ENABLED": {
+      "desc": "保存完整API调用记录；仅已接入记录的接口生效",
+      "default": "1",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "backend/app/api_recording.py",
+          "kind": "read",
+          "token": "API_RECORD_ENABLED"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "backend/app/api_recording.py",
+          "expression": "'1'"
+        }
+      ]
+    },
+    "API_RECORD_RETENTION_DAYS": {
+      "desc": "完整调用记录保留天数，非正数不自动清理",
+      "default": "7",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "backend/app/api_recording.py",
+          "kind": "read",
+          "token": "API_RECORD_RETENTION_DAYS"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "backend/app/api_recording.py",
+          "expression": "'7'"
+        }
+      ]
     }
   },
   "reader_contracts": {
     "backend/app/api_recording.py": [
-      "config_getenv('KG_API_RECORD_DIR', '')",
-      "config_getenv('KG_API_RECORD_RETENTION_DAYS', '7')",
-      "config_getenv('KG_API_RECORD_ENABLED', '1')"
+      "config_getenv('API_RECORD_RETENTION_DAYS', '7')",
+      "config_getenv('API_RECORD_ENABLED', '1')"
     ],
     "backend/app/environment.py": [
       "config_getenv('ENVIRONMENT')"
@@ -6186,14 +6085,9 @@
       "config_getenv('AGENT_LLM_MODEL')"
     ],
     "agent/agentcode/api.py": [
+      "config_getenv('AGENT_WORKER_CONCURRENCY', '4')",
       "config_getenv('AGENT_WORKER_CONCURRENCY', '1')",
-      "config_getenv('AGENT_WORKER_POOL_SIZE', str(_WORKER_CONCURRENCY))",
-      "config_getenv('AGENT_API_WORKERS', '1')",
-      "config_getenv('AGENT_API_WORKERS', '1')",
-      "config_getenv('AGENT_WORKER_CONCURRENCY', '1')",
-      "config_getenv('AGENT_WORKER_POOL_SIZE', '1')",
-      "config_getenv('AGENT_WORKER_CONCURRENCY', '1')",
-      "config_getenv('AGENT_WORKER_POOL_SIZE', '1')"
+      "config_getenv('AGENT_WORKER_CONCURRENCY', '1')"
     ],
     "agent/agentcode/decompose.py": [
       "_flag('AGENT_DECOMPOSITION_ENABLED')",
@@ -6204,7 +6098,6 @@
       "config_getenv('COMPACT_TOKEN_THRESHOLD', 100000)"
     ],
     "agent/agentcode/task_store.py": [
-      "config_getenv('TASK_STORE_REDIS_URL', 'redis://localhost:6379/0')",
       "config_getenv('TASK_STORE_KEY_PREFIX', 'agentcode:task')",
       "config_getenv('TASK_STORE_TASK_TTL', 86400)",
       "config_getenv('TASK_STORE_MAX_QUEUE', 50000)",
@@ -6212,9 +6105,9 @@
       "config_getenv('TASK_STORE_EVENT_MAXLEN', 10000)"
     ],
     "agent/agentcode/tools/base_tools/memory_tool.py": [
+      "config_getenv('AGENT_LLM_MODEL', '')",
       "config_getenv('AGENT_LLM_API_KEY', '')",
-      "config_getenv('AGENT_LLM_BASE_URL', 'http://localhost:9999')",
-      "config_getenv('AGENT_LLM_MODEL', '')"
+      "config_getenv('AGENT_LLM_BASE_URL', 'http://localhost:9999')"
     ],
     "agent/agentcode/tools/base_tools/shell_tool.py": [
       "config_getenv('AGENT_LOG_DIR')"
@@ -6248,8 +6141,7 @@
       "config_getenv('KG_JEV_MODEL_PATH', '')"
     ],
     "algorithm/knowledge_extract/request_runtime.py": [
-      "config_getenv(config['api_key_env'], '')",
-      "config_getenv('KG_EXTRACT_TRACE_DIR', 'tmp/extraction-traces')"
+      "config_getenv(config['api_key_env'], '')"
     ],
     "algorithm/knowledge_extract/version.py": [
       "getenv('KG_EXTRACT_ALGO_VERSION', DEFAULT_VERSION)"
@@ -6574,6 +6466,8 @@
     ]
   },
   "aliases": {
+    "KG_API_RECORD_ENABLED": "API_RECORD_ENABLED",
+    "KG_API_RECORD_RETENTION_DAYS": "API_RECORD_RETENTION_DAYS",
     "KG_EXTRACT_API_URL": "KG_EXTRACT_LLM_BASE_URL",
     "KG_EXTRACT_V3_BASE_URL": "KG_EXTRACT_LLM_BASE_URL",
     "KG_EXTRACT_API_KEY": "KG_EXTRACT_LLM_API_KEY",
@@ -6771,5 +6665,55 @@
       "VLLM_MODEL_PATH",
       "VLLM_SERVED_MODEL_NAME"
     ]
+  },
+  "api_registry_contract": {
+    "service_fields": [
+      "kind",
+      "model",
+      "base_url",
+      "adapter",
+      "api_key_env",
+      "capabilities",
+      "limits",
+      "account_id"
+    ],
+    "account_fields": [
+      "max_concurrency",
+      "qps",
+      "qpm"
+    ],
+    "capability_fields": [
+      "context_tokens",
+      "max_output_tokens",
+      "thinking_parameter",
+      "api_mode",
+      "response_format"
+    ],
+    "limit_defaults": {
+      "max_concurrency": 4,
+      "qps": 0,
+      "qpm": 0
+    },
+    "routes": [
+      "extract",
+      "graph",
+      "agent",
+      "entity_count"
+    ],
+    "capability_defaults": {},
+    "credential_storage": "reference-only",
+    "scheduler": "internal-redis-fifo-service-and-account",
+    "hot_reload": "new-request-snapshot",
+    "descriptions": {
+      "base_url": "OpenAI兼容API地址，不允许URL携带用户名、密码、查询参数或片段。",
+      "model": "供应商提供的模型名称；本地服务引用已登记的模型记录。",
+      "api_key_env": "已声明的凭据变量名；这里只保存引用，不填写密钥。",
+      "context_tokens": "服务实际上下文上限，输入与输出合计；不是算法切片大小。",
+      "max_output_tokens": "服务允许的一次输出上限；算法可请求更少。",
+      "max_concurrency": "所有 Backend / Agent 进程共同允许的在途请求数。",
+      "qps": "每秒最多开始多少请求；0 表示本系统不额外限速。",
+      "qpm": "每分钟最多开始多少请求；0 表示本系统不额外限速。",
+      "account_id": "选择共享账号额度；关联的所有服务同时受账号总限制。"
+    }
   }
 }

@@ -25,7 +25,7 @@ def _load_env() -> dict[str, Any]:
     root_env = Path(__file__).resolve().parents[2] / ".env"
     if root_env.exists():
         load_dotenv(root_env, override=False)
-    return {
+    values = {
         "base_url": (config_getenv("AGENT_LLM_BASE_URL") or "http://localhost:9999").strip(),
         "api_key": (config_getenv("AGENT_LLM_API_KEY") or "").strip(),
         "model": (config_getenv("AGENT_LLM_MODEL") or "Qwen/Qwen3-8B").strip(),
@@ -33,6 +33,13 @@ def _load_env() -> dict[str, Any]:
         "max_tokens": int(config_getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),
         "timeout_s": int(config_getenv("AGENT_TEMPLATE_TIMEOUT_SECONDS") or 120),
     }
+    from external_services.llm.service import resolve_chat_service
+    routed = resolve_chat_service('agent')
+    if routed:
+        service, credential = routed
+        values.update(base_url=service['base_url'], model=service['model'],
+                      api_key=credential, service_snapshot=service)
+    return values
 
 
 def _chat_completions_url(base_url: str) -> str:

@@ -107,6 +107,9 @@ def check(root, *, deployed=False):
             actual = {**REGISTRY_CONTRACT, 'native_migration': sorted(NATIVE_STARTUP_KEYS), 'worker_migration': sorted(WORKER_STARTUP_KEYS)}
             if catalog['inference_contract'] != actual:
                 errors.append('模型引擎/记录/迁移契约变化，必须登记配置声明新版本')
+    from docker.api_services import API_REGISTRY_CONTRACT
+    if catalog.get('schema') == 1 and catalog.get('api_registry_contract') != API_REGISTRY_CONTRACT:
+        errors.append('API服务/账号登记规则变化，必须登记新配置声明版本')
     for key, item in catalog['items'].items():
         if item.get('mode') != ('hot' if key in HOT_KEYS else 'startup'):
             errors.append(f'{key} 热更新属性与实际读取规则不一致')

@@ -79,7 +79,10 @@ class _BlockingLLM:
         timeout = self._cfg["timeout_s"]
         if cancel_token is not None and cancel_token.remaining_seconds() is not None:
             timeout = max(0.1, min(timeout, cancel_token.remaining_seconds()))
-        resp = self._client.post(self._url, json=payload, headers=headers, timeout=timeout)
+        from external_services.llm.service import model_call
+        with model_call(self._cfg.get('service_snapshot'), payload, timeout=timeout,
+                        cancelled=cancel_token.is_cancelled if cancel_token is not None else None) as remaining:
+            resp = self._client.post(self._url, json=payload, headers=headers, timeout=remaining)
         if cancel_token is not None and cancel_token.is_cancelled():
             raise AgentCancelled("Task cancelled")
         resp.raise_for_status()
@@ -140,6 +143,11 @@ class _StreamingWorkerLLM:
         )
 
     def set_task_id(self, task_id: str) -> None:
+        if task_id != self._task_id:
+            # Worker threads reuse the transport, but a new task must select
+            # the latest approved route. All calls in this task keep it fixed.
+            self._cfg = _load_env()
+            self._url = _chat_completions_url(self._cfg['base_url'])
         self._task_id = task_id
 
     def set_subtask(self, subtask: str | None) -> None:
@@ -175,8 +183,10 @@ class _StreamingWorkerLLM:
             timeout = self._cfg["timeout_s"]
             if cancel_token is not None and cancel_token.remaining_seconds() is not None:
                 timeout = max(0.1, min(timeout, cancel_token.remaining_seconds()))
-            with self._client.stream(
-                "POST", self._url, json=payload, headers=headers, timeout=timeout
+            from external_services.llm.service import model_call
+            with model_call(self._cfg.get('service_snapshot'), payload, timeout=timeout,
+                            cancelled=cancel_token.is_cancelled if cancel_token is not None else None) as remaining, self._client.stream(
+                "POST", self._url, json=payload, headers=headers, timeout=remaining
             ) as resp:
                 resp.raise_for_status()
                 for line in resp.iter_lines():

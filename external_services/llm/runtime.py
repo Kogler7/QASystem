@@ -75,8 +75,15 @@ def get_pool(group: str, limits: dict[str, Any]) -> QuotaPool:
 class ScheduledClient:
     """Wrap SDK endpoints, so fallback HTTP attempts also acquire quota."""
     def __init__(self, client: Any, config: dict[str, Any]):
-        self.client = client
-        self.pool = get_pool(config["quota_group"], config)
+        # SDK-internal HTTP retries would bypass per-attempt QPS/QPM counting.
+        # Registered callers retry through the algorithm, acquiring each time.
+        self.client = client.with_options(max_retries=0) if config.get('service_snapshot') and hasattr(client, 'with_options') else client
+        self.service_snapshot = config.get('service_snapshot')
+        if config.get('service_snapshot'):
+            from .distributed import service_pool
+            self.pool = service_pool(config['service_snapshot'])
+        else:
+            self.pool = get_pool(config["quota_group"], config)
         self.timeout = float(config["request_timeout"])
         self.thinking_parameter = config.get("thinking_parameter", "thinking")
         self.disable_thinking = config["disable_thinking"]
@@ -98,6 +105,8 @@ class ScheduledClient:
         error_type = None
         try:
             check_input_budget(kwargs, self.max_input_tokens)
+            from .service import check_service_budget
+            check_service_budget(kwargs, self.__dict__.get('service_snapshot'))
             call_deadline = started + self.timeout
             if self.deadline is not None:
                 call_deadline = min(call_deadline, self.deadline)
