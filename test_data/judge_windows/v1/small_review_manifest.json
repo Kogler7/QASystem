@@ -1,6 +1,6 @@
 {
   "dataset": "small_reviewed.jsonl",
-  "sha256": "850ebca81b2fcc83687d5c87073f66ca292ed2972c7aa3196c07c30f4982aff9",
+  "sha256": "1f084adfa2fe08c8addf7925bf443a416b3fdcb52d98713f7bf97defd76af383",
   "snapshot_path": "tmp\\judge-windows-v1\\graphs.json",
   "snapshot_sha256": "094cf648de0191bb40736d238768852d763a26aa3693a8fcebbeb29c9cf9088e",
   "window_count": 6,
@@ -187,5 +187,13 @@
         "fn": 1
       }
     }
-  ]
+  ],
+  "version": "1.0.1",
+  "byte_revision": {
+    "source_commit": "2392ece",
+    "previous_sha256": "850ebca81b2fcc83687d5c87073f66ca292ed2972c7aa3196c07c30f4982aff9",
+    "encoding": "UTF-8, LF",
+    "semantic_content_changed": false,
+    "reason": "Canonical Git LF bytes must match the manifest on Windows and Linux."
+  }
 }

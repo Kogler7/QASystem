@@ -143,6 +143,7 @@ class OntologyClass:
     properties: list[OntologyProperty] = field(default_factory=list)
     identity_properties: tuple[str, ...] = ()
     is_abstract: bool = False
+    description: str = ""
 
     @property
     def identifier(self) -> str:
@@ -206,8 +207,20 @@ class OntologySchema:
         classes: list[OntologyClass] = []
         current: OntologyClass | None = None
         in_body = False
-
+        code_lines = []
+        in_note = False
         for line in source.splitlines():
+            stripped = line.strip().casefold()
+            if stripped.startswith('note '):
+                in_note = ':' not in line
+                continue
+            if in_note:
+                if stripped in {'end note', 'endnote'}:
+                    in_note = False
+                continue
+            code_lines.append(line)
+
+        for line in code_lines:
             header = _CLASS_HEADER.match(line)
             if header:
                 display_name = (header.group("quoted") or header.group("name") or "").strip()
@@ -247,7 +260,21 @@ class OntologySchema:
             current.properties.append(prop)
 
         provisional = cls(classes)
+        note_target, note_lines = None, []
         for line in source.splitlines():
+            if note_target is not None:
+                if line.strip().casefold() == 'end note' or line.strip().casefold() == 'endnote':
+                    target = provisional.resolve_class(note_target)
+                    if target is not None:
+                        target.description = '\n'.join(filter(None, (target.description, '\n'.join(note_lines).strip())))
+                    note_target, note_lines = None, []
+                else:
+                    note_lines.append(line)
+                continue
+            match = re.match(r'^\s*note\s+(?:left|right|top|bottom)\s+of\s+("[^"]+"|[^\s:]+)\s*$', line, re.IGNORECASE)
+            if match:
+                note_target = match.group(1).strip('"')
+        for line in code_lines:
             identity_match = _IDENTITY.match(line)
             if not identity_match:
                 continue
@@ -263,7 +290,7 @@ class OntologySchema:
 
         parents: dict[str, list[str]] = {}
         relations: list[OntologyRelation] = []
-        for line in source.splitlines():
+        for line in code_lines:
             stripped = line.strip()
             if not stripped or stripped.startswith("'"):
                 continue

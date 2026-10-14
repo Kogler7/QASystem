@@ -1,4 +1,6 @@
 """Cross-chunk identity routing leaves all property synthesis to the model."""
+
+from .stub_llm import source_documents
 import json
 
 import pytest
@@ -37,12 +39,12 @@ def complete(handler, *, batch_size=24):
 def test_key_group_never_split_and_model_owns_consolidated_properties():
     def handler(prompt, chunk):
         payload = json.loads(prompt)
-        known = payload['stage_context']['known_entities']
+        known = payload['task']['known_entities']
         assert len(known) == 1
         entity = known[0]
         assert 'id' not in entity
         if entity['type'] == 'Person':
-            assert [d['text'] for d in payload['documents']] == ['巡检：人员负责检查。', '巡检：人员负责记录。']
+            assert chunk['text'] == '巡检：人员负责检查。\n\n巡检：人员负责记录。'
             assert [o['properties'] for o in entity['occurrences']] == [{'duty': '检查'}, {'duty': '记录'}]
             properties = {'duty': '检查并记录'}
         else:
@@ -62,7 +64,7 @@ def test_key_group_never_split_and_model_owns_consolidated_properties():
 def test_rejects_invalid_model_consolidation(bad):
     def handler(prompt, chunk):
         entities = []
-        for e in json.loads(prompt)['stage_context']['known_entities']:
+        for e in json.loads(prompt)['task']['known_entities']:
             entities.append({'type': e['type'], 'name': e['name'], 'properties': {}, 'evidence': {'quote': '巡检'}})
         if bad == 'duplicate':
             entities.append(dict(entities[0]))

@@ -34,6 +34,7 @@ def extract_harness(
     retry_base_seconds: float = 0.05,
     assembly_planner: SkillAssemblyPlanner | None = None,
     skills_dir: str | None = None,
+    skill_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run entity extraction and property enrichment over caller-provided chunks."""
     ontology = (ontology or "").strip()
@@ -74,12 +75,14 @@ def extract_harness(
         max_attempts=max_attempts,
         retry_base_seconds=retry_base_seconds,
         assembly_planner=planner,
+        skill_refs=skill_refs,
     )
     plans = planner.audit()
     if plans:
         result.setdefault("profile", {})["prompt_assembly"] = {
-            "mode": "deterministic_skill_compile", "plans": plans,
-            "calls": [], "attempts": [],
+            "mode": "request_skill_selection", "plans": plans,
+            "calls": [c for c in result.get("run_trace", {}).get("calls", []) if c.get("pass") == "skill_selection"],
+            "attempts": [a for a in result.get("attempts", []) if a.get("pass") == "skill_selection"],
         }
     return result
 

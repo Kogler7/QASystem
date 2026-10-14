@@ -124,16 +124,23 @@ def test_required_property_repair_cannot_expand_to_unrelated_entities(custom):
     text = '甲负责巡检，乙负责运输。'
     rows = [{**span_item('Person', name, text), 'properties': {'duty': duty}}
             for name, duty in [('甲', '巡检'), ('乙', '运输')]]
+    def repair_model(prompt, chunk):
+        assert 'known_entities' in json.loads(prompt)['task']
+        return {'entities': [{**{key: value for key, value in row.items() if key != 'mention'},
+                              'name': row['mention']} for row in rows]}
     llm = StubLLM(entity_handler=lambda p, c: [{**span_item('Person', '甲', text), 'properties': {}}],
-                  repair_handler=lambda p, c: {'entities': rows},
+                  repair_handler=repair_model,
                   verification_handler=lambda item, chunk: 'yes')
     repairer = (lambda payload: {'entities': [
         {**{k: v for k, v in row.items() if k != 'mention'}, 'name': row['mention']} for row in rows]}) if custom else None
     result = extract_split(ONTOLOGY, [ExtractionChunk('c1', text)], llm=llm,
                            repairer=repairer, retry_base_seconds=0, max_attempts=1)
-    assert result['status'] == 'succeeded'
+    assert result['status'] == ('succeeded' if custom else 'failed')
     assert [(e['name'], e['properties']) for e in result['raw']['entities']] == [('甲', {'duty': '巡检'})]
-    assert any(w['code'] == 'REPAIR_OUT_OF_SCOPE' for w in result['warnings'])
+    if custom:
+        assert any(w['code'] == 'REPAIR_OUT_OF_SCOPE' for w in result['warnings'])
+    else:
+        assert any(a['pass'] == 'repair_property' and a['terminal'] for a in result['attempts'])
 
 
 @pytest.mark.parametrize('proposal', [None, {'entities': [1]}, {'entities': [{'type': 'Person'}]},
@@ -146,9 +153,15 @@ def test_invalid_custom_repair_is_a_typed_failure(proposal):
     assert any(a['pass'] == 'repair' and a['terminal'] for a in result['attempts'])
 
 
-def test_custom_repair_cannot_mutate_sources_or_forge_evidence_receipts():
+def test_custom_repair_cannot_mutate_sources_or_forge_evidence_receipts(monkeypatch):
     chunk = ExtractionChunk('c1', '甲负责巡检。', clause_number='1', metadata={'nested': {'value': 'original'}})
     observed = []
+    from .. import property_grounding
+    original_ground = property_grounding.ground_properties
+    def ground(rows, sources, *args, **kwargs):
+        observed.extend(source.metadata['nested']['value'] for source in sources)
+        return original_ground(rows, sources, *args, **kwargs)
+    monkeypatch.setattr(property_grounding, 'ground_properties', ground)
     def repair(payload):
         payload['chunks'][0]['metadata']['nested']['value'] = 'changed'
         return {'entities': [{'type': 'Person', 'name': '甲', 'properties': {'duty': '巡检'},
@@ -156,7 +169,8 @@ def test_custom_repair_cannot_mutate_sources_or_forge_evidence_receipts():
             'evidences': [{'quote': 'fake', 'source_block_ids': ['forged']}],
             'property_evidence': {'duty': {'support': 'llm', 'value': '巡检', 'sources': []}}}]}
     def verify(item, source):
-        observed.append(source['metadata']['nested']['value'])
+        assert 'metadata' not in source
+        assert source['text'] == chunk.text
         return 'yes'
     result = extract_split(ONTOLOGY, [chunk], llm=StubLLM(verification_handler=verify),
                            repairer=repair, retry_base_seconds=0, max_attempts=1)

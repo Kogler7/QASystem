@@ -6,11 +6,27 @@ tags: []
 
 # 知识沉淀评测
 
+V3.1 的单次调试聚合结果可以离线转成实体/证据/模型消息 JSONL 与运行摘要：`python3 -m eval.tools.export_v31_artifacts --result tmp/old-run/result.json --calls tmp/old-run/calls.json --output tmp/new-run`。目标目录须不存在；`--calls` 是可选的当次真实模型调用记录，不调用模型。该工具只精简查看产物，不替换正式评测 manifest、原始输入/输出或评分记录，partial/failed 状态原样保留。字段说明见 [V3.1 README](../algorithm/knowledge_extract/v3_1/README.md#精简文件产物)。
+
 改完解析、切片、抽取或沉淀流水线后，在仓库根目录对指定 case 跑一次脚本。默认只测后台 HTTP，不 `import algorithm` / `backend`。
 
 默认连 `http://127.0.0.1:8006`。Backend 已在跑时，在仓库根目录执行即可；评测数据在 `test_data/eval/`，不要只拷 `eval/` 目录。
 
+本机使用已登录的 CodeFuse 做诊断时，可运行 `python3 -m eval.tools.cfuse_eval_proxy`：仅监听 `127.0.0.1:18089`，从本机 CodeFuse 配置在内存中取得凭据，将固定 `deepseek-v4-flash-0731` 模型的非流式 SSE 封装转换为标准 Chat JSON。抽取和 judge 的 base URL 均可设为 `http://127.0.0.1:18089/v1`；模型必须使用上述完整 ID，judge 可设 `judge_response_format: json_object`，两者关闭 thinking。该工具不实现抽取或评分、不保存鉴权头、不修改 CodeFuse 配置，仍使用现有 Backend 和 `run.py`。仅用于本地诊断，不作为正式部署组件；响应模型不符或 SSE 不完整时明确失败。
+
+代理也处理 HTTP 200/SSE 包装中的显式上游错误，包括 `error` 包装和顶层 `object=error` / `code` 结构：已识别限流转成 429、鉴权转成 401，其余错误或缺少 completion 为 502。暂态错误携带 1–60 秒的有界 `Retry-After`（默认 10 秒），供已有动态重试释放 worker 后排队等待；只返回固定安全错误类别，不保存或透传原始供应商错误及凭据。缩小核验批次会增加请求数，评测时应同时设置 `KG_EXTRACT_LLM_QPM`，不能只靠 QPS 限制每分钟调用量。失败/降级评分仍需重新得到有效 LLM 评分，不能将这些错误当作抽取质量通过。
+
+共享账号额度较低时，代理支持 `--requests-per-minute N`，按固定间隔共同约束抽取和 judge 的请求，默认 0 不启用。例如 `--requests-per-minute 4` 使两类请求合计每 15 秒最多发起一次。限速不改变模型、消息或评分规则，但会计入实际 API/评分耗时；降低速率后仍须保留超时和预算失败，不能据此宣称生产耗时门禁通过。
+
+使用本机 Backend 或模型代理时，在评测进程及 Backend 进程显式设置 `NO_PROXY=127.0.0.1,localhost` 和 `no_proxy=127.0.0.1,localhost`。macOS 的系统代理也可能影响 Python 标准库请求，仅清除 `HTTP_PROXY` 等环境变量不一定足够；本机地址被转发至系统代理后，网络切换或休眠可能使 judge 卡在间接连接上。只调整本次进程的环境，不修改系统代理。长评测需保持机器联网和唤醒；`caffeinate -i` 不能阻止合盖休眠。中断批次保留失败状态，恢复时可用 `--reuse-extract-from` 重评已有产物，不能把回退分数当有效 LLM 评分。
+
 抽取算法版本默认由 Backend 的 `KG_EXTRACT_ALGO_VERSION` 控制。现在也可在脚本中传 `--extract-version v2/v3/v3.1/latest`、`--extract-provider <服务端配置名>`、`--extract-model <模型>` 和超时覆盖项，在同一个 Backend 上逐次选择配置，无需重启。完整规则和供应商登记方式见 [抽取请求配置覆盖](../docs/接口/抽取请求配置覆盖.md)。MCP 工具仍使用服务端默认配置。
+
+## 仅检查 V3.1 Skill 路由
+
+`python3 -m eval.tools.eval_skill_routing --repeats 3 --output tmp/eval/runs/<新批次>` 复用 benchmark 的逐文档及 case 冻结切片，调用正式 V3.1 Skill 选择和规则装配代码，使用上述本机 CodeFuse 代理。它复用 `run.py` 的文档发现、本体选择和请求字段契约，直接运行算法的路由阶段，不调用 Backend 抽取接口、不执行实体抽取或 judge，也不验证 HTTP 队列链路。预期标签只在本地评分使用，来自 `test_data/eval/skill-routing.expected.json`，不发送给路由模型。新增领域数据时同步维护该预期文件。
+
+`--dry-run` 只检查每份有效文档是否有对应切片和本体，不调用模型，不报告准确率；`--case <领域>/<case>` 可重复指定以诊断失败 case；`--workers` 默认 3，可设 1 减少模型服务并发。当前覆盖 9 个 case、14 份有效文档，忽略 Office 锁文件。simple 使用问题/方案、利益相关者/关注点和术语本体，预期 `no_match`。产物包含冻结输入、实际模型消息/回答、选择及规则装配审计、版本与 SHA-256、manifest、summary 和 report；目标目录必须为 `tmp/eval/runs/` 下的新目录，不保存传输凭据。模型调用失败计入失败和覆盖率，不等同于已返回的路由判断错误。本工具的通过结论仅限路由，不替代下述正式评测门禁。
 
 ## 两套评测
 
@@ -19,14 +35,14 @@ tags: []
 | 层次 | 含义 |
 | --- | --- |
 | 整体 | 本次全部有效评分按 TP/FP/FN 累加 |
-| 分类型 | `official`、`rule`、`simple` 等类型目录各自累加 |
+| 分类型 | `official`、`rule`、`simple`、`trouble` 类型目录各自累加 |
 | 单个文件 | 每个 case（`类型/case`，一份文档，可含多个附件）对照自己的 golden |
 
 | | mini-eval | eval |
 | --- | --- | --- |
 | 用途 | 改完抽取或评分后先看一小批 | 发布前的全量门禁，也用于按路径或类型抽查 |
 | 入口 | `python3 eval/mini_eval.py`，或 `bash eval/mini_eval.sh` | `python3 eval/run.py`，或 `./eval/run.sh` |
-| 范围 | 每类 1–2 个 case，由本轮 `--mini-cases-per-type` / `--mini-per-type` 决定。当前默认是 `official_01`、`official_02`，以及 rule、simple 各 1 个，共 4 个 | `test_data/eval/` 下全部 case。当前是 official 5 个、rule 1 个、simple 1 个，共 7 个 |
+| 范围 | 每类 1–2 个 case，由本轮 `--mini-cases-per-type` / `--mini-per-type` 决定。当前默认是 `official_01`、`official_02`，以及 rule、simple、trouble 各 1 个，共 5 个；trouble 默认按目录排序选择 `trouble_01` | `test_data/eval/` 下全部 case。当前是 official 5 个、rule 1 个、simple 1 个、trouble 2 个，共 9 个 |
 | 结果 | `report.md` 里的整体、分类型、单个文件 | 同一份结论文档结构 |
 
 发布前的全量门禁用 eval。mini-eval 走同一个 `run.py`，只是先按类型抽样。下面「如何使用」分别给出命令。`quick_eval.py` 是另外的诊断入口，固定三个公文 case，不算这两套评测。
@@ -71,6 +87,9 @@ test_data/eval/
 | `official` | 公文 | 5（`official_01` … `official_05`） | 多数含通知 PDF + `表单.pdf` 两个附件 |
 | `rule` | 规则 | 1（`rule_01`） | 有 golden，会评分 |
 | `simple` | 简单规则/术语 | 1（`Simple_故障规则的诊断`） |  |
+| `trouble` | 故障检修 | 2（`trouble_01`、`trouble_mini`） | Excel 行修更换、互换记录；分别为完整集和小规模集，均有 golden 和共用本体 |
+
+当前共 4 类、9 个 case，golden 合计 829 个实体、1,257 条关系。实际可发现范围以 `python3 eval/run.py --dry-run` 为准。
 
 不再使用中文类型目录名（`公文`/`标准`/`规则`）。`中车RAG验证数据集/` 若出现会被扫描跳过。
 
@@ -138,6 +157,10 @@ Chat 适配器调用 Chat Completions 接口；SystemOne 适配器使用完整 y
 
 预测只写 `tmp/eval/runs/<时间戳>/`，不会覆盖 `test_data/eval/<类型>/<case>/extract/golden.json`。
 
+Judge 输出因 `finish_reason=length` 截断时，与输入预算超限一样按较长轴递归拆窗。保留失败窗口的付费调用诊断与 `split_reason`，只统计成功子窗口的候选覆盖，原始索引和全局一对一匹配不变。最小 1×1 窗口仍失败时明确评分失败；认证、限流或服务端异常不因这条规则拆窗，不把截断结果或 identity 降级算作有效 LLM 评分。
+
+Chat judge 可配置 `eval.judge_transport_attempts`（1–3，默认 1）。仅对 HTTP 429/502/503/504 在相同格式下有界重试，遵从数值 Retry-After（0.5–60 秒）；全部调用与等待共用单窗口 timeout。诊断保留状态及等待时间，不保存上游错误正文或鉴权头。认证、一般参数拒绝、坏 JSON 和内容语义错误不走此重试；重试耗尽仍缺评分，不能当作有效 LLM 分数。
+
 批量跑多个 case / 多附件时，单个文件或单个 case 失败不会停下后面的任务：该单元最多重试 3 次，仍失败则跳过并记入 `failed_files` / `skipped_after_retries`，已成功的解析、切片、抽取产物下一轮直接复用。Ctrl+C 会先把当前进度写入 `summary.json`（带 `interrupted`）再退出。
 
 ## 如何使用
@@ -193,7 +216,7 @@ chmod +x eval/run.sh
 ./eval/run.sh --dry-run
 ```
 
-确认能认出 `official` / `standard` / `rule` / `simple` 共 16 个 case。拷到部署机后先跑这一步。`--dry-run` 只扫描选择与配置，不调用服务，也不清理历史批次。
+确认能认出 `official` / `rule` / `simple` / `trouble` 共 9 个 case。拷到部署机后先跑这一步。`--dry-run` 只扫描选择与配置，不调用服务，也不清理历史批次。
 
 ---
 
@@ -244,7 +267,7 @@ python3 eval/run.py test_data/eval/official/official_01
 ./eval/run.sh
 ```
 
-扫 `official` / `standard` / `rule` / `simple` 下全部 case，默认只跑后台并使用 LLM-judge；缺少评分地址会退出 1。正式开测可先显式 `--match-mode identity` 跑通链路，再用 LLM-judge 正式评测。
+扫 `official` / `rule` / `simple` / `trouble` 下全部 case，默认只跑后台并使用 LLM-judge；缺少评分地址会退出 1。正式开测可先显式 `--match-mode identity` 跑通链路，再用 LLM-judge 正式评测。
 
 **修复评分后补评并继续未完成的 case**
 
@@ -299,10 +322,10 @@ python3 eval/run.py --stage backend --mode extract \
 
 ```bash
 ./eval/run.sh test_data/eval/official
-./eval/run.sh --groups official,standard
+./eval/run.sh --groups official,trouble
 ```
 
-路径与 `--groups/--cases` 不要混用。`--groups` 用目录名：`official,standard,rule,simple`。
+路径与 `--groups/--cases` 不要混用。`--groups` 用目录名：`official,rule,simple,trouble`。
 
 ---
 
@@ -545,3 +568,13 @@ python3 -m eval.tools.chunk_variants --source <冻结inputs目录> --output tmp/
 已保存结果可以重新做 judge 比较，不重新解析/抽取。探索实验入口为 `python3 -m eval.tools.judge_window_compare --help`；测试数据在 `test_data/judge_windows/v1/`，输出必须在 `tmp/`。这类窗口实验用于分析稳定性，不是端到端抽取质量的正式全量门禁。标签口径、失败与速度条件见 [四模型 judge 报告](../docs/算法/LLM多候选Judge对比20261012.md)。
 
 配置及部署更新使用 `ops`，评测不修改运行环境，也不能代替用户批准配置版本。见 [配置体系说明](../docs/部署/配置体系说明.md)。
+
+### 2026-10-13：v3.1 身份与 judge 格式兼容
+
+图节点归一化优先使用 `display_name`，随后为显式 `name` / `identity`，最后才兼容旧节点的 `properties.name`；本体的业务 `name` 属性保留，不能覆盖实体身份或合并同业务名称的不同节点。
+
+judge 的规范输出仍为含 `golden_index`、`predicted_index` 的对象。若供应商返回恰好两个非负整数的数组 `[g, p]`，仅将其无损转换为对象，并在调用诊断记录 `normalized_index_pairs`。字符串、布尔值、额外元素、越界索引、跨本体类型及未完成响应仍不能作为有效匹配。短标签实体须结合双方属性确认同一指代，不能仅凭序号或主题相同判对。
+
+评分代码变化后应使用 `--reuse-extract-from` 对旧预测重新评分，另存新批次；缺少旧预测的 case 需显式从重评分选择中排除，因为此参数的既有行为会对缺失产物重新抽取。旧结果不足全量或原运行存在 partial 时，重评分只能用于同口径诊断对比，不能据此宣称生产基线门禁通过。
+
+judge 主扫描会先按规范化本体标识分组（关系按两端类型及关系类型），再完整遍历组内所有候选对。跨类型本来就不能匹配，现在不再占用模型窗口。`judge_coverage.type_pruned_pairs` 记录提前排除的对数，`pairs_presented + type_pruned_pairs == pairs_total`；已有匹配行仍参与扫描，最终统一最大匹配，避免丢失增广路径。此调整及评分器变化要求新旧预测都重新评分，不能把不同评分代码的 F1 直接相减。

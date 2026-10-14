@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -26,6 +27,26 @@ def contract(tmp_path):
 
 def test_current_repository_contract():
     assert config_contract.check(ROOT) == []
+
+
+def test_git_ignore_cannot_hide_tracked_runtime_configuration_reads(contract):
+    root, source = contract
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    subprocess.run(['git', 'add', '-f', 'backend/settings.py'], cwd=root, check=True)
+    (root / '.gitignore').write_text('backend/settings.py\n')
+    source.write_text('import os\nvalue = os.getenv("TEST_SETTING")\n')
+    assert source in set(config_contract.files(root))
+    assert any('禁止' in error for error in config_contract.check(root))
+
+
+def test_git_ignored_untracked_experiment_is_not_delivered_runtime_source(contract):
+    root, _ = contract
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    (root / '.gitignore').write_text('algorithm/knowledge_extract/v4/\n')
+    experiment = root / 'algorithm/knowledge_extract/v4/local.py'
+    experiment.parent.mkdir(parents=True)
+    experiment.write_text('import os\nvalue = os.getenv("LOCAL_EXPERIMENT")\n')
+    assert experiment not in set(config_contract.files(root))
 
 
 def test_deleted_module_cannot_leave_configuration_declarations(contract):

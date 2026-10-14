@@ -42,6 +42,10 @@ class ExtractionResponseError(ExtractionError):
     error_code = "LLM_JSON_PARSE_FAILED"
 
 
+class ExtractionIncompleteError(ExtractionResponseError):
+    error_code = 'LLM_RESPONSE_INCOMPLETE'
+
+
 class ExtractionValidationError(ExtractionError):
     error_code = "LLM_SCHEMA_INVALID"
 
@@ -69,6 +73,18 @@ class RunAttempt:
     usage_unavailable: bool | None = None
     response_characters: int | None = None
     recovered_items: int | None = None
+    rejected_records: int | None = None
+    rejection_reasons: list[dict[str, Any]] = field(default_factory=list)
+    response_normalizations: list[str] = field(default_factory=list)
+    ignored_saved_records: int = 0
+    duplicate_entity_records: int = 0
+    repetitive_entity_output: bool = False
+    transport_failures: int = 0
+    output_failures: int = 0
+    adaptive_split: bool = False
+    unfinished_entity_tail: bool = False
+    recovery: str = ""
+    missing_item_ids: list[str] = field(default_factory=list)
     next_response_mode: str = ""
     retryable: bool | None = None
     message: str = ""
@@ -103,6 +119,19 @@ class RunAttempt:
                 if payload.get("recovered_items") is not None
                 else None
             ),
+            rejected_records=(int(payload["rejected_records"])
+                              if payload.get("rejected_records") is not None else None),
+            rejection_reasons=list(payload.get('rejection_reasons') or []),
+            response_normalizations=list(payload.get('response_normalizations') or []),
+            ignored_saved_records=int(payload.get('ignored_saved_records') or 0),
+            duplicate_entity_records=int(payload.get('duplicate_entity_records') or 0),
+            repetitive_entity_output=bool(payload.get('repetitive_entity_output', False)),
+            transport_failures=int(payload.get('transport_failures') or 0),
+            output_failures=int(payload.get('output_failures') or 0),
+            adaptive_split=bool(payload.get('adaptive_split', False)),
+            unfinished_entity_tail=bool(payload.get('unfinished_entity_tail', False)),
+            recovery=str(payload.get("recovery") or ""),
+            missing_item_ids=list(payload.get("missing_item_ids") or []),
             next_response_mode=str(payload.get("next_response_mode") or ""),
             retryable=(
                 bool(payload.get("retryable"))
@@ -127,6 +156,7 @@ class RunAttempt:
 
 
 _FAILURE_PRIORITY = {
+    "call_budget": ("LLM_CALL_BUDGET_EXCEEDED", "文档模型调用预算耗尽"),
     "input_budget": ("LLM_INPUT_BUDGET_EXCEEDED", "请求超过输入预算"),
     "incomplete": ("LLM_RESPONSE_INCOMPLETE", "LLM 响应不完整"),
     "empty": ("LLM_EMPTY_RESPONSE", "LLM 返回为空"),
@@ -224,6 +254,9 @@ class ExtractionRun:
         self.accepted_entities = max(0, int(accepted_entities))
         self.accepted_relations = max(0, int(accepted_relations))
         failure = self.primary_failure()
+        if (failure is None and not (self.accepted_entities or self.accepted_relations)
+                and any(a.error_type == 'candidate_rejected' for a in self.attempts)):
+            failure = _FAILURE_PRIORITY['schema_validation']
         if failure is None:
             self.status = RunStatus.SUCCEEDED
             self.stop_reason = stop_reason
@@ -237,6 +270,7 @@ class ExtractionRun:
     def primary_failure(self) -> tuple[str, str] | None:
         error_types = {attempt.error_type for attempt in self.attempts if attempt.terminal}
         for failure_type in (
+            "call_budget",
             "input_budget",
             "incomplete",
             "empty",

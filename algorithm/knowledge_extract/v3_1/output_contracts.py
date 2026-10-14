@@ -48,28 +48,32 @@ def validate_verification_items(payload: dict[str, Any], items: list[dict[str, A
 
 
 ENTITY_NAME_RULES = """- mention 将直接作为最终实体 name：原文有明确名称时，必须逐字保留完整名称及内部空格、大小写、标点，不自行改写、缩写或概括。
+- 显式对象声明中的实例标签用作该实例的 mention；其 name 等业务属性按本体另填，不用属性值替换实例标签。普通叙述中的整句动作或状态不因字面出现就成为专名。
 - 当前提供片段明确说明同一实体的全称和简称时，优先选择原文中实际出现的完整全称；不得凭常识扩写简称，也不得把不同实体仅凭名称相似视为同一实体。
 - 仅当原文没有明确名称时，才允许依据实际证据忠实归纳 mention；不得用概括名称替换已有的原文名称。"""
 
 ENTITY_RULES = """
 - 每项包含 type、mention、properties、evidence；禁止 name 或其他键。
 - 同时提取当前片段明确支持的本体属性；无证据时 properties 返回 {}，不得猜测。
+- 输出本轮全部唯一实体后立即结束；不得为同一实体换一种属性措辞或引文反复输出。
+- 每个实体对象独立闭合后换行；不能在同一个对象里反复写 type、mention、properties、evidence 来表示多个实体。
 - properties 的键必须使用本体属性标识（目录箭头右侧），不能使用显示名称或原文表头；只使用当前 type 声明的属性。
 - 每个属性的支持引文放在 evidence.property_quotes 的同名键（字符串数组）；引文必须来自 documents 原文。
+- 即使只有一条引文，也写成 {"属性标识": ["原文引文"]}，不得把数组写成字符串。
 - 不输出字符偏移；程序根据 evidence.quote 定位来源，优先给出足以区分重复出现位置的原文上下文。
-- 数值、单位、标量属性值、字段标签和修饰词不是独立实体；同一 type + 完全相同 mention 每个 chunk 只输出一次。
-- 仍要给出 evidence.quote 作为来源（优先逐字原文片段）；确实无法逐字对应时给出最相关的原文片段，不要输出空实体。
+- evidence.quote 必须为可定位的原文片段；归纳 mention 不影响引文必须忠实原文。
+- evidence.quote 优先选能定位主体的短连续引文；各属性分别给出必要引文，不重复整份表单或长段正文。
 """ + ENTITY_NAME_RULES
 PROPERTY_RULES = """
-- 按 known_entities 中的 type + name 补全属性，直接以 JSONL 逐行返回完整实体；不得输出 entity_id、candidate_id 或 updates。
-- 每个唯一 type + name 必须返回一次，name 必须逐字保留候选阶段选定的原文名称，不得因合并而缩写、扩写、概括或改写；结合 occurrences 与全部 documents 的证据补全属性，没有可补属性时 properties 返回 {}。
-- 跨切片 type 和 name 完全相同的记录由你合并为一个完整实体；同名不同 type 分别处理，不做别名或模糊名称归并；不得新增、遗漏或重命名实体。
+- 按 known_entities 中的精确 type + name 逐行返回属性变更提案；不得输出 entity_id、candidate_id 或 updates。
+- 每个唯一 type + name 必须返回一次，name 必须逐字保留候选阶段选定的名称（含合法归纳名称），不得因合并而缩写、扩写、概括或改写；结合全部相关 documents 的证据补全属性，没有可补属性时 properties 返回 {}。
+- properties 只含本轮新增、修改或冲突消解的属性；省略属性不表示删除，已核验旧值由程序保留。相同键的来源用于综合事实，不做别名或模糊归并。
 - 合并属性时保留不同适用条件和各自证据，不用一个切片的结论覆盖另一个切片；无法消解的冲突不得擅自选值或拼造事实。
 - properties 只能包含该 type 在 ontology 中声明的属性；不得加入其他类型的属性。
 - 标识、名称、编号、日期、数值、单位等字面属性必须有原文依据；不得臆造流水号或默认值。
 - 描述、定义、范围、类别等语义属性可以忠实归纳，但不得加入证据之外的新事实。
-- 字符串属性确实缺失或无法确定时允许空字符串，不使用 null。
-- evidence.quote 必须是本次提供文本中的原文；每个属性的全部支持引文放入 evidence.property_quotes 的同名键（字符串数组），不得用实体名代替属性证据。"""
+- 缺失、无法确定或无变更的属性优先省略；兼容的空字符串不代表删除旧值，不使用 schema 未允许的 null。
+- 非空属性提案必须携带 evidence；每个属性的全部支持引文放入 evidence.property_quotes 的同名键（字符串数组），不得用实体名代替属性证据。无变更时 properties={}，不要求引文。"""
 def build_output_contract(schema: dict[str, Any], *, entity_task: bool,
                           task: str) -> dict[str, Any]:
     if not schema or schema.get("type") != "object":
@@ -80,20 +84,20 @@ def build_output_contract(schema: dict[str, Any], *, entity_task: bool,
     item = root.get("entities", {}).get("items", {})
     if (set(root) != {"entities"} or root["entities"].get("type") != "array"
             or set(item.get("properties", {})) != expected_fields
-            or set(item.get("required", [])) != (expected_fields - {"properties"} if entity_task else expected_fields)
+            or set(item.get("required", [])) != (expected_fields - {"properties"} if entity_task else expected_fields - {"evidence"})
             or schema.get("additionalProperties") is not False
             or item.get("additionalProperties") is not False):
         raise ValueError(f"Output schema does not match {task} stage")
     if entity_task:
         rules = ENTITY_RULES
-    elif task == "property":
+    elif task in {"property", "repair"}:
         rules = PROPERTY_RULES
     else:
         raise ValueError(f"Unsupported extraction task: {task}")
     return {
         "format": "jsonl",
         "success_schema": deepcopy(item),
-        "empty_result": "{}",
+        **({"empty_result": "{}"} if entity_task else {}),
         "constraints": ("只输出 JSONL，每行一个符合 success_schema 的实体对象；无实体候选时只输出单独一行 {}。\n"
                         if entity_task else "只输出 JSONL，每行一个符合 success_schema 的实体对象；必须覆盖所有给定的唯一 type + name，不能返回空结果。\n") + "禁止 entities 包装、外层数组、Markdown 代码块或解释文字；字符串内换行必须转义为 \\n，不得拆成多行。\n" + rules,
     }
@@ -191,11 +195,14 @@ def _property_schema(data_type: str) -> dict[str, Any]:
 
 
 def property_entity_schema(entities: list[dict[str, Any]], plan: ExtractionPlan) -> dict[str, Any]:
-    """The model returns complete records; type/name pairing is also checked locally."""
+    """One delta proposal per exact key; no-change rows need no invented evidence."""
     types = {entity["type"] for entity in entities}
     if len(types) != 1:
         raise ValueError("Property batches require exactly one entity type")
     specs = {prop.identifier: prop for prop in plan.class_specs[next(iter(types))].properties}
+    if all('requested_properties' in entity for entity in entities):
+        requested = {key for entity in entities for key in entity['requested_properties']}
+        specs = {key: prop for key, prop in specs.items() if key in requested}
     item = {
         "type": "object",
         "properties": {
@@ -206,13 +213,27 @@ def property_entity_schema(entities: list[dict[str, Any]], plan: ExtractionPlan)
             }, "additionalProperties": False},
             "evidence": {"type": "object", "properties": {"quote": {"type": "string"}, "property_quotes": {
             "type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}},
-                         "required": ["quote"], "additionalProperties": False},
+                         "additionalProperties": False},
         },
-        "required": ["type", "name", "properties", "evidence"],
+        "required": ["type", "name", "properties"],
         "additionalProperties": False,
     }
     return {"type": "object", "properties": {"entities": {"type": "array", "items": item}},
             "required": ["entities"], "additionalProperties": False}
+
+
+def validate_property_proposals(payload):
+    """Require source quotes for every proposed value, not for unchanged keys."""
+    errors = []
+    for index, row in enumerate(payload.get('entities', [])):
+        quotes = (row.get('evidence') or {}).get('property_quotes') or {}
+        for prop, value in row.get('properties', {}).items():
+            if value in (None, '', []):
+                continue
+            support = quotes.get(prop) or [(row.get('evidence') or {}).get('quote', '')]
+            if any(not q.strip() for q in support):
+                errors.append(f'entities[{index}].evidence.property_quotes.{prop}: support quotes required')
+    return errors
 
 
 def validate_candidate_properties(parsed, plan, *, chunk=None):
@@ -225,9 +246,11 @@ def validate_candidate_properties(parsed, plan, *, chunk=None):
             errors.append(f'$.entities[{index}].mention: must be non-empty')
         if chunk is not None:
             from .chunk_context import ChunkContextManager
-            manager = ChunkContextManager([chunk])
+            from .source_windows import source_parts
+            sources = source_parts(chunk)
             quote = row.get('evidence', {}).get('quote', '')
-            if manager.find_span(chunk.chunk_id, quote) is None and name not in chunk.text:
+            if not any(ChunkContextManager([source]).find_span(source.chunk_id, quote)
+                       or ChunkContextManager([source]).find_span(source.chunk_id, name) for source in sources):
                 errors.append(f'$.entities[{index}].evidence: neither quote nor mention has a source')
         if row.get("type") not in plan.class_specs:
             continue

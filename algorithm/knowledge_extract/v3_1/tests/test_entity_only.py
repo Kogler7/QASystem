@@ -39,7 +39,7 @@ def test_many_entities_with_required_relations_finish_after_properties():
     text = '\n\n'.join(f'{n}负责巡检。' if n.startswith('人员') else f'{n}需要执行。' for n in names)
     planner = EntityPlanner()
     def properties(prompt, chunk):
-        known = json.loads(prompt)["stage_context"]["known_entities"]
+        known = json.loads(prompt)["task"]["known_entities"]
         return {'entities': [{'type': e['type'], 'name': e['name'], 'properties': {'duty': '巡检'} if e['type']=='Person' else {},
                              'evidence': {'quote': e['name'] + '负责巡检。' if e['type']=='Person' else e['name']}} for e in known]}
     llm = StubLLM(entity_handler=lambda p, c: [span_item('Person' if n.startswith('人员') else 'Work', n) for n in names],
@@ -54,7 +54,7 @@ def test_many_entities_with_required_relations_finish_after_properties():
     assert result['intermediate_model']['relations'] == []
     assert result['mapping']['relations'] == []
     assert result['profile']['pipeline'] == 'entity_property'
-    assert {task for task, _ in llm.calls} == {'entity', 'property', 'evidence_verification'}
+    assert {task for task, _ in llm.calls} == {'skill_selection', 'entity', 'property', 'evidence_verification'}
     assert set(planner.stages) == {'entity', 'property'}
     assert result['profile']['repair_rounds'] == []
     assert not any(g['gap_type'] in {'relation_coverage', 'composite_membership'} for g in result['coverage_gaps'])

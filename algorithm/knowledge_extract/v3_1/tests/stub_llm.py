@@ -40,11 +40,24 @@ def _user_payload(prompt: str) -> dict[str, Any]:
     return payload if isinstance(payload, dict) and "task" in payload else {}
 
 
+def source_documents(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return only model-visible text; source segmentation remains internal."""
+    text = payload['documents']
+    pattern = r'【原文片段(\d+)；([^\n]*)】\n(.*?)\n【原文片段\1结束】'
+    parts = [{'text': match[2], 'context_only': '仅辅助上下文' in match[1]}
+             for match in re.findall(pattern, text, re.S)]
+    return parts or [{'text': text}]
+
+
+
 def current_chunk(prompt: str) -> dict[str, Any]:
     """解析 "## current chunk" 段落中的 chunk JSON（单行 json.dumps）。"""
     payload = _user_payload(prompt)
     if payload:
-        return payload["documents"][0]
+        documents = source_documents(payload)
+        if payload['task']['operation'] in {'entity', 'repair'} and 'known_entities' not in payload['task']:
+            return next((document for document in documents if not document.get('context_only')), documents[0])
+        return {'text': '\n\n'.join(document['text'] for document in documents)}
     lines = prompt.splitlines()
     for index, line in enumerate(lines):
         if line.strip() == "## current chunk" and index + 1 < len(lines):
@@ -80,7 +93,7 @@ def parse_known_entities(prompt: str) -> list[dict[str, str]]:
             "type": item["type"], "name": item["name"],
             "properties": ", ".join(f"{k}={v}" for k, v in item.get("properties", {}).items()),
             "missing": ", ".join(item.get("missing_properties", {})),
-        } for item in payload["stage_context"]["known_entities"]]
+        } for item in payload["task"]["known_entities"]]
     rows = []
     for match in _KNOWN_ROW.finditer(prompt):
         row = match.groupdict()
@@ -106,11 +119,15 @@ class StubLLM:
         property_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
         repair_handler: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
         verification_handler=None,
+        selection_handler=None,
+        identity_handler=None,
     ) -> None:
         self.entity_handler = entity_handler
         self.property_handler = property_handler
         self.repair_handler = repair_handler
         self.verification_handler = verification_handler
+        self.selection_handler = selection_handler
+        self.identity_handler = identity_handler
         self.calls: list[tuple[str, str]] = []
 
     def _ground(self, item: dict[str, Any], chunk: dict[str, Any]) -> dict[str, Any]:
@@ -128,23 +145,41 @@ class StubLLM:
     def __call__(self, messages: Any) -> str:
         prompt = user_prompt(messages)
         task = task_of(prompt)
-        chunk = current_chunk(prompt)
         self.calls.append((task, prompt))
+        if task == 'skill_selection':
+            user = _user_payload(prompt)
+            if self.selection_handler is not None:
+                return json.dumps(self.selection_handler(user), ensure_ascii=False)
+            # Deterministic fixtures only; runtime selection uses Skill descriptions.
+            types = set(user['task']['allowed_types'])
+            family = ('official_document' if 'OfficialDocument' in types else
+                      'rule' if 'RuleType' in types else
+                      'trouble' if 'FaultComponent' in types else None)
+            refs = [s['skill_ref'] for s in user['task']['skills'] if s['name'] == family]
+            return json.dumps({'status': 'selected' if refs else 'no_match',
+                               'skill_refs': refs, 'reason': 'fixture selection'})
+        chunk = current_chunk(prompt)
         if task in {"relation", "relation_verification"}:
             raise AssertionError("V3.1 must not request relationship extraction")
+        elif task == 'candidate_identity':
+            items = _user_payload(prompt)['task']['items']
+            payload = (self.identity_handler(_user_payload(prompt)) if self.identity_handler else
+                       {item['item_id']: {'mention': item['name']} for item in items})
+            return json.dumps(payload, ensure_ascii=False)
         elif task == "evidence_verification":
-            items = _user_payload(prompt)["stage_context"]["items"]
+            items = _user_payload(prompt)["task"]["items"]
             payload = {"verdicts": [{"item_id": item["item_id"],
                 "supported": self.verification_handler(item, chunk) if self.verification_handler else "uncertain",
                 "reason": "fixture verdict"} for item in items]}
         elif task == "entity":
             items = self.entity_handler(prompt, chunk) if self.entity_handler else []
             payload: dict[str, Any] = {"entities": [self._ground(item, chunk) for item in items]}
-        elif task == "property":
+        elif task == "property" or (task == 'repair' and 'known_entities' in _user_payload(prompt)['task']):
+            handler = self.repair_handler if task == 'repair' else self.property_handler
             payload = (
-                self.property_handler(prompt, chunk) if self.property_handler else {
-                    "entities": [{"type": e["type"], "name": e["name"], "properties": e.get("properties", {}),
-                                  "evidence": {"quote": e["name"]}} for e in _user_payload(prompt)["stage_context"]["known_entities"]]
+                handler(prompt, chunk) if handler else {
+                    "entities": [{"type": e["type"], "name": e["name"], "properties": {}}
+                                 for e in _user_payload(prompt)["task"]["known_entities"]]
                 }
             )
         else:  # repair 或其他：按 output schema 顶层 required 键返回空集合
@@ -153,4 +188,4 @@ class StubLLM:
             else:
                 required = output_schema_required(prompt) or ["entities"]
                 payload = {key: [] for key in required}
-        return ("\n".join(json.dumps(item, ensure_ascii=False) for item in payload["entities"]) or "{}") if "entities" in payload else json.dumps(payload, ensure_ascii=False)
+        return ("\n".join(json.dumps(item, ensure_ascii=False) for item in payload["entities"]) or "{}") if "entities" in payload else "\n".join(json.dumps(item, ensure_ascii=False) for item in payload["verdicts"])

@@ -55,13 +55,10 @@ def entity_uid(entity_type: Any, entity_name: Any, properties: dict[str, Any] | 
 
 
 def build_node_properties(entity_name: Any, properties: dict[str, Any] | None) -> dict[str, Any]:
-    """Populate node properties while preventing empty `name` overrides."""
+    """Keep ontology properties intact; supply a display fallback only if absent."""
     merged = dict(properties or {})
     resolved_name = coerce_non_empty_name(entity_name) or coerce_non_empty_name(merged.get("name"))
-    if resolved_name:
-        merged["name"] = resolved_name
-    else:
-        merged.setdefault("name", "")
+    merged.setdefault("name", resolved_name or "")
     return merged
 
 

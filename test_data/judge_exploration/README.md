@@ -1,3 +1,9 @@
+---
+noteId: "e165d0e7c5fd11f192edfbc308186266"
+tags: []
+
+---
+
 # Judge 诊断集 v1
 
 `diagnostic-v1.json` 冻结 24 对来自 2026-10-11 v3/DeepSeek 四模型实验的预测与 golden 候选：10 个 provisional 正例、12 个难负例、2 个粒度争议。审阅来源是 `docs/算法/评测Judge人工抽查20261011.md`；不是人类 ground truth，不验证原文事实支持，不能用来估计总体准确率。

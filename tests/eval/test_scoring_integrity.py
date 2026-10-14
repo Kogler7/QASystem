@@ -62,6 +62,40 @@ def test_all_candidate_edges_survive_until_global_assignment(monkeypatch):
     ]
 
 
+def test_output_truncation_splits_window_and_preserves_original_indices(monkeypatch):
+    client = _client(monkeypatch, lambda g, p: [(i,j) for i in range(len(g)) for j in range(len(p))])
+    original = run.http_request
+    def truncated(url, **kwargs):
+        status, headers, body = original(url, **kwargs)
+        data=json.loads(body)
+        content=json.loads(data['choices'][0]['message']['content'])
+        if len(content['entity_matches']) > 2:
+            data['choices'][0]['finish_reason']='length'
+        return status,headers,json.dumps(data).encode()
+    monkeypatch.setattr(run,'http_request',truncated)
+    pairs,batches,coverage=run._judge_windows(client,'entity_matches',
+        [_entity('g0'),_entity('gap'),_entity('g2')],[_entity('p0'),_entity('gap'),_entity('p2')],
+        [0,2],[0,2],golden_window=2,predicted_window=2,max_concurrency=2)
+    assert set(pairs)=={(0,0),(0,2),(2,0),(2,2)}
+    assert coverage['pairs_presented']==4 and coverage['windows']==2
+    assert batches[0]['split_retry'] and batches[0]['split_reason']=='output_limit'
+    assert len(batches)==3
+
+
+def test_single_pair_truncation_still_fails_without_infinite_splitting(monkeypatch):
+    client=_client(monkeypatch,lambda g,p:[])
+    original=run.http_request
+    def truncated(url,**kwargs):
+        status,headers,body=original(url,**kwargs);data=json.loads(body)
+        data['choices'][0]['finish_reason']='length'
+        return status,headers,json.dumps(data).encode()
+    monkeypatch.setattr(run,'http_request',truncated)
+    with pytest.raises(run.JudgeBatchError) as caught:
+        run._judge_windows(client,'entity_matches',[_entity('g')],[_entity('p')],[0],[0],
+                           golden_window=1,predicted_window=1,max_concurrency=1)
+    assert len(caught.value.judge_batches)==1
+
+
 @pytest.mark.parametrize("pair", [(1, 0), (0, 1), (4, 8)])
 def test_out_of_bounds_judge_reply_is_a_protocol_failure(monkeypatch, pair):
     client = _client(monkeypatch, lambda _g, _p: [pair])
@@ -219,9 +253,10 @@ def test_judge_cannot_award_tp_across_ontology_types(monkeypatch, gold_type, pre
         [golden], [], [predicted], [], _client(monkeypatch, lambda _g, _p: [(0, 0)]),
     )
     assert metrics["entities"]["tp"] == 0
-    assert metrics["details"]["judge_coverage"]["entities"]["rejected_type_pairs"] == [
-        {"golden_index": 0, "predicted_index": 0}
-    ]
+    coverage = metrics["details"]["judge_coverage"]["entities"]
+    assert coverage["type_pruned_pairs"] == 1
+    assert coverage["pairs_presented"] == 0
+    assert metrics["details"]["judge_batches"] == []
 
 
 @pytest.mark.parametrize("field", ["from_type", "rel_type", "to_type"])
@@ -232,7 +267,8 @@ def test_judge_cannot_award_tp_for_relation_type_conflicts(monkeypatch, field):
         _client(monkeypatch, lambda _g, _p: [(0, 0)]), "relation_matches", [golden], [predicted],
     )
     assert pairs == []
-    assert len(coverage["rejected_type_pairs"]) == 1
+    assert coverage["type_pruned_pairs"] == 1
+    assert coverage["pairs_presented"] == 0
 
 
 def test_type_spelling_normalization_preserves_declared_equivalence(monkeypatch):
@@ -298,3 +334,34 @@ def test_relation_alignment_recomputes_maximum_over_all_candidate_edges():
         [(0, 0), (1, 1)], [(0, 0), (0, 1), (1, 0)],
     )
     assert pairs == [(0, 1), (1, 0)]
+
+
+def test_type_partition_visits_all_compatible_pairs_and_keeps_original_indices(monkeypatch):
+    golden = [{'type': t, 'name': f'g{i}'} for i, t in enumerate(['A', 'B', 'A', 'C'])]
+    predicted = [{'type': t, 'name': f'p{i}'} for i, t in enumerate(['B', 'A', 'A', 'D'])]
+    seen = set()
+    def respond(gold, pred):
+        assert len({e['type'] for e in gold + pred}) == 1
+        for g in gold:
+            for p in pred:
+                seen.add((g['name'], p['name']))
+        return [(0, 0)]
+    pairs, _, coverage = run._judge_collection(_client(monkeypatch, respond),
+        'entity_matches', golden, predicted, batch_size=1, golden_batch_size=1)
+    expected = {(g['name'], p['name']) for g in golden for p in predicted if g['type'] == p['type']}
+    assert seen == expected
+    assert len(pairs) == 3
+    assert all(golden[g]['type'] == predicted[p]['type'] for g, p in pairs)
+    assert coverage['pairs_presented'] == 5
+    assert coverage['pairs_presented'] + coverage['type_pruned_pairs'] == coverage['pairs_total'] == 16
+
+
+def test_type_partition_failure_retains_previous_paid_call_diagnostics(monkeypatch):
+    golden = [{'type': t, 'name': 'gold'} for t in ['A', 'B']]
+    predicted = [{'type': t, 'name': 'pred'} for t in ['A', 'B']]
+    client = _client(monkeypatch, lambda g, p: [(0, 0)] if g[0]['type'] == 'A' else [(0, 9)])
+    with pytest.raises(run.JudgeBatchError) as caught:
+        run._judge_collection(client, 'entity_matches', golden, predicted)
+    assert len(caught.value.judge_batches) == 2
+    assert caught.value.judge_batches[0]['attempts'][0]['status'] == 'succeeded'
+    assert caught.value.judge_batches[1]['attempts'][0]['status'] == 'failed'

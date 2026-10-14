@@ -1,6 +1,6 @@
 {
   "schema_version": "judge-windows-v1",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "label_contract": "eval/run.py _build_judge_messages reference-relative matching; entity aliases, property compatibility, relation direction/endpoints",
   "adjudication": "Inherited exact indexed pairs from judge/v1 agent review and deterministic contract rules; no independent human labels, no historical judge predictions used as labels",
   "window_policy": "Original normalized evidence-stripped graph order, floor(index/40)*40 golden and floor(index/20)*20 predicted; natural tail windows retain actual length; no synthetic or cross-document candidates",
@@ -61,12 +61,20 @@
     "jp-0df4fca73cb1a6bd1ef5"
   ],
   "files_sha256": {
-    "windows.jsonl": "37561932d599464ea2fec38590104275b6807468569bfdb8942c45ab48d810c5"
+    "windows.jsonl": "2852c4c3bee7b0b700b64c17fa202dcb215f0dd99c191411c5740fe723329328"
   },
   "label_coverage_audit": {
     "scanned_pairs": 103,
     "same_source_in_window_exact_object_pairs": 16,
     "additional_labels_added": 0,
     "policy": "Every reviewed pair origin is checked against existing window source_id, global bounds and exact source objects; no windows added; duplicate candidate edges excluded."
+  },
+  "byte_revision": {
+    "source_commit": "2392ece",
+    "previous_version": "1.0.0",
+    "previous_sha256": "37561932d599464ea2fec38590104275b6807468569bfdb8942c45ab48d810c5",
+    "encoding": "UTF-8, LF",
+    "semantic_content_changed": false,
+    "reason": "Canonical Git LF bytes must match the manifest on Windows and Linux."
   }
 }

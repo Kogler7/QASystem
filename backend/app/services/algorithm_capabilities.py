@@ -28,7 +28,8 @@ from backend.app.schemas import (
     TextChunk,
     TextEmbeddingItem,
 )
-from backend.app.services.knowledge_extract_adapter import extract_chunks, publish_best_effort_graph
+from backend.app.services import knowledge_extract_adapter
+from backend.app.services.knowledge_extract_adapter import extract_chunks
 
 
 class CapabilityError(Exception):
@@ -152,7 +153,7 @@ class GraphExtractionBatch:
         # 默认（KG_EXTRACT_PUBLISH_BEST_EFFORT=1）校验未过也发布 best-effort 图谱，
         # graph_publishable=false 仅作"不可沉淀入库"的质量信号；置 0 恢复旧行为：
         # graph/graphs 置空，图谱只出现在 isolated_graph/isolated_graphs。
-        quarantine_graph = not publishable and not publish_best_effort_graph()
+        quarantine_graph = not publishable and not knowledge_extract_adapter.publish_best_effort_graph()
         if self.graph is not None:
             data["graph"] = {"nodes": [], "relationships": []} if quarantine_graph else self.graph
             quarantined_graph = self.isolated_graph if self.isolated_graph is not None else self.graph
@@ -460,7 +461,12 @@ class GraphExtractionService:
                 for item in failed
             ]
             all_failed = len(failed) == len(results)
-            if all_failed or _strict_chunk_failures():
+            recovered_partial = any(
+                item.get("quality", {}).get("status") == "partial"
+                and bool(item.get("graph", {}).get("nodes"))
+                for item in results
+            )
+            if (all_failed and not recovered_partial) or _strict_chunk_failures():
                 raise CapabilityError(
                     _extraction_error(failed, len(results)),
                     "全部文本切片知识抽取失败" if all_failed else "部分文本切片知识抽取失败",
@@ -499,6 +505,7 @@ class GraphExtractionService:
         }
         if failed:
             quality["status"] = "partial"
+            quality["graph_publishable"] = False
             quality["error_code"] = _extraction_error(failed, len(results)).name
             quality["failed_chunk_count"] = len(failed)
         if extraction_config:
@@ -512,7 +519,7 @@ class GraphExtractionService:
             # 校验未过时默认仍发布 best-effort 图谱（graph_publishable 照旧为
             # False，供下游沉淀/入库判断）；KG_EXTRACT_PUBLISH_BEST_EFFORT=0
             # 恢复旧的置空行为。isolated_graph 语义不变：未过校验即保留隔离副本。
-            publish_graph = graph_publishable or publish_best_effort_graph()
+            publish_graph = graph_publishable or knowledge_extract_adapter.publish_best_effort_graph()
             return GraphExtractionBatch(
                 items=results,
                 attempts=attempts,
@@ -527,7 +534,7 @@ class GraphExtractionService:
                 empty_reason=empty_reason,
             )
         graph_publishable = bool(quality.get("graph_publishable", True))
-        publish_graph = graph_publishable or publish_best_effort_graph()
+        publish_graph = graph_publishable or knowledge_extract_adapter.publish_best_effort_graph()
         extracted_graphs = [item["graph"] for item in results]
         return GraphExtractionBatch(
             items=results,

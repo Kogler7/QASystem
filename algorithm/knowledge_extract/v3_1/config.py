@@ -1,6 +1,5 @@
 """知识抽取 V3.1 的 LLM 环境配置。"""
 from docker.configuration import getenv as config_getenv
-import os
 
 
 def _env(key: str, *fallback_keys: str, default: str = "") -> str:
@@ -34,4 +33,5 @@ def get_llm_config() -> dict:
         "qpm": max(0, KG_EXTRACT_QPM),
         "request_timeout": max(1.0, KG_EXTRACT_REQUEST_TIMEOUT),
         "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
+        "generation_temperature": float(_env("KG_EXTRACT_V31_GENERATION_TEMPERATURE", default="0")),
     }

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal, TypedDict
 
 from .prompt_templates import BASE_SYSTEM_PROMPT, build_system_prompt, render_user
@@ -11,10 +11,11 @@ from .prompt_templates import document_payload
 from .output_contracts import build_output_contract
 from .chunk_context import ExtractionChunk
 from .structured_text import is_structured_payload
+from .source_windows import source_parts as _source_parts
 from .ontology_compiler import ExtractionPlan
 from .graph_utils import canonical_name
 
-RouteKind = Literal["generic", "official_document", "standard"]
+RouteKind = Literal["generic", "official_document", "standard", "rule", "trouble"]
 RouteSource = Literal["ontology", "chunks", "fallback"]
 
 
@@ -277,6 +278,24 @@ def resolve_document_route(plan: ExtractionPlan, chunks: list[ExtractionChunk]) 
     )
 
 
+def resolve_extraction_route(plan: ExtractionPlan, chunks: list[ExtractionChunk]) -> DocumentRoute:
+    """Preserve the V2 document router, supplement its unambiguous generic fallback."""
+    route = resolve_document_route(plan, chunks)
+    if route.kind != 'generic' or any(score >= _DOMAIN_THRESHOLD for _, score in route.scores):
+        return route
+    specs = {canonical_name(key): spec for key, spec in plan.class_specs.items()}
+    rule = specs.get('ruletype')
+    is_rule = rule is not None and {'antecedent', 'consequent'} <= {
+        canonical_name(p.identifier) for p in rule.properties}
+    is_trouble = len(set(specs) & {'faultcomponent', 'faulttype', 'faulthandlingmethod',
+                                 'troubleshootingexperiment', 'experimentresult'}) >= 3
+    if is_rule == is_trouble:
+        return route
+    family = 'rule' if is_rule else 'trouble'
+    return replace(route, kind=family, source='ontology',
+                   reasons=tuple(sorted((*route.reasons, f'route.ontology.{family}.family'))))
+
+
 def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False, type_ids=None) -> str:
     lines: list[str] = []
     for type_id in sorted(plan.allowed_types if type_ids is None else type_ids):
@@ -287,11 +306,18 @@ def _catalog_text(plan: ExtractionPlan, *, include_comments: bool = False, type_
         if spec.identity_properties:
             line += f"；identity: {', '.join(spec.identity_properties)}"
         lines.append(line)
+        if include_comments and spec.description:
+            lines.append('  类定义：' + spec.description)
         for prop in spec.properties:
             suffix = ""
             if include_comments:
                 comment = " ".join((prop.comment or "").split())
-                suffix = f" // {comment[:200]}" if comment else ""
+                suffix = f" // {comment}" if comment else ""
+                constraints = {key: getattr(prop, key) for key in
+                               ('required', 'multi_value', 'context_inferable')
+                               if getattr(prop, key) is not None}
+                if constraints:
+                    suffix += '；约束: ' + ', '.join(f'{key}={str(value).lower()}' for key, value in constraints.items())
             lines.append(f"  - `{prop.display_name}` -> `{prop.identifier}` ({prop.data_type}){suffix}")
     return "\n".join(lines) if lines else "（无本体类目录）"
 
@@ -309,12 +335,9 @@ def _type_catalog_text(plan: ExtractionPlan) -> str:
 def _known_entities_payload(
     known_entities: list[dict[str, Any]] | None, *, task: str,
 ) -> list[dict[str, Any]]:
-    """Preserve the old catalog fields and repair budget in structured form."""
+    """Allowlist business operands without silently truncating repair targets."""
     entries = known_entities or []
-    fields = ("type", "name", "properties", "occurrences", "missing_properties")
-    if task == "repair":
-        entries = entries[:25]
-        fields = fields[:-1]
+    fields = ("type", "name", "properties", "occurrences", "missing_properties", "requested_properties")
     result = []
     for entry in entries:
         item = {key: entry[key] for key in fields
@@ -337,6 +360,23 @@ def _known_entities_payload(
 
 def _chunk_payload(chunk: ExtractionChunk, *, task: str) -> dict[str, Any]:
     return document_payload(chunk)
+
+
+def _repair_inputs(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep the problem and business target, not paths, spans or audit state."""
+    # COSEC: Allowlist task operands so new internal diagnostics cannot leak to the model.
+    result = []
+    for issue in issues:
+        item = {key: issue[key] for key in ("code", "message", "repair_type") if issue.get(key)}
+        context = issue.get("context") or {}
+        if issue.get("repair_type") == "uncovered_block":
+            item["message"] = "所给原文尚未绑定实体，请检查是否存在符合本体的遗漏实体。"
+        item.update({key: context[key] for key in
+                     ("target_type", "evidence", "expected_features", "required") if context.get(key)})
+        if issue.get('repair_type') == 'required_property' and context.get('evidence'):
+            item['target_name'] = context['evidence']
+        result.append(item)
+    return result
 
 
 def _looks_like_record_table(chunk: ExtractionChunk) -> bool:
@@ -366,10 +406,10 @@ def build_chat_messages(
     output_schema: dict[str, Any] | None = None,
     repair_issues: list[dict[str, Any]] | None = None,
     assembly_planner: Any | None = None,
+    accepted_keys=(),
 ) -> ChatMessages:
-    entity_task = task == "entity" or (
-        task == "repair" and "entities" in (output_schema or {}).get("properties", {})
-    )
+    entity_task = task == "entity" or (task == "repair" and 'mention' in
+        (output_schema or plan.output_schemas['entity_candidates'])['properties']['entities']['items']['properties'])
     if task not in {"entity", "property", "repair"}:
         raise ValueError(f"Unsupported extraction task: {task}")
     if output_schema is None:
@@ -377,14 +417,13 @@ def build_chat_messages(
             output_schema = plan.output_schemas["entity_candidates"]
         else:
             raise ValueError(f"output_schema is required for {task}")
-    if task == "repair" and not entity_task:
-        raise ValueError("Repair only supports entity candidates")
     if task == "repair":
-        discipline = "只修复列出的 verifier issues；不得重复已接受事实，不得处理未列问题。"
+        discipline = ("只检查给定漏抽问题的来源范围，发现符合本体的遗漏实体，不输出无关事实。" if entity_task else
+                      "保持给定目标的精确 type + name，仅提出待修属性的变更；无进展返回该键及空 properties，不输出无关实体。")
     elif entity_task:
         discipline = "同时提取实体候选和当前片段支持的本体属性，禁止输出关系；按属性说明理解字段，不得因处于候选阶段而省略已知属性。"
     elif task == "property":
-        discipline = "按给定实体的 type + name 补全属性并以 JSONL 逐行返回完整实体；跨切片相同 type + name 统一输出一个实体，不同 type 的同名实体分开；不得新增、遗漏或重命名实体，不得输出关系。"
+        discipline = "每个给定的精确 type + name 恰好返回一条属性变更提案；省略属性不表示删除旧值，无变更返回空 properties。不得新增、遗漏或重命名实体，不输出关系。"
     else:
         raise ValueError(f"Unsupported extraction task: {task}")
 
@@ -400,17 +439,20 @@ def build_chat_messages(
         task={
             "operation": task,
             "discipline": discipline,
+            **({"known_entities": known} if not entity_task else {}),
+            **({'saved_entity_keys': [{'type': type_id, 'name': name} for type_id, name in sorted(accepted_keys)
+                                     if type_id in type_ids]}
+               if entity_task and any(type_id in type_ids for type_id, _ in accepted_keys) else {}),
+            **({"repair_issues": _repair_inputs(repair_issues or [])} if task == "repair" else {}),
         },
         output_contract=contract,
         domain_policy=compose_domain_policy(route.to_dict(),
-            ("entity", "property", "repair") if task == "repair" else
-            ("entity", "property") if entity_task else ("property",), assembly_planner),
-        stage_context={**({"known_entities": known} if not entity_task else {}),
-                       **({"repair_issues": repair_issues or []} if task == "repair" else {})},
+            ("entity", "repair") if task == "repair" and entity_task else
+            ("property", "repair") if task == "repair" else (task,), assembly_planner),
         ontology={
             "catalog": ontology_section,
         },
-        documents=[_chunk_payload(source, task=task) for source in (source_chunks or [chunk])],
+        documents=[_chunk_payload(source, task=task) for source in (source_chunks or _source_parts(chunk))],
     )
     user = render_user(**payload)
     return [

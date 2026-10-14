@@ -120,6 +120,15 @@ class ExtractionVerifier:
             if any(not _valid_source_span(span, manager) for span in spans):
                 issues.append(VerificationIssue(code='EVIDENCE_INVALID',
                     message='实体证据的来源、偏移或引文不一致', path=f'entities[{index}]'))
+            literal = any(manager.has_chunk(cid) and manager.find_span(cid, entity['name']) is not None
+                          for span in spans for cid in span.get('source_block_ids', []))
+            if not literal:
+                receipt = entity.get('entity_evidence') or {}
+                if (receipt.get('name') != entity['name'] or receipt.get('type') != entity['type']
+                        or receipt.get('support') != 'llm' or not receipt.get('sources')
+                        or any(not _valid_source_span(s, manager) for s in receipt['sources'])):
+                    issues.append(VerificationIssue(code='ENTITY_SEMANTIC_UNSUPPORTED',
+                        message='归纳实体名称缺少语义核验收据', path=f'entities[{index}]'))
             for prop, value in (entity.get("properties") or {}).items():
                 receipt = (entity.get("property_evidence") or {}).get(prop) or {}
                 spans = receipt.get("sources") or []

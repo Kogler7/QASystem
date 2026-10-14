@@ -8,6 +8,18 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "test_data/judge_windows/v1"
 
 
+def test_frozen_windows_use_canonical_lf_bytes_without_label_changes():
+    for filename, manifest_name in (
+        ('windows.jsonl', 'manifest.json'),
+        ('small_reviewed.jsonl', 'small_review_manifest.json'),
+    ):
+        assert b'\r\n' not in (DATA / filename).read_bytes()
+        manifest = json.loads((DATA / manifest_name).read_text(encoding='utf-8'))
+        assert manifest['version'] == '1.0.1'
+        assert manifest['byte_revision']['semantic_content_changed'] is False
+        assert manifest['byte_revision']['encoding'] == 'UTF-8, LF'
+
+
 def test_window_labels_retain_exact_reviewed_objects():
     pairs = {p["id"]: p for p in map(json.loads, (ROOT / "test_data/judge/v1/pairs.jsonl").read_text(encoding="utf-8").splitlines())}
     rows = list(map(json.loads, (DATA / "windows.jsonl").read_text(encoding="utf-8").splitlines()))

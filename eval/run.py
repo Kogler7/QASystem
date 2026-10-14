@@ -104,6 +104,7 @@ DEFAULT_PARAMS: dict[str, Any] = {
         "judge_max_concurrency": 4,
         "judge_response_format": "auto",
         "judge_disable_thinking": True,
+        "judge_transport_attempts": 1,
     },
     "groups": {},
     "runs_retention_days": DEFAULT_RUNS_RETENTION_DAYS,
@@ -173,6 +174,7 @@ def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--judge-batch-size", type=int, default=DEFAULT_PARAMS["eval"]["judge_batch_size"], help="裁判预测窗口条数")
     parser.add_argument("--judge-golden-batch-size", type=int, default=DEFAULT_PARAMS["eval"]["judge_golden_batch_size"], help="裁判 golden 窗口条数")
     parser.add_argument("--judge-max-concurrency", type=int, default=DEFAULT_PARAMS["eval"]["judge_max_concurrency"], help="裁判并发数")
+    parser.add_argument("--judge-transport-attempts", type=int, choices=(1, 2, 3), default=DEFAULT_PARAMS["eval"]["judge_transport_attempts"], help="裁判瞬时错误（429/502/503/504）重试次数，默认1")
     parser.add_argument("--judge-response-format", choices=("auto", "json_object", "json_schema"), default=DEFAULT_PARAMS["eval"]["judge_response_format"], help="裁判响应协议")
     parser.add_argument("--judge-disable-thinking", action=argparse.BooleanOptionalAction, default=DEFAULT_PARAMS["eval"]["judge_disable_thinking"], help="关闭裁判思考输出")
     parser.add_argument("--mini-cases-per-type", type=int, choices=(1, 2), default=1, help="mini 每类型选择数量")
@@ -192,7 +194,7 @@ def params_from_args(args: argparse.Namespace) -> dict[str, Any]:
     params = deepcopy(DEFAULT_PARAMS)
     for key in ("backend_url", "mcp_url", "poll_interval_seconds", "poll_timeout_seconds"):
         if hasattr(args, key): params[key] = getattr(args, key)
-    for key in ("timeout_seconds", "max_tokens", "batch_size", "golden_batch_size", "max_concurrency", "response_format", "disable_thinking"):
+    for key in ("timeout_seconds", "max_tokens", "batch_size", "golden_batch_size", "max_concurrency", "response_format", "disable_thinking", "transport_attempts"):
         if getattr(args, "judge_" + key, None) is not None: params["eval"]["judge_" + key] = getattr(args, "judge_" + key)
     params["_judge_overrides"] = {key: getattr(args, "judge_" + key) for key in ("model", "base_url", "adapter", "key_env") if getattr(args, "judge_" + key, None) is not None}
     params["_judge_overrides"].update({key: getattr(args, "judge_" + key) for key in ("max_tokens", "timeout_seconds") if getattr(args, "judge_" + key, None) is not None})
@@ -783,7 +785,7 @@ def _safe_text(value: Any) -> str:
 def _node_type_name(node: dict[str, Any]) -> tuple[str, str]:
     properties = node.get("properties") if isinstance(node.get("properties"), dict) else {}
     etype = _safe_text(node.get("type") or node.get("label"))
-    ename = _safe_text(node.get("name") or properties.get("name") or node.get("identity"))
+    ename = _safe_text(node.get("display_name") or node.get("name") or node.get("identity") or properties.get("name"))
     if (not etype or not ename) and "::" in _safe_text(node.get("uid")):
         uid_type, uid_name = _safe_text(node.get("uid")).split("::", 1)
         etype = etype or uid_type
@@ -1095,6 +1097,7 @@ def _build_judge_messages(
 1. type：必须是同一本体类型标识，只允许大小写、全半角、空格、下划线的书写差异。不得推断类型同义词或跨类型匹配；部门、活动和交互等即使有关联也不是同一实体。
 2. name：指向同一个现实对象即可。允许同义表达、别名、简称与全称、规范名，允许标点/空格/大小写/全半角/繁简差异，
    允许不改变指代的修饰成分（如“的通知”“（试行）”“等3项管理制度”）。
+   名称是序号或短标签时，结合两侧属性中的标题、原文内容、顺序号确认指代；短标签与原文全文名称可指向同一对象，但仅主题相关或序号相同不足以匹配。
 3. properties：只在两侧都填写了的属性键上比较，值语义一致即通过（数值 100 与 100.0、日期与单位的不同写法、
    全半角与空格差异都算一致）。
    - 只有一侧填写（另一侧缺失、空字符串、空数组）时不算冲突，不得因此判为不匹配；
@@ -1552,9 +1555,12 @@ def _judge_windows(
                 })
             input_limit = any(attempt.get("input_limit") for info in exc.judge_batches
                               for attempt in info.get("attempts", []))
-            if input_limit and (len(golden_slice) > 1 or len(predicted_slice) > 1):
+            output_limit = any(attempt.get('finish_reason') == 'length' for info in exc.judge_batches
+                               for attempt in info.get('attempts', []))
+            if (input_limit or output_limit) and (len(golden_slice) > 1 or len(predicted_slice) > 1):
                 for info in exc.judge_batches:
                     info["split_retry"] = True
+                    info['split_reason'] = 'output_limit' if output_limit else 'input_limit'
                 if len(golden_slice) >= len(predicted_slice) and len(golden_slice) > 1:
                     midpoint = len(golden_slice) // 2
                     children = [(golden_slice[:midpoint], predicted_slice),
@@ -1694,17 +1700,39 @@ def _judge_collection(
             candidate_pairs_out.extend(auto_candidates)
         return auto_pairs, [], coverage
 
-    pairs, batch_infos, window_coverage = _judge_windows(
-        judge_client,
-        collection_name,
-        golden_items,
-        predicted_items,
-        swept_golden,
-        swept_predicted,
-        golden_window=max(1, int(golden_batch_size or 0) or max(int(batch_size or 20), JUDGE_GOLDEN_WINDOW_DEFAULT)),
-        predicted_window=max(1, int(batch_size or 20)),
-        max_concurrency=max(1, int(max_concurrency or 1)),
-    )
+    # Cross-type pairs are already forbidden by the scoring contract. Partition
+    # before prompting so unrelated types cannot drown out real candidates in a
+    # large window (some judges otherwise return a syntactically valid empty set).
+    # Visit every compatible pair, including rows in the local matching, so
+    # global augmenting paths and the final one-to-one assignment remain intact.
+    fields = ("from_type", "rel_type", "to_type") if relation else ("type",)
+    def type_buckets(items):
+        buckets = {}
+        for index, item in enumerate(items):
+            key = tuple(_type_identity(item.get(field)) for field in fields)
+            if all(key):
+                buckets.setdefault(key, []).append(index)
+        return buckets
+    golden_types, predicted_types = type_buckets(golden_items), type_buckets(predicted_items)
+    pairs, batch_infos = [], []
+    window_coverage = {"windows": 0, "pairs_presented": 0, "empty_windows": 0}
+    for type_key in sorted(golden_types.keys() & predicted_types.keys()):
+        try:
+            found, infos, counts = _judge_windows(
+                judge_client, collection_name, golden_items, predicted_items,
+                golden_types[type_key], predicted_types[type_key],
+                golden_window=max(1, int(golden_batch_size or 0) or max(int(batch_size or 20), JUDGE_GOLDEN_WINDOW_DEFAULT)),
+                predicted_window=max(1, int(batch_size or 20)),
+                max_concurrency=max(1, int(max_concurrency or 1)),
+            )
+        except JudgeBatchError as exc:
+            exc.judge_batches = batch_infos + exc.judge_batches
+            raise
+        pairs.extend(found)
+        batch_infos.extend(infos)
+        for key in window_coverage:
+            window_coverage[key] += counts[key]
+    coverage["type_pruned_pairs"] = coverage["pairs_total"] - window_coverage["pairs_presented"]
     # 全图扫描的窗口可能整窗回空数组：与数百对候选一起送审时模型会放弃作答。凡是身份
     # 归一化一致、类型相容、只因属性/端点上下文冲突而无法本地确认的候选，单独补判一次。
     deferred_pairs = _deferred_identity_pairs(golden_items, predicted_items, relation=relation)
@@ -1970,6 +1998,7 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
         response_format=str(eval_cfg.get("judge_response_format") or "auto"),
         disable_thinking=eval_cfg.get("judge_disable_thinking", True),
         adapter=adapter,
+        transport_attempts=eval_cfg.get('judge_transport_attempts', 1),
     )
 
 

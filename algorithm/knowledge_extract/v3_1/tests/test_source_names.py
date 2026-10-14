@@ -1,4 +1,6 @@
 """Original names survive candidate selection and cross-chunk completion."""
+
+from .stub_llm import source_documents
 import json
 
 import pytest
@@ -24,7 +26,8 @@ def test_original_name_rules_reach_system_and_user(stage):
     messages = build_chat_messages(task=stage, plan=plan, route=resolve_document_route(plan, [chunk]),
                                   chunk=chunk, output_schema=plan.output_schemas["entity_candidates"], repair_issues=[{'code': 'MISSING_ENTITY'}] if stage=='repair' else [])
     user = json.loads(messages[1]['content'])
-    for rules in [messages[0]['content'], user['output_contract']['constraints']]:
+    assert 'output_contract.success_schema' in messages[0]['content']
+    for rules in [user['output_contract']['constraints']]:
         assert '逐字保留完整名称及内部空格、大小写、标点' in rules
         assert '优先选择原文中实际出现的完整全称' in rules
         assert '不得凭常识扩写简称' in rules
@@ -35,11 +38,13 @@ def test_original_name_rules_reach_system_and_user(stage):
 def test_full_source_name_unchanged_after_cross_chunk_completion():
     def properties(prompt, chunk):
         user=json.loads(prompt)
-        known=user['stage_context']['known_entities']
+        known=user['task']['known_entities']
         assert len(known)==1 and known[0]['name']==NAME
         assert len(known[0]['occurrences'])==2
         assert user['output_contract']['success_schema']['properties']['name']['enum']==[NAME]
-        return {'entities':[{'type':'Organization','name':NAME,'properties':{'duty':'检查并记录'},'evidence':{'quote':chunk['text'], 'property_quotes':{'duty':[d['text'] for d in user['documents']]}}}]}
+        quotes = [f'{NAME}（简称“智能装备”）负责检查。', f'{NAME}负责记录。']
+        assert all(quote in user['documents'] for quote in quotes)
+        return {'entities':[{'type':'Organization','name':NAME,'properties':{'duty':'检查并记录'},'evidence':{'quote':quotes[0], 'property_quotes':{'duty':quotes}}}]}
     result=extract_split(ONTOLOGY, [ExtractionChunk('a',f'{NAME}（简称“智能装备”）负责检查。'),
                                    ExtractionChunk('b',f'{NAME}负责记录。')],
         llm=StubLLM(entity_handler=lambda p,c:[span_item('Organization',NAME, c['text'])],property_handler=properties,

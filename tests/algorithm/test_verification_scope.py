@@ -66,9 +66,16 @@ def test_blank_context_message_keeps_full_chunk_fallback_consistent(version):
 def test_other_versions_keep_existing_full_chunk_contract(version):
     module = importlib.import_module(f"algorithm.knowledge_extract.{version}.semantic_evidence")
     messages = module.build_verification_messages(
-        chunk=SimpleNamespace(chunk_id="c", document_id="d", text="完整原文"),
+        chunk=SimpleNamespace(chunk_id="c", document_id="d", text="完整原文", metadata={}),
         items=[{"item_id": "one", "entity_context": "范围"}])
-    assert payload(messages)["text"] == "完整原文"
+    if version == 'v3_1':
+        user = json.loads(messages[1]['content'])
+        assert user['documents'] == '完整原文'
+        assert user['task']['items'] == [{'item_id': 'one'}]
+        assert user['output_contract']['format'] == 'jsonl'
+        assert set(user['output_contract']['success_schema']['properties']) == {'item_id', 'supported', 'reason'}
+    else:
+        assert payload(messages)["text"] == "完整原文"
 
 
 @pytest.mark.parametrize("version", ["v3", "latest"])

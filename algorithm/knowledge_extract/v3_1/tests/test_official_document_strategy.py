@@ -53,7 +53,7 @@ class IntegrationTest(unittest.TestCase):
         def entity_handler(prompt: str, chunk: dict) -> list[dict]:
             return [span_item(type_id, name) for type_id, name in verbatim]
 
-        llm = StubLLM(entity_handler=entity_handler)
+        llm = StubLLM(entity_handler=entity_handler, verification_handler=lambda item, chunk: 'yes')
         result = SE.extract_split(
             OFFICIAL_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=text)],

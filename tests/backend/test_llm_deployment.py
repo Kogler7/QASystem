@@ -10,11 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_llm_uses_shared_image_readonly_models_and_explicit_gpu(tmp_path):
-    from docker.configure import Configuration, slug
+    from docker.configure import Configuration
+    from docker.model_services import service_name
     editor = Configuration(tmp_path)
     repo = editor.catalog[0]['repo']
-    editor.models[repo].update(enabled=True, gpu='6')
-    service = editor.compose()['services'][slug(repo)]
+    editor.models[repo].update(enabled=True, device='gpu:6')
+    service = editor.compose()['services'][service_name(repo)]
     backend = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["backend"]
     assert service["image"] == 'qasystem-env-v1'
     assert backend['image'].startswith('${QASYSTEM_ENV_IMAGE')

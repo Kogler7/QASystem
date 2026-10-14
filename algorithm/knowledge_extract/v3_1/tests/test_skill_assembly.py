@@ -1,8 +1,10 @@
-"""Public entrypoints compile skills once without planning requests."""
+"""Public entrypoints select once or use a registered explicit binding."""
+
+from .stub_llm import source_documents
 import json
 
 def policy_text(policy):
-    return "\n\n".join(block["text"] for block in policy["rule_blocks"])
+    return policy
 
 
 import pytest
@@ -25,8 +27,9 @@ class ExtractionLLM:
     def __call__(self, messages):
         first = json.loads(messages[1]['content'])
         self.calls.append(messages)
-        assert 'assembly_target' not in first, 'Skill planning must not call the LLM'
-        assert set(first) == {'task', 'output_contract', 'domain_policy', 'ontology', 'documents', 'stage_context'}
+        assert set(first) == {'task', 'output_contract', 'domain_policy', 'ontology', 'documents'}
+        if first['task']['operation'] == 'skill_selection':
+            return json.dumps({'status': 'selected', 'skill_refs': ['custom@1'], 'reason': '设备业务匹配'})
         return self.stub(messages)
 
 
@@ -41,14 +44,15 @@ def test_public_entrypoint_compiles_without_planning_calls(tmp_path, entrypoint)
     custom_skills(tmp_path)
     llm = ExtractionLLM()
     result = entrypoint(ontology=ONTOLOGY, chunks=[ExtractionChunk('c1', '关于开展巡检的通知\n〔2026〕1号\n开展巡检。')], llm=llm, use_scheduler=False, skills_dir=str(tmp_path))
-    assert result['profile']['prompt_assembly']['mode'] == 'deterministic_skill_compile'
+    assert result['profile']['prompt_assembly']['mode'] == 'request_skill_selection'
+    assert len(result['profile']['prompt_assembly']['calls']) == 1
     record = result['profile']['prompt_assembly']['plans'][0]
     assert record['stages']['entity'] == [{'skill_id': 'custom', 'sections': ['all']}]
     assert len(record['read_skills'][0]['sha256']) == 64
-    extraction = [json.loads(m[1]['content']) for m in llm.calls if 'task' in json.loads(m[1]['content'])]
+    extraction = [json.loads(m[1]['content']) for m in llm.calls if json.loads(m[1]['content'])['task']['operation'] != 'skill_selection']
     assert extraction
     user = extraction[0]
-    assert user['documents'][0]['text'] == '关于开展巡检的通知\n〔2026〕1号\n开展巡检。'
+    assert source_documents(user)[0]['text'] == '关于开展巡检的通知\n〔2026〕1号\n开展巡检。'
     assert policy_text(user['domain_policy']) == '按原文抽取设备业务事项，保留完整动宾短语。'
     fields = user['output_contract']['success_schema']['properties']
     assert set(fields) == {'type', 'mention', 'properties', 'evidence'}
@@ -83,7 +87,8 @@ def test_public_entrypoint_keeps_empty_policy_for_all_chunks(first_text):
         llm=llm, use_scheduler=False,
     )
     assembly = result['profile']['prompt_assembly']
-    assert assembly['calls'] == []
+    assert len(assembly['calls']) == 1
+    assert assembly['plans'][0]['selection']['status'] == 'no_match'
     assert len(assembly['plans']) == 1
     assert all(record['stages']['entity'] == [] for record in assembly['plans'])
 
@@ -107,10 +112,10 @@ def test_later_chunk_selects_shared_request_skill(tmp_path):
                 ExtractionChunk('later', '关于开展巡检的通知\n〔2026〕1号')],
         llm=llm, use_scheduler=False, skills_dir=str(tmp_path),
     )
-    assert result['profile']['prompt_assembly']['calls'] == []
+    assert len(result['profile']['prompt_assembly']['calls']) == 1
     assert len(result['profile']['prompt_assembly']['plans']) == 1
-    users = [json.loads(m[1]['content']) for m in llm.calls if 'task' in json.loads(m[1]['content'])]
-    assert {u['documents'][0]['text'] for u in users} == {'开展巡检。', '关于开展巡检的通知\n〔2026〕1号'}
+    users = [json.loads(m[1]['content']) for m in llm.calls if json.loads(m[1]['content'])['task']['operation'] != 'skill_selection']
+    assert {source_documents(u)[0]['text'] for u in users} == {'开展巡检。', '关于开展巡检的通知\n〔2026〕1号'}
     assert all('route' not in u['domain_policy'] for u in users)
     assert result['profile']['prompt_assembly']['plans'][0]['route']['kind'] == 'official_document'
     assert all(policy_text(u['domain_policy']) for u in users)
@@ -134,34 +139,34 @@ class OfficialDocument {
             self.calls = []
 
         def generate_structured(self, schema, messages, run_context):
-            if run_context['pass_name'] == 'property_verification':
+            if run_context['pass_name'] in {'property_verification', 'entity_verification'}:
                 from .stub_llm import StubLLM
                 return StubLLM(verification_handler=lambda item, chunk: 'yes')(messages)
             user = json.loads(messages[1]['content'])
             self.calls.append((messages, user, run_context))
             assert run_context['response_mode'] == 'plain'
             assert user['output_contract']['format'] == 'jsonl'
-            assert set(user['domain_policy']) == {'rule_blocks'}
-            assert policy_text(user['domain_policy']).startswith('公文领域抽取规则：')
+            assert isinstance(user['domain_policy'], str)
+            assert '文件管理对象（OfficialDocument）' in policy_text(user['domain_policy'])
             assert '若文本是公文' not in policy_text(user['domain_policy'])
-            assert '无需重新判断领域' in messages[0]['content']
-            assert user['documents'] == [{'text': text, 'chunk_id': 'c1'}]
+            assert '无需重新选择 Skill' in messages[0]['content']
+            assert source_documents(user) == [{'text': text}]
             if run_context['pass_name'] == 'entity':
-                assert '逐字保留完整名称及内部空格、大小写、标点' in messages[0]['content']
+                assert '逐字保留完整名称及内部空格、大小写、标点' in user['output_contract']['constraints']
                 row = {'type': 'OfficialDocument', 'mention': name,
                        'evidence': {'quote': name}}
                 if run_context['attempt'] == 1:
                     return json.dumps({'entities': [row]}, ensure_ascii=False)
                 return json.dumps(row, ensure_ascii=False)
             assert run_context['pass_name'] == 'property'
-            assert user['stage_context']['known_entities'][0]['name'] == name
+            assert user['task']['known_entities'][0]['name'] == name
             return json.dumps({'type': 'OfficialDocument', 'name': name,
                                'properties': {'title': name, 'documentNumber': '〔2026〕1号'},
                                'evidence': {'quote': text}}, ensure_ascii=False)
 
     llm = JsonlLLM()
     result = extract_harness(ontology=ontology, chunks=[ExtractionChunk('c1', text)],
-                             llm=llm, use_scheduler=False, retry_base_seconds=0)
+                             llm=llm, use_scheduler=False, retry_base_seconds=0, skill_refs=['official_document@12'])
     assert result['status'] == 'succeeded'
     assert [(ctx['pass_name'], ctx['attempt']) for _, _, ctx in llm.calls] == [
         ('entity', 1), ('entity', 2), ('property', 1),
@@ -178,4 +183,4 @@ class OfficialDocument {
     assert assembly['calls'] == []
     assert len(assembly['plans']) == 1
     assert assembly['plans'][0]['route']['kind'] == 'official_document'
-    assert assembly['plans'][0]['read_skills'][0]['version'] == '5'
+    assert assembly['plans'][0]['read_skills'][0]['version'] == '12'

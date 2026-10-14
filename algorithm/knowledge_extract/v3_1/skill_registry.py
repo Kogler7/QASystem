@@ -11,7 +11,7 @@ import yaml
 
 STAGES = frozenset({"entity", "property", "repair"})
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
-_SECTION = re.compile(r"^## rules:(all|entity|property|repair)[ \t]*$", re.MULTILINE)
+_SECTION = re.compile(r"^## rules:(all|semantics|entity|property|repair)[ \t]*$", re.MULTILINE)
 
 
 class SkillConfigurationError(ValueError):
@@ -32,7 +32,7 @@ class Skill:
     def available_sections(self, stage: str) -> dict[str, str]:
         if stage not in self.stages:
             return {}
-        return {name: body for name, body in self.sections if name in {"all", stage}}
+        return {name: body for name, body in self.sections if name in {"all", "semantics", stage}}
 
 
 class SkillRegistry:
@@ -84,7 +84,7 @@ class SkillRegistry:
                     if not rule or heading[1] in dict(sections):
                         raise ValueError("rule sections must be nonempty and unique")
                     sections.append((heading[1], rule))
-                if not sections or any(not ({"all", stage} & dict(sections).keys()) for stage in stages):
+                if not sections or any(not ({"all", "semantics", stage} & dict(sections).keys()) for stage in stages):
                     raise ValueError("each supported stage needs an applicable rule section")
                 if name in self._skills:
                     raise ValueError(f"duplicate skill name: {name}")
@@ -97,6 +97,28 @@ class SkillRegistry:
         return [{"skill_id": s.name, "description": s.description, "version": s.version,
                  "sections": list(s.available_sections(stage)), "route_hints": list(s.route_hints)}
                 for s in self._skills.values() if s.available_sections(stage)]
+
+    def selection_catalog(self) -> list[dict[str, Any]]:
+        """Expose discovery metadata, never rule bodies or filesystem paths."""
+        return [{"skill_ref": f"{s.name}@{s.version}", "name": s.name,
+                 "version": s.version, "description": s.description,
+                 "stages": list(s.stages)} for s in self._skills.values()]
+
+    @property
+    def snapshot_sha256(self) -> str:
+        payload = "\n".join(f"{s.name}@{s.version}:{s.sha256}" for s in self._skills.values())
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def resolve_refs(self, refs: list[str]) -> list[str]:
+        """Resolve exact registered versions in stable catalog order."""
+        # COSEC: Model/configuration refs are identifiers, never resource paths.
+        if (not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs)
+                or len(set(refs)) != len(refs)):
+            raise SkillConfigurationError("Skill refs must be a unique string list")
+        registered = {f"{s.name}@{s.version}": s.name for s in self._skills.values()}
+        if any(ref not in registered for ref in refs):
+            raise SkillConfigurationError("Skill ref or version is not registered")
+        return [name for ref, name in registered.items() if ref in refs]
 
     def matching_catalog(self, stage: str, kind: str) -> list[dict[str, Any]]:
         """Only the program-selected document family is eligible, including custom IDs."""

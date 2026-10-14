@@ -1,0 +1,6 @@
+{
+  "official": {"status": "selected", "skills": ["official_document"]},
+  "rule": {"status": "selected", "skills": ["rule"]},
+  "trouble": {"status": "selected", "skills": ["trouble"]},
+  "simple": {"status": "no_match", "skills": []}
+}

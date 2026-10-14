@@ -6,8 +6,8 @@
 from __future__ import annotations
 
 import re
+import math
 from typing import Any
-from external_services.llm.chat import create_chat_completion
 from urllib.parse import urlparse
 
 from ._logging import get_step_logger
@@ -209,28 +209,54 @@ class OpenAICompatibleLLM:
         max_tokens: int,
         disable_thinking: bool,
         base_url: str = "",
+        generation_temperature: float = 0,
     ) -> None:
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.disable_thinking = disable_thinking
         self.base_url = base_url
+        if not math.isfinite(generation_temperature) or not 0 <= generation_temperature <= 2:
+            raise ValueError('generation_temperature must be finite and between 0 and 2')
+        self.generation_temperature = generation_temperature
 
-    def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None) -> Any:
+    def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None,
+                temperature: float = 0) -> Any:
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": self.max_tokens,
+        }
+        if response_format is not None:
+            kwargs["response_format"] = response_format
         logger.info(
-            "[步骤][LLM-Client] 请求: model=%s messages=%d prompt=%d字符 max_tokens=%s response_format=%s thinking=%s",
+            "[步骤][LLM-Client] 请求: model=%s messages=%d prompt=%d字符 max_tokens=%s response_format=%s thinking=%s temperature=%s",
             self.model,
             len(messages),
             sum(len(str(item.get("content") or "")) for item in messages),
             self.max_tokens,
             (response_format or {}).get("type") if isinstance(response_format, dict) else None,
             "disabled" if self.disable_thinking else "default",
+            temperature,
         )
-        response = create_chat_completion(
-            self.client.chat.completions.create,
-            model=self.model, messages=messages, max_tokens=self.max_tokens,
-            disable_thinking=self.disable_thinking, response_format=response_format,
-        )
+        try:
+            if self.disable_thinking:
+                response = self.client.chat.completions.create(
+                    **kwargs,
+                    # OpenAI-compatible SDKs forward provider-specific fields
+                    # through ``extra_body``.  DeepSeek V4 documents the
+                    # thinking toggle in this location rather than as a
+                    # top-level SDK argument.
+                    extra_body={"thinking": {"type": "disabled"}},
+                )
+            else:
+                response = self.client.chat.completions.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001 - compatible providers vary
+            if not self.disable_thinking or not _unsupported_parameter(exc):
+                raise
+            logger.info("[步骤][LLM-Client] thinking 参数不被支持，改用默认思考模式重试")
+            response = self.client.chat.completions.create(**kwargs)
         logger.info(
             "[步骤][LLM-Client] 响应: id=%s finish_reason=%s usage=%s 文本=%d字符",
             _field(response, "id"),
@@ -306,8 +332,9 @@ class OpenAICompatibleLLM:
         *,
         response_mode: str,
         response_format: dict[str, Any] | None = None,
+        temperature: float = 0,
     ) -> StructuredLLMResponse:
-        response = self._create(messages, response_format=response_format)
+        response = self._create(messages, response_format=response_format, temperature=temperature)
         text = self._chat_text(response)
         finish_reason = self._chat_finish_reason(response)
         return StructuredLLMResponse(
@@ -348,7 +375,10 @@ class OpenAICompatibleLLM:
         run_context: dict[str, Any] | None = None,
     ) -> StructuredLLMResponse:
         """Use plain chat text; JSONL parsing and schema validation are local."""
-        return self._chat_structured(messages, response_mode="plain")
+        generation = (run_context or {}).get('pass_name') in {
+            'entity', 'repair_entity', 'property', 'repair_property', 'candidate_identity'}
+        return self._chat_structured(messages, response_mode="plain",
+            temperature=self.generation_temperature if generation else 0)
 
 
 def create_llm_client(
@@ -387,6 +417,7 @@ def create_llm_client(
             config["disable_thinking"] if disable_thinking is None else disable_thinking
         ),
         base_url=base_url or config["base_url"],
+        generation_temperature=config['generation_temperature'],
     )
 
 

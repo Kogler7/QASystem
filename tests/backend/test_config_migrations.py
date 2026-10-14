@@ -78,10 +78,11 @@ def test_old_model_parameters_move_without_enabling_or_changing_paths(tmp_path):
     editor = make_editor(tmp_path, 'LLM_SERVED_MODEL_NAME=Qwen/Qwen3.5-4B\nLLM_GPU_DEVICE_IDS=6\n'
                          'LLM_HOST_PORT=9991\nLLM_MODEL_DIR=custom/weights\nLLM_BIND=0.0.0.0\nLLM_MAX_NUM_SEQS=3\n')
     state = editor.models['Qwen/Qwen3.5-4B']
-    assert state['gpu'] == '6' and state['port'] == '9991'
+    assert state['device'] == 'gpu:6' and state['port'] == '9991'
     assert state['model_dir'] == 'custom/weights' and state['bind'] == '0.0.0.0'
     assert not state['enabled']
-    assert all(m['max_num_seqs'] == '3' for m in editor.models.values())
+    assert all(m['max_num_seqs'] == '3' for m in editor.models.values()
+               if m['engine'] == 'vllm' and m['adapter'] == 'chat' and m['manager'] == 'ops')
     assert 'LLM_HOST_PORT' not in editor.pending_payloads()[tmp_path / '.env']
 
 

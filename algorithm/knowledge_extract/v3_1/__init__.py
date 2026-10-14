@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from .batch import deduplicate_chunk_graphs
+from .artifacts import export_artifacts
 from .chunk_context import ExtractionChunk
 from .harness_extractor import extract_harness
 from .result_contract import to_public_result
@@ -33,6 +34,7 @@ def extract_aggregate(
     use_scheduler: bool = True,
     assembly_planner: Any | None = None,
     skills_dir: str | None = None,
+    skill_refs: list[str] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     """Run the pipeline over ``chunks`` and return the aggregate contract."""
@@ -50,6 +52,7 @@ def extract_aggregate(
         use_scheduler=use_scheduler,
         assembly_planner=assembly_planner,
         skills_dir=skills_dir,
+        skill_refs=skill_refs,
     )
 
 
@@ -58,5 +61,6 @@ __all__ = [
     "extract_aggregate",
     "extract_split",
     "extract_harness",
+    "export_artifacts",
     "deduplicate_chunk_graphs",
 ]

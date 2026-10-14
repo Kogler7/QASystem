@@ -153,6 +153,11 @@ def test_chunk_uses_one_service_snapshot_for_all_original_slices(registry, monke
     from backend.app.services.algorithm_capabilities import DocumentChunkingService
     from backend.app.schemas import ChunkOptions
     from algorithm.knowledge_pipeline import entity_count_estimator
+    from algorithm.knowledge_pipeline.chunking import chunk_document_items
+    # Protocol fixtures reimport services with a stub splitter; this test must
+    # exercise actual splitting while checking the request's fixed route.
+    monkeypatch.setitem(DocumentChunkingService.chunk.__globals__,
+                        'chunk_document_items', chunk_document_items)
     monkeypatch.setenv('CHUNK_ENTITY_LOG_PATH', str(tmp_path / 'decisions.jsonl'))
     calls = []
     def estimate(text, *, model, service):

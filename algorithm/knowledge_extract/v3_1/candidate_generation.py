@@ -7,14 +7,10 @@ from __future__ import annotations
 from docker.configuration import getenv as config_getenv
 
 import json
-import os
 import re
 import time
-from collections import deque
 from copy import deepcopy
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor
-from itertools import islice
 from typing import Any
 
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
@@ -23,10 +19,12 @@ from .graph_utils import append_warning as _append_warning, canonical_name
 from .ontology_compiler import ExtractionPlan
 from .output_contracts import output_schema_for_types, validate_candidate_properties
 from .request_budget import fits, input_limit, message_bytes, window_chars, windows, iter_windows, split_request_failure, recover_split_attempts, document_expired
+from .source_windows import source_parts
 from .ontology_schema import OntologySchema
 from ._logging import get_step_logger
 from .prompt_router import ChatMessages, DocumentRoute, _looks_like_record_table, build_chat_messages
 from .prompt_templates import user_with_retry_feedback
+from .task_runtime import synchronous, invoke, ordered_tasks, current_runtime, CallBudgetExceeded
 
 
 logger = get_step_logger(__name__)
@@ -37,9 +35,6 @@ from .structured_output import validate_json_schema
 
 GLOBAL_RELATION_CATALOG_THRESHOLD = 80
 MAX_LOCAL_RELATION_CATALOG = 160
-# 批大小受输出上限约束：每条 pair 决策（pair_id+label+evidence.quote）约 60~90
-# token，默认 max_tokens=16384 最多容纳约 150~250 条。超限会导致响应 JSON 截断、
-# generate_structured 解析失败后整批丢弃（批越大丢得越多），故取 150。
 SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS = 512
 # 表格切片按行拆分：单次调用只裁决一批记录，避免 JSON 被输出上限截断；
 # 同时按字符封顶，防止"行少但单元格极长"的表格把单次 prompt 撑爆。
@@ -130,35 +125,117 @@ def decode_json_object(response: Any) -> tuple[dict[str, Any] | None, str | None
     if start >= 0 and end > start:
         stripped = stripped[start : end + 1]
     try:
-        parsed = json.loads(stripped)
-    except json.JSONDecodeError as exc:
-        return None, f"JSON 解析失败: {exc.msg}"
+        def unique_object(pairs):
+            # COSEC: A selection/status must not be replaced by a duplicate JSON key.
+            value = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("重复 JSON 字段")
+                value[key] = item
+            return value
+        def reject_constant(value):
+            raise ValueError("非有限数值不是合法 JSON")
+        parsed = json.loads(stripped, object_pairs_hook=unique_object, parse_constant=reject_constant)
+    except (json.JSONDecodeError, ValueError):
+        return None, "JSON 解析失败或包含重复字段/非有限数值"
     if not isinstance(parsed, dict):
         return None, "LLM 返回顶层必须是 JSON object"
     return parsed, None
 
 
-def decode_jsonl_entities(response: Any) -> tuple[dict[str, Any] | None, str | None]:
-    """Decode complete JSONL only; never silently keep a truncated prefix."""
-    text = _response_text(response).strip()
-    if not text:
-        return None, "LLM 返回为空；无实体时应返回单独一行 {}"
-    rows = []
-    for number, line in enumerate(text.splitlines(), 1):
+def _unclosed_json_record(line):
+    """Detect an unfinished container/string without repairing or decoding it."""
+    if not line.lstrip().startswith('{'):
+        return False
+    stack, quoted, escaped = [], False, False
+    for char in line:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in '{[':
+            stack.append(char)
+        elif char in '}]':
+            if not stack or stack.pop() != ('{' if char == '}' else '['):
+                return False
+    return quoted or bool(stack)
+
+
+def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, incomplete_lines=None) -> tuple[list[dict[str, Any]], list[str]]:
+    """Read independent complete lines; damaged lines never erase their neighbours."""
+    rows, errors = [], []
+    text = _response_text(response)
+    if not text.strip():
+        return [], ["LLM 返回为空"]
+    # COSEC: Only remove a complete, unambiguous transport envelope. Do not
+    # repair JSON, extract nested objects, or discard arbitrary surrounding text.
+    if normalizations is not None:
+        stripped = text.strip()
+        lines = stripped.split('\n')
+        if (len(lines) >= 3 and lines[0].strip() in {'```', '```json', '```jsonl'}
+                and lines[-1].strip() == '```'
+                and not any(line.strip().startswith('```') for line in lines[1:-1])):
+            text = '\n'.join(lines[1:-1])
+            normalizations.append('complete_markdown_fence')
+        # Some providers emit the empty-result marker after completed records.
+        # It carries no facts. Accept exactly one final marker, never an empty
+        # middle record or an incomplete/malformed preceding record.
+        lines = [line for line in text.split('\n') if line.strip()]
+        if collection_name == 'entities' and len(lines) > 1 and lines[-1].strip() == '{}':
+            prefix = '\n'.join(lines[:-1])
+            _, prefix_errors = _jsonl_rows(prefix, collection_name)
+            if not prefix_errors:
+                text = prefix
+                normalizations.append('final_empty_marker')
+
+    def unique_object(pairs):
+        # COSEC: Reject duplicate keys instead of silently replacing a verdict/value.
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("重复 JSON 字段")
+            result[key] = value
+        return result
+
+    def reject_constant(value):
+        raise ValueError("非有限数值不是合法 JSON")
+
+    all_lines = text.split('\n')
+    last_line = max((i for i, line in enumerate(all_lines, 1) if line.strip()), default=0)
+    for number, line in enumerate(all_lines, 1):
         if not line.strip():
             continue
         try:
-            row = json.loads(line)
-        except json.JSONDecodeError as exc:
-            return None, f"JSONL 第 {number} 行解析失败: {exc.msg}"
-        if not isinstance(row, dict) or "entities" in row:
-            return None, f"JSONL 第 {number} 行必须是单个实体对象，不使用数组或 entities 包装"
+            row = json.loads(line, object_pairs_hook=unique_object, parse_constant=reject_constant)
+        except json.JSONDecodeError:
+            errors.append(f"JSONL 第 {number} 行不完整或不是合法 JSON")
+            if incomplete_lines is not None and number == last_line and _unclosed_json_record(line):
+                incomplete_lines.append(number)
+            continue
+        except ValueError:
+            errors.append(f"JSONL 第 {number} 行含重复字段或非有限数值；每个记录须独立闭合并换行")
+            continue
+        if not isinstance(row, dict) or collection_name in row:
+            errors.append(f"JSONL 第 {number} 行必须是单个记录，不使用数组或 {collection_name} 包装")
+            continue
+        if not row:
+            if collection_name == "entities" and text.strip() == "{}":
+                return [], []
+            errors.append(f"JSONL 第 {number} 行的空对象不能与记录混用")
+            continue
         rows.append(row)
-    if rows == [{}]:
-        return {"entities": []}, None
-    if any(not row for row in rows):
-        return None, "空结果 {} 只能单独出现，不能与实体行混用"
-    return {"entities": rows}, None
+    return rows, errors
+
+
+def decode_jsonl_entities(response: Any) -> tuple[dict[str, Any] | None, str | None]:
+    """Strict decoder; the generation loop separately retains validated records."""
+    rows, errors = _jsonl_rows(response, "entities")
+    return (None, "; ".join(errors[:5])) if errors else ({"entities": rows}, None)
 
 
 def _array_collection_name(schema: dict[str, Any]) -> str | None:
@@ -174,93 +251,80 @@ def _array_collection_name(schema: dict[str, Any]) -> str | None:
     return None
 
 
-def _recover_array_prefix(response: Any, collection_name: str | None) -> list[dict[str, Any]]:
-    """Recover only fully decoded object items before a truncated JSON array tail."""
-    if not collection_name or not isinstance(response, str):
-        return []
-    key_match = re.search(rf'"{re.escape(collection_name)}"\s*:', response)
-    if key_match is None:
-        return []
-    array_start = response.find("[", key_match.end())
-    if array_start < 0:
-        return []
+def _merge_collection_items(collection_name, existing, incoming):
+    """Preserve distinct entity facts; later valid keyed decisions replace earlier ones."""
+    def key(item):
+        if collection_name == "verdicts":
+            return item["item_id"]
+        if "name" in item:  # Property completion returns one complete record per exact key.
+            return item["type"], item["name"]
+        return json.dumps(item, ensure_ascii=False, sort_keys=True)
+    merged = {key(item): item for item in existing}
+    merged.update((key(item), item) for item in incoming)
+    return list(merged.values())
 
-    decoder = json.JSONDecoder()
-    cursor = array_start + 1
-    recovered: list[dict[str, Any]] = []
-    while cursor < len(response):
-        while cursor < len(response) and response[cursor].isspace():
-            cursor += 1
-        if cursor >= len(response) or response[cursor] == "]":
-            break
-        if response[cursor] == ",":
-            cursor += 1
+
+def _valid_recovered_items(items, *, collection_name, schema, validator=None, rejection_reasons=None):
+    """Validate records independently, without relaxing field or evidence rules."""
+    item_schema = schema["properties"][collection_name]["items"]
+    valid = []
+    for index, item in enumerate(items):
+        errors = validate_json_schema(item, item_schema)
+        # Verification's full validator requires all IDs; its per-row enum already
+        # checks scope. Entity/property validators also check grounding/exact keys.
+        if not errors and collection_name != "verdicts" and validator is not None:
+            errors = validator({collection_name: [item]})
+        if errors:
+            if rejection_reasons is not None and len(rejection_reasons) < 5:
+                rejection_reasons.append({'record': index, 'errors': list(errors[:3])})
             continue
-        try:
-            value, end = decoder.raw_decode(response, cursor)
-        except json.JSONDecodeError:
-            break
-        if not isinstance(value, dict):
-            break
-        recovered.append(value)
-        cursor = end
-        while cursor < len(response) and response[cursor].isspace():
-            cursor += 1
-        if cursor < len(response) and response[cursor] not in {",", "]"}:
-            break
-    return recovered
+        valid.append(item)
+    return valid
 
 
-def _collection_item_key(collection_name: str, item: dict[str, Any]) -> tuple[str, ...]:
-    if collection_name == "entities":
-        return (
-            canonical_name(item.get("type")),
-            canonical_name(item.get("name")),
-            json.dumps(item.get("properties") or {}, ensure_ascii=False, sort_keys=True, default=str),
-            canonical_name((item.get("evidence") or {}).get("quote")),
-        )
-    return (json.dumps(item, ensure_ascii=False, sort_keys=True, default=str),)
+def _ambiguous_keys(items, collection_name):
+    """Duplicate keyed decisions in one response must not be cherry-picked."""
+    keys = ([row["item_id"] for row in items if isinstance(row.get("item_id"), str)]
+            if collection_name == "verdicts" else
+            [(row["type"], row["name"]) for row in items
+             if isinstance(row.get("type"), str) and isinstance(row.get("name"), str)])
+    return {key for key in keys if keys.count(key) > 1}
 
 
-def _merge_collection_items(
-    collection_name: str,
-    existing: list[dict[str, Any]],
-    incoming: Iterable[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    merged = list(existing)
-    seen = {_collection_item_key(collection_name, item) for item in merged}
-    for item in incoming:
-        key = _collection_item_key(collection_name, item)
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(item)
-    return merged
+def _expected_record_keys(schema, collection_name):
+    if collection_name not in {'entities', 'verdicts'}:
+        return None
+    fields = schema['properties'][collection_name]['items']['properties']
+    if collection_name == 'verdicts':
+        return set(fields['item_id'].get('enum', []))
+    if 'name' in fields and len(fields['type'].get('enum', [])) == 1:
+        return {(fields['type']['enum'][0], name) for name in fields['name'].get('enum', [])}
+    return None
 
 
-def _valid_recovered_items(
-    items: Iterable[dict[str, Any]],
-    *,
-    collection_name: str,
-    schema: dict[str, Any],
-) -> list[dict[str, Any]]:
-    return [
-        item
-        for item in items
-        if not validate_json_schema({collection_name: [item]}, schema)
-    ]
+def _record_key(row, collection_name):
+    return row.get('item_id') if collection_name == 'verdicts' else (row.get('type'), row.get('name'))
 
 
-def _recovery_summary(collection_name: str, items: list[dict[str, Any]]) -> str:
-    labels: list[str] = []
-    for item in items[:80]:
-        if collection_name == "entities":
-            labels.append(f"{item.get('type', '')}::{item.get('name', '')}")
-        else:
-            labels.append(
-                f"{item.get('from_id', '')}:{item.get('rel_type', '')}:{item.get('to_id', '')}"
-            )
-    return "; ".join(labels)
+def _remaining_request(messages, schema, collection_name, pending):
+    """Narrow both wire schema and operands; never change source text or rules."""
+    narrowed = deepcopy(schema)
+    collection = narrowed['properties'][collection_name]
+    fields = collection['items']['properties']
+    payload = json.loads(messages[1]['content'])
+    if collection_name == 'verdicts':
+        fields['item_id']['enum'] = sorted(pending)
+        collection.update(minItems=len(pending), maxItems=len(pending))
+        if 'items' in payload['task']:
+            payload['task']['items'] = [item for item in payload['task']['items'] if item['item_id'] in pending]
+    else:
+        fields['name']['enum'] = sorted(name for _, name in pending)
+        if 'known_entities' in payload['task']:
+            payload['task']['known_entities'] = [row for row in payload['task']['known_entities']
+                if (row['type'], row['name']) in pending]
+    if 'output_contract' in payload:
+        payload['output_contract']['success_schema'] = deepcopy(collection['items'])
+    return [deepcopy(messages[0]), {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}], narrowed
 
 
 def _is_deepseek_llm(llm: Any) -> bool:
@@ -388,7 +452,8 @@ def _invoke_generation(
     return llm(messages)
 
 
-def generate_structured(
+@synchronous
+async def generate_structured(
     llm: Any,
     messages: ChatMessages,
     schema: dict[str, Any],
@@ -403,34 +468,64 @@ def generate_structured(
     retry_empty_collection: bool = False,
     record_table: bool | None = None,
     validator=None,
+    item_validator=None,
     split_on_overflow: bool = False,
+    saved_entity_keys=(),
 ) -> dict[str, Any] | None:
-    """Call one required pass with bounded retry and conservative prefix recovery."""
+    """Bounded JSONL calls retain individually validated records across failures."""
     messages, schema = deepcopy(messages), deepcopy(schema)
     attempt_messages = messages
+    attempt_schema = schema
     resolved_max_attempts = max(1, int(max_attempts))
+    # Transport outages must not consume every chance to repair the first
+    # returned output. Both categories remain bounded, with one shared document
+    # call budget/deadline and an absolute per-task ceiling.
+    max_total_attempts = 2 * resolved_max_attempts - 1
+    transport_failures = output_failures = 0
     response_mode = "plain"
-    collection_name = _array_collection_name(schema)
+    collection_name = _array_collection_name(schema) if len(schema.get("properties", {})) == 1 else None
+    expected_keys = _expected_record_keys(schema, collection_name)
+    entity_delta = False
+    incomplete_discovery = False
     recovered_items: list[dict[str, Any]] = []
     largest_invalid_response = 0
     record_table_flag = retry_empty_collection if record_table is None else bool(record_table)
-    for attempt_number in range(1, resolved_max_attempts + 1):
+    def partial_result():
+        if recovered_items and attempts:
+            attempts[-1]["recovered_items"] = len(recovered_items)
+            attempts[-1]["recovery"] = "jsonl_valid_records"
+            if collection_name == "verdicts":
+                expected = schema["properties"]["verdicts"]["items"]["properties"]["item_id"].get("enum", [])
+                attempts[-1]["missing_item_ids"] = sorted(set(expected) - {row["item_id"] for row in recovered_items})
+        return {collection_name: recovered_items} if collection_name and recovered_items else None
+
+    for attempt_number in range(1, max_total_attempts + 1):
         if document_expired(llm):
             attempts.append({'attempt': attempt_number, 'type': 'timeout', 'pass': pass_name,
                 'chunk': chunk_id, 'message': 'document deadline exhausted',
                 'retryable': False, 'terminal': True})
-            return None
+            return partial_result()
         started = time.monotonic()
         error_type = ""
         message = ""
         response: Any = None
         retryable = True
+        rejected_records = 0
+        rejection_reasons = []
+        response_normalizations = []
+        incomplete_lines = []
+        ignored_saved_records = 0
+        duplicate_entity_records = 0
+        repetitive_entity_output = False
+        discovery_progress = False
+        adaptive_split = False
+        retry_after = 0.0
         logger.info(
             "[步骤][LLM] 输入: pass=%s chunk=%s attempt=%d/%d mode=%s 消息=%d prompt=%d字符",
             pass_name,
             chunk_id,
             attempt_number,
-            resolved_max_attempts,
+            max_total_attempts,
             response_mode,
             len(attempt_messages),
             sum(len(str(item.get("content") or "")) for item in attempt_messages),
@@ -439,27 +534,25 @@ def generate_structured(
             attempts.append({"attempt": attempt_number, "type": "input_budget", "pass": pass_name,
                 "chunk": chunk_id, "message": f"request {message_bytes(attempt_messages)} bytes exceeds {input_limit(llm)} budget",
                 "terminal": True})
-            return None
+            return partial_result()
         try:
-            if use_scheduler:
-                from .request_budget import document_deadline
-                with get_llm_scheduler().request_slot(deadline=document_deadline(llm)):
-                    if document_expired(llm):
-                        raise TimeoutError('document deadline exhausted during scheduling')
-                    response = _invoke_generation(
-                        llm,
-                        schema,
-                        attempt_messages,
-                        pass_name=pass_name,
-                        chunk_id=chunk_id,
-                        attempt_number=attempt_number,
-                        response_mode=response_mode,
-                        record_table=record_table_flag,
-                    )
-            else:
-                response = _invoke_generation(
+            def request_once():
+                if document_expired(llm):
+                    raise TimeoutError('document deadline exhausted before generation')
+                if use_scheduler:
+                    from .request_budget import document_deadline
+                    with get_llm_scheduler().request_slot(deadline=document_deadline(llm)):
+                        if document_expired(llm):
+                            raise TimeoutError('document deadline exhausted during scheduling')
+                        return _invoke_generation(
+                            llm, attempt_schema, attempt_messages,
+                            pass_name=pass_name, chunk_id=chunk_id,
+                            attempt_number=attempt_number, response_mode=response_mode,
+                            record_table=record_table_flag,
+                        )
+                return _invoke_generation(
                     llm,
-                    schema,
+                    attempt_schema,
                     attempt_messages,
                     pass_name=pass_name,
                     chunk_id=chunk_id,
@@ -467,101 +560,135 @@ def generate_structured(
                     response_mode=response_mode,
                     record_table=record_table_flag,
                 )
+            response = await current_runtime().call(request_once, stage=pass_name, llm=llm)
             # A provider may ignore its timeout. A late result is not a successful attempt.
             if document_expired(llm):
                 raise TimeoutError('document deadline exhausted during generation')
             pre_parse_error = _pre_parse_response_error(response)
+            if collection_name in {"entities", "verdicts"}:
+                rows, line_errors = _jsonl_rows(response, collection_name,
+                    normalizations=response_normalizations, incomplete_lines=incomplete_lines)
+                valid_rows = _valid_recovered_items(rows, collection_name=collection_name,
+                    schema=attempt_schema, validator=item_validator or validator,
+                    rejection_reasons=rejection_reasons)
+                # Repeated accepted keys are scheduling noise, not malformed
+                # records. Never overwrite their verified facts with the repeat.
+                if collection_name == 'entities' and 'mention' in schema['properties'][collection_name]['items'].get('properties', {}):
+                    keys = [(row['type'], row['mention']) for row in valid_rows]
+                    duplicate_entity_records = len(keys) - len(set(keys))
+                    # A saturated response repeating mostly the same exact keys
+                    # is decoder/task repetition, not evidence that a smaller
+                    # source alone will complete the unknown discovery scope.
+                    repetitive_entity_output = (len(keys) >= 12
+                        and duplicate_entity_records * 2 >= len(keys))
+                    saved = set(saved_entity_keys)
+                    previous_keys = {(row['type'], row['mention']) for row in recovered_items} | saved
+                    discovery_progress = any((row['type'], row['mention']) not in previous_keys for row in valid_rows)
+                    ignored_saved_records = sum((row['type'], row['mention']) in saved for row in valid_rows)
+                    valid_rows = [row for row in valid_rows if (row['type'], row['mention']) not in saved]
+                keyed = collection_name == "verdicts" or "name" in schema["properties"][collection_name]["items"].get("properties", {})
+                if keyed:
+                    ambiguous = _ambiguous_keys(rows, collection_name)
+                    def row_key(row):
+                        return row.get("item_id") if collection_name == "verdicts" else (row.get("type"), row.get("name"))
+                    valid_rows = [row for row in valid_rows if row_key(row) not in ambiguous]
+                    # Accepted keys from earlier attempts are outside this retry's
+                    # scope. Out-of-scope duplicate rows cannot invalidate them.
+                    active = _expected_record_keys(attempt_schema, collection_name)
+                    recovered_items = [row for row in recovered_items
+                        if row_key(row) not in ambiguous or (active is not None and row_key(row) not in active)]
+                rejected_records = len(line_errors) + len(rows) - len(valid_rows) - ignored_saved_records
+                recovered_items = _merge_collection_items(collection_name, recovered_items, valid_rows)
+                parsed = {collection_name: valid_rows}
+                parse_error = "; ".join(line_errors[:5]) if line_errors else None
+            else:
+                parsed, parse_error = decode_json_object(response)
+
             if pre_parse_error is not None:
                 error_type, message = pre_parse_error
-                response_characters = len(_response_text(response))
-                largest_invalid_response = max(largest_invalid_response, response_characters)
-                if error_type == "incomplete" and collection_name:
-                    recovered = _valid_recovered_items(
-                        _recover_array_prefix(_response_text(response), collection_name),
-                        collection_name=collection_name,
-                        schema=schema,
-                    )
-                    recovered_items = _merge_collection_items(
-                        collection_name,
-                        recovered_items,
-                        recovered,
-                    )
-            else:
-                parsed, parse_error = (decode_jsonl_entities(response) if collection_name == "entities"
-                                       else decode_json_object(response))
-                if parse_error is not None:
-                    error_type = "json"
-                    message = parse_error
-                    response_characters = len(_response_text(response))
-                    largest_invalid_response = max(largest_invalid_response, response_characters)
-                    if collection_name:
-                        recovered = _valid_recovered_items(
-                            _recover_array_prefix(_response_text(response), collection_name),
-                            collection_name=collection_name,
-                            schema=schema,
-                        )
-                        recovered_items = _merge_collection_items(
-                            collection_name,
-                            recovered_items,
-                            recovered,
-                        )
+                if error_type == 'incomplete' and expected_keys is None and collection_name == 'entities':
+                    incomplete_discovery = True
+            elif parse_error is not None:
+                if collection_name == 'entities' and expected_keys is None and incomplete_lines:
+                    # A provider's stop flag cannot override an unfinished body.
+                    # Repairing its final record does not prove source exhaustion.
+                    error_type, message = 'incomplete', parse_error
+                    incomplete_discovery = True
                 else:
-                    schema_errors = validate_json_schema(parsed, schema)
-                    if not schema_errors and validator is not None:
-                        schema_errors = validator(parsed)
-                    if schema_errors:
-                        error_type = "schema"
-                        message = "; ".join(schema_errors[:5])
-                    elif (
-                        collection_name
-                        and not (parsed.get(collection_name) or [])
-                        and largest_invalid_response >= SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS
-                    ):
-                        error_type = "schema"
-                        message = "前序大体量响应校验失败，重试不得用空集合覆盖"
-                    elif (
-                        retry_empty_collection
-                        and collection_name == "entities"
-                        and not (parsed.get(collection_name) or [])
-                        and attempt_number < resolved_max_attempts
-                    ):
-                        error_type = "empty_collection"
-                        message = "实体阶段返回空集合，按提示词要求重试补全"
-                    else:
-                        _record_call(
-                            call_metrics,
-                            attempt=attempt_number,
-                            pass_name=pass_name,
-                            chunk_id=chunk_id,
-                            status="succeeded",
-                            elapsed_seconds=time.monotonic() - started,
-                            messages=attempt_messages,
-                            response=response,
-                            response_mode=response_mode,
-                        )
-                        logger.info(
-                            "[步骤][LLM] 输出: pass=%s chunk=%s attempt=%d status=succeeded response=%d字符 %s=%d 耗时=%.2fs",
-                            pass_name,
-                            chunk_id,
-                            attempt_number,
-                            len(_response_text(response)),
-                            collection_name or "items",
-                            len(parsed.get(collection_name) or []) if collection_name else len(parsed),
-                            time.monotonic() - started,
-                        )
-                        return parsed
+                    error_type, message = "json", parse_error
+            elif rejected_records:
+                details = '; '.join(f"record[{r['record']}]: {'; '.join(r['errors'])}" for r in rejection_reasons)
+                error_type, message = 'schema', details or '重复的精确键产生多个决策；已拒收，其他有效行保留'
+            else:
+                schema_errors = validate_json_schema(parsed, attempt_schema)
+                aggregate = ({collection_name: recovered_items} if collection_name in {'entities', 'verdicts'} else parsed)
+                if not schema_errors:
+                    schema_errors = validate_json_schema(aggregate, schema)
+                if not schema_errors and expected_keys is not None:
+                    keys = [_record_key(row, collection_name) for row in aggregate[collection_name]]
+                    if set(keys) != expected_keys or len(keys) != len(expected_keys):
+                        schema_errors = ['remaining records must cover every expected key exactly once']
+                if not schema_errors and validator is not None:
+                    schema_errors = validator(aggregate)
+                if schema_errors:
+                    error_type, message = "schema", "; ".join(schema_errors[:5])
+                elif incomplete_discovery and not discovery_progress:
+                    error_type, message = 'schema', '前序实体发现被截断；仅重复已保存键不能证明来源范围已完成'
+                elif (collection_name and not parsed.get(collection_name)
+                      and not (entity_delta and recovered_items and not incomplete_discovery)
+                      and (recovered_items or largest_invalid_response >= SUBSTANTIVE_INVALID_RESPONSE_CHARACTERS)):
+                    error_type, message = "schema", "前序响应包含有效记录或大体量无效输出，重试不得用空集合覆盖"
+                elif (retry_empty_collection and collection_name == "entities"
+                      and not parsed.get(collection_name) and not entity_delta
+                      and output_failures + 1 < resolved_max_attempts):
+                    error_type, message = "empty_collection", "实体阶段返回空集合，按提示词要求重试补全"
+                else:
+                    if collection_name in {"entities", "verdicts"}:
+                        # Retain earlier grounded entities even when a complete retry omits them.
+                        parsed = aggregate
+                    _record_call(call_metrics, attempt=attempt_number, pass_name=pass_name,
+                        chunk_id=chunk_id, status="succeeded", elapsed_seconds=time.monotonic() - started,
+                        messages=attempt_messages, response=response, response_mode=response_mode)
+                    if call_metrics:
+                        call_metrics[-1].update(response_normalizations=response_normalizations,
+                                                ignored_saved_records=ignored_saved_records)
+                    return parsed
+            largest_invalid_response = max(largest_invalid_response, len(_response_text(response)))
         except Exception as exc:  # noqa: BLE001 - recorded as typed run evidence
-            error_type = "timeout" if _is_timeout(exc) else "request"
+            error_type = 'call_budget' if isinstance(exc, CallBudgetExceeded) else "timeout" if _is_timeout(exc) else "request"
             # 以下为安全注释COSEC：供应商异常可能回显鉴权头、URL 或请求正文。
             # 仅保留控制重试所需的错误类别，不将原始异常写入日志或结果。
             raw_message = str(exc).lower()
             overflow = any(text in raw_message for text in
                 ('context length', 'context_length', 'maximum context', 'token limit', 'too many tokens'))
-            message = ('context length exceeded' if overflow else
+            message = ('document model call budget exhausted' if error_type == 'call_budget' else
+                       'context length exceeded' if overflow else
                        'document deadline exhausted' if document_expired(llm) else
                        'LLM request timed out' if error_type == 'timeout' else 'LLM provider request failed')
-            retryable = _is_retryable_exception(exc) and not document_expired(llm)
+            retryable = error_type != 'call_budget' and _is_retryable_exception(exc) and not document_expired(llm)
+            # COSEC: Read only a bounded numeric retry hint, never persist headers.
+            try:
+                retry_after = min(60.0, max(0.0, float(getattr(getattr(exc, 'response', None), 'headers', {}).get('Retry-After', 0))))
+            except (ValueError, TypeError, AttributeError):
+                retry_after = 0.0
+            # A gateway that failed after a long generation may fail repeatedly
+            # on the same large output. Narrow the source/schema/items once the
+            # bounded caller permits it. Rate-limit delays retain normal retry.
+            try:
+                status_code = int(getattr(exc, 'status_code', None) or getattr(getattr(exc, 'response', None), 'status_code', 0))
+            except (ValueError, TypeError):
+                status_code = 0
+            adaptive_split = (retryable and error_type == 'request' and status_code in {502, 504}
+                              and retry_after == 0 and time.monotonic() - started >= 60)
 
+        if error_type in {'request', 'timeout'}:
+            transport_failures += 1
+            retry_limit_reached = transport_failures >= resolved_max_attempts
+        elif error_type in {'json', 'schema', 'incomplete', 'empty', 'empty_collection'}:
+            output_failures += 1
+            retry_limit_reached = output_failures >= resolved_max_attempts
+        else:
+            retry_limit_reached = True
         message = message.encode("utf-8")[:1024].decode("utf-8", errors="ignore")
         next_response_mode = _next_response_mode(response_mode, error_type)
         logger.warning(
@@ -580,6 +707,8 @@ def generate_structured(
         attempts.append(
             {
                 "attempt": attempt_number,
+                "transport_failures": transport_failures,
+                "output_failures": output_failures,
                 "type": error_type,
                 "pass": pass_name,
                 "chunk": chunk_id,
@@ -594,6 +723,14 @@ def generate_structured(
                 "message": message,
                 "response_characters": len(_response_text(response)),
                 "recovered_items": len(recovered_items),
+                "rejected_records": rejected_records,
+                "rejection_reasons": rejection_reasons,
+                "response_normalizations": response_normalizations,
+                "ignored_saved_records": ignored_saved_records,
+                "duplicate_entity_records": duplicate_entity_records,
+                "repetitive_entity_output": repetitive_entity_output,
+                "adaptive_split": adaptive_split,
+                "unfinished_entity_tail": bool(collection_name == 'entities' and expected_keys is None and incomplete_lines),
                 "elapsed_seconds": round(time.monotonic() - started, 6),
                 "retryable": retryable,
                 "terminal": False,
@@ -604,56 +741,64 @@ def generate_structured(
             attempt=attempt_number,
             pass_name=pass_name,
             chunk_id=chunk_id,
-            status="failed",
+            status="partial" if recovered_items else "failed",
             elapsed_seconds=time.monotonic() - started,
             messages=attempt_messages,
             response=response,
             error_type=error_type,
             response_mode=response_mode,
         )
-        if not retryable or attempt_number >= resolved_max_attempts or (split_on_overflow and split_request_failure(attempts)):
+        pending_keys = (expected_keys - {_record_key(row, collection_name) for row in recovered_items}
+                        if expected_keys is not None else None)
+        if (not retryable or retry_limit_reached or attempt_number >= max_total_attempts
+                or pending_keys == set()
+                or (split_on_overflow and split_request_failure(attempts))):
             attempts[-1]["terminal"] = True
             break
-        if error_type in {"json", "schema", "empty_collection"}:
-            response_size = len(_response_text(response))
-            recovery_instruction = ""
-            if collection_name and recovered_items:
-                recovery_instruction = (
-                    f"\n上一次前缀中检测到 {len(recovered_items)} 条完整候选（仅作诊断）："
-                    f"{_recovery_summary(collection_name, recovered_items)}\n"
-                    "本次必须重新输出该批次的完整 JSONL；不要依赖前缀恢复。"
-                )
-            empty_instruction = ""
-            if error_type == "empty_collection":
-                empty_instruction = (
-                    "上一次输出是空集合，不允许交白卷：请逐条检查 current chunk 中的记录/条目/条款，"
-                    "凡可归纳为 ontology 实体的对象都必须输出；只有整个 chunk 与 ontology 完全无关时才可输出空集合。\n"
-                )
-            attempt_messages = [
-                messages[0],
-                {
-                    "role": "user",
-                    "content": user_with_retry_feedback(
-                        messages[1]["content"],
-                        "## 上一次输出校验失败，请纠正后重新输出完整 JSONL\n"
-                        f"错误类型：{error_type}\n错误：{message}\n"
-                        f"上一次输出摘要：已省略原文，字符数 {response_size}\n"
-                        f"{recovery_instruction}"
-                        f"{empty_instruction}"
-                        + ("不得解释错误，只输出 JSONL，每行一个符合 success_schema 的实体对象；无实体时只输出 {}。"
-                         if collection_name == "entities" else "不得解释错误，只输出符合 schema 的 JSON 对象。")
-                    ),
-                },
-            ]
+        if error_type in {"json", "schema", "empty_collection", "incomplete"}:
+            retry_messages = messages
+            if pending_keys is not None:
+                retry_messages, attempt_schema = _remaining_request(messages, schema, collection_name, pending_keys)
+            feedback = (
+                ("上一次输出校验失败，请重新输出完整 JSON 对象。\n" if collection_name not in {'entities', 'verdicts'} else
+                 "上一次部分输出未采用，请只处理本轮剩余任务。\n") +
+                f"错误类型：{error_type}；错误：{message}\n"
+                f"程序已保留 {len(recovered_items)} 条本轮格式及局部契约校验通过的记录；损坏行未采用。已保存不等于事实已获语义证明，也不证明当前来源范围已抽全。\n"
+            )
+            feedback += ("只输出一个符合 success_schema 的 JSON 对象，不输出 Markdown 或解释。" if collection_name not in {'entities', 'verdicts'} else
+                         "只输出 JSONL，每行一个符合 success_schema 的记录，不输出数组、包装或解释。")
+            if collection_name is None:
+                feedback = ("上一次输出校验失败，请返回一个完整 JSON 对象，严格遵守 success_schema。"
+                            f"错误类型：{error_type}；错误：{message}。不要集合包装、Markdown 或额外字段。")
+            if collection_name == "verdicts":
+                feedback += "逐项且仅一次覆盖本轮 task.items 中剩余的 item_id，按本轮 success_schema 返回；不能用实体存在代替属性核验。"
+            elif collection_name == "entities":
+                feedback += "已保存记录由程序保留，本轮输出不覆盖它们。"
+                if 'mention' in schema['properties'][collection_name]['items'].get('properties', {}) and recovered_items:
+                    accepted_keys = list(dict.fromkeys((row['type'], row['mention']) for row in recovered_items))
+                    entity_delta = True
+                    feedback += ('已保存的 type/mention 如下；只补充遗漏候选或修复不合格行，不重复这些已保存实体，'
+                        '不通过改写 mention 重复同一实体。完成后立即停止输出：'
+                        + json.dumps(accepted_keys, ensure_ascii=False))
+                    if not incomplete_discovery:
+                        feedback += '没有新增候选时返回单独一行 {}，表示续补结束，不删除已保存记录。'
+                    else:
+                        feedback += '先前输出被供应商标记截断，仅返回 {} 不能证明该来源范围已完成。'
+            attempt_messages = [retry_messages[0], {"role": "user", "content":
+                user_with_retry_feedback(retry_messages[1]["content"], feedback)}]
         response_mode = next_response_mode
-        if retry_base_seconds > 0:
+        if retry_base_seconds > 0 or retry_after > 0:
             from .request_budget import document_deadline
             deadline = document_deadline(llm)
             delay = retry_base_seconds * (2 ** (attempt_number - 1))
+            if error_type in {'request', 'timeout'}:
+                import random
+                delay = max(retry_after, max(0.5, delay) * random.uniform(0.8, 1.2))
             if deadline is not None:
                 delay = min(delay, max(0, deadline - time.monotonic()))
-            time.sleep(delay)
-    return None
+            await current_runtime().delay(delay)
+    return partial_result()
+
 
 
 def verify_items_with_llm(
@@ -766,7 +911,8 @@ def _normalize_span_entities(
                 "mention 无法逐字定位，已保留归纳型实体名并以 evidence.quote 作为证据",
                 path, name)
         elif not name_in_text and not quote_in_text:
-            if ChunkContextManager([chunk]).find_span(chunk.chunk_id, quote) is not None:
+            if any(ChunkContextManager([source]).find_span(source.chunk_id, quote)
+                   for source in source_parts(chunk)):
                 quote_in_text = True
             else:
                 _append_warning(warnings, "ENTITY_UNGROUNDED",
@@ -803,7 +949,8 @@ def bind_entity_evidence(
     return bound.get("entities", [])
 
 
-def entity_pass(
+@synchronous
+async def entity_pass(
     plan: ExtractionPlan,
     schema: OntologySchema,
     manager: ChunkContextManager,
@@ -821,10 +968,13 @@ def entity_pass(
     call_metrics: list[dict[str, Any]] | None = None,
     task: str = "entity",
     repair_issues: list[dict[str, Any]] | None = None,
+    local_previous: int = 1,
+    local_next: int = 1,
+    same_section: bool = True,
 ) -> list[tuple[str, list[dict[str, Any]]]]:
     chunks = list(request.chunks)
 
-    def run(chunk: ExtractionChunk) -> tuple[
+    async def run(chunk: ExtractionChunk, *, type_ids=None, saved_keys=(), audit_types=True) -> tuple[
         str,
         list[dict[str, Any]],
         list[dict[str, Any]],
@@ -834,9 +984,55 @@ def entity_pass(
         local_attempts: list[dict[str, Any]] = []
         local_warnings: list[dict[str, Any]] = []
         local_call_metrics: list[dict[str, Any]] = []
-        from .property_grounding import ground_properties
+        from .property_grounding import ground_properties, admit_entity_names
 
-        def scan(part, types, depth=0):
+        def context_sources(part):
+            sources = source_parts(part)
+            original = manager.get_chunk(part.chunk_id)
+            start = int(part.metadata.get('_v31_window_start', 0))
+            end = start + len(part.text)
+            from dataclasses import replace
+            ranges = [] if part.metadata.get('_v31_table_rows') else ((max(0, start - 200), start), (end, min(len(original.text), end + 200)))
+            for left, right in ranges:
+                if left < right:
+                    sources.append(replace(original, text=original.text[left:right], metadata={**original.metadata,
+                        '_v31_window_start': left, '_v31_context_only': True}))
+            neighbours = (manager.local_context(part.chunk_id, previous=local_previous,
+                          next=local_next, same_section=same_section) if len(manager) > 1 else [])
+            for neighbour in neighbours:
+                if neighbour.chunk_id == part.chunk_id:
+                    continue
+                previous = manager.index_of(neighbour.chunk_id) < manager.index_of(part.chunk_id)
+                left = max(0, len(neighbour.text) - 200) if previous else 0
+                sources.append(replace(neighbour, text=neighbour.text[left:left + 200], metadata={**neighbour.metadata,
+                    '_v31_window_start': left, '_v31_context_only': True}))
+            return sources
+
+        async def finish(parsed, part):
+            warning_start = len(local_warnings)
+            entities = _normalize_span_entities(parsed, chunk=part, schema=schema,
+                target_types=request.target_types, warnings=local_warnings)
+            for warning in local_warnings[warning_start:]:
+                if warning.get('code') == 'ENTITY_UNGROUNDED':
+                    local_attempts.append({'attempt': 1, 'type': 'candidate_rejected',
+                        'pass': 'entity_admission', 'chunk': chunk.chunk_id,
+                        'message': 'candidate has no locatable evidence in the primary source',
+                        'retryable': False, 'terminal': False})
+            sources = context_sources(part)
+            entities = await invoke(admit_entity_names, entities, sources, llm, attempts=local_attempts,
+                warnings=local_warnings, use_scheduler=use_scheduler, max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds, call_metrics=local_call_metrics, plan=plan,
+                route=route, assembly_planner=assembly_planner, max_workers=max_workers)
+            for entity in entities:
+                start = int(part.metadata.get('_v31_window_start', 0))
+                entity['_scanned_range'] = (start, start + len(part.text))
+                entity['_attempted_properties'] = list(entity.get('properties', {}))
+            return await invoke(ground_properties, entities, sources, llm, attempts=local_attempts,
+                warnings=local_warnings, use_scheduler=use_scheduler, max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds, call_metrics=local_call_metrics, plan=plan,
+                route=route, assembly_planner=assembly_planner, max_workers=max_workers)
+
+        async def scan(part, types, depth=0, accepted_keys=()):
             if document_expired(llm):
                 local_attempts.append({'attempt': 1, 'type': 'timeout',
                     'pass': 'repair_entity' if task == 'repair' else 'entity',
@@ -846,50 +1042,90 @@ def entity_pass(
             output_schema = output_schema_for_types(plan, "entity_candidates", types)
             messages = build_chat_messages(assembly_planner=assembly_planner,
                 task=task, plan=plan, route=route, chunk=part, output_schema=output_schema,
-                repair_issues=repair_issues)
+                source_chunks=context_sources(part), repair_issues=repair_issues, accepted_keys=accepted_keys)
             before = len(local_attempts)
             # Schema partitions are scheduling only: visit every allowed type.
             # Shrink before calling, including ontology, skills and metadata.
-            too_big = not fits(messages, llm)
+            # Reserve feedback space while a request can still be partitioned.
+            # At the minimum source/type scope, the actual wire budget decides;
+            # an optional reserve must not reject an otherwise legal request.
+            too_big = not fits(messages, llm, reserve=0 if len(types) == 1 and len(part.text) <= 256 else 2048)
             parsed = None
             if not too_big:
-                parsed = generate_structured(llm, messages, output_schema,
+                parsed = await invoke(generate_structured, llm, messages, output_schema,
                     use_scheduler=use_scheduler, attempts=local_attempts,
                     pass_name="repair_entity" if task == "repair" else "entity", chunk_id=chunk.chunk_id,
                     max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
                     call_metrics=local_call_metrics,
                     split_on_overflow=depth < 12 and (len(types) > 1 or len(part.text) > 256),
-                    validator=lambda payload: validate_candidate_properties(payload, plan, chunk=part))
+                    # Source entailment is a candidate admission decision, not
+                    # a serialization failure requiring regeneration of peers.
+                    validator=lambda payload: validate_candidate_properties(payload, plan),
+                    saved_entity_keys=accepted_keys)
             if parsed is None and document_expired(llm):
                 return []
-            if too_big or (parsed is None and split_request_failure(local_attempts[before:])):
-                if depth < 12 and (len(types) > 1 or len(part.text) > 256):
+            output_failure = bool(local_attempts[before:] and local_attempts[-1].get('terminal')
+                                  and local_attempts[-1].get('type') in {'json', 'schema'} and depth < 2)
+            if too_big or split_request_failure(local_attempts[before:]) or output_failure:
+                if depth < 12 and (len(types) > 1 or (len(part.text) > 256 and not part.metadata.get('_v31_atomic_table'))):
                     parent_failures = local_attempts[before:]
+                    retained = await finish(parsed, part) if parsed is not None else []
+                    for row in retained:
+                        row['_properties_scanned'] = False  # The interrupted scan cannot establish property completeness.
+                    saved = set(accepted_keys) | {(row['type'], row['name']) for row in retained}
                     recover_split_attempts(parent_failures)
-                    if len(types) > 1 and too_big:
+                    unfinished_tail = any(a.get('unfinished_entity_tail') for a in parent_failures)
+                    repetition = any(a.get('repetitive_entity_output') for a in parent_failures)
+                    if len(types) > 1 and (too_big or parsed is not None) and (repetition or not unfinished_tail):
                         mid = len(types) // 2
-                        return scan(part, types[:mid], depth + 1) + scan(part, types[mid:], depth + 1)
-                    if len(part.text) > 256:
-                        return [entity for sub in windows(part, max(128, len(part.text) // 2))
-                                for entity in scan(sub, types, depth + 1)]
+                        first = await scan(part, types[:mid], depth + 1, saved)
+                        saved.update((row['type'], row['name']) for row in first)
+                        return retained + first + await scan(part, types[mid:], depth + 1, saved)
+                    if len(part.text) > 256 and not part.metadata.get('_v31_atomic_table'):
+                        found = list(retained)
+                        for sub in windows(part, max(128, len(part.text) // 2)):
+                            additions = await scan(sub, types, depth + 1, saved)
+                            found.extend(additions)
+                            # Different source windows may contain another
+                            # occurrence/new properties of the same key. Only
+                            # exclude the retained parent prefix, whose missing
+                            # properties are explicitly rescanned afterwards.
+                        return found
                     mid = len(types) // 2
-                    return scan(part, types[:mid], depth + 1) + scan(part, types[mid:], depth + 1)
+                    return retained + await scan(part, types[:mid], depth + 1, saved) + await scan(part, types[mid:], depth + 1, saved)
                 if too_big:
                     local_attempts.append({"attempt": 0, "type": "input_budget",
                         "pass": "repair_entity" if task == "repair" else "entity", "chunk": chunk.chunk_id,
                         "message": "minimum source/schema window exceeds request budget", "terminal": True})
-                return []
+                return await finish(parsed, part) if parsed is not None else []
             if parsed is None:
                 return []
-            entities = _normalize_span_entities(parsed, chunk=part, schema=schema,
-                target_types=request.target_types, warnings=local_warnings)
-            return ground_properties(entities, [part], llm, attempts=local_attempts,
-                warnings=local_warnings, use_scheduler=use_scheduler, max_attempts=max_attempts,
-                retry_base_seconds=retry_base_seconds, call_metrics=local_call_metrics, plan=plan,
-                route=route, assembly_planner=assembly_planner)
+            return await finish(parsed, part)
 
-        grounded_entities = [entity for part in windows(chunk, window_chars(llm))
-                             for entity in scan(part, sorted(plan.relevant_types(part.text)))]
+        grounded_entities = []
+        for part in windows(chunk, window_chars(llm)):
+            grounded_entities.extend(await scan(part, sorted(type_ids or plan.relevant_types(part.text)),
+                                                accepted_keys=saved_keys))
+        allowed = sorted(plan.relevant_types(chunk.text))
+        represented = {row['type'] for row in grounded_entities}
+        # A long multi-type source can receive one valid type and stop early
+        # instead of visiting the other allowed type scopes. Check the
+        # remaining type scopes once; no required count, no forced candidates.
+        # Each child owns its diagnostics, avoiding cross-task recovery markers.
+        type_audit_enabled = config_getenv('KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT', 'false').strip().casefold() in {'1', 'true', 'yes'}
+        if (type_audit_enabled and audit_types and len(chunk.text) >= 512 and len(allowed) > 1
+                and len(represented) == 1 and not any(a.get('terminal') for a in local_attempts)
+                and not document_expired(llm)):
+            saved = {(row['type'], row['name']) for row in grounded_entities}
+            async def remaining(type_id):
+                return await run(chunk, type_ids=[type_id], saved_keys=saved, audit_types=False)
+            checks = await ordered_tasks(remaining, [t for t in allowed if t not in represented],
+                                         limit=max(1, max_workers))
+            for _, additions, child_attempts, child_warnings, child_calls in checks:
+                grounded_entities.extend(additions)
+                local_attempts.extend(child_attempts)
+                local_warnings.extend(child_warnings)
+                local_call_metrics.extend(child_calls)
         return (
             chunk.chunk_id,
             grounded_entities,
@@ -898,25 +1134,10 @@ def entity_pass(
             local_call_metrics,
         )
 
-    def workers():
-        worker_count = max(1, max_workers)
-        # Upstream may supply one enormous chunk. Schedule bounded windows, so
-        # that case can still use the configured concurrency without an
-        # unbounded queue or a separate executor per chunk.
-        pending_chunks = (part for chunk in chunks
-                          for part in iter_windows(chunk, window_chars(llm)))
-        if worker_count == 1:
-            yield from map(run, pending_chunks)
-            return
-        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="ke-entity") as executor:
-            pending = deque(executor.submit(run, c) for c in islice(pending_chunks, worker_count * 2))
-            while pending:
-                yield pending.popleft().result()
-                chunk = next(pending_chunks, None)
-                if chunk is not None:
-                    pending.append(executor.submit(run, chunk))
+    pending_chunks = (part for chunk in chunks for part in iter_windows(chunk, window_chars(llm)))
+    outputs = await ordered_tasks(run, pending_chunks, limit=max(1, max_workers) * 2)
     results: dict[str, list[dict[str, Any]]] = {chunk.chunk_id: [] for chunk in chunks}
-    for chunk_id, entities, local_attempts, local_warnings, local_calls in workers():
+    for chunk_id, entities, local_attempts, local_warnings, local_calls in outputs:
         attempts.extend(local_attempts)
         warnings.extend(local_warnings)
         if call_metrics is not None:
@@ -927,12 +1148,14 @@ def entity_pass(
 
 
 def _append_call(call_metrics, call):
-    # Full prompts are debugging data, not extraction output. Bound retention
+    # Full messages are debugging data, not extraction output. Bound retention
     # across the request while retaining every call's timing/status/usage.
     limit = max(0, int(config_getenv("KG_EXTRACT_V31_TRACE_CALLS", "32")))
     if len(call_metrics) >= limit:
         call.pop("messages", None)
+        call.pop("response_text", None)
         call["messages_omitted"] = True
+        call["response_omitted"] = True
     call_metrics.append(call)
 
 
@@ -974,6 +1197,7 @@ def _record_call(
             "usage_unavailable": response_metadata.get("usage_unavailable"),
             "token_usage": usage,
             "messages": [dict(message) for message in messages],
+            **({"response_text": text} if response is not None else {}),
         }
     )
 

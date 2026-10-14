@@ -38,10 +38,11 @@ def create_chat_completion(
     disable_thinking: bool,
     response_format: dict[str, Any] | None = None,
     thinking_parameter: str = "thinking",
+    temperature: float = 0,
 ) -> Any:
     """Use an injected SDK/HTTP adapter; each retry enters its scheduler again."""
     kwargs: dict[str, Any] = {
-        "model": model, "messages": messages, "temperature": 0, "max_tokens": max_tokens,
+        "model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens,
     }
     if response_format is not None:
         kwargs["response_format"] = response_format

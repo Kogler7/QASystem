@@ -5,7 +5,9 @@ Chat construction is shared with extraction; judge response formats stay explici
 """
 from __future__ import annotations
 import json
+import math
 import re
+import time
 from typing import Any, Callable
 from urllib.parse import urlsplit
 from external_services.llm.chat import (
@@ -101,6 +103,7 @@ class JudgeClient:
         response_format: str = "auto",
         disable_thinking: bool = True,
         adapter: str = "chat",
+        transport_attempts: int = 1,
     ) -> None:
         self.http_request = transport
         self.base_url = base_url
@@ -111,6 +114,9 @@ class JudgeClient:
         if adapter not in {"chat", "systemone"}:
             raise ValueError("judge_adapter 必须是 chat 或 systemone")
         self.adapter = adapter
+        if type(transport_attempts) is not int or not 1 <= transport_attempts <= 3:
+            raise ValueError("judge_transport_attempts 必须是 1–3 的整数")
+        self.transport_attempts = transport_attempts
         if response_format not in {"auto", "json_object", "json_schema"}:
             raise ValueError("judge_response_format 必须是 auto、json_object 或 json_schema")
         if not isinstance(disable_thinking, bool):
@@ -142,6 +148,7 @@ class JudgeClient:
             response_format=self.response_format,
             disable_thinking=self.disable_thinking,
             adapter=self.adapter,
+            transport_attempts=self.transport_attempts,
         )
 
     def _safe_error(self, value: Any) -> str:
@@ -177,11 +184,32 @@ class JudgeClient:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        status, _headers, body = self.http_request(
-            _chat_completions_url(self.base_url), method="POST",
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers=headers, timeout=self.timeout,
-        )
+        deadline = time.monotonic() + self.timeout
+        transport_history: list[dict[str, Any]] = []
+        for attempt in range(1, self.transport_attempts + 1):
+            status, response_headers, body = self.http_request(
+                _chat_completions_url(self.base_url), method="POST",
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers=headers, timeout=max(0.001, deadline - time.monotonic()),
+            )
+            if status not in {429, 502, 503, 504} or attempt == self.transport_attempts:
+                break
+            # COSEC: Retain only status and a bounded numeric delay, never
+            # provider error bodies, authentication headers or redirect targets.
+            hint = next((value for key, value in dict(response_headers or {}).items()
+                         if str(key).casefold() == "retry-after"), None)
+            try:
+                delay = float(hint)
+                if not math.isfinite(delay):
+                    raise ValueError("non-finite delay")
+                delay = max(0.5, min(60.0, delay))
+            except (ValueError, TypeError):
+                delay = min(10.0, 2.0 ** attempt)
+            transport_history.append({"http_status": status, "retry_delay_seconds": delay})
+            self.last_diagnostics["transport_retries"] = transport_history
+            if time.monotonic() + delay >= deadline:
+                break
+            time.sleep(delay)
         self.last_diagnostics["http_status"] = status
         try:
             data = json.loads(body.decode("utf-8") or "{}")
@@ -275,6 +303,20 @@ class JudgeClient:
         else:
             response_format = None
         data = _decode_judge_response(self._post_chat(messages, response_format))
+        # Some OpenAI-compatible providers serialize an index pair as [g, p].
+        # This is transport normalization only: never coerce strings/bools,
+        # discard malformed pairs, or change the semantic matching rules.
+        collection = next(iter(schema["properties"]))
+        pairs = data.get(collection)
+        if isinstance(pairs, list):
+            normalized = 0
+            for index, pair in enumerate(pairs):
+                if (isinstance(pair, list) and len(pair) == 2
+                        and all(type(value) is int and value >= 0 for value in pair)):
+                    pairs[index] = {"golden_index": pair[0], "predicted_index": pair[1]}
+                    normalized += 1
+            if normalized:
+                self.last_diagnostics["normalized_index_pairs"] = normalized
         _validate_judge_result(data, schema)
         return data
 

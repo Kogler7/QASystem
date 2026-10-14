@@ -4,3 +4,9 @@ test_data/repetition/verifier-scope-v1/** text eol=lf
 test_data/judge_windows/** text eol=lf
 # The Linux control launcher must retain a valid shebang after Windows checkout.
 ops text eol=lf
+# Canonical hashes for the isolated V3.1 experiment; binary documents stay binary.
+test_data/eval-v31-20261014/**/*.json text eol=lf
+test_data/eval-v31-20261014/**/*.md text eol=lf
+test_data/eval-v31-20261014/**/*.puml text eol=lf
+test_data/eval-v31-20261014/**/*.jsonl text eol=lf
+test_data/eval-v31-20261014/**/*.txt text eol=lf
