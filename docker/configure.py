@@ -57,6 +57,54 @@ def slug(repo: str) -> str:
 
 
 class Configuration:
+    @staticmethod
+    def process_environment():
+        from docker.startup_contract import PROCESS_ENVIRONMENT
+        return dict(PROCESS_ENVIRONMENT)
+
+    MIGRATION_STATE = ('approved-config.json', 'history', 'versions', 'events', 'observed',
+                       'applied-models.json', 'applied.compose.json')
+
+    def legacy_snapshot(self):
+        if self.input_directory == self.directory:
+            return {}
+        return {str(p.relative_to(self.input_directory)): guard.digest(p.read_bytes())
+                for p in self.input_directory.rglob('*') if p.is_file()}
+
+    def copy_legacy_runtime(self):
+        """Explicit save copies private state; caller rolls back on any failed write."""
+        copied = []
+        if self.input_directory == self.directory:
+            return copied
+        if any((self.directory / name).exists() for name in self.MIGRATION_STATE):
+            raise ValueError('目标配置目录已存在历史或实际状态；拒绝覆盖')
+        try:
+            for name in self.MIGRATION_STATE:
+                source, target = self.input_directory / name, self.directory / name
+                if not source.exists():
+                    continue
+                if target.exists():
+                    raise ValueError('目标配置目录已存在历史或实际状态；拒绝覆盖')
+                copied.append(target)
+                if source.is_dir():
+                    shutil.copytree(source, target)
+                    target.chmod(0o700)
+                else:
+                    shutil.copy2(source, target)
+                    target.chmod(0o600)
+        except Exception:
+            self.rollback_migration(copied)
+            raise
+        return copied
+
+    @staticmethod
+    def rollback_migration(copied):
+        for target in reversed(copied):
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink(missing_ok=True)
+
     def __init__(self, root: Path):
         self.root = root.resolve()
         self.catalog = json.loads(Path(__file__).with_name("llm-models.json").read_text(encoding="utf-8"))
@@ -68,11 +116,20 @@ class Configuration:
         original_values, self.migration_conflicts = migrate(helper.read_env(self.original))
         self.resolved_migrations = set()
         self.values = {**helper.read_env(self.template), **original_values}
-        directory = Path(self.values.get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config"))
-        self.directory = (root / directory).resolve() if not directory.is_absolute() else directory
+        from docker.startup_contract import runtime_directory
+        self.directory = runtime_directory(root)
+        old_directory = Path(self.values.get('QASYSTEM_RUNTIME_CONFIG_DIR', './runtime-config'))
+        self.input_directory = (root / old_directory).resolve()
+        self.approval_directory = self.directory
+        if self.input_directory != self.directory and self.input_directory.exists():
+            if any((self.directory / name).exists() for name in ('config.json', 'settings.json', 'models.json', *self.MIGRATION_STATE)):
+                raise ValueError('新旧配置目录同时含实际配置；拒绝自动合并或覆盖')
+            self.approval_directory = self.input_directory
+        else:
+            self.input_directory = self.directory
         self.directory.mkdir(parents=True, exist_ok=True)
         self.directory.chmod(0o700)
-        hot = self.directory / "config.json"
+        hot = self.input_directory / "config.json"
         document = read_document(hot, migration=True)
         original_values, self.migration_conflicts = migrate({**helper.read_env(self.original), **document['settings']})
         self.migration_conflicts.update({key: old for key, old in duplicate_conflicts(self.original).items()
@@ -93,8 +150,8 @@ class Configuration:
         self.migration_conflicts.update(model_conflicts)
         if set(self.models) - {m['repo'] for m in self.catalog}:
             raise ValueError('模型计划包含未登记模型，请先更新当前版本模型清单')
-        models = self.directory / "models.json"  # migration input only
-        applied = self.directory / "applied-models.json"
+        models = self.input_directory / "models.json"  # migration input only
+        applied = self.input_directory / "applied-models.json"
         self.previous_models = json.loads(applied.read_text()) if applied.exists() else {}
         self.model_defaults = {}
         for index, model in enumerate(self.catalog):
@@ -107,15 +164,19 @@ class Configuration:
         self.backup.mkdir(parents=True, mode=0o700)
         for name, source in [("deployment.env", root / ".env"), ("config.json", hot),
                              ('deployment.env.example', root / '.env.example'),
-                             ("settings.json", self.directory / "settings.json"),
+                             ("settings.json", self.input_directory / "settings.json"),
                              ("models.json", models), ("applied-models.json", applied),
-                             ("models.compose.json", self.directory / "models.compose.json")]:
+                             ("models.compose.json", self.input_directory / "models.compose.json")]:
             if source.exists():
                 target = self.backup / name
                 target.write_bytes(source.read_bytes())
                 target.chmod(0o600)
         self.expected = {p: p.read_bytes() if p.exists() else None for p in
             (root / ".env", root / '.env.example', hot, models, self.directory / "settings.json", self.directory / "models.compose.json")}
+        self.expected.update({p: p.read_bytes() if p.exists() else None for p in
+                              (self.directory / 'config.json',
+                               self.input_directory / 'settings.json', self.input_directory / 'models.compose.json')})
+        self.legacy_expected = self.legacy_snapshot()
         self.live = []
         self.live_error = "实际状态尚未读取"
         self.pending_reservations = set()
@@ -322,7 +383,7 @@ class Configuration:
             if not model["enabled"]: continue
             services[slug(repo)] = dict(image=self.values["QASYSTEM_ENV_IMAGE"], pull_policy="never",
                 entrypoint=['python', '/app/docker/config_guard.py', '--project-dir', '/app', '--runtime-dir', '/app/runtime-config', '--exec'],
-                restart="unless-stopped", init=True, gpus="all", environment={"CUDA_VISIBLE_DEVICES": model["gpu"],
+                restart="unless-stopped", init=True, gpus="all", environment={**self.process_environment(), "CUDA_VISIBLE_DEVICES": model["gpu"],
                 "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "VLLM_NO_USAGE_STATS": "1"},
                 volumes=[f"{self.model_root()}:/models:ro", f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
                          f"{self.directory}:/app/runtime-config:ro", f"{self.directory / 'observed'}:/app/runtime-config/observed", f"{self.root / '.env'}:/app/.env:ro",
@@ -358,11 +419,12 @@ class Configuration:
         for path, expected in self.expected.items():
             if (path.read_bytes() if path.exists() else None) != expected:
                 raise ValueError("配置已被其他进程修改；请退出并重新打开，避免覆盖")
-        if Path(self.values.get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config")) != Path(helper.read_env(self.original).get("QASYSTEM_RUNTIME_CONFIG_DIR", "./runtime-config")):
-            raise ValueError("运行时目录是启动位置，不能在当前编辑会话中移动")
+        if self.legacy_snapshot() != self.legacy_expected:
+            raise ValueError('旧配置目录已被其他进程修改；请重新打开')
         payloads = self.pending_payloads()
-        written = []
+        written, copied = [], []
         try:
+            copied = self.copy_legacy_runtime()
             for path, content in payloads.items():
                 helper.atomic_write(path, content)
                 written.append(path)
@@ -371,7 +433,11 @@ class Configuration:
                 old = self.expected[path]
                 if old is None: path.unlink(missing_ok=True)
                 else: helper.atomic_write(path, old.decode("utf-8-sig"))
+            self.rollback_migration(copied)
             raise
+        self.approval_directory = self.directory
+        self.input_directory = self.directory
+        self.legacy_expected = {}
         # Old inputs were backed up on entry. Never continue to overlay them.
         for legacy in (self.directory / "settings.json", self.directory / "models.json"):
             legacy.unlink(missing_ok=True)
@@ -489,7 +555,7 @@ def review_save(config: Configuration) -> bool:
         raise ValueError('；'.join(errors))
     payloads = config.pending_payloads()
     current = guard.snapshot(config.root, config.directory, payloads=payloads)
-    previous = guard.approved(config.directory)
+    previous = guard.approved(config.approval_directory)
     revision = int(previous.get('revision', 0)) + 1 if previous else 1
     changes = guard.changes(previous, current)
     if not changes and previous and current == previous['snapshot']:

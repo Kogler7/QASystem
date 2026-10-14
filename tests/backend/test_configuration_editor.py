@@ -15,6 +15,7 @@ def editor(tmp_path, monkeypatch):
     (tmp_path / '.env').write_text('GPU_DEVICE_IDS=4,5,6,7\nEXECUTION_GPU_RESERVED_DEVICE_IDS=7\nHOST_MODELS_DIR=./models\nPRIVATE_API_KEY=never-print\n')
     (tmp_path / 'docker-compose.yml').write_text('services: {}')
     monkeypatch.setattr(configure.helper, 'run', lambda *a, **kw: pytest.fail('Opening or saving must not execute Docker'))
+    monkeypatch.chdir(tmp_path)
     return configure.Configuration(tmp_path)
 
 
@@ -38,7 +39,7 @@ def test_save_generates_defaults_and_hot_file_without_deploy(editor, monkeypatch
     assert 'KG_EXTRACT_LLM_MODEL' not in env
     assert json.loads((editor.directory / 'models.compose.json').read_text()) == {'services': {}}
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
+    monkeypatch.chdir(editor.root)
     assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'test-model'
     editor.values['KG_EXTRACT_LLM_MODEL'] = 'second-model'
     editor.save()
@@ -86,16 +87,16 @@ def test_concurrent_configuration_edit_is_preserved(editor):
 
 def test_runtime_rejects_secrets_and_malformed_file(tmp_path, monkeypatch):
     path = tmp_path / 'settings.json'
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(path))
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv('KG_EXTRACT_LLM_MODEL', 'fallback')
     assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'fallback'
     for text in ('{', '{"KG_EXTRACT_LLM_API_KEY":"secret"}', '[]'):
         path.write_text(text)
-        with pytest.raises(ValueError, match='Invalid runtime'): runtime_settings.read_settings()
+        with pytest.raises(ValueError, match='Invalid runtime'): runtime_settings.read_settings(path)
 
 
 def test_new_requests_reload_model_and_version_existing_snapshot_is_stable(editor, monkeypatch):
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
+    monkeypatch.chdir(editor.root)
     editor.values.update(KG_EXTRACT_ALGO_VERSION='v3', KG_EXTRACT_LLM_MODEL='first',
                          KG_EXTRACT_LLM_MAX_TOKENS='1024', KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS='1024')
     editor.save()
@@ -340,7 +341,7 @@ def test_container_mount_precedes_host_relative_config_dir(monkeypatch):
 
 def test_judge_budget_does_not_inherit_extraction_budget(editor, monkeypatch):
     from eval.run import build_judge_client
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(editor.directory / 'config.json'))
+    monkeypatch.chdir(editor.root)
     monkeypatch.setenv('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS', '16384')
     monkeypatch.setenv('KG_EXTRACT_LLM_TIMEOUT_SECONDS', '900')
     monkeypatch.setenv('QASYSTEM_JUDGE_BASE_URL', 'http://127.0.0.1:60123/v1')
@@ -381,3 +382,92 @@ def test_ui_explicit_review_records_saved_configuration(editor, monkeypatch):
     record = configure.guard.approved(editor.directory)
     assert record['reason'] == 'initial deployment review'
     assert 'never-print' not in json.dumps(record)
+
+
+def legacy_editor(tmp_path):
+    old = tmp_path / 'custom-config'
+    old.mkdir()
+    (tmp_path / '.env').write_text('QASYSTEM_RUNTIME_CONFIG_DIR=./custom-config\nHOST_MODELS_DIR=./models\n')
+    (old / 'config.json').write_text('{"settings":{"KG_EXTRACT_LLM_MODEL":"old"},"models":{}}')
+    (old / 'models.compose.json').write_text('{"services":{}}')
+    configure.guard.record(old, configure.guard.snapshot(tmp_path, old), reason='fixture', reviewer='tester')
+    return configure.Configuration(tmp_path), old
+
+
+def test_custom_directory_plan_does_not_modify_original_or_copy_approval(tmp_path):
+    editor, old = legacy_editor(tmp_path)
+    before = (old / 'approved-config.json').read_bytes()
+    plan = editor.pending_payloads()
+    assert editor.values['KG_EXTRACT_LLM_MODEL'] == 'old'
+    assert editor.approval_directory == old
+    assert 'QASYSTEM_RUNTIME_CONFIG_DIR=' not in plan[tmp_path / '.env']
+    assert (old / 'approved-config.json').read_bytes() == before
+    assert not (editor.directory / 'approved-config.json').exists()
+    assert not (editor.directory / 'config.json').exists()
+
+
+def test_custom_directory_save_preserves_history_and_repeat_save(tmp_path):
+    editor, old = legacy_editor(tmp_path)
+    editor.save()
+    assert (editor.directory / 'versions/r000001/.env').read_bytes() == (old / 'versions/r000001/.env').read_bytes()
+    assert configure.guard.approved(editor.directory)['revision'] == 1
+    configure.guard.record(editor.directory, configure.guard.snapshot(tmp_path, editor.directory), reason='fixture', reviewer='tester')
+    assert configure.guard.approved(editor.directory)['revision'] == 2
+    assert configure.guard.approved(old)['revision'] == 1
+    editor.save()
+
+
+def test_directory_migration_rejects_existing_destination_state(tmp_path):
+    editor, old = legacy_editor(tmp_path)
+    (editor.directory / 'applied-models.json').write_text('{}')
+    with pytest.raises(ValueError, match='拒绝覆盖'):
+        editor.save()
+    assert not (editor.directory / 'config.json').exists()
+    assert not (editor.directory / 'approved-config.json').exists()
+
+
+def test_directory_migration_rejects_concurrent_history_change(tmp_path):
+    editor, old = legacy_editor(tmp_path)
+    (old / 'events/new.json').write_text('{}')
+    with pytest.raises(ValueError, match='其他进程'):
+        editor.save()
+    assert not (editor.directory / 'approved-config.json').exists()
+
+
+def test_directory_migration_write_failure_rolls_back_copied_state(tmp_path, monkeypatch):
+    editor, old = legacy_editor(tmp_path)
+    original_env = (tmp_path / '.env').read_bytes()
+    original = configure.helper.atomic_write
+    def write(path, content):
+        if path == editor.directory / 'config.json':
+            raise OSError('simulated write failure')
+        original(path, content)
+    monkeypatch.setattr(configure.helper, 'atomic_write', write)
+    with pytest.raises(OSError, match='simulated'):
+        editor.save()
+    assert (tmp_path / '.env').read_bytes() == original_env
+    assert (old / 'approved-config.json').exists()
+    assert not (editor.directory / 'approved-config.json').exists()
+    assert not (editor.directory / 'versions').exists()
+
+
+def test_cancel_custom_directory_review_never_copies_or_saves(tmp_path, monkeypatch):
+    editor, old = legacy_editor(tmp_path)
+    before = (tmp_path / '.env').read_bytes()
+    monkeypatch.setattr(configure.sys.stdin, 'isatty', lambda: True)
+    monkeypatch.setattr(configure, 'read_key', lambda: 'q')
+    assert configure.review_save(editor) is False
+    assert (tmp_path / '.env').read_bytes() == before
+    assert not (editor.directory / 'config.json').exists()
+    assert not (editor.directory / 'approved-config.json').exists()
+    assert (old / 'approved-config.json').exists()
+
+
+@pytest.mark.parametrize('filename', ['config.json', 'history/old.json'])
+def test_opening_editor_rejects_both_actual_directories(tmp_path, filename):
+    editor, old = legacy_editor(tmp_path)
+    destination = editor.directory / filename
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text('{}')
+    with pytest.raises(ValueError, match='拒绝自动合并'):
+        configure.Configuration(tmp_path)

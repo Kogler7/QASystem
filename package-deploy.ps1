@@ -77,7 +77,7 @@ foreach ($directory in @("backend", "algorithm", "mcp_services", "agent_mcp", "a
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "config_guard.py", "configuration.py", "config_contract.py", "config_database.py", "config_migrations.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "startup_contract.py", "config_guard.py", "configuration.py", "config_contract.py", "config_database.py", "config_migrations.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docker/config-releases') -Destination (Join-Path $runtimeDir 'docker/config-releases') -Recurse -Force

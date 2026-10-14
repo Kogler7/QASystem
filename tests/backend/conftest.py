@@ -214,7 +214,7 @@ def protocol_module():
         for name in (
             "EXECUTION_MODE",
             "EXECUTION_REDIS_URL",
-            "QASYSTEM_LOAD_DOTENV",
+            "ENVIRONMENT",
         )
     }
     # Existing protocol tests exercise algorithm contracts without starting
@@ -222,7 +222,7 @@ def protocol_module():
     # production fallback.
     os.environ["EXECUTION_MODE"] = "inline"
     os.environ.pop("EXECUTION_REDIS_URL", None)
-    os.environ["QASYSTEM_LOAD_DOTENV"] = "false"
+    os.environ["ENVIRONMENT"] = "test"
     original = {name: sys.modules.get(name) for name in stubs}
     application_modules = [
         "backend.app.services.algorithm_capabilities",

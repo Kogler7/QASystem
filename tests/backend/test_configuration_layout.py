@@ -51,7 +51,7 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     template = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "- .env" in compose
-    assert "QASYSTEM_LOAD_DOTENV=false" in template
+    assert "QASYSTEM_LOAD_DOTENV=" not in template
     assert "./deploy/qasystem-runtime:/app" not in compose
     assert "backend-data:/app/backend/data" in compose
     assert "agent-output:/app/agent/image_result" in compose
@@ -75,7 +75,7 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "execution-vlm-worker" not in compose
     assert "vllm-0:" not in compose
     assert "AGENT_MCP_URL=http://agent-mcp:9181/mcp" in template
-    assert "environment:" not in compose
+    assert "environment: *qasystem-process-environment" in compose
     assert "${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro" in compose
     assert "${AGENT_HOST_PORT:?Run ops config to generate configuration}:9180" in compose
     assert "MCP_PORT" not in env_keys
@@ -157,3 +157,16 @@ def test_runtime_version_check_accepts_cuda_build_tag_but_rejects_release_drift(
     monkeypatch.setattr(verify_runtime.importlib.metadata, "version", lambda name: "2.12.0+cu130")
     with pytest.raises(RuntimeError, match="runtime distribution version mismatches"):
         verify_runtime._check_distribution_versions()
+
+
+def test_fixed_process_contract_and_runtime_mounts_are_shared():
+    import yaml
+    from docker.startup_contract import PROCESS_ENVIRONMENT
+    compose = yaml.safe_load((ROOT / 'docker-compose.yml').read_text())
+    for name in ('backend', 'agent', 'clef', 'nanojev'):
+        service = compose['services'][name]
+        assert service['environment'] == PROCESS_ENVIRONMENT
+        assert './runtime-config:/app/runtime-config:ro' in service['volumes']
+    template = (ROOT / '.env.example').read_text()
+    for key in ('QASYSTEM_LOAD_DOTENV', 'QASYSTEM_RUNTIME_CONFIG_DIR', 'PYTHONPATH', 'PYTHONUNBUFFERED'):
+        assert key + '=' not in template

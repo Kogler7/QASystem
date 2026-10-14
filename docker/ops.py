@@ -71,8 +71,8 @@ def install_command(root):
 
 
 def directory_for(root):
-    env = read_env((root / '.env').read_text(encoding='utf-8-sig'))
-    return root / env.get('QASYSTEM_RUNTIME_CONFIG_DIR', './runtime-config')
+    from docker.startup_contract import runtime_directory
+    return runtime_directory(root)
 
 
 def probe_runtime(root, directory):

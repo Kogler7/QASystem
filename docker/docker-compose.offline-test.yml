@@ -13,7 +13,6 @@ services:
     gpus: all
     environment:
       ENVIRONMENT: offline-test
-      QASYSTEM_LOAD_DOTENV: "false"
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: /app:/app/agent
       LIBREOFFICE_PATH: /usr/bin/soffice
@@ -25,7 +24,6 @@ services:
       CONFIDENCE_SBERT_MODEL_PATH: /models/bge-small-zh-v1.5
       NL2CYPHER_EMBEDDING_MODEL_PATH: /models/bge-small-zh-v1.5
       DATABASE_HOST: ""
-      APPLICATION_SERVICE_URL: ""
       APPLICATION_SERVICE_URL: ""
       KG_EXTRACT_LLM_BASE_URL: http://mock-llm:9000/v1
       KG_EXTRACT_LLM_API_KEY: offline-test

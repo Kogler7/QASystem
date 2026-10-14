@@ -58,7 +58,7 @@ def snapshot(root, directory, *, payloads=None):
     config_path = directory / 'config.json'
     template = root / 'deployment.env.example' if (root / 'deployment.env.example').is_file() else root / '.env.example'
     # The image mounts source at /app; the host UI can use its bundled catalog.
-    if not template.is_file():
+    if not template.is_file() and template not in payloads:
         template = Path(__file__).resolve().parents[1] / '.env.example'
     release = Path(__file__).resolve().parents[1] / '.env.example'
     if not release.is_file():
@@ -69,6 +69,11 @@ def snapshot(root, directory, *, payloads=None):
     else:
         document = read_document(config_path)
     values = {'env.' + k: safe_value(k, v) for k, v in env.items()}
+    try:
+        displayed_directory = './' + directory.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        displayed_directory = str(directory.resolve())
+    values['deployment.runtime_directory'] = {'value': displayed_directory}
     for key, value in document['settings'].items():
         values['settings.' + key] = {'value': value}
     for repo, model in document['models'].items():
@@ -85,7 +90,7 @@ def snapshot(root, directory, *, payloads=None):
     if declaration.exists():
         registry = json.loads(declaration.read_text(encoding='utf-8'))
         values['declarations.version'] = {'value': registry['version']}
-        for key in ('aliases', 'model_defaults', 'model_descriptions', 'model_migrations', 'retired'):
+        for key in ('aliases', 'model_defaults', 'model_descriptions', 'model_migrations', 'retired', 'fixed_contracts'):
             values['declarations.' + key] = {'value': json.dumps(registry.get(key), ensure_ascii=False, sort_keys=True)}
         for key, item in registry['items'].items():
             values['declarations.' + key] = {**safe_value(key, str(item['default'])),
@@ -251,7 +256,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         root = args.project_dir.resolve()
-        directory = args.runtime_dir or root / read_env((root / '.env').read_text()).get('QASYSTEM_RUNTIME_CONFIG_DIR', './runtime-config')
+        from docker.startup_contract import runtime_directory
+        directory = args.runtime_dir or runtime_directory(root)
         revision = require(root, directory)
         print(f'配置 guard 通过，批准版本 r{revision}', flush=True)
         if args.execute:

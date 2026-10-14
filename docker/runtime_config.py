@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -41,13 +40,9 @@ MODEL_DESCRIPTIONS = {
 
 
 def runtime_path(root: Path | None = None, env=None) -> Path:
-    env = os.environ if env is None else env
     root = Path.cwd() if root is None else Path(root)
-    explicit = env.get("QASYSTEM_RUNTIME_SETTINGS_FILE")
-    directory = env.get("QASYSTEM_RUNTIME_CONFIG_DIR")
-    path = Path("/app/runtime-config/config.json") if Path("/app/runtime-config").is_dir() else Path(explicit) if explicit else (
-        Path(directory) / "config.json" if directory else Path("runtime-config/config.json"))
-    return path if path.is_absolute() else root / path
+    from docker.startup_contract import runtime_directory
+    return Path('/app/runtime-config/config.json') if Path('/app/runtime-config').is_dir() else runtime_directory(root) / 'config.json'
 
 
 def _json(path: Path):

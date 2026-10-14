@@ -5,6 +5,11 @@ import pytest
 from backend.app import environment
 
 
+@pytest.fixture(autouse=True)
+def local_runtime(monkeypatch):
+    monkeypatch.setattr(environment, 'in_container_runtime', lambda: False)
+
+
 def test_unmanaged_local_run_loads_root_dotenv(monkeypatch):
     calls = []
     monkeypatch.delenv("ENVIRONMENT", raising=False)
@@ -27,23 +32,14 @@ def test_managed_runtime_uses_process_environment_only(monkeypatch):
     assert environment.configure_runtime_environment() is False
 
 
-def test_explicit_dotenv_switch_overrides_automatic_detection(monkeypatch):
-    calls = []
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("QASYSTEM_LOAD_DOTENV", "true")
-    monkeypatch.setattr(environment, "load_dotenv", lambda path, override: calls.append((path, override)))
-
-    assert environment.configure_runtime_environment() is True
-    assert calls == [(environment.ROOT_ENV_FILE, False)]
-
-    monkeypatch.setenv("QASYSTEM_LOAD_DOTENV", "false")
-    calls.clear()
-    assert environment.configure_runtime_environment() is False
-    assert calls == []
+@pytest.mark.parametrize('legacy_switch', ['true', 'false', 'sometimes'])
+def test_removed_switch_cannot_override_runtime_detection(monkeypatch, legacy_switch):
+    monkeypatch.setenv('ENVIRONMENT', 'production')
+    monkeypatch.setenv('QASYSTEM_LOAD_DOTENV', legacy_switch)
+    assert environment.should_load_local_dotenv() is False
 
 
-def test_invalid_explicit_dotenv_switch_fails_fast(monkeypatch):
-    monkeypatch.setenv("QASYSTEM_LOAD_DOTENV", "sometimes")
-
-    with pytest.raises(ValueError, match="QASYSTEM_LOAD_DOTENV"):
-        environment.should_load_local_dotenv()
+def test_container_never_loads_dotenv_even_without_environment(monkeypatch):
+    monkeypatch.delenv('ENVIRONMENT', raising=False)
+    monkeypatch.setattr(environment, 'in_container_runtime', lambda: True)
+    assert environment.should_load_local_dotenv() is False

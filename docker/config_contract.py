@@ -73,6 +73,7 @@ def check(root, *, deployed=False):
     from docker.runtime_config import HOT_KEYS
     from docker.runtime_config import MODEL_DEFAULTS, MODEL_DESCRIPTIONS
     from docker.config_migrations import ALIASES, MODEL_KEYS
+    from docker.startup_contract import PROCESS_ENVIRONMENT, RUNTIME_DIRECTORY_NAME
     if catalog.get('schema') == 1:
         if catalog.get('aliases') != ALIASES:
             errors.append('别名迁移规则与当前版本声明不一致')
@@ -82,6 +83,8 @@ def check(root, *, deployed=False):
             errors.append('模型配置说明变化，必须登记配置声明新版本')
         if catalog.get('model_migrations') != {**MODEL_KEYS, 'LLM_SERVED_MODEL_NAME': 'models.<repo>'}:
             errors.append('模型配置迁移规则与当前版本声明不一致')
+        if catalog.get('fixed_contracts') != {'process_environment': PROCESS_ENVIRONMENT, 'runtime_directory': RUNTIME_DIRECTORY_NAME}:
+            errors.append('固定启动约定变化，必须登记配置声明新版本')
     for key, item in catalog['items'].items():
         if item.get('mode') != ('hot' if key in HOT_KEYS else 'startup'):
             errors.append(f'{key} 热更新属性与实际读取规则不一致')
@@ -131,6 +134,8 @@ def check(root, *, deployed=False):
                 # runtime source. Its contract is checked before packaging.
                 if deployed and consumer['kind'] == 'external':
                     found = True
+                if not deployed or consumer['kind'] != 'external':
+                    errors.append(f"{key} 消费者路径不存在：{consumer['path']}")
                 continue
             if consumer['kind'] == 'external':
                 found |= consumer['token'] in path.read_text(encoding='utf-8-sig')

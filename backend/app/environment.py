@@ -1,33 +1,20 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
 
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from docker.startup_contract import in_container_runtime
 
 
 ROOT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
-_TRUE_VALUES = {"1", "true", "yes", "on"}
-_FALSE_VALUES = {"0", "false", "no", "off"}
 
 
 def should_load_local_dotenv() -> bool:
     """Use dotenv for unmanaged local runs, never as a production config source."""
-    explicit = config_getenv("QASYSTEM_LOAD_DOTENV")
-    if explicit is not None:
-        normalized = explicit.strip().lower()
-        if normalized in _TRUE_VALUES:
-            return True
-        if normalized in _FALSE_VALUES:
-            return False
-        raise ValueError(
-            "QASYSTEM_LOAD_DOTENV 仅支持 true/false、1/0、yes/no 或 on/off"
-        )
-
     # Docker/Kubernetes/systemd normally inject a deployment environment.
     # If it is already present, process environment is the single source of truth.
-    return config_getenv("ENVIRONMENT") is None
+    return not in_container_runtime() and config_getenv("ENVIRONMENT") is None
 
 
 def configure_runtime_environment() -> bool:

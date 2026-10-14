@@ -1,3 +1,8 @@
+x-qasystem-process-environment: &qasystem-process-environment
+  ENVIRONMENT: production
+  PYTHONPATH: /app:/app/agent
+  PYTHONUNBUFFERED: "1"
+
 services:
   backend:
     image: ${QASYSTEM_ENV_IMAGE:?Run ops config to generate configuration}
@@ -9,14 +14,15 @@ services:
     gpus: all
     env_file:
       - .env
+    environment: *qasystem-process-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       # 整项目目录挂载为 /app（只读）；backend 数据与 Agent 输出由下方
       # 命名卷覆盖，写操作不回落到源码目录。
       - ${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}:/app/runtime-config:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}/observed:/app/runtime-config/observed
+      - ./runtime-config:/app/runtime-config:ro
+      - ./runtime-config/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - ${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro
@@ -50,13 +56,14 @@ services:
     entrypoint: ["python", "/app/docker/config_guard.py", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
     env_file:
       - .env
+    environment: *qasystem-process-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       # 整项目目录挂载为 /app（只读）；Agent 输出写入下方命名卷。
       - ${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}:/app/runtime-config:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}/observed:/app/runtime-config/observed
+      - ./runtime-config:/app/runtime-config:ro
+      - ./runtime-config/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - agent-output:/app/agent/image_result
@@ -87,10 +94,11 @@ services:
     gpus: all
     env_file:
       - .env
+    environment: *qasystem-process-environment
     volumes:
       - ${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}:/app/runtime-config:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}/observed:/app/runtime-config/observed
+      - ./runtime-config:/app/runtime-config:ro
+      - ./runtime-config/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - ${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro
@@ -114,10 +122,11 @@ services:
     gpus: all
     env_file:
       - .env
+    environment: *qasystem-process-environment
     volumes:
       - ${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}:/app/runtime-config:ro
-      - ${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}/observed:/app/runtime-config/observed
+      - ./runtime-config:/app/runtime-config:ro
+      - ./runtime-config/observed:/app/runtime-config/observed
       - ./.env:/app/.env:ro
       - ./.env.example:/app/deployment.env.example:ro
       - ${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro

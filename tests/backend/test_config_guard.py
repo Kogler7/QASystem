@@ -106,7 +106,7 @@ def test_compose_startup_runs_guard_for_all_application_services():
         assert service['entrypoint'][1] == '/app/docker/config_guard.py'
         assert service['entrypoint'][-1] == '--exec'
         assert './.env:/app/.env:ro' in service['volumes']
-        assert '${QASYSTEM_RUNTIME_CONFIG_DIR:?Run ops config to generate configuration}:/app/runtime-config:ro' in service['volumes']
+        assert './runtime-config:/app/runtime-config:ro' in service['volumes']
 
 
 def test_runtime_rejects_unapproved_and_modified_hot_configuration(project):
@@ -153,3 +153,20 @@ def test_numeric_token_budgets_remain_visible_in_review(project):
     values = guard.snapshot(root, directory)['values']
     assert values['env.AGENT_TEMPLATE_MAX_TOKENS'] == {'value': '4096'}
     assert values['env.KG_EXTRACT_THINKING_MAX_TOKENS'] == {'value': '32768'}
+
+
+def test_runtime_directory_snapshot_is_portable_between_host_and_container(tmp_path):
+    root = tmp_path / 'host-deployment'
+    root.mkdir()
+    directory = root / 'runtime-config'
+    directory.mkdir()
+    assert guard.snapshot(root, directory)['values']['deployment.runtime_directory'] == {'value': './runtime-config'}
+
+
+def test_first_review_uses_proposed_template_when_deployment_template_is_missing(tmp_path):
+    template = 'TEST_SETTING=x\n'
+    (tmp_path / 'runtime-config').mkdir()
+    directory = tmp_path / 'runtime-config'
+    planned = guard.snapshot(tmp_path, directory, payloads={tmp_path / '.env.example': template})
+    (tmp_path / '.env.example').write_bytes(template.encode())
+    assert planned == guard.snapshot(tmp_path, directory)

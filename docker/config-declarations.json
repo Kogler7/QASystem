@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.13.1",
+  "version": "2026.10.14.1",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -54,35 +54,21 @@
     "LLM_SERVED_MODEL_NAME",
     "NANOJEV_REVISION",
     "NL2CYPHER_EMBEDDING_MODEL_PATH",
+    "PYTHONPATH",
+    "PYTHONUNBUFFERED",
     "QASYSTEM_JUDGE_ADAPTER",
     "QASYSTEM_JUDGE_BASE_URL",
     "QASYSTEM_JUDGE_MAX_TOKENS",
     "QASYSTEM_JUDGE_MODEL",
+    "QASYSTEM_LOAD_DOTENV",
     "QASYSTEM_REMOTE_ENV_IMAGE",
+    "QASYSTEM_RUNTIME_CONFIG_DIR",
+    "QASYSTEM_RUNTIME_SETTINGS_FILE",
     "REDIS_MEMORY_LIMIT",
     "SOFFICE_PATH",
     "VLLM_MODEL_VERSION"
   ],
   "items": {
-    "QASYSTEM_LOAD_DOTENV": {
-      "desc": "HTTP 与容器 / Compose 会把本文件作为进程环境注入；Server 不再重复读取容器内 dotenv。 / 本地直接启动且未注入 ENVIRONMENT 时，后端仍会自动加载仓库根 .env。",
-      "default": "false",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/environment.py",
-          "kind": "read",
-          "token": "QASYSTEM_LOAD_DOTENV"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/environment.py",
-          "expression": "None"
-        }
-      ]
-    },
     "BACKEND_BIND": {
       "desc": "对外部署默认监听所有网卡；通过宿主机防火墙或安全组限制访问来源。",
       "default": "0.0.0.0",
@@ -91,11 +77,6 @@
       "consumers": [
         {
           "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "BACKEND_BIND"
-        },
-        {
-          "path": "docker-compose.remote-only.yml",
           "kind": "external",
           "token": "BACKEND_BIND"
         }
@@ -109,11 +90,6 @@
       "consumers": [
         {
           "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "BACKEND_HOST_PORT"
-        },
-        {
-          "path": "docker-compose.remote-only.yml",
           "kind": "external",
           "token": "BACKEND_HOST_PORT"
         },
@@ -154,11 +130,6 @@
           "token": "QASYSTEM_ENV_IMAGE"
         },
         {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "QASYSTEM_ENV_IMAGE"
-        },
-        {
           "path": "docker/setup_llm.py",
           "kind": "external",
           "token": "QASYSTEM_ENV_IMAGE"
@@ -182,16 +153,6 @@
           "token": "QASYSTEM_SOURCE_DIR"
         },
         {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "QASYSTEM_SOURCE_DIR"
-        },
-        {
-          "path": "docker-compose.remote-only.yml",
-          "kind": "external",
-          "token": "QASYSTEM_SOURCE_DIR"
-        },
-        {
           "path": "docker/configure.py",
           "kind": "external",
           "token": "QASYSTEM_SOURCE_DIR"
@@ -210,11 +171,6 @@
           "token": "HOST_MODELS_DIR"
         },
         {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "HOST_MODELS_DIR"
-        },
-        {
           "path": "docker/setup_llm.py",
           "kind": "external",
           "token": "HOST_MODELS_DIR"
@@ -223,55 +179,6 @@
           "path": "docker/configure.py",
           "kind": "external",
           "token": "HOST_MODELS_DIR"
-        }
-      ]
-    },
-    "QASYSTEM_RUNTIME_CONFIG_DIR": {
-      "desc": "可变配置目录只读挂载；首次增加挂载需重建 Backend/Agent，之后热配置无需重建。",
-      "default": "./runtime-config",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "QASYSTEM_RUNTIME_CONFIG_DIR"
-        },
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "QASYSTEM_RUNTIME_CONFIG_DIR"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "QASYSTEM_RUNTIME_CONFIG_DIR"
-        }
-      ]
-    },
-    "PYTHONUNBUFFERED": {
-      "desc": "vLLM 模型启用、权重、GPU、端口和推理参数统一由 ops config 的模型分区维护。",
-      "default": "1",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "env_file:"
-        }
-      ]
-    },
-    "PYTHONPATH": {
-      "desc": "部署参数 PYTHONPATH",
-      "default": "/app:/app/agent",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "env_file:"
         }
       ]
     },
@@ -4981,11 +4888,6 @@
           "token": "CUDA_VISIBLE_DEVICES"
         },
         {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "CUDA_VISIBLE_DEVICES"
-        },
-        {
           "path": "docker/configure.py",
           "kind": "external",
           "token": "CUDA_VISIBLE_DEVICES"
@@ -6385,16 +6287,6 @@
           "token": "HF_HUB_OFFLINE"
         },
         {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "HF_HUB_OFFLINE"
-        },
-        {
-          "path": "docker/clef-flash.service",
-          "kind": "external",
-          "token": "HF_HUB_OFFLINE"
-        },
-        {
           "path": "docker/configure.py",
           "kind": "external",
           "token": "HF_HUB_OFFLINE"
@@ -6415,16 +6307,6 @@
         {
           "path": "nanojev_service/app.py",
           "kind": "reference",
-          "token": "TRANSFORMERS_OFFLINE"
-        },
-        {
-          "path": "docker/docker-compose.llm.yml",
-          "kind": "external",
-          "token": "TRANSFORMERS_OFFLINE"
-        },
-        {
-          "path": "docker/clef-flash.service",
-          "kind": "external",
           "token": "TRANSFORMERS_OFFLINE"
         },
         {
@@ -6615,7 +6497,6 @@
       "config_getenv('KG_API_RECORD_ENABLED', '1')"
     ],
     "backend/app/environment.py": [
-      "config_getenv('QASYSTEM_LOAD_DOTENV')",
       "config_getenv('ENVIRONMENT')"
     ],
     "backend/app/health.py": [
@@ -7220,5 +7101,13 @@
     "max_num_seqs": "同时处理的最大序列数，必须为正整数。",
     "max_num_batched_tokens": "每个调度批次的 token 上限，必须为正整数。",
     "dtype": "vLLM 计算精度；auto 按权重配置选择。"
+  },
+  "fixed_contracts": {
+    "process_environment": {
+      "ENVIRONMENT": "production",
+      "PYTHONPATH": "/app:/app/agent",
+      "PYTHONUNBUFFERED": "1"
+    },
+    "runtime_directory": "runtime-config"
   }
 }

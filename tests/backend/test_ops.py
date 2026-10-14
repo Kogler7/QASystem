@@ -18,7 +18,7 @@ def project(tmp_path, monkeypatch):
     directory.mkdir()
     (directory / 'config.json').write_text('{"settings":{},"models":{}}')
     (directory / 'models.compose.json').write_text('{"services":{}}')
-    monkeypatch.setenv('QASYSTEM_RUNTIME_SETTINGS_FILE', str(directory / 'config.json'))
+    monkeypatch.chdir(tmp_path)
     return tmp_path, directory
 
 

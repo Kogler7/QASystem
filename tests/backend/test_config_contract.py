@@ -160,3 +160,24 @@ def test_public_extraction_error_redacts_undeclared_provider_configuration(monke
     with pytest.raises(extraction_config.ExtractionConfigurationError) as error:
         extraction_config.snapshot_payload('graph.extract', {'ontology': 'test', 'options': {}})
     assert 'private config details' not in str(error.value)
+
+
+def test_missing_consumer_is_rejected_even_if_another_consumer_survives(contract):
+    root, source = contract
+    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog['items']['TEST_SETTING']['consumers'].append(
+        {'path': 'backend/deleted.py', 'kind': 'read', 'token': 'TEST_SETTING'})
+    for name in ('config-declarations.json', 'config-releases/1.json'):
+        (root / 'docker' / name).write_text(json.dumps(catalog))
+    assert any('消费者路径不存在' in e for e in config_contract.check(root))
+
+
+def test_external_tools_can_be_excluded_only_in_delivered_source(contract):
+    root, source = contract
+    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog['items']['TEST_SETTING']['consumers'].append(
+        {'path': 'eval/absent.py', 'kind': 'external', 'token': 'TEST_SETTING'})
+    for name in ('config-declarations.json', 'config-releases/1.json'):
+        (root / 'docker' / name).write_text(json.dumps(catalog))
+    assert any('消费者路径不存在' in e for e in config_contract.check(root))
+    assert config_contract.check(root, deployed=True) == []
