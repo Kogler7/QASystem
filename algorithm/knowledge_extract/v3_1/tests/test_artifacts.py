@@ -48,8 +48,13 @@ def test_evidence_deduplicates_without_merging_equal_quotes_from_different_sourc
 def test_partial_pipeline_exports_facts_and_terminal_failure_without_changing_strict_api(tmp_path):
     text = '张三检查。'
     line = json.dumps({**span_item('Person', '张三', text), 'properties': {}}, ensure_ascii=False)
+    def llm(messages):
+        task = json.loads(messages[-1]['content'])['task']
+        if task['operation'] == 'evidence_verification':
+            return json.dumps({'item_id': task['items'][0]['item_id'], 'supported': 'yes', 'reason': 'fixture'})
+        return line + '\n{"type":'
     result = extract_harness('@startuml\nclass Person\n@enduml', [ExtractionChunk('c1', text)],
-        llm=lambda messages: line + '\n{"type":', max_attempts=1, max_repair_rounds=0,
+        llm=llm, max_attempts=1, max_repair_rounds=0,
         use_scheduler=False, best_effort=True, skill_refs=[])
     with pytest.raises(ExtractionResponseError):
         to_public_result(result)
@@ -61,7 +66,7 @@ def test_partial_pipeline_exports_facts_and_terminal_failure_without_changing_st
     assert summary['attempts'][0]['recovery'] == 'jsonl_valid_records'
     assert summary['coverage_ledger'][0]['entity_scan_complete'] is False
     assert json.loads(open(files['entities.jsonl']).read())['name'] == '张三'
-    call = json.loads(open(files['messages.jsonl']).read())
+    call = json.loads(open(files['messages.jsonl']).readline())
     assert call['messages'][-1] == {'role': 'assistant', 'content': line + '\n{"type":'}
     assert summary['message_trace']['complete'] is True
 

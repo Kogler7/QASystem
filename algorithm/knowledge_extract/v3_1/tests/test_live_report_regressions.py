@@ -72,6 +72,8 @@ def test_truncated_candidate_repartitions_once_and_preserves_parent_facts():
     calls = []
     def llm(messages):
         payload = json.loads(messages[1]['content'])
+        if payload['task']['operation'] == 'evidence_verification':
+            return StubLLM()(messages)
         types = payload['output_contract']['success_schema']['properties']['type']['enum']
         calls.append(types)
         if len(types) == 2:

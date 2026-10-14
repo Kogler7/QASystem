@@ -131,7 +131,7 @@ class TwoPassPipelineTest(unittest.TestCase):
             entity_handler=composite_entity_handler,
             property_handler=composite_property_handler,
             verification_handler=lambda item, chunk: "yes" if item["value"] in [COMPOSITE_TEXT, "AND", *MEMBER_RULE_TEXTS, *MEMBER_MENTIONS, "不得部署安装各类开源智能体"] else "no",
-        )
+            entity_verification_handler=lambda item, chunk: 'yes')
         result = SE.extract_split(
             RULE_ONTOLOGY,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=COMPOSITE_TEXT)],
@@ -169,7 +169,8 @@ class TwoPassPipelineTest(unittest.TestCase):
         # 实体 -> 按类型批量补全 -> 每个实体独立属性核验
         stages = [task for task, _ in llm.calls]
         self.assertEqual(stages[:2], ["skill_selection", "entity"])
-        self.assertCountEqual(stages[2:], ["property", "evidence_verification", "property", "evidence_verification"])
+        self.assertEqual(stages[2], "evidence_verification")
+        self.assertCountEqual(stages[3:], ["property", "evidence_verification", "property", "evidence_verification"])
         # 无 schema/证据告警
         self.assertEqual(result["warnings"], [])
         self.assertIsNone(result["error_code"])
@@ -212,7 +213,7 @@ class "术语" as Terminology <<KnowledgeUnit>> {
 
         llm = StubLLM(entity_handler=entity_handler, property_handler=property_handler,
                       verification_handler=lambda item, chunk: "yes" if item["property"] in
-                      {"TermName", "TermDefinition", "Synonyms"} else "uncertain")
+                      {"TermName", "TermDefinition", "Synonyms"} else "uncertain", entity_verification_handler=lambda item, chunk: 'yes')
         result = SE.extract_split(terminology_ontology, chunks=chunks, llm=llm)
         entities = result["raw"]["entities"]
         self.assertEqual(len(entities), 1)
@@ -288,7 +289,7 @@ class FailureAndEdgeTest(unittest.TestCase):
             return SE.extract_split(RULE_ONTOLOGY, chunks=[CC.ExtractionChunk("c", "规则内容：" + value)],
                 llm=StubLLM(entity_handler=lambda p, c: [span_item("SimpleRule", "规则")],
                             property_handler=properties,
-                            verification_handler=lambda item, chunk: 'yes' if item['value'] == value else 'no'))
+                            verification_handler=lambda item, chunk: 'yes' if item['value'] == value else 'no', entity_verification_handler=lambda item, chunk: 'yes'))
         first, second = run("A"), run("B")
         self.assertEqual(first["graph"]["nodes"][0]["uid"], second["graph"]["nodes"][0]["uid"])
         self.assertNotEqual(first["raw"]["entities"][0]["properties"], second["raw"]["entities"][0]["properties"])

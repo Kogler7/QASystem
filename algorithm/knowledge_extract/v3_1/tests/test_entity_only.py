@@ -44,7 +44,7 @@ def test_many_entities_with_required_relations_finish_after_properties():
                              'evidence': {'quote': e['name'] + '负责巡检。' if e['type']=='Person' else e['name']}} for e in known]}
     llm = StubLLM(entity_handler=lambda p, c: [span_item('Person' if n.startswith('人员') else 'Work', n) for n in names],
                   property_handler=properties,
-                  verification_handler=lambda item, chunk: 'yes' if item['value'] == '巡检' else 'no')
+                  verification_handler=lambda item, chunk: 'yes' if item['value'] == '巡检' else 'no', entity_verification_handler=lambda item, chunk: 'yes')
     result = extract_harness(ONTOLOGY, [ExtractionChunk('c0', text)], llm=llm,
                              assembly_planner=planner, use_scheduler=False)
     assert result['status'] == 'succeeded'

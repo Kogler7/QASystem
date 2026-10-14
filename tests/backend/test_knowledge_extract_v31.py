@@ -23,8 +23,12 @@ def test_v31_jsonl_tail_failure_keeps_recovered_graph_and_partial_diagnostics():
     text = '甲组每晚检查机房。'
     row = {'type': 'Assignment', 'mention': '甲组每晚检查机房',
            'properties': {}, 'evidence': {'quote': text}}
+    def llm(messages):
+        if json.loads(messages[-1]['content'])['task']['operation'] == 'evidence_verification':
+            return StubLLM()(messages)
+        return json.dumps(row) + '\n{"type":'
     result = v3_1.extract_harness(ONTOLOGY, [ExtractionChunk('chunk-0000', text)],
-        llm=lambda messages: json.dumps(row) + '\n{"type":',
+        llm=llm,
         best_effort=True, use_scheduler=False, max_attempts=1, max_repair_rounds=0, skill_refs=[])
     item = adapter.project_items(result, texts=[text])[0]
     assert len(item['graph']['nodes']) == 1
@@ -218,7 +222,10 @@ def test_v31_real_harness_returns_entities_without_relations(monkeypatch):
     assert all(item["quality"]["status"] == "succeeded" for item in items)
     assert items[0]["graph"]["relationships"] == []
     assert items[1]["graph"]["relationships"] == []
-    assert {task for task, _ in generation.calls} == {"skill_selection", "entity"}  # neither type declares properties
+    assert {task for task, _ in generation.calls} == {"skill_selection", "entity", "evidence_verification"}
+    assert all('property' not in item for task, prompt in generation.calls if task == 'evidence_verification'
+               for item in json.loads(prompt)['task']['items'])
+    assert items[0]['quality']['verification']['semantic_recall_verified'] is False
     nodes = {node["label"]: node for item in items for node in item["graph"]["nodes"]}
     assert nodes["Team"]["chunk_indices"] == [0]
     assert nodes["Work"]["chunk_indices"] == [1]

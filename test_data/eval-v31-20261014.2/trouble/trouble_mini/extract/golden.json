@@ -1,0 +1,3538 @@
+{
+  "entities": [
+    {
+      "type": "FaultComponent",
+      "name": "A节大闸",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "A节大闸"
+      },
+      "evidence": {
+        "quote": "7:31分换端后A节大闸不缓解，重新转93阀无效，大复位后正常",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "93阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "93阀"
+      },
+      "evidence": {
+        "quote": "7:31分换端后A节大闸不缓解，重新转93阀无效，大复位后正常",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "283KP压力开关",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "283KP压力开关"
+      },
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "A节大闸不缓解",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "A节大闸不缓解",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "换端后A节大闸不能正常缓解。"
+      },
+      "evidence": {
+        "quote": "7:31分换端后A节大闸不缓解，重新转93阀无效，大复位后正常",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "重新转93阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "重新转93阀",
+        "MethodType": "调整",
+        "MethodStrategy": "纠正性",
+        "MethodDescription": "重新转93阀，但故障未消除。"
+      },
+      "evidence": {
+        "quote": "7:31分换端后A节大闸不缓解，重新转93阀无效，大复位后正常",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "大复位",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "大复位",
+        "MethodType": "复位",
+        "MethodStrategy": "纠正性",
+        "MethodDescription": "执行大复位后状态恢复正常。"
+      },
+      "evidence": {
+        "quote": "7:31分换端后A节大闸不缓解，重新转93阀无效，大复位后正常",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换283KP压力开关",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换283KP压力开关",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换283KP压力开关。"
+      },
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "283KP状态数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "283KP状态数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据并分析283KP压力开关状态。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "283KP压力开关断开检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "283KP压力开关断开",
+        "ResultStatus": "异常",
+        "ResultDescription": "下载数据分析发现283KP压力开关处于断开状态。"
+      },
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "大闸缓解功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "大闸缓解功能验证试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "大复位后观察大闸缓解状态，并进行库内试验。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "大闸缓解功能验证结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "大闸缓解功能恢复",
+        "ResultStatus": "正常",
+        "ResultDescription": "大复位后状态正常，库内试验正常。"
+      },
+      "evidence": {
+        "quote": "…KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "LTE-A网",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "LTE-A网"
+      },
+      "evidence": {
+        "quote": "…B节操纵，4:58分运行至541KM+800M处LTE-A网脱网5:00恢复；5:50运行至482K…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "A网通信模块",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "A网通信模块"
+      },
+      "evidence": {
+        "quote": "…下载主车7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载从车70…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "OCE",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "OCE"
+      },
+      "evidence": {
+        "quote": "机车1+1编组模式，下载主车7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "LTE-A网脱网",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "LTE-A网脱网",
+        "FaultCategory": "通信故障",
+        "FaultDescription": "4:58分运行至541KM+800M处LTE-A网脱网5:00恢复；5:50运行至482KM+900M处A网闪红5:51恢复；6:11分运行至457KM+890M处，A网脱网6:14恢复。"
+      },
+      "evidence": {
+        "quote": "…B节操纵，4:58分运行至541KM+800M处LTE-A网脱网5:00恢复；5:50运行至482KM+…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换A网通信模块",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换A网通信模块",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换A网通信模块。"
+      },
+      "evidence": {
+        "quote": "…式，下载主车7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载从车70…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "LTE与OCE通信数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "LTE与OCE通信数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载主车7002的LTE、OCE数据，并在神池入库后下载从车7079数据进行分析。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载从车7079数据，请示技术部周占松继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "列车管",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "列车管"
+      },
+      "evidence": {
+        "quote": "A节操纵，大闸运转位均缸缓解正常，列车管不缓解",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "A节中继阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "A节中继阀"
+      },
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "181遮断阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "181遮断阀"
+      },
+      "evidence": {
+        "quote": "中继阀-181遮断阀",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "一级配件名称"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "列车管不缓解",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "列车管不缓解",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "A节操纵，大闸运转位均缸缓解正常，列车管不缓解。"
+      },
+      "evidence": {
+        "quote": "A节操纵，大闸运转位均缸缓解正常，列车管不缓解",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换A节中继阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换A节中继阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换A节中继阀。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换181遮断阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换181遮断阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换181遮断阀。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "列车管缓解数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "列车管缓解数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据分析列车管缓解异常。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "列车管缓解功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "列车管缓解功能验证试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "更换相关阀件后进行多次列车管缓解试验。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "列车管缓解功能验证结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "列车管缓解功能恢复",
+        "ResultStatus": "正常",
+        "ResultDescription": "多次试验均正常。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "BCU",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "BCU"
+      },
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "流量计",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "流量计"
+      },
+      "evidence": {
+        "quote": "…车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "253YV",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "253YV"
+      },
+      "evidence": {
+        "quote": "253YV-181遮断阀",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "一级配件名称"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "制动机",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "制动机"
+      },
+      "evidence": {
+        "quote": "制动柜-制动机",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "部件名称"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "列车管未充风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "列车管未充风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "列车管压力上升缓慢，且故障时未正常充风。"
+      },
+      "evidence": {
+        "quote": "…，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "列车管减压慢",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "列车管减压慢",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "主车制动时从车列车管减压缓慢。"
+      },
+      "evidence": {
+        "quote": "…上升慢，均缸正常，从车没有流量显示，充满后主车制动，从车列车管减压慢。时间9:00",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "流量计无显示",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "流量计无显示",
+        "FaultCategory": "其他",
+        "FaultDescription": "从车流量计无显示。"
+      },
+      "evidence": {
+        "quote": "…车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换700…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "主从控BCU数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "主从控BCU数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "均缸缓解状态检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "均缸缓解正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "故障时刻均缸缓解正常。"
+      },
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "总风压力变化检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "总风压力无下降",
+        "ResultStatus": "正常",
+        "ResultDescription": "故障时刻总风压力无下降。"
+      },
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "流量计显示检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "流量计无显示",
+        "ResultStatus": "异常",
+        "ResultDescription": "BCU数据分析显示流量计无显示。"
+      },
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "列车管充风状态检测结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "列车管未充风",
+        "ResultStatus": "异常",
+        "ResultDescription": "BCU数据分析判断故障时刻列车管未充风。"
+      },
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换253YV",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换253YV",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换7002A节253YV，181遮断阀。"
+      },
+      "evidence": {
+        "quote": "…量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮断阀，试验制动机正常，请…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "制动机功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "制动机功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "更换相关阀件后试验制动机功能。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…管未充风，预防性更换7002A节253YV，181遮断阀，试验制动机正常，请示王志伟继续运行（罗蒙…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "制动机功能试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "制动机正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "试验制动机功能正常。"
+      },
+      "evidence": {
+        "quote": "…管未充风，预防性更换7002A节253YV，181遮断阀，试验制动机正常，请示王志伟继续运行（罗蒙…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节TCU1M2A相下管",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节TCU1M2A相下管"
+      },
+      "evidence": {
+        "quote": "B节TCU1M2A相下管故障，时间22:51:58-22:53:31…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "IGBT",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "IGBT"
+      },
+      "evidence": {
+        "quote": "…析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "门极驱动板",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "门极驱动板"
+      },
+      "evidence": {
+        "quote": "门极驱动板",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "一级配件名称"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节TCU1M2A相下管故障",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节TCU1M2A相下管故障",
+        "FaultCategory": "电气故障",
+        "FaultDescription": "B节TCU1的M2单元A相下管发生故障。"
+      },
+      "evidence": {
+        "quote": "B节TCU1M2A相下管故障，时间22:51:58-22:53:31,2…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "TCU故障数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "TCU故障数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据，分析B节TCU1M2A相下管故障记录。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "A相下管故障诊断结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "B节TCU1M2A相下管故障",
+        "ResultStatus": "异常",
+        "ResultDescription": "数据分析确认B节TCU1M2A相下管故障。"
+      },
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "IGBT阻值测量",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "IGBT阻值测量",
+        "ExperimentType": "电气测量",
+        "ExperimentProcedure": "上车测量IGBT阻值。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "IGBT阻值测量结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "IGBT阻值正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "IGBT阻值测量结果正常。"
+      },
+      "evidence": {
+        "quote": "…载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换门极驱动板",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换门极驱动板",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换门极驱动板。"
+      },
+      "evidence": {
+        "quote": "…相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "TCU功率单元库内功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "TCU功率单元库内功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "更换门极驱动板后进行库内功能试验。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "TCU功率单元库内试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "未复现A相下管故障",
+        "ResultStatus": "正常",
+        "ResultDescription": "库内试验正常。"
+      },
+      "evidence": {
+        "quote": "…相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "压缩机",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "压缩机"
+      },
+      "evidence": {
+        "quote": "压缩机",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "部件名称"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "287KP",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "287KP"
+      },
+      "evidence": {
+        "quote": "287KP",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "一级配件名称"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "压缩机未自动打风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "压缩机未自动打风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "总风压力低于750kPa时，压缩机未按预期自动打风。"
+      },
+      "evidence": {
+        "quote": "…M处（6:12），75KM处（6:31），总风低于750KPA，压缩机未自动打风",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "压缩机自动打风功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "压缩机自动打风功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "在总风压力低于750kPa时，多次试验AB节压缩机自动打风情况。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "上车多次试验总风低于750KPA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "压缩机自动打风试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "总风低于750kPa时AB节压缩机自动打风",
+        "ResultStatus": "正常",
+        "ResultDescription": "上车多次试验时，AB节压缩机均能自动打风。"
+      },
+      "evidence": {
+        "quote": "上车多次试验总风低于750KPA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换287KP",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换287KP",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换287KP。"
+      },
+      "evidence": {
+        "quote": "…低于750KPA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节压缩机",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节压缩机"
+      },
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节压缩机滤清筒",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节压缩机滤清筒"
+      },
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节干燥塔进出气止回阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节干燥塔进出气止回阀"
+      },
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节进气阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节进气阀"
+      },
+      "evidence": {
+        "quote": "…析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节最小压力阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节最小压力阀"
+      },
+      "evidence": {
+        "quote": "…验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节压缩机不打风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节压缩机不打风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "B节压缩机不能正常打风。"
+      },
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节压缩机滤清筒往外排风",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节压缩机滤清筒往外排风",
+        "FaultCategory": "气路故障",
+        "FaultDescription": "B节压缩机滤清筒向外异常排风。"
+      },
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "压缩机故障数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "压缩机故障数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据，分析B节压缩机不打风及滤清筒异常排风。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "干燥塔止回阀拆解检查",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "干燥塔止回阀拆解检查",
+        "ExperimentType": "拆解检查",
+        "ExperimentProcedure": "拆解检查B节干燥塔进出气止回阀。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "干燥塔止回阀拆解检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "进出气止回阀正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "拆解检查表明B节干燥塔进出气止回阀正常。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换B节进气阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换B节进气阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换B节进气阀。"
+      },
+      "evidence": {
+        "quote": "…内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换B节最小压力阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换B节最小压力阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换B节最小压力维持阀。"
+      },
+      "evidence": {
+        "quote": "…内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "压缩机库内反复功能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "压缩机库内反复功能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "在库内对B节压缩机及滤清筒状态进行试验，并在更换阀件后反复验证。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  …",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "压缩机库内反复试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "未复现不打风及异常排风",
+        "ResultStatus": "正常",
+        "ResultDescription": "库内试验及更换后的反复试验均正常。"
+      },
+      "evidence": {
+        "quote": "…析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  …",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节空调",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节空调"
+      },
+      "evidence": {
+        "quote": "AB节空调制冷不佳",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节空调蒸发器",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节空调蒸发器"
+      },
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节EM231模块",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节EM231模块"
+      },
+      "evidence": {
+        "quote": "…结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节CPU模块",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节CPU模块"
+      },
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "AB节空调制冷不佳",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "AB节空调制冷不佳",
+        "FaultCategory": "热故障",
+        "FaultDescription": "A、B节空调制冷效果不佳。"
+      },
+      "evidence": {
+        "quote": "AB节空调制冷不佳",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "AB节空调状态检查",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "AB节空调状态检查",
+        "ExperimentType": "其他",
+        "ExperimentProcedure": "检查AB节空调蒸发器以及EM231、CPU模块的工作状态。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "空调蒸发器检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "AB节空调蒸发器未结冰",
+        "ResultStatus": "未判定",
+        "ResultDescription": "上车检查发现AB节空调蒸发器未结冰。"
+      },
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "空调控制模块检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "EM231及CPU模块工作正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "检查时EM231及CPU模块工作正常。"
+      },
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换AB节EM231模块",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换AB节EM231模块",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换A、B节EM231模块。"
+      },
+      "evidence": {
+        "quote": "…器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "AB节空调制冷性能试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "AB节空调制冷性能试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "测量环境温度和出风口温度，并长时间试验AB节空调制冷情况。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，继续运行（徐…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "环境温度测量结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "32℃",
+        "ResultStatus": "未判定",
+        "ResultDescription": "试验时环境温度为32度。"
+      },
+      "evidence": {
+        "quote": "…EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，继续运行（徐…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "出风口温度测量结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "14℃",
+        "ResultStatus": "未判定",
+        "ResultDescription": "试验时出风口温度为14度。"
+      },
+      "evidence": {
+        "quote": "…EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，继续运行（徐…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "空调长时间制冷试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "AB节空调制冷正常",
+        "ResultStatus": "正常",
+        "ResultDescription": "长时间试验后AB节空调制冷正常。"
+      },
+      "evidence": {
+        "quote": "…EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，继续运行（徐…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节制动显示屏",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节制动显示屏"
+      },
+      "evidence": {
+        "quote": "B节制动显示屏显示A7故障",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "B节紧急阀",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "B节紧急阀"
+      },
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "B节制动显示屏显示A7故障",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "B节制动显示屏显示A7故障",
+        "FaultCategory": "其他",
+        "FaultDescription": "B节制动显示屏显示A7故障报警。"
+      },
+      "evidence": {
+        "quote": "B节制动显示屏显示A7故障",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换B节紧急阀",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换B节紧急阀",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换B节紧急阀。"
+      },
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "制动系统功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "制动系统功能验证试验",
+        "ExperimentType": "功能测试",
+        "ExperimentProcedure": "进行上车试验，并在更换B节紧急阀后进行库内试验。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "制动系统功能试验结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "未复现A7故障报警",
+        "ResultStatus": "正常",
+        "ResultDescription": "上车试验正常，更换B节紧急阀后库内试验正常。"
+      },
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "LTE-B网",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "LTE-B网"
+      },
+      "evidence": {
+        "quote": "…005A节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢复；2.…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节OCE",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节OCE"
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "OCE到交换机的线路",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "OCE到交换机的线路"
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultComponent",
+      "name": "AB节CPU板卡",
+      "properties": {
+        "ComponentId": "",
+        "ComponentName": "AB节CPU板卡"
+      },
+      "evidence": {
+        "quote": "…通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "LTE-B网脱网",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "LTE-B网脱网",
+        "FaultCategory": "通信故障",
+        "FaultDescription": "主车8016B节 从车7005A节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢复；2.192km21:24又脱网，21:34 204km 300m恢复；3.207km 600m又脱网，21：41 208km 300m恢复\n4.231km 160m22：15又脱网，运行至西柏坡站分解"
+      },
+      "evidence": {
+        "quote": "…005A节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢复；2.19…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "故障内容"
+      }
+    },
+    {
+      "type": "FaultType",
+      "name": "AB节OCE通讯中断",
+      "properties": {
+        "FaultTypeId": "",
+        "FaultTypeName": "AB节OCE通讯中断",
+        "FaultCategory": "通信故障",
+        "FaultDescription": "下载数据分析发现A、B节OCE通信中断。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "OCE通信数据分析",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "OCE通信数据分析",
+        "ExperimentType": "数据分析",
+        "ExperimentProcedure": "下载运行数据，分析LTE-B网脱网及AB节OCE通信状态。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "OCE通信中断诊断结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "AB节OCE通讯中断",
+        "ResultStatus": "异常",
+        "ResultDescription": "数据分析发现AB节OCE通讯中断。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "OCE到交换机线路检查",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "OCE到交换机线路检查",
+        "ExperimentType": "线路检查",
+        "ExperimentProcedure": "检查OCE到交换机的线路状态。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "OCE到交换机线路检查结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "OCE到交换机的线路良好",
+        "ResultStatus": "正常",
+        "ResultDescription": "检查确认OCE到交换机的线路良好。"
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "更换AB节CPU板卡",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "更换AB节CPU板卡",
+        "MethodType": "更换",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "预防性更换AB节CPU板卡。"
+      },
+      "evidence": {
+        "quote": "…CE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "FaultHandlingMethod",
+      "name": "刷新AB节OCE底层程序",
+      "properties": {
+        "MethodId": "",
+        "MethodName": "刷新AB节OCE底层程序",
+        "MethodType": "软件处理",
+        "MethodStrategy": "预防性",
+        "MethodDescription": "刷新底层程序后试验正常"
+      },
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "TroubleshootingExperiment",
+      "name": "OCE通信功能验证试验",
+      "properties": {
+        "ExperimentId": "",
+        "ExperimentName": "OCE通信功能验证试验",
+        "ExperimentType": "通信测试",
+        "ExperimentProcedure": "更换CPU板卡并刷新底层程序后进行通信功能试验。",
+        "ExpectedResult": null
+      },
+      "evidence": {
+        "quote": "…CE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "type": "ExperimentResult",
+      "name": "OCE通信功能验证结果",
+      "properties": {
+        "ResultId": "",
+        "ResultValue": "OCE通信功能恢复",
+        "ResultStatus": "正常",
+        "ResultDescription": "刷新底层程序后试验正常。"
+      },
+      "evidence": {
+        "quote": "…CE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "A节大闸",
+      "evidence": {
+        "quote": "7:31分换端后A节大闸不缓解，重新转93阀无效，大复位后…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "重新转93阀",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "重新转93阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "93阀",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "大复位",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换283KP压力开关",
+      "evidence": {
+        "quote": "…数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换283KP压力开关",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "283KP压力开关",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "283KP状态数据分析",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "283KP状态数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "283KP压力开关",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "283KP状态数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "283KP压力开关断开检测结果",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "A节大闸不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "大闸缓解功能验证试验",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "大闸缓解功能验证试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "A节大闸",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "大闸缓解功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "大闸缓解功能验证结果",
+      "evidence": {
+        "quote": "下载数据分析283KP压力开关断开，预防性更换283KP压力开关，库内试验正常（罗蒙峰）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 1,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-A网脱网",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "LTE-A网",
+      "evidence": {
+        "quote": "…，4:58分运行至541KM+800M处LTE-A网脱网5:00恢复；5:50运行至…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-A网脱网",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换A网通信模块",
+      "evidence": {
+        "quote": "…主车7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换A网通信模块",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "A网通信模块",
+      "evidence": {
+        "quote": "…7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-A网脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "LTE与OCE通信数据分析",
+      "evidence": {
+        "quote": "机车1+1编组模式，下载主车7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载从车7079数据，请示技术部周占松继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "LTE与OCE通信数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "LTE-A网",
+      "evidence": {
+        "quote": "机车1+1编组模式，下载主车7002LTE数据、OCE数据，预防性更换A网通信模块，车站着急发车，神池入库后下载从车7079数据，请示技术部周占松继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "LTE与OCE通信数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "OCE",
+      "evidence": {
+        "quote": "…1编组模式，下载主车7002LTE数据、OCE数据，预防性更换A网通信模块，车…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 2,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "列车管",
+      "evidence": {
+        "quote": "A节操纵，大闸运转位均缸缓解正常，列车管不缓解",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换A节中继阀",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换A节中继阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "A节中继阀",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换181遮断阀",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换181遮断阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "181遮断阀",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "列车管缓解数据分析",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管不缓解",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "列车管缓解功能验证试验",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "列车管缓解功能验证试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "列车管",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "列车管缓解功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "列车管缓解功能验证结果",
+      "evidence": {
+        "quote": "下载数据分析，预防性更换A节中继阀、181遮断阀，多次试验正常（赵成）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 3,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管未充风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "主从控BCU数据分析",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管减压慢",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "主从控BCU数据分析",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "流量计无显示",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "主从控BCU数据分析",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "BCU",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "均缸缓解状态检测结果",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "总风压力变化检测结果",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "流量计显示检测结果",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "主从控BCU数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "列车管充风状态检测结果",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "流量计显示检测结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "流量计无显示",
+      "evidence": {
+        "quote": "…2故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "列车管充风状态检测结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "列车管未充风",
+      "evidence": {
+        "quote": "…解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节25…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管未充风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "列车管",
+      "evidence": {
+        "quote": "…+7002A，天窗来电后编组试风缓解后，列车管压力上升慢，均缸正常，从车没有流…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管减压慢",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "列车管",
+      "evidence": {
+        "quote": "…+7002A，天窗来电后编组试风缓解后，列车管压力上升慢，均缸正常，从车没有流…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "流量计无显示",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "流量计",
+      "evidence": {
+        "quote": "7196B+7002A，天窗来电后编组试风缓解后，列车管压力上升慢，均缸正常，从车没有流量显示，充满后主车制动，从车列车管减压慢。时间9:00",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管未充风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换253YV",
+      "evidence": {
+        "quote": "…解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节25…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换253YV",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "253YV",
+      "evidence": {
+        "quote": "…示，判断为列车管未充风，预防性更换7002A节253YV，181遮断阀，试验制动机…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管未充风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换181遮断阀",
+      "evidence": {
+        "quote": "…解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节25…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管未充风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "制动机功能试验",
+      "evidence": {
+        "quote": "…解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节25…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "列车管减压慢",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "制动机功能试验",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮断阀，试验制动机正常，请示…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "制动机功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "制动机",
+      "evidence": {
+        "quote": "…防性更换7002A节253YV，181遮断阀，试验制动机正常，请示王志伟继续运…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "制动机功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "制动机功能试验结果",
+      "evidence": {
+        "quote": "下载主从控BCU数据分析为从车7002故障时刻，均缸缓解正常，总风压力无下降，流量计无显示，判断为列车管未充风，预防性更换7002A节253YV，181遮断阀，试验制动机正常，请示…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 4,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节TCU1M2A相下管",
+      "evidence": {
+        "quote": "B节TCU1M2A相下管故障，时间22:51:58-22:5…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "TCU故障数据分析",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU故障数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节TCU1M2A相下管",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU故障数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "A相下管故障诊断结果",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "A相下管故障诊断结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "B节TCU1M2A相下管故障",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "IGBT阻值测量",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "IGBT阻值测量",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "IGBT",
+      "evidence": {
+        "quote": "…TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "IGBT阻值测量",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "IGBT阻值测量结果",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换门极驱动板",
+      "evidence": {
+        "quote": "…障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换门极驱动板",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "门极驱动板",
+      "evidence": {
+        "quote": "…起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节TCU1M2A相下管故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "TCU功率单元库内功能试验",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU功率单元库内功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节TCU1M2A相下管",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "TCU功率单元库内功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "TCU功率单元库内试验结果",
+      "evidence": {
+        "quote": "下载数据分析为B节TCU1M2A相下管故障引起，上车测量IGBT阻值正常，预防性更换门极驱动板，库内试验正常（陈明）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 5,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "压缩机未自动打风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "压缩机",
+      "evidence": {
+        "quote": "…:12），75KM处（6:31），总风低于750KPA，压缩机未自动打风",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "压缩机未自动打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机自动打风功能试验",
+      "evidence": {
+        "quote": "上车多次试验总风低于750KPA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机自动打风功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "压缩机",
+      "evidence": {
+        "quote": "…多次试验总风低于750KPA时AB节压缩机自动打风，预防性更换287KP，请示…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机自动打风功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "压缩机自动打风试验结果",
+      "evidence": {
+        "quote": "上车多次试验总风低于750KPA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "压缩机未自动打风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换287KP",
+      "evidence": {
+        "quote": "…0KPA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换287KP",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "287KP",
+      "evidence": {
+        "quote": "…PA时AB节压缩机自动打风，预防性更换287KP，请示周少游继续运行",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 6,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机故障数据分析",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "干燥塔止回阀拆解检查",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机库内反复功能试验",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节进气阀",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节最小压力阀",
+      "evidence": {
+        "quote": "…常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒往外排风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机故障数据分析",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒往外排风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "干燥塔止回阀拆解检查",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒往外排风",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "压缩机库内反复功能试验",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒往外排风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节进气阀",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒往外排风",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节最小压力阀",
+      "evidence": {
+        "quote": "…常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机不打风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机",
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节压缩机滤清筒往外排风",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机滤清筒",
+      "evidence": {
+        "quote": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机故障数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机故障数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机滤清筒",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "干燥塔止回阀拆解检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节干燥塔进出气止回阀",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "干燥塔止回阀拆解检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "干燥塔止回阀拆解检查结果",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换B节进气阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节进气阀",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换B节最小压力阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节最小压力阀",
+      "evidence": {
+        "quote": "…拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机库内反复功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机库内反复功能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "B节压缩机滤清筒",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "压缩机库内反复功能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "压缩机库内反复试验结果",
+      "evidence": {
+        "quote": "下载数据分析，库内试验正常，拆解B节干燥塔进出气止回阀正常，预防性更换B节最小压力阀进气阀，反复试验正常，请示技术部王志伟可继续运行（陈明  张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 7,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节空调",
+      "evidence": {
+        "quote": "AB节空调制冷不佳",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "AB节空调状态检查",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节空调蒸发器",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节EM231模块",
+      "evidence": {
+        "quote": "…M231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节CPU模块",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "空调蒸发器检查结果",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调状态检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "空调控制模块检查结果",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换AB节EM231模块",
+      "evidence": {
+        "quote": "…，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换AB节EM231模块",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节EM231模块",
+      "evidence": {
+        "quote": "…M231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节空调制冷不佳",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "AB节空调制冷性能试验",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节空调",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "环境温度测量结果",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "出风口温度测量结果",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "AB节空调制冷性能试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "空调长时间制冷试验结果",
+      "evidence": {
+        "quote": "上车检查AB节空调蒸发器未结冰，EM231及CPU模块工作正常，预防性更换AB节EM231模块，试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常，请示技术部孙飞，…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 8,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节制动显示屏显示A7故障",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节制动显示屏",
+      "evidence": {
+        "quote": "B节制动显示屏显示A7故障",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节制动显示屏显示A7故障",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换B节紧急阀",
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换B节紧急阀",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "B节紧急阀",
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "B节制动显示屏显示A7故障",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "制动系统功能验证试验",
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "制动系统功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "制动系统功能试验结果",
+      "evidence": {
+        "quote": "上车试验正常，预防性更换B节紧急阀，库内试验正常（张金鹏）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 9,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网脱网",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "LTE-B网",
+      "evidence": {
+        "quote": "…节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通讯中断",
+      "rel_type": "OCCURS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE",
+      "evidence": {
+        "quote": "主车8016B节 从车7005A节两万同步运行至：1.180km21:03时LTE B网脱网21:20 192km恢复；2.192km21:24又脱网，21:34 204km 30…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "故障内容"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信数据分析",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE到交换机线路检查",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网脱网",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信功能验证试验",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网脱网",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换AB节CPU板卡",
+      "evidence": {
+        "quote": "…中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "LTE-B网脱网",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "刷新AB节OCE底层程序",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通讯中断",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信数据分析",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通讯中断",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE到交换机线路检查",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通讯中断",
+      "rel_type": "DIAGNOSED_BY",
+      "to_type": "TroubleshootingExperiment",
+      "to_name": "OCE通信功能验证试验",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通讯中断",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "更换AB节CPU板卡",
+      "evidence": {
+        "quote": "…中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultType",
+      "from_name": "AB节OCE通讯中断",
+      "rel_type": "HANDLED_BY",
+      "to_type": "FaultHandlingMethod",
+      "to_name": "刷新AB节OCE底层程序",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信数据分析",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信数据分析",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "OCE通信中断诊断结果",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "ExperimentResult",
+      "from_name": "OCE通信中断诊断结果",
+      "rel_type": "INDICATES",
+      "to_type": "FaultType",
+      "to_name": "AB节OCE通讯中断",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE到交换机线路检查",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "OCE到交换机的线路",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE到交换机线路检查",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "OCE到交换机线路检查结果",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "更换AB节CPU板卡",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节CPU板卡",
+      "evidence": {
+        "quote": "…，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "FaultHandlingMethod",
+      "from_name": "刷新AB节OCE底层程序",
+      "rel_type": "ACTS_ON",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信功能验证试验",
+      "rel_type": "TARGETS",
+      "to_type": "FaultComponent",
+      "to_name": "AB节OCE",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路…",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    },
+    {
+      "from_type": "TroubleshootingExperiment",
+      "from_name": "OCE通信功能验证试验",
+      "rel_type": "PRODUCES",
+      "to_type": "ExperimentResult",
+      "to_name": "OCE通信功能验证结果",
+      "evidence": {
+        "quote": "下载数据分析，AB节OCE通讯中断，检查OCE到交换机的线路良好，预防性更换AB节CPU板卡，刷新底层程序后试验正常，请示技术部周占松单牵运行（李斌）",
+        "document": "行修更换、互换记录50.xlsx",
+        "sheet": "Sheet1",
+        "row": 10,
+        "column": "处理方法"
+      }
+    }
+  ]
+}

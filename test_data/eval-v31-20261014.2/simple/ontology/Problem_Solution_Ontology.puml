@@ -1,0 +1,34 @@
+@startuml
+
+  class 问题 <<Problem>> {
+- 问题标识 (ProblemId): String //问题的唯一标识符，用于区分不同问题
+- 问题名称 (ProblemName): String //问题的名称
+- 问题描述 (ProblemDescription): String // 对问题的描述，帮助理解问题。
+- 坐标系 (Coordinates): Map<DimensionID.ScaleID> // 与知识空间对应的的维度与刻度
+- 目标对象 (TargetObject): TargetObject // 问题的对象
+- 问题目标 (ProblemGoal): String // 问题解决的最终目标，明确描述需要达成的结果或状态
+- 约束条件 (Constraints): String // 问题所需遵守的约束规则。
+- 干系人 (Stakeholder): Stakeholder // 主体干系人
+- 关注点 (Concern): Concern // 问题的关注点
+- 问题类型 (ProblemType): problemType // 问题类型（基于5W1H扩展的问题分类）
+- 子问题(ChildernProblem) : Problem[] // 该问题拆解出来的子问题，形同Problem本体
+}
+
+  class 方案 <<Solution>> {
+- 方案标识 (solutionId): String
+- 方案名称 (solutionName): String
+- 方案描述 (solutionDescription): String
+- 方案类别(SolutionCategory): SolutionCategory
+- 解决方案目标(SolutionGoal): String
+- 输入 (Input): String
+- 输出 (Output): String
+- 约束 (Constraint): String
+- 资源需求 (resourceRequirements): KnowledgeResource //实现该解决方案所需要的资源集，包括知识资源、组件资源等
+- 覆盖的维度 (coverDimensions): Map<DimensionID.ScaleID> //该解决方案所覆盖的维度与刻度
+- 方案模板 (SolutionTemple): ActivityDiagram //方案模板是一个活动流程，包括方案步骤以及控制逻辑，方案步骤与Solution本体同形
+- 验证规则 (valaditionRule): String //该解决方案成功解决该问题的验证规则
+}
+
+  ' 问题-方案内部关系
+  问题 "1" --> "0..*" 方案 : 需要方案
+@enduml

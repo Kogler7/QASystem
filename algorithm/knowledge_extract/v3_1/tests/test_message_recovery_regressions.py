@@ -126,7 +126,7 @@ def test_required_property_repair_uses_exact_key_and_delta_contract():
     assert result['raw']['entities'][0]['properties'] == {'duty': '巡检'}
 
 
-@pytest.mark.parametrize('ref', ['official_document@12', 'rule@8', 'trouble@8'])
+@pytest.mark.parametrize('ref', ['official_document@13', 'rule@10', 'trouble@10'])
 def test_stage_operations_do_not_leak_into_discovery_or_review(ref):
     plan = compile_plan(ONTOLOGY)
     chunk = ExtractionChunk('c', '原文')
@@ -265,6 +265,8 @@ def test_overflow_splits_keep_accepted_entity_and_resume_only_missing_candidates
             prefix = json.dumps({**span_item('Person', '甲', '甲负责巡检。'), 'properties': {}})
             return StructuredLLMResponse(text=prefix + '\n{"type":', api='chat.completions',
                 response_mode='plain', status='incomplete', finish_reason='length')
+        if user['task']['operation'] == 'evidence_verification':
+            return StubLLM()(messages)
         if user['task']['operation'] == 'property':
             return '\n'.join(json.dumps({'type': row['type'], 'name': row['name'], 'properties': {}})
                 for row in user['task']['known_entities'])

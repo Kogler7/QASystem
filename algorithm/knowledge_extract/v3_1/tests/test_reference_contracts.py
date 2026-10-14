@@ -23,7 +23,8 @@ ONTOLOGY = '@startuml\nclass Person {\n + 出生地 (birthplace): String\n}\n@en
 def test_literal_cooccurrence_does_not_prove_property_meaning():
     text = '张三出生于北京并在上海工作。'
     llm = StubLLM(entity_handler=lambda p, c: [{**span_item('Person', '张三', text),
-        'properties': {'birthplace': '上海'}}], verification_handler=lambda item, chunk: 'no')
+        'properties': {'birthplace': '上海'}}], verification_handler=lambda item, chunk: 'no',
+        entity_verification_handler=lambda item, chunk: 'yes')
     result = extract_split(ONTOLOGY, [ExtractionChunk('c', text)], llm=llm)
     assert result['raw']['entities'][0]['properties'] == {}
     assert any(task == 'evidence_verification' for task, _ in llm.calls)

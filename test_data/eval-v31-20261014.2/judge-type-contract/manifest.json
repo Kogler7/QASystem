@@ -1,0 +1,10 @@
+{
+  "purpose": "程序类型门禁契约回归，不参与 judge 性能评分",
+  "from_corpus_version": "1.0.0",
+  "pairs": 28,
+  "windows": 4,
+  "files": {
+    "pairs.jsonl": "cbce9168b3d76e5fab93eec0ca3ba985959e0c3441ebd83a15b5df0d93c1ac63",
+    "windows.jsonl": "fe6c41d196a378549ae562e2566f6dcf72f328eb7e190cb1ac5821fb9869bfaa"
+  }
+}

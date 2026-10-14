@@ -193,7 +193,7 @@ end note
         if task == 'evidence_verification':
             assert '仅为有证据支持的 missing property 输出更新' not in user['domain_policy']
     assert result['profile']['document_route']['kind']=='generic'
-    assert result['profile']['prompt_assembly']['plans'][0]['selection']['skill_refs']==['rule@8']
+    assert result['profile']['prompt_assembly']['plans'][0]['selection']['skill_refs']==['rule@10']
 
 
 def test_partial_v31_never_publishable_when_structure_is_valid():

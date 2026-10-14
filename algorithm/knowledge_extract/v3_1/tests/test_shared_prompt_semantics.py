@@ -47,19 +47,19 @@ def test_shared_semantics_are_identical_and_operations_stay_in_their_stage(skill
             applicable.add('repair')
     user = json.loads(messages[1]['content'])
     if skill_id == 'official_document':
-        assert ref == 'official_document@12'
+        assert ref == 'official_document@13'
         assert '仅有签名或“已阅”不自动证明承担具体工作职责' in user['domain_policy']
         assert '表单中的明确批示、承办主体、事项和约束' in user['domain_policy']
         assert '角色名单能支持主体身份，但不能凭名单补写职责' in user['domain_policy']
         assert '不能把签阅流水中的姓名名单当成主送名单' in user['domain_policy']
         assert '不能用表头替代文件标题' in user['domain_policy']
     if skill_id == 'rule':
-        assert ref == 'rule@8'
+        assert ref == 'rule@10'
         assert '核验时也必须检查连接关系' in user['domain_policy']
         assert '不能把甲的恢复转给乙' in user['domain_policy']
         assert '不另补“甲导致丙”' in user['domain_policy']
     if skill_id == 'trouble':
-        assert ref == 'trouble@8'
+        assert ref == 'trouble@10'
         assert '检查动作、试验项目或结果文字不自动成为固有专名' in user['domain_policy']
         assert '项目文字仍可忠实填入本体的名称属性' in user['domain_policy']
         assert '显式对象实例标签和真正固有名称逐字保留' in user['domain_policy']
@@ -108,7 +108,7 @@ def test_sample_uses_common_prompts_and_preserves_instance_and_business_name(bin
     entity = result['raw']['entities'][0]
     assert (entity['type'], entity['name'], entity['properties']['name']) == (type_id, '维护角色_B', '维护工程师')
     assert result['raw']['relations'] == []
-    assert result['run_trace']['prompt_version'] == 'knowledge-extract-v3.1-table-role-grounding-v34'
+    assert result['run_trace']['prompt_version'] == 'knowledge-extract-v3.1-all-entity-admission-v35'
     assert {item['name'] for item in SkillRegistry().selection_catalog()} == {'official_document', 'rule', 'trouble'}
     for messages in seen:
         user = json.loads(messages[1]['content'])
@@ -132,7 +132,7 @@ def test_official_literal_names_still_require_business_scope_admission():
     llm = StubLLM(entity_handler=lambda p, c: [span_item('RenamedActor', n, source)
         for n in ('甲', '乙', '丙')], verification_handler=verdict)
     result = extract_harness(ontology, [ExtractionChunk('c', source)], llm=llm,
-        skill_refs=['official_document@12'], use_scheduler=False,
+        skill_refs=['official_document@13'], use_scheduler=False,
         max_attempts=1, max_repair_rounds=0)
     assert result['status'] == 'succeeded'
     assert set(seen) == {'甲', '乙', '丙'}

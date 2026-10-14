@@ -91,17 +91,18 @@ def test_delayed_retry_releases_worker_and_discovery_queue_capacity():
     assert metrics['retry_delays'] == 1
 
 
-@pytest.mark.parametrize('best_effort,status', [(True, 'partial'), (False, 'failed')])
-def test_call_budget_is_shared_by_generation_and_review(monkeypatch, best_effort, status):
+@pytest.mark.parametrize('best_effort', [True, False])
+def test_call_budget_is_shared_by_generation_and_review(monkeypatch, best_effort):
     monkeypatch.setenv('KG_EXTRACT_V31_MAX_CALLS', '1')
     llm = StubLLM(entity_handler=lambda p, c: [{**span_item('Person', '甲', '甲负责巡检。'),
                                                'properties': {'duty': '巡检'}}])
     result = extract_split(ONTOLOGY, [ExtractionChunk('c', '甲负责巡检。')], llm=llm,
                            skill_refs=[], best_effort=best_effort, max_attempts=3, retry_base_seconds=0)
-    assert result['status'] == status
+    assert result['status'] == 'failed'
     assert result['error_code'] == 'LLM_CALL_BUDGET_EXCEEDED'
     assert len(llm.calls) == 1
-    assert result['raw']['entities'][0]['properties'] == {}
+    # Discovery consumed the budget; unreviewed entities cannot be published.
+    assert result['raw']['entities'] == []
     assert any(a['type'] == 'call_budget' and a['terminal'] for a in result['attempts'])
 
 

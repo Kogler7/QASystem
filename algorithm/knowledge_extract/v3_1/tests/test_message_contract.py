@@ -126,7 +126,7 @@ def test_default_rule_granularity_policy_reaches_each_stage(stage, setup):
     assert user['output_contract']['format'] == 'jsonl'
     assert ('不按预设数量补造规则' in policy) == (stage == 'repair')
     assert rule_setup[-1].audit()[0]['read_skills'][0]['skill_id'] == 'rule'
-    assert rule_setup[-1].audit()[0]['read_skills'][0]['version'] == '8'
+    assert rule_setup[-1].audit()[0]['read_skills'][0]['version'] == '10'
 
 
 def test_pipeline_verifier_reuses_snapshot_after_skill_file_changes(setup):

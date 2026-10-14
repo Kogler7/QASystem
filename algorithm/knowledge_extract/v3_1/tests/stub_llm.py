@@ -111,7 +111,11 @@ def span_item(type_id: str, mention: str, quote: str | None = None) -> dict[str,
 
 
 class StubLLM:
-    """按 task 路由的测试桩；未提供的 handler 返回合法空响应。"""
+    """按 task 路由的测试桩；默认实体核验 yes，属性核验 uncertain。
+
+    默认 yes 只表示测试 fixture 声明的实体获支持，不执行真实语义判断。
+    verification_handler 同时覆盖实体/属性；实体专用判据可单独提供。
+    """
 
     def __init__(
         self,
@@ -121,6 +125,7 @@ class StubLLM:
         verification_handler=None,
         selection_handler=None,
         identity_handler=None,
+        entity_verification_handler=None,
     ) -> None:
         self.entity_handler = entity_handler
         self.property_handler = property_handler
@@ -128,6 +133,7 @@ class StubLLM:
         self.verification_handler = verification_handler
         self.selection_handler = selection_handler
         self.identity_handler = identity_handler
+        self.entity_verification_handler = entity_verification_handler
         self.calls: list[tuple[str, str]] = []
 
     def _ground(self, item: dict[str, Any], chunk: dict[str, Any]) -> dict[str, Any]:
@@ -168,8 +174,12 @@ class StubLLM:
             return json.dumps(payload, ensure_ascii=False)
         elif task == "evidence_verification":
             items = _user_payload(prompt)["task"]["items"]
+            def verdict(item):
+                handler = (self.entity_verification_handler if 'property' not in item
+                           and self.entity_verification_handler is not None else self.verification_handler)
+                return handler(item, chunk) if handler else ('yes' if 'property' not in item else 'uncertain')
             payload = {"verdicts": [{"item_id": item["item_id"],
-                "supported": self.verification_handler(item, chunk) if self.verification_handler else "uncertain",
+                "supported": verdict(item),
                 "reason": "fixture verdict"} for item in items]}
         elif task == "entity":
             items = self.entity_handler(prompt, chunk) if self.entity_handler else []
