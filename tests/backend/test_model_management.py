@@ -140,6 +140,8 @@ def test_duplicate_worker_engine_start_is_rejected(monkeypatch):
     from backend.app.execution.supervisor import RuntimeSupervisor
     monkeypatch.setattr('backend.app.execution.supervisor._gpu_ids', lambda: [])
     monkeypatch.setattr('backend.app.execution.supervisor.is_remote_only', lambda: False)
+    monkeypatch.setattr('docker.configuration.approved_execution_plan',
+                        lambda **kwargs: {'revision': 7, 'cpu_workers': 'auto'})
     supervisor = RuntimeSupervisor()
     supervisor.engines = [('4', 8100, object())]
     with pytest.raises(RuntimeError, match='重复启动'):

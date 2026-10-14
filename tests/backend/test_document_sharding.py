@@ -212,8 +212,9 @@ def test_worker_can_reserve_only_its_own_gpu_slot(monkeypatch):
 
 
 def test_supervisor_derives_worker_counts_from_cpu_and_gpu(monkeypatch):
-    monkeypatch.setenv("EXECUTION_CPU_WORKERS", "auto")
+    monkeypatch.setenv("ALGORITHM_RUNTIME_PROFILE", "full-runtime")
     monkeypatch.setenv("EXECUTION_VLM_WORKERS_PER_GPU", "auto")
-    assert _auto_cpu_workers(32) == 8
+    assert _auto_cpu_workers(32, 'auto') == 8
+    assert _auto_cpu_workers(32, '3') == 3
     assert _auto_vlm_workers(32, 4) == 2
     assert _auto_vlm_workers(32, 0) == 0

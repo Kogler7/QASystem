@@ -83,7 +83,11 @@ def test_supervisor_cpu_spawn_never_enters_fail_all_collection(monkeypatch):
     from backend.app.execution import supervisor
     monkeypatch.setattr(supervisor, '_gpu_ids', lambda: [])
     monkeypatch.setattr('docker.model_services.worker_record', lambda: None)
-    runtime = supervisor.RuntimeSupervisor(cpu_workers='1')
+    monkeypatch.setattr(configuration, 'approved_execution_plan',
+                        lambda **kwargs: {'revision': 7, 'cpu_workers': '1'})
+    events = []
+    monkeypatch.setattr(supervisor.RuntimeSupervisor, '_record_cpu_control', lambda self, event: events.append(event))
+    runtime = supervisor.RuntimeSupervisor()
     processes = []
     class Process:
         pid = 123
@@ -92,6 +96,7 @@ def test_supervisor_cpu_spawn_never_enters_fail_all_collection(monkeypatch):
     runtime._start_core_workers()
     assert len(runtime.children) == 1 and runtime.children[0].name == 'api'
     assert runtime.cpu_controller.status()['cpu']['processes'][0]['state'] == 'failed'
+    assert events[0]['revision'] == 7 and events[0]['action'] == 'startup'
 
 
 def test_cpu_getters_fail_closed_without_committed_json(monkeypatch):

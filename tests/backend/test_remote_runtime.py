@@ -14,7 +14,8 @@ def test_remote_profile_disables_gpu_and_limits_cpu_workers(monkeypatch):
     monkeypatch.setenv("ALGORITHM_RUNTIME_PROFILE", "remote-only")
     assert is_remote_only() is True
     assert supervisor._gpu_ids() == []
-    assert supervisor._auto_cpu_workers(32) == 1
+    assert supervisor._auto_cpu_workers(32, 'auto') == 1
+    assert supervisor._auto_cpu_workers(32, '3') == 3
 
 
 def test_remote_embedding_preserves_input_order_and_dimension(monkeypatch):
