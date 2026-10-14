@@ -222,3 +222,8 @@ docker/config-releases/v4.json
 
 # Mutable deployment configuration and credential-bearing backups
 runtime-config/
+
+# 评测原始包归档（macOS 打包的 official/，含 __MACOSX 与 .DS_Store；内容已按
+# test_data/eval/official/official_0N 展开入库，此处只保留本地工作副本）
+test_data/eval/official.zip
+
