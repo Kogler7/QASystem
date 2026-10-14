@@ -1,0 +1,67 @@
+# mini-eval-deepseek 评测参数（不含密钥）。
+# options 与生产 PipelineOptions 对齐；backend_url / judge 由运行脚本用环境变量覆盖：
+#   QASYSTEM_BACKEND_URL / QASYSTEM_JUDGE_BASE_URL / QASYSTEM_JUDGE_MODEL / QASYSTEM_JUDGE_API_KEY
+# 这里的 backend_url 只是占位（v2 的端口），单跑某个版本时以环境变量为准。
+
+backend_url: http://127.0.0.1:8021
+mcp_url: null
+poll_interval_seconds: 2
+poll_timeout_seconds: 3600
+
+options:
+  parser:
+    engine: auto
+    force: false
+    page_sharding: auto
+    page_shard_size: 0
+    max_page_shards: 16
+    mineru_options:
+      language: ch
+      ocr_mode: auto
+      table_enable: true
+      formula_enable: true
+    keep_page_edges: first_page
+    page_edge_min_chars: 3
+  chunking:
+    strategy: recursive
+    size: 4000
+    chunk_overlap: 0
+    similarity: 0.6
+    separators: null
+    size_unit: char
+    breakpoint_method: percentile
+  extraction:
+    # null：模型、地址、密钥全部由各版本 Backend 的环境变量决定，评测进程不覆盖。
+    model: null
+    merge: true
+  storage:
+    persist_graph: false
+    knowledge_space_id: null
+
+# 抽取评分：LLM-judge（DeepSeek）。地址/模型在此声明，密钥只从环境变量读。
+eval:
+  match_mode: llm
+  judge_model: deepseek-flash
+  judge_base_url: https://api.deepseek.com/v1
+  judge_timeout_seconds: 300
+  judge_max_tokens: 8192
+  judge_batch_size: 20
+  judge_golden_batch_size: 40
+  judge_max_concurrency: 4
+  judge_response_format: auto
+  judge_disable_thinking: true
+
+# 小样本选择：数据来自工作区 test_data/eval 的实体拷贝（非软链）。
+# 当前会选 official×2 + rule/rule_01 + simple + trouble/trouble_01（共 5）。
+# trouble_01 golden 很大（543e/800r），mini 回归若太慢可改选 trouble_mini 或先排除。
+mini_eval:
+  cases_per_type: 1
+  per_type:
+    official: 2
+  selection: first
+  seed: 42
+
+# 0 = 不清理历史批次：这个套件下的批次是版本对比基线，保留全部。
+runs_retention_days: 0
+
+groups: {}
