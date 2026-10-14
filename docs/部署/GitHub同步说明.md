@@ -28,7 +28,7 @@
 
 ## 操作命令
 
-使用 Python 3.10+、Git，以及开发工具 `git-filter-repo==2.47.0`。它不是应用运行依赖，不需要重建环境镜像。
+使用 Python 3.10+、Git，以及开发工具 `git-filter-repo==2.47.0`，该工具已登记在 `backend/requirements.test.txt`，确保新开发环境能运行同步单测。它不是应用运行依赖，不需要重建环境镜像。
 
 ```powershell
 .venv/Scripts/python.exe -m pip install git-filter-repo==2.47.0
