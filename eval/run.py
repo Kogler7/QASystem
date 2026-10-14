@@ -4150,6 +4150,12 @@ def main() -> int:
         finished=True,
     )
     write_run_report(run_dir, summary)
+    from eval.tools.development_approval_policy import observe as observe_development_policy
+    # 状态路径跟随 RUNS_DIR，评测批次（含测试）只写自己的批次根目录，不落到仓库真实状态文件。
+    policy_result = observe_development_policy(
+        run_dir / "summary.json", RUNS_DIR.parent / "development-approval-policy.json")
+    if policy_result is not None:
+        log(f"开发评测配置批准豁免状态: {json.dumps(policy_result, ensure_ascii=False)}")
 
     print("\n---------- 评测总览 ----------")
     print(

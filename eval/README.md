@@ -578,3 +578,10 @@ judge 的规范输出仍为含 `golden_index`、`predicted_index` 的对象。�
 评分代码变化后应使用 `--reuse-extract-from` 对旧预测重新评分，另存新批次；缺少旧预测的 case 需显式从重评分选择中排除，因为此参数的既有行为会对缺失产物重新抽取。旧结果不足全量或原运行存在 partial 时，重评分只能用于同口径诊断对比，不能据此宣称生产基线门禁通过。
 
 judge 主扫描会先按规范化本体标识分组（关系按两端类型及关系类型），再完整遍历组内所有候选对。跨类型本来就不能匹配，现在不再占用模型窗口。`judge_coverage.type_pruned_pairs` 记录提前排除的对数，`pairs_presented + type_pruned_pairs == pairs_total`；已有匹配行仍参与扫描，最终统一最大匹配，避免丢失增广路径。此调整及评分器变化要求新旧预测都重新评分，不能把不同评分代码的 F1 直接相减。
+
+
+## 开发评测的配置批准临时豁免
+
+用户已授权本地开发与 88 评测暂时豁免配置批准记录检查。策略文件为 `tmp/eval/development-approval-policy.json`，通过 `python3 -m eval.tools.development_approval_policy --enable` 创建；只有评测临时部署启动器读取策略，生产配置 guard 不读取、不提供全局绕过开关，也不生成批准记录。源码配置契约、JSON 结构及凭据保护继续生效。每次评测部署必须保留恢复原服务挂载和原 guard 的步骤。
+
+`run.py` 在正式批次完成后自动检查该策略：必须为 v3.1、LLM 评分、完整覆盖 official_01–05、rule_01、Simple_故障规则的诊断、trouble_mini 共 8 个 case，无失败/跳过/缺评分/回退，且门禁 passed=true；按有效实体 TP/FP/FN 重算整体 micro F1 达到 0.85 后，将策略 enabled 置为 false，后续启动器必须恢复配置批准检查。v3.1 关系固定为空，不参与此恢复阈值。未完成、部分评分或较低 F1 保持开发豁免；这不等于质量通过或生产发布通过。可用 `--status` 查看状态，或 `--observe <summary.json>` 核验既有批次。
