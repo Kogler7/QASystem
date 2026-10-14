@@ -76,6 +76,12 @@ New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 foreach ($directory in @("backend", "algorithm", "mcp_services", "agent_mcp", "agent", "external_services", "clef_service", "nanojev_service")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
+# v4 是本地实验副本：不进 Git、不登记配置声明，因此也不进交付源码包（否则服务器启动门禁会因未声明消费者失败）
+$localOnlySource = Join-Path $runtimeDir "algorithm/knowledge_extract/v4"
+if (Test-Path -LiteralPath $localOnlySource) {
+    Write-ProgressLog "Excluding local-only algorithm copy from the delivered source: algorithm/knowledge_extract/v4"
+    Remove-Item -LiteralPath $localOnlySource -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
 foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "startup_contract.py", "config_guard.py", "configuration.py", "config_contract.py", "config_database.py", "config_migrations.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.1",
+  "version": "2026.10.14.2",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -69,6 +69,101 @@
     "VLLM_MODEL_VERSION"
   ],
   "items": {
+    "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE": {
+      "desc": "实体准入可单独缩小核验批次；不大于 KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE，未配置时沿用该值。",
+      "default": "16",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "expression": "str(limit)"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_GENERATION_TEMPERATURE": {
+      "desc": "仅实体/属性生成与候选身份复查的采样温度；核验及 Skill 选择保持 0；默认保持原值。",
+      "default": "0",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_GENERATION_TEMPERATURE"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'0'"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_MAX_CALLS": {
+      "desc": "同一抽取请求全部阶段、重试与拆分合计的模型调用上限。",
+      "default": "512",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/task_runtime.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_MAX_CALLS"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/task_runtime.py",
+          "expression": "'512'"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT": {
+      "desc": "实验性补扫未出现类型；实测可能产生越界候选，默认关闭。",
+      "default": "false",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "expression": "'false'"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE": {
+      "desc": "独立证据核验每批最大条数（1–24）；仍受完整输入/输出预算约束，超限拆小。",
+      "default": "16",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "expression": "'16'"
+        }
+      ]
+    },
     "BACKEND_BIND": {
       "desc": "对外部署默认监听所有网卡；通过宿主机防火墙或安全组限制访问来源。",
       "default": "0.0.0.0",
@@ -6919,7 +7014,8 @@
       "_env('KG_EXTRACT_EVIDENCE_ADMISSION', default='warn')"
     ],
     "algorithm/knowledge_extract/v3_1/candidate_generation.py": [
-      "config_getenv('KG_EXTRACT_V31_TRACE_CALLS', '32')"
+      "config_getenv('KG_EXTRACT_V31_TRACE_CALLS', '32')",
+      "config_getenv('KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT', 'false')"
     ],
     "algorithm/knowledge_extract/v3_1/config.py": [
       "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
@@ -6931,7 +7027,8 @@
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
-      "config_getenv(k)"
+      "config_getenv(k)",
+      "_env('KG_EXTRACT_V31_GENERATION_TEMPERATURE', default='0')"
     ],
     "algorithm/knowledge_extract/v3_1/request_budget.py": [
       "config_getenv('KG_EXTRACT_LLM_MAX_INPUT_TOKENS')",
@@ -7050,6 +7147,13 @@
     "agent_mcp/__main__.py": [
       "config_getenv('AGENT_MCP_HOST', '0.0.0.0')",
       "config_getenv('AGENT_MCP_PORT', '9181')"
+    ],
+    "algorithm/knowledge_extract/v3_1/property_grounding.py": [
+      "config_getenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '16')",
+      "config_getenv('KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE', str(limit))"
+    ],
+    "algorithm/knowledge_extract/v3_1/task_runtime.py": [
+      "config_getenv('KG_EXTRACT_V31_MAX_CALLS', '512')"
     ]
   },
   "aliases": {

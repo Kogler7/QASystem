@@ -79,7 +79,7 @@ def deduplicate_chunk_graphs(items: list[dict[str, Any]]) -> dict[str, list[dict
                         chunk_indices.append(source_index)
 
     valid_uids = set(nodes_by_uid)
-    uid_by_key = {(node.get("label"), (node.get("properties") or {}).get("name")): uid
+    uid_by_key = {(node.get("label"), node.get('display_name') or (node.get("properties") or {}).get("name")): uid
                   for uid, node in nodes_by_uid.items()}
 
     relationship_candidates: list[dict[str, Any]] = []

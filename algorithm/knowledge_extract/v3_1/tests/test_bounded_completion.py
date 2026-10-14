@@ -1,4 +1,6 @@
 """Regression tests for P1/P2, first-pass properties and bounded long inputs."""
+
+from .stub_llm import source_documents
 import json
 import re
 import threading
@@ -14,6 +16,8 @@ ONTOLOGY = '@startuml\nclass Person {\n + 职责 (duty): String\n}\n@enduml'
 
 
 def extract(chunks, llm, **kwargs):
+    # These fixtures exercise extraction budgets, with skill selection explicitly unbound.
+    kwargs.setdefault('skill_refs', [])
     return extract_split(ONTOLOGY, chunks, llm=llm, retry_base_seconds=0, **kwargs)
 
 
@@ -83,7 +87,7 @@ def test_adjacent_pronoun_context_reaches_completion():
               ExtractionChunk('b', '他负责检查并记录。', document_id='d', section_id='s'),
               ExtractionChunk('c', '他负责发射火箭。', document_id='other', section_id='s')]
     def complete(prompt, chunk):
-        docs = [d['text'] for d in json.loads(prompt)['documents']]
+        docs = json.loads(prompt)['documents']
         assert chunks[1].text in docs
         assert chunks[2].text not in docs
         return {'entities': [{'type': 'Person', 'name': '张三', 'properties': {'duty': '检查并记录'},
@@ -113,7 +117,7 @@ def test_very_long_single_chunk_keeps_tail_and_original_offsets(monkeypatch):
     assert result['status'] == 'succeeded'
     assert len(result['raw']['entities']) == 600
     assert any(e['name'] == '人员0599' for e in result['raw']['entities'])
-    assert all(len(json.loads(p)['documents'][0]['text']) <= 500 for t, p in llm.calls if t == 'entity')
+    assert all(len(source_documents(json.loads(p))[0]['text']) <= 500 for t, p in llm.calls if t == 'entity')
     for row in result['raw']['entities']:
         for span in row['evidences']:
             assert text[span['start_char']:span['end_char']] == span['quote']
@@ -150,7 +154,7 @@ def test_repeated_conflicting_wording_revisits_distinct_support_only():
 
     def complete(prompt, chunk):
         payload = json.loads(prompt)
-        for row in payload['stage_context']['known_entities'][0]['occurrences']:
+        for row in payload['task']['known_entities'][0]['occurrences']:
             values.add(row['properties']['duty'])
         return {'entities': [{'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
                                'evidence': {'quote': '张三负责检查。'}}]}
@@ -186,7 +190,7 @@ def test_candidate_property_meaning_survives_non_json_source_windows(monkeypatch
 
     def entities(prompt, chunk):
         payload = json.loads(prompt)
-        assert '规则成立所依赖的前提条件' in payload['ontology']['catalog']
+        assert '规则成立所依赖的前提条件' in payload['ontology']
         assert '同时提取实体候选和当前片段支持的本体属性' in payload['task']['discipline']
         return []
 
@@ -237,6 +241,9 @@ def test_candidate_property_schema_partition_and_shared_key_types():
 
 
 def test_frequent_key_sources_are_bounded_even_for_legacy_candidates(monkeypatch):
+    # This synthetic many-window case checks per-call size, independently of
+    # the new document-wide call budget (covered by task-runtime tests).
+    monkeypatch.setenv('KG_EXTRACT_V31_MAX_CALLS', '4096')
     monkeypatch.setenv('KG_EXTRACT_V31_MAX_INPUT_BYTES', '16000')
     chunks = [ExtractionChunk(f'c{i}', '张三负责检查。' + '正文。' * 1500) for i in range(40)]
     def complete(prompt, chunk):
@@ -265,7 +272,7 @@ def test_incomplete_response_splits_instead_of_retrying_same_window(monkeypatch,
             if run_context['pass_name'] == 'property_verification':
                 return StubLLM(verification_handler=lambda item, chunk: 'yes')(messages)
             payload = json.loads(messages[1]['content'])
-            text = payload['documents'][0]['text']
+            text = source_documents(payload)[0]['text']
             self.lengths.append(len(text))
             if len(text) > 600:
                 if failure == 'timeout':
@@ -306,16 +313,16 @@ def test_source_windows_cover_every_character():
 
 def test_failed_key_keeps_discovery_and_does_not_erase_other_keys():
     def properties(prompt, chunk):
-        name = json.loads(prompt)['stage_context']['known_entities'][0]['name']
-        return {'entities': [] if name == '张三' else [{'type': 'Person', 'name': name,
-            'properties': {'duty': '检查'}, 'evidence': {'quote': '李四负责检查。'}}]}
+        return {'entities': [{'type': 'Person', 'name': row['name'],
+            'properties': {'duty': '检查'}, 'evidence': {'quote': '李四负责检查。'}}
+            for row in json.loads(prompt)['task']['known_entities'] if row['name'] != '张三']}
     llm = StubLLM(entity_handler=lambda p, c: [span_item('Person', c['text'][:2])], property_handler=properties,
                   verification_handler=lambda item, chunk: 'yes' if item['name'] == '李四' and item['value'] == '检查' else 'no')
     result = extract([ExtractionChunk('a', '张三负责检查。'), ExtractionChunk('b', '李四负责检查。')],
                      llm, best_effort=True, max_attempts=2)
     assert result['status'] == 'partial'
     assert [(e['name'], e['properties']) for e in result['raw']['entities']] == [('张三', {}), ('李四', {'duty': '检查'})]
-    assert len([p for t, p in llm.calls if t == 'property']) == 3
+    assert len([p for t, p in llm.calls if t == 'property']) == 2
 
 
 def test_candidate_property_types_retry_and_source_is_unchanged():
@@ -349,7 +356,7 @@ def test_large_schema_is_partitioned_without_dropping_types(monkeypatch):
         types = json.loads(prompt)['output_contract']['success_schema']['properties']['type']['enum']
         seen.update(types)
         return [{'type': t, 'mention': '甲', 'properties': {}, 'evidence': {'quote': '甲'}} for t in types]
-    result = extract_split(ontology, [ExtractionChunk('c', '甲')], llm=StubLLM(entity_handler=entities), retry_base_seconds=0)
+    result = extract_split(ontology, [ExtractionChunk('c', '甲')], llm=StubLLM(entity_handler=entities), retry_base_seconds=0, skill_refs=[])
     assert result['status'] == 'succeeded'
     assert seen == {f'Type{i:03}' for i in range(120)}
     assert len(result['raw']['entities']) == 120
@@ -368,9 +375,9 @@ def test_property_overflow_splits_sources_and_retains_both_ends():
             user = json.loads(messages[1]['content'])
             if run_context['pass_name'] == 'entity':
                 return json.dumps(span_item('Person', '张三'), ensure_ascii=False)
-            docs = user['documents']
-            self.properties.append([d['text'] for d in docs])
-            if len(docs) > 2 and not user['stage_context']['known_entities'][0].get('properties'):
+            text = user['documents']
+            self.properties.append(text)
+            if text.count('记录编号') > 2 and not user['task']['known_entities'][0].get('properties'):
                 return StructuredLLMResponse(text='', api='chat.completions', response_mode='plain', status='incomplete', finish_reason='length')
             return json.dumps({'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
                                'evidence': {'quote': '张三负责检查。'}}, ensure_ascii=False)
@@ -392,7 +399,7 @@ def test_repair_no_progress_is_reported_and_has_bounded_context(monkeypatch):
     assert result['coverage_gaps']
     repairs = [json.loads(p) for t, p in llm.calls if t == 'repair']
     assert len(repairs) > 1
-    assert all(len(p['documents'][0]['text']) <= 500 for p in repairs)
+    assert all(len(source_documents(p)[0]['text']) <= 500 for p in repairs)
 
 
 @pytest.mark.parametrize('source', ['张三负责检查。李四负责发射火箭。', '张三负责检查，李四负责发射火箭。'])

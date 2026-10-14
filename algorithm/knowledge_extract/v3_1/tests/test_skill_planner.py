@@ -125,7 +125,37 @@ def test_default_skills_include_existing_rules_for_each_stage():
     registry = SkillRegistry()
     assert {s['skill_id'] for s in registry.catalog('entity')} == {'official_document', 'rule', 'trouble'}
     assert registry.catalog('relation') == []
-    assert '前件' in registry.render([{'skill_id': 'rule', 'sections': ['property']}], 'property')['rule']['extraction_rules']
+    entry = next(item for item in registry.catalog('property') if item['skill_id'] == 'rule')
+    assert '前件' in registry.render([{'skill_id': 'rule', 'sections': entry['sections']}], 'property')['rule']['extraction_rules']
+
+
+@pytest.mark.parametrize('skill_id,ontology_path', [
+    ('rule', 'test_data/eval/rule/ontology/rule.puml'),
+    ('trouble', 'test_data/eval/trouble/ontology/trouble.puml'),
+    ('official_document', 'test_data/eval/official/ontology/Official_Ontology.puml'),
+])
+def test_catalog_describes_benchmark_ontology_without_injecting_it_into_rules(skill_id, ontology_path):
+    from algorithm.knowledge_extract.v3_1.ontology_compiler import compile_plan
+
+    root = Path(__file__).resolve().parents[4]
+    plan = compile_plan((root / ontology_path).read_text(encoding='utf-8'))
+    registry = SkillRegistry()
+    entry = next(item for item in registry.catalog('entity') if item['skill_id'] == skill_id)
+    # The selector must receive the ontology guidance through discovery metadata.
+    assert plan.allowed_types
+    assert all(type_id in entry['description'] for type_id in plan.allowed_types)
+    planner = SkillAssemblyPlanner(registry)
+    user = user_payload()
+    user['domain_policy']['route']['kind'] = skill_id
+    for stage in ('entity', 'property', 'repair'):
+        result = planner.assemble(user, stage=stage)
+        rules = result['domain_policy']['profiles'][skill_id]['extraction_rules']
+        # Maintenance examples and benchmark paths must not become source evidence.
+        assert entry['description'] not in rules
+        assert '维护参照' not in rules
+        assert ontology_path not in rules
+        assert result['documents'] == user['documents']
+        assert result['ontology'] == user['ontology']
 
 
 def test_skill_components_do_not_import_clients_or_other_algorithms():

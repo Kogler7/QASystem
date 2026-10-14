@@ -4,7 +4,6 @@ from docker.configuration import getenv as config_getenv
 
 import json
 import math
-import os
 import time
 from dataclasses import replace
 
@@ -51,6 +50,11 @@ def iter_windows(chunk, limit, *, overlap=100):
     if len(text) <= limit:
         yield chunk
         return
+    from .source_windows import table_windows
+    structured = table_windows(chunk, limit)
+    if structured is not None:
+        yield from structured
+        return
     start = 0
     overlap = min(max(0, overlap), max(0, limit // 4))
     base = int(chunk.metadata.get("_v31_window_start", 0))
@@ -69,7 +73,7 @@ def iter_windows(chunk, limit, *, overlap=100):
 
 
 def split_request_failure(attempts):
-    return bool(attempts and (attempts[-1].get("type") in {"incomplete", "input_budget"}
+    return bool(attempts and (attempts[-1].get('adaptive_split') or attempts[-1].get("type") in {"incomplete", "input_budget"}
         or (attempts[-1].get("type") == "timeout" and attempts[-1].get("retryable", True))
         or (attempts[-1].get("type") == "request" and any(s in
             attempts[-1].get("message", "").lower() for s in

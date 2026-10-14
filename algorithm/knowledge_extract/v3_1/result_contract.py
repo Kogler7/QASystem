@@ -7,6 +7,7 @@ from .run_state import (
     ExtractionError,
     ExtractionRequestError,
     ExtractionResponseError,
+    ExtractionIncompleteError,
     ExtractionTimeoutError,
     ExtractionValidationError,
 )
@@ -16,6 +17,7 @@ _ERROR_TYPES = {
     "LLM_REQUEST_FAILED": ExtractionRequestError,
     "LLM_TIMEOUT": ExtractionTimeoutError,
     "LLM_JSON_PARSE_FAILED": ExtractionResponseError,
+    'LLM_RESPONSE_INCOMPLETE': ExtractionIncompleteError,
     "LLM_SCHEMA_INVALID": ExtractionValidationError,
 }
 
@@ -41,11 +43,7 @@ def to_public_result(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
         {
             "type": entity.get("type"),
             "name": entity.get("name"),
-            "properties": {
-                key: value
-                for key, value in dict(entity.get("properties") or {}).items()
-                if key != "name"
-            },
+            "properties": dict(entity.get("properties") or {}),
         }
         for entity in raw.get("entities") or []
     ]

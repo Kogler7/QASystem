@@ -9,6 +9,7 @@ from functools import lru_cache
 from collections.abc import Iterable
 from typing import Any
 from .candidate_generation import entity_pass as _entity_pass
+from .task_runtime import document_tasks
 from .chunk_context import ChunkContextManager, ExtractionChunk, ExtractionRequest
 from .coverage import CoverageAuditor
 from .evidence import evidence_coverage
@@ -146,6 +147,7 @@ def _repair_context_chunks(
     return resolved if max_chunks is None else resolved[:max(1, max_chunks)]
 
 
+@document_tasks
 def extract_split(
     ontology, chunks, *, target_types=None, include_subclasses=True,
     validation_mode="strict", llm, model="", unknown_content_policy="ignore",
@@ -154,7 +156,7 @@ def extract_split(
     mapping_accepted_threshold=0.85, mapping_low_confidence_threshold=0.70,
     apply_mapping_threshold=False, best_effort=False, repairer=None,
     entity_adjudicator=None, max_repair_rounds=2, max_attempts=3,
-    retry_base_seconds=0.05, assembly_planner=None,
+    retry_base_seconds=0.05, assembly_planner=None, skill_refs=None,
 ):
     """Discover per-chunk names, then let the LLM return complete entity records.
 
@@ -169,6 +171,10 @@ def extract_split(
         raise TypeError("extract_split 只接收 ExtractionChunk 序列")
     # Freeze caller-owned text/metadata before model calls and worker handoff.
     chunks = deepcopy(chunks)
+    # COSEC: Window/header offsets are host-generated source provenance, never
+    # caller metadata that could introduce fabricated text into model evidence.
+    if any(any(str(key).startswith('_v31_') for key in chunk.metadata) for chunk in chunks):
+        raise ValueError('chunk metadata 的 _v31_ 前缀保留给内部来源窗口')
     target_types = tuple(target_types) if target_types is not None else None
     if validation_mode.casefold() not in {"strict", "permissive"}:
         raise ValueError("validation_mode 仅支持 strict 或 permissive")
@@ -182,21 +188,34 @@ def extract_split(
     request = ExtractionRequest(chunks=chunks, target_types=list(target_types) if target_types is not None else None)
     route = resolve_document_route(plan, chunks)
     planner = assembly_planner if assembly_planner is not None else SkillAssemblyPlanner()
-    planner.prepare(route.to_dict())
     warnings = [w.to_dict() for w in plan.schema_warnings]
     attempts, calls = [], []
     run = ExtractionRun.create(run_id=run_id or f"ke-{uuid.uuid4().hex}", ontology=ontology,
         markdown="\n".join(c.text for c in chunks), model=model,
-        prompt_version="knowledge-extract-v3.1-stage-messages-v5", best_effort=best_effort)
+        prompt_version="knowledge-extract-v3.1-table-role-grounding-v34", best_effort=best_effort)
     run.start()
     for c in chunks:
         run.register_block(c.chunk_id, block_id=str(c.metadata.get("block_id") or c.chunk_id), kind="chunk")
     if not chunks:
         _append_warning(warnings, "EMPTY_INPUT", "请求没有 chunks", "chunks")
+    selection = planner.select_for_request(route=route.to_dict(), ontology=ontology, plan=plan,
+        chunks=chunks, llm=llm, skill_refs=skill_refs, use_scheduler=use_scheduler,
+        attempts=attempts, call_metrics=calls, max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds)
+    selection_ok = selection['status'] in {'selected', 'no_match'}
+    if not selection_ok:
+        _append_warning(warnings, 'SKILL_SELECTION_FAILED',
+                        'Skill 选择失败或存在歧义，未执行抽取', 'skill_selection', selection['status'])
     discovered = _entity_pass(plan, schema, manager, request, llm, route=route,
         assembly_planner=planner, max_workers=max_workers, use_scheduler=use_scheduler,
         attempts=attempts, warnings=warnings, max_attempts=max_attempts,
-        retry_base_seconds=retry_base_seconds, call_metrics=calls) if chunks else []
+        retry_base_seconds=retry_base_seconds, call_metrics=calls,
+        local_previous=local_previous, local_next=local_next, same_section=same_section) if chunks and selection_ok else []
+    from .candidate_identity import reconcile_candidate_identities
+    discovered = reconcile_candidate_identities(discovered, manager, plan, llm, route=route,
+        assembly_planner=planner, attempts=attempts, warnings=warnings, call_metrics=calls,
+        use_scheduler=use_scheduler, max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds, max_workers=max_workers)
     entities, property_stats = enrich_entity_properties(discovered, manager, plan, llm,
         route=route, assembly_planner=planner, attempts=attempts, warnings=warnings,
         call_metrics=calls, use_scheduler=use_scheduler, local_previous=local_previous,
@@ -209,6 +228,9 @@ def extract_split(
     repair_stop_reason = "validation_complete"
     seen_repair_states = set()
     for round_number in range(1, max_repair_rounds + 1):
+        if not selection_ok:
+            repair_stop_reason = 'skill_selection_failed'
+            break
         report = verifier.verify(plan, schema, manager, request, entities, [])
         issues = [i.to_dict() for i in report.repairable_issues]
         if not issues:
@@ -238,7 +260,7 @@ def extract_split(
                     'terminal': True, 'retryable': False})
                 repair_stop_reason = 'repair_failed'
                 break
-            from .property_grounding import ground_properties
+            from .property_grounding import ground_properties, admit_entity_names
             additions = _custom_repair_candidates(proposal, plan)
             if additions is None:
                 attempts.append({'attempt': round_number, 'type': 'schema', 'pass': 'repair',
@@ -246,6 +268,10 @@ def extract_split(
                     'terminal': True, 'retryable': False})
                 repair_stop_reason = 'repair_failed'
                 break
+            additions = admit_entity_names(additions, referenced, llm, attempts=attempts, warnings=warnings,
+                use_scheduler=use_scheduler, max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds, call_metrics=calls, plan=plan,
+                route=route, assembly_planner=planner)
             additions = ground_properties(additions, referenced, llm, attempts=attempts, warnings=warnings,
                 use_scheduler=use_scheduler, max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds, call_metrics=calls, plan=plan,
@@ -253,11 +279,34 @@ def extract_split(
             grouped = [(c.chunk_id, [e for e in additions
                 if c.chunk_id in (e.get("evidence") or {}).get("source_block_ids", [])]) for c in referenced]
         else:
-            grouped = _entity_pass(plan, schema, manager, ExtractionRequest(referenced, request.target_types),
+            property_issues = [issue for issue in issues if issue.get('repair_type') == 'required_property']
+            target_keys = {(issue.get('context', {}).get('target_type'), issue.get('context', {}).get('evidence'))
+                           for issue in property_issues}
+            targets = [(entity['evidence']['source_block_ids'][0],
+                        [{**deepcopy(entity), '_properties_scanned': False}]) for entity in entities
+                       if (entity['type'], entity['name']) in target_keys]
+            if targets:
+                repaired, stats = enrich_entity_properties(targets, manager, plan, llm,
+                    route=route, assembly_planner=planner, attempts=attempts, warnings=warnings,
+                    call_metrics=calls, use_scheduler=use_scheduler, max_attempts=max_attempts,
+                    retry_base_seconds=retry_base_seconds, max_workers=max_workers,
+                    local_previous=local_previous, local_next=local_next, same_section=same_section,
+                    task='repair', repair_issues=property_issues)
+                entities = [entity for entity in entities if (entity['type'], entity['name']) not in target_keys] + repaired
+                for key in property_stats:
+                    property_stats[key] += stats[key]
+                rounds.append({'round': round_number, 'affected_entities': len(targets),
+                               'completed_entities': len(repaired), 'operation': 'repair_property'})
+            discovery_issues = [issue for issue in issues if issue.get('repair_type') == 'uncovered_block']
+            if not discovery_issues:
+                continue
+            discovery_sources = _repair_context_chunks(discovery_issues, manager, entities=entities, relations=[])
+            grouped = _entity_pass(plan, schema, manager, ExtractionRequest(discovery_sources, request.target_types),
                 llm, route=route, assembly_planner=planner, max_workers=max_workers,
                 use_scheduler=use_scheduler, attempts=attempts, warnings=warnings,
                 max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
-                call_metrics=calls, task="repair", repair_issues=issues)
+                call_metrics=calls, task="repair", repair_issues=discovery_issues,
+                local_previous=local_previous, local_next=local_next, same_section=same_section)
         grouped = _admit_repair_scope(grouped, issues, entities, manager, warnings)
         affected = {(e["type"], e["name"]) for _, rows in grouped for e in rows}
         if not affected:
@@ -297,11 +346,14 @@ def extract_split(
         # Legacy graph transport requires a uid, but this does not deduplicate,
         # change the complete model records or feed IDs back into extraction.
         nodes.append({"uid": entity_uid(entity["type"], entity["name"], None), "label": entity["type"],
+                      "display_name": entity["name"],
                       "properties": build_node_properties(entity["name"], entity["properties"]),
                       "evidences": deepcopy(evidence)})
     raw = {"entities": final_entities, "relations": []}
     report = verifier.verify(plan, schema, manager, request, final_entities, [])
-    if report.hard_issues:
+    if not selection_ok:
+        repair_stop_reason = 'skill_selection_failed'
+    elif report.hard_issues:
         repair_stop_reason = "verification_failed"
     elif not report.repairable_issues:
         repair_stop_reason = "validation_complete"
@@ -310,23 +362,29 @@ def extract_split(
                          "message": "; ".join(i.message for i in report.hard_issues), "terminal": True})
     failed = {(a.get("pass"), a.get("chunk")) for a in attempts if a.get("terminal")}
     for c in chunks:
-        run.mark_chunk_scan(c.chunk_id, "entity", completed=("entity", c.chunk_id) not in failed)
+        run.mark_chunk_scan(c.chunk_id, "entity", completed=selection_ok and ("entity", c.chunk_id) not in failed)
     run.absorb_attempts(attempts)
     run.finish(accepted_entities=len(final_entities), accepted_relations=0, stop_reason=repair_stop_reason)
     gaps = [g.to_dict() for g in CoverageAuditor().audit(plan, manager, request, final_entities, [])]
     trace = run.to_trace()
     trace.update(calls=calls, repair_rounds=rounds, repair_stop_reason=repair_stop_reason,
                  verification=report.to_dict())
-    result = {"raw": raw, "graph": {"nodes": nodes, "relationships": []}, "triples": [],
+    result = {"extract_version": "v3.1", "raw": raw, "graph": {"nodes": nodes, "relationships": []}, "triples": [],
         "intermediate_model": {"objects": objects, "relations": [], "coverage_gaps": gaps},
         "warnings": warnings, "attempts": attempts, "evidence_coverage": evidence_coverage(raw),
         "coverage_gaps": gaps, "verification": report.to_dict(),
         "mapping": {"entities": scores, "relations": [], "rejected": sum(s["status"] == "rejected" for s in scores)},
         "profile": {"document_route": route.to_dict(), "pipeline": "entity_property", "chunks": len(chunks),
+            "generation_temperature": getattr(llm, 'generation_temperature', None),
+            "skill_selection": selection,
+            "prompt_assembly": {"mode": "request_skill_selection", "plans": planner.audit(),
+                "calls": [c for c in calls if c.get('pass') == 'skill_selection'],
+                "attempts": [a for a in attempts if a.get('pass') == 'skill_selection']},
             "input_manifest": [{"chunk_id": c.chunk_id,
                 "sha256": hashlib.sha256(json.dumps(c.to_dict(), ensure_ascii=False,
                     sort_keys=True, default=str).encode('utf-8')).hexdigest()} for c in chunks],
-            "entity_candidates": sum(len(es) for _, es in discovered), "relation_candidates": 0,
+            "entity_candidates": sum(len(es) for _, es in discovered) + sum(a.get('type') == 'candidate_rejected' for a in attempts), "relation_candidates": 0,
+            "candidate_selection": {"rejected_entities": sum(a.get('type') == 'candidate_rejected' for a in attempts)},
             "accepted_entities": len(final_entities), "accepted_relations": 0, "property_enrichment": property_stats,
             "mapping_mode": "enforce" if apply_mapping_threshold else "annotate",
             "repair_rounds": rounds, "repair_stop_reason": repair_stop_reason, "llm_calls": len(calls)},

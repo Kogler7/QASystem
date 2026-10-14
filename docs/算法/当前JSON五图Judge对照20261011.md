@@ -1,3 +1,9 @@
+---
+noteId: "e165a9d6c5fd11f192edfbc308186266"
+tags: []
+
+---
+
 # 当前 JSON/API 五图 Judge 同图谱对照（2026-10-11）
 
 本报告补充 [Judge 根因与修复探索](评测Judge根因与修复20261011.md)，使用**不同的新预测图谱**，不得与旧 3392 对实验混算。审阅只比较 prediction、golden 的属性和保存的判分结果，不访问原文、不重跑抽取、不改 golden。标签为 agent provisional，未有独立人类 ground truth。没有更改生产 Judge 默认或追加 named 实验。

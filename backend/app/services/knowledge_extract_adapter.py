@@ -63,7 +63,7 @@ _SPREADSHEET_TYPES = frozenset({"csv", "excel", "xls", "xlsx"})
 #: terminal ``repair_*`` or ``verification`` attempt is not attributed to a
 #: chunk because it is a document-level concern.
 _FATAL_ATTEMPT_TYPES = frozenset(
-    {"incomplete", "empty", "timeout", "request", "json", "schema", "schema_validation"}
+    {"incomplete", "empty", "timeout", "request", "json", "schema", "schema_validation", "input_budget", "call_budget"}
 )
 #: Only the entity pass is load-bearing -- if it fails there is genuinely
 #: nothing to report.  Every other pass *adds* to a result that already
@@ -73,7 +73,7 @@ _FATAL_ATTEMPT_TYPES = frozenset(
 #: extracted, which is why an ontology with fewer classes (nothing left for
 #: the relation pass to find) appeared to extract nothing at all.
 _NON_FATAL_PASSES = frozenset(
-    {"property", "relation", "repair_entity", "repair_relation", "verification"}
+    {"property", "property_verification", "entity_verification", "relation", "repair_entity", "repair_relation", "verification"}
 )
 
 
@@ -93,7 +93,7 @@ def publish_best_effort_graph() -> bool:
     return value not in {"0", "false", "no"}
 
 
-def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
+def _quality_summary(result: dict[str, Any], *, version: str | None = None) -> dict[str, Any]:
     """Keep aggregate verification visible across the per-chunk adapter."""
     profile = result.get("profile") or {}
     verification = result.get("verification") or {}
@@ -108,6 +108,8 @@ def _quality_summary(result: dict[str, Any]) -> dict[str, Any]:
     graph_publishable = verification.get("valid") is not False and status not in {
         "failed",
     }
+    if (version or result.get('extract_version')) == 'v3.1' and status != 'succeeded':
+        graph_publishable = False
     if not graph_publishable and status == "succeeded":
         # 校验未过的图谱不得标 succeeded：降级为 partial，与 best-effort 发布语义一致。
         status = "partial"
@@ -533,6 +535,7 @@ def project_items(
     texts: Sequence[str],
     ranges: Sequence[Sequence[int] | None] | None = None,
     metadata: Sequence[dict[str, Any] | None] | None = None,
+    version: str | None = None,
 ) -> list[dict[str, Any]]:
     """Project the document-level V2 result back onto one item per chunk."""
     total = len(texts)
@@ -597,7 +600,7 @@ def project_items(
     warnings = result.get("warnings") or []
     profile = result.get("profile") or {}
     raw = result.get("raw") or {}
-    quality = _quality_summary(result)
+    quality = _quality_summary(result, version=version)
 
     items: list[dict[str, Any]] = []
     for position in range(total):
@@ -746,7 +749,7 @@ def extract_chunks(
             }
             for position, text in enumerate(chunks)
         ]
-    return project_items(result, texts=chunks, ranges=ranges, metadata=metadata)
+    return project_items(result, texts=chunks, ranges=ranges, metadata=metadata, version=version)
 
 
 def run_single_document(

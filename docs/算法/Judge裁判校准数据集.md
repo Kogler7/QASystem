@@ -1,3 +1,9 @@
+---
+noteId: "42a0f170c55211f192edfbc308186266"
+tags: []
+
+---
+
 # Judge 裁判校准数据集
 
 第一版位于 `test_data/judge/v1/`，用于验证裁判能否客观判断预测与给定 golden 的匹配关系。golden 是题目给定参照，本基准不要求证明其业务真值、完整性或抽取质量。判定规则沿用 `eval/run.py` 的 `_build_judge_messages`。

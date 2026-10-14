@@ -34,8 +34,36 @@ def fixtures(version):
     return plan, catalog, schema
 
 
+def assert_v31_entity_only(text):
+    """Retired relation cases now assert the supported entity-only contract."""
+    from algorithm.knowledge_extract.v3_1 import extract_split
+    from algorithm.knowledge_extract.v3_1.chunk_context import ExtractionChunk
+    from algorithm.knowledge_extract.v3_1.ontology_compiler import compile_plan
+    plan = compile_plan(ONTOLOGY)
+    assert set(plan.output_schemas) == {'entity_candidates'}
+    operations = []
+    def llm(messages):
+        user = json.loads(messages[1]['content'])
+        operations.append(user['task']['operation'])
+        if user['task']['operation'] == 'skill_selection':
+            return json.dumps({'status': 'no_match', 'skill_refs': [],
+                               'reason': '通用实体本体，无匹配领域技能'}, ensure_ascii=False)
+        return json.dumps({'type': 'Agent', 'mention': '部门', 'properties': {},
+                           'evidence': {'quote': '部门'}}, ensure_ascii=False)
+    result = extract_split(ONTOLOGY, [ExtractionChunk('body', text)], llm=llm)
+    assert result['status'] == 'succeeded'
+    assert result['raw']['entities']
+    assert result['raw']['relations'] == result['graph']['relationships'] == []
+    assert result['intermediate_model']['relations'] == result['triples'] == []
+    assert operations == ['skill_selection', 'entity']
+    assert not result['verification']['repairable_issue_count']
+
+
 @pytest.mark.parametrize('version', VERSIONS)
 def test_missing_constraint_skipped_without_widening_or_mutating_inputs(version):
+    if version == 'v3_1':
+        assert_v31_entity_only('通知适用于部门。')
+        return
     plan, catalog, schema = fixtures(version)
     issues = [issue(), issue('APPLIES_TO')]
     snapshot = copy.deepcopy((catalog, issues, schema, plan.output_schemas))
@@ -52,6 +80,9 @@ def test_missing_constraint_skipped_without_widening_or_mutating_inputs(version)
 
 @pytest.mark.parametrize('version', VERSIONS)
 def test_valid_endpoint_after_25_is_visible_and_executable(version):
+    if version == 'v3_1':
+        assert_v31_entity_only('合规要求适用于部门。' + '部门。' * 27)
+        return
     plan, catalog, _ = fixtures(version)
     catalog += [{'id': f'entity-{i}', 'type': 'Agent', 'name': str(i), 'properties': {}} for i in range(2, 26)]
     catalog += [{'id': 'entity-26', 'type': 'Constraint', 'name': '合规要求', 'properties': {}}]
@@ -99,6 +130,9 @@ def test_existing_enum_never_expanded_even_with_both_endpoint_types():
 
 @pytest.mark.parametrize('version', VERSIONS)
 def test_builtin_repair_skips_impossible_request_and_preserves_unresolved_gap(version, monkeypatch):
+    if version == 'v3_1':
+        assert_v31_entity_only('通知适用于部门。')
+        return
     root = 'algorithm.knowledge_extract.' + version
     se = importlib.import_module(root + '.split_extractor')
     verification = importlib.import_module(root + '.verification')

@@ -66,6 +66,41 @@ def _judge(client):
     return run._judge_one_batch(client, "entity_matches", [{"type": "T", "name": "x"}], [{"type": "T", "name": "x"}], 0)
 
 
+@pytest.mark.parametrize('hint,expected', [('10',10.0), ('10000',60.0), ('NaN',2.0), ('-4',0.5)])
+def test_transient_transport_retries_same_format_with_bounded_delay(monkeypatch, hint, expected):
+    calls, delays = [], []
+    def request(url, **kwargs):
+        calls.append(json.loads(kwargs['data']))
+        if len(calls)==1:
+            return 502, {'Retry-After':hint}, b'{"error":{"message":"private provider error"}}'
+        return 200, {}, json.dumps(_reply()).encode()
+    monkeypatch.setattr(run,'http_request',request)
+    monkeypatch.setattr(run.time,'sleep',delays.append)
+    client=_client(transport_attempts=3,timeout=300)
+    pairs, info=_judge(client)
+    assert pairs==[] and calls[0]==calls[1]
+    assert delays==[expected]
+    assert info['attempts'][0]['transport_retries']==[{'http_status':502,'retry_delay_seconds':expected}]
+    assert 'private provider' not in json.dumps(info)
+    assert client.clone().transport_attempts==3
+
+
+def test_exhausted_transient_retries_are_not_valid_scores(monkeypatch):
+    calls=_stub_http(monkeypatch, [(503,{'error':{'message':'private'}})]*3)
+    monkeypatch.setattr(run.time,'sleep',lambda _:None)
+    with pytest.raises(run.JudgeBatchError):
+        _judge(_client(transport_attempts=3))
+    assert len(calls)==3
+
+
+@pytest.mark.parametrize('status',[400,401,403])
+def test_transport_retry_never_retries_authentication_or_general_rejection(monkeypatch,status):
+    calls=_stub_http(monkeypatch, [(status,{'error':{'message':'private'}})])
+    with pytest.raises(run.JudgeBatchError):
+        _judge(_client(transport_attempts=3))
+    assert len(calls)==1
+
+
 def _prompt_items(messages):
     prompt = messages[1]["content"]
     golden_json = prompt.split("## golden items\n", 1)[1].split("\n\n## predicted items", 1)[0]
@@ -196,7 +231,8 @@ def test_incomplete_or_filtered_responses_fail_even_with_valid_json(monkeypatch,
 
 @pytest.mark.parametrize("data", [
     {}, {"entity_matches": [], "explanation": "extra"}, {"entity_matches": None},
-    {"entity_matches": {}}, {"entity_matches": [[0, 0]]},
+    {"entity_matches": {}},
+    *[{"entity_matches": [pair]} for pair in ([0], [0, 0, 1], [True, 0], ["0", 0], [-1, 0], [0.0, 0])],
     {"entity_matches": [{"golden_index": 0}]},
     {"entity_matches": [{"golden_index": 0, "predicted_index": 0, "confidence": 1}]},
     *[{"entity_matches": [{"golden_index": value, "predicted_index": 0}]} for value in (True, False, "0", 0.0, -1, None)],
@@ -698,3 +734,27 @@ def test_empty_property_value_counts_as_missing_not_conflict(monkeypatch):
     )
     assert requests == []
     assert metrics["entities"]["tp"] == 1
+
+
+def test_exact_integer_array_pairs_normalize_without_semantic_changes(monkeypatch):
+    _stub_http(monkeypatch, [_reply('{"entity_matches": [[0, 0]]}')])
+    pairs, info = _judge(_client())
+    assert pairs == [(0, 0)]
+    assert info['attempts'][0]['normalized_index_pairs'] == 1
+
+
+def test_array_pair_out_of_window_still_fails(monkeypatch):
+    _stub_http(monkeypatch, [_reply('{"entity_matches": [[0, 1]]}')])
+    with pytest.raises(run.JudgeBatchError, match='超出当前窗口'):
+        _judge(_client())
+
+
+def test_display_name_preserves_identity_when_business_name_differs():
+    graph = {'nodes': [
+        {'uid': 'A', 'type': 'T', 'display_name': '甲', 'properties': {'name': '业务名称'}},
+        {'uid': 'B', 'type': 'T', 'display_name': '乙', 'properties': {'name': '业务名称'}},
+    ], 'relationships': [{'from_uid': 'A', 'to_uid': 'B', 'type': 'LINK'}]}
+    entities, relations = run.normalize_graph(graph)
+    assert [e['name'] for e in entities] == ['甲', '乙']
+    assert all(e['properties']['name'] == '业务名称' for e in entities)
+    assert (relations[0]['from_name'], relations[0]['to_name']) == ('甲', '乙')

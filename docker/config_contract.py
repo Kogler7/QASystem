@@ -43,11 +43,27 @@ def reader_contracts(root):
     return contracts
 
 
+def git_ignored(root, paths):
+    """被 .gitignore 忽略的路径不参与门禁：它们是本地实验副本，不进 Git 与交付包。"""
+    rel = sorted({p.relative_to(root).as_posix() for p in paths})
+    if not rel or not (root / '.git').exists():
+        return set()
+    done = subprocess.run(['git', 'check-ignore', '--no-index', '-z', '--stdin'],
+                          cwd=root, input='\0'.join(rel), capture_output=True, text=True, timeout=30)
+    if done.returncode not in (0, 1):
+        return set()
+    return {entry for entry in done.stdout.split('\0') if entry}
+
+
 def files(root):
-    for directory in APPLICATION_DIRS:
-        for path in (root / directory).rglob('*.py'):
-            if 'tests' not in path.relative_to(root).parts:
-                yield path
+    root = Path(root)
+    candidates = [path for directory in APPLICATION_DIRS
+                  for path in (root / directory).rglob('*.py')
+                  if 'tests' not in path.relative_to(root).parts]
+    ignored = git_ignored(root, candidates)
+    for path in candidates:
+        if path.relative_to(root).as_posix() not in ignored:
+            yield path
 
 
 def check(root, *, deployed=False):

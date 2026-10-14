@@ -216,5 +216,9 @@ eval_api.md
 # 本地备份（不提交）
 algorithm/knowledge_extract/v2/backups/
 
+# v4 本地实验副本（不进 Git、不进交付源码包；配置声明门禁跳过被 Git 忽略的路径）
+algorithm/knowledge_extract/v4/
+docker/config-releases/v4.json
+
 # Mutable deployment configuration and credential-bearing backups
 runtime-config/

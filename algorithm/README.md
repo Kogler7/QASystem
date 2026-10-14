@@ -28,7 +28,7 @@ tags: []
 | `knowledge_extract/latest/` | `latest` 实体包：当前主版本代码副本，不是 v3 的软链/映射 |
 | `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
-| `knowledge_extract/v3_1/` | 通用语义 harness，作为 `v3.1` 运行：主模型生成候选、Clef 做语义裁决、疑难项定向升级；输入输出契约同 V2 |
+| `knowledge_extract/v3_1/` | 实体与属性抽取：同一 LLM 分阶段生成、证据核验及定向修复；关系固定为空，未接入 Clef |
 | `embedding_runtime.py` | 文本向量化运行时（本地模型 / 远程服务自动选择） |
 | `knowledge_precipitation.py` | 图谱沉淀总编排（解析→切片→抽取→向量化→入库） |
 | `term_vector/` | Term 语义向量索引的构建与检索 |
@@ -120,7 +120,7 @@ tags: []
 | `knowledge_extract/latest/` | `latest` 实体包：当前主版本代码副本，不是 v3 的软链/映射 |
 | `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
-| `knowledge_extract/v3_1/` | 通用语义 harness，作为 `v3.1` 运行：主模型生成候选、Clef 做语义裁决、疑难项定向升级；输入输出契约同 V2 |
+| `knowledge_extract/v3_1/` | 实体与属性抽取：同一 LLM 分阶段生成、证据核验及定向修复；关系固定为空，未接入 Clef |
 
 Backend `graph.extract` 与 MCP `kg_extract_v2` 通过
 `backend/app/services/knowledge_extract_adapter.py` 调用上述 shim。
@@ -130,7 +130,7 @@ Backend `graph.extract` 与 MCP `kg_extract_v2` 通过
 - `v2` / `v3` / `v3.1`：固定跑对应版本，便于算法版本对比评测；
 - `jev`：运行 `knowledge_extract/jev_extract`，默认关闭，不改变 `latest`。
 
-V2/V3/V3.1 都返回文档聚合结果，其中 V3.1 使用主模型与 Clef 分阶段语义处理；adapter 再按每 chunk 的证据锚点把结果投影回 V1 的逐 chunk 契约，因此上层代码无需随版本切换而改动。
+V2/V3/V3.1 都返回文档聚合结果，其中 V3.1 使用同一 LLM 分阶段抽取和证据核验，仅输出实体与属性；adapter 再按每 chunk 的证据锚点把结果投影回 V1 的逐 chunk 契约，因此上层代码无需随版本切换而改动。
 
 ---
 

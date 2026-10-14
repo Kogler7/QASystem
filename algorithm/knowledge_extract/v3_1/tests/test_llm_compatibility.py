@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
-from algorithm.knowledge_extract.v3_1.llm_client import OpenAICompatibleLLM, _is_deepseek_v4_flash
+from algorithm.knowledge_extract.v3_1.llm_client import OpenAICompatibleLLM, _is_deepseek_v4_flash, create_llm_client
 
 
 class _Completions:
@@ -53,6 +54,35 @@ SCHEMA = {
 
 
 class LLMCompatibilityTests(unittest.TestCase):
+    def test_factory_keeps_generation_sampling_out_of_sdk_constructor(self):
+        # The factory is exercised without inheriting workstation proxy/auth
+        # settings; this test never contacts the configured endpoint.
+        with patch.dict('os.environ', {'KG_EXTRACT_V31_GENERATION_TEMPERATURE': '0.7'}, clear=True):
+            llm = create_llm_client(base_url='http://127.0.0.1:18090/v1',
+                api_key='not-needed', model='deepseek-v4-flash-0731')
+        self.assertEqual(llm.generation_temperature, 0.7)
+        client = _Client()
+        llm.client.close()
+        llm.client = client
+        llm.generate_structured(SCHEMA, [{'role': 'user', 'content': 'source'}], {'pass_name': 'entity'})
+        self.assertEqual(client.chat.completions.calls[0]['temperature'], 0.7)
+
+    def test_generation_temperature_does_not_change_verification_or_selection(self):
+        client = _Client()
+        llm = OpenAICompatibleLLM(client, model='deepseek-v4-flash-0731',
+            max_tokens=128, disable_thinking=True, generation_temperature=0.7)
+        stages = ('entity', 'repair_entity', 'property', 'repair_property',
+                  'candidate_identity', 'entity_verification', 'property_verification', 'skill_selection')
+        for stage in stages:
+            llm.generate_structured(SCHEMA, [{'role': 'user', 'content': 'source'}], {'pass_name': stage})
+        self.assertEqual([c['temperature'] for c in client.chat.completions.calls], [0.7]*5+[0]*3)
+
+    def test_invalid_generation_temperature_fails_before_network(self):
+        for value in (-0.1, 2.1, float('nan'), float('inf')):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                OpenAICompatibleLLM(_Client(), model='x', max_tokens=1,
+                    disable_thinking=True, generation_temperature=value)
+
     @staticmethod
     def _llm(client, *, base_url: str, model: str = "deepseek-v4-flash"):
         return OpenAICompatibleLLM(

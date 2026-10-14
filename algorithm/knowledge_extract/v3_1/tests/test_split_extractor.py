@@ -16,6 +16,8 @@
 """
 from __future__ import annotations
 
+from .stub_llm import source_documents
+
 import json
 import unittest
 from .. import ontology_schema
@@ -164,8 +166,10 @@ class TwoPassPipelineTest(unittest.TestCase):
         # 证据覆盖
         self.assertEqual(result["evidence_coverage"]["entities"]["rate"], 1.0)
         self.assertEqual(result["evidence_coverage"]["relations"]["rate"], 1.0)
-        # 实体 -> 属性 -> 关系候选 -> 独立关系语义核验
-        self.assertEqual([task for task, _ in llm.calls], ["entity", "property", "evidence_verification", "property", "evidence_verification", "property", "evidence_verification"])
+        # 实体 -> 按类型批量补全 -> 每个实体独立属性核验
+        stages = [task for task, _ in llm.calls]
+        self.assertEqual(stages[:2], ["skill_selection", "entity"])
+        self.assertCountEqual(stages[2:], ["property", "evidence_verification", "property", "evidence_verification"])
         # 无 schema/证据告警
         self.assertEqual(result["warnings"], [])
         self.assertIsNone(result["error_code"])
@@ -221,8 +225,8 @@ class "术语" as Terminology <<KnowledgeUnit>> {
         self.assertEqual(len([t for t, _ in llm.calls if t == "property"]), 1)
         import json
         payload = json.loads(next(p for t, p in llm.calls if t == "property"))
-        self.assertEqual([d["text"] for d in payload["documents"]], [c.text for c in chunks])
-        self.assertEqual(len(payload["stage_context"]["known_entities"][0]["occurrences"]), 2)
+        self.assertEqual([part['text'] for part in source_documents(payload)], [c.text for c in chunks])
+        self.assertEqual(len(payload["task"]["known_entities"][0]["occurrences"]), 2)
 
     def test_out_of_scope_entity_rejected(self) -> None:
         # 重构后 entity pass 的 output schema enum 已限定在目标范围内，范围外类型
@@ -309,7 +313,7 @@ class BenchmarkSmokeTest(unittest.TestCase):
         def entity_handler(prompt: str, chunk: dict) -> list[dict]:
             return [span_item("OperationalActivity", mention) for mention in mentions]
 
-        llm = StubLLM(entity_handler=entity_handler)
+        llm = StubLLM(entity_handler=entity_handler, verification_handler=lambda item, chunk: 'yes')
         result = SE.extract_split(
             ontology,
             chunks=[CC.ExtractionChunk(chunk_id="chunk-0", text=text)],

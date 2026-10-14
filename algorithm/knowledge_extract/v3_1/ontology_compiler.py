@@ -82,6 +82,7 @@ class ClassSpec:
     properties: tuple[PropertySpec, ...] = ()
     identity_properties: tuple[str, ...] = ()
     is_abstract: bool = False
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -524,25 +525,20 @@ def _compile_class_specs(
         )
         inherited_properties: list[PropertySpec] = []
         seen_identifiers = {prop.identifier for prop in own_properties}
-        for parent in schema.parents.get(identifier, ()):
-            parent_class = schema.resolve_class(parent)
-            if parent_class is None:
+        # Use the parser's effective property order/override rules at every depth.
+        # Walking only direct parents silently drops grandparent requirements.
+        for prop in schema._properties_for(identifier):
+            if prop.identifier in seen_identifiers:
                 continue
-            for prop in parent_class.properties:
-                if prop.identifier in seen_identifiers:
-                    continue
-                seen_identifiers.add(prop.identifier)
-                inherited_properties.append(
-                    PropertySpec(
-                        identifier=prop.identifier,
-                        display_name=prop.display_name,
-                        data_type=prop.data_type,
-                        source_class=parent,
-                        comment=prop.comment,
-                        inherited=True,
-                        required=True if is_required(identifier, prop.identifier) else None,
-                    )
-                )
+            seen_identifiers.add(prop.identifier)
+            owner = next(c.identifier for c in schema.classes
+                         if any(p is prop for p in c.properties))
+            inherited_properties.append(PropertySpec(
+                identifier=prop.identifier, display_name=prop.display_name,
+                data_type=prop.data_type, source_class=owner, comment=prop.comment,
+                inherited=True,
+                required=True if is_required(identifier, prop.identifier) else None,
+            ))
         specs[identifier] = ClassSpec(
             class_id=identifier,
             display_name=ontology_class.display_name,
@@ -552,6 +548,7 @@ def _compile_class_specs(
             properties=own_properties + tuple(inherited_properties),
             identity_properties=schema.identity_properties_for(identifier),
             is_abstract=ontology_class.is_abstract,
+            description=ontology_class.description,
         )
     return specs
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
@@ -196,9 +197,22 @@ class ChunkContextManager:
             return None
         pattern = r"\s+".join(re.escape(part) for part in quote.split(" "))
         match = re.search(pattern, text)
+        if match is not None:
+            return match.start(), match.end()
+        # PDF text often contains compatibility glyphs (e.g. ⽂ / 文). Map
+        # equivalent characters back to original offsets; never rewrite source
+        # text or accept a semantically similar but different quotation.
+        normalized, offsets = [], []
+        for index, char in enumerate(text):
+            for mapped in unicodedata.normalize('NFKC', char):
+                normalized.append(mapped)
+                offsets.append(index)
+        normalized_quote = _WS.sub(' ', unicodedata.normalize('NFKC', quote)).strip()
+        pattern = r'\s+'.join(re.escape(part) for part in normalized_quote.split(' '))
+        match = re.search(pattern, ''.join(normalized)) if normalized_quote else None
         if match is None:
             return None
-        return match.start(), match.end()
+        return offsets[match.start()], offsets[match.end() - 1] + 1
 
     def evidence_text(
         self,
