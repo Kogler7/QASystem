@@ -10,3 +10,9 @@ test_data/eval-v31-20261014/**/*.md text eol=lf
 test_data/eval-v31-20261014/**/*.puml text eol=lf
 test_data/eval-v31-20261014/**/*.jsonl text eol=lf
 test_data/eval-v31-20261014/**/*.txt text eol=lf
+
+test_data/eval-v31-20261014.2/**/*.json text eol=lf
+test_data/eval-v31-20261014.2/**/*.md text eol=lf
+test_data/eval-v31-20261014.2/**/*.puml text eol=lf
+test_data/eval-v31-20261014.2/**/*.jsonl text eol=lf
+test_data/eval-v31-20261014.2/**/*.txt text eol=lf

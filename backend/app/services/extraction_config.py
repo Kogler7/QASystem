@@ -121,7 +121,7 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         raise ValueError('Unsupported extraction version')
     if version == 'jev' and has_overrides(options):
         raise ValueError('Request configuration overrides do not support jev')
-    package = {'v2.1': 'v2_1', 'v2.2': 'v2_2', 'v3.1': 'v3_1', 'jev': 'v2'}.get(version, version)
+    package = {'v2.1': 'v2_1', 'v2.2': 'v2_2', 'v2.2-v31': 'v2_2_v31', 'v3.1': 'v3_1', 'jev': 'v2'}.get(version, version)
     defaults = importlib.import_module(f'algorithm.knowledge_extract.{package}.config').get_llm_policy()
     provider = options.get('provider') or 'default'
     routed = resolve_service('extract', registry=document, revision=revision,

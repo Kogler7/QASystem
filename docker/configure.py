@@ -436,7 +436,7 @@ class Configuration:
         for purpose in self.routes:
             try: resolve_service(purpose, registry=proposed)
             except ValueError as exc: errors.append(str(exc))
-        if self.values.get("KG_EXTRACT_ALGO_VERSION") not in {"latest", "v0", "v2", "v2.1", "v2.2", "v3", "v3.1", "jev"}:
+        if self.values.get("KG_EXTRACT_ALGO_VERSION") not in {"latest", "v0", "v2", "v2.1", "v2.2", "v2.2-v31", "v3", "v3.1", "jev"}:
             errors.append("抽取算法版本无效")
         a, b = self.values.get("KG_EXTRACT_LLM_MAX_TOKENS"), self.values.get("KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS")
         if a and b and a != b: errors.append("MAX_TOKENS 与 MAX_OUTPUT_TOKENS 必须一致（或后者留空）")

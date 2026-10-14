@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.8",
+  "version": "2026.10.14.9",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -771,6 +771,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_TIMEOUT_SECONDS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TIMEOUT_SECONDS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TIMEOUT_SECONDS"
         }
       ],
       "fallbacks": [
@@ -901,6 +911,16 @@
           "path": "docker/configure.py",
           "kind": "external",
           "token": "KG_EXTRACT_LLM_MAX_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_TOKENS"
         }
       ],
       "fallbacks": [
@@ -951,6 +971,11 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
         }
@@ -1086,6 +1111,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_DISABLE_THINKING"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_DISABLE_THINKING"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_DISABLE_THINKING"
         }
       ],
       "fallbacks": [
@@ -1148,6 +1183,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_ENABLED"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_ENABLED"
         }
       ],
       "fallbacks": [
@@ -1192,6 +1232,11 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_MODEL_PATH"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_MODEL_PATH"
         }
@@ -1240,6 +1285,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_ACCEPT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_ACCEPT"
         }
       ],
       "fallbacks": [
@@ -1284,6 +1334,11 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_REJECT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_REJECT"
         }
@@ -1332,6 +1387,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_CHOICE_CONFIDENCE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_CHOICE_CONFIDENCE"
         }
       ],
       "fallbacks": [
@@ -1378,6 +1438,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_PRECISION"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_PRECISION"
         }
       ],
       "fallbacks": [
@@ -1422,6 +1487,11 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_BATCH_QUESTIONS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_BATCH_QUESTIONS"
         }
@@ -1504,6 +1574,11 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_IDENTITY_ADMISSION"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_IDENTITY_ADMISSION"
         }
@@ -2290,6 +2365,11 @@
         {
           "path": "eval/run.py",
           "kind": "external",
+          "token": "NANOJEV_SERVICE_URL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/jev_client.py",
+          "kind": "read",
           "token": "NANOJEV_SERVICE_URL"
         }
       ],
@@ -3142,6 +3222,11 @@
           "path": "docker/configure.py",
           "kind": "external",
           "token": "CUDA_VISIBLE_DEVICES"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/jev_client.py",
+          "kind": "read",
+          "token": "CUDA_VISIBLE_DEVICES"
         }
       ],
       "fallbacks": [
@@ -3975,6 +4060,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_ENABLED"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_ENABLED"
         }
       ],
       "fallbacks": [
@@ -3992,6 +4082,11 @@
       "consumers": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_ACCEPT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_ACCEPT"
         }
@@ -4013,6 +4108,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_MAX_QUESTIONS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_MAX_QUESTIONS"
         }
       ],
       "fallbacks": [
@@ -4030,6 +4130,11 @@
       "consumers": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_TIMEOUT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_TIMEOUT"
         }
@@ -4051,6 +4156,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_MAX_CALLS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_MAX_CALLS"
         }
       ],
       "fallbacks": [
@@ -4070,6 +4180,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_STATE_CHARS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_STATE_CHARS"
         }
       ],
       "fallbacks": [
@@ -4087,6 +4202,11 @@
       "consumers": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_MAX_INFLIGHT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_MAX_INFLIGHT"
         }
@@ -4394,6 +4514,11 @@
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_MAX_INPUT_BYTES"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_MAX_INPUT_BYTES"
         }
       ],
       "fallbacks": [
@@ -4413,6 +4538,11 @@
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_WINDOW_CHARS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_WINDOW_CHARS"
         }
       ],
       "fallbacks": [
@@ -4430,6 +4560,11 @@
       "consumers": [
         {
           "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_TRACE_CALLS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_TRACE_CALLS"
         }
@@ -4464,6 +4599,11 @@
           "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE"
         }
       ],
       "fallbacks": [
@@ -4481,6 +4621,11 @@
       "consumers": [
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_GENERATION_TEMPERATURE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_GENERATION_TEMPERATURE"
         }
@@ -4502,6 +4647,11 @@
           "path": "algorithm/knowledge_extract/v3_1/task_runtime.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_MAX_CALLS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/task_runtime.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_MAX_CALLS"
         }
       ],
       "fallbacks": [
@@ -4521,6 +4671,11 @@
           "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT"
         }
       ],
       "fallbacks": [
@@ -4538,6 +4693,11 @@
       "consumers": [
         {
           "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE"
         }
@@ -4993,6 +5153,54 @@
       "config_getenv('KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE', str(limit))"
     ],
     "algorithm/knowledge_extract/v3_1/task_runtime.py": [
+      "config_getenv('KG_EXTRACT_V31_MAX_CALLS', '512')"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/config.py": [
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
+      "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
+      "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
+      "config_getenv(k)",
+      "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
+      "_env('KG_EXTRACT_V22_CLEF_ENABLED', default='0')",
+      "_env('KG_EXTRACT_JEV_ACCEPT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_REJECT', default='0.9')",
+      "_env('KG_EXTRACT_JEV_CHOICE_CONFIDENCE', default='0.9')",
+      "_env('KG_EXTRACT_JEV_BATCH_QUESTIONS', default='32')",
+      "_env('KG_EXTRACT_JEV_MODEL_PATH', default='/models/nanojev')",
+      "_env('KG_EXTRACT_V22_CLEF_ACCEPT', default='0.9')",
+      "_env('KG_EXTRACT_V22_CLEF_MAX_QUESTIONS', default='16')",
+      "_env('KG_EXTRACT_V22_CLEF_TIMEOUT', default='10')",
+      "_env('KG_EXTRACT_V22_CLEF_MAX_CALLS', default='512')",
+      "_env('KG_EXTRACT_V22_CLEF_STATE_CHARS', default='800')",
+      "_env('KG_EXTRACT_V22_CLEF_MAX_INFLIGHT', default='2')",
+      "_env('KG_EXTRACT_JEV_ENABLED', default='0')"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/jev_client.py": [
+      "config_getenv('CUDA_VISIBLE_DEVICES', '')",
+      "config_getenv('NANOJEV_SERVICE_URL', '')"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py": [
+      "config_getenv('KG_EXTRACT_V31_TRACE_CALLS', '32')",
+      "config_getenv('KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT', 'false')"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py": [
+      "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
+      "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
+      "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
+      "config_getenv(k)",
+      "_env('KG_EXTRACT_V31_GENERATION_TEMPERATURE', default='0')"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py": [
+      "config_getenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '16')",
+      "config_getenv('KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE', str(limit))"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py": [
+      "config_getenv('KG_EXTRACT_LLM_MAX_INPUT_TOKENS')",
+      "config_getenv('KG_EXTRACT_V31_MAX_INPUT_BYTES', '48000')",
+      "config_getenv('KG_EXTRACT_V31_WINDOW_CHARS', '2000')"
+    ],
+    "algorithm/knowledge_extract/v2_2_v31/entity_stage/task_runtime.py": [
       "config_getenv('KG_EXTRACT_V31_MAX_CALLS', '512')"
     ]
   },

@@ -371,3 +371,11 @@ def test_http_submission_reports_adaptive_document_timeout(providers, protocol_m
     effective = response.json()["data"]["quality"]["effective_config"]
     assert effective["document_timeout"] == pytest.approx(config.adaptive_document_timeout(4509, 1))
     assert effective["document_timeout"] > config.DOCUMENT_TIMEOUT_FLOOR
+
+
+def test_hybrid_version_uses_registered_service_without_legacy_connection(providers, monkeypatch):
+    monkeypatch.setenv('KG_EXTRACT_LLM_BASE_URL', 'http://retired.invalid')
+    chosen = config.resolve_config({'version': 'v2.2-v31'})
+    assert chosen['version'] == 'v2.2-v31'
+    assert chosen['base_url'] != 'http://retired.invalid'
+    assert chosen['service_snapshot']['service_id'] == chosen['model_service']

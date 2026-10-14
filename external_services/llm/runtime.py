@@ -9,43 +9,122 @@ from contextlib import contextmanager
 import threading
 import time
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Iterable
 
 from algorithm.token_budget import check_input_budget
+
+# DeepSeek-style account tiers: (max input tokens, RPM, TPM for input+output).
+# Applied only when the matching configured QPM/TPM limit is enabled (>0).
+DEFAULT_RATE_TIERS: tuple[tuple[int, int, int], ...] = (
+    (8192, 56, 460_000),
+    (16_384, 26, 420_000),
+    (32_768, 11, 350_000),
+    (65_536, 4, 280_000),
+)
+
+
+def select_rate_tier(
+    input_tokens: int,
+    tiers: Iterable[tuple[int, int, int]] = DEFAULT_RATE_TIERS,
+) -> tuple[int, int]:
+    """Return (rpm, tpm) for the smallest tier that covers ``input_tokens``."""
+    ordered = tuple(tiers) or DEFAULT_RATE_TIERS
+    for limit, rpm, tpm in ordered:
+        if input_tokens <= limit:
+            return rpm, tpm
+    return ordered[-1][1], ordered[-1][2]
+
+
+def effective_rate_limits(
+    *,
+    qpm: int,
+    tpm: int,
+    input_tokens: int,
+    tiers: Iterable[tuple[int, int, int]] = DEFAULT_RATE_TIERS,
+) -> tuple[int, int]:
+    """Tighten configured QPM/TPM by the input-size tier when that limit is on."""
+    tier_rpm, tier_tpm = select_rate_tier(max(0, int(input_tokens)), tiers)
+    effective_qpm = min(qpm, tier_rpm) if qpm > 0 else 0
+    effective_tpm = min(tpm, tier_tpm) if tpm > 0 else 0
+    return effective_qpm, effective_tpm
+
 
 class QuotaPool:
     def __init__(self, limits: dict[str, Any]):
         self.condition = threading.Condition()
         self.active = 0
         self.starts: deque[float] = deque()
-        self.limits = {key: int(limits[key]) for key in ("max_concurrency", "qps", "qpm")}
+        self.token_starts: deque[tuple[float, int]] = deque()
+        self.limits = {
+            "max_concurrency": int(limits["max_concurrency"]),
+            "qps": int(limits["qps"]),
+            "qpm": int(limits["qpm"]),
+            "tpm": max(0, int(limits.get("tpm", 0))),
+        }
+        tiers = limits.get("rate_tiers")
+        self.rate_tiers = tuple(tiers) if tiers else DEFAULT_RATE_TIERS
 
     def tighten(self, limits: dict[str, Any]) -> None:
         # Aliases sharing a quota group cannot reset counters or loosen its cap.
         with self.condition:
-            for key, old in self.limits.items():
-                new = int(limits[key])
+            for key in ("max_concurrency", "qps", "qpm", "tpm"):
+                if key not in limits and key == "tpm":
+                    continue
+                old = self.limits[key]
+                new = int(limits[key]) if key in limits else old
                 self.limits[key] = min(old, new) if old and new else old or new
+            tiers = limits.get("rate_tiers")
+            if tiers:
+                self.rate_tiers = tuple(tiers)
             self.condition.notify_all()
 
+    def _prune(self, now: float) -> None:
+        while self.starts and now - self.starts[0] >= 60:
+            self.starts.popleft()
+        while self.token_starts and now - self.token_starts[0][0] >= 60:
+            self.token_starts.popleft()
+
     @contextmanager
-    def request_slot(self, deadline: float | None = None):
+    def request_slot(
+        self,
+        deadline: float | None = None,
+        *,
+        tokens: int = 0,
+        input_tokens: int | None = None,
+    ):
+        reserved = max(0, int(tokens))
+        sized = max(0, int(input_tokens if input_tokens is not None else reserved))
         with self.condition:
             while True:
                 now = time.monotonic()
                 if deadline is not None and now >= deadline:
                     raise TimeoutError("Extraction queue wait budget exhausted")
-                while self.starts and now - self.starts[0] >= 60:
-                    self.starts.popleft()
+                self._prune(now)
+                qpm_cap, tpm_cap = effective_rate_limits(
+                    qpm=self.limits["qpm"],
+                    tpm=self.limits["tpm"],
+                    input_tokens=sized,
+                    tiers=self.rate_tiers,
+                )
                 waits = []
-                for key, period in (("qps", 1), ("qpm", 60)):
-                    cap = self.limits[key]
+                for key, period, cap in (
+                    ("qps", 1, self.limits["qps"]),
+                    ("qpm", 60, qpm_cap),
+                ):
                     recent = [t for t in self.starts if now - t < period]
                     if cap and len(recent) >= cap:
                         waits.append(recent[-cap] + period - now)
+                if tpm_cap:
+                    recent_tokens = sum(count for stamp, count in self.token_starts if now - stamp < 60)
+                    if recent_tokens + reserved > tpm_cap and self.token_starts:
+                        waits.append(self.token_starts[0][0] + 60 - now)
+                    elif recent_tokens + reserved > tpm_cap:
+                        waits.append(0.05)
                 if self.active < self.limits["max_concurrency"] and not waits:
                     self.active += 1
                     self.starts.append(now)
+                    if reserved:
+                        self.token_starts.append((now, reserved))
                     break
                 wait = max(waits) if waits else None
                 if deadline is not None:
@@ -109,13 +188,23 @@ class ScheduledClient:
         acquired = None
         error_type = None
         try:
-            check_input_budget(kwargs, self.max_input_tokens)
+            estimate = check_input_budget(kwargs, self.max_input_tokens)
+            output_reserve = int(kwargs.get("max_tokens") or kwargs.get("max_output_tokens") or 0)
             from .service import check_service_budget
             check_service_budget(kwargs, self.__dict__.get('service_snapshot'))
             call_deadline = started + self.timeout
             if self.deadline is not None:
                 call_deadline = min(call_deadline, self.deadline)
-            with self.pool.request_slot(call_deadline):
+            # Distributed service pools only accept deadline/cancelled; local QuotaPool also meters TPM.
+            if self.__dict__.get("service_snapshot"):
+                slot = self.pool.request_slot(call_deadline)
+            else:
+                slot = self.pool.request_slot(
+                    call_deadline,
+                    tokens=estimate + max(0, output_reserve),
+                    input_tokens=estimate,
+                )
+            with slot:
                 acquired = time.monotonic()
                 remaining = call_deadline - acquired
                 if remaining <= 0:

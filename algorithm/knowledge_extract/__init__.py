@@ -5,6 +5,8 @@
 - ``v1/``：旧 batch 契约（batch / extractor / ontology_schema / scheduler / uml）
 - ``v2/``：V2 聚合流水线
 - ``v3/``：V3 聚合流水线
+- ``v2_2/``：v2.2 原流水线（配置值 ``v2.2``）
+- ``v2_2_v31/``：v2.2-v31（Stage1=v3.1 对齐实体 + Stage2=v2.2 关系，配置值 ``v2.2-v31``）
 - ``v3_1/``：主模型生成与 Clef 语义裁决的通用 harness（配置值为 ``v3.1``，契约同 V2）
 - ``latest/``：当前默认版本（独立代码副本）
 - ``jev_extract/``：latest 的实验副本，仅 ``KG_EXTRACT_ALGO_VERSION=jev`` 时进入

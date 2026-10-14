@@ -31,7 +31,7 @@
 # Directory Layout Constraints
 
 - `tests/`、`test_data/`、`eval/`、`tmp/` 不属于运行时应用源码，不得进入交付镜像或 `deploy/runtime` 源码包；`.dockerignore` 与 `package-deploy.ps1` 已将其排除。
-- `algorithm/knowledge_extract/v1/`、`v2/`、`v3/`、`v3_1/`（配置值 `v3.1`）、`latest/` 只保留算法代码与其单元测试（`v3_2`、`v3_3` 与旧 `v3_1` 实验实现已下线）：
+- `algorithm/knowledge_extract/v1/`、`v2/`、`v2_2/`（配置值 `v2.2`）、`v2_2_v31/`（配置值 `v2.2-v31`，Stage1=v3.1 对齐实体+Stage2=v2.2 关系）、`v3/`、`v3_1/`（配置值 `v3.1`）、`latest/` 只保留算法代码与其单元测试（`v3_2`、`v3_3` 与旧 `v3_1` 实验实现已下线）：
   - benchmark 数据集统一放 `test_data/`：`v2` 对应 `test_data/eval-v2/`，`v3` 对应 `test_data/eval-v3/`；golden、评测文档（PDF/MD）一律不得进入算法目录；
   - benchmark 评测/打分脚本统一放 `eval/`（统一入口 `eval/run.py`，直接评测线上链路；旧版 legacy 脚本已清理），算法目录下不得出现 `*_benchmark_eval.py`、`*_fixed_judge.py` 等评测脚本；
   - 评测辅助脚本放 `eval/tools/`（如 `v2_scripts/merge_official_results.py`）；

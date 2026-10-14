@@ -3,7 +3,7 @@
   "status": "experimental",
   "source_commit": "134ec99516220778a1cfab59ccbc459a12e55386",
   "baseline_workspace": "test_data/eval",
-  "purpose": "Isolate cyue-dev reparsed and rechunked inputs without replacing the existing evaluation baseline.",
+  "purpose": "Isolate revised trouble labels and workbook without replacing either frozen baseline.",
   "files_sha256": {
     "skill-routing.expected.json": "2e32181e29a6b117e9eed75b86d15ce52d5f395cbf2e91a7e762c0ca9ea87595",
     "judge-type-contract/manifest.json": "9129010944102ff3bef8a418e205008a1af9cd59d40b0b377dca235d149a4e5b",
@@ -149,11 +149,12 @@
     "trouble/trouble_01/chunks.json": "ab6a2cfc9034ccf612a6577410cad660ca19368f6406e4b9e22b998f9f4a6f15",
     "trouble/trouble_mini/chunks.json": "1ce74a116d3b8d4a6ebb1e4560194ac53452173fc600294299dc5ce729b80d99",
     "trouble/trouble_01/chunks/行修更换、互换记录50.json": "ab6a2cfc9034ccf612a6577410cad660ca19368f6406e4b9e22b998f9f4a6f15",
-    "trouble/trouble_01/docs/行修更换、互换记录50.xlsx": "e6d7219547411e28726857167dc97bee57c40cecf6e28b25c751cf8b593420d6",
-    "trouble/trouble_01/extract/golden.json": "79c793bc9d2acd84f1e22af27bb750c212a5bb4efa8eecec681255e830243832",
+    "trouble/trouble_01/docs/行修更换、互换记录50.xlsx": "1640ebd6f585c5fb1a72f8cf9cd627781903f659b265399763ab18c88a7748df",
+    "trouble/trouble_01/extract/golden.json": "5de9bb59e8b562923213fd9568b61ba330747ea64b309dd7e1ae4793296ec4ed",
     "trouble/trouble_mini/chunks/行修更换、互换记录50.json": "1ce74a116d3b8d4a6ebb1e4560194ac53452173fc600294299dc5ce729b80d99",
     "trouble/trouble_mini/docs/行修更换、互换记录50.xlsx": "32645930deefe41dbbad4d44e7fed898afc014ebbfccc29b7729a75614a6b075",
-    "trouble/trouble_mini/extract/golden.json": "9fac2434c62811f7de493c0db6c234dea8c7dbd66de831d0fbe905aabf32266b"
+    "trouble/trouble_mini/extract/golden.json": "425759f4ef21a33e946fcc1e2a074a0e2c9e15ba41b1f4d48fed96141d57cf3e"
   },
-  "byte_policy": "Text files are normalized to LF; source_files_sha256 retains exact source commit bytes."
+  "byte_policy": "Text files are normalized to LF; source_files_sha256 retains exact source commit bytes.",
+  "parent_workspace": "test_data/eval-v31-20261014"
 }
