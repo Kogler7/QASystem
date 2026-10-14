@@ -7,6 +7,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 import tempfile
 from typing import Any
 
@@ -124,11 +125,11 @@ class ShellTool:
         _work_dir: 命令执行工作目录。
         _timeout: 单次命令执行超时（秒）。
         _max_output_bytes: 输出截断阈值（字节）。
-        _mem_limit_mb: 子进程最大内存限制（MB），0 表示不限制。
+        _mem_limit_mb: 子进程虚拟地址空间上限（MB），0 表示不限制；不是 RSS 上限。
         _cpu_limit_s: 子进程最大 CPU 时间限制（秒），0 表示不限制。
         _file_size_limit_mb: 子进程能创建的单个文件最大大小（MB），0 表示不限制。
         _nproc_limit: 子进程能创建的最大进程数，0 表示不限制。
-        _resource_enabled: 当前平台是否支持资源限制（Linux/macOS 为 True）。
+        _resource_enabled: 当前平台是否提供 resource 模块；不代表任意限制值都可生效。
     """
 
     TOOL_NAME = "base__execute_command"
@@ -163,6 +164,9 @@ class ShellTool:
         """构建 preexec_fn 闭包，在子进程 fork 后、exec 前施加资源限制。
 
         仅在支持 resource 模块的平台（Linux/macOS）生效，Windows 返回 None。
+        任何 setrlimit 失败均向 Popen 传播，使其在 exec 前终止子进程。
+        macOS 会拒绝小于当前虚拟地址空间的 RLIMIT_AS；不能将拒绝视为成功，
+        也不能用 RLIMIT_RSS 替代（Darwin 中两者是别名）。
         若所有限制均为 0 也返回 None，避免空函数调用开销。
 
         Returns:
@@ -180,31 +184,21 @@ class ShellTool:
             return None
 
         def _apply_limits() -> None:
+            # Do not log or recover here: this runs after fork, before exec.
+            # Ignoring a rejected limit would run the command without its contract.
             if mem_limit_mb > 0:
                 limit_bytes = mem_limit_mb * 1024 * 1024
-                try:
-                    _resource_module.setrlimit(_resource_module.RLIMIT_AS, (limit_bytes, limit_bytes))
-                except (ValueError, OSError) as e:
-                    logger.warning("Failed to set RLIMIT_AS (%d MB): %s", mem_limit_mb, e)
+                _resource_module.setrlimit(_resource_module.RLIMIT_AS, (limit_bytes, limit_bytes))
 
             if cpu_limit_s > 0:
-                try:
-                    _resource_module.setrlimit(_resource_module.RLIMIT_CPU, (cpu_limit_s, cpu_limit_s))
-                except (ValueError, OSError) as e:
-                    logger.warning("Failed to set RLIMIT_CPU (%d s): %s", cpu_limit_s, e)
+                _resource_module.setrlimit(_resource_module.RLIMIT_CPU, (cpu_limit_s, cpu_limit_s))
 
             if file_size_limit_mb > 0:
                 limit_bytes = file_size_limit_mb * 1024 * 1024
-                try:
-                    _resource_module.setrlimit(_resource_module.RLIMIT_FSIZE, (limit_bytes, limit_bytes))
-                except (ValueError, OSError) as e:
-                    logger.warning("Failed to set RLIMIT_FSIZE (%d MB): %s", file_size_limit_mb, e)
+                _resource_module.setrlimit(_resource_module.RLIMIT_FSIZE, (limit_bytes, limit_bytes))
 
             if nproc_limit > 0:
-                try:
-                    _resource_module.setrlimit(_resource_module.RLIMIT_NPROC, (nproc_limit, nproc_limit))
-                except (ValueError, OSError) as e:
-                    logger.warning("Failed to set RLIMIT_NPROC (%d): %s", nproc_limit, e)
+                _resource_module.setrlimit(_resource_module.RLIMIT_NPROC, (nproc_limit, nproc_limit))
 
         return _apply_limits
 
@@ -261,6 +255,16 @@ class ShellTool:
         if not tokens:
             return "Error: 命令解析结果为空"
 
+        requested_limits = {
+            "RLIMIT_AS(MB)": self._mem_limit_mb,
+            "RLIMIT_CPU(s)": self._cpu_limit_s,
+            "RLIMIT_FSIZE(MB)": self._file_size_limit_mb,
+            "RLIMIT_NPROC": self._nproc_limit,
+        }
+        limit_description = ", ".join(f"{name}={value}" for name, value in requested_limits.items() if value > 0)
+        if limit_description and not self._resource_enabled:
+            return f"Error: 当前平台不支持所请求的资源限制（{limit_description}）；命令未执行"
+
         try:
             result = subprocess.run(
                 tokens,
@@ -279,6 +283,13 @@ class ShellTool:
         except PermissionError:
             logger.warning("Permission denied: %s", tokens[0])
             return f"Error: 没有权限执行 '{tokens[0]}'"
+        except subprocess.SubprocessError as e:
+            if self._limits_preexec is None:
+                return f"Error: 命令执行异常 — {e}"
+            # Popen intentionally hides the child-side preexec exception details.
+            # Report the requested limits, never imply that execution succeeded.
+            logger.warning("Resource limit setup failed on %s (%s): %s", sys.platform, limit_description, e)
+            return f"Error: 无法应用子进程资源限制（{sys.platform}: {limit_description}）；命令未执行"
         except Exception as e:
             logger.error("Command exception: %s — %s", command, e)
             return f"Error: 命令执行异常 — {e}"
