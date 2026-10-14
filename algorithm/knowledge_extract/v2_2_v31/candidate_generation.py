@@ -1167,6 +1167,7 @@ def relation_pass(
     retry_base_seconds: float = 0.05,
     call_metrics: list[dict[str, Any]] | None = None,
     clef: ClefGate | bool | None = None,
+    candidate_batch_size: int | None = None,
 ) -> list[tuple[str, list[dict[str, Any]]]]:
     """按本体签名和局部证据做小批关系分类；接受仍由全局候选池完成。"""
     from .relation_extraction import run_relation_stage
@@ -1190,6 +1191,7 @@ def relation_pass(
         call_metrics=call_metrics,
         clef=clef,
         generate_structured=generate_structured,
+        candidate_batch_size=candidate_batch_size,
     )
 
 

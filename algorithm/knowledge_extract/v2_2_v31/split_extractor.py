@@ -77,7 +77,7 @@ from .property_enrichment import enrich_entity_properties
 from .run_state import ExtractionRun, ExtractionValidationError
 from .standard_semantics import enrich_standard_semantics
 from .structure_entities import add_structural_heading_entities
-from .v31_entity_bridge import run_entity_stage, seed_frozen_entities
+from .v31_entity_bridge import EntityStageResult, run_entity_stage, seed_frozen_entities
 from .verification import ExtractionVerifier
 from ._logging import get_step_logger, preview
 
@@ -471,8 +471,13 @@ def extract_split(
     clef: ClefGate | Any | None = None,
     skill_refs: list[str] | None = None,
     assembly_planner: Any | None = None,
+    seed_entities: Iterable[dict[str, Any]] | None = None,
+    relation_only: bool = False,
 ) -> dict[str, Any]:
     """两段式抽取：Stage1=内嵌 v3.1 对齐实体定稿并冻结（不依赖 v3_1 包），Stage2=v2.2 关系抽取。
+
+    ``relation_only=True`` 时跳过 Stage1、确定性实体补充与结构边组装，
+    仅用 ``seed_entities`` 冻结端点后跑 LLM 关系阶段（诊断/评测用）。
 
     ``llm`` 是接收标准 ChatMessages 的 callable；返回契约兼容现有
     extractor（raw / graph / warnings / attempts / profile / error_code），
@@ -486,6 +491,13 @@ def extract_split(
     resolved_validation_mode = (validation_mode or "strict").casefold()
     if resolved_validation_mode not in {"strict", "permissive"}:
         raise ValueError("validation_mode 仅支持 strict 或 permissive")
+    resolved_seed_entities = [
+        deepcopy(row) for row in (seed_entities or ()) if isinstance(row, dict)
+    ]
+    if relation_only and not resolved_seed_entities:
+        raise ValueError("relation_only=True 时必须提供非空 seed_entities")
+    if resolved_seed_entities and not relation_only:
+        raise ValueError("seed_entities 仅在 relation_only=True 时可用")
 
     resolved_target_types = tuple(target_types) if target_types is not None else None
     plan, schema = _compile_runtime(
@@ -578,77 +590,99 @@ def extract_split(
             "clef",
         )
 
-    # Stage 1：v3.1 实体抽取定稿（身份/属性在此完成后冻结）。
-    entity_stage = run_entity_stage(
-        ontology,
-        extraction_chunks,
-        llm=llm,
-        target_types=resolved_target_types,
-        include_subclasses=include_subclasses,
-        validation_mode=resolved_validation_mode,
-        model=model,
-        unknown_content_policy=unknown_content_policy,
-        local_previous=local_previous,
-        local_next=local_next,
-        same_section=same_section,
-        max_workers=max_workers,
-        use_scheduler=use_scheduler,
-        run_id=resolved_run_id,
-        mapping_weights=mapping_weights,
-        mapping_accepted_threshold=mapping_accepted_threshold,
-        mapping_low_confidence_threshold=mapping_low_confidence_threshold,
-        apply_mapping_threshold=apply_mapping_threshold,
-        best_effort=best_effort,
-        max_repair_rounds=max_repair_rounds,
-        max_attempts=max_attempts,
-        retry_base_seconds=retry_base_seconds,
-        assembly_planner=assembly_planner,
-        skill_refs=skill_refs,
-    )
-    attempts.extend(entity_stage.attempts)
-    call_metrics.extend(entity_stage.calls)
-    for warning in entity_stage.warnings:
-        if warning not in warnings:
-            warnings.append(warning)
-    seeded = seed_frozen_entities(pool, entity_stage.entities, warnings=warnings)
-    logger.info(
-        "[步骤][抽取] Stage1 实体冻结: v31_entities=%d seeded=%d pool=%d repair=%s",
-        len(entity_stage.entities),
-        len(seeded),
-        pool.entity_candidate_count,
-        entity_stage.repair_stop_reason or "-",
-    )
+    document_entities: dict[str, Any] = {}
+    structural_headings = 0
+    official_units = 0
+    standard_semantics: dict[str, Any] = {}
+    property_enrichment: dict[str, Any] = {}
 
-    # 原 v2.2 确定性补充：文档锚点 / 结构标题 / 公文单元 / 标准语义，供结构边组装。
-    document_entities = enrich_document_entities(
-        pool,
-        manager,
-        plan,
-        warnings=warnings,
-    )
-    structural_headings = add_structural_heading_entities(
-        pool,
-        manager,
-        allowed_types=plan.allowed_types,
-        warnings=warnings,
-    )
-    official_units = (
-        add_official_document_units(pool, manager, plan, warnings=warnings)
-        if route.kind == "official_document"
-        else 0
-    )
-    standard_semantics = (
-        enrich_standard_semantics(pool, manager, plan, warnings=warnings)
-        if route.kind == "standard"
-        else {}
-    )
-    logger.info(
-        "[步骤][抽取] 确定性补充输出: 结构标题实体=%d 文档实体=%s 标准语义=%s 池内候选=%d",
-        structural_headings,
-        preview(document_entities, 120),
-        preview(standard_semantics, 120),
-        pool.entity_candidate_count,
-    )
+    if relation_only:
+        # 诊断路径：用外部种子实体冻结端点，跳过 Stage1 与确定性补充。
+        entity_stage = EntityStageResult(
+            entities=resolved_seed_entities,
+            status="seeded",
+            repair_stop_reason="relation_only_seed",
+        )
+        seeded = seed_frozen_entities(pool, resolved_seed_entities, warnings=warnings)
+        logger.info(
+            "[步骤][抽取] relation_only 实体冻结: seed=%d seeded=%d pool=%d",
+            len(resolved_seed_entities),
+            len(seeded),
+            pool.entity_candidate_count,
+        )
+    else:
+        # Stage 1：v3.1 实体抽取定稿（身份/属性在此完成后冻结）。
+        entity_stage = run_entity_stage(
+            ontology,
+            extraction_chunks,
+            llm=llm,
+            target_types=resolved_target_types,
+            include_subclasses=include_subclasses,
+            validation_mode=resolved_validation_mode,
+            model=model,
+            unknown_content_policy=unknown_content_policy,
+            local_previous=local_previous,
+            local_next=local_next,
+            same_section=same_section,
+            max_workers=max_workers,
+            use_scheduler=use_scheduler,
+            run_id=resolved_run_id,
+            mapping_weights=mapping_weights,
+            mapping_accepted_threshold=mapping_accepted_threshold,
+            mapping_low_confidence_threshold=mapping_low_confidence_threshold,
+            apply_mapping_threshold=apply_mapping_threshold,
+            best_effort=best_effort,
+            max_repair_rounds=max_repair_rounds,
+            max_attempts=max_attempts,
+            retry_base_seconds=retry_base_seconds,
+            assembly_planner=assembly_planner,
+            skill_refs=skill_refs,
+        )
+        attempts.extend(entity_stage.attempts)
+        call_metrics.extend(entity_stage.calls)
+        for warning in entity_stage.warnings:
+            if warning not in warnings:
+                warnings.append(warning)
+        seeded = seed_frozen_entities(pool, entity_stage.entities, warnings=warnings)
+        logger.info(
+            "[步骤][抽取] Stage1 实体冻结: v31_entities=%d seeded=%d pool=%d repair=%s",
+            len(entity_stage.entities),
+            len(seeded),
+            pool.entity_candidate_count,
+            entity_stage.repair_stop_reason or "-",
+        )
+
+        # 原 v2.2 确定性补充：文档锚点 / 结构标题 / 公文单元 / 标准语义，供结构边组装。
+        document_entities = enrich_document_entities(
+            pool,
+            manager,
+            plan,
+            warnings=warnings,
+        )
+        structural_headings = add_structural_heading_entities(
+            pool,
+            manager,
+            allowed_types=plan.allowed_types,
+            warnings=warnings,
+        )
+        official_units = (
+            add_official_document_units(pool, manager, plan, warnings=warnings)
+            if route.kind == "official_document"
+            else 0
+        )
+        standard_semantics = (
+            enrich_standard_semantics(pool, manager, plan, warnings=warnings)
+            if route.kind == "standard"
+            else {}
+        )
+        logger.info(
+            "[步骤][抽取] 确定性补充输出: 结构标题实体=%d 文档实体=%s 标准语义=%s 池内候选=%d",
+            structural_headings,
+            preview(document_entities, 120),
+            preview(standard_semantics, 120),
+            pool.entity_candidate_count,
+        )
+
     selector = CandidateSelector(plan, manager, warnings)
     selector.pre_relation(pool.entity_candidates())
     logger.info(
@@ -662,44 +696,45 @@ def extract_split(
         preview(_warning_codes(warnings), 200),
     )
 
-    # 属性补全：Stage1 已覆盖 v31 实体；仅当确定性补充引入新实体时再跑一轮。
-    supplemental_entities = [
-        entity
-        for entity in pool.accepted_entities()
-        if str(getattr(entity, "source", "") or "") != "v31_entity"
-    ]
-    if supplemental_entities:
-        property_enrichment = enrich_entity_properties(
-            pool,
-            manager,
-            plan,
-            llm,
-            route=route,
-            attempts=attempts,
-            warnings=warnings,
-            call_metrics=call_metrics,
-            use_scheduler=use_scheduler,
-            local_previous=local_previous,
-            local_next=local_next,
-            same_section=same_section,
-            max_attempts=max_attempts,
-            retry_base_seconds=retry_base_seconds,
-            max_workers=max_workers,
-            clef=clef_gate,
+    if not relation_only:
+        # 属性补全：Stage1 已覆盖 v31 实体；仅当确定性补充引入新实体时再跑一轮。
+        supplemental_entities = [
+            entity
+            for entity in pool.accepted_entities()
+            if str(getattr(entity, "source", "") or "") != "v31_entity"
+        ]
+        if supplemental_entities:
+            property_enrichment = enrich_entity_properties(
+                pool,
+                manager,
+                plan,
+                llm,
+                route=route,
+                attempts=attempts,
+                warnings=warnings,
+                call_metrics=call_metrics,
+                use_scheduler=use_scheduler,
+                local_previous=local_previous,
+                local_next=local_next,
+                same_section=same_section,
+                max_attempts=max_attempts,
+                retry_base_seconds=retry_base_seconds,
+                max_workers=max_workers,
+                clef=clef_gate,
+            )
+            if entity_stage.property_stats:
+                property_enrichment = {
+                    **dict(entity_stage.property_stats),
+                    **property_enrichment,
+                    "entity_stage": dict(entity_stage.property_stats),
+                }
+        else:
+            property_enrichment = dict(entity_stage.property_stats or {})
+        logger.info(
+            "[步骤][抽取] 属性补全输出: supplemental=%d %s",
+            len(supplemental_entities),
+            preview(property_enrichment, 240),
         )
-        if entity_stage.property_stats:
-            property_enrichment = {
-                **dict(entity_stage.property_stats),
-                **property_enrichment,
-                "entity_stage": dict(entity_stage.property_stats),
-            }
-    else:
-        property_enrichment = dict(entity_stage.property_stats or {})
-    logger.info(
-        "[步骤][抽取] 属性补全输出: supplemental=%d %s",
-        len(supplemental_entities),
-        preview(property_enrichment, 240),
-    )
 
     # Stage 2：关系候选（LLM，基于已冻结的 accepted 实体目录）
     relation_results = _relation_pass(
@@ -720,6 +755,7 @@ def extract_split(
         retry_base_seconds=retry_base_seconds,
         call_metrics=call_metrics,
         clef=clef_gate,
+        **({"candidate_batch_size": 4} if relation_only else {}),
     )
     for _, raw_relations in relation_results:
         for raw_relation in raw_relations:
@@ -747,45 +783,55 @@ def extract_split(
         len(pool.accepted_relations()),
     )
 
-    # 原 v2.2 结构边组装：HAS_PART / EVIDENCED_BY / 文档边 / 标准语义边等。
-    document_relations = assemble_document_relations(
-        pool,
-        manager,
-        document_entities,
-        warnings=warnings,
-    )
-    numbered_hierarchy_relations = assemble_numbered_hierarchy_relations(
-        pool,
-        manager,
-        warnings=warnings,
-    )
-    document_unit_relations = assemble_document_unit_relations(
-        pool,
-        manager,
-        warnings=warnings,
-    )
-    standard_semantic_relations = (
-        assemble_standard_semantic_relations(
+    document_relations: dict[str, Any] = {}
+    numbered_hierarchy_relations = 0
+    document_unit_relations: dict[str, Any] = {}
+    standard_semantic_relations: dict[str, Any] = {}
+    standard_technical_relations: dict[str, Any] = {}
+    composite_issues: list[dict[str, Any]] = []
+
+    if not relation_only:
+        # 原 v2.2 结构边组装：HAS_PART / EVIDENCED_BY / 文档边 / 标准语义边等。
+        document_relations = assemble_document_relations(
             pool,
             manager,
             document_entities,
             warnings=warnings,
         )
-        if route.kind == "standard"
-        else {}
-    )
-    standard_technical_relations = (
-        assemble_standard_technical_relations(pool, manager, warnings=warnings)
-        if route.kind == "standard"
-        else {}
-    )
+        numbered_hierarchy_relations = assemble_numbered_hierarchy_relations(
+            pool,
+            manager,
+            warnings=warnings,
+        )
+        document_unit_relations = assemble_document_unit_relations(
+            pool,
+            manager,
+            warnings=warnings,
+        )
+        standard_semantic_relations = (
+            assemble_standard_semantic_relations(
+                pool,
+                manager,
+                document_entities,
+                warnings=warnings,
+            )
+            if route.kind == "standard"
+            else {}
+        )
+        standard_technical_relations = (
+            assemble_standard_technical_relations(pool, manager, warnings=warnings)
+            if route.kind == "standard"
+            else {}
+        )
 
-    # §21/AC-6：复合元素确定性组装与校验（补建 hasSubRule 成员关系）
-    composite_handler = CompositeElementHandler.from_plan(plan)
-    composite_issues = composite_handler.assemble(pool, plan, manager, warnings=warnings)
+        # §21/AC-6：复合元素确定性组装与校验（补建 hasSubRule 成员关系）
+        composite_handler = CompositeElementHandler.from_plan(plan)
+        composite_issues = composite_handler.assemble(pool, plan, manager, warnings=warnings)
+
     selector.post_relation(pool.entity_candidates(), pool.relation_candidates())
     logger.info(
-        "[步骤][抽取] 关系后处理输出: 复合组装问题=%d 文档关系=%s 单元结构边=%s 层级关系=%d accepted_entities=%d accepted_relations=%d warnings=%s",
+        "[步骤][抽取] 关系后处理输出: relation_only=%s 复合组装问题=%d 文档关系=%s 单元结构边=%s 层级关系=%d accepted_entities=%d accepted_relations=%d warnings=%s",
+        relation_only,
         len(composite_issues),
         preview(document_relations, 80),
         preview(document_unit_relations, 80),
@@ -1181,7 +1227,10 @@ def extract_split(
             "entity_extract_version": "v3.1-aligned",
             "entity_stage_package": "algorithm.knowledge_extract.v2_2_v31.entity_stage",
             "entity_frozen": True,
-            "deterministic_enrichment": "enabled",
+            "relation_only": relation_only,
+            "entity_source": "seed" if relation_only else "entity_stage",
+            "seeded_entities": len(seeded),
+            "deterministic_enrichment": "disabled" if relation_only else "enabled",
             "chunks": len(extraction_chunks),
             "entity_candidates": pool.entity_candidate_count,
             "relation_candidates": pool.relation_candidate_count,

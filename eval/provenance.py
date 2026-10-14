@@ -64,12 +64,16 @@ def _scoring(settings: Mapping[str, Any]) -> dict[str, Any]:
     modes = settings.get("modes") or ["chunk-extract"]
     if isinstance(modes, str):
         modes = [modes]
-    return {
+    result = {
         "stage": settings.get("stage") or "backend",
         "modes": sorted(set(modes)),
         "match_mode": settings.get("match_mode") or "identity",
         "judge": settings.get("judge") or {},
     }
+
+    if settings.get("relation_only_from_golden"):
+        result["metric_scope"] = "relations"
+    return result
 
 
 def _source_manifest(root: Path | None) -> dict[str, Any]:
@@ -363,7 +367,7 @@ def compare_baseline(
                     issue("scorer_mismatch", run=side, case=label, module=module, actual=actual_mode, expected=match_mode)
                     continue
                 values[side] = metrics
-            for metric_side in ("entities", "relations"):
+            for metric_side in (("relations",) if contract.get("metric_scope") == "relations" else ("entities", "relations")):
                 f1 = {side: _mapping(values.get(side, {}).get(metric_side)).get("f1") for side in ("current", "baseline")}
                 if any(not _number(value) or not 0 <= value <= 1 for value in f1.values()):
                     issue("missing_or_invalid_f1", case=label, module=module, metric=metric_side)

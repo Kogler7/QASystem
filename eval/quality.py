@@ -123,6 +123,13 @@ def build_quality_gate(
                 if require_scored and module in expected:
                     issues.append({"case": label, "module": module, "reason": "missing_metrics"})
                 continue
+            if summary.get('metric_scope') == 'relations':
+                entity_side = _mapping(metrics.get('entities'))
+                if metrics.get('metric_scope') != 'relations' or entity_side.get('evaluated') is not False or any(entity_side.get(key) != 0 for key in COUNTS):
+                    issues.append({'case': label, 'module': module, 'reason': 'invalid_relation_only_scope'})
+                identity = _mapping(metrics.get('identity'))
+                if identity and (identity.get('metric_scope') != 'relations' or _mapping(identity.get('entities')).get('evaluated') is not False):
+                    issues.append({'case': label, 'module': module, 'reason': 'invalid_identity_relation_only_scope'})
             invalid = _invalid_fields(metrics)
             if invalid:
                 issues.append({"case": label, "module": module, "reason": "invalid_metrics", "fields": invalid})
@@ -197,6 +204,8 @@ def _aggregate(
             # union ratio. Keep that alias, without implying true negatives.
             "accuracy": round(tp / (tp + fp + fn), 6) if tp + fp + fn else None,
         }
+        if values and all(value.get('evaluated') is False for value in values):
+            micro[side].update(evaluated=False, source='golden_seed')
         macro[side] = {
             "cases": len(informative),
             "empty_cases": len(values) - len(informative),

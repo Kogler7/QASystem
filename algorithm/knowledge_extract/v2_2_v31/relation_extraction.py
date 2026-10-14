@@ -23,7 +23,7 @@ from .relation_context import build_relation_index
 
 logger = get_step_logger(__name__)
 
-# 32 是单次调用上限，不是一篇文档的关系总数。输出预算更紧时继续缩小。
+# 32 是正常链路的单次调用上限，诊断模式可显式缩小。
 RELATION_CANDIDATE_BATCH_SIZE = 32
 # 约 4K token 的保守字符预算，为提示词、端点和 schema 留出余量。
 _EVIDENCE_CHAR_BUDGET = 8000
@@ -274,6 +274,7 @@ def _decide_group(
     use_scheduler: bool,
     max_attempts: int,
     retry_base_seconds: float,
+    candidate_batch_size: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     attempts: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
@@ -300,7 +301,7 @@ def _decide_group(
         )
         return messages, schema
 
-    batch_size = output_batch_size(llm, tokens_per_item=96, ceiling=RELATION_CANDIDATE_BATCH_SIZE)
+    batch_size = output_batch_size(llm, tokens_per_item=96, ceiling=candidate_batch_size or RELATION_CANDIDATE_BATCH_SIZE)
     label = group[0].fragments[0].chunk_id
     parsed = generate_batched(
         group,
@@ -410,6 +411,7 @@ def run_relation_stage(
     call_metrics: list[dict[str, Any]] | None,
     clef: ClefGate | bool | None,
     generate_structured: Callable[..., Any],
+    candidate_batch_size: int | None = None,
 ) -> list[tuple[str, list[dict[str, Any]]]]:
     """在最终实体集合上召回并判断关系。返回值仍按 chunk 分组，供原流水线入库。"""
     chunks = list(request.chunks)
@@ -462,6 +464,7 @@ def run_relation_stage(
             use_scheduler=use_scheduler,
             max_attempts=max_attempts,
             retry_base_seconds=retry_base_seconds,
+            candidate_batch_size=candidate_batch_size,
         )
 
     groups = list(grouped.values())

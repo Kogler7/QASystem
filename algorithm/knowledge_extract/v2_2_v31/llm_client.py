@@ -11,7 +11,7 @@ from external_services.llm.chat import create_chat_completion
 from urllib.parse import urlparse
 
 from ._logging import get_step_logger
-from .config import get_llm_config
+from .config import get_llm_config, get_llm_policy
 from .prompt_router import ChatMessages
 
 
@@ -453,7 +453,7 @@ def create_llm_client(
     """Build an OpenAI-compatible live client without importing OpenAI at module import."""
     from openai import OpenAI  # lazy import：仅 live 调用时才需要
 
-    config = get_llm_config()
+    config = get_llm_policy() if base_url else get_llm_config()
     client = OpenAI(
         base_url=base_url or config["base_url"],
         api_key=api_key or config["api_key"] or "not-needed",

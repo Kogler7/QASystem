@@ -35,8 +35,13 @@ def extract_harness(
     clef: Any = None,
     skill_refs: list[str] | None = None,
     assembly_planner: Any | None = None,
+    seed_entities: Iterable[dict[str, Any]] | None = None,
+    relation_only: bool = False,
 ) -> dict[str, Any]:
-    """Run Stage1 v3.1 entities then Stage2 v2.2 relations over caller chunks."""
+    """Run Stage1 v3.1 entities then Stage2 v2.2 relations over caller chunks.
+
+    ``relation_only=True`` seeds frozen entities and runs only the LLM relation stage.
+    """
     ontology = (ontology or "").strip()
     if not ontology:
         raise ValueError("本体定义不能为空")
@@ -82,6 +87,8 @@ def extract_harness(
         clef=clef,
         skill_refs=skill_refs,
         assembly_planner=assembly_planner,
+        seed_entities=list(seed_entities) if seed_entities is not None else None,
+        relation_only=relation_only,
     )
 
 

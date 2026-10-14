@@ -18,6 +18,19 @@ tags: []
 
 Benchmark 数据集仍在 `test_data/eval-v2/`；在线链路评测走 `eval/run.py`（`KG_EXTRACT_ALGO_VERSION=v2.2-v31`）。
 
+关系-only 诊断（golden 实体种子 → 纯 LLM 关系，跳过 Stage1/确定性补充/结构边）：
+
+```bash
+python3 eval/run.py test_data/eval/trouble/trouble_mini \
+  --mode extract --from-run tmp/eval/runs/<冻结切片> \
+  --extract-version v2.2-v31 --relation-only-from-golden \
+  --match-mode llm --min-relation-f1 0.5
+```
+
+此为显式离线诊断，不是默认端到端评测。宿主必须能访问已批准的 ops 注册配置和凭据环境；使用同一服务及账号推理队列，不另建 Backend、地址或队列。实体直接来自 golden，不计实体成绩；仅关系指标可用于本诊断。关系-only 的单批候选上限为 4，正常链路保持 32，实体批次和窗口默认不变。
+
+算法侧等价：`extract_harness(..., seed_entities=golden_entities, relation_only=True)`。
+
 ## 公共入口
 
 ```python
@@ -65,7 +78,7 @@ KG_EXTRACT_ALGO_VERSION=v2.2-v31 .venv/bin/python eval/run.py test_data/eval
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。
 
-最近一次 official_01 关系阶段评测：`docs/official_01评测结果-20261012.md`，原始批次在 `output/20261012-011048/`。
+最近一次 official_01 关系阶段评测：[official_01评测结果](../../../docs/算法/official_01评测结果-20261012.md)，原始产物保存在 `tmp/merge-archives/relation-only-ac22fd19/algorithm/knowledge_extract/v2_2/output/`。
 
 ## 设计与运维文档
 

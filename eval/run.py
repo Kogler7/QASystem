@@ -15,7 +15,8 @@
 每批次结束在批次目录（tmp/eval/runs/<时间戳>/）写 report.md 报告；
 启动时按 runs_retention_days（默认 30 天，--runs-retention-days 可覆盖，<=0 关闭）清理过期批次。
 
-本目录只调已有 HTTP / MCP；复用 external_services.llm 的公共调用逻辑，不调用 algorithm / backend 业务实现。
+本目录通常只调已有 HTTP / MCP。例外：``--relation-only-from-golden`` 在进程内调用
+``v2_2_v31``（golden 实体种子 + 纯 LLM 关系），不经 Backend 抽取接口。
 """
 from __future__ import annotations
 
@@ -2077,7 +2078,12 @@ def add_metrics(total: dict[str, Any], item: dict[str, Any] | None) -> None:
         return
     for name in ("entities", "relations"):
         src = item.get(name) or {}
+        if item.get("metric_scope") == "relations":
+            total["metric_scope"] = "relations"
         dst = total.setdefault(name, {"golden": 0, "predicted": 0, "tp": 0, "fp": 0, "fn": 0})
+        if src.get("evaluated") is False:
+            dst["evaluated"] = False
+            continue
         for key in ("golden", "predicted", "tp", "fp", "fn"):
             dst[key] = int(dst.get(key) or 0) + int(src.get(key) or 0)
 
@@ -2091,6 +2097,10 @@ def finalize_metrics(total: dict[str, Any]) -> dict[str, Any]:
             "predicted": src.get("predicted", 0),
             **calculate_metrics(int(src.get("tp") or 0), int(src.get("fp") or 0), int(src.get("fn") or 0)),
         }
+        if src.get("evaluated") is False:
+            result[name].update(evaluated=False, source="golden_seed", precision=None, recall=None, f1=None)
+    if total.get("metric_scope"):
+        result["metric_scope"] = total["metric_scope"]
     return result
 
 
@@ -2386,6 +2396,8 @@ def plugin_extract(
 
 def _metric_side_lines(label: str, block: dict[str, Any] | None) -> list[str]:
     item = block or {}
+    if item.get("evaluated") is False:
+        return [f"{label}：未评估（golden 实体种子）"]
     return [
         (
             f"{label}  P={float(item.get('precision') or 0):.3f}  "
@@ -2638,6 +2650,96 @@ def _apply_extraction_quality(block: dict[str, Any], envelope: dict[str, Any]) -
         return
 
 
+def _chunk_items_to_v22v31(items: list[dict[str, Any]]) -> list[Any]:
+    """Build v2_2_v31 ExtractionChunk list from eval chunk payloads."""
+    from algorithm.knowledge_extract.v2_2_v31.chunk_context import ExtractionChunk
+
+    chunks: list[Any] = []
+    for index, item in enumerate(items):
+        text = str(item.get("text") or "")
+        ranges = item.get("ranges") or item.get("range")
+        metadata = dict(item.get("metadata") or {}) if isinstance(item.get("metadata"), dict) else {}
+        start_offset = ranges[0] if isinstance(ranges, (list, tuple)) and len(ranges) >= 2 else metadata.get("start_offset")
+        end_offset = ranges[1] if isinstance(ranges, (list, tuple)) and len(ranges) >= 2 else metadata.get("end_offset")
+        document_id = metadata.get("document_id") or metadata.get("source_file")
+        chunks.append(
+            ExtractionChunk(
+                chunk_id=str(metadata.get("chunk_id") or f"chunk-{index}"),
+                text=text,
+                document_id=str(document_id) if document_id else None,
+                section_id=metadata.get("section_id"),
+                section_title=metadata.get("section_title") or metadata.get("sheet_name"),
+                clause_number=metadata.get("clause_number"),
+                page_no=metadata.get("page_no"),
+                start_offset=start_offset,
+                end_offset=end_offset,
+                metadata=metadata,
+            )
+        )
+    return chunks
+
+
+def _relation_only_llm_credentials(extraction: dict[str, Any]) -> dict[str, Any]:
+    """Read the committed ops service snapshot, never legacy environment routes."""
+    from backend.app.services.extraction_config import resolve_config
+    if any(key in extraction for key in ('base_url', 'api_key')):
+        raise ValueError('relation-only requires an ops registered service; raw connection overrides are unsupported')
+    return resolve_config({**extraction, 'version': 'v2.2-v31'})
+
+
+def _relation_only_offline_envelope(
+    ontology: str,
+    items: list[dict[str, Any]],
+    seed_entities: list[dict[str, Any]],
+    options: dict[str, Any],
+) -> dict[str, Any]:
+    """Run v2.2-v31 relation_only in-process; wrap as Backend-like extract envelope."""
+    from algorithm.knowledge_extract.v2_2_v31 import extract_harness
+
+    extraction = dict(options.get("extraction") or {})
+    creds = _relation_only_llm_credentials(extraction)
+    from algorithm.knowledge_extract.request_runtime import create_request_llm
+    llm = create_request_llm(creds)
+    # CPU task scheduling is separate; the SDK always uses shared model admission.
+    result = extract_harness(
+        ontology=ontology,
+        chunks=_chunk_items_to_v22v31(items),
+        validation_mode="permissive",
+        best_effort=True,
+        llm=llm,
+        model=creds["model"],
+        max_workers=max(1, int(creds["max_concurrency"])),
+        use_scheduler=False,
+        seed_entities=seed_entities,
+        relation_only=True,
+    )
+    graph = result.get("graph") or {"nodes": [], "relationships": []}
+    profile = dict(result.get("profile") or {})
+    quality = {
+        "extract_version": "v2.2-v31",
+        "status": str(result.get("status") or "succeeded"),
+        "relation_only_from_golden": True,
+        "deterministic_enrichment": profile.get("deterministic_enrichment"),
+        "entity_source": profile.get("entity_source"),
+        "seeded_entities": profile.get("seeded_entities"),
+        "metric_scope": "relations",
+        "profile": profile,
+    }
+    if result.get("error_code"):
+        quality["status"] = "failed"
+        quality["error_code"] = result.get("error_code")
+    return {
+        "code": 0 if quality["status"] == "succeeded" else 1,
+        "info": "relation_only offline extract (golden entities → LLM relations)",
+        "data": {
+            "graph": graph,
+            "raw": result.get("raw"),
+            "quality": quality,
+            "warnings": result.get("warnings") or [],
+        },
+    }
+
+
 def _extract_items(
     base_url: str,
     ontology: str,
@@ -2647,22 +2749,46 @@ def _extract_items(
     golden: dict[str, Any] | None,
     out_dir: Path,
     score_ctx: dict[str, Any] | None,
+    *,
+    relation_only_from_golden: bool = False,
 ) -> dict[str, Any]:
     """模块 extract：切片 → 图谱 → 对照 golden 评分。"""
     extract_started = time.perf_counter()
     try:
-        envelope = extract_graphs(base_url, ontology, items, options, params)
+        if relation_only_from_golden:
+            if golden is None:
+                raise RuntimeError("relation-only-from-golden 需要 case 的 extract/golden.json")
+            seed_entities, _gold_relations = normalize_graph(golden)
+            if not seed_entities:
+                raise RuntimeError("relation-only-from-golden 需要非空 golden.entities")
+            log(
+                f"模块 extract relation-only 离线: seed_entities={len(seed_entities)} "
+                "跳过 Stage1/确定性补充/结构边，不调 Backend"
+            )
+            envelope = _relation_only_offline_envelope(ontology, items, seed_entities, options)
+            timing_source = "relation_only_offline"
+        else:
+            envelope = extract_graphs(base_url, ontology, items, options, params)
+            timing_source = "extract_api"
         extract_elapsed = elapsed_seconds(extract_started)
         # Save inference cost before scoring; a failed/slow judge or a later
         # stage retry must not turn an already paid API call into zero time.
         write_json(out_dir / "backend_extract.timing.json", {
             "elapsed_seconds": extract_elapsed,
-            "source": "extract_api",
+            "source": timing_source,
         })
         write_json(out_dir / "backend_extract.json", envelope)
         graph = extract_graph_from_envelope(envelope)
         score_started = time.perf_counter()
         metrics = split_match_details(out_dir, "backend_extract", maybe_score(golden, graph, score_ctx))
+        if relation_only_from_golden and metrics:
+            for scoped in (metrics, metrics.get('identity')):
+                if not isinstance(scoped, dict):
+                    continue
+                scoped['metric_scope'] = 'relations'
+                scoped['entities'] = {key: 0 for key in ('tp', 'fp', 'fn', 'golden', 'predicted')}
+                scoped['entities'].update(precision=0.0, recall=0.0, f1=0.0,
+                    accuracy=0.0, jaccard=0.0, evaluated=False, source='golden_seed')
         block: dict[str, Any] = {
             "status": "succeeded",
             "nodes": len(graph.get("nodes") or []),
@@ -2671,19 +2797,30 @@ def _extract_items(
             "elapsed_seconds": extract_elapsed,
             "score_elapsed_seconds": elapsed_seconds(score_started),
         }
+        if relation_only_from_golden:
+            block["relation_only_from_golden"] = True
+            block["extract_version"] = "v2.2-v31"
+            block["metric_scope"] = "relations"
         version = extract_version_from(envelope)
         if version:
             block["extract_version"] = version
         _apply_extraction_quality(block, envelope)
+        if relation_only_from_golden and block.get("status") not in {"partial", "failed"}:
+            quality = (envelope.get("data") or {}).get("quality") or {}
+            if quality.get("status") == "failed":
+                block["status"] = "failed"
+                block["message"] = str(quality.get("error_code") or "relation_only extract failed")
         emit_metrics(
             f"模块 extract {format_duration(extract_elapsed)} "
             f"评分 {format_duration(block['score_elapsed_seconds'])}",
             metrics,
         )
         return block
-    except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+    except (URLError, TimeoutError, RuntimeError, OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         block = fail_payload(exc)
         block["elapsed_seconds"] = elapsed_seconds(extract_started)
+        if relation_only_from_golden:
+            block["relation_only_from_golden"] = True
         log(f"模块 extract 失败 {format_duration(block['elapsed_seconds'])}: {block['message']}")
         return block
 
@@ -2966,11 +3103,13 @@ def run_backend_case(
     modes: list[str] | None = None,
     reuse_dir: Path | None = None,
     reuse_extract_dir: Path | None = None,
+    relation_only_from_golden: bool = False,
 ) -> dict[str, Any]:
     """后台评测。modes 取值：extract（仅抽取，复用切片）、chunk-extract（切片+抽取）、pipeline（整条沉淀）。
 
     ``reuse_dir`` 指向上次运行的 case 目录（``tmp/eval/runs/<ts>/<类型>/<case>``）：
     extract 模式从中读 chunks.json，chunk-extract 模式从中读 document.md。
+    ``relation_only_from_golden`` 时离线跑 v2.2-v31 关系阶段（不经 Backend extract）。
     """
     modes = modes or ["pipeline"]
     result: dict[str, Any] = {
@@ -3054,9 +3193,14 @@ def run_backend_case(
         chunk_status = str(((result.get("modules") or {}).get("chunk") or {}).get("status") or "")
         reused_extract = (
             _reuse_extract_case(reuse_extract_dir, golden, out_dir, score_ctx)
-            if items and reuse_extract_dir is not None else None
+            if items and reuse_extract_dir is not None and not relation_only_from_golden
+            else None
         )
-        existing_extract = _load_json_file(extract_path) if chunk_status in {"succeeded", "reused"} else None
+        existing_extract = (
+            _load_json_file(extract_path)
+            if chunk_status in {"succeeded", "reused"} and not relation_only_from_golden
+            else None
+        )
         if reused_extract is not None:
             result["modules"]["extract"] = reused_extract
         elif existing_extract and items and _extract_cache_complete(existing_extract):
@@ -3073,13 +3217,27 @@ def run_backend_case(
             log(f"模块 extract 复用 {extract_path}")
         elif items:
             result["modules"]["extract"] = _extract_items(
-                base_url, ontology, items, options, params, golden, out_dir, score_ctx
+                base_url,
+                ontology,
+                items,
+                options,
+                params,
+                golden,
+                out_dir,
+                score_ctx,
+                relation_only_from_golden=relation_only_from_golden,
             )
         else:
             result["modules"].setdefault("extract", {"status": "skipped", "message": "无可用切片"})
 
     if "pipeline" in modes:
-        result["system"] = _run_system(base_url, sources, ontology, options, params, golden, out_dir, score_ctx)
+        if relation_only_from_golden:
+            result["system"] = {
+                "status": "skipped",
+                "message": "relation-only-from-golden 不支持 pipeline",
+            }
+        else:
+            result["system"] = _run_system(base_url, sources, ontology, options, params, golden, out_dir, score_ctx)
 
     result["markdown"] = markdown
     return result
@@ -3179,6 +3337,7 @@ def run_case_stages(
     modes: list[str],
     reuse_dir: Path | None,
     reuse_extract_dir: Path | None = None,
+    relation_only_from_golden: bool = False,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str]:
     markdown = ""
     backend: dict[str, Any] | None = None
@@ -3196,30 +3355,37 @@ def run_case_stages(
             modes=modes,
             reuse_dir=reuse_dir,
             reuse_extract_dir=reuse_extract_dir,
+            relation_only_from_golden=relation_only_from_golden,
         )
         markdown = str(backend.pop("markdown", "") or "")
     if run_plugin:
-        if not markdown:
-            markdown, parse_block = _parse_sources(base_url, sources, options, params, out_dir)
-            if not markdown.strip():
-                plugin = {
-                    "status": "failed",
-                    "message": parse_block.get("message") or "插件阶段解析无可用 Markdown",
-                    "failed_files": parse_block.get("failed_files") or [],
-                    "per_file": parse_block.get("per_file") or [],
-                }
-        if markdown.strip() and (plugin or {}).get("status") != "failed":
-            plugin = run_plugin_case(
-                mcp_url=mcp_url,
-                base_url=base_url,
-                ontology=ontology,
-                markdown=markdown,
-                options=options,
-                params=params,
-                golden=golden,
-                out_dir=out_dir,
-                score_ctx=score_ctx,
-            )
+        if relation_only_from_golden:
+            plugin = {
+                "status": "skipped",
+                "message": "relation-only-from-golden 不跑插件阶段",
+            }
+        else:
+            if not markdown:
+                markdown, parse_block = _parse_sources(base_url, sources, options, params, out_dir)
+                if not markdown.strip():
+                    plugin = {
+                        "status": "failed",
+                        "message": parse_block.get("message") or "插件阶段解析无可用 Markdown",
+                        "failed_files": parse_block.get("failed_files") or [],
+                        "per_file": parse_block.get("per_file") or [],
+                    }
+            if markdown.strip() and (plugin or {}).get("status") != "failed":
+                plugin = run_plugin_case(
+                    mcp_url=mcp_url,
+                    base_url=base_url,
+                    ontology=ontology,
+                    markdown=markdown,
+                    options=options,
+                    params=params,
+                    golden=golden,
+                    out_dir=out_dir,
+                    score_ctx=score_ctx,
+                )
     return backend, plugin, markdown
 
 
@@ -3241,6 +3407,7 @@ def run_case_with_retries(
     reuse_dir: Path | None,
     reuse_extract_dir: Path | None = None,
     max_attempts: int | None = None,
+    relation_only_from_golden: bool = False,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str, int, str | None]:
     """默认尝试一次，显式配置可至多三次；返回结果、尝试次数及错误。"""
     max_attempts = 1 if max_attempts is None else max_attempts
@@ -3267,6 +3434,7 @@ def run_case_with_retries(
                 modes=modes,
                 reuse_dir=reuse_dir,
                 reuse_extract_dir=reuse_extract_dir,
+                relation_only_from_golden=relation_only_from_golden,
             )
             last_backend, last_plugin = backend, plugin
             failed = stage_failed(backend) or stage_failed(plugin)
@@ -3418,6 +3586,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="运行目录",
         help="从旧批次复用已保存的 backend_extract.json 并重新评分，缺少产物的 case 正常抽取；"
         "仅支持 --stage backend --mode extract，且必须用 --from-run 固定切片",
+    )
+    parser.add_argument(
+        "--relation-only-from-golden",
+        action="store_true",
+        help="v2.2-v31 诊断：用 case golden.entities 作种子，离线只跑 LLM 关系抽取（跳过 Stage1/"
+        "确定性补充/结构边）；须 --extract-version v2.2-v31 --mode extract --from-run，"
+        "不调 Backend extract；门禁以 --min-relation-f1 为准，忽略 --min-f1",
     )
     parser.add_argument(
         "--system",
@@ -3685,6 +3860,20 @@ def main() -> int:
     if args.reuse_extract_from and (args.stage != "backend" or modes != ["extract"] or not args.from_run):
         log("--reuse-extract-from 仅支持 --stage backend --mode extract，并且必须指定 --from-run 固定切片")
         return 1
+    relation_only_from_golden = bool(args.relation_only_from_golden)
+    if relation_only_from_golden:
+        if args.stage != "backend" or modes != ["extract"] or not args.from_run:
+            log(
+                "--relation-only-from-golden 仅支持 --stage backend --mode extract，"
+                "并且必须指定 --from-run 固定切片"
+            )
+            return 1
+        if args.reuse_extract_from:
+            log("--relation-only-from-golden 不能与 --reuse-extract-from 同用")
+            return 1
+        if args.system or "pipeline" in modes or "chunk-extract" in modes:
+            log("--relation-only-from-golden 仅支持纯 extract 模式")
+            return 1
     reuse_run_dir: Path | None = None
     reuse_extract_run_dir: Path | None = None
     try:
@@ -3736,6 +3925,11 @@ def main() -> int:
     except ValueError as exc:
         log(str(exc))
         return 1
+    if relation_only_from_golden:
+        resolved_version = str((options.get("extraction") or {}).get("version") or "").strip()
+        if resolved_version != "v2.2-v31":
+            log("--relation-only-from-golden 要求 --extract-version v2.2-v31")
+            return 1
     params["options"] = options
     params["request_attempts"] = args.request_attempts
     group_cfg = params.get("groups") or {}
@@ -3800,7 +3994,14 @@ def main() -> int:
     manifest = build_manifest(
         workspace=workspace, cases=manifest_cases, reuse_dir=reuse_run_dir,
         reuse_extract_dir=reuse_extract_run_dir,
-        settings={"stage": args.stage, "modes": modes, "match_mode": match_mode, "judge": judge_settings, "options": options},
+        settings={
+            "stage": args.stage,
+            "modes": modes,
+            "match_mode": match_mode,
+            "judge": judge_settings,
+            "options": options,
+            "relation_only_from_golden": relation_only_from_golden,
+        },
         evaluator_paths=[KIT_DIR / name for name in ("run.py", "quality.py", "provenance.py")],
     )
 
@@ -3833,20 +4034,37 @@ def main() -> int:
         log(f"复用: {reuse_run_dir}")
     if reuse_extract_run_dir is not None:
         log(f"复用抽取并重新评分: {reuse_extract_run_dir}（缺少抽取产物的 case 正常抽取）")
+    if relation_only_from_golden:
+        log(
+            "关系-only: golden.entities 种子 → 离线 LLM 关系（跳过 Stage1/确定性补充/结构边；"
+            "使用已批准 ops 服务与统一排队，不调 Backend extract）"
+        )
     if match_mode == "llm":
         judge = score_ctx["judge_client"]
         log(f"评分: LLM-judge model={judge.model} base_url={judge.base_url}")
     else:
         log("评分: identity（type+name 精确匹配）")
-    log(f"空抽取: 0 节点判失败（empty_extraction）" if args.fail_on_empty else "空抽取: 只记录不判失败（--no-fail-on-empty）")
+    if relation_only_from_golden:
+        log(
+            "空抽取: golden 有关系且预测关系为 0 判失败"
+            if args.fail_on_empty
+            else "空抽取: 只记录不判失败（--no-fail-on-empty）"
+        )
+    else:
+        log(f"空抽取: 0 节点判失败（empty_extraction）" if args.fail_on_empty else "空抽取: 只记录不判失败（--no-fail-on-empty）")
     budget_notes = []
     if args.max_case_seconds is not None:
         budget_notes.append(f"case≤{args.max_case_seconds:g}s")
     budget_notes.extend(f"{name}≤{budget:g}s" for name, budget in stage_budgets.items())
     if budget_notes:
         log(f"耗时预算: {', '.join(budget_notes)}")
-    if args.min_f1 > 0:
-        log(f"最低实体 F1: {args.min_f1:g}")
+    gate_min_f1 = 0.0 if relation_only_from_golden else args.min_f1
+    if relation_only_from_golden and args.min_f1 > 0:
+        log(f"最低实体 F1: 已忽略（relation-only，原 --min-f1={args.min_f1:g}）")
+    elif gate_min_f1 > 0:
+        log(f"最低实体 F1: {gate_min_f1:g}")
+    if args.min_relation_f1 > 0:
+        log(f"最低关系 F1: {args.min_relation_f1:g}")
 
     started = datetime.now()
     run_started = time.perf_counter()
@@ -3871,7 +4089,8 @@ def main() -> int:
     snapshot["targets"] = list(args.targets)
     snapshot["system"] = "pipeline" in modes
     snapshot["fail_on_empty"] = args.fail_on_empty
-    snapshot["min_f1"] = args.min_f1
+    snapshot["relation_only_from_golden"] = relation_only_from_golden
+    snapshot["min_f1"] = gate_min_f1
     snapshot["min_relation_f1"] = args.min_relation_f1
     snapshot["require_scored"] = require_scored
     snapshot["baseline"] = str(baseline_path) if baseline_path else None
@@ -4018,6 +4237,7 @@ def main() -> int:
                     reuse_dir=(reuse_run_dir / type_dir.name / case_dir.name) if reuse_run_dir is not None else None,
                     reuse_extract_dir=(reuse_extract_run_dir / type_dir.name / case_dir.name)
                     if reuse_extract_run_dir is not None else None,
+                    relation_only_from_golden=relation_only_from_golden,
                 )
                 record["backend"] = backend
                 record["plugin"] = plugin
@@ -4064,7 +4284,22 @@ def main() -> int:
                 record["empty_extraction"] = False
                 if not failed and golden is not None:
                     gold_entities, gold_relations = normalize_graph(golden)
-                    if gold_entities or gold_relations:
+                    if relation_only_from_golden:
+                        if gold_relations:
+                            empty_blocks = [
+                                block_label
+                                for block_label, block in scored_extract_blocks(record)
+                                if int(block.get("relationships") or 0) == 0
+                            ]
+                            record["empty_extraction"] = bool(empty_blocks)
+                            if empty_blocks and args.fail_on_empty:
+                                failed = True
+                                record["error"] = "empty_extraction"
+                                log(
+                                    f"{label} 关系抽取为空（golden 有关系且预测关系为 0）: "
+                                    f"{', '.join(empty_blocks)}，记为失败"
+                                )
+                    elif gold_entities or gold_relations:
                         empty_blocks = [
                             block_label
                             for block_label, block in scored_extract_blocks(record)
@@ -4118,9 +4353,11 @@ def main() -> int:
         log("未发现任何 case（需要 <类型>/<case>/docs 与同级 extract/golden.json）")
         return 1
 
+    if relation_only_from_golden:
+        summary["metric_scope"] = "relations"
     summary["gate"] = build_run_gate(
         summary,
-        min_f1=args.min_f1,
+        min_f1=gate_min_f1,
         max_case_seconds=args.max_case_seconds,
         stage_budgets=stage_budgets,
         min_relation_f1=args.min_relation_f1,
