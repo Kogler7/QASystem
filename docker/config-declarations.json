@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.5",
+  "version": "2026.10.14.6",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -32,7 +32,10 @@
     "EMBEDDING_MAX_CONCURRENCY",
     "EMBEDDING_MODEL_NAME",
     "EMBEDDING_MODEL_VERSION",
+    "EXECUTION_GPU_LEASE_TTL_SECONDS",
     "EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS",
+    "EXECUTION_WORKER_HEARTBEAT_SECONDS",
+    "EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS",
     "FILE_SERVICE_URL",
     "KG_API_RECORD_DIR",
     "KG_API_RECORD_ENABLED",
@@ -442,25 +445,6 @@
         }
       ]
     },
-    "EXECUTION_GPU_LEASE_TTL_SECONDS": {
-      "desc": "部署参数 EXECUTION_GPU_LEASE_TTL_SECONDS",
-      "default": "900",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/resources.py",
-          "kind": "read",
-          "token": "EXECUTION_GPU_LEASE_TTL_SECONDS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/resources.py",
-          "expression": "'900'"
-        }
-      ]
-    },
     "EXECUTION_GPU_SAFETY_MARGIN_MB": {
       "desc": "部署参数 EXECUTION_GPU_SAFETY_MARGIN_MB",
       "default": "512",
@@ -558,48 +542,6 @@
           "path": "backend/app/execution/resources.py",
           "kind": "reference",
           "token": "EXECUTION_GPU_MEMORY_REQUEST_MB_"
-        }
-      ]
-    },
-    "EXECUTION_WORKER_HEARTBEAT_SECONDS": {
-      "desc": "部署参数 EXECUTION_WORKER_HEARTBEAT_SECONDS",
-      "default": "5",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/worker.py",
-          "kind": "read",
-          "token": "EXECUTION_WORKER_HEARTBEAT_SECONDS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/worker.py",
-          "expression": "'5'"
-        }
-      ]
-    },
-    "EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS": {
-      "desc": "部署参数 EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS",
-      "default": "30",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/resources.py",
-          "kind": "read",
-          "token": "EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/resources.py",
-          "expression": "'30'"
-        },
-        {
-          "path": "backend/app/execution/resources.py",
-          "expression": "'30'"
         }
       ]
     },
@@ -6002,15 +5944,12 @@
       "config_getenv('EXECUTION_WORKER_INSTANCE_ID')",
       "config_getenv('HOSTNAME', socket.gethostname())",
       "config_getenv('EXECUTION_SCHEDULER_ID', 'gpu-capacity-local')",
-      "config_getenv('EXECUTION_GPU_LEASE_TTL_SECONDS', '900')",
-      "config_getenv('EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS', '30')",
       "config_getenv('EXECUTION_SCHEDULER_ID', 'gpu-capacity-local')",
       "config_getenv('EXECUTION_GPU_PROBE_TIMEOUT_SECONDS', '2')",
       "config_getenv('EXECUTION_GPU_PROBE_CACHE_SECONDS', '1')",
       "config_getenv('EXECUTION_GPU_RESERVED_DEVICE_IDS')",
       "config_getenv('EXECUTION_GPU_MAX_LEASES_PER_DEVICE', default_max)",
       "config_getenv(name)",
-      "config_getenv('EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS', '30')",
       "config_getenv('EXECUTION_GPU_SAFETY_MARGIN_MB', '512')",
       "config_getenv('EXECUTION_GPU_SCHEDULING', 'true')",
       "config_getenv('EXECUTION_GPU_MAX_LEASES_PER_WORKER', '1')",
@@ -6050,7 +5989,6 @@
       "config_getenv('EXECUTION_GPU_DEVICE')",
       "config_getenv('MINERU_VLM_SERVER_URL')",
       "config_getenv('EXECUTION_WORKER_ID_UNIQUE', 'false')",
-      "config_getenv('EXECUTION_WORKER_HEARTBEAT_SECONDS', '5')",
       "config_getenv('EXECUTION_REAPER_ENABLED', 'true')"
     ],
     "backend/app/services/algorithm_capabilities.py": [
@@ -6531,7 +6469,13 @@
       "PYTHONPATH": "/app:/app/agent",
       "PYTHONUNBUFFERED": "1"
     },
-    "runtime_directory": "runtime-config"
+    "runtime_directory": "runtime-config",
+    "execution_liveness": {
+      "heartbeat_seconds": 5,
+      "heartbeat_ttl_seconds": 30,
+      "lease_ttl_seconds": 900,
+      "renewal_max_interval_seconds": 5
+    }
   },
   "inference_contract": {
     "engines": {

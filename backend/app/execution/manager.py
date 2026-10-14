@@ -1,11 +1,14 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
+from docker.startup_contract import EXECUTION_LIVENESS
 
 import base64
 import copy
 import os
 import socket
 import time
+import threading
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -35,6 +38,10 @@ class ExecutionCancelled(RuntimeError):
     """
 
 
+class ExecutionLeaseLost(ResourceLeaseUnavailable):
+    """Active work lost its reservation; do not publish or automatically replay it."""
+
+
 @dataclass(slots=True)
 class JobSubmission:
     job_id: str
@@ -48,6 +55,22 @@ def _resource_queue(resource_class: str) -> str:
 
 
 class ExecutionManager:
+    def _keep_allocation(self, allocation, stop_event, lost_event):
+        interval = max(0.01, min(EXECUTION_LIVENESS['renewal_max_interval_seconds'], self.scheduler.lease_ttl_seconds / 3))
+        while not stop_event.wait(interval):
+            try:
+                for lease in allocation.get('gpu_allocations', []):
+                    if not lease.get('lease_id'):
+                        continue
+                    if not self.scheduler.renew(lease, worker_id=allocation.get('worker_id')):
+                        lost_event.set()
+                        logging.getLogger(__name__).error('GPU reservation expired during active task: lease_id=%s', lease.get('lease_id'))
+                        return
+            except Exception:
+                lost_event.set()
+                logging.getLogger(__name__).exception('GPU reservation renewal failed')
+                return
+
     def __init__(
         self,
         store: MemoryExecutionStore | RedisExecutionStore | None = None,
@@ -356,7 +379,32 @@ class ExecutionManager:
             task_payload = self.read_payload(envelope.get("payload_ref") or job.get("payload_ref"))
             if isinstance(task_payload, dict):
                 task_payload = {**task_payload, "__execution": {"allocation": allocation, "job_id": job_id, "task_id": execution["task_id"], "attempt_id": execution["attempt_id"]}}
-            result = runner(task_payload)
+            renewal_stop = threading.Event()
+            renewal_lost = threading.Event()
+            renewal = None
+            if any(lease.get('lease_id') for lease in allocation.get('gpu_allocations', [])):
+                renewal = threading.Thread(target=self._keep_allocation, args=(allocation, renewal_stop, renewal_lost), daemon=True)
+                renewal.start()
+            try:
+                result = runner(task_payload)
+            finally:
+                renewal_stop.set()
+                if renewal is not None:
+                    renewal.join(timeout=6)
+                    if renewal.is_alive():
+                        renewal_lost.set()
+            if not renewal_lost.is_set():
+                try:
+                    for lease in allocation.get('gpu_allocations', []):
+                        if not lease.get('lease_id'):
+                            continue
+                        if not self.scheduler.renew(lease, worker_id=allocation.get('worker_id')):
+                            renewal_lost.set()
+                except Exception:
+                    renewal_lost.set()
+                    logging.getLogger(__name__).exception('GPU reservation final ownership check failed')
+            if renewal_lost.is_set():
+                raise ExecutionLeaseLost('GPU资源预约续期失败；本次结果不发布，请排查后人工重试')
             persist_started = time.monotonic()
             result_ref = self.artifacts.write_result(job_id, result)
             finished_at = iso_now()

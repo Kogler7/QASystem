@@ -1,5 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
+from docker.startup_contract import EXECUTION_LIVENESS
 
 import json
 import os
@@ -199,7 +200,7 @@ class ResourceScheduler:
         self.store = store
         self.worker_id = worker_id or config_getenv("EXECUTION_WORKER_ID", "gateway-inline")
         self.inventory = inventory or GpuInventory()
-        self.lease_ttl_seconds = max(5, int(config_getenv("EXECUTION_GPU_LEASE_TTL_SECONDS", "900")))
+        self.lease_ttl_seconds = EXECUTION_LIVENESS['lease_ttl_seconds']
         self.prefix = getattr(store, "prefix", config_getenv("EXECUTION_KEY_PREFIX", "qasystem:execution"))
 
     @property
@@ -239,6 +240,7 @@ class ResourceScheduler:
         gpu_devices: list[str],
         snapshots: list[GpuSnapshot] | None = None,
         endpoint: str | None = None,
+        queue_consumer_id: str | None = None,
     ) -> dict[str, Any]:
         record = {
             "worker_id": worker_id,
@@ -251,7 +253,9 @@ class ResourceScheduler:
             "host_id": socket.gethostname(),
             "updated_at": time.time(),
         }
-        ttl = max(self.lease_ttl_seconds, int(config_getenv("EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS", "30")))
+        if queue_consumer_id:
+            record['queue_consumer_id'] = queue_consumer_id
+        ttl = EXECUTION_LIVENESS['heartbeat_ttl_seconds']
         if self.redis is not None:
             self.redis.set(self._worker_key(worker_id), json.dumps(record, ensure_ascii=False, separators=(",", ":")), ex=ttl)
         else:
@@ -259,12 +263,23 @@ class ResourceScheduler:
                 self._local_workers[worker_id] = record
         return record
 
-    def unregister_worker(self, worker_id: str) -> None:
+    def unregister_worker(self, worker_id: str, *, queue_consumer_id: str | None = None) -> None:
         if self.redis is not None:
-            self.redis.delete(self._worker_key(worker_id))
+            if queue_consumer_id:
+                self.redis.eval("""
+                local raw = redis.call('get', KEYS[1])
+                if not raw then return 0 end
+                local record = cjson.decode(raw)
+                if record.queue_consumer_id ~= ARGV[1] then return 0 end
+                return redis.call('del', KEYS[1])
+                """, 1, self._worker_key(worker_id), queue_consumer_id)
+            else:
+                self.redis.delete(self._worker_key(worker_id))
         else:
             with self._local_lock:
-                self._local_workers.pop(worker_id, None)
+                record = self._local_workers.get(worker_id)
+                if not queue_consumer_id or (record and record.get('queue_consumer_id') == queue_consumer_id):
+                    self._local_workers.pop(worker_id, None)
 
     def list_workers(self, resource_class: str | None = None) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
@@ -281,7 +296,7 @@ class ResourceScheduler:
         else:
             with self._local_lock:
                 now = time.time()
-                ttl = max(5, int(config_getenv("EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS", "30")))
+                ttl = EXECUTION_LIVENESS['heartbeat_ttl_seconds']
                 for worker_id, item in list(self._local_workers.items()):
                     if now - float(item.get("updated_at", 0)) > ttl:
                         self._local_workers.pop(worker_id, None)
@@ -529,6 +544,40 @@ class ResourceScheduler:
                     return False
                 worker_leases[lease_id] = now + self.lease_ttl_seconds
             leases[lease_id] = (budget_mb, now + self.lease_ttl_seconds)
+            return True
+
+    def renew(self, lease: dict[str, Any], *, worker_id: str | None = None) -> bool:
+        """Extend an existing reservation, never resurrect an expired one."""
+        lease_id, physical_index = lease.get('lease_id'), str(lease.get('physical_index', ''))
+        worker_id = worker_id or lease.get('worker_id')
+        if not lease_id or not physical_index:
+            return False
+        device = GpuSnapshot(physical_index, lease.get('device_uuid'), None, None, None, 'renew')
+        key, worker_key = self._lease_key(device), self._worker_lease_key(worker_id or 'unassigned')
+        now = time.time()
+        if self.redis is not None:
+            script = """
+            local raw = redis.call('hget', KEYS[1], ARGV[1])
+            if not raw then return 0 end
+            local budget, expiry = string.match(raw, '^([^|]+)|([^|]+)')
+            if (tonumber(expiry) or 0) <= tonumber(ARGV[2]) then return 0 end
+            local until_time = tonumber(ARGV[2]) + tonumber(ARGV[3])
+            redis.call('hset', KEYS[1], ARGV[1], budget .. '|' .. tostring(until_time))
+            redis.call('expire', KEYS[1], ARGV[3])
+            if ARGV[4] ~= '' then
+                redis.call('hset', KEYS[2], ARGV[1], tostring(until_time))
+                redis.call('expire', KEYS[2], ARGV[3])
+            end
+            return 1
+            """
+            return bool(self.redis.eval(script, 2, key, worker_key, lease_id, now, self.lease_ttl_seconds, worker_id or ''))
+        with self._local_lock:
+            record = self._local_leases.get(key, {}).get(lease_id)
+            if not record or record[1] <= now:
+                return False
+            self._local_leases[key][lease_id] = (record[0], now + self.lease_ttl_seconds)
+            if worker_id:
+                self._local_worker_leases.setdefault(worker_key, {})[lease_id] = now + self.lease_ttl_seconds
             return True
 
     def release(self, lease: GpuLease | dict[str, Any] | None, *, worker_id: str | None = None) -> bool:

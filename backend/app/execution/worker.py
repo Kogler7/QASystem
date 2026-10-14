@@ -1,5 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
+from docker.startup_contract import EXECUTION_LIVENESS
 
 import argparse
 import logging
@@ -7,14 +8,16 @@ import os
 import signal
 import socket
 import time
+import threading
 import uuid
 
 from backend.app.responses import ErrorCode, is_retryable
 
-from .manager import ExecutionCancelled, ExecutionManager
+from .manager import ExecutionCancelled, ExecutionLeaseLost, ExecutionManager
 from .operations import run_operation
 from .queue import RedisTaskQueue
 from .store import RedisExecutionStore
+from .models import TERMINAL_STATUSES
 from external_services.application import bind_user_headers
 
 
@@ -30,6 +33,8 @@ def _error_retryable(exc: Exception) -> bool:
     本体无效 4006 等确定性失败不再白重试；未知异常（网络/依赖抖动）保持
     可重试。取消不是失败，调用方先判 ``ExecutionCancelled``。
     """
+    if isinstance(exc, ExecutionLeaseLost):
+        return False
     code = getattr(exc, "code", None)
     if isinstance(code, ErrorCode):
         return is_retryable(code)
@@ -56,7 +61,9 @@ class WorkerRuntime:
             configured_worker_id = f"{configured_worker_id}-{socket.gethostname()}"
         self.worker_id = configured_worker_id
         os.environ["EXECUTION_WORKER_ID"] = self.worker_id
-        os.environ["EXECUTION_WORKER_INSTANCE_ID"] = uuid.uuid4().hex
+        instance_id = uuid.uuid4().hex
+        os.environ["EXECUTION_WORKER_INSTANCE_ID"] = instance_id
+        self.consumer_id = self.worker_id + '@' + instance_id
         self.manager = ExecutionManager()
         if not isinstance(self.manager.store, RedisExecutionStore):
             raise RuntimeError("Worker requires EXECUTION_REDIS_URL and Redis; memory execution is test-only")
@@ -72,7 +79,7 @@ class WorkerRuntime:
         self._last_reap = 0.0
 
     def _heartbeat(self, *, force: bool = False) -> None:
-        if not force and time.monotonic() - self._last_heartbeat < float(config_getenv("EXECUTION_WORKER_HEARTBEAT_SECONDS", "5")):
+        if not force and time.monotonic() - self._last_heartbeat < EXECUTION_LIVENESS['heartbeat_seconds']:
             return
         devices = [self.gpu_device] if self.gpu_device else []
         snapshots = self.manager.scheduler.inventory.snapshots(force=True) if devices else []
@@ -82,7 +89,10 @@ class WorkerRuntime:
             gpu_devices=devices,
             snapshots=snapshots,
             endpoint=config_getenv("MINERU_VLM_SERVER_URL"),
+            queue_consumer_id=getattr(self, 'consumer_id', None),
         )
+        if getattr(self, 'consumer_id', None):
+            self.queue.heartbeat_consumer(self.consumer_id)
         self._last_heartbeat = time.monotonic()
 
     def _retry_envelope(self, resource_class: str, envelope: dict) -> dict:
@@ -173,20 +183,26 @@ class WorkerRuntime:
     def _reap(self, resource_class: str) -> None:
         """收回并代投本 worker 名下 idle 超阈值的滞留消息。
 
-        不做超时强杀：min-idle 默认 600 秒（EXECUTION_REAPER_MIN_IDLE_SECONDS），
-        只有崩溃退出（finally 没走到 ack）的消息才会滞留到该阈值。共享队列与
+        不做超时强杀：min-idle 默认 600 秒（EXECUTION_REAPER_MIN_IDLE_SECONDS）。
+        队列同时检查实际消费者实例的心跳；正常长任务不会因 idle 超阈值被抢走。共享队列与
         指向本 worker 的定向队列都收割；指向其他 worker 的定向消息不在此处理。
         """
         for target in (None, self.worker_id):
             for message_id, envelope in self.queue.reclaim(
                 resource_class,
-                self.worker_id,
+                getattr(self, 'consumer_id', self.worker_id),
                 min_idle_seconds=self._reaper_min_idle_seconds,
                 target_worker=target,
             ):
-                self._handle_reclaimed(resource_class, message_id, envelope)
+                self._handle_reclaimed(resource_class, message_id, envelope, target_worker=target)
 
-    def _handle_reclaimed(self, resource_class: str, message_id: str, envelope: dict) -> None:
+    def _ack_reclaimed(self, resource_class, message_id, target_worker):
+        if target_worker is None:
+            self.queue.ack(resource_class, message_id)
+        else:
+            self.queue.ack(resource_class, message_id, target_worker=target_worker)
+
+    def _handle_reclaimed(self, resource_class: str, message_id: str, envelope: dict, *, target_worker=None) -> None:
         """处理一条收回的滞留消息：重投（attempt+1）或按上限/取消态终态化。"""
         job_id = envelope.get("job_id")
         attempt = int(envelope.get("attempt", 1))
@@ -195,11 +211,19 @@ class WorkerRuntime:
         if not job:
             # job 记录已过期：消息没有可归属的任务，清掉鉴权上下文后丢弃。
             self.manager.store.delete_auth_context(envelope.get("auth_context_id"))
-            self.queue.ack(resource_class, message_id)
+            self.manager.release_allocation(envelope.get('reserved_allocation'))
+            self._ack_reclaimed(resource_class, message_id, target_worker)
             LOGGER.warning("reaped orphaned message without job, dropped: message_id=%s job_id=%s", message_id, job_id)
+            return
+        if job.get('status') in TERMINAL_STATUSES:
+            # Completion can be durable even when the consumer crashes before ACK.
+            self.manager.store.delete_auth_context(envelope.get('auth_context_id'))
+            self.manager.release_allocation(envelope.get('reserved_allocation'))
+            self._ack_reclaimed(resource_class, message_id, target_worker)
             return
         if job.get("cancel_requested"):
             self.manager.store.delete_auth_context(envelope.get("auth_context_id"))
+            self.manager.release_allocation(envelope.get('reserved_allocation'))
             self.manager.store.update_job(
                 job_id,
                 status="cancelled",
@@ -207,7 +231,7 @@ class WorkerRuntime:
                 error={"type": "ExecutionCancelled", "message": "任务在滞留期间被取消，不再重投"},
             )
             self.manager.hub.emit(job_id, "job.cancelled", operation=envelope.get("operation"), stage="reap")
-            self.queue.ack(resource_class, message_id)
+            self._ack_reclaimed(resource_class, message_id, target_worker)
             return
         if attempt >= max_attempts:
             error = {
@@ -215,9 +239,10 @@ class WorkerRuntime:
                 "message": f"任务重投达到上限 {max_attempts}（含崩溃重投），不再重投",
             }
             self.manager.store.delete_auth_context(envelope.get("auth_context_id"))
+            self.manager.release_allocation(envelope.get('reserved_allocation'))
             self.manager.store.update_job(job_id, status="failed", stage="reap", error=error)
             self.manager.hub.emit(job_id, "job.failed", level="ERROR", operation=envelope.get("operation"), stage="reap", details={**error, "attempt": attempt})
-            self.queue.ack(resource_class, message_id)
+            self._ack_reclaimed(resource_class, message_id, target_worker)
             LOGGER.error("reaped message exceeded max attempts, job failed: job_id=%s attempt=%s", job_id, attempt)
             return
         next_envelope = self._retry_envelope(resource_class, envelope)
@@ -245,12 +270,34 @@ class WorkerRuntime:
             stage="reap",
             details={"attempt": attempt + 1, "max_attempts": max_attempts, "reaped_message_id": str(message_id)},
         )
-        self.queue.ack(resource_class, message_id)
+        self._ack_reclaimed(resource_class, message_id, target_worker)
 
     def stop(self, *_args) -> None:
         self.stopped = True
 
+    def _keep_alive(self, stop_event) -> None:
+        # A synchronous model call must not suppress process liveness reporting.
+        while not stop_event.wait(EXECUTION_LIVENESS['heartbeat_seconds']):
+            try:
+                self._heartbeat(force=True)
+            except Exception:
+                LOGGER.exception('worker heartbeat failed: id=%s', self.worker_id)
+
     def run(self) -> None:
+        stop_event = threading.Event()
+        heartbeat = threading.Thread(target=self._keep_alive, args=(stop_event,), daemon=True)
+        self._heartbeat(force=True)
+        heartbeat.start()
+        try:
+            self._run_messages()
+        finally:
+            stop_event.set()
+            heartbeat.join(timeout=6)
+            self.manager.scheduler.unregister_worker(self.worker_id, queue_consumer_id=getattr(self, 'consumer_id', None))
+            if getattr(self, 'consumer_id', None):
+                self.queue.remove_consumer_heartbeat(self.consumer_id)
+
+    def _run_messages(self) -> None:
         LOGGER.info("worker ready: id=%s resource_class=%s gpu=%s", self.worker_id, self.resource_class, config_getenv("CUDA_VISIBLE_DEVICES", ""))
         self._heartbeat(force=True)
         while not self.stopped:
@@ -259,10 +306,10 @@ class WorkerRuntime:
             handled = False
             for resource_class in self.resource_classes:
                 target = self.worker_id
-                message = self.queue.consume(resource_class, self.worker_id, block_ms=10, target_worker=target)
+                message = self.queue.consume(resource_class, getattr(self, 'consumer_id', self.worker_id), block_ms=10, target_worker=target)
                 if message is None:
                     target = None
-                    message = self.queue.consume(resource_class, self.worker_id, block_ms=50)
+                    message = self.queue.consume(resource_class, getattr(self, 'consumer_id', self.worker_id), block_ms=50)
                 if message is None:
                     continue
                 handled = True
@@ -304,7 +351,6 @@ class WorkerRuntime:
                 break
             if not handled:
                 time.sleep(0.05)
-        self.manager.scheduler.unregister_worker(self.worker_id)
 
 
 def main() -> None:

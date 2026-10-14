@@ -7,6 +7,12 @@ PROCESS_ENVIRONMENT = {
     'PYTHONPATH': '/app:/app/agent',
     'PYTHONUNBUFFERED': '1',
 }
+EXECUTION_LIVENESS = {
+    'heartbeat_seconds': 5,
+    'heartbeat_ttl_seconds': 30,
+    'lease_ttl_seconds': 900,
+    'renewal_max_interval_seconds': 5,
+}
 
 
 def runtime_directory(root):

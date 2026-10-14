@@ -1,5 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
+from docker.startup_contract import EXECUTION_LIVENESS
 
 import json
 import os
@@ -59,6 +60,13 @@ class RedisTaskQueue:
         suffix = f":worker:{target_worker}" if target_worker else ""
         return f"{self.prefix}:{resource_class}{suffix}"
 
+    def heartbeat_consumer(self, consumer: str) -> None:
+        self.redis.set(f'{self.store.prefix}:queue-consumers:{consumer}', 'alive',
+                       ex=EXECUTION_LIVENESS['heartbeat_ttl_seconds'])
+
+    def remove_consumer_heartbeat(self, consumer: str) -> None:
+        self.redis.delete(f'{self.store.prefix}:queue-consumers:{consumer}')
+
     def enqueue(self, resource_class: str, envelope: dict[str, Any], target_worker: str | None = None) -> str:
         return self.redis.xadd(
             self._stream(resource_class, target_worker),
@@ -108,25 +116,38 @@ class RedisTaskQueue:
         count: int = 32,
         target_worker: str | None = None,
     ) -> list[tuple[str, dict[str, Any]]]:
-        """用 XAUTOCLAIM 收回 ``consumer`` 名下滞留超过 ``min_idle_seconds`` 的消息。
-
-        只用于崩溃恢复：正常路径的消息在消费循环的 finally 里即时 ack，
-        不会滞留到 idle 阈值。min-idle-time 取秒级阈值，避免误收正常在途
-        消息（长流程合法，不做超时强杀）。
-        """
+        """Reclaim only idle messages whose actual consumer has lost its heartbeat."""
         self.ensure_group(resource_class, target_worker)
-        _cursor, entries, _deleted = self.redis.xautoclaim(
-            self._stream(resource_class, target_worker),
-            self.consumer_group,
-            consumer,
-            min_idle_time=max(0, int(min_idle_seconds * 1000)),
-            start_id="0",
-            count=count,
-        )
-        reclaimed: list[tuple[str, dict[str, Any]]] = []
-        for entry in entries:
-            message_id, values = entry
-            reclaimed.append((message_id, json.loads(values["payload"])))
+        stream = self._stream(resource_class, target_worker)
+        count = max(1, int(count))
+        cursor = getattr(self, '_reap_cursors', {}).get(stream, '-')
+        pending = self.redis.xpending_range(stream, self.consumer_group, cursor, '+', count,
+                                           idle=max(0, int(min_idle_seconds * 1000)))
+        if not hasattr(self, '_reap_cursors'):
+            self._reap_cursors = {}
+        self._reap_cursors[stream] = '(' + str(pending[-1]['message_id']) if len(pending) == count else '-'
+        script = """
+        if redis.call('exists', KEYS[2]) == 1 then return {} end
+        local legacy = redis.call('get', KEYS[3])
+        if legacy then
+            local ok, record = pcall(cjson.decode, legacy)
+            if not ok or not record.queue_consumer_id then return {} end
+        end
+        local current = redis.call('xpending', KEYS[1], ARGV[1], ARGV[3], ARGV[3], 1)
+        if #current == 0 or current[1][2] ~= ARGV[4] then return {} end
+        return redis.call('xclaim', KEYS[1], ARGV[1], ARGV[2], ARGV[5], ARGV[3])
+        """
+        reclaimed = []
+        for entry in pending:
+            owner, message_id = entry['consumer'], entry['message_id']
+            entries = self.redis.eval(script, 3, stream,
+                                      f'{self.store.prefix}:queue-consumers:{owner}',
+                                      f'{self.store.prefix}:workers:{owner}',
+                                      self.consumer_group, consumer, message_id, owner,
+                                      max(0, int(min_idle_seconds * 1000)))
+            for reclaimed_id, fields in entries:
+                values = dict(zip(fields[::2], fields[1::2]))
+                reclaimed.append((reclaimed_id, json.loads(values['payload'])))
         return reclaimed
 
 

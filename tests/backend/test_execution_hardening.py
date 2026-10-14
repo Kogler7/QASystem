@@ -270,25 +270,25 @@ class _FakeRedis:
     def xgroup_create(self, *_args, **_kwargs):
         raise Exception("BUSYGROUP consumer group name already exists")
 
-    def xautoclaim(self, name, groupname, consumername, min_idle_time, start_id="0", count=None):
-        self.calls.append(
-            {"name": name, "group": groupname, "consumer": consumername, "min_idle_time": min_idle_time}
-        )
-        return ("0-0", self.entries, [])
+    def xpending_range(self, name, groupname, minimum, maximum, count, idle):
+        self.calls.append({'name': name, 'group': groupname, 'min_idle_time': idle})
+        return [{'message_id': mid, 'consumer': 'dead-worker'} for mid, _ in self.entries]
+
+    def eval(self, script, key_count, stream, consumer_key, worker_key, group, consumer, message_id, owner, idle):
+        self.calls.append({'consumer': consumer, 'worker_key': worker_key, 'owner': owner})
+        return [[mid, ['payload', fields['payload']]] for mid, fields in self.entries if mid == message_id]
 
 
-def test_redis_queue_reclaim_parses_xautoclaim_entries():
+def test_redis_queue_reclaim_parses_guarded_claim_entries():
     redis = _FakeRedis([("1700000000000-0", {"payload": '{"job_id":"j1","attempt":2}'})])
     task_queue = RedisTaskQueue(SimpleNamespace(redis=redis, prefix="qa"))
-
     reaped = task_queue.reclaim("cpu.chunk", "cpu-0", min_idle_seconds=600)
-
     assert reaped == [("1700000000000-0", {"job_id": "j1", "attempt": 2})]
-    assert redis.calls[0]["name"] == "qa:queue:cpu.chunk"
-    assert redis.calls[0]["group"] == "workers"
-    assert redis.calls[0]["consumer"] == "cpu-0"
-    # min-idle 以毫秒下发（600s -> 600000ms）。
-    assert redis.calls[0]["min_idle_time"] == 600000
+    assert redis.calls[0]['name'] == 'qa:queue:cpu.chunk'
+    assert redis.calls[0]['group'] == 'workers'
+    assert redis.calls[0]['min_idle_time'] == 600000
+    assert redis.calls[1]['consumer'] == 'cpu-0'
+    assert redis.calls[1]['worker_key'] == 'qa:workers:dead-worker'
 
 
 def test_memory_queue_reclaim_is_empty():
