@@ -163,8 +163,8 @@ def changes(previous, current):
     return result
 
 
-def record(directory, current, *, reason, reviewer, root=None):
-    """Only called after interactive review; no CLI auto-approval option exists."""
+def record(directory, current, *, reason, reviewer, root=None, actor='human', audit=None):
+    """Publish history after the shared validated UI/automation transaction."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     directory.chmod(0o700)
@@ -172,7 +172,7 @@ def record(directory, current, *, reason, reviewer, root=None):
     revision = int(previous.get('revision', 0)) + 1 if previous else 1
     data = {'schema': 1, 'revision': revision, 'time': datetime.now(timezone.utc).isoformat(),
             'reviewer': reviewer, 'reason': reason, 'previous': digest(json.dumps(previous, sort_keys=True).encode()) if previous else None,
-            'changes': changes(previous, current), 'snapshot': current}
+            'changes': changes(previous, current), 'snapshot': current, 'actor': actor, 'audit': audit or {}}
     from docker.config_database import record_approval
     record_approval(directory, data, root=root)
     history = directory / 'history'

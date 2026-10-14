@@ -52,7 +52,8 @@ def record_approval(directory, approved, *, root=None):
                 'release': approved['snapshot']['values'].get('declarations.version', {}).get('value'),
                 'source_commit': approved['snapshot']['values'].get('release.source_commit', {}).get('value'),
                 'time': approved['time'], 'files': approved['snapshot']['files'],
-                'values': approved['snapshot']['values']}
+                'values': approved['snapshot']['values'], 'actor': approved.get('actor', 'human'),
+                'reviewer': approved.get('reviewer'), 'reason': approved.get('reason'), 'audit': approved.get('audit', {})}
     private_write(version / 'environment.json', json.dumps(metadata, ensure_ascii=False, indent=2).encode())
     for name in ('config.json', 'models.compose.json'):
         source = directory / name

@@ -3,7 +3,7 @@
 - 应用配置统一从 `docker.configuration` 读取，不得在 Backend、Agent、算法、外部服务适配器、模型服务或 MCP 应用中新增直接的 `os.getenv`、`os.environ.get`、环境下标读取。启动时绑定 GPU、传递子进程环境等进程管理操作不作为业务配置读取入口。
 - 配置声明维护于 `docker/config-declarations.json`，部署默认值仍只在根 `.env.example` 定义；声明版本保存在 `docker/config-releases/`，旧版本不得覆盖。声明包括说明、默认值、消费者、热更新属性和兼容回退表达式。增删消费者、修改默认回退或热更新属性必须登记新声明版本。
 - 发布、打包和部署必须通过 `python -m docker.config_contract` 门禁；不得静默重新扫描生成声明来消除失败，不得保留失去消费者的配置。外部依赖自行读取的参数必须明确登记外部消费契约。
-- 每次人工批准自动归档独立配置版本；保存批准、容器可读验证和进程实际读取分开记录。原始 `.env` 归档仅保存在私有目录，不进入 Git、报告或 JSON 历史视图；JSON 只保留凭据指纹。不得由 Agent 代替用户批准配置版本。
+- 每次受控配置事务批准自动归档独立配置版本；保存批准、容器可读验证和进程实际读取分开记录。原始 `.env` 归档仅保存在私有目录，不进入 Git、报告或 JSON 历史视图；JSON 只保留凭据指纹。允许 Agent 在用户授权范围内通过 ops 受控事务自动操作并生成批准版本，必须记录操作者、原因及脱敏变更清单；不得手改批准记录。
 
 - The only application environment image is `qasystem-env-v1`.
 - `Dockerfile` must contain CUDA, vLLM, Torch, system tools, language runtimes and dependency contracts only. It must not copy Backend, Agent, algorithm, MCP application source, models, deployment secrets or runtime data into the final image.
@@ -20,8 +20,8 @@
 # Configuration Maintenance Rules
 
 - 环境变量清单只在根 `.env.example` 维护；新增、删除、改默认值或生效方式，必须同步消费者、测试及 `docs/部署/配置体系说明.md` 中的迭代记录，并随代码提交。不得通过业务代码、Compose 或评测参数文件另设一套默认部署配置。
-- 部署 `.env` 和 `runtime-config/config.json` 的变更必须在 CLI UI 展示与上次批准版本的差异，由用户逐页审核、填写原因并人工确认。AI、脚本、CI 不得替用户生成生产/测试部署批准记录；单元测试的临时目录记录除外。
-- 配置 guard 必须在部署前及应用容器启动时执行。未经确认、文件与批准记录不符、清单升级未审核或历史记录不一致时拒绝启动，不得添加跳过 guard、自动确认或非交互批准选项。
+- 部署 `.env` 和 `runtime-config/config.json` 的变更统一通过 ops 配置事务处理：CLI UI 支持人工逐页审核，受控非交互入口支持已授权 Agent/脚本操作；两种入口必须使用同一迁移、校验、版本比较、归档与失败回滚流程，填写原因、记录操作者，并生成脱敏变更清单。不得直接修改部署文件或伪造批准记录。
+- 配置 guard 必须在部署前及应用容器启动时执行。未经确认、文件与批准记录不符、清单升级未审核或历史记录不一致时拒绝启动，不得添加跳过 guard 或不经校验的自动确认选项；受控非交互配置事务仍必须通过全部 guard。
 - 批准记录和历史版本保存在部署运行时目录，仅本地保存、凭据脱敏，不进入 Git 或交付镜像。修改 `.env` 需要 recreate；仅修改已挂载热配置影响新请求，无需重建环境镜像。
 
 # Git Workflow Rules

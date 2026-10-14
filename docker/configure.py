@@ -675,12 +675,9 @@ def review_save(config: Configuration) -> bool:
                 continue
             if input(f'输入 confirm r{revision} 批准并保存，其他输入取消: ') != f'confirm r{revision}':
                 return False
-            # A concurrent edit is rejected by save before any writes.
-            config.save()
-            actual = guard.snapshot(config.root, config.directory)
-            if actual != current:
-                raise ValueError('审核过程中配置发生变化；未生成批准记录，请重新审核')
-            guard.record(config.directory, actual, reason=reason, reviewer=getpass.getuser(), root=config.root)
+            from docker.config_transaction import apply as commit_configuration
+            commit_configuration(config, reason=reason, actor='human', reviewer=getpass.getuser(),
+                                 base_revision=revision - 1, expected_snapshot=current)
             return True
 
 

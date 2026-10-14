@@ -42,7 +42,7 @@ ops status
 
 1. 设置 `QASYSTEM_ENV_IMAGE`、`QASYSTEM_SOURCE_DIR` 和 `HOST_MODELS_DIR`。源码、权重分别只读挂载，镜像沿用 `qasystem-env-v1`。
 2. 在“模型”分区勾选模型，选择适用的推理方式和设备，设置宿主端口、权重相对路径及引擎参数。vLLM 可设置上下文和显存比例；Clef/NanoJev 使用原生适配器参数。GPU 编号需要在允许范围内；不要直接照搬生产默认的 `4,5,6,7` 到卡数不同的测试机。MinerU 的解析引擎仍由 Backend worker 管理，不能再登记一个由 ops 重复启动的实例。
-3. 按 `s`，逐页审核差异，填写变更原因并输入界面要求的确认词。取消不批准、不写入实际配置。Agent 不能替用户确认。
+3. 按 `s`，逐页审核差异，填写变更原因并输入界面要求的确认词。取消不批准、不写入实际配置。Agent 可使用下述受控自动配置入口；不需要模拟键盘或逐页人工确认。
 4. 退出后执行 `ops check`，再执行 `ops deploy`。部署检查已批准版本、模型启动条件、GPU 与端口冲突，并应用启用计划；当前还会重新创建 Backend、Agent。
 5. 用 `ops status` 查看配置批准版本及容器状态，再做一次实际推理请求验证。配置批准、容器运行、模型能完成请求是不同状态。
 
@@ -73,7 +73,7 @@ ops status
 
 | 命令 | 用途与边界 |
 | --- | --- |
-| `ops config` | 查询状态、编辑、人工审核；入口时备份原配置 |
+| `ops config` | 配置 GUI；入口时备份原配置，保存经过统一事务 |
 | `ops check` | 检查批准版本、结构和配置冲突，不部署 |
 | `ops deploy` | 应用已批准的启动配置和独立模型计划 |
 | `ops reload` | 检查 Backend / Agent 内热配置可读，不加载模型、不重启、不验证下游请求 |
@@ -97,7 +97,7 @@ ops status
 | --- | --- |
 | 找不到 `ops` | 新开终端检查 PATH，或直接使用 `python3 ops.py` |
 | UI 提示需要交互终端 | 交互 SSH 登录，远程单命令使用 `ssh -t` |
-| guard 拒绝部署 | 用 `ops config` 查看版本和差异，人工审核；不要手改批准文件绕过 |
+| guard 拒绝部署 | 用 `ops config` 查看版本和差异，通过 GUI 或受控自动事务审核；不要手改批准文件绕过 |
 | 修改 `.env` 后仍是旧值 | 手改会使批准指纹失效；通过 UI 审核后部署，启动参数需要重新创建容器 |
 | 权重已找到但没有模型服务 | 检查是否勾选、审核并执行部署；目录存在只证明目录检查通过 |
 | `reload` 提示模型计划未部署 | 模型启动参数需要 `ops deploy` |
@@ -110,3 +110,33 @@ ops status
 执行层现在自动维持长任务心跳和GPU资源预约，用户无需设置心跳间隔或预约TTL。`EXECUTION_REAPER_MIN_IDLE_SECONDS`仍是滞留消息进入恢复检查的等待时间；它不是模型调用或任务超时。只有取走消息的消费者实例失联后，消息才能被回收。任务已完成但进程没来得及确认消息时，只补确认，不重做任务。
 
 资源续期失败会记录本地错误，丢弃本次结果并停止自动重试；在`ops status`和执行日志中排查Redis与worker后，再人工重试。不能把配置已批准、容器可读或心跳正常当作任务完成证据。常驻模型的启停和账号服务限流继续由原有ops服务登记管理，本批没有改动模型地址、密钥或GPU选择。详见[执行任务恢复与GPU预约](执行任务恢复与GPU预约.md)。
+
+
+## Agent 自动配置和变更清单
+
+GUI 是面向人的入口，不是唯一入口。已授权 Agent 可用同一套配置迁移、冲突检查、版本归档和 guard 自动保存；完成配置不代表已经部署或服务健康。
+
+```bash
+ops config plan --patch /private/config-patch.json
+ops config apply --patch /private/config-patch.json --base-revision 3 --reason "调整任务并发" --actor agent
+```
+
+首次没有批准版本时 `--base-revision 0`。计划输出脱敏 JSON，包含当前批准版本、源代码版本、声明版本、变化及热更新/进程重启/容器重建分类。`diff` 与 `plan` 相同；这两个动作不保存有效配置或批准记录，只会像打开 GUI 一样生成私有备份。
+
+patch 示例（没有密钥）：
+
+```json
+{
+  "settings": {"API_RECORD_RETENTION_DAYS": "14"},
+  "services": {"extract-api": {"limits": {"max_concurrency": 4, "qps": 0, "qpm": 30}}},
+  "routes": {"extract": "extract-api"}
+}
+```
+
+`settings` 使用当前模板中的标准变量名，值为字符串；按 ID 合并 models/services/accounts 记录，routes 指向服务 ID；登记记录为 null 表示明确删除。嵌套对象以 patch 中给出的对象替换，修改 limits 等对象时需给出希望保留的全部字段。未知、退役参数、悬空路由、非法服务或未解决迁移冲突会拒绝保存。
+
+迁移冲突需在 `resolve_conflicts` 中逐项声明 `keep`（保留登记值）、`patched`（同时明确提供标准配置取值）或 `retire`（确认该旧入口退役），所有解决动作入审计。不能通过空 patch 静默跳过冲突。base_revision 不匹配、文件被其他进程修改或归档写入失败时事务失败，不推进批准指针。
+
+凭据仅能通过私有 patch 文件中的已登记秘密字段输入，服务保存凭据变量引用；不要把密钥写在命令参数、变更原因或普通报告中。patch 不属于源码，不提交 Git。原始 `.env` 仍留在私有备份与版本归档，JSON 历史和报告只记录凭据指纹。
+
+每次成功保存生成 `runtime-config/changes/rNNNNNN/changes.json` 和 `changes.md`，记录操作者、原因、基准版本、源代码/声明版本及脱敏差异，并立即刷新 `runtime-config/database.json`。之后是否 reload、局部重启或 deploy 按报告动作和部署授权另行执行；自动配置没有 guard 跳过开关。

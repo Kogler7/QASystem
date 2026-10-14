@@ -1,4 +1,4 @@
-"""Unified QASystem control entry point; never approves configuration."""
+"""Unified QASystem control with validated, audited configuration transactions."""
 from __future__ import annotations
 
 import argparse
@@ -132,12 +132,17 @@ def main(argv=None):
     parser.add_argument('--project-dir', type=Path, default=Path.cwd())
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('install', help='安装用户级 ops 命令并登记 PATH，无需管理员权限')
-    sub.add_parser('config', help='打开配置 UI，人工审核并保存')
+    config_parser = sub.add_parser('config', help='配置 GUI 或受控自动配置事务')
+    config_parser.add_argument('operation', nargs='?', choices=['plan', 'diff', 'apply'])
+    config_parser.add_argument('--patch', type=Path, help='私有 JSON patch 文件，不在命令参数中填写凭据')
+    config_parser.add_argument('--reason', help='变更原因，不得包含凭据')
+    config_parser.add_argument('--actor', choices=['human', 'agent', 'automation'], default='agent')
+    config_parser.add_argument('--base-revision', type=int, help='计划基准版本；首次为 0，apply 必填')
     sub.add_parser('check', help='校验批准版本及配置冲突，不部署')
     sub.add_parser('status', help='显示批准版本及容器状态，不显示凭据')
     history = sub.add_parser('history', help='查看配置版本和实际读取记录，生成本地 JSON 数据库视图')
     history.add_argument('--json', action='store_true', help='输出脱敏 JSON 历史')
-    sub.add_parser('deploy', help='调用现有部署流程；必须已在 UI 确认')
+    sub.add_parser('deploy', help='调用现有部署流程；必须通过有效配置事务')
     reload_parser = sub.add_parser('reload', help='核对动态配置在容器内可读，不重启容器')
     reload_parser.add_argument('--services', nargs='+', choices=['backend', 'agent'], default=['backend', 'agent'])
     for action in ('restart', 'logs'):
@@ -148,6 +153,14 @@ def main(argv=None):
     root = args.project_dir.resolve()
     try:
         if args.action == 'config':
+            if args.operation:
+                from docker.config_transaction import run as configuration_transaction
+                report = configuration_transaction(root, operation=args.operation, patch_path=args.patch,
+                    reason=args.reason, actor=args.actor, base_revision=args.base_revision)
+                print(json.dumps(report, ensure_ascii=False, indent=2))
+                return 0
+            if args.patch is not None or args.reason is not None or args.base_revision is not None:
+                raise ControlError('请指定 config plan/diff/apply；无子操作时打开 GUI')
             from docker.configure import main as configure
             return configure(['--project-dir', str(root)])
         if args.action == 'install':
