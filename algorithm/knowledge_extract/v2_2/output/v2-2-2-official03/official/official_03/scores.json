@@ -1,0 +1,3670 @@
+{
+  "group": "official",
+  "case": "official_03",
+  "files": [
+    "关于印发《中国中车股份有限公司产品研发管理办法》的通知.pdf",
+    "表单.pdf"
+  ],
+  "golden": "/home/ycheng/ZhCHRAG/qasystem/test_data/eval/official/official_03/extract/golden.json",
+  "scored": true,
+  "status": "succeeded",
+  "backend": {
+    "system": {
+      "status": "skipped",
+      "message": "未选择 pipeline 模式；需要时加 --mode pipeline"
+    },
+    "modules": {
+      "parse": {
+        "status": "succeeded",
+        "files": 2,
+        "parsed": 2,
+        "content_length": 2044,
+        "failed_files": [],
+        "per_file": [
+          {
+            "file": "关于印发《中国中车股份有限公司产品研发管理办法》的通知.pdf",
+            "status": "succeeded",
+            "attempts": 1,
+            "elapsed_seconds": 32.693,
+            "markdown_length": 286
+          },
+          {
+            "file": "表单.pdf",
+            "status": "succeeded",
+            "attempts": 1,
+            "elapsed_seconds": 13.142,
+            "markdown_length": 1756
+          }
+        ],
+        "elapsed_seconds": 45.835
+      },
+      "chunk": {
+        "status": "succeeded",
+        "chunk_count": 2,
+        "elapsed_seconds": 0.125
+      },
+      "extract": {
+        "status": "succeeded",
+        "nodes": 21,
+        "relationships": 27,
+        "metrics": {
+          "entities": {
+            "golden": 9,
+            "predicted": 21,
+            "precision": 0.285714,
+            "recall": 0.666667,
+            "f1": 0.4,
+            "jaccard": 0.25,
+            "accuracy": 0.25,
+            "tp": 6,
+            "fp": 15,
+            "fn": 3
+          },
+          "relations": {
+            "golden": 22,
+            "predicted": 27,
+            "precision": 0.185185,
+            "recall": 0.227273,
+            "f1": 0.204082,
+            "jaccard": 0.113636,
+            "accuracy": 0.113636,
+            "tp": 5,
+            "fp": 22,
+            "fn": 17
+          },
+          "aligned_relations": {
+            "golden": 22,
+            "predicted": 27,
+            "precision": 0.111111,
+            "recall": 0.136364,
+            "f1": 0.122449,
+            "jaccard": 0.065217,
+            "accuracy": 0.065217,
+            "tp": 3,
+            "fp": 24,
+            "fn": 19,
+            "scope": "diagnostic",
+            "entity_mapping": "selected_maximum_matching"
+          },
+          "match_mode": "llm",
+          "identity": {
+            "entities": {
+              "golden": 9,
+              "predicted": 21,
+              "precision": 0.190476,
+              "recall": 0.444444,
+              "f1": 0.266667,
+              "jaccard": 0.153846,
+              "accuracy": 0.153846,
+              "tp": 4,
+              "fp": 17,
+              "fn": 5
+            },
+            "relations": {
+              "golden": 22,
+              "predicted": 27,
+              "precision": 0.111111,
+              "recall": 0.136364,
+              "f1": 0.122449,
+              "jaccard": 0.065217,
+              "accuracy": 0.065217,
+              "tp": 3,
+              "fp": 24,
+              "fn": 19
+            }
+          },
+          "predicted_graph": {
+            "nodes": [
+              {
+                "uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "label": "DocumentUnit",
+                "name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "properties": {
+                  "name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "单元标识": "unit-1",
+                  "单元标题": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "单元类型": "通知",
+                  "原文位置": "chunk-0000:0-304",
+                  "原文内容": "中国中车股份有限公司各一级子公司，总部各部门:\n\n《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+                  "顺序号": "1"
+                }
+              },
+              {
+                "uid": "DocumentUnit::通知正文",
+                "label": "DocumentUnit",
+                "name": "通知正文",
+                "properties": {
+                  "name": "通知正文",
+                  "单元标识": "通知正文",
+                  "原文位置": "《关于印发《中国中车股份有限公司产品研发管理办法》的通知》正文",
+                  "单元类型": "正文",
+                  "单元标题": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "原文内容": "《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过，现予印发，请各单位贯彻执行。",
+                  "顺序号": "1"
+                }
+              },
+              {
+                "uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "label": "OfficialDocument",
+                "name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "properties": {
+                  "name": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "文件标题": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "来文字号": "中车股份科信〔2025〕45号"
+                }
+              },
+              {
+                "uid": "OperationalActivity::印发并贯彻执行",
+                "label": "OperationalActivity",
+                "name": "印发并贯彻执行",
+                "properties": {
+                  "name": "印发并贯彻执行",
+                  "活动名称": "印发并贯彻执行",
+                  "活动描述": "印发《中国中车股份有限公司产品研发管理办法》并请各单位贯彻执行",
+                  "活动类型": "印发执行",
+                  "动作词": "印发、贯彻执行",
+                  "预期结果": "各单位贯彻执行《中国中车股份有限公司产品研发管理办法》"
+                }
+              },
+              {
+                "uid": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "label": "OperationalActivity",
+                "name": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "properties": {
+                  "name": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设"
+                }
+              },
+              {
+                "uid": "OperationalActivity::请各位领导阅，请各部门经理阅",
+                "label": "OperationalActivity",
+                "name": "请各位领导阅，请各部门经理阅",
+                "properties": {
+                  "name": "请各位领导阅，请各部门经理阅",
+                  "活动名称": "请各位领导阅，请各部门经理阅",
+                  "活动描述": "请各位领导和各部门经理阅看文件",
+                  "活动类型": "管理",
+                  "动作词": "阅"
+                }
+              },
+              {
+                "uid": "OperationalActivity::请赵总阅批",
+                "label": "OperationalActivity",
+                "name": "请赵总阅批",
+                "properties": {
+                  "name": "请赵总阅批",
+                  "活动名称": "请赵总阅批",
+                  "活动描述": "请赵总阅示并批示",
+                  "活动类型": "管理",
+                  "动作词": "阅批"
+                }
+              },
+              {
+                "uid": "OperationalActivity::阅研",
+                "label": "OperationalActivity",
+                "name": "阅研",
+                "properties": {
+                  "name": "阅研",
+                  "活动名称": "阅研",
+                  "活动描述": "技术中心和工业软件事业部阅研文件，结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                  "活动类型": "管理",
+                  "动作词": "阅研",
+                  "预期结果": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设"
+                }
+              },
+              {
+                "uid": "OperationalAgent::中国中车股份有限公司",
+                "label": "OperationalAgent",
+                "name": "中国中车股份有限公司",
+                "properties": {
+                  "name": "中国中车股份有限公司",
+                  "主体名称": "中国中车股份有限公司",
+                  "主体类型": "公司",
+                  "组织层级": "股份公司",
+                  "职责": "印发《中国中车股份有限公司产品研发管理办法》"
+                }
+              },
+              {
+                "uid": "OperationalAgent::中国中车股份有限公司办公室",
+                "label": "OperationalAgent",
+                "name": "中国中车股份有限公司办公室",
+                "properties": {
+                  "name": "中国中车股份有限公司办公室",
+                  "主体名称": "中国中车股份有限公司办公室",
+                  "主体类型": "部门",
+                  "组织层级": "总部",
+                  "职责": "印发文件"
+                }
+              },
+              {
+                "uid": "OperationalAgent::中国中车股份有限公司各一级子公司",
+                "label": "OperationalAgent",
+                "name": "中国中车股份有限公司各一级子公司",
+                "properties": {
+                  "name": "中国中车股份有限公司各一级子公司",
+                  "主体名称": "中国中车股份有限公司各一级子公司",
+                  "主体类型": "子公司",
+                  "组织层级": "一级子公司",
+                  "职责": "贯彻执行《中国中车股份有限公司产品研发管理办法》"
+                }
+              },
+              {
+                "uid": "OperationalAgent::公司领导",
+                "label": "OperationalAgent",
+                "name": "公司领导",
+                "properties": {
+                  "name": "公司领导",
+                  "主体名称": "公司领导",
+                  "主体类型": "领导",
+                  "职责": "抄送对象"
+                }
+              },
+              {
+                "uid": "OperationalAgent::总师级领导",
+                "label": "OperationalAgent",
+                "name": "总师级领导",
+                "properties": {
+                  "name": "总师级领导",
+                  "主体名称": "总师级领导",
+                  "主体类型": "领导",
+                  "职责": "抄送对象"
+                }
+              },
+              {
+                "uid": "OperationalAgent::总部各部门",
+                "label": "OperationalAgent",
+                "name": "总部各部门",
+                "properties": {
+                  "name": "总部各部门",
+                  "主体名称": "总部各部门",
+                  "主体类型": "部门",
+                  "组织层级": "总部",
+                  "职责": "贯彻执行《中国中车股份有限公司产品研发管理办法》"
+                }
+              },
+              {
+                "uid": "OperationalAgent::股份公司2025年第25次总裁办公会",
+                "label": "OperationalAgent",
+                "name": "股份公司2025年第25次总裁办公会",
+                "properties": {
+                  "name": "股份公司2025年第25次总裁办公会",
+                  "主体名称": "股份公司2025年第25次总裁办公会",
+                  "主体类型": "会议",
+                  "职责": "审议通过《中国中车股份有限公司产品研发管理办法》"
+                }
+              },
+              {
+                "uid": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》",
+                "label": "OperationalInformation",
+                "name": "《中国中车股份有限公司产品研发管理办法》",
+                "properties": {
+                  "name": "《中国中车股份有限公司产品研发管理办法》",
+                  "信息标识": "中国中车股份有限公司产品研发管理办法",
+                  "信息名称": "《中国中车股份有限公司产品研发管理办法》",
+                  "信息类型": "管理办法",
+                  "来源文本": "《中国中车股份有限公司产品研发管理办法》已经股份公司2025年第25次总裁办公会审议通过"
+                }
+              },
+              {
+                "uid": "OperationalInformation::中车股份科信〔2025〕45号",
+                "label": "OperationalInformation",
+                "name": "中车股份科信〔2025〕45号",
+                "properties": {
+                  "name": "中车股份科信〔2025〕45号",
+                  "信息标识": "中车股份科信〔2025〕45号",
+                  "信息名称": "中车股份科信〔2025〕45号",
+                  "信息类型": "来文字号",
+                  "来源文本": "中车股份科信〔2025〕45号"
+                }
+              },
+              {
+                "uid": "OperationalAgent::工业软件事业部",
+                "label": "OperationalAgent",
+                "name": "工业软件事业部",
+                "properties": {
+                  "name": "工业软件事业部",
+                  "主体名称": "工业软件事业部",
+                  "主体类型": "部门",
+                  "组织层级": "部门",
+                  "职责": "阅研文件，结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设"
+                }
+              },
+              {
+                "uid": "OperationalAgent::技术中心",
+                "label": "OperationalAgent",
+                "name": "技术中心",
+                "properties": {
+                  "name": "技术中心",
+                  "主体名称": "技术中心",
+                  "主体类型": "部门",
+                  "组织层级": "部门",
+                  "职责": "阅研文件，结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设"
+                }
+              },
+              {
+                "uid": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "label": "OperationalAgent",
+                "name": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "properties": {
+                  "name": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "主体名称": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "主体类型": "部门",
+                  "组织层级": "部门",
+                  "职责": "收文处理"
+                }
+              },
+              {
+                "uid": "OperationalInformation::收文处理单",
+                "label": "OperationalInformation",
+                "name": "收文处理单",
+                "properties": {
+                  "name": "收文处理单",
+                  "信息名称": "收文处理单",
+                  "信息类型": "材料",
+                  "定义": "公文收文登记与流转处理的表单材料",
+                  "来源文本": "\"notes\": [\"收文处理单\", ...]"
+                }
+              }
+            ],
+            "relationships": [
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::中国中车股份有限公司",
+                "type": "APPLIES_TO",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::中国中车股份有限公司各一级子公司",
+                "type": "APPLIES_TO",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::公司领导",
+                "type": "APPLIES_TO",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::总师级领导",
+                "type": "APPLIES_TO",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::总部各部门",
+                "type": "APPLIES_TO",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》",
+                "type": "DEFINES",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalInformation::中车股份科信〔2025〕45号",
+                "type": "DEFINES",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》",
+                "type": "HAS_KEY_INFORMATION",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalInformation::中车股份科信〔2025〕45号",
+                "type": "HAS_KEY_INFORMATION",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "type": "HAS_PART",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "DocumentUnit::通知正文",
+                "type": "HAS_PART",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::中国中车股份有限公司",
+                "type": "ISSUED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalAgent::股份公司2025年第25次总裁办公会",
+                "type": "ISSUED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalActivity::请各位领导阅，请各部门经理阅",
+                "type": "REQUIRES_ACTIVITY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalActivity::请赵总阅批",
+                "type": "REQUIRES_ACTIVITY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "to_uid": "OperationalActivity::阅研",
+                "type": "REQUIRES_ACTIVITY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalActivity::印发并贯彻执行",
+                "to_uid": "DocumentUnit::通知正文",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::中国中车股份有限公司",
+                "to_uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::中国中车股份有限公司办公室",
+                "to_uid": "DocumentUnit::通知正文",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::中国中车股份有限公司各一级子公司",
+                "to_uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::公司领导",
+                "to_uid": "DocumentUnit::通知正文",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::总师级领导",
+                "to_uid": "DocumentUnit::通知正文",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::总部各部门",
+                "to_uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalAgent::股份公司2025年第25次总裁办公会",
+                "to_uid": "DocumentUnit::通知正文",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》",
+                "to_uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalInformation::中车股份科信〔2025〕45号",
+                "to_uid": "DocumentUnit::关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "type": "EVIDENCED_BY",
+                "properties": {}
+              },
+              {
+                "from_uid": "OperationalActivity::请各位领导阅，请各部门经理阅",
+                "to_uid": "OperationalActivity::阅研",
+                "type": "PRECEDES",
+                "properties": {}
+              }
+            ]
+          }
+        },
+        "elapsed_seconds": 111.072,
+        "score_elapsed_seconds": 4.414,
+        "extract_version": "v2.2",
+        "quality": {
+          "status": "succeeded",
+          "error_code": null,
+          "verification": {
+            "valid": true,
+            "hard_issue_count": 0,
+            "repairable_issue_count": 85,
+            "issues": [
+              {
+                "code": "EVIDENCE_INVALID",
+                "message": "evidence 缺少 source_block_ids",
+                "path": "entities[4]",
+                "severity": "warning",
+                "repair_type": null,
+                "context": {}
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "path": "chunk-0000:259:272",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-20",
+                  "span_id": "chunk-0000:259:272",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司办公室",
+                  "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "APPLIES_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::工业软件事业部 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "path": "chunk-0001:446:453",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-21",
+                  "span_id": "chunk-0001:446:453",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "工业软件事业部",
+                  "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "APPLIES_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::技术中心 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "path": "chunk-0001:441:445",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-22",
+                  "span_id": "chunk-0001:441:445",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "技术中心",
+                  "reason": "OperationalAgent::技术中心 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "APPLIES_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "path": "chunk-0001:294:319",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-23",
+                  "span_id": "chunk-0001:294:319",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "APPLIES_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "path": "chunk-0000:111:129",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-24",
+                  "span_id": "chunk-0000:111:129",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "股份公司2025年第25次总裁办公会",
+                  "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "APPLIES_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0000:134:147",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-25",
+                  "span_id": "chunk-0000:134:147",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "印发并贯彻执行",
+                  "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "path": "",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-26",
+                  "span_id": "",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                  "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0001:425:440",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-27",
+                  "span_id": "chunk-0001:425:440",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "请各位领导阅，请各部门经理阅",
+                  "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::请赵总阅批 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0001:403:409",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-28",
+                  "span_id": "chunk-0001:403:409",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "请赵总阅批",
+                  "reason": "OperationalActivity::请赵总阅批 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::阅研 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0001:453:455",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-29",
+                  "span_id": "chunk-0001:453:455",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "阅研",
+                  "reason": "OperationalActivity::阅研 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:2:12",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-30",
+                  "span_id": "chunk-0000:2:12",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:259:272",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-31",
+                  "span_id": "chunk-0000:259:272",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司办公室",
+                  "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:64:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-32",
+                  "span_id": "chunk-0000:64:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司各一级子公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::公司领导 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:243:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-33",
+                  "span_id": "chunk-0000:243:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "公司领导",
+                  "reason": "OperationalAgent::公司领导 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::工业软件事业部 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0001:446:453",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-34",
+                  "span_id": "chunk-0001:446:453",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "工业软件事业部",
+                  "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总师级领导 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:251:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-35",
+                  "span_id": "chunk-0000:251:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总师级领导",
+                  "reason": "OperationalAgent::总师级领导 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总部各部门 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:81:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-36",
+                  "span_id": "chunk-0000:81:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总部各部门",
+                  "reason": "OperationalAgent::总部各部门 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::技术中心 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0001:441:445",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-37",
+                  "span_id": "chunk-0001:441:445",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "技术中心",
+                  "reason": "OperationalAgent::技术中心 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0001:294:319",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-38",
+                  "span_id": "chunk-0001:294:319",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "path": "chunk-0000:111:129",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-39",
+                  "span_id": "chunk-0000:111:129",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "股份公司2025年第25次总裁办公会",
+                  "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "CONSTRAINS_AGENT"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::收文处理单 缺少入向必需关系 DEFINES（源端基数 1）",
+                "path": "chunk-0001:1645:1650",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-40",
+                  "span_id": "chunk-0001:1645:1650",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "收文处理单",
+                  "reason": "OperationalInformation::收文处理单 缺少入向必需关系 DEFINES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "DEFINES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                "path": "chunk-0000:39:59",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-41",
+                  "span_id": "chunk-0000:39:59",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                  "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "EXCHANGES_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                "path": "chunk-0000:16:31",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-42",
+                  "span_id": "chunk-0000:16:31",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中车股份科信〔2025〕45号",
+                  "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "EXCHANGES_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::收文处理单 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                "path": "chunk-0001:1645:1650",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-43",
+                  "span_id": "chunk-0001:1645:1650",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "收文处理单",
+                  "reason": "OperationalInformation::收文处理单 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "EXCHANGES_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少入向必需关系 HAS_DOCUMENT_RELATION（源端基数 1）",
+                "path": "chunk-0001:118:145",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-44",
+                  "span_id": "chunk-0001:118:145",
+                  "target_type": "OfficialDocument",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "reason": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少入向必需关系 HAS_DOCUMENT_RELATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "HAS_DOCUMENT_RELATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::收文处理单 缺少入向必需关系 HAS_KEY_INFORMATION（源端基数 1）",
+                "path": "chunk-0001:1645:1650",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-45",
+                  "span_id": "chunk-0001:1645:1650",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "收文处理单",
+                  "reason": "OperationalInformation::收文处理单 缺少入向必需关系 HAS_KEY_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "HAS_KEY_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少入向必需关系 HAS_PART（源端基数 1）",
+                "path": "chunk-0001:118:145",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-46",
+                  "span_id": "chunk-0001:118:145",
+                  "target_type": "OfficialDocument",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                  "reason": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少入向必需关系 HAS_PART（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "HAS_PART"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0000:259:272",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-47",
+                  "span_id": "chunk-0000:259:272",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司办公室",
+                  "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0000:64:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-48",
+                  "span_id": "chunk-0000:64:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司各一级子公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::公司领导 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0000:243:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-49",
+                  "span_id": "chunk-0000:243:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "公司领导",
+                  "reason": "OperationalAgent::公司领导 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::工业软件事业部 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0001:446:453",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-50",
+                  "span_id": "chunk-0001:446:453",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "工业软件事业部",
+                  "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总师级领导 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0000:251:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-51",
+                  "span_id": "chunk-0000:251:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总师级领导",
+                  "reason": "OperationalAgent::总师级领导 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总部各部门 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0000:81:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-52",
+                  "span_id": "chunk-0000:81:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总部各部门",
+                  "reason": "OperationalAgent::总部各部门 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::技术中心 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0001:441:445",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-53",
+                  "span_id": "chunk-0001:441:445",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "技术中心",
+                  "reason": "OperationalAgent::技术中心 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "path": "chunk-0001:294:319",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-54",
+                  "span_id": "chunk-0001:294:319",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "ISSUED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:2:12",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-55",
+                  "span_id": "chunk-0000:2:12",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:259:272",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-56",
+                  "span_id": "chunk-0000:259:272",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司办公室",
+                  "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:64:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-57",
+                  "span_id": "chunk-0000:64:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司各一级子公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::公司领导 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:243:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-58",
+                  "span_id": "chunk-0000:243:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "公司领导",
+                  "reason": "OperationalAgent::公司领导 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::工业软件事业部 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0001:446:453",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-59",
+                  "span_id": "chunk-0001:446:453",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "工业软件事业部",
+                  "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总师级领导 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:251:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-60",
+                  "span_id": "chunk-0000:251:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总师级领导",
+                  "reason": "OperationalAgent::总师级领导 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总部各部门 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:81:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-61",
+                  "span_id": "chunk-0000:81:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总部各部门",
+                  "reason": "OperationalAgent::总部各部门 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::技术中心 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0001:441:445",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-62",
+                  "span_id": "chunk-0001:441:445",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "技术中心",
+                  "reason": "OperationalAgent::技术中心 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0001:294:319",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-63",
+                  "span_id": "chunk-0001:294:319",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "path": "chunk-0000:111:129",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-64",
+                  "span_id": "chunk-0000:111:129",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "股份公司2025年第25次总裁办公会",
+                  "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PERFORMED_BY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "path": "chunk-0000:134:147",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-65",
+                  "span_id": "chunk-0000:134:147",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "印发并贯彻执行",
+                  "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 PRECEDES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRECEDES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "path": "",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-66",
+                  "span_id": "",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                  "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 PRECEDES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRECEDES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "path": "chunk-0001:425:440",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-67",
+                  "span_id": "chunk-0001:425:440",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "请各位领导阅，请各部门经理阅",
+                  "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 PRECEDES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRECEDES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::请赵总阅批 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "path": "chunk-0001:403:409",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-68",
+                  "span_id": "chunk-0001:403:409",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "请赵总阅批",
+                  "reason": "OperationalActivity::请赵总阅批 缺少入向必需关系 PRECEDES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRECEDES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 PRODUCES（源端基数 1）",
+                "path": "chunk-0000:39:59",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-69",
+                  "span_id": "chunk-0000:39:59",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                  "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 PRODUCES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRODUCES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 PRODUCES（源端基数 1）",
+                "path": "chunk-0000:16:31",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-70",
+                  "span_id": "chunk-0000:16:31",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中车股份科信〔2025〕45号",
+                  "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 PRODUCES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRODUCES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::收文处理单 缺少入向必需关系 PRODUCES（源端基数 1）",
+                "path": "chunk-0001:1645:1650",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-71",
+                  "span_id": "chunk-0001:1645:1650",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "收文处理单",
+                  "reason": "OperationalInformation::收文处理单 缺少入向必需关系 PRODUCES（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "PRODUCES"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                "path": "chunk-0000:39:59",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-72",
+                  "span_id": "chunk-0000:39:59",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                  "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "RELATED_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                "path": "chunk-0000:16:31",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-73",
+                  "span_id": "chunk-0000:16:31",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中车股份科信〔2025〕45号",
+                  "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "RELATED_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::收文处理单 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                "path": "chunk-0001:1645:1650",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-74",
+                  "span_id": "chunk-0001:1645:1650",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "收文处理单",
+                  "reason": "OperationalInformation::收文处理单 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "RELATED_TO"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 REQUIRES_ACTIVITY（源端基数 1）",
+                "path": "chunk-0000:134:147",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-75",
+                  "span_id": "chunk-0000:134:147",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "印发并贯彻执行",
+                  "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 REQUIRES_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "REQUIRES_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 REQUIRES_ACTIVITY（源端基数 1）",
+                "path": "",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-76",
+                  "span_id": "",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                  "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 REQUIRES_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "REQUIRES_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0000:134:147",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-77",
+                  "span_id": "chunk-0000:134:147",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "印发并贯彻执行",
+                  "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "SUPPORTS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "path": "",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-78",
+                  "span_id": "",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                  "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "SUPPORTS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0001:425:440",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-79",
+                  "span_id": "chunk-0001:425:440",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "请各位领导阅，请各部门经理阅",
+                  "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "SUPPORTS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::请赵总阅批 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0001:403:409",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-80",
+                  "span_id": "chunk-0001:403:409",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "请赵总阅批",
+                  "reason": "OperationalActivity::请赵总阅批 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "SUPPORTS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalActivity::阅研 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "path": "chunk-0001:453:455",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-81",
+                  "span_id": "chunk-0001:453:455",
+                  "target_type": "OperationalActivity",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "阅研",
+                  "reason": "OperationalActivity::阅研 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "SUPPORTS_ACTIVITY"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                "path": "chunk-0000:39:59",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-82",
+                  "span_id": "chunk-0000:39:59",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                  "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "USES_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                "path": "chunk-0000:16:31",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-83",
+                  "span_id": "chunk-0000:16:31",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中车股份科信〔2025〕45号",
+                  "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "USES_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalInformation::收文处理单 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                "path": "chunk-0001:1645:1650",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-84",
+                  "span_id": "chunk-0001:1645:1650",
+                  "target_type": "OperationalInformation",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "收文处理单",
+                  "reason": "OperationalInformation::收文处理单 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "USES_INFORMATION"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:2:12",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-85",
+                  "span_id": "chunk-0000:2:12",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:259:272",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-86",
+                  "span_id": "chunk-0000:259:272",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司办公室",
+                  "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:64:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-87",
+                  "span_id": "chunk-0000:64:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司各一级子公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::公司领导 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:243:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-88",
+                  "span_id": "chunk-0000:243:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "公司领导",
+                  "reason": "OperationalAgent::公司领导 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::工业软件事业部 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0001:446:453",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-89",
+                  "span_id": "chunk-0001:446:453",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "工业软件事业部",
+                  "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总师级领导 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:251:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-90",
+                  "span_id": "chunk-0000:251:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总师级领导",
+                  "reason": "OperationalAgent::总师级领导 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总部各部门 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:81:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-91",
+                  "span_id": "chunk-0000:81:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总部各部门",
+                  "reason": "OperationalAgent::总部各部门 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::技术中心 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0001:441:445",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-92",
+                  "span_id": "chunk-0001:441:445",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "技术中心",
+                  "reason": "OperationalAgent::技术中心 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0001:294:319",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-93",
+                  "span_id": "chunk-0001:294:319",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "path": "chunk-0000:111:129",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-94",
+                  "span_id": "chunk-0000:111:129",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "股份公司2025年第25次总裁办公会",
+                  "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 sourceAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "sourceAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:2:12",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-95",
+                  "span_id": "chunk-0000:2:12",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:259:272",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-96",
+                  "span_id": "chunk-0000:259:272",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司办公室",
+                  "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:64:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-97",
+                  "span_id": "chunk-0000:64:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "中国中车股份有限公司各一级子公司",
+                  "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::公司领导 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:243:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-98",
+                  "span_id": "chunk-0000:243:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "公司领导",
+                  "reason": "OperationalAgent::公司领导 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::工业软件事业部 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0001:446:453",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-99",
+                  "span_id": "chunk-0001:446:453",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "工业软件事业部",
+                  "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总师级领导 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:251:256",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-100",
+                  "span_id": "chunk-0000:251:256",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总师级领导",
+                  "reason": "OperationalAgent::总师级领导 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::总部各部门 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:81:86",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-101",
+                  "span_id": "chunk-0000:81:86",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "总部各部门",
+                  "reason": "OperationalAgent::总部各部门 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::技术中心 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0001:441:445",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-102",
+                  "span_id": "chunk-0001:441:445",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "技术中心",
+                  "reason": "OperationalAgent::技术中心 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0001:294:319",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-103",
+                  "span_id": "chunk-0001:294:319",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                  "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              },
+              {
+                "code": "REQUIRED_RELATION_MISSING",
+                "message": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 targetAgent（源端基数 1）",
+                "path": "chunk-0000:111:129",
+                "severity": "warning",
+                "repair_type": "required_relation",
+                "context": {
+                  "gap_id": "generic-relation_coverage-104",
+                  "span_id": "chunk-0000:111:129",
+                  "target_type": "OperationalAgent",
+                  "gap_type": "relation_coverage",
+                  "severity": "info",
+                  "evidence": "股份公司2025年第25次总裁办公会",
+                  "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 targetAgent（源端基数 1）",
+                  "expected_features": [],
+                  "expected_relations": [
+                    "targetAgent"
+                  ]
+                }
+              }
+            ],
+            "coverage_gaps": [
+              {
+                "gap_id": "generic-feature_coverage-1",
+                "span_id": "chunk-0001:118:145",
+                "target_type": "OfficialDocument",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "reason": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少特性 领导批示, 联系电话, 缓急, 来文单位, 文件备注, 收文部门, 收文日期, 收文号, 拟办意见, 抄送, 密级, 主送, 主办部门（提示，非 required）",
+                "expected_features": [
+                  "领导批示",
+                  "联系电话",
+                  "缓急",
+                  "来文单位",
+                  "文件备注",
+                  "收文部门",
+                  "收文日期",
+                  "收文号",
+                  "拟办意见",
+                  "抄送",
+                  "密级",
+                  "主送",
+                  "主办部门"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-2",
+                "span_id": "chunk-0000:134:147",
+                "target_type": "OperationalActivity",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "印发并贯彻执行",
+                "reason": "OperationalActivity::印发并贯彻执行 缺少特性 活动标识, 优先级（提示，非 required）",
+                "expected_features": [
+                  "活动标识",
+                  "优先级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-3",
+                "span_id": "",
+                "target_type": "OperationalActivity",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少特性 活动名称, 活动描述, 活动标识, 活动类型, 动作词, 预期结果, 优先级（提示，非 required）",
+                "expected_features": [
+                  "活动名称",
+                  "活动描述",
+                  "活动标识",
+                  "活动类型",
+                  "动作词",
+                  "预期结果",
+                  "优先级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-4",
+                "span_id": "chunk-0001:425:440",
+                "target_type": "OperationalActivity",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "请各位领导阅，请各部门经理阅",
+                "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少特性 活动标识, 预期结果, 优先级（提示，非 required）",
+                "expected_features": [
+                  "活动标识",
+                  "预期结果",
+                  "优先级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-5",
+                "span_id": "chunk-0001:403:409",
+                "target_type": "OperationalActivity",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "请赵总阅批",
+                "reason": "OperationalActivity::请赵总阅批 缺少特性 活动标识, 预期结果, 优先级（提示，非 required）",
+                "expected_features": [
+                  "活动标识",
+                  "预期结果",
+                  "优先级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-6",
+                "span_id": "chunk-0001:453:455",
+                "target_type": "OperationalActivity",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "阅研",
+                "reason": "OperationalActivity::阅研 缺少特性 活动标识, 优先级（提示，非 required）",
+                "expected_features": [
+                  "活动标识",
+                  "优先级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-7",
+                "span_id": "chunk-0000:2:12",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司",
+                "reason": "OperationalAgent::中国中车股份有限公司 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-8",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-9",
+                "span_id": "chunk-0000:64:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司各一级子公司",
+                "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-10",
+                "span_id": "chunk-0000:243:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "公司领导",
+                "reason": "OperationalAgent::公司领导 缺少特性 主体标识, 组织层级（提示，非 required）",
+                "expected_features": [
+                  "主体标识",
+                  "组织层级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-11",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-12",
+                "span_id": "chunk-0000:251:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "总师级领导",
+                "reason": "OperationalAgent::总师级领导 缺少特性 主体标识, 组织层级（提示，非 required）",
+                "expected_features": [
+                  "主体标识",
+                  "组织层级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-13",
+                "span_id": "chunk-0000:81:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "总部各部门",
+                "reason": "OperationalAgent::总部各部门 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-14",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-15",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少特性 主体标识（提示，非 required）",
+                "expected_features": [
+                  "主体标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-16",
+                "span_id": "chunk-0000:111:129",
+                "target_type": "OperationalAgent",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "股份公司2025年第25次总裁办公会",
+                "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少特性 主体标识, 组织层级（提示，非 required）",
+                "expected_features": [
+                  "主体标识",
+                  "组织层级"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-17",
+                "span_id": "chunk-0000:39:59",
+                "target_type": "OperationalInformation",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少特性 定义（提示，非 required）",
+                "expected_features": [
+                  "定义"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-18",
+                "span_id": "chunk-0000:16:31",
+                "target_type": "OperationalInformation",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "中车股份科信〔2025〕45号",
+                "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少特性 定义（提示，非 required）",
+                "expected_features": [
+                  "定义"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-feature_coverage-19",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "feature_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少特性 信息标识（提示，非 required）",
+                "expected_features": [
+                  "信息标识"
+                ],
+                "expected_relations": []
+              },
+              {
+                "gap_id": "generic-relation_coverage-20",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "APPLIES_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-21",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "APPLIES_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-22",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "APPLIES_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-23",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "APPLIES_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-24",
+                "span_id": "chunk-0000:111:129",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "股份公司2025年第25次总裁办公会",
+                "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 APPLIES_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "APPLIES_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-25",
+                "span_id": "chunk-0000:134:147",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "印发并贯彻执行",
+                "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-26",
+                "span_id": "",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-27",
+                "span_id": "chunk-0001:425:440",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "请各位领导阅，请各部门经理阅",
+                "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-28",
+                "span_id": "chunk-0001:403:409",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "请赵总阅批",
+                "reason": "OperationalActivity::请赵总阅批 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-29",
+                "span_id": "chunk-0001:453:455",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "阅研",
+                "reason": "OperationalActivity::阅研 缺少入向必需关系 CONSTRAINS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-30",
+                "span_id": "chunk-0000:2:12",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司",
+                "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-31",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-32",
+                "span_id": "chunk-0000:64:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司各一级子公司",
+                "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-33",
+                "span_id": "chunk-0000:243:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "公司领导",
+                "reason": "OperationalAgent::公司领导 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-34",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-35",
+                "span_id": "chunk-0000:251:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总师级领导",
+                "reason": "OperationalAgent::总师级领导 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-36",
+                "span_id": "chunk-0000:81:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总部各部门",
+                "reason": "OperationalAgent::总部各部门 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-37",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-38",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-39",
+                "span_id": "chunk-0000:111:129",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "股份公司2025年第25次总裁办公会",
+                "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 CONSTRAINS_AGENT（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "CONSTRAINS_AGENT"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-40",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少入向必需关系 DEFINES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "DEFINES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-41",
+                "span_id": "chunk-0000:39:59",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "EXCHANGES_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-42",
+                "span_id": "chunk-0000:16:31",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中车股份科信〔2025〕45号",
+                "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "EXCHANGES_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-43",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少入向必需关系 EXCHANGES_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "EXCHANGES_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-44",
+                "span_id": "chunk-0001:118:145",
+                "target_type": "OfficialDocument",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "reason": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少入向必需关系 HAS_DOCUMENT_RELATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "HAS_DOCUMENT_RELATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-45",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少入向必需关系 HAS_KEY_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "HAS_KEY_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-46",
+                "span_id": "chunk-0001:118:145",
+                "target_type": "OfficialDocument",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "关于印发《中国中车股份有限公司产品研发管理办法》的通知",
+                "reason": "OfficialDocument::关于印发《中国中车股份有限公司产品研发管理办法》的通知 缺少入向必需关系 HAS_PART（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "HAS_PART"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-47",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-48",
+                "span_id": "chunk-0000:64:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司各一级子公司",
+                "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-49",
+                "span_id": "chunk-0000:243:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "公司领导",
+                "reason": "OperationalAgent::公司领导 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-50",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-51",
+                "span_id": "chunk-0000:251:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总师级领导",
+                "reason": "OperationalAgent::总师级领导 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-52",
+                "span_id": "chunk-0000:81:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总部各部门",
+                "reason": "OperationalAgent::总部各部门 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-53",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-54",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 ISSUED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "ISSUED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-55",
+                "span_id": "chunk-0000:2:12",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司",
+                "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-56",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-57",
+                "span_id": "chunk-0000:64:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司各一级子公司",
+                "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-58",
+                "span_id": "chunk-0000:243:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "公司领导",
+                "reason": "OperationalAgent::公司领导 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-59",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-60",
+                "span_id": "chunk-0000:251:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总师级领导",
+                "reason": "OperationalAgent::总师级领导 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-61",
+                "span_id": "chunk-0000:81:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总部各部门",
+                "reason": "OperationalAgent::总部各部门 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-62",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-63",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-64",
+                "span_id": "chunk-0000:111:129",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "股份公司2025年第25次总裁办公会",
+                "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 PERFORMED_BY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PERFORMED_BY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-65",
+                "span_id": "chunk-0000:134:147",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "印发并贯彻执行",
+                "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRECEDES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-66",
+                "span_id": "",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRECEDES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-67",
+                "span_id": "chunk-0001:425:440",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "请各位领导阅，请各部门经理阅",
+                "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRECEDES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-68",
+                "span_id": "chunk-0001:403:409",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "请赵总阅批",
+                "reason": "OperationalActivity::请赵总阅批 缺少入向必需关系 PRECEDES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRECEDES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-69",
+                "span_id": "chunk-0000:39:59",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 PRODUCES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRODUCES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-70",
+                "span_id": "chunk-0000:16:31",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中车股份科信〔2025〕45号",
+                "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 PRODUCES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRODUCES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-71",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少入向必需关系 PRODUCES（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "PRODUCES"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-72",
+                "span_id": "chunk-0000:39:59",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "RELATED_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-73",
+                "span_id": "chunk-0000:16:31",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中车股份科信〔2025〕45号",
+                "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "RELATED_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-74",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少入向必需关系 RELATED_TO（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "RELATED_TO"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-75",
+                "span_id": "chunk-0000:134:147",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "印发并贯彻执行",
+                "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 REQUIRES_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "REQUIRES_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-76",
+                "span_id": "",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 REQUIRES_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "REQUIRES_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-77",
+                "span_id": "chunk-0000:134:147",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "印发并贯彻执行",
+                "reason": "OperationalActivity::印发并贯彻执行 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "SUPPORTS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-78",
+                "span_id": "",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设",
+                "reason": "OperationalActivity::结合公司产品研发，融合中车产品研发管理要求，服务研发数字化建设 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "SUPPORTS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-79",
+                "span_id": "chunk-0001:425:440",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "请各位领导阅，请各部门经理阅",
+                "reason": "OperationalActivity::请各位领导阅，请各部门经理阅 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "SUPPORTS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-80",
+                "span_id": "chunk-0001:403:409",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "请赵总阅批",
+                "reason": "OperationalActivity::请赵总阅批 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "SUPPORTS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-81",
+                "span_id": "chunk-0001:453:455",
+                "target_type": "OperationalActivity",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "阅研",
+                "reason": "OperationalActivity::阅研 缺少入向必需关系 SUPPORTS_ACTIVITY（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "SUPPORTS_ACTIVITY"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-82",
+                "span_id": "chunk-0000:39:59",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "《中国中车股份有限公司产品研发管理办法》",
+                "reason": "OperationalInformation::《中国中车股份有限公司产品研发管理办法》 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "USES_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-83",
+                "span_id": "chunk-0000:16:31",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中车股份科信〔2025〕45号",
+                "reason": "OperationalInformation::中车股份科信〔2025〕45号 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "USES_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-84",
+                "span_id": "chunk-0001:1645:1650",
+                "target_type": "OperationalInformation",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "收文处理单",
+                "reason": "OperationalInformation::收文处理单 缺少入向必需关系 USES_INFORMATION（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "USES_INFORMATION"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-85",
+                "span_id": "chunk-0000:2:12",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司",
+                "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-86",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-87",
+                "span_id": "chunk-0000:64:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司各一级子公司",
+                "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-88",
+                "span_id": "chunk-0000:243:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "公司领导",
+                "reason": "OperationalAgent::公司领导 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-89",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-90",
+                "span_id": "chunk-0000:251:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总师级领导",
+                "reason": "OperationalAgent::总师级领导 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-91",
+                "span_id": "chunk-0000:81:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总部各部门",
+                "reason": "OperationalAgent::总部各部门 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-92",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-93",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-94",
+                "span_id": "chunk-0000:111:129",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "股份公司2025年第25次总裁办公会",
+                "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 sourceAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "sourceAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-95",
+                "span_id": "chunk-0000:2:12",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司",
+                "reason": "OperationalAgent::中国中车股份有限公司 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-96",
+                "span_id": "chunk-0000:259:272",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司办公室",
+                "reason": "OperationalAgent::中国中车股份有限公司办公室 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-97",
+                "span_id": "chunk-0000:64:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "中国中车股份有限公司各一级子公司",
+                "reason": "OperationalAgent::中国中车股份有限公司各一级子公司 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-98",
+                "span_id": "chunk-0000:243:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "公司领导",
+                "reason": "OperationalAgent::公司领导 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-99",
+                "span_id": "chunk-0001:446:453",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "工业软件事业部",
+                "reason": "OperationalAgent::工业软件事业部 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-100",
+                "span_id": "chunk-0000:251:256",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总师级领导",
+                "reason": "OperationalAgent::总师级领导 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-101",
+                "span_id": "chunk-0000:81:86",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "总部各部门",
+                "reason": "OperationalAgent::总部各部门 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-102",
+                "span_id": "chunk-0001:441:445",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "技术中心",
+                "reason": "OperationalAgent::技术中心 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-103",
+                "span_id": "chunk-0001:294:319",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+                "reason": "OperationalAgent::综合管理部(党群工作部、董事会办公室、企业文化部) 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              },
+              {
+                "gap_id": "generic-relation_coverage-104",
+                "span_id": "chunk-0000:111:129",
+                "target_type": "OperationalAgent",
+                "gap_type": "relation_coverage",
+                "severity": "info",
+                "evidence": "股份公司2025年第25次总裁办公会",
+                "reason": "OperationalAgent::股份公司2025年第25次总裁办公会 缺少入向必需关系 targetAgent（源端基数 1）",
+                "expected_features": [],
+                "expected_relations": [
+                  "targetAgent"
+                ]
+              }
+            ]
+          },
+          "graph_publishable": true,
+          "repair_stop_reason": "repair_no_new_facts",
+          "extract_version": "v2.2",
+          "effective_config": {
+            "version": "v2.2",
+            "provider": "default",
+            "model": "deepseek-ai/DeepSeek-V4-Flash",
+            "request_timeout": 300.0,
+            "document_timeout": null,
+            "max_tokens": 65536,
+            "max_input_tokens": 65536,
+            "max_output_tokens": 65536,
+            "disable_thinking": true,
+            "api_mode": "auto",
+            "thinking_parameter": "thinking",
+            "response_format": "auto"
+          },
+          "trace_id": "84e1672fc8c34effa7c5499cf40c7bf9"
+        },
+        "quality_status": "succeeded",
+        "failed_chunks": []
+      }
+    }
+  },
+  "plugin": null,
+  "error": null,
+  "golden_counts": {
+    "entities": 9,
+    "relations": 22
+  },
+  "attempts": 1,
+  "extract_version": "v2.2",
+  "empty_extraction": false,
+  "elapsed_seconds": 161.458
+}
