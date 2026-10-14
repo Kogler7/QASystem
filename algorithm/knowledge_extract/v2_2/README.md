@@ -62,7 +62,7 @@ KG_EXTRACT_ALGO_VERSION=v2.2 .venv/bin/python eval/run.py test_data/eval
 
 LLM 连接由 `KG_EXTRACT_LLM_*` 环境变量配置。算法不会读取或写入 Neo4j、Elasticsearch、benchmark golden、部署凭据或运行时数据。
 
-最近一次 official_01 关系阶段评测：`docs/official_01评测结果-20261012.md`，原始批次在 `output/20261012-011048/`。
+最近一次 official_01 关系阶段评测：[official_01 评测结果](../../../docs/算法/official_01评测结果-20261012.md)，原始批次已归档到 `tmp/eval/imported-zyx/v2.2/20261013/20261012-011048/`。
 
 ## 设计与运维文档
 
