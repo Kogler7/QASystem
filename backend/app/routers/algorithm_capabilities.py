@@ -113,7 +113,8 @@ async def _chunk_document(http_request: Request, body: ChunkRequest) -> JSONResp
         result = await dispatch_operation(
             operation="document.chunk",
             resource_class="cpu.chunk",
-            payload=body.model_dump(),
+            # Preserve whether the caller explicitly selected an entity model.
+            payload=body.model_dump(exclude_unset=True),
             wait_seconds=prefer_wait_seconds(http_request.headers.get("Prefer")),
         )
         if isinstance(result.data, dict):

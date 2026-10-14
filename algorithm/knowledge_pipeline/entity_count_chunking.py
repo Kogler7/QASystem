@@ -113,6 +113,10 @@ def refine_chunks(
         else:
             planned = _PARTS[bucket]
             record.update(bucket=bucket, planned_parts=planned)
+            if isinstance(prediction.get('model'), str):
+                record['model'] = prediction['model']
+            if prediction.get('service_id'):
+                record.update(service_id=prediction['service_id'], config_revision=prediction.get('config_revision'))
             if type(prediction.get('estimated_count')) is int:
                 record['estimated_count'] = prediction['estimated_count']
             confidence = prediction.get('confidence')

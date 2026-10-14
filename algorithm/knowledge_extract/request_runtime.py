@@ -18,10 +18,12 @@ def create_request_llm(config: dict[str, Any]):
         package = version
     module = importlib.import_module(f"algorithm.knowledge_extract.{package}.llm_client")
     factory = module.create_llm_client
-    credential = config_getenv(config["api_key_env"], "")
-    if config["provider"] != "default" and not credential.strip():
+    credential = config_getenv(config["api_key_env"], "") if config.get('api_key_env') else ''
+    if (config["provider"] != "default" or config.get('credential_required')) and not credential.strip():
         raise ValueError("Extraction provider credential is not configured")
-    llm = factory(base_url=config["base_url"], api_key=credential,
+    # A nonempty placeholder prevents algorithm factories from falling back
+    # to an unrelated API credential for an unauthenticated local service.
+    llm = factory(base_url=config["base_url"], api_key=credential or 'not-needed',
                   model=config["model"], max_tokens=config.get("max_output_tokens") or config["max_tokens"],
                   request_timeout=config["request_timeout"], disable_thinking=config["disable_thinking"])
     llm.client = ScheduledClient(llm.client, config)

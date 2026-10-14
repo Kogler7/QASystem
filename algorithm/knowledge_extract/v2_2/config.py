@@ -84,7 +84,6 @@ def get_v22_clef_config() -> dict:
     max_inflight = min(4, max(1, max_inflight))
     return {
         "enabled": enabled,
-        "service_url": _env("CLEF_SERVICE_URL", default=""),
         "accept": accept,
         "max_questions": max_questions,
         "timeout": timeout,

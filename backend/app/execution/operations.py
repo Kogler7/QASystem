@@ -59,7 +59,8 @@ def _chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
     from backend.app.services.algorithm_capabilities import document_chunking_service
 
     return document_chunking_service.chunk(
-        payload["markdown"], ChunkOptions.model_validate(payload.get("options") or {})
+        payload["markdown"], ChunkOptions.model_validate(payload.get("options") or {}),
+        **({'entity_count_service': payload['__entity_count_service']} if '__entity_count_service' in payload else {}),
     )
 
 
@@ -182,6 +183,7 @@ def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
                 options=options,
                 job_id=execution_meta.get("job_id"),
                 extraction_config=payload.get("__extraction_config"),
+                entity_count_service=payload.get('__entity_count_service'),
             )
         )
     return service.process_batch(
@@ -190,6 +192,7 @@ def _knowledge_ingestion(payload: dict[str, Any]) -> dict[str, Any]:
             ontology=ontology,
             options=options,
             extraction_config=payload.get("__extraction_config"),
+            entity_count_service=payload.get('__entity_count_service'),
         )
     )
 

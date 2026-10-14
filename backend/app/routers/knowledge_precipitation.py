@@ -115,7 +115,7 @@ async def _knowledge_ingestion(
             resource_class="workflow.knowledge",
             payload={
                 "ontology": ontology,
-                "options": config.model_dump(),
+                "options": config.model_dump(exclude_unset=True),
                 "files": [
                     {"file_name": name, "content": content}
                     for name, content in collected

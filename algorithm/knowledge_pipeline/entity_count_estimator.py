@@ -14,8 +14,11 @@ ENTITY_COUNT_QUESTION={
     'instructions':'Estimate how many distinct entities could be extracted from the entire supplied passage. Count real identifiable organizations, persons, equipment, places, documents, tasks and business rules. Count the same referent only once. Attributes, field names, years and repeated evidence are not separate entities. Count neither lines nor characters. Do not infer missing document content. Choose only the count interval.',
     'criteria':{'le20':'0 through 20 distinct entities, inclusive','21to40':'21 through 40 distinct entities, inclusive','gt40':'41 or more distinct entities'}}
 
-def estimate_entities(text: str, *, model: str = 'clef-flash') -> dict:
-    if model == 'clef-flash':
+def estimate_entities(text: str, *, model: str = 'clef-flash', service: dict | None = None) -> dict:
+    if service is not None:
+        client=ClefFlashClient(service=service)
+        model=service['model']
+    elif model == 'clef-flash':
         client=ClefFlashClient(model=model)
     elif model == 'nanojev':
         client=NanoJevServiceClient()
@@ -25,6 +28,8 @@ def estimate_entities(text: str, *, model: str = 'clef-flash') -> dict:
     answer=response['answers']['entity_count'];bucket=answer['choice']
     if bucket not in ENTITY_COUNT_QUESTION['criteria']:raise ValueError('invalid count interval')
     result={'bucket':bucket,'model':model}
+    if service is not None:
+        result.update(service_id=service['service_id'], config_revision=service.get('revision'))
     if answer.get('confidence') is not None:
         confidence=float(answer['confidence'])
         if not math.isfinite(confidence) or not 0<=confidence<=1:raise ValueError('invalid confidence')

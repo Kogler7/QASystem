@@ -242,18 +242,18 @@ class ClefGate:
         config = get_v22_clef_config()
         if not config["enabled"]:
             return cls(enabled=False)
-        if not config["service_url"]:
-            gate = cls(enabled=False)
-            gate.disabled_reason = "missing_service_url"
-            return gate
         try:
             from external_services.clef import ClefFlashClient
 
-            client = ClefFlashClient(base_url=config["service_url"], timeout=config["timeout"])
+            client = ClefFlashClient(timeout=config["timeout"])
         except Exception:
             logger.warning("[步骤][Clef] 客户端初始化失败，本请求回退生成式模型")
             gate = cls(enabled=False)
             gate.disabled_reason = "client_init_failed"
+            return gate
+        if not client.base_url:
+            gate = cls(enabled=False)
+            gate.disabled_reason = "missing_service_url"
             return gate
         return cls(
             client=client,

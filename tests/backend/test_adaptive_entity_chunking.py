@@ -42,7 +42,7 @@ def test_enabled_refines_actual_short_document(monkeypatch, caplog, bucket, part
     estimator = importlib.import_module("algorithm.knowledge_pipeline.entity_count_estimator")
     calls = []
     source = "甲乙丙丁" * 100
-    def estimate(text, *, model):
+    def estimate(text, *, model, service=None):
         assert model == 'clef-flash'
         calls.append(text)
         return {"bucket": bucket, "confidence": 0.99}
@@ -64,7 +64,7 @@ def test_enabled_refines_actual_short_document(monkeypatch, caplog, bucket, part
 def test_request_model_is_forwarded_without_service_configuration(monkeypatch):
     estimator = importlib.import_module("algorithm.knowledge_pipeline.entity_count_estimator")
     calls = []
-    def estimate(text, *, model):
+    def estimate(text, *, model, service=None):
         calls.append(model)
         return {"bucket": "le20"}
     monkeypatch.setattr(estimator, "estimate_entities", estimate)
@@ -77,7 +77,7 @@ def test_request_model_is_forwarded_without_service_configuration(monkeypatch):
 
 def test_estimator_failure_preserves_baseline_and_logs_fallback(monkeypatch, caplog):
     estimator = importlib.import_module("algorithm.knowledge_pipeline.entity_count_estimator")
-    def unavailable(_, *, model):
+    def unavailable(_, *, model, service=None):
         raise RuntimeError("endpoint not configured")
     monkeypatch.setattr(estimator, "estimate_entities", unavailable)
     source = "短文需要切片。" * 30
@@ -96,7 +96,7 @@ def test_model_estimation_scoped_to_each_initial_chunk(monkeypatch):
     options = ChunkOptions(strategy="symbols", size=160, chunk_overlap=0,
                            adaptive_entity_count=True)
     calls = []
-    def estimate(text, *, model):
+    def estimate(text, *, model, service=None):
         calls.append((text, model))
         return {"bucket": "21to40", "confidence": 0.99}
     monkeypatch.setattr(estimator, "estimate_entities", estimate)

@@ -62,20 +62,34 @@ class ClefFlashClient:
         timeout: float | None = None,
         env_prefix: str = "CLEF",
         capability: str = "models.decisions.create",
+        service: dict[str, Any] | None = None,
+        purpose: str | None = None,
+        resolve_registered: bool = True,
     ) -> None:
-        self.base_url = (
+        if resolve_registered and service is None and base_url is None:
+            from .model_routes import resolve_adapter_service
+            service = resolve_adapter_service('nanojev' if env_prefix == 'NANOJEV' else 'clef', purpose=purpose)
+        self.base_url = (service['base_url'] if service is not None else
             base_url if base_url is not None else getenv(f"{env_prefix}_SERVICE_URL", "")
         ).strip().rstrip("/")
-        endpoint = endpoint_for(capability)
-        self.path = endpoint.path
-        self.method = endpoint.method
+        endpoint = endpoint_for(capability) if service is None else None
+        self.path = endpoint.path if endpoint is not None else service.get('path', '/v1/systemone')
+        self.method = endpoint.method if endpoint is not None else 'POST'
         if not self.path or not self.path.startswith("/") or self.path.startswith("//"):
             raise ModelServiceError("CLEF_SERVICE_PATH 必须是服务内的绝对路径")
-        self.model = model or getenv("CLEF_MODEL", "").strip() or "clef-flash"
-        self.api_key = config_getenv(f"{env_prefix}_SERVICE_API_KEY", "").strip()
+        self.model = service['model'] if service is not None else model or getenv("CLEF_MODEL", "").strip() or "clef-flash"
+        self.api_key = '' if service is not None else config_getenv(f"{env_prefix}_SERVICE_API_KEY", "").strip()
+        if service is not None:
+            if service.get('adapter') not in {'clef', 'nanojev'}:
+                raise ModelServiceError('实体判定服务的推理协议不兼容')
+            self.base_url = service['base_url'].rstrip('/')
+            self.model = service['model']
+            self.api_key = config_getenv(service['api_key_env'], '').strip() if service.get('api_key_env') else ''
+            if service.get('kind') == 'api' and not self.api_key:
+                raise ModelServiceError('判定服务凭据未配置')
         try:
             self.timeout = float(
-                timeout if timeout is not None else getenv(f"{env_prefix}_SERVICE_TIMEOUT_SECONDS", "120")
+                timeout if timeout is not None else service.get('timeout', 120) if service is not None else getenv(f"{env_prefix}_SERVICE_TIMEOUT_SECONDS", "120")
             )
         except (TypeError, ValueError):
             raise ModelServiceError("CLEF_SERVICE_TIMEOUT_SECONDS 必须为正数") from None

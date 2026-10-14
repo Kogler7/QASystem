@@ -373,7 +373,7 @@ class DocumentParsingService:
 
 
 class DocumentChunkingService:
-    def chunk(self, markdown: str, options: ChunkOptions) -> dict[str, Any]:
+    def chunk(self, markdown: str, options: ChunkOptions, *, entity_count_service: dict | None = None) -> dict[str, Any]:
         try:
             items = chunk_document_items(
                 markdown,
@@ -390,10 +390,15 @@ class DocumentChunkingService:
                 # failure and records the reason through the refinement logger.
                 from algorithm.knowledge_pipeline.entity_count_chunking import refine_chunks
                 from algorithm.knowledge_pipeline.entity_count_estimator import estimate_entities
+                if entity_count_service is None:
+                    from external_services.model_routes import snapshot_entity_service
+                    entity_count_service = snapshot_entity_service(options.entity_count_model,
+                        explicit='entity_count_model' in options.model_fields_set) or {}
 
                 items = refine_chunks(
                     markdown, items,
-                    lambda text: estimate_entities(text, model=options.entity_count_model),
+                    lambda text: estimate_entities(text, model=options.entity_count_model,
+                        **({'service': entity_count_service} if entity_count_service else {})),
                     overlap=options.chunk_overlap, logger=logger,
                 )
         except ValueError as exc:

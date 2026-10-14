@@ -106,6 +106,7 @@ class KnowledgeIngestionRequest:
     #: 协作式取消检查与页分片编排的父任务关联都靠它；直接调用 service 时为 None。
     job_id: str | None = None
     extraction_config: dict[str, Any] | None = None
+    entity_count_service: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -120,6 +121,7 @@ class BatchKnowledgeIngestionRequest:
     ontology: str
     options: PipelineOptions = field(default_factory=PipelineOptions)
     extraction_config: dict[str, Any] | None = None
+    entity_count_service: dict[str, Any] | None = None
 
 
 class PipelineError(Exception):
@@ -549,6 +551,7 @@ class KnowledgePrecipitationService:
         document_segments: list[dict[str, Any]] | None = None,
         fingerprint: str | None = None,
         extraction_config: dict[str, Any] | None = None,
+        entity_count_service: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         chunk_started = time.monotonic()
         if document_segments:
@@ -560,7 +563,8 @@ class KnowledgePrecipitationService:
             for segment in document_segments:
                 text = str(segment["text"])
                 base = int(segment["start"])
-                segment_items = self.chunking.chunk(text, options.chunking)["items"]
+                segment_items = self.chunking.chunk(text, options.chunking,
+                    **({'entity_count_service': entity_count_service} if entity_count_service is not None else {}))["items"]
                 segment_metadata = dict(segment.get("metadata") or {})
                 for item in segment_items:
                     local_start, local_end = item["range"]
@@ -573,7 +577,8 @@ class KnowledgePrecipitationService:
                     chunks.append(item)
             chunked = {"count": len(chunks), "items": chunks}
         else:
-            chunked = self.chunking.chunk(markdown, options.chunking)
+            chunked = self.chunking.chunk(markdown, options.chunking,
+                **({'entity_count_service': entity_count_service} if entity_count_service is not None else {}))
             chunks = chunked["items"]
         for item in chunks:
             item_metadata = dict(source_metadata or {})
@@ -1075,6 +1080,7 @@ class KnowledgePrecipitationService:
                 },
                 fingerprint=fingerprint,
                 extraction_config=request.extraction_config,
+                entity_count_service=request.entity_count_service,
             )
         except CapabilityError as exc:
             partial = None
@@ -1237,6 +1243,7 @@ class KnowledgePrecipitationService:
             document_segments=document_segments,
             fingerprint=combined_fingerprint,
             extraction_config=request.extraction_config,
+            entity_count_service=request.entity_count_service,
         )
         # Augment summary with file count
         fc = len(request.files)
