@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any, Iterable
 
 from .candidate_models import EntityCandidate
@@ -118,7 +119,7 @@ def add_official_form_agents(
 
 
 # ---------------------------------------------------------------------------
-# 确定性官方结构与元数据（对齐 golden：通知正文 / 排查要求一..N / 报送要求 / 附件说明）
+# 确定性官方结构与元数据（对齐 golden：章 / 条 / 第N段 / 附件说明）
 # ---------------------------------------------------------------------------
 
 _DOC_TITLE = re.compile(
@@ -138,12 +139,68 @@ def _first_sentence(text: str) -> str:
     return text[: index + 1] if index >= 0 else text
 
 
-def _item_prefix(title: str) -> str:
-    if "排查" in title:
-        return "排查要求"
-    if "工作要点" in title:
-        return "工作要点"
-    return "要求"
+_CN_DIGITS = "一二三四五六七八九十"
+
+
+def _cn_number(value: int) -> str:
+    """阿拉伯数字 → 汉字数字（1..99），用于「工作目标第一条」这类模板名。"""
+    if value < 1 or value > 99:
+        return str(value)
+    if value <= 10:
+        return _CN_DIGITS[value - 1]
+    if value < 20:
+        return "十" + _CN_DIGITS[value - 11]
+    tens, ones = divmod(value, 10)
+    return _CN_DIGITS[tens - 1] + "十" + (_CN_DIGITS[ones - 1] if ones else "")
+
+
+# 解析产物的正文行带 markdown 标题前缀（`# 一、工作目标`），匹配前需剥掉。
+_MD_HEADING = re.compile(r"^\s*#{1,6}\s*")
+
+# 版记/版头类噪声：抄送、联系人、印发说明等，金标不作为结构单元。
+_NOISE_PREFIXES = ("抄送", "抄 送", "联系人", "主题词", "签发", "共印", "份数")
+_NOISE_SUFFIXES = ("印发",)
+
+
+def _strip_markdown_heading(line: str) -> str:
+    """`# 一、工作目标` → `一、工作目标`。"""
+    return _MD_HEADING.sub("", line).strip()
+
+
+def _is_body_paragraph(text: str) -> bool:
+    """判断一个块是否是正文自然段。
+
+    正文段落须有句读；页码（`丨11`）、印发机关、成文日期、密级文号一类的版头版记
+    既无句读也不是正文，金标里不建结构单元。
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if stripped.startswith(_NOISE_PREFIXES) or stripped.endswith(_NOISE_SUFFIXES):
+        return False
+    return bool(re.search(r"[，,。；;]", stripped))
+
+
+# 表单区段起始标记：正文到此结束。解析产物常把正文与「收文处理单/领导批示」
+# 拼在同一个 chunk 里，若不截断，批示文字（「已阅。」「请…阅」）会被误当成正文段落。
+_FORM_SECTION_MARKERS = (
+    "收文处理单",
+    "领导批示",
+    "拟办意见",
+    "承办处理",
+    "附件/相关文件",
+    "关联文件",
+    "收文号",
+    "来文单位",
+)
+
+
+def _starts_form_section(line: str) -> bool:
+    """该行是否开启表单区段（收文处理单 / 领导批示 / 拟办意见 …）。"""
+    probe = unicodedata.normalize("NFKC", line).replace(" ", "")
+    probe = probe.lstrip("|").replace("**", "").replace("__", "")
+    return any(probe == marker or probe.startswith((marker + ":", marker + "|"))
+               for marker in _FORM_SECTION_MARKERS)
 
 
 def _marker_numeral(mark: str) -> str:
@@ -209,16 +266,22 @@ def _plain_document_units(text: str) -> list[dict[str, Any]]:
 
 
 def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
-    """按 golden 口径切分：通知正文 / 条 / 段落 / 附件说明。"""
-    raw_lines = [line.strip() for line in text.splitlines()]
+    """按 golden 口径切分：章 / 条 / 第N段 / 附件说明。"""
+    raw_lines = [_strip_markdown_heading(line) for line in text.splitlines()]
     if title:
         normalized = re.sub(r"\s+", "", title)
         for index, line in enumerate(raw_lines):
             if normalized and normalized in re.sub(r"\s+", "", line):
                 raw_lines = raw_lines[index + 1:]
                 break
-    while raw_lines and raw_lines[0].endswith(("：", ":")):
+    # 丢掉标题之后的主送行（以「：」结尾）及其间的空行
+    while raw_lines and (not raw_lines[0] or raw_lines[0].endswith(("：", ":"))):
         raw_lines.pop(0)
+    # 正文在表单区段（收文处理单 / 领导批示 / 拟办意见 …）处结束
+    for index, line in enumerate(raw_lines):
+        if _starts_form_section(line):
+            raw_lines = raw_lines[:index]
+            break
 
     blocks: list[list[str]] = []
     current: list[str] = []
@@ -255,50 +318,80 @@ def _golden_document_units(text: str, title: str) -> list[dict[str, Any]]:
         blocks.append(current)
 
     units: list[dict[str, Any]] = []
-    seen_intro = False
+    paragraph = 0
+    chapter = ""            # 当前章题名（`一、工作目标`），供章下无题名的条生成模板名
+    chapter_numeral = ""
     for block in blocks:
-        paragraph = "\n".join(block).strip()
-        if not paragraph or ("<" in paragraph and ">" in paragraph):
+        paragraph_text = "\n".join(block).strip()
+        if not paragraph_text or ("<" in paragraph_text and ">" in paragraph_text):
             continue
-        if _ATTACHMENT_MARKER.match(paragraph):
-            name = "附件列表" if re.search(r"\d+\s*[.、]", paragraph) else "附件说明"
-            units.append(_make_unit(name, "附件说明", "附件", paragraph, "", f"《{title}》附件"))
-            continue
-        item = _ITEM_MARKER.match(paragraph)
-        if item:
-            numeral = _marker_numeral(item.group(1))
-            body = item.group(2).strip()
-            unit_title = re.split(r"[，,。；;]", body, maxsplit=1)[0].strip()
+
+        # 附件段 —— 无论附件项是否带编号，单元名统一取「附件说明」
+        if _ATTACHMENT_MARKER.match(paragraph_text):
             units.append(
-                _make_unit(
-                    f"{_item_prefix(title)}{numeral}",
-                    "条",
-                    unit_title,
-                    _first_sentence(body),
-                    numeral,
-                    f"《{title}》{numeral}",
-                )
+                _make_unit("附件说明", "附件", "附件说明", paragraph_text, "",
+                           f"{title}#附件")
             )
-            seen_intro = True
             continue
-        if not seen_intro:
-            units.append(_make_unit("通知正文", "正文", title, paragraph, "", f"《{title}》正文"))
-            seen_intro = True
+
+        item = _ITEM_MARKER.match(paragraph_text)
+        if item:
+            mark = item.group(1)
+            numeral = _marker_numeral(mark)
+            inline = item.group(2).strip()
+            is_arabic = bool(re.match(r"^\d", mark))
+
+            # 章：只有标题、标题内无句读（`一、工作目标`），单独建为「章」单元
+            if not is_arabic and not re.search(r"[，,。；;：:]", inline) and len(inline) <= 20:
+                chapter = inline
+                chapter_numeral = numeral
+                units.append(
+                    _make_unit(inline, "章", inline, paragraph_text, numeral,
+                               f"{title}#{numeral}")
+                )
+                continue
+
+            if is_arabic and chapter:
+                # 章下无题名的条 → 「<章题名>第N条」
+                name = f"{chapter}第{_cn_number(int(numeral))}条"
+                units.append(
+                    _make_unit(name, "条", name, paragraph_text, numeral,
+                               f"{title}#{chapter_numeral}-{numeral}")
+                )
+                continue
+
+            # 有编号且有题名的条 → 名称取题名（去掉编号前缀），逐字照抄
+            unit_title = re.split(r"[，,。；;]", inline, maxsplit=1)[0].strip()
+            if not unit_title:
+                unit_title = inline or numeral
+            units.append(
+                _make_unit(unit_title, "条", unit_title, paragraph_text, numeral,
+                           f"{title}#{numeral}")
+            )
             continue
-        if any(marker in paragraph for marker in _REPORT_MARKERS):
-            units.append(_make_unit("报送要求", "段落", "排查情况报送要求", paragraph, "", f"《{title}》报送要求段落"))
+
+        # 无编号自然段 → 「第N段」。正文首段与后续段落同等处理，
+        # 不再区分「通知正文」/「报送要求」（那套角色命名与本体及金标不一致）。
+        if not _is_body_paragraph(paragraph_text):
+            continue
+        paragraph += 1
+        name = f"第{paragraph}段"
+        units.append(
+            _make_unit(name, "段落", name, paragraph_text, str(paragraph),
+                       f"{title}#段落{paragraph}")
+        )
     # 正文以 《X》(见附件) 方式引用附件但没有独立附件块时，补一个附件说明单元。
-    if not any(unit.get("unit_type") == "附件说明" for unit in units):
+    if not any(unit.get("unit_type") == "附件" for unit in units):
         reference = re.search(r"《([^《》]{2,80})》[^。]{0,12}见附件", text)
         if reference:
             units.append(
                 _make_unit(
                     "附件说明",
-                    "附件说明",
                     "附件",
+                    "附件说明",
                     f"附件：{reference.group(1)}",
                     "",
-                    f"《{title}》附件",
+                    f"{title}#附件",
                 )
             )
 
@@ -350,13 +443,13 @@ def _document_unit_entities(plan: Any, chunk: Any, text: str, title: str) -> lis
     body_key = _property_symbol(plan, "DocumentUnit", "原文内容", "originalText")
     order_key = _property_symbol(plan, "DocumentUnit", "顺序号", "unitOrder")
     location_key = _property_symbol(plan, "DocumentUnit", "原文位置", "unitLocation")
-    id_key = _property_symbol(plan, "DocumentUnit", "单元标识", "unitId")
+    # 注意：`单元标识` 按本体是**非抽取字段**（系统分配，不参与抽取），
+    # 且金标不含该属性，因此这里不产出，避免用单元名去填充它。
     units = _golden_document_units(text, title) if name_key is not None else _plain_document_units(text)
     entities: list[dict[str, Any]] = []
     for unit in units:
         properties: dict[str, Any] = {}
         mapping = (
-            (id_key, unit.get("unit_id", unit.get("name", ""))),
             (type_key, unit.get("unit_type", "")),
             (name_key, unit.get("unit_title", "")),
             (body_key, unit.get("original_text", "")),

@@ -126,8 +126,10 @@ class DeterministicExtractionTest(unittest.TestCase):
         self.assertIsNotNone(manager.find_span("chunk-0", document["evidence"]["quote"]))
 
     def test_document_units_match_gold_01(self) -> None:
-        # v3 语义单元命名：DocumentUnit 按语义命名（如「通知正文」「排查要求一」），
-        # 与 test_data/eval-v3 official golden 的命名约定一致（v2 的 DU-XXX 编号已废弃）。
+        # v2 归档模块（official_document_strategy）的语义单元命名：DocumentUnit 按语义命名
+        # （如「通知正文」「排查要求一」）。注意现行管线走的是
+        # algorithm/knowledge_extract/latest/official_structure.py，其命名已对齐
+        # test_data/eval/official golden（第N段 / 题名 / <章题名>第N条 / 附件说明）。
         # 该 fixture 为单 chunk 摘录，确定性结构只切出正文一个单元；完整公文的
         # 条款级切分见 benchmark golden（official_01）。
         text = case_text("02_official_document")
