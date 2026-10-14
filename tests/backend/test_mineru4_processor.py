@@ -13,11 +13,50 @@ import json
 from pathlib import Path
 import sys
 import types
+import struct
 
 import pytest
 
 from algorithm.preproc.preproc_src.processors import mineru4_processor
 from algorithm.preproc.preproc_src.processors.mineru4_processor import Mineru4Processor
+from qasystem_config import mineru_adapter
+
+
+@pytest.fixture(autouse=True)
+def controlled_runtime(tmp_path, monkeypatch):
+    """Model-output unit tests use prepared local fixtures and a fake provider."""
+    base = tmp_path / 'models'
+    (base / '.locks').mkdir(parents=True)
+    values = dict(home=str(tmp_path/'home'), base_dir=str(base), source='local',
+        small_backend='onnx', vlm_engine='llama-cpp', declaration_version='test', revision=7)
+    for repo, names in mineru_adapter.required_repositories(values, 'standard').items():
+        for name in names:
+            path=base/repo/name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'GGUF'+struct.pack('<IQQ',3,1,1)+b'fixture-payload'*5
+                             if path.suffix=='.gguf' else b'fixture-payload')
+        (base/repo/'.mineru_complete').touch()
+    monkeypatch.setattr(mineru_adapter, 'settings', lambda: dict(values))
+    return values
+
+
+def _runtime_plan(tmp_path, values, monkeypatch):
+    work=tmp_path/'runtime-plan';work.mkdir(exist_ok=True)
+    plan,_,_=mineru_adapter.prepare_runtime(values, 'standard', work, {})
+    _fake_loaded_runtime(plan, monkeypatch)
+    return str(plan)
+
+
+def _fake_loaded_runtime(plan_path, monkeypatch):
+    plan=json.loads(Path(plan_path).read_text())
+    model=json.loads(Path(plan['config_path']).read_text())['model']
+    module=types.ModuleType('mineru.config')
+    module.config=types.SimpleNamespace(model=types.SimpleNamespace(source=model['source'],
+        base_dir=model['base_dir'], small_backend=model['small_backend'],
+        vlm=types.SimpleNamespace(engine=model['vlm']['engine'],server_url='')),
+        llm_aided=types.SimpleNamespace(features=types.SimpleNamespace(title_leveling=False,cross_page_table_cell_merge=False)))
+    module.get_config_file_path=lambda: plan['config_path']
+    monkeypatch.setitem(sys.modules, 'mineru.config', module)
 
 # 假的 4.0 结果：第 1 页封面（带页眉/页脚），第 2 页正文
 FAKE_MARKDOWN = (
@@ -86,6 +125,7 @@ def fake_mineru(monkeypatch):
     from algorithm.preproc.preproc_src.processors import mineru4_worker
 
     def run_worker(cmd, **kwargs):
+        _fake_loaded_runtime(cmd[cmd.index('--runtime-plan')+1], monkeypatch)
         return types.SimpleNamespace(returncode=mineru4_worker.main(cmd[2:]), stderr="")
 
     monkeypatch.setattr(mineru4_processor.subprocess, "run", run_worker)
@@ -440,7 +480,7 @@ def test_native_child_failure_is_returned_as_parse_error(pdf_file, monkeypatch):
     assert 'native crash' in result['metadata']['error']
 
 
-def test_worker_omits_image_bytes_but_keeps_ocr_text(tmp_path, monkeypatch):
+def test_worker_omits_image_bytes_but_keeps_ocr_text(tmp_path, monkeypatch, controlled_runtime):
     _fake_version(monkeypatch, "4.0.4")
     from algorithm.preproc.preproc_src.processors import mineru4_worker
     class Result:
@@ -450,32 +490,35 @@ def test_worker_omits_image_bytes_but_keeps_ocr_text(tmp_path, monkeypatch):
             return {'pages': []}
     monkeypatch.setitem(sys.modules, 'mineru', types.SimpleNamespace(parse=lambda *a, **k: Result(), __version__='4.0.4'))
     out=tmp_path/'out'
-    assert mineru4_worker.main(['--pdf','fake.pdf','--out-dir',str(out),'--ocr-mode','ocr']) == 0
+    plan = _runtime_plan(tmp_path, controlled_runtime, monkeypatch)
+    assert mineru4_worker.main(['--pdf','fake.pdf','--out-dir',str(out),'--ocr-mode','ocr','--runtime-plan',plan]) == 0
     text=(out/'markdown.md').read_text()
     assert 'base64' not in text
     assert '印章文字' in text and '截止日期2026年4月10日' in text
 
 
 @pytest.mark.parametrize("version", ["2.7.6", "5.0.0", ""])
-def test_worker_rejects_unsupported_mineru_version(tmp_path, monkeypatch, version):
+def test_worker_rejects_unsupported_mineru_version(tmp_path, monkeypatch, version, controlled_runtime):
     from algorithm.preproc.preproc_src.processors import mineru4_worker
     calls = []
     monkeypatch.setitem(sys.modules, "mineru", types.SimpleNamespace(parse=lambda *a, **k: calls.append(1)))
     _fake_version(monkeypatch, version)
     out = tmp_path / "worker"
-    assert mineru4_worker.main(["--pdf", "fake.pdf", "--out-dir", str(out)]) == 1
+    plan = _runtime_plan(tmp_path, controlled_runtime, monkeypatch)
+    assert mineru4_worker.main(["--pdf", "fake.pdf", "--out-dir", str(out), '--runtime-plan', plan]) == 1
     report = json.loads((out / "result.json").read_text(encoding="utf-8"))
     assert "需要 MinerU 4.x" in report["error"]
     assert calls == []
 
 
-def test_worker_preserves_actual_parse_failure(tmp_path, monkeypatch):
+def test_worker_preserves_actual_parse_failure(tmp_path, monkeypatch, controlled_runtime):
     from algorithm.preproc.preproc_src.processors import mineru4_worker
     def fail(*args, **kwargs):
         raise RuntimeError("model load failed")
     monkeypatch.setitem(sys.modules, "mineru", types.SimpleNamespace(parse=fail))
     _fake_version(monkeypatch, "4.0.4")
     out = tmp_path / "worker"
-    assert mineru4_worker.main(["--pdf", "fake.pdf", "--out-dir", str(out)]) == 1
+    plan = _runtime_plan(tmp_path, controlled_runtime, monkeypatch)
+    assert mineru4_worker.main(["--pdf", "fake.pdf", "--out-dir", str(out), '--runtime-plan', plan]) == 1
     report = json.loads((out / "result.json").read_text(encoding="utf-8"))
     assert report["error"] == "RuntimeError: model load failed"

@@ -13,10 +13,6 @@ from algorithm.runtime_profile import is_remote_only
 
 MODEL_PATHS = {
     "docling": Path("/models/docling-models"),
-    # MinerU 2.x 已退役：本地解析回退层是 4.x，可用性由 main_processor 的
-    # _local_mineru4_available（主解释器安装版本为 4.x）判定；
-    # 4.0 模型目录另见 runtime_checks 的 mineru4 检查。
-    "mineru_pipeline": Path("/models/mineru/pipeline"),
 }
 OPTIONAL_MODEL_ENV = (
     "VECTOR_MODEL_PATH",
@@ -85,7 +81,11 @@ def runtime_checks() -> dict[str, Any]:
         }
     else:
         checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
-        checks["mineru4"] = _directory_check(Path(config_getenv("MINERU_MODEL_BASE_DIR", "/models/mineru4")))
+        from qasystem_config.mineru_adapter import settings, model_report
+        try:
+            checks["mineru4"] = model_report(settings(), config_getenv("MINERU4_TIER"), check_lock=True)
+        except (ValueError, OSError) as exc:
+            checks["mineru4"] = {"ok": False, "reason": str(exc)}
         from qasystem_config.model_registry import worker_record
         record = worker_record()
         if not record or not record.get('enabled'):

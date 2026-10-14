@@ -153,6 +153,9 @@ class Mineru4Processor(BaseProcessor):
         timeout = int(config_getenv("MINERU4_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS)
         workdir = tempfile.mkdtemp(prefix="mineru4-")
         try:
+            from qasystem_config.mineru_adapter import settings, prepare_runtime
+
+            plan, environment, _stamp = prepare_runtime(settings(), tier, workdir, os.environ.copy())
             cmd = [
                 python, str(worker),
                 "--pdf", str(file_path),
@@ -160,9 +163,10 @@ class Mineru4Processor(BaseProcessor):
                 "--tier", tier,
                 "--ocr-mode", OCR_MODE_MAP.get(ocr_mode, ocr_mode),
                 "--page-range", page_range,
+                "--runtime-plan", str(plan),
             ]
             completed = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout, env=os.environ.copy()
+                cmd, capture_output=True, text=True, timeout=timeout, env=environment
             )
             info_path = Path(workdir) / "result.json"
             info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.is_file() else {}
@@ -287,6 +291,7 @@ class Mineru4Processor(BaseProcessor):
                 "version": version,
                 "mode": mode,
                 "file_suffix": suffix,
+                "configuration": info.get("configuration"),
                 **({"tier_reason": tier_reason} if tier_reason else {}),
                 # 4.0 无这些开关/参数，这里如实记录，避免调用方以为生效了
                 "ignored_options": ignored,

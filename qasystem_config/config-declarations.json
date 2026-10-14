@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.12",
+  "version": "2026.10.14.13",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -2500,7 +2500,7 @@
       ]
     },
     "MINERU_MODEL_SOURCE": {
-      "desc": "文档解析 / MinerU 2.x 已退役：VLM 端点未配置时的本地回退层是 MinerU 4.x（见下方 MINERU_MODEL_BASE_DIR）。",
+      "desc": "MinerU运行时模型来源只允许local，禁止自动联网回退。下载来源由独立模型准备命令--source临时选择。",
       "default": "local",
       "scope": "deployment",
       "mode": "startup",
@@ -2508,6 +2508,16 @@
         {
           "path": "algorithm/preproc/preproc_src/processors/ocr_processor.py",
           "kind": "read",
+          "token": "MINERU_MODEL_SOURCE"
+        },
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "kind": "read",
+          "token": "MINERU_MODEL_SOURCE"
+        },
+        {
+          "path": "docker/configure.py",
+          "kind": "reference",
           "token": "MINERU_MODEL_SOURCE"
         }
       ],
@@ -2518,6 +2528,10 @@
         },
         {
           "path": "algorithm/preproc/preproc_src/processors/ocr_processor.py",
+          "expression": "None"
+        },
+        {
+          "path": "qasystem_config/mineru_adapter.py",
           "expression": "None"
         }
       ]
@@ -2547,7 +2561,7 @@
       ]
     },
     "MINERU_HOME": {
-      "desc": "MinerU 4.0（本地推理，不调用远程 API），与 docling 装在同一个环境。 / 解析子进程直接复用主 Python；不需要配置独立解释器路径。 / 模型放在 ${HOST_MODELS_DIR}/mineru4，容器内即 /models/mineru4： / MinerU-4_models_onnx（basic 档小模型，约 819MB） / MinerU2.5-Pro-2605-1.2B-GGUF（standard/advanced 档 VLM，llama.cpp，约 1.2GB）",
+      "desc": "MinerU运行数据目录，必须为当前运行环境的绝对路径；旧config.yaml不参与解析，每次解析自动生成受控配置。",
       "default": "/app/backend/data/mineru4",
       "scope": "deployment",
       "mode": "startup",
@@ -2556,30 +2570,56 @@
           "path": "algorithm/preproc/preproc_src/processors/mineru4_worker.py",
           "kind": "external",
           "token": "mineru"
+        },
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "kind": "read",
+          "token": "MINERU_HOME"
+        },
+        {
+          "path": "docker/configure.py",
+          "kind": "reference",
+          "token": "MINERU_HOME"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "expression": "None"
         }
       ]
     },
     "MINERU_MODEL_BASE_DIR": {
-      "desc": "部署参数 MINERU_MODEL_BASE_DIR",
+      "desc": "MinerU 4本地模型共同根目录，必须为运行环境的绝对路径；模型本体只读，.locks单独可写。按必需文件检查，不能仅依赖完成标记。",
       "default": "/models/mineru4",
       "scope": "deployment",
       "mode": "startup",
       "consumers": [
         {
-          "path": "backend/app/health.py",
+          "path": "qasystem_config/mineru_adapter.py",
           "kind": "read",
+          "token": "MINERU_MODEL_BASE_DIR"
+        },
+        {
+          "path": "docker/configure.py",
+          "kind": "reference",
+          "token": "MINERU_MODEL_BASE_DIR"
+        },
+        {
+          "path": "docker-compose.yml",
+          "kind": "external",
           "token": "MINERU_MODEL_BASE_DIR"
         }
       ],
       "fallbacks": [
         {
-          "path": "backend/app/health.py",
-          "expression": "'/models/mineru4'"
+          "path": "qasystem_config/mineru_adapter.py",
+          "expression": "None"
         }
       ]
     },
     "MINERU_MODEL_SMALL_BACKEND": {
-      "desc": "部署参数 MINERU_MODEL_SMALL_BACKEND",
+      "desc": "MinerU本地小模型后端，明确选择onnx或torch；模型准备、健康检查与解析使用同一资源清单。",
       "default": "onnx",
       "scope": "deployment",
       "mode": "startup",
@@ -2588,11 +2628,27 @@
           "path": "algorithm/preproc/preproc_src/processors/mineru4_worker.py",
           "kind": "external",
           "token": "mineru"
+        },
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "kind": "read",
+          "token": "MINERU_MODEL_SMALL_BACKEND"
+        },
+        {
+          "path": "docker/configure.py",
+          "kind": "reference",
+          "token": "MINERU_MODEL_SMALL_BACKEND"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "expression": "None"
         }
       ]
     },
     "MINERU_MODEL_VLM_ENGINE": {
-      "desc": "VLM 引擎：llama-cpp（CPU，默认）/ vllm（GPU 提速，用镜像自带 vLLM，见下方 VLLM 段）。 / 配 vllm 时需另外准备非 GGUF 权重并设置 MINERU_MODEL_VLM_SERVER_URL（或用本地 vLLM 服务）。",
+      "desc": "MinerU本地VLM引擎，明确选择llama-cpp/vllm/lmdeploy/mlx；standard/advanced需要对应本地权重，禁止旧YAML切换远程服务。",
       "default": "llama-cpp",
       "scope": "deployment",
       "mode": "startup",
@@ -2601,6 +2657,22 @@
           "path": "algorithm/preproc/preproc_src/processors/mineru4_worker.py",
           "kind": "external",
           "token": "mineru"
+        },
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "kind": "read",
+          "token": "MINERU_MODEL_VLM_ENGINE"
+        },
+        {
+          "path": "docker/configure.py",
+          "kind": "reference",
+          "token": "MINERU_MODEL_VLM_ENGINE"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "qasystem_config/mineru_adapter.py",
+          "expression": "None"
         }
       ]
     },
@@ -2627,11 +2699,25 @@
           "path": "algorithm/preproc/preproc_src/processors/mineru4_processor.py",
           "kind": "read",
           "token": "MINERU4_TIER"
+        },
+        {
+          "path": "backend/app/health.py",
+          "kind": "read",
+          "token": "MINERU4_TIER"
+        },
+        {
+          "path": "docker/download_models.py",
+          "kind": "external",
+          "token": "MINERU4_TIER"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/preproc/preproc_src/processors/mineru4_processor.py",
+          "expression": "None"
+        },
+        {
+          "path": "backend/app/health.py",
           "expression": "None"
         }
       ]
@@ -4722,7 +4808,7 @@
     "backend/app/health.py": [
       "config_getenv(name, '')",
       "config_getenv('DATABASE_URL', '')",
-      "config_getenv('MINERU_MODEL_BASE_DIR', '/models/mineru4')",
+      "config_getenv('MINERU4_TIER')",
       "config_getenv('DOCUMENT_PARSE_SERVICE_URL', '')",
       "config_getenv('EMBEDDING_SERVICE_URL', '')"
     ],
@@ -5163,6 +5249,13 @@
     ],
     "external_services/llm/service.py": [
       "configuration.getenv(service['api_key_env'], '')"
+    ],
+    "qasystem_config/mineru_adapter.py": [
+      "getenv('MINERU_HOME')",
+      "getenv('MINERU_MODEL_BASE_DIR')",
+      "getenv('MINERU_MODEL_SOURCE')",
+      "getenv('MINERU_MODEL_SMALL_BACKEND')",
+      "getenv('MINERU_MODEL_VLM_ENGINE')"
     ]
   },
   "aliases": {
@@ -5640,6 +5733,53 @@
     "business_configuration_owner": "qasystem_config",
     "deployment_owner": "docker",
     "io_owner": "qasystem_config.io",
-    "native_entrypoint": "model_runtime.native"
+    "native_entrypoint": "model_runtime.native",
+    "provider_scan_files": [
+      "qasystem_config/mineru_adapter.py"
+    ]
+  },
+  "mineru_runtime_contract": {
+    "onnx_files": [
+      "Layout/PP-DocLayoutV2/inference.onnx",
+      "Layout/PP-DocLayoutV2/inference.yml",
+      "OCR/paddleocr/ch_PP-OCRv6_tiny_det_infer.onnx",
+      "OCR/paddleocr/ch_PP-OCRv6_tiny_det_inference.yml",
+      "OCR/paddleocr/ch_PP-OCRv6_small_rec_infer.onnx",
+      "OCR/paddleocr/ch_PP-OCRv6_small_rec_inference.yml",
+      "OCR/paddleocr/seal_PP-OCRv4_det_infer.onnx",
+      "OCR/paddleocr/seal_PP-OCRv4_det_inference.yml",
+      "MFR/pp_formulanet_plus_m/PP-FormulaNet_plus-M.onnx",
+      "MFR/pp_formulanet_plus_m/PP-FormulaNet_plus-M_inference.yml",
+      "Table/slanet-plus.onnx",
+      "Table/unet.onnx",
+      "Table/PP-LCNet_x1_0_table_cls.onnx"
+    ],
+    "torch_files": [
+      "Layout/PP-DocLayoutV2",
+      "OCR/paddleocr",
+      "MFR/pp_formulanet_plus_m/PP-FormulaNet_plus-M.pth",
+      "MFR/pp_formulanet_plus_m/PP-FormulaNet_plus-M_inference.yml",
+      "Table/slanet-plus.onnx",
+      "Table/unet.onnx",
+      "Table/PP-LCNet_x1_0_table_cls.onnx"
+    ],
+    "gguf_files": [
+      "MinerU2.5-Pro-2605-1.2B-Q8_0.gguf",
+      "mmproj-MinerU2.5-Pro-2605-1.2B-Q8_0.gguf"
+    ],
+    "child_environment_carriers": [
+      "MINERU_CONFIG",
+      "MINERU_HOME"
+    ],
+    "provider": "mineru.config",
+    "functions": {
+      "settings": "def settings():\n    from qasystem_config.configuration import getenv, declarations, read_registry\n    values = {'home': getenv('MINERU_HOME'), 'base_dir': getenv('MINERU_MODEL_BASE_DIR'), 'source': getenv('MINERU_MODEL_SOURCE'), 'small_backend': getenv('MINERU_MODEL_SMALL_BACKEND'), 'vlm_engine': getenv('MINERU_MODEL_VLM_ENGINE')}\n    values['declaration_version'] = declarations()['version']\n    _, values['revision'] = read_registry(with_revision=True)\n    return validate_settings(values)",
+      "validate_settings": "def validate_settings(values):\n    values = dict(values)\n    values['home'] = str(absolute_path(values.get('home'), 'MINERU_HOME'))\n    values['base_dir'] = str(absolute_path(values.get('base_dir'), 'MINERU_MODEL_BASE_DIR'))\n    if values.get('source') != 'local':\n        raise ValueError('MinerU 运行时模型来源必须是 local；下载请使用独立的模型准备工具')\n    if values.get('small_backend') not in {'onnx', 'torch'}:\n        raise ValueError('MinerU 小模型后端必须明确选择 onnx 或 torch')\n    if values.get('vlm_engine') not in {'llama-cpp', 'vllm', 'lmdeploy', 'mlx'}:\n        raise ValueError('MinerU VLM 引擎必须明确配置，不能自动回退')\n    return values",
+      "required_repositories": "def required_repositories(values, tier):\n    values = validate_settings(values)\n    if tier not in {'flash', 'basic', 'standard', 'advanced'}:\n        raise ValueError('MinerU 档位无效')\n    if tier == 'flash':\n        return {}\n    repos = {'MinerU-4_models_onnx': ONNX_FILES} if values['small_backend'] == 'onnx' else {'MinerU-4_models_torch': TORCH_FILES}\n    if tier in {'standard', 'advanced'}:\n        repos['MinerU2.5-Pro-2605-1.2B-GGUF' if values['vlm_engine'] == 'llama-cpp' else 'MinerU2.5-Pro-2605-1.2B'] = GGUF_FILES if values['vlm_engine'] == 'llama-cpp' else ('config.json', 'tokenizer_config.json')\n    return repos",
+      "_safetensors_complete": "def _safetensors_complete(path):\n    with path.open('rb') as stream:\n        raw = stream.read(8)\n        if len(raw) != 8:\n            return False\n        size = struct.unpack('<Q', raw)[0]\n        if not 2 <= size <= min(100000000, path.stat().st_size - 8):\n            return False\n        try:\n            header = json.loads(stream.read(size))\n            spans = sorted((item['data_offsets'] for key, item in header.items() if key != '__metadata__'))\n            cursor = 0\n            for start, end in spans:\n                if type(start) is not int or type(end) is not int or start != cursor or (end < start):\n                    return False\n                cursor = end\n            return bool(spans) and cursor > 0 and (cursor == path.stat().st_size - 8 - size)\n        except (ValueError, KeyError, TypeError, AttributeError):\n            return False",
+      "model_report": "def model_report(values, tier, *, check_lock=False, require_receipt=True):\n    values = validate_settings(values)\n    base = Path(values['base_dir'])\n    missing, invalid, checked = ([], [], 0)\n    repositories = required_repositories(values, tier)\n    for repo, names in repositories.items():\n        folder = base / repo\n        if not folder.resolve().is_relative_to(base):\n            invalid.append(repo + ': 模型目录越出共同根目录')\n            continue\n        for name in names:\n            path = folder / name\n            if not path.resolve().is_relative_to(folder.resolve()):\n                invalid.append(repo + '/' + name + ': 路径越界')\n            elif path.is_dir():\n                payloads = [p for p in path.rglob('*') if p.is_file() and p.name != '.mineru_complete']\n                weights = [p for p in payloads if p.suffix in {'.pth', '.bin', '.safetensors', '.onnx'}]\n                if not weights or any((p.stat().st_size == 0 for p in weights)):\n                    missing.append(repo + '/' + name)\n                elif require_receipt and (not any(((p / '.mineru_complete').is_file() for p in (path, folder)))):\n                    missing.append(repo + '/' + name + '/.mineru_complete')\n                else:\n                    checked += len(payloads)\n            elif not path.is_file() or path.stat().st_size == 0:\n                missing.append(repo + '/' + name)\n            else:\n                checked += 1\n                if path.suffix == '.gguf':\n                    with path.open('rb') as stream:\n                        header = stream.read(24)\n                    valid = len(header) == 24 and header[:4] == b'GGUF'\n                    if valid:\n                        version, tensors, metadata = struct.unpack('<IQQ', header[4:])\n                        valid = version in (2, 3) and tensors > 0 and (metadata > 0) and (path.stat().st_size >= 24 + tensors * 32 + metadata * 13)\n                    if not valid:\n                        invalid.append(repo + '/' + name + ': GGUF 文件头无效')\n        if require_receipt and repo == 'MinerU2.5-Pro-2605-1.2B-GGUF' and (not (folder / '.mineru_complete').is_file()):\n            missing.append(repo + '/.mineru_complete')\n        if repo == 'MinerU2.5-Pro-2605-1.2B':\n            index = folder / 'model.safetensors.index.json'\n            try:\n                if index.is_file():\n                    weight_map = json.loads(index.read_text())['weight_map']\n                    names = set(weight_map.values())\n                    if not names:\n                        raise ValueError()\n                    weights = [folder / name for name in names]\n                else:\n                    weights = list(folder.glob('*.safetensors'))\n                if not weights or any((not p.resolve().is_relative_to(folder.resolve()) or not p.is_file() or (not _safetensors_complete(p)) for p in weights)):\n                    invalid.append(repo + ': 权重分片缺失或截断')\n                checked += len(weights)\n            except (ValueError, KeyError, TypeError, OSError):\n                invalid.append(repo + ': 权重索引无效')\n            if require_receipt and (not (folder / '.mineru_complete').is_file()):\n                missing.append(repo + '/.mineru_complete')\n    if check_lock and repositories:\n        import tempfile\n        try:\n            with tempfile.TemporaryFile(dir=base / '.locks'):\n                pass\n        except OSError:\n            invalid.append('.locks: 模型锁目录不存在或不可写')\n    return {'ok': not missing and (not invalid), 'path': str(base), 'tier': tier, 'checked_files': checked, 'missing': missing, 'invalid': invalid}",
+      "prepare_runtime": "def prepare_runtime(values, tier, directory, inherited):\n    values = validate_settings(values)\n    report = model_report(values, tier, check_lock=True)\n    if not report['ok']:\n        raise ValueError('MinerU 本地模型未就绪：' + '; '.join(report['missing'] + report['invalid']))\n    directory = Path(directory).resolve()\n    configuration = {'model': {'base_dir': values['base_dir'], 'source': 'local', 'small_backend': values['small_backend'], 'vlm': {'engine': values['vlm_engine'], 'server_url': '', 'api_key': '', 'model': ''}}, 'llm_aided': {'features': {'title_leveling': False, 'cross_page_table_cell_merge': False}}}\n    payload = json.dumps(configuration, ensure_ascii=False, sort_keys=True)\n    config_path = directory / 'mineru-config.yaml'\n    config_path.write_text(payload, encoding='utf-8')\n    stamp = {'declaration_version': values.get('declaration_version'), 'revision': values.get('revision'), 'fingerprint': hashlib.sha256(payload.encode()).hexdigest(), 'source': 'local', 'legacy_config_ignored': True, 'checked_files': report['checked_files']}\n    plan = {'config_path': str(config_path), 'stamp': stamp}\n    plan_path = directory / 'mineru-plan.json'\n    plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding='utf-8')\n    environment = {key: value for key, value in inherited.items() if not key.startswith('MINERU_')}\n    environment.update({'MINERU_CONFIG': str(config_path), 'MINERU_HOME': values['home']})\n    return (plan_path, environment, stamp)",
+      "verify_loaded_configuration": "def verify_loaded_configuration(plan_path):\n    plan_path = Path(plan_path).resolve()\n    plan = json.loads(plan_path.read_text(encoding='utf-8'))\n    config_path = Path(plan['config_path']).resolve()\n    if config_path.parent != plan_path.parent:\n        raise ValueError('MinerU 生成配置路径不属于本次解析')\n    payload = config_path.read_bytes()\n    if hashlib.sha256(payload).hexdigest() != plan['stamp']['fingerprint']:\n        raise ValueError('MinerU 生成配置指纹不一致')\n    from mineru.config import config, get_config_file_path\n    if Path(get_config_file_path()).resolve() != config_path:\n        raise ValueError('MinerU 未读取本次受控配置，拒绝回退到旧 YAML')\n    expected = json.loads(payload)\n    model = expected['model']\n    if config.model.source != 'local' or config.model.base_dir != model['base_dir'] or config.model.small_backend != model['small_backend'] or (config.model.vlm.engine != model['vlm']['engine']) or config.model.vlm.server_url or config.llm_aided.features.title_leveling or config.llm_aided.features.cross_page_table_cell_merge:\n        raise ValueError('MinerU 实际配置被覆盖，拒绝解析')\n    return plan['stamp']"
+    }
   }
 }

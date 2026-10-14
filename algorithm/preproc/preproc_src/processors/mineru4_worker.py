@@ -8,7 +8,8 @@
 
     python mineru4_worker.py \\
         --pdf /path/in.pdf --out-dir /tmp/xxx \\
-        --tier standard --ocr-mode auto --page-range 1-3
+        --tier standard --ocr-mode auto --page-range 1-3 \\
+        --runtime-plan /tmp/xxx/mineru-plan.json
 
 产物（写入 --out-dir）：
 
@@ -16,7 +17,7 @@
 * ``structured.json`` —— ``ParseResult.structured_content()``（页/块/bbox，用于分页定位）
 * ``result.json``   —— 版本、耗时等元信息
 
-只需要 stdlib + mineru，因此不依赖仓库其它模块。
+通过公共配置适配器核对本次生成配置；不要把此 worker 当成独立配置入口。
 """
 from __future__ import annotations
 
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tier", default="standard")
     parser.add_argument("--ocr-mode", default="auto", choices=["auto", "ocr", "txt"])
     parser.add_argument("--page-range", default="")
+    parser.add_argument("--runtime-plan", required=True, help="本次解析自动生成的受控配置计划")
     args = parser.parse_args(argv)
 
     out_dir = Path(args.out_dir)
@@ -55,6 +57,9 @@ def main(argv: list[str] | None = None) -> int:
                 "请使用包含 MinerU 4.x 的 qasystem-env-v1 环境镜像"
             )
 
+        from qasystem_config.mineru_adapter import verify_loaded_configuration
+
+        configuration = verify_loaded_configuration(args.runtime_plan)
         result = mineru.parse(
             args.pdf,
             tier=args.tier,
@@ -84,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                     "page_range": args.page_range,
                     "elapsed": round(time.time() - started, 2),
                     "chars": len(markdown),
+                    "configuration": configuration,
                     "pages": len(getattr(result, "pages", []) or []),
                 },
                 ensure_ascii=False,

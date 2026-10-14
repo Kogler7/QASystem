@@ -11,13 +11,28 @@ from qasystem_config.environment_contract import central_reader_names, environme
 
 APPLICATION_DIRS = ('backend', 'agent', 'algorithm', 'external_services', 'clef_service', 'nanojev_service', 'mcp_services', 'agent_mcp', 'model_runtime')
 HISTORY_DIRECTORIES = ('docker/config-releases', 'qasystem_config/config-releases')
+EXTRA_SCAN_FILES = ('qasystem_config/mineru_adapter.py',)
 CORE_CONTRACT = {
     'package': 'qasystem_config', 'declaration': 'qasystem_config/config-declarations.json',
     'history_directories': list(HISTORY_DIRECTORIES),
     'forbidden_core_dependencies': ['docker', *APPLICATION_DIRS],
     'business_configuration_owner': 'qasystem_config', 'deployment_owner': 'docker',
     'io_owner': 'qasystem_config.io', 'native_entrypoint': 'model_runtime.native',
+    'provider_scan_files': list(EXTRA_SCAN_FILES),
 }
+
+
+def mineru_runtime_contracts():
+    """Freeze the explicitly registered dependency adapter, not a regenerated catalog."""
+    from qasystem_config.mineru_adapter import ONNX_FILES, TORCH_FILES, GGUF_FILES
+    tree = ast.parse(Path(__file__).with_name('mineru_adapter.py').read_text(encoding='utf-8'))
+    names = {'settings', 'validate_settings', 'required_repositories', 'model_report',
+             '_safetensors_complete', 'prepare_runtime', 'verify_loaded_configuration'}
+    return {'onnx_files': list(ONNX_FILES), 'torch_files': list(TORCH_FILES), 'gguf_files': list(GGUF_FILES),
+            'child_environment_carriers': ['MINERU_CONFIG', 'MINERU_HOME'],
+            'provider': 'mineru.config',
+            'functions': {node.name: ast.unparse(node) for node in tree.body
+                          if isinstance(node, ast.FunctionDef) and node.name in names}}
 
 
 READERS = {'config_getenv','config_required','getenv','required','startup_getenv','setting','_env','_flag','_env_int','_env_float','_bounded_int'}
@@ -110,6 +125,7 @@ def files(root):
     candidates = [path for directory in APPLICATION_DIRS
                   for path in (root / directory).rglob('*.py')
                   if 'tests' not in path.relative_to(root).parts]
+    candidates += [root / name for name in EXTRA_SCAN_FILES if (root / name).is_file()]
     ignored = git_ignored(root, candidates)
     for path in candidates:
         if path.relative_to(root).as_posix() not in ignored:
@@ -142,6 +158,8 @@ def check(root, *, deployed=False):
     from qasystem_config.config_migrations import ALIASES, MODEL_KEYS
     from qasystem_config.startup_contract import PROCESS_ENVIRONMENT, RUNTIME_DIRECTORY_NAME, EXECUTION_LIVENESS, EXECUTION_TOPOLOGY, SERVICE_TOPOLOGY
     if catalog.get('schema') == 1:
+        if catalog.get('mineru_runtime_contract') != mineru_runtime_contracts():
+            errors.append('MinerU 受控配置/资源/第三方消费契约变化，必须登记新声明版本')
         if catalog.get('core_contract') != CORE_CONTRACT:
             errors.append('公共配置核心边界变化，必须登记新声明版本')
         if catalog.get('environment_access_contract') != ENVIRONMENT_ACCESS_CONTRACT:

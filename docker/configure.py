@@ -375,6 +375,18 @@ class Configuration:
 
     def validate(self, probe: bool = False) -> list[str]:
         errors, ports, gpus = [], {}, {}
+        if self.values.get('ALGORITHM_RUNTIME_PROFILE') != 'remote-only':
+            from pathlib import PurePosixPath, PureWindowsPath
+            for key in ('MINERU_HOME', 'MINERU_MODEL_BASE_DIR'):
+                value = self.values.get(key, '')
+                if not value or '${' in value or not (PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()):
+                    errors.append(f'{key} 必须为目标运行环境的绝对路径')
+            if self.values.get('MINERU_MODEL_SOURCE') != 'local':
+                errors.append('MinerU 运行时只使用 local；下载来源在模型准备命令中临时选择')
+            if self.values.get('MINERU_MODEL_SMALL_BACKEND') not in {'onnx', 'torch'}:
+                errors.append('MinerU 小模型后端必须明确选择 onnx 或 torch')
+            if self.values.get('MINERU_MODEL_VLM_ENGINE') not in {'llama-cpp', 'vllm', 'lmdeploy', 'mlx'}:
+                errors.append('MinerU VLM 引擎必须明确选择，不能自动回退')
         for key, old in self.migration_conflicts.items():
             if key not in self.resolved_migrations:
                 errors.append(f'{key} 与旧配置 {", ".join(old)} 冲突；在 UI 中编辑标准项确认取值')
