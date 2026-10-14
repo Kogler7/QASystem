@@ -49,6 +49,8 @@ class _BlockingLLM:
         self._cfg = _load_env()
         self._url = _chat_completions_url(self._cfg["base_url"])
         self._client = httpx.Client(
+            verify=(self._cfg.get('service_snapshot', {}).get('connection') or {}).get('ca_bundle') or
+                   (self._cfg.get('service_snapshot', {}).get('connection') or {}).get('verify_ssl', True),
             timeout=self._cfg["timeout_s"],
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=20),
             transport=httpx.HTTPTransport(retries=1),
@@ -132,21 +134,33 @@ class _StreamingWorkerLLM:
 
     def __init__(self, broker=None):
         import httpx
-        self._cfg = _load_env()
-        self._url = _chat_completions_url(self._cfg["base_url"])
+        # A missing route fails the submitted task, rather than killing an
+        # idle worker before an administrator registers the Agent service.
+        self._cfg = {'timeout_s': 120}
+        self._url = ''
         self._broker = broker
         self._task_id: str | None = None
         self._subtask: str | None = None
         self._client = httpx.Client(
+            verify=(self._cfg.get('service_snapshot', {}).get('connection') or {}).get('ca_bundle') or
+                   (self._cfg.get('service_snapshot', {}).get('connection') or {}).get('verify_ssl', True),
             timeout=self._cfg["timeout_s"],
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=20),
         )
 
-    def set_task_id(self, task_id: str) -> None:
+    def set_task_id(self, task_id: str, *, service_config=None) -> None:
         if task_id != self._task_id:
             # Worker threads reuse the transport, but a new task must select
             # the latest approved route. All calls in this task keep it fixed.
-            self._cfg = _load_env()
+            previous = self._cfg.get('service_snapshot', {}).get('connection') or {}
+            self._cfg = dict(service_config) if service_config is not None else _load_env()
+            connection = self._cfg.get('service_snapshot', {}).get('connection') or {}
+            if previous != connection:
+                import httpx
+                self._client.close()
+                self._client = httpx.Client(timeout=self._cfg['timeout_s'],
+                    verify=connection.get('ca_bundle') or connection.get('verify_ssl', True),
+                    limits=httpx.Limits(max_keepalive_connections=5, max_connections=20))
             self._url = _chat_completions_url(self._cfg['base_url'])
         self._task_id = task_id
 
@@ -288,10 +302,10 @@ class _StreamingWorkerLLM:
         self._client.close()
 
 
-def _make_tagged_llm(broker, task_id: str, subtask: str):
+def _make_tagged_llm(broker, task_id: str, subtask: str, *, service_config=None):
     """为分解子任务新建已打标的流式 LLM 实例（由 decompose 模块负责关闭）。"""
     llm = _StreamingWorkerLLM(broker=broker)
-    llm.set_task_id(task_id)
+    llm.set_task_id(task_id, service_config=service_config)
     llm.set_subtask(subtask)
     return llm
 
@@ -365,7 +379,6 @@ def _process_one(
                 continue
 
             task_id, request_data = item
-            llm.set_task_id(task_id)
 
             msg_preview = request_data.get("user_message", "")[:80]
             logger.info("[%s] thread-%d 开始: %s", task_id, thread_id, msg_preview)
@@ -385,6 +398,7 @@ def _process_one(
             lease_thread.start()
 
             try:
+                llm.set_task_id(task_id)
                 cancel_token = CancellationToken(
                     remote_check=lambda current_id=task_id: task_store.is_cancel_requested(current_id)
                 )
@@ -406,7 +420,7 @@ def _process_one(
                             parent_tm=tm,
                             user_headers=user_headers,
                             direct_llm=llm,
-                            llm_factory=lambda subtask: _make_tagged_llm(broker, task_id, subtask),
+                            llm_factory=lambda subtask: _make_tagged_llm(broker, task_id, subtask, service_config=llm._cfg),
                             config=config,
                             user_message=request_data["user_message"],
                             history=history,

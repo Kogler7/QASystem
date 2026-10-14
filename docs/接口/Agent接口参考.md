@@ -30,7 +30,7 @@ CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](../Agen
 
 ### MCP 连接配置
 
-默认路径为 `agent/agentcode/tools/mcp_tools/mcp_config.json`，可通过 `AGENT_MCP_CONFIG` 在服务启动时覆盖。配置文件格式：
+HTTP Agent 内置连接由部署拓扑自动生成，不接受环境变量文件路径或 URL 覆盖。CLI 开发扩展使用显式 `--mcp-config <文件>`，继续支持多个HTTP/SSE/stdio服务；外部MCP的ops注册UI尚未实现。显式扩展文件格式示例：
 
 ```json
 {
@@ -43,7 +43,7 @@ CLI 参数、环境变量、Redis 与并发旋钮以[部署运维指南](../Agen
 }
 ```
 
-配置了单个 MCP 服务器时，环境变量 `AGENT_MCP_URL` 会覆盖其 URL（容器内默认 `http://agent-mcp:9181/mcp`；本地开发时用 `AGENT_MCP_URL=http://127.0.0.1:9181/mcp` 指向本地 agent-mcp）。
+内置地址在容器内为 `http://agent-mcp:9181/mcp`，本地开发自动为 `http://127.0.0.1:9181/mcp`；显式CLI配置的URL按文件读取，不再由旧环境变量覆盖。
 
 ---
 

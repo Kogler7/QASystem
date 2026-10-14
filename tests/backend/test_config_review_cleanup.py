@@ -50,3 +50,45 @@ def test_configuration_preserves_accounts_in_pending_payloads(tmp_path, monkeypa
     payload = config.pending_payloads()[config.directory / 'config.json']
     assert json.loads(payload)['accounts']['shared']['qpm'] == 30
     assert any(row['kind'] == 'api_registry' and row['registry_kind'] == '账号' for row in config.rows())
+
+
+def test_default_execution_ignores_retired_inline_switch(tmp_path, monkeypatch):
+    from backend.app.execution.manager import ExecutionManager, ExecutionUnavailable
+    from backend.app.execution.store import MemoryExecutionStore
+    from backend.app.execution.artifacts import ArtifactStore
+    from backend.app.execution.hub import ExecutionEventHub
+    monkeypatch.setenv('EXECUTION_MODE', 'inline')
+    monkeypatch.setenv('EXECUTION_ALLOW_MEMORY_QUEUE', 'false')
+    store = MemoryExecutionStore()
+    manager = ExecutionManager(store, ArtifactStore(tmp_path), ExecutionEventHub(store))
+    assert manager.is_async
+    with pytest.raises(ExecutionUnavailable):
+        manager.submit(operation='unit', resource_class='cpu.default', payload={})
+
+
+def test_retired_redis_and_artifact_overrides_cannot_change_topology(tmp_path, monkeypatch):
+    from backend.app.execution import store, artifacts
+    calls = []
+    monkeypatch.setenv('EXECUTION_REDIS_URL', 'redis://foreign.invalid/99')
+    monkeypatch.setenv('EXECUTION_DATA_DIR', str(tmp_path / 'legacy'))
+    monkeypatch.setattr(startup_contract, 'in_container_runtime', lambda: True)
+    monkeypatch.setattr(store, '_STORE', None)
+    monkeypatch.setattr(store, 'RedisExecutionStore', lambda url: calls.append(url) or object())
+    store.get_execution_store()
+    assert calls == ['redis://redis:6379/1']
+    monkeypatch.setattr(artifacts, 'execution_data_directory', lambda: tmp_path / 'managed')
+    assert artifacts.ArtifactStore().root == tmp_path / 'managed'
+    assert not (tmp_path / 'legacy').exists()
+
+
+def test_retired_hot_connection_inputs_are_preserved_in_service_migration(tmp_path):
+    directory = tmp_path / 'runtime-config'
+    directory.mkdir()
+    (directory / 'config.json').write_text(json.dumps({'settings': {
+        'KG_EXTRACT_LLM_BASE_URL': 'http://model.test/v1', 'KG_EXTRACT_LLM_MODEL': 'old-model',
+        'KG_EXTRACT_LLM_MAX_CONCURRENCY': '2'}, 'models': {}}))
+    config = Configuration(tmp_path)
+    service = config.services[config.routes['extract']]
+    assert service['model'] == 'old-model' and service['limits']['max_concurrency'] == 2
+    payload = json.loads(config.pending_payloads()[directory / 'config.json'])
+    assert not set(payload['settings']) & {'KG_EXTRACT_LLM_BASE_URL', 'KG_EXTRACT_LLM_MODEL'}

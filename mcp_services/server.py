@@ -1,5 +1,5 @@
-from docker.configuration import getenv as config_getenv
-import os
+import argparse
+from docker.startup_contract import INTERNAL_MCP_BIND, INTERNAL_MCP_PORT
 
 from .runtime import mcp, MCP_V2
 from .domains.data import sql as _sql
@@ -10,10 +10,16 @@ from .domains.visualization import charts as _charts
 from .domains import execution as _execution
 
 
-def main() -> None:
-    transport = config_getenv("MCP_TRANSPORT", "streamable-http")
-    binding = {"host": config_getenv("MCP_HOST", "0.0.0.0"),
-               "port": int(config_getenv("MCP_PORT", "8890"))}
+def main(argv=None) -> None:
+    parser = argparse.ArgumentParser(description="Standalone MCP development server; Backend embeds HTTP MCP automatically")
+    parser.add_argument("--transport", choices=("streamable-http", "stdio", "sse"), default="streamable-http")
+    parser.add_argument("--host", default=INTERNAL_MCP_BIND)
+    parser.add_argument("--port", type=int, default=INTERNAL_MCP_PORT)
+    args = parser.parse_args(argv)
+    transport = args.transport
+    binding = {"host": args.host, "port": args.port}
+    if not MCP_V2 and transport != "stdio":
+        mcp.settings.host, mcp.settings.port = args.host, args.port
     mcp.run(transport=transport, **(binding if MCP_V2 and transport != "stdio" else {}))
 
 

@@ -14,24 +14,13 @@ def run_llm(
     engine: str = "Qwen/Qwen3-8B",
 ) -> str:
     """调用图谱检索专用 LLM；失败时重试并返回明确错误标记。"""
-    model = engine or config_getenv("GRAPH_LLM_MODEL", "Qwen/Qwen3-8B")
-    default_host = "host.docker.internal" if os.path.exists("/.dockerenv") else "127.0.0.1"
-    base_url = config_getenv("GRAPH_LLM_BASE_URL", f"http://{default_host}:9999").rstrip("/")
-    key = api_key or config_getenv("GRAPH_LLM_API_KEY", "")
-    verify_ssl = config_getenv("GRAPH_LLM_VERIFY_SSL", "true").lower() not in {
-        "false",
-        "0",
-        "no",
-        "off",
-    }
-    retries = max(1, int(config_getenv("GRAPH_LLM_RETRIES", "3")))
-    timeout = float(config_getenv("GRAPH_LLM_TIMEOUT_SECONDS", "60"))
     from external_services.llm.service import resolve_chat_service, model_call
-    routed = resolve_chat_service('graph')
-    service = None
-    if routed:
-        service, key = routed
-        base_url, model = service['base_url'], service['model']
+    service, key = resolve_chat_service('graph', required=True)
+    base_url, model = service['base_url'], service['model']
+    connection = service.get('connection') or {}
+    verify_ssl = connection.get('ca_bundle') or connection.get('verify_ssl', True)
+    retries = 3  # Graph algorithm policy, not per-deployment configuration.
+    timeout = float(connection.get('timeout_seconds', 60))
     messages = [
         {
             "role": "system",

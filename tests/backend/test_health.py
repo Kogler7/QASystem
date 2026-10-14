@@ -23,7 +23,9 @@ def test_full_health_reports_failed_runtime_check(monkeypatch):
 
 def test_basic_health_waits_for_supervisor_runtime_marker(tmp_path, monkeypatch):
     marker = tmp_path / "runtime-ready"
-    monkeypatch.setenv("EXECUTION_RUNTIME_READY_FILE", str(marker))
+    from docker import startup_contract
+    monkeypatch.setattr(startup_contract, 'runtime_ready_file', lambda: marker)
+    monkeypatch.setattr(startup_contract, 'in_container_runtime', lambda: True)
 
     pending = asyncio.run(health_endpoint(full=False, validate_models=False))
     assert isinstance(pending, JSONResponse)
@@ -44,8 +46,7 @@ def test_full_health_reports_all_checks_when_runtime_is_ready(monkeypatch):
 
 
 def test_dependency_checks_reports_unreachable_configured_service(monkeypatch):
-    monkeypatch.setenv("DATABASE_HOST", "mysql.example")
-    monkeypatch.setenv("DATABASE_PORT", "3306")
+    monkeypatch.setenv("DATABASE_URL", "mysql+pymysql://user:password@mysql.example:3306/database")
     monkeypatch.setenv("KG_EXTRACT_LLM_BASE_URL", "")
     monkeypatch.setenv("APPLICATION_SERVICE_URL", "")
     monkeypatch.setenv("FILE_SERVICE_URL", "")
@@ -57,8 +58,8 @@ def test_dependency_checks_reports_unreachable_configured_service(monkeypatch):
 
     checks = health.dependency_checks()
 
-    assert checks["mysql"]["ok"] is False
-    assert checks["mysql"]["reason"] == "connection refused"
+    assert checks["sql_database"]["ok"] is False
+    assert checks["sql_database"]["reason"] == "connection refused"
 
 
 

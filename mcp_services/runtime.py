@@ -1,5 +1,4 @@
-from docker.configuration import getenv as config_getenv
-import os
+from docker.startup_contract import INTERNAL_MCP_BIND, INTERNAL_MCP_PORT
 from importlib.metadata import version
 
 MCP_V2 = int(version("mcp").split(".")[0]) >= 2
@@ -13,8 +12,8 @@ mcp = MCPServer(
     "qasystem-tools",
     instructions="QASystem unified knowledge, graph retrieval, data, and visualization tools",
     **({} if MCP_V2 else {
-        "host": config_getenv("MCP_HOST", "0.0.0.0"),
-        "port": int(config_getenv("MCP_PORT", "8890")),
+        "host": INTERNAL_MCP_BIND,
+        "port": INTERNAL_MCP_PORT,
     }),
 )
 
@@ -22,5 +21,5 @@ mcp = MCPServer(
 def streamable_http_app():
     # Preserve the deployed host binding/security behavior across SDK versions.
     return mcp.streamable_http_app(
-        **({"host": config_getenv("MCP_HOST", "0.0.0.0")} if MCP_V2 else {})
+        **({"host": INTERNAL_MCP_BIND} if MCP_V2 else {})
     )

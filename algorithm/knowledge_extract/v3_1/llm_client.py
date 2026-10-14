@@ -394,6 +394,8 @@ def create_llm_client(
     from openai import OpenAI  # lazy import：仅 live 调用时才需要
 
     config = get_llm_config()
+    if not (base_url or config["base_url"]):
+        raise ValueError("知识抽取未选择已登记的模型服务；请使用 ops 配置抽取用途")
     client = OpenAI(
         base_url=base_url or config["base_url"],
         api_key=api_key or config["api_key"] or "not-needed",
@@ -409,6 +411,9 @@ def create_llm_client(
         # SDK retries enabled multiplies requests invisibly and breaks budgets.
         max_retries=0,
     )
+    if not base_url:
+        from algorithm.knowledge_extract.service_configuration import standalone_sdk
+        client = standalone_sdk(client, config)
     return OpenAICompatibleLLM(
         client,
         model=model or config["model"],

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
-from docker.startup_contract import EXECUTION_LIVENESS
+from docker.startup_contract import EXECUTION_LIVENESS, EXECUTION_TOPOLOGY
 
 import argparse
 import logging
@@ -71,11 +71,9 @@ class WorkerRuntime:
         self.stopped = False
         self._last_heartbeat = 0.0
         # PEL 滞留消息重投（崩溃恢复）：开关与阈值见 _reap。
-        self._reaper_enabled = config_getenv("EXECUTION_REAPER_ENABLED", "true").strip().lower() not in {
-            "0", "false", "off", "no",
-        }
+        self._reaper_enabled = EXECUTION_TOPOLOGY['reaper_enabled']
         self._reaper_min_idle_seconds = float(config_getenv("EXECUTION_REAPER_MIN_IDLE_SECONDS", "600"))
-        self._reaper_interval_seconds = float(config_getenv("EXECUTION_REAPER_INTERVAL_SECONDS", "60"))
+        self._reaper_interval_seconds = EXECUTION_TOPOLOGY['reaper_interval_seconds']
         self._last_reap = 0.0
 
     def _heartbeat(self, *, force: bool = False) -> None:

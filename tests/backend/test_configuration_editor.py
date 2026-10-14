@@ -29,22 +29,22 @@ def test_catalog_covers_every_release_key_and_masks_secrets(editor):
 
 
 def test_save_generates_defaults_and_hot_file_without_deploy(editor, monkeypatch):
-    editor.values['KG_EXTRACT_LLM_MODEL'] = 'test-model'
+    editor.values['KG_EXTRACT_ALGO_VERSION'] = 'v3'
     editor.save()
-    assert json.loads((editor.directory / 'config.json').read_text())['settings']['KG_EXTRACT_LLM_MODEL'] == 'test-model'
+    assert json.loads((editor.directory / 'config.json').read_text())['settings']['KG_EXTRACT_ALGO_VERSION'] == 'v3'
     env = configure.helper.read_env((editor.root / '.env').read_text())
     assert env['PRIVATE_API_KEY'] == 'never-print'
     assert env['GPU_DEVICE_IDS'] == '4,5,6,7'
     assert env['EXECUTION_GPU_RESERVED_DEVICE_IDS'] == '7'
-    assert 'KG_EXTRACT_LLM_MODEL' not in env
+    assert 'KG_EXTRACT_ALGO_VERSION' not in env
     assert json.loads((editor.directory / 'models.compose.json').read_text()) == {'services': {}}
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     monkeypatch.chdir(editor.root)
-    assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'test-model'
-    editor.values['KG_EXTRACT_LLM_MODEL'] = 'second-model'
+    assert runtime_settings.getenv('KG_EXTRACT_ALGO_VERSION') == 'v3'
+    editor.values['KG_EXTRACT_ALGO_VERSION'] = 'v2'
     editor.save()
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
-    assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'second-model'
+    assert runtime_settings.getenv('KG_EXTRACT_ALGO_VERSION') == 'v2'
 
 
 def enable(editor, index, gpu='6', port='60123'):
@@ -90,8 +90,8 @@ def test_concurrent_configuration_edit_is_preserved(editor):
 def test_runtime_rejects_secrets_and_malformed_file(tmp_path, monkeypatch):
     path = tmp_path / 'settings.json'
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv('KG_EXTRACT_LLM_MODEL', 'fallback')
-    assert runtime_settings.getenv('KG_EXTRACT_LLM_MODEL') == 'fallback'
+    monkeypatch.setenv('KG_EXTRACT_ALGO_VERSION', 'v2')
+    assert runtime_settings.getenv('KG_EXTRACT_ALGO_VERSION') == 'v2'
     for text in ('{', '{"KG_EXTRACT_LLM_API_KEY":"secret"}', '[]'):
         path.write_text(text)
         with pytest.raises(ValueError, match='Invalid runtime'): runtime_settings.read_settings(path)
@@ -99,12 +99,17 @@ def test_runtime_rejects_secrets_and_malformed_file(tmp_path, monkeypatch):
 
 def test_new_requests_reload_model_and_version_existing_snapshot_is_stable(editor, monkeypatch):
     monkeypatch.chdir(editor.root)
-    editor.values.update(KG_EXTRACT_ALGO_VERSION='v3', KG_EXTRACT_LLM_MODEL='first',
-                         KG_EXTRACT_LLM_MAX_TOKENS='1024', KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS='1024')
+    monkeypatch.setenv('KG_EXTRACT_LLM_API_KEY', 'unit-credential')
+    editor.values.update(KG_EXTRACT_ALGO_VERSION='v3', KG_EXTRACT_LLM_MAX_TOKENS='1024',
+                         KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS='1024')
+    editor.services['chat'] = {'kind':'api','adapter':'chat','base_url':'http://model.test/v1','model':'first',
+                               'api_key_env':'KG_EXTRACT_LLM_API_KEY'}
+    editor.routes['extract'] = 'chat'
     editor.save()
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     first = extraction_config.resolve_config({})
-    editor.values.update(KG_EXTRACT_ALGO_VERSION='v2', KG_EXTRACT_LLM_MODEL='second')
+    editor.values['KG_EXTRACT_ALGO_VERSION'] = 'v2'
+    editor.services['chat']['model'] = 'second'
     editor.save()
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     second = extraction_config.resolve_config({})
@@ -257,7 +262,7 @@ def test_key_value_columns_have_common_right_edge_and_flag(editor):
     line = screen.item_line(row, 76)
     assert line.rstrip().endswith('8006')
     assert screen.width(line) == 76
-    hot = next(r for r in rows if r['key'] == 'KG_EXTRACT_LLM_MODEL')
+    hot = next(r for r in rows if r['key'] == 'KG_EXTRACT_ALGO_VERSION')
     assert hot['display_name'].startswith('[热更] ')
     assert screen.width(screen.item_line(hot, 76)) == 76
     assert screen.width(screen.pair('中文名称', '中文值', 35)) == 35
@@ -270,7 +275,7 @@ def test_live_inspection_is_readonly_masks_secrets_and_reports_actual_difference
     model = {**metadata, 'name': '/qasystem-matrix-qwen35-4b', 'command': ['vllm', 'serve', '/models/4b',
         '--served-model-name', 'Qwen/Qwen3.5-4B', '--max-model-len', '262144', '--api-key', 'never-expose'],
         'ports': {'8000/tcp': [{'HostPort': '9998'}]}}
-    raw = '\n'.join(json.dumps(x) for x in [metadata, {'env': 'KG_EXTRACT_LLM_MODEL=actual-model'}, model, {'env': 'CUDA_VISIBLE_DEVICES=6'}])
+    raw = '\n'.join(json.dumps(x) for x in [metadata, {'env': 'KG_EXTRACT_ALGO_VERSION=v3'}, model, {'env': 'CUDA_VISIBLE_DEVICES=6'}])
     commands = []
     def run(command, **kwargs):
         commands.append(command)
@@ -280,11 +285,11 @@ def test_live_inspection_is_readonly_masks_secrets_and_reports_actual_difference
     editor.refresh_live()
     assert all(c[0] == 'nvidia-smi' or c[1] in {'ps', 'inspect'} for c in commands)
     assert 'KG_EXTRACT_LLM_API_KEY' not in commands[1][3]
-    assert editor.actual_value('KG_EXTRACT_LLM_MODEL') == 'actual-model'
+    assert editor.actual_value('KG_EXTRACT_ALGO_VERSION') == 'v3'
     rows = editor.rows()
-    r = next(r for r in rows if r['key'] == 'KG_EXTRACT_LLM_MODEL')
+    r = next(r for r in rows if r['key'] == 'KG_EXTRACT_ALGO_VERSION')
     assert r['display_value'].startswith('! ')
-    assert r['actual_value'] == 'actual-model'
+    assert r['actual_value'] == 'v3'
     runtime = next(r for r in rows if r['key'] == 'qasystem-matrix-qwen35-4b')
     assert runtime['container']['gpu'] == '6'
     assert runtime['container']['context'] == '262144'
@@ -295,24 +300,24 @@ def test_live_inspection_is_readonly_masks_secrets_and_reports_actual_difference
 def test_actual_value_uses_live_mount_not_unapplied_edit_directory(editor, tmp_path):
     actual_dir = tmp_path / 'actual-mount'
     actual_dir.mkdir()
-    (actual_dir / 'settings.json').write_text('{"KG_EXTRACT_LLM_MODEL":"mounted-model"}')
-    editor.live = [{'name': 'qasystem_backend', 'status': 'running', 'env': {'KG_EXTRACT_LLM_MODEL': 'old-env'},
+    (actual_dir / 'settings.json').write_text('{"KG_EXTRACT_ALGO_VERSION":"v3"}')
+    editor.live = [{'name': 'qasystem_backend', 'status': 'running', 'env': {'KG_EXTRACT_ALGO_VERSION': 'v2'},
         'mounts': [{'Destination': '/app/runtime-config', 'Source': str(actual_dir)}]}]
-    assert editor.actual_value('KG_EXTRACT_LLM_MODEL') == 'mounted-model'
+    assert editor.actual_value('KG_EXTRACT_ALGO_VERSION') == 'v3'
 
 
 def test_save_migrates_legacy_files_and_env_without_persisting_template_defaults(editor):
     directory = editor.directory
-    (directory / 'settings.json').write_text(json.dumps({'KG_EXTRACT_LLM_MODEL': 'legacy-model'}))
+    (directory / 'settings.json').write_text(json.dumps({'KG_EXTRACT_ALGO_VERSION': 'v3'}))
     (directory / 'models.json').write_text('{}')
     with (editor.root / '.env').open('a') as stream:
-        stream.write('KG_EXTRACT_LLM_MAX_CONCURRENCY=3\n')
+        stream.write('KG_EXTRACT_LLM_MAX_TOKENS=3\n')
     reopened = configure.Configuration(editor.root)
-    assert reopened.values['KG_EXTRACT_LLM_MODEL'] == 'legacy-model'
+    assert reopened.values['KG_EXTRACT_ALGO_VERSION'] == 'v3'
     reopened.save()
     settings = json.loads((directory / 'config.json').read_text())['settings']
-    assert settings == {'KG_EXTRACT_LLM_MODEL': 'legacy-model', 'KG_EXTRACT_LLM_MAX_CONCURRENCY': '3'}
-    assert 'KG_EXTRACT_LLM_MAX_CONCURRENCY' not in configure.helper.read_env((editor.root / '.env').read_text())
+    assert settings == {'KG_EXTRACT_ALGO_VERSION': 'v3', 'KG_EXTRACT_LLM_MAX_TOKENS': '3'}
+    assert 'KG_EXTRACT_LLM_MAX_TOKENS' not in configure.helper.read_env((editor.root / '.env').read_text())
     assert not (directory / 'settings.json').exists()
     assert not (directory / 'models.json').exists()
     assert (reopened.backup / 'settings.json').is_file()
@@ -322,7 +327,7 @@ def test_save_migrates_legacy_files_and_env_without_persisting_template_defaults
 def test_canonical_runtime_file_does_not_overlay_old_files(editor):
     from docker.runtime_config import read_document
     (editor.directory / 'config.json').write_text('{"settings": {}, "models": {}}')
-    (editor.directory / 'settings.json').write_text('{"KG_EXTRACT_LLM_MODEL":"stale"}')
+    (editor.directory / 'settings.json').write_text('{"KG_EXTRACT_ALGO_VERSION":"stale"}')
     assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}, 'services': {}, 'routes': {}, 'accounts': {}}
 
 
@@ -362,7 +367,7 @@ def test_ui_cancelled_review_does_not_write_hot_changes(editor, monkeypatch):
     monkeypatch.setattr(configure.sys.stdin, 'isatty', lambda: True)
     monkeypatch.setattr(configure, 'read_key', lambda: 'q')
     original = (editor.root / '.env').read_bytes()
-    editor.values['KG_EXTRACT_LLM_MODEL'] = 'pending-only'
+    editor.values['KG_EXTRACT_ALGO_VERSION'] = 'v2'
     assert configure.review_save(editor) is False
     assert (editor.root / '.env').read_bytes() == original
     assert not (editor.directory / 'config.json').exists()
@@ -390,7 +395,7 @@ def legacy_editor(tmp_path):
     old = tmp_path / 'custom-config'
     old.mkdir()
     (tmp_path / '.env').write_text('QASYSTEM_RUNTIME_CONFIG_DIR=./custom-config\nHOST_MODELS_DIR=./models\n')
-    (old / 'config.json').write_text('{"settings":{"KG_EXTRACT_LLM_MODEL":"old"},"models":{}}')
+    (old / 'config.json').write_text('{"settings":{"KG_EXTRACT_ALGO_VERSION":"v3"},"models":{}}')
     (old / 'models.compose.json').write_text('{"services":{}}')
     configure.guard.record(old, configure.guard.snapshot(tmp_path, old), reason='fixture', reviewer='tester')
     return configure.Configuration(tmp_path), old
@@ -400,7 +405,7 @@ def test_custom_directory_plan_does_not_modify_original_or_copy_approval(tmp_pat
     editor, old = legacy_editor(tmp_path)
     before = (old / 'approved-config.json').read_bytes()
     plan = editor.pending_payloads()
-    assert editor.values['KG_EXTRACT_LLM_MODEL'] == 'old'
+    assert editor.values['KG_EXTRACT_ALGO_VERSION'] == 'v3'
     assert editor.approval_directory == old
     assert 'QASYSTEM_RUNTIME_CONFIG_DIR=' not in plan[tmp_path / '.env']
     assert (old / 'approved-config.json').read_bytes() == before

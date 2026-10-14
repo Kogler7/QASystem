@@ -273,15 +273,10 @@ summary = summarize_text(text=document_text)
 
 | 环境变量                           | 用途                                |
 | ---------------------------------- | ----------------------------------- |
-| `KG_EXTRACT_LLM_BASE_URL`        | OpenAI-compatible API 地址          |
 | `KG_EXTRACT_LLM_API_KEY`         | API Key                             |
-| `KG_EXTRACT_LLM_MODEL`           | 模型名称，默认 `deepseek-v4-flash-0731` |
 | `KG_EXTRACT_LLM_DISABLE_THINKING` | 是否关闭 thinking，默认 `1` 关闭；设 `0` 开启 |
 | `KG_EXTRACT_LLM_MAX_TOKENS`      | 最大输出 token 数                   |
 | `KG_EXTRACT_LLM_JSON_RETRIES`    | JSON 格式错误后的重试次数           |
-| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认`4` |
-| `KG_EXTRACT_LLM_QPS`             | 每秒最大请求数，`0` 表示不限制    |
-| `KG_EXTRACT_LLM_QPM`             | 每分钟最大请求数，`0` 表示不限制  |
 
 部分配置保留旧环境变量作为回退，具体以 `config.py` 和 `extractor.py` 为准。
 
@@ -331,3 +326,6 @@ summary = summarize_text(text=document_text)
 - 在调用 LLM 前返回明确的本体语法错误；
 - 按本体 identity 在本地统一生成实体 UID；
 - 对大型本体按领域或相关性裁剪后再进入提示词。
+
+
+服务连接通过 ops 登记，抽取用途选择服务 ID。旧地址、模型、PROVIDERS_JSON 和配额环境变量只用于人工审核迁移，不再作为运行时连接回退。各版本 `get_llm_policy()` 保留算法策略，`get_llm_config()` 在运行时组合登记服务；默认 live 工厂缺服务时明确失败，独立算法调用仍共用服务排队。输入、输出、思考等策略环境入口将在后续算法策略批退役，本批不改变各版本默认策略。

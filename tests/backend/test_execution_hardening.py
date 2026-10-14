@@ -320,12 +320,12 @@ def _manager(tmp_path, monkeypatch):
 
     ResourceScheduler._local_leases.clear()
     ResourceScheduler._local_workers.clear()
-    monkeypatch.setenv("EXECUTION_MODE", "inline")
     store = MemoryExecutionStore()
     manager = ExecutionManager(
         store=store,
         hub=ExecutionEventHub(store),
         artifacts=ArtifactStore(tmp_path / "execution"),
+        mode='inline',
     )
     return manager, store
 

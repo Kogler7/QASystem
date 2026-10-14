@@ -36,7 +36,7 @@ def test_initial_configuration_requires_manual_review(project):
 @pytest.mark.parametrize('filename,content', [
     ('.env', 'GPU_DEVICE_IDS=0\n'),
     ('.env.example', '# upgraded help\nGPU_DEVICE_IDS=4,5,6,7\n'),
-    ('runtime-config/config.json', '{"settings":{"KG_EXTRACT_LLM_MODEL":"changed"},"models":{}}'),
+    ('runtime-config/config.json', '{"settings":{"KG_EXTRACT_ALGO_VERSION":"v3"},"models":{}}'),
     ('runtime-config/models.compose.json', '{"services":{"unknown":{}}}'),
 ])
 def test_unreviewed_edits_block_deployment(project, filename, content):

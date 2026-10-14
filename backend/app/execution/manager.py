@@ -1,6 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
-from docker.startup_contract import EXECUTION_LIVENESS
+from docker.startup_contract import EXECUTION_LIVENESS, EXECUTION_TOPOLOGY
 
 import base64
 import copy
@@ -76,18 +76,19 @@ class ExecutionManager:
         store: MemoryExecutionStore | RedisExecutionStore | None = None,
         artifacts: ArtifactStore | None = None,
         hub: ExecutionEventHub | None = None,
+        *, mode: str = EXECUTION_TOPOLOGY['mode'],
     ):
         self.store = store or get_execution_store()
         self.artifacts = artifacts or ArtifactStore()
         self.hub = hub or get_event_hub()
         self.queue = get_task_queue(self.store)
         self.scheduler = ResourceScheduler(self.store)
-        self.mode = config_getenv("EXECUTION_MODE", "async").strip().lower()
+        self.mode = mode.strip().lower()
         self.allow_memory_queue = config_getenv("EXECUTION_ALLOW_MEMORY_QUEUE", "false").lower() in {
             "1", "true", "yes", "on"
         }
         if self.mode not in {"async", "inline"}:
-            raise ValueError("EXECUTION_MODE must be async or inline")
+            raise ValueError("Execution mode must be async or inline")
 
     @property
     def is_async(self) -> bool:
@@ -96,7 +97,7 @@ class ExecutionManager:
     def _ensure_queue_available(self) -> None:
         if self.is_async and isinstance(self.store, MemoryExecutionStore) and not self.allow_memory_queue:
             raise ExecutionUnavailable(
-                "执行队列未配置：生产/默认模式需要 EXECUTION_REDIS_URL 和可用 Redis"
+                "执行队列不可用：默认服务必须连接内部 Redis，内存执行仅供显式测试注入"
             )
 
     def _write_payload(self, job_id: str, payload: Any) -> str:
@@ -565,17 +566,10 @@ class ExecutionManager:
 
 
 _MANAGER: ExecutionManager | None = None
-_MANAGER_KEY: tuple[str, str, str] | None = None
 
 
 def get_execution_manager() -> ExecutionManager:
-    global _MANAGER, _MANAGER_KEY
-    key = (
-        config_getenv("EXECUTION_MODE", "async").strip().lower(),
-        config_getenv("EXECUTION_REDIS_URL", "").strip(),
-        config_getenv("EXECUTION_DATA_DIR", "").strip(),
-    )
-    if _MANAGER is None or _MANAGER_KEY != key:
+    global _MANAGER
+    if _MANAGER is None:
         _MANAGER = ExecutionManager()
-        _MANAGER_KEY = key
     return _MANAGER

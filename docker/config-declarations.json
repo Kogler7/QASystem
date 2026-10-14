@@ -1,14 +1,27 @@
 {
   "schema": 1,
-  "version": "2026.10.14.6",
+  "version": "2026.10.14.7",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
   ],
   "retired": [
     "AGENT_API_WORKERS",
+    "AGENT_INTERNAL_URL",
+    "AGENT_LLM_BASE_URL",
+    "AGENT_LLM_MODEL",
+    "AGENT_MCP_CONFIG",
+    "AGENT_MCP_HOST",
+    "AGENT_MCP_PORT",
+    "AGENT_MCP_URL",
     "AGENT_MEMORY_LIMIT",
     "AGENT_WORKER_POOL_SIZE",
+    "APPLICATION_API_CONFIDENCE_PATH",
+    "APPLICATION_API_CYPHER_QUERY_PATH",
+    "APPLICATION_API_DOCUMENT_EVIDENCE_PATH",
+    "APPLICATION_API_FILE_UPLOAD_PATH",
+    "APPLICATION_API_GRAPH_WRITE_PATH",
+    "APPLICATION_API_VECTOR_STORE_PATH",
     "BACKEND_MEMORY_LIMIT",
     "CLEF_BIND",
     "CLEF_CPU_THREADS",
@@ -27,16 +40,29 @@
     "CLEF_SOURCE_DIR",
     "COMPOSE_PROFILES",
     "CONFIDENCE_SBERT_MODEL_PATH",
+    "DATABASE_HOST",
+    "DATABASE_PORT",
     "DOCUMENT_PARSE_MAX_CONCURRENCY",
     "DOCUMENT_PARSE_MAX_FILE_MB",
     "EMBEDDING_MAX_CONCURRENCY",
     "EMBEDDING_MODEL_NAME",
     "EMBEDDING_MODEL_VERSION",
+    "EXECUTION_DATA_DIR",
     "EXECUTION_GPU_LEASE_TTL_SECONDS",
+    "EXECUTION_MODE",
+    "EXECUTION_REAPER_ENABLED",
+    "EXECUTION_REAPER_INTERVAL_SECONDS",
+    "EXECUTION_REDIS_URL",
     "EXECUTION_RESOURCE_WAIT_TIMEOUT_SECONDS",
+    "EXECUTION_RUNTIME_READY_FILE",
     "EXECUTION_WORKER_HEARTBEAT_SECONDS",
     "EXECUTION_WORKER_HEARTBEAT_TTL_SECONDS",
     "FILE_SERVICE_URL",
+    "GRAPH_LLM_BASE_URL",
+    "GRAPH_LLM_MODEL",
+    "GRAPH_LLM_RETRIES",
+    "GRAPH_LLM_TIMEOUT_SECONDS",
+    "GRAPH_LLM_VERIFY_SSL",
     "KG_API_RECORD_DIR",
     "KG_API_RECORD_ENABLED",
     "KG_API_RECORD_RETENTION_DAYS",
@@ -48,8 +74,15 @@
     "KG_EXTRACT_JEV_PROVIDER",
     "KG_EXTRACT_JEV_TIMEOUT_SECONDS",
     "KG_EXTRACT_JSON_RETRIES",
+    "KG_EXTRACT_LLM_BASE_URL",
+    "KG_EXTRACT_LLM_MAX_CONCURRENCY",
+    "KG_EXTRACT_LLM_MODEL",
+    "KG_EXTRACT_LLM_QPM",
+    "KG_EXTRACT_LLM_QPS",
+    "KG_EXTRACT_LLM_QUOTA_GROUP",
     "KG_EXTRACT_MAX_TOKENS",
     "KG_EXTRACT_MODEL",
+    "KG_EXTRACT_PROVIDERS_JSON",
     "KG_EXTRACT_THINKING_MAX_TOKENS",
     "KG_EXTRACT_THINKING_PASSES",
     "KG_EXTRACT_TRACE_DIR",
@@ -75,6 +108,10 @@
     "LLM_MAX_NUM_SEQS",
     "LLM_MODEL_DIR",
     "LLM_SERVED_MODEL_NAME",
+    "MCP_DATABASE_URL",
+    "MCP_HOST",
+    "MCP_PORT",
+    "MCP_TRANSPORT",
     "NANOJEV_BIND",
     "NANOJEV_CPU_THREADS",
     "NANOJEV_CUDA_VISIBLE_DEVICES",
@@ -93,16 +130,24 @@
     "PYTHONPATH",
     "PYTHONUNBUFFERED",
     "QASYSTEM_JUDGE_ADAPTER",
+    "QASYSTEM_JUDGE_API_KEY",
     "QASYSTEM_JUDGE_BASE_URL",
     "QASYSTEM_JUDGE_MAX_TOKENS",
     "QASYSTEM_JUDGE_MODEL",
     "QASYSTEM_LOAD_DOTENV",
+    "QASYSTEM_LOCAL_LLM_API_KEY",
     "QASYSTEM_REMOTE_ENV_IMAGE",
     "QASYSTEM_RUNTIME_CONFIG_DIR",
     "QASYSTEM_RUNTIME_SETTINGS_FILE",
     "REDIS_MEMORY_LIMIT",
     "SOFFICE_PATH",
     "TASK_STORE_REDIS_URL",
+    "TERM_GRAPH_DB",
+    "TERM_GRAPH_HTTP_URL",
+    "TERM_GRAPH_PASSWORD",
+    "TERM_GRAPH_USER",
+    "TERM_RESOURCE_TYPE",
+    "TERM_VECTOR_INDEX",
     "VLLM_BASE_PORT",
     "VLLM_ENABLED",
     "VLLM_EXTRA_ARGS",
@@ -279,113 +324,6 @@
         {
           "path": "backend/app/execution/resources.py",
           "expression": "None"
-        }
-      ]
-    },
-    "EXECUTION_MODE": {
-      "desc": "统一执行层：默认异步；Redis 不可用时失败关闭，不回退到入口进程。",
-      "default": "async",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/manager.py",
-          "kind": "read",
-          "token": "EXECUTION_MODE"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/manager.py",
-          "expression": "'async'"
-        },
-        {
-          "path": "backend/app/execution/manager.py",
-          "expression": "'async'"
-        }
-      ]
-    },
-    "EXECUTION_REDIS_URL": {
-      "desc": "部署参数 EXECUTION_REDIS_URL",
-      "default": "redis://redis:6379/1",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/manager.py",
-          "kind": "read",
-          "token": "EXECUTION_REDIS_URL"
-        },
-        {
-          "path": "backend/app/execution/store.py",
-          "kind": "read",
-          "token": "EXECUTION_REDIS_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/manager.py",
-          "expression": "''"
-        },
-        {
-          "path": "backend/app/execution/store.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "EXECUTION_DATA_DIR": {
-      "desc": "部署参数 EXECUTION_DATA_DIR",
-      "default": "/app/backend/data/execution",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/artifacts.py",
-          "kind": "read",
-          "token": "EXECUTION_DATA_DIR"
-        },
-        {
-          "path": "backend/app/execution/manager.py",
-          "kind": "read",
-          "token": "EXECUTION_DATA_DIR"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/artifacts.py",
-          "expression": "None"
-        },
-        {
-          "path": "backend/app/execution/manager.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "EXECUTION_RUNTIME_READY_FILE": {
-      "desc": "部署参数 EXECUTION_RUNTIME_READY_FILE",
-      "default": "/tmp/qasystem-runtime-ready",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/main.py",
-          "kind": "read",
-          "token": "EXECUTION_RUNTIME_READY_FILE"
-        },
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "EXECUTION_RUNTIME_READY_FILE"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/main.py",
-          "expression": "''"
-        },
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "'/tmp/qasystem-runtime-ready'"
         }
       ]
     },
@@ -633,25 +571,6 @@
         }
       ]
     },
-    "EXECUTION_REAPER_ENABLED": {
-      "desc": "worker 崩溃恢复：周期收割 Redis Streams PEL 中滞留的消息并重投； / min-idle 防止误收正在执行的消息，attempt 达上限判 failed 防死信循环。",
-      "default": "true",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/worker.py",
-          "kind": "read",
-          "token": "EXECUTION_REAPER_ENABLED"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/worker.py",
-          "expression": "'true'"
-        }
-      ]
-    },
     "EXECUTION_REAPER_MIN_IDLE_SECONDS": {
       "desc": "部署参数 EXECUTION_REAPER_MIN_IDLE_SECONDS",
       "default": "600",
@@ -668,25 +587,6 @@
         {
           "path": "backend/app/execution/worker.py",
           "expression": "'600'"
-        }
-      ]
-    },
-    "EXECUTION_REAPER_INTERVAL_SECONDS": {
-      "desc": "部署参数 EXECUTION_REAPER_INTERVAL_SECONDS",
-      "default": "60",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/worker.py",
-          "kind": "read",
-          "token": "EXECUTION_REAPER_INTERVAL_SECONDS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/worker.py",
-          "expression": "'60'"
         }
       ]
     },
@@ -776,8 +676,8 @@
       ]
     },
     "DATABASE_URL": {
-      "desc": "SQL 直连是当前唯一保留的数据库兼容能力。",
-      "default": "mysql+pymysql://root:123456@host.docker.internal:3306/railway_db",
+      "desc": "关系型数据库（SQL）连接，默认留空；Neo4j和Elasticsearch不通过此项直连",
+      "default": "",
       "scope": "deployment",
       "mode": "startup",
       "consumers": [
@@ -792,8 +692,8 @@
           "token": "DATABASE_URL"
         },
         {
-          "path": "docker/configure.py",
-          "kind": "external",
+          "path": "backend/app/health.py",
+          "kind": "read",
           "token": "DATABASE_URL"
         }
       ],
@@ -805,104 +705,6 @@
         {
           "path": "agent_mcp/data.py",
           "expression": "''"
-        }
-      ]
-    },
-    "MCP_DATABASE_URL": {
-      "desc": "部署参数 MCP_DATABASE_URL",
-      "default": "mysql+pymysql://root:123456@host.docker.internal:3306/railway_db",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "mcp_services/domains/data/sql.py",
-          "kind": "read",
-          "token": "MCP_DATABASE_URL"
-        },
-        {
-          "path": "agent_mcp/data.py",
-          "kind": "read",
-          "token": "MCP_DATABASE_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "mcp_services/domains/data/sql.py",
-          "expression": "None"
-        },
-        {
-          "path": "agent_mcp/data.py",
-          "expression": "None"
-        }
-      ]
-    },
-    "MCP_TRANSPORT": {
-      "desc": "部署参数 MCP_TRANSPORT",
-      "default": "streamable-http",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "mcp_services/server.py",
-          "kind": "read",
-          "token": "MCP_TRANSPORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "mcp_services/server.py",
-          "expression": "'streamable-http'"
-        }
-      ]
-    },
-    "MCP_HOST": {
-      "desc": "部署参数 MCP_HOST",
-      "default": "0.0.0.0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "mcp_services/runtime.py",
-          "kind": "read",
-          "token": "MCP_HOST"
-        },
-        {
-          "path": "mcp_services/server.py",
-          "kind": "read",
-          "token": "MCP_HOST"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "mcp_services/runtime.py",
-          "expression": "'0.0.0.0'"
-        },
-        {
-          "path": "mcp_services/runtime.py",
-          "expression": "'0.0.0.0'"
-        },
-        {
-          "path": "mcp_services/server.py",
-          "expression": "'0.0.0.0'"
-        }
-      ]
-    },
-    "GRAPH_LLM_BASE_URL": {
-      "desc": "图谱检索 LLM（知识空间定位、实体链接）",
-      "default": "http://host.docker.internal:9999",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_BASE_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "expression": "f'http://{default_host}:9999'"
         }
       ]
     },
@@ -913,13 +715,8 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "algorithm/ans/QA/config.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "kind": "read",
+          "path": "docker/api_services.py",
+          "kind": "external",
           "token": "GRAPH_LLM_API_KEY"
         }
       ],
@@ -931,205 +728,6 @@
         {
           "path": "algorithm/ans/QA/utils.py",
           "expression": "''"
-        }
-      ]
-    },
-    "GRAPH_LLM_MODEL": {
-      "desc": "部署参数 GRAPH_LLM_MODEL",
-      "default": "Qwen/Qwen3-8B",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/ans/QA/config.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_MODEL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/ans/QA/config.py",
-          "expression": "None"
-        },
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "expression": "'Qwen/Qwen3-8B'"
-        }
-      ]
-    },
-    "GRAPH_LLM_VERIFY_SSL": {
-      "desc": "部署参数 GRAPH_LLM_VERIFY_SSL",
-      "default": "true",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_VERIFY_SSL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "expression": "'true'"
-        }
-      ]
-    },
-    "GRAPH_LLM_RETRIES": {
-      "desc": "部署参数 GRAPH_LLM_RETRIES",
-      "default": "3",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_RETRIES"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "expression": "'3'"
-        }
-      ]
-    },
-    "GRAPH_LLM_TIMEOUT_SECONDS": {
-      "desc": "部署参数 GRAPH_LLM_TIMEOUT_SECONDS",
-      "default": "60",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "kind": "read",
-          "token": "GRAPH_LLM_TIMEOUT_SECONDS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/ans/QA/utils.py",
-          "expression": "'60'"
-        }
-      ]
-    },
-    "QASYSTEM_JUDGE_API_KEY": {
-      "desc": "评测凭据；judge 地址、模型、适配器、输出上限只通过每次评测命令行设置。",
-      "default": "",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "eval/run.py",
-          "kind": "external",
-          "token": "QASYSTEM_JUDGE_API_KEY"
-        }
-      ]
-    },
-    "KG_EXTRACT_LLM_BASE_URL": {
-      "desc": "知识抽取 LLM",
-      "default": "http://host.docker.internal:9999",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "backend/app/health.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/jev_extract/client.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_LLM_BASE_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/health.py",
-          "expression": "''"
-        },
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "expression": "'http://localhost:9999'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "expression": "'http://localhost:9999'"
         }
       ]
     },
@@ -1213,59 +811,9 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "backend/app/services/extraction_config.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "eval/run.py",
+          "path": "docker/api_services.py",
           "kind": "external",
           "token": "KG_EXTRACT_LLM_API_KEY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/jev_extract/client.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_LLM_API_KEY"
         }
       ],
       "fallbacks": [
@@ -1300,93 +848,6 @@
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "expression": "''"
-        }
-      ]
-    },
-    "KG_EXTRACT_LLM_MODEL": {
-      "desc": "部署参数 KG_EXTRACT_LLM_MODEL",
-      "default": "Qwen/Qwen3-8B",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        },
-        {
-          "path": "algorithm/knowledge_extract/jev_extract/client.py",
-          "kind": "reference",
-          "token": "KG_EXTRACT_LLM_MODEL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "expression": "'deepseek-v4-flash'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "expression": "'deepseek-v4-flash'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "expression": "'deepseek-v4-flash-0731'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "expression": "'deepseek-v4-flash'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "expression": "'deepseek-v4-flash'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "expression": "'deepseek-v4-flash'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "expression": "'deepseek-v4-flash'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "expression": "'deepseek-v4-flash'"
         }
       ]
     },
@@ -1984,290 +1445,6 @@
         }
       ]
     },
-    "KG_EXTRACT_LLM_MAX_CONCURRENCY": {
-      "desc": "同时在途的知识抽取请求数；应结合 LLM 服务的并发容量设置",
-      "default": "4",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "expression": "'4'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "expression": "'4'"
-        }
-      ]
-    },
-    "KG_EXTRACT_LLM_QPS": {
-      "desc": "0 表示不限速；非 0 时同时满足每秒和每分钟两个滑动窗口限制",
-      "default": "0",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "expression": "'0'"
-        }
-      ]
-    },
-    "KG_EXTRACT_LLM_QPM": {
-      "desc": "部署参数 KG_EXTRACT_LLM_QPM",
-      "default": "0",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QPM"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/knowledge_extract/latest/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v0/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v1/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3/config.py",
-          "expression": "'0'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "expression": "'0'"
-        }
-      ]
-    },
-    "KG_EXTRACT_LLM_QUOTA_GROUP": {
-      "desc": "请求级供应商选择：这里只登记地址、模型、配额组和密钥环境变量名，禁止放密钥值。 / 同一账号的别名应共用 quota_group；与默认供应商共额度时也设成同一个组。",
-      "default": "default",
-      "scope": "deployment",
-      "mode": "hot",
-      "consumers": [
-        {
-          "path": "backend/app/services/extraction_config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_QUOTA_GROUP"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/services/extraction_config.py",
-          "expression": "'default'"
-        }
-      ]
-    },
-    "KG_EXTRACT_PROVIDERS_JSON": {
-      "desc": "部署参数 KG_EXTRACT_PROVIDERS_JSON",
-      "default": "{}",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/services/extraction_config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_PROVIDERS_JSON"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/services/extraction_config.py",
-          "expression": "'{}'"
-        }
-      ]
-    },
     "SILICONFLOW_API_KEY": {
       "desc": "示例（单行 JSON，取消注释替换上行；限额须按实际供应商账号配置）： / KG_EXTRACT_PROVIDERS_JSON={\"siliconflow\":{\"base_url\":\"https://api.siliconflow.cn/v1\",\"api_key_env\":\"SILICONFLOW_API_KEY\",\"model\":\"deepseek-ai/DeepSeek-V4-Flash\",\"quota_group\":\"siliconflow-account\",\"max_concurrency\":2,\"qps\":1,\"qpm\":30,\"api_mode\":\"chat\",\"thinking_parameter\":\"enable_thinking\"}}",
       "default": "",
@@ -2291,19 +1468,6 @@
           "path": "eval/run.py",
           "kind": "external",
           "token": "DEEPSEEK_API_KEY"
-        }
-      ]
-    },
-    "QASYSTEM_LOCAL_LLM_API_KEY": {
-      "desc": "本地无鉴权 LLM 的占位凭据，仅用于供应商配置的非空校验；不要复用云端密钥。",
-      "default": "local-llm",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/services/extraction_config.py",
-          "kind": "reference",
-          "token": "api_key_env"
         }
       ]
     },
@@ -2664,34 +1828,6 @@
         }
       ]
     },
-    "AGENT_LLM_BASE_URL": {
-      "desc": "Agent LLM",
-      "default": "http://host.docker.internal:9999",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/adapter.py",
-          "kind": "read",
-          "token": "AGENT_LLM_BASE_URL"
-        },
-        {
-          "path": "agent/agentcode/tools/base_tools/memory_tool.py",
-          "kind": "read",
-          "token": "AGENT_LLM_BASE_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/adapter.py",
-          "expression": "None"
-        },
-        {
-          "path": "agent/agentcode/tools/base_tools/memory_tool.py",
-          "expression": "'http://localhost:9999'"
-        }
-      ]
-    },
     "AGENT_LLM_API_KEY": {
       "desc": "部署参数 AGENT_LLM_API_KEY",
       "default": "",
@@ -2699,42 +1835,9 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "agent/agentcode/adapter.py",
-          "kind": "read",
+          "path": "docker/api_services.py",
+          "kind": "external",
           "token": "AGENT_LLM_API_KEY"
-        },
-        {
-          "path": "agent/agentcode/tools/base_tools/memory_tool.py",
-          "kind": "read",
-          "token": "AGENT_LLM_API_KEY"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/adapter.py",
-          "expression": "None"
-        },
-        {
-          "path": "agent/agentcode/tools/base_tools/memory_tool.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "AGENT_LLM_MODEL": {
-      "desc": "部署参数 AGENT_LLM_MODEL",
-      "default": "Qwen/Qwen3-8B",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/adapter.py",
-          "kind": "read",
-          "token": "AGENT_LLM_MODEL"
-        },
-        {
-          "path": "agent/agentcode/tools/base_tools/memory_tool.py",
-          "kind": "read",
-          "token": "AGENT_LLM_MODEL"
         }
       ],
       "fallbacks": [
@@ -2805,85 +1908,6 @@
         }
       ]
     },
-    "AGENT_MCP_URL": {
-      "desc": "Agent 专属 MCP 服务（compose 内网地址；本地开发用 http://127.0.0.1:9181/mcp）",
-      "default": "http://agent-mcp:9181/mcp",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/tools/mcp_tools/mcp_loader.py",
-          "kind": "read",
-          "token": "AGENT_MCP_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/tools/mcp_tools/mcp_loader.py",
-          "expression": "None"
-        },
-        {
-          "path": "agent/agentcode/tools/mcp_tools/mcp_loader.py",
-          "expression": "None"
-        }
-      ]
-    },
-    "AGENT_MCP_HOST": {
-      "desc": "Agent MCP 服务自身监听（agent-mcp 容器）",
-      "default": "0.0.0.0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent_mcp/runtime.py",
-          "kind": "read",
-          "token": "AGENT_MCP_HOST"
-        },
-        {
-          "path": "agent_mcp/__main__.py",
-          "kind": "read",
-          "token": "AGENT_MCP_HOST"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent_mcp/runtime.py",
-          "expression": "'0.0.0.0'"
-        },
-        {
-          "path": "agent_mcp/__main__.py",
-          "expression": "'0.0.0.0'"
-        }
-      ]
-    },
-    "AGENT_MCP_PORT": {
-      "desc": "部署参数 AGENT_MCP_PORT",
-      "default": "9181",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent_mcp/runtime.py",
-          "kind": "read",
-          "token": "AGENT_MCP_PORT"
-        },
-        {
-          "path": "agent_mcp/__main__.py",
-          "kind": "read",
-          "token": "AGENT_MCP_PORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent_mcp/runtime.py",
-          "expression": "'9181'"
-        },
-        {
-          "path": "agent_mcp/__main__.py",
-          "expression": "'9181'"
-        }
-      ]
-    },
     "AGENT_WORKER_CONCURRENCY": {
       "desc": "部署参数 AGENT_WORKER_CONCURRENCY",
       "default": "4",
@@ -2908,29 +1932,6 @@
         {
           "path": "agent/agentcode/api.py",
           "expression": "'1'"
-        }
-      ]
-    },
-    "AGENT_MCP_CONFIG": {
-      "desc": "部署参数 AGENT_MCP_CONFIG",
-      "default": "/app/agent/agentcode/tools/mcp_tools/mcp_config.json",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "agent/agentcode/adapter.py",
-          "kind": "read",
-          "token": "AGENT_MCP_CONFIG"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "agent/agentcode/adapter.py",
-          "expression": "None"
-        },
-        {
-          "path": "agent/agentcode/adapter.py",
-          "expression": "None"
         }
       ]
     },
@@ -3756,63 +2757,6 @@
         {
           "path": "backend/app/environment.py",
           "expression": "None"
-        }
-      ]
-    },
-    "DATABASE_PORT": {
-      "desc": "内部/兼容参数 DATABASE_PORT，消费者见 consumers；未列入部署模板",
-      "default": "3306",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/health.py",
-          "kind": "read",
-          "token": "DATABASE_PORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/health.py",
-          "expression": "'3306'"
-        }
-      ]
-    },
-    "DATABASE_HOST": {
-      "desc": "内部/兼容参数 DATABASE_HOST，消费者见 consumers；未列入部署模板",
-      "default": "",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/health.py",
-          "kind": "read",
-          "token": "DATABASE_HOST"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/health.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "AGENT_INTERNAL_URL": {
-      "desc": "内部/兼容参数 AGENT_INTERNAL_URL，消费者见 consumers；未列入部署模板",
-      "default": "http://agent:9180",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/main.py",
-          "kind": "read",
-          "token": "AGENT_INTERNAL_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/main.py",
-          "expression": "'http://agent:9180'"
         }
       ]
     },
@@ -4937,124 +3881,6 @@
         }
       ]
     },
-    "TERM_GRAPH_HTTP_URL": {
-      "desc": "内部/兼容参数 TERM_GRAPH_HTTP_URL，消费者见 consumers；未列入部署模板",
-      "default": "",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "kind": "read",
-          "token": "TERM_GRAPH_HTTP_URL"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "''"
-        },
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "TERM_GRAPH_USER": {
-      "desc": "内部/兼容参数 TERM_GRAPH_USER，消费者见 consumers；未列入部署模板",
-      "default": "",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "kind": "read",
-          "token": "TERM_GRAPH_USER"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "TERM_GRAPH_PASSWORD": {
-      "desc": "内部/兼容参数 TERM_GRAPH_PASSWORD，消费者见 consumers；未列入部署模板",
-      "default": "",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "kind": "read",
-          "token": "TERM_GRAPH_PASSWORD"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "TERM_VECTOR_INDEX": {
-      "desc": "内部/兼容参数 TERM_VECTOR_INDEX，消费者见 consumers；未列入部署模板",
-      "default": "term_index.json",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "kind": "read",
-          "token": "TERM_VECTOR_INDEX"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "'term_index.json'"
-        }
-      ]
-    },
-    "TERM_RESOURCE_TYPE": {
-      "desc": "内部/兼容参数 TERM_RESOURCE_TYPE，消费者见 consumers；未列入部署模板",
-      "default": "Term",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "kind": "read",
-          "token": "TERM_RESOURCE_TYPE"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "'Term'"
-        }
-      ]
-    },
-    "TERM_GRAPH_DB": {
-      "desc": "内部/兼容参数 TERM_GRAPH_DB，消费者见 consumers；未列入部署模板",
-      "default": "neo4j",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "kind": "read",
-          "token": "TERM_GRAPH_DB"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "algorithm/term_vector/build.py",
-          "expression": "'neo4j'"
-        }
-      ]
-    },
     "KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS": {
       "desc": "内部/兼容参数 KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS，消费者见 consumers；未列入部署模板",
       "default": "2600",
@@ -5437,84 +4263,6 @@
         }
       ]
     },
-    "APPLICATION_API_FILE_UPLOAD_PATH": {
-      "desc": "内部/兼容参数 APPLICATION_API_FILE_UPLOAD_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "reference",
-          "token": "APPLICATION_API_FILE_UPLOAD_PATH"
-        }
-      ]
-    },
-    "APPLICATION_API_VECTOR_STORE_PATH": {
-      "desc": "内部/兼容参数 APPLICATION_API_VECTOR_STORE_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "reference",
-          "token": "APPLICATION_API_VECTOR_STORE_PATH"
-        }
-      ]
-    },
-    "APPLICATION_API_CYPHER_QUERY_PATH": {
-      "desc": "内部/兼容参数 APPLICATION_API_CYPHER_QUERY_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "reference",
-          "token": "APPLICATION_API_CYPHER_QUERY_PATH"
-        }
-      ]
-    },
-    "APPLICATION_API_GRAPH_WRITE_PATH": {
-      "desc": "内部/兼容参数 APPLICATION_API_GRAPH_WRITE_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "reference",
-          "token": "APPLICATION_API_GRAPH_WRITE_PATH"
-        }
-      ]
-    },
-    "APPLICATION_API_CONFIDENCE_PATH": {
-      "desc": "内部/兼容参数 APPLICATION_API_CONFIDENCE_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "reference",
-          "token": "APPLICATION_API_CONFIDENCE_PATH"
-        }
-      ]
-    },
-    "APPLICATION_API_DOCUMENT_EVIDENCE_PATH": {
-      "desc": "内部/兼容参数 APPLICATION_API_DOCUMENT_EVIDENCE_PATH，消费者见 consumers；未列入部署模板",
-      "default": null,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "external_services/application.py",
-          "kind": "reference",
-          "token": "APPLICATION_API_DOCUMENT_EVIDENCE_PATH"
-        }
-      ]
-    },
     "HF_HUB_OFFLINE": {
       "desc": "内部/兼容参数 HF_HUB_OFFLINE，消费者见 consumers；未列入部署模板",
       "default": null,
@@ -5576,34 +4324,6 @@
           "path": "nanojev_service/app.py",
           "kind": "reference",
           "token": "HF_HUB_DISABLE_TELEMETRY"
-        }
-      ]
-    },
-    "MCP_PORT": {
-      "desc": "内部/兼容参数 MCP_PORT，消费者见 consumers；未列入部署模板",
-      "default": "8890",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "mcp_services/runtime.py",
-          "kind": "read",
-          "token": "MCP_PORT"
-        },
-        {
-          "path": "mcp_services/server.py",
-          "kind": "read",
-          "token": "MCP_PORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "mcp_services/runtime.py",
-          "expression": "'8890'"
-        },
-        {
-          "path": "mcp_services/server.py",
-          "expression": "'8890'"
         }
       ]
     },
@@ -5877,23 +4597,14 @@
       "config_getenv('ENVIRONMENT')"
     ],
     "backend/app/health.py": [
-      "config_getenv('DATABASE_PORT', '3306')",
       "config_getenv(name, '')",
+      "config_getenv('DATABASE_URL', '')",
       "config_getenv('MINERU_MODEL_BASE_DIR', '/models/mineru4')",
-      "config_getenv('DATABASE_HOST', '')",
-      "config_getenv('KG_EXTRACT_LLM_BASE_URL', '')",
       "config_getenv('DOCUMENT_PARSE_SERVICE_URL', '')",
       "config_getenv('EMBEDDING_SERVICE_URL', '')"
     ],
-    "backend/app/main.py": [
-      "config_getenv('AGENT_INTERNAL_URL', 'http://agent:9180')",
-      "config_getenv('EXECUTION_RUNTIME_READY_FILE', '')"
-    ],
     "backend/app/observability.py": [
       "config_getenv(env_name, '')"
-    ],
-    "backend/app/execution/artifacts.py": [
-      "config_getenv('EXECUTION_DATA_DIR')"
     ],
     "backend/app/execution/document_sharding.py": [
       "config_getenv('EXECUTION_SHARD_TIMEOUT_SECONDS', '3600')",
@@ -5917,13 +4628,9 @@
       "config_getenv('EXECUTION_GPU_DEVICE', '')",
       "config_getenv('EXECUTION_MODEL')",
       "config_getenv('MINERU_VLM_SERVER_URL')",
-      "config_getenv('EXECUTION_REDIS_URL', '')",
-      "config_getenv('EXECUTION_DATA_DIR', '')",
       "config_getenv('EXECUTION_ALLOW_MEMORY_QUEUE', 'false')",
       "config_getenv('MINERU_VLM_SERVER_URL')",
       "config_getenv('CUDA_VISIBLE_DEVICES', '')",
-      "config_getenv('EXECUTION_MODE', 'async')",
-      "config_getenv('EXECUTION_MODE', 'async')",
       "config_getenv('EXECUTION_GPU_LEASE_MODE', 'auto')",
       "config_getenv('EXECUTION_GPU_SCHEDULING_REQUIRED', 'false')"
     ],
@@ -5959,7 +4666,6 @@
     "backend/app/execution/store.py": [
       "config_getenv('EXECUTION_KEY_PREFIX', 'qasystem:execution')",
       "config_getenv('EXECUTION_EVENT_MAXLEN', '10000')",
-      "config_getenv('EXECUTION_REDIS_URL', '')",
       "config_getenv('EXECUTION_JOB_TTL', '604800')",
       "config_getenv('EXECUTION_JOB_TTL', '604800')",
       "config_getenv('EXECUTION_AUTH_CONTEXT_TTL_SECONDS', '3600')"
@@ -5969,7 +4675,6 @@
       "_env_int('EXECUTION_VLM_WORKERS_PER_GPU', 2, minimum=1, maximum=8)",
       "_env_int('API_WORKERS', 1 if is_remote_only() else 2, minimum=1, maximum=16)",
       "_env_int('EXECUTION_AUX_WORKERS_PER_GPU', 1, minimum=0, maximum=4)",
-      "config_getenv('EXECUTION_RUNTIME_READY_FILE', '/tmp/qasystem-runtime-ready')",
       "config_getenv('VLLM_READINESS_SCRIPT', '/usr/local/bin/vllm_readiness.py')",
       "config_getenv('VLLM_STARTUP_TIMEOUT_SECONDS', '900')",
       "config_getenv(name, str(default))",
@@ -5980,7 +4685,6 @@
     ],
     "backend/app/execution/worker.py": [
       "config_getenv('EXECUTION_REAPER_MIN_IDLE_SECONDS', '600')",
-      "config_getenv('EXECUTION_REAPER_INTERVAL_SECONDS', '60')",
       "config_getenv('EXECUTION_MAX_ATTEMPTS', '3')",
       "config_getenv('EXECUTION_MAX_ATTEMPTS', '3')",
       "config_getenv('CUDA_VISIBLE_DEVICES', '')",
@@ -5988,23 +4692,19 @@
       "config_getenv('EXECUTION_WORKER_ID')",
       "config_getenv('EXECUTION_GPU_DEVICE')",
       "config_getenv('MINERU_VLM_SERVER_URL')",
-      "config_getenv('EXECUTION_WORKER_ID_UNIQUE', 'false')",
-      "config_getenv('EXECUTION_REAPER_ENABLED', 'true')"
+      "config_getenv('EXECUTION_WORKER_ID_UNIQUE', 'false')"
     ],
     "backend/app/services/algorithm_capabilities.py": [
       "config_getenv('KG_EXTRACT_STRICT_CHUNK_FAILURES', '')"
     ],
     "backend/app/services/extraction_config.py": [
-      "config_getenv(key, default)",
       "setting('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '65536')",
-      "setting('KG_EXTRACT_V31_DOCUMENT_TIMEOUT', '900')",
-      "setting('KG_EXTRACT_LLM_QUOTA_GROUP', 'default')",
+      "config_getenv(key, default)",
       "setting('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS')",
-      "setting('KG_EXTRACT_PROVIDERS_JSON', '{}')",
       "setting('KG_EXTRACT_V31_REQUEST_TIMEOUT', '120')",
-      "setting(values['api_key_env'], '')",
-      "setting('KG_EXTRACT_ALGO_VERSION', 'latest')",
-      "setting(routed['api_key_env'], '')"
+      "setting('KG_EXTRACT_V31_DOCUMENT_TIMEOUT', '900')",
+      "setting(routed['api_key_env'], '')",
+      "setting('KG_EXTRACT_ALGO_VERSION', 'latest')"
     ],
     "backend/app/services/knowledge_extract_adapter.py": [
       "config_getenv('KG_EXTRACT_PUBLISH_BEST_EFFORT', '1')"
@@ -6013,14 +4713,9 @@
       "config_getenv('KNOWLEDGE_PIPELINE_PARSE_SHARDING', '')"
     ],
     "agent/agentcode/adapter.py": [
-      "config_getenv('AGENT_MCP_CONFIG')",
       "config_getenv('AGENT_TEMPLATE_TEMPERATURE')",
       "config_getenv('AGENT_TEMPLATE_MAX_TOKENS')",
-      "config_getenv('AGENT_TEMPLATE_TIMEOUT_SECONDS')",
-      "config_getenv('AGENT_MCP_CONFIG')",
-      "config_getenv('AGENT_LLM_BASE_URL')",
-      "config_getenv('AGENT_LLM_API_KEY')",
-      "config_getenv('AGENT_LLM_MODEL')"
+      "config_getenv('AGENT_TEMPLATE_TIMEOUT_SECONDS')"
     ],
     "agent/agentcode/api.py": [
       "config_getenv('AGENT_WORKER_CONCURRENCY', '4')",
@@ -6042,11 +4737,6 @@
       "config_getenv('TASK_STORE_VISIBILITY_TIMEOUT', 1500)",
       "config_getenv('TASK_STORE_EVENT_MAXLEN', 10000)"
     ],
-    "agent/agentcode/tools/base_tools/memory_tool.py": [
-      "config_getenv('AGENT_LLM_MODEL', '')",
-      "config_getenv('AGENT_LLM_API_KEY', '')",
-      "config_getenv('AGENT_LLM_BASE_URL', 'http://localhost:9999')"
-    ],
     "agent/agentcode/tools/base_tools/shell_tool.py": [
       "config_getenv('AGENT_LOG_DIR')"
     ],
@@ -6054,10 +4744,6 @@
       "config_getenv('MCP_REBIND_TIMEOUT_SECONDS', '60')",
       "config_getenv(srv.auth_ref)",
       "config_getenv('MCP_HTTP_TIMEOUT_SECONDS', '30')"
-    ],
-    "agent/agentcode/tools/mcp_tools/mcp_loader.py": [
-      "config_getenv('AGENT_MCP_URL')",
-      "config_required('AGENT_MCP_URL')"
     ],
     "algorithm/embedding_runtime.py": [
       "config_getenv('CUDA_VISIBLE_DEVICES', '')"
@@ -6093,43 +4779,12 @@
     "algorithm/NL_to_cypher/vector.py": [
       "config_getenv('VECTOR_MODEL_PATH')"
     ],
-    "algorithm/term_vector/build.py": [
-      "config_getenv('TERM_GRAPH_USER', '')",
-      "config_getenv('TERM_GRAPH_PASSWORD', '')",
-      "config_getenv('TERM_VECTOR_INDEX', 'term_index.json')",
-      "config_getenv('TERM_RESOURCE_TYPE', 'Term')",
-      "config_getenv('TERM_GRAPH_HTTP_URL', '')",
-      "config_getenv('TERM_GRAPH_DB', 'neo4j')",
-      "config_getenv('TERM_GRAPH_HTTP_URL', '')"
-    ],
-    "algorithm/ans/QA/config.py": [
-      "config_getenv('GRAPH_LLM_MODEL')",
-      "config_getenv('GRAPH_LLM_API_KEY')"
-    ],
-    "algorithm/ans/QA/utils.py": [
-      "config_getenv('GRAPH_LLM_MODEL', 'Qwen/Qwen3-8B')",
-      "config_getenv('GRAPH_LLM_API_KEY', '')",
-      "config_getenv('GRAPH_LLM_TIMEOUT_SECONDS', '60')",
-      "config_getenv('GRAPH_LLM_BASE_URL', f'http://{default_host}:9999')",
-      "config_getenv('GRAPH_LLM_RETRIES', '3')",
-      "config_getenv('GRAPH_LLM_VERIFY_SSL', 'true')"
-    ],
-    "algorithm/knowledge_extract/jev_extract/client.py": [
-      "config_getenv(variable)",
-      "config_required(variable)"
-    ],
     "algorithm/knowledge_extract/latest/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS', default='2600')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS', default='400')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_OVERLAP', default='200')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH', default='3')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "_env('KG_EXTRACT_MAX_REPAIR_ROUNDS', default='2')",
@@ -6139,13 +4794,7 @@
       "_env('KG_EXTRACT_EVIDENCE_ADMISSION', default='warn')"
     ],
     "algorithm/knowledge_extract/v0/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
@@ -6163,13 +4812,7 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v1/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash-0731')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "config_getenv(k)"
     ],
@@ -6178,13 +4821,7 @@
       "config_getenv('KG_EXTRACT_LLM_JSON_RETRIES', '2')"
     ],
     "algorithm/knowledge_extract/v2/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
@@ -6202,13 +4839,7 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v2_1/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
@@ -6226,13 +4857,7 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v2_2/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "_env('KG_EXTRACT_JEV_PRECISION', default='bf16')",
@@ -6257,17 +4882,11 @@
       "config_getenv('NANOJEV_SERVICE_URL', '')"
     ],
     "algorithm/knowledge_extract/v3/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS', default='2600')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS', default='400')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_OVERLAP', default='50')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH', default='3')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "_env('KG_EXTRACT_MAX_REPAIR_ROUNDS', default='2')",
@@ -6281,13 +4900,7 @@
       "config_getenv('KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT', 'false')"
     ],
     "algorithm/knowledge_extract/v3_1/config.py": [
-      "_env('KG_EXTRACT_LLM_BASE_URL', default='http://localhost:9999')",
-      "_env('KG_EXTRACT_LLM_API_KEY', default='')",
-      "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
-      "_env('KG_EXTRACT_LLM_QPS', default='0')",
-      "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "config_getenv(k)",
@@ -6356,18 +4969,7 @@
     "mcp_services/dispatch.py": [
       "config_getenv('MCP_EXECUTION_MODE', 'inline')"
     ],
-    "mcp_services/runtime.py": [
-      "config_getenv('MCP_HOST', '0.0.0.0')",
-      "config_getenv('MCP_PORT', '8890')",
-      "config_getenv('MCP_HOST', '0.0.0.0')"
-    ],
-    "mcp_services/server.py": [
-      "config_getenv('MCP_TRANSPORT', 'streamable-http')",
-      "config_getenv('MCP_HOST', '0.0.0.0')",
-      "config_getenv('MCP_PORT', '8890')"
-    ],
     "mcp_services/domains/data/sql.py": [
-      "config_getenv('MCP_DATABASE_URL')",
       "config_getenv('DATABASE_URL', '')"
     ],
     "mcp_services/domains/graph/retrieval.py": [
@@ -6380,20 +4982,11 @@
       "config_getenv('MCP_IMAGE_OUTPUT_DIR', str(default_dir))"
     ],
     "agent_mcp/data.py": [
-      "config_getenv('MCP_DATABASE_URL')",
       "config_getenv('DATABASE_URL', '')"
     ],
     "agent_mcp/graph.py": [
       "config_getenv('AGENT_MCP_CONTENT_MAX', '1200')",
       "config_getenv('AGENT_MCP_SUBSPACE_TTL_SECONDS', '300')"
-    ],
-    "agent_mcp/runtime.py": [
-      "config_getenv('AGENT_MCP_HOST', '0.0.0.0')",
-      "config_getenv('AGENT_MCP_PORT', '9181')"
-    ],
-    "agent_mcp/__main__.py": [
-      "config_getenv('AGENT_MCP_HOST', '0.0.0.0')",
-      "config_getenv('AGENT_MCP_PORT', '9181')"
     ],
     "algorithm/knowledge_extract/v3_1/property_grounding.py": [
       "config_getenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '16')",
@@ -6404,6 +4997,7 @@
     ]
   },
   "aliases": {
+    "MCP_DATABASE_URL": "DATABASE_URL",
     "KG_API_RECORD_ENABLED": "API_RECORD_ENABLED",
     "KG_API_RECORD_RETENTION_DAYS": "API_RECORD_RETENTION_DAYS",
     "KG_EXTRACT_API_URL": "KG_EXTRACT_LLM_BASE_URL",
@@ -6475,6 +5069,22 @@
       "heartbeat_ttl_seconds": 30,
       "lease_ttl_seconds": 900,
       "renewal_max_interval_seconds": 5
+    },
+    "execution_topology": {
+      "mode": "async",
+      "redis_database": 1,
+      "data_directory": "/app/backend/data/execution",
+      "runtime_ready_file": "/tmp/qasystem-runtime-ready",
+      "reaper_enabled": true,
+      "reaper_interval_seconds": 60
+    },
+    "service_topology": {
+      "mcp_bind": "0.0.0.0",
+      "mcp_port": 8890,
+      "agent_mcp_port": 9181,
+      "agent_mcp_host": "agent-mcp",
+      "agent_host": "agent",
+      "agent_port": 9180
     }
   },
   "inference_contract": {
@@ -6619,8 +5229,18 @@
       "api_key_env",
       "capabilities",
       "limits",
-      "account_id"
+      "account_id",
+      "connection",
+      "enabled"
     ],
+    "connection_fields": [
+      "verify_ssl",
+      "ca_bundle",
+      "timeout_seconds"
+    ],
+    "connection_defaults": {
+      "verify_ssl": true
+    },
     "account_fields": [
       "max_concurrency",
       "qps",
@@ -6648,7 +5268,18 @@
     "credential_storage": "reference-only",
     "scheduler": "internal-redis-fifo-service-and-account",
     "hot_reload": "new-request-snapshot",
+    "credential_references": [
+      "KG_EXTRACT_LLM_API_KEY",
+      "GRAPH_LLM_API_KEY",
+      "AGENT_LLM_API_KEY",
+      "SILICONFLOW_API_KEY",
+      "DEEPSEEK_API_KEY"
+    ],
     "descriptions": {
+      "enabled": "是否允许新请求使用服务；关闭仍保留记录，已引用用途必须先调整。",
+      "verify_ssl": "验证远程服务TLS证书，默认开启；自签证书建议填写可信CA。",
+      "ca_bundle": "可信CA证书文件路径，需要在调用进程所在环境中可读；不存证书私钥。",
+      "timeout_seconds": "一次HTTP通信最长等待秒数，与算法任务总预算分开。",
       "base_url": "OpenAI兼容API地址，不允许URL携带用户名、密码、查询参数或片段。",
       "model": "供应商提供的模型名称；本地服务引用已登记的模型记录。",
       "api_key_env": "已声明的凭据变量名；这里只保存引用，不填写密钥。",

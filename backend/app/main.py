@@ -56,7 +56,8 @@ async def capture_application_user_context(request: Request, call_next):
 
 async def _proxy_agent(request: Request, path: str = "") -> StreamingResponse:
     """Expose the isolated Agent service through the Backend public endpoint."""
-    upstream = config_getenv("AGENT_INTERNAL_URL", "http://agent:9180").rstrip("/")
+    from docker.startup_contract import internal_agent_url
+    upstream = internal_agent_url()
     target = f"{upstream}/{path.lstrip('/')}"
     headers = {
         key: value
@@ -142,8 +143,8 @@ async def health(
     full: bool = Query(default=False),
     validate_models: bool = Query(default=False),
 ) -> dict | JSONResponse:
-    ready_file = config_getenv("EXECUTION_RUNTIME_READY_FILE", "").strip()
-    if ready_file and not Path(ready_file).is_file():
+    from docker.startup_contract import runtime_ready_file, in_container_runtime
+    if in_container_runtime() and not runtime_ready_file().is_file():
         return JSONResponse(status_code=503, content={"status": "starting", "reason": "runtime warmup pending"})
     if full or validate_models:
         result = full_health()

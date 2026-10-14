@@ -365,11 +365,18 @@ def _entities_to_graph(extracted: dict[str, Any]) -> dict[str, list[dict[str, An
 
 
 def _build_openai_client(base_url: str = "", api_key: str = "") -> OpenAI:
+    if not base_url:
+        raise ValueError('知识抽取未选择已登记的模型服务；请使用 ops 配置抽取用途')
     kwargs: dict[str, Any] = {}
     if base_url:
         kwargs["base_url"] = base_url
     kwargs["api_key"] = api_key or "not-needed"
-    return OpenAI(**kwargs)
+    client = OpenAI(**kwargs, max_retries=0)
+    config = get_llm_config()
+    if config.get('service_snapshot') and base_url == config['base_url']:
+        from algorithm.knowledge_extract.service_configuration import standalone_sdk
+        client = standalone_sdk(client, config)
+    return client
 
 
 def _structured_output_rejected(exc: Exception) -> bool:

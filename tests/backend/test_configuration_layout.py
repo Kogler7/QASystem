@@ -74,19 +74,19 @@ def test_compose_reuses_root_environment_without_variable_duplication():
     assert "execution-gpu-worker" not in compose
     assert "execution-vlm-worker" not in compose
     assert "vllm-0:" not in compose
-    assert "AGENT_MCP_URL=http://agent-mcp:9181/mcp" in template
+    assert "AGENT_MCP_URL" not in env_keys
     assert "environment: *qasystem-process-environment" in compose
     assert "${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro" in compose
     assert "${AGENT_HOST_PORT:?Run ops config to generate configuration}:9180" in compose
     assert "MCP_PORT" not in env_keys
-    assert "AGENT_MCP_PORT" in env_keys
+    assert "AGENT_MCP_PORT" not in env_keys
 
 
 def test_backend_proxies_agent_under_its_public_route():
     main = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")
     assert 'app.add_api_route("/agent"' in main
     assert 'app.add_api_route("/agent/{path:path}"' in main
-    assert '"http://agent:9180"' in main
+    assert 'upstream = internal_agent_url()' in main
 
 
 def test_deploy_script_only_generates_runtime_assets():
@@ -132,20 +132,17 @@ def test_dockerfile_performs_complete_runtime_verification():
     assert "DOCLING_ARTIFACTS_PATH" not in dockerfile
 
 
-def test_agent_module_reads_its_own_llm_namespace(monkeypatch):
+def test_agent_module_uses_registered_service_and_ignores_legacy_namespace(monkeypatch):
     from agentcode import adapter
-    from agentcode.adapter import _load_env
-
-    # _load_env 会把仓库根 .env 整体 load 进进程环境（override=False），
-    # 污染后续用例的执行层配置；本用例只关心 AGENT_LLM_* 命名空间，屏蔽掉该副作用。
-    monkeypatch.setattr(adapter, "load_dotenv", lambda *args, **kwargs: False)
-    monkeypatch.setenv("AGENT_LLM_BASE_URL", "http://agent-llm:9000")
-    monkeypatch.setenv("AGENT_LLM_API_KEY", "agent-key")
-    monkeypatch.setenv("AGENT_LLM_MODEL", "agent-model")
-    config = _load_env()
-    assert config["base_url"] == "http://agent-llm:9000"
-    assert config["api_key"] == "agent-key"
-    assert config["model"] == "agent-model"
+    from external_services.llm import service
+    monkeypatch.setattr(adapter, 'load_dotenv', lambda *a, **kw: False)
+    monkeypatch.setenv('AGENT_LLM_BASE_URL', 'http://retired.invalid')
+    monkeypatch.setenv('AGENT_LLM_MODEL', 'retired-model')
+    monkeypatch.setattr(service, 'resolve_chat_service', lambda *a, **kw: (
+        {'base_url':'http://agent-llm:9000','model':'agent-model','service_id':'chosen'}, 'agent-key'))
+    config = adapter._load_env()
+    assert config['base_url'] == 'http://agent-llm:9000'
+    assert config['api_key'] == 'agent-key' and config['model'] == 'agent-model'
 
 
 def test_runtime_version_check_accepts_cuda_build_tag_but_rejects_release_drift(monkeypatch):

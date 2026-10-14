@@ -24,7 +24,27 @@ def providers(monkeypatch):
             "api_mode": "chat", "thinking_parameter": "enable_thinking",
         },
     }
-    monkeypatch.setenv("KG_EXTRACT_PROVIDERS_JSON", json.dumps(profiles))
+    from copy import deepcopy
+    from external_services import model_routes
+    from external_services.llm import distributed
+    def snapshot():
+        services = {'default-chat': {'kind': 'api', 'adapter': 'chat',
+                     'base_url':'https://provider.example/v1','model':'default-model',
+                     'api_key_env':'TEST_EXTRACT_KEY'}}
+        accounts = {}
+        for name, profile in profiles.items():
+            limits = {k: profile.get(k, 4 if k=='max_concurrency' else 0) for k in ('max_concurrency','qps','qpm')}
+            group = profile.get('quota_group','test-account')
+            accounts[group] = limits
+            services[name] = {'kind':'api','adapter':'chat','base_url':profile['base_url'],
+                'model':profile['model'],'api_key_env':profile['api_key_env'],
+                'limits':limits,'account_id':group,
+                'capabilities': {k:profile[k] for k in ('api_mode','thinking_parameter','response_format','context_tokens','max_output_tokens') if k in profile}}
+        return (deepcopy({'settings':{},'models':{},'services':services,'accounts':accounts,
+                         'routes':{'extract':'default-chat'}}), 'unit-approved')
+    monkeypatch.setattr(config,'registry_snapshot',snapshot)
+    monkeypatch.setattr(model_routes,'registry_snapshot',snapshot)
+    monkeypatch.setattr(distributed,'service_pool',lambda s: llm_runtime.get_pool(s.get('account_id') or s['service_id'],s.get('limits') or {'max_concurrency':4,'qps':0,'qpm':0}))
     monkeypatch.setenv("TEST_EXTRACT_KEY", "secret-must-not-appear")
     monkeypatch.setenv("KG_EXTRACT_ALGO_VERSION", "v2")
     return profiles
@@ -44,16 +64,15 @@ def test_defaults_and_partial_override_do_not_change_environment(providers, monk
 
 
 def test_separate_input_output_limits_and_legacy_alias(providers, monkeypatch):
-    providers['siliconflow'].update(max_input_tokens=32768, max_output_tokens=4096)
-    monkeypatch.setenv('KG_EXTRACT_PROVIDERS_JSON', json.dumps(providers))
+    providers['siliconflow'].update(context_tokens=36864, max_output_tokens=4096)
     chosen = config.resolve_config({'version': 'v3', 'provider': 'siliconflow'})
     assert chosen['max_input_tokens'] == 32768
     assert chosen['max_output_tokens'] == chosen['max_tokens'] == 4096
     assert config.public_config(chosen)['max_input_tokens'] == 32768
-    providers['siliconflow']['max_tokens'] = 8192
-    monkeypatch.setenv('KG_EXTRACT_PROVIDERS_JSON', json.dumps(providers))
-    with pytest.raises(ValueError, match='invalid'):
-        config.resolve_config({'version': 'v3', 'provider': 'siliconflow'})
+    # The legacy request alias still rejects conflicting explicit budgets;
+    # service capabilities are independently registered, not a provider ENV.
+    with pytest.raises(ValueError, match='Conflicting'):
+        config.ProviderProfile(base_url='https://provider.example',api_key_env='',model='m',quota_group='a',max_tokens=8192,max_output_tokens=4096)
 
 
 def test_default_environment_separates_budgets(providers, monkeypatch):
@@ -88,8 +107,7 @@ def test_api_rejects_invalid_or_sensitive_override(options):
 
 
 def test_provider_errors_do_not_echo_profile_contents(providers, monkeypatch):
-    providers["siliconflow"]["api_key"] = "secret-must-not-appear"
-    monkeypatch.setenv("KG_EXTRACT_PROVIDERS_JSON", json.dumps(providers))
+    providers["siliconflow"]["api_key_env"] = "MISSING_TEST_EXTRACT_KEY"
     with pytest.raises(config.ExtractionConfigurationError) as error:
         config.snapshot_payload("graph.extract", {"ontology": "x", "options": {"provider": "siliconflow"}})
     assert "secret-must-not-appear" not in str(error.value)
@@ -223,8 +241,7 @@ def test_live_client_configuration_uses_chat_only_without_network(providers, mon
     import openai
     from algorithm.output_batching import output_batch_size
 
-    providers["siliconflow"]["max_tokens"] = max_tokens
-    monkeypatch.setenv("KG_EXTRACT_PROVIDERS_JSON", json.dumps(providers))
+    providers["siliconflow"]["max_output_tokens"] = max_tokens
     seen = []
     def create(**kwargs):
         seen.append(kwargs)
@@ -287,7 +304,7 @@ def test_pipeline_http_preserves_same_overrides(providers, protocol_module):
     assert effective["provider"] == "siliconflow" and effective["document_timeout"] == 60
 
 
-def test_refactored_v31_default_config_and_live_factory(monkeypatch):
+def test_refactored_v31_default_config_and_live_factory(providers, monkeypatch):
     from algorithm.knowledge_extract.v3_1 import llm_client
     monkeypatch.setenv("KG_EXTRACT_TRACE_DIR", "")
     chosen = config.resolve_config({"version": "v3.1"})

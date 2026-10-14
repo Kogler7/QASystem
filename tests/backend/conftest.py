@@ -31,14 +31,27 @@ def _module(name: str, **attributes: object) -> types.ModuleType:
 
 
 @pytest.fixture(autouse=True)
-def _protocol_stub_lifetime(request, monkeypatch):
+def _protocol_stub_lifetime(request, monkeypatch, tmp_path_factory):
     """Keep the session app stable but restore global stubs after each test."""
     if "protocol_module" not in request.fixturenames:
         yield
         return
     protocol = request.getfixturevalue("protocol_module")
-    monkeypatch.setenv("EXECUTION_MODE", "inline")
-    monkeypatch.setenv("EXECUTION_REDIS_URL", "")
+    from backend.app.execution import manager as execution_manager
+    from backend.app.execution import api as execution_api
+    from backend.app.execution.store import MemoryExecutionStore
+    from backend.app.execution.artifacts import ArtifactStore
+    from backend.app.execution.hub import ExecutionEventHub
+    store = MemoryExecutionStore()
+    inline_manager = execution_manager.ExecutionManager(store=store,
+        artifacts=ArtifactStore(tmp_path_factory.mktemp('protocol-execution')), hub=ExecutionEventHub(store), mode='inline')
+    monkeypatch.setattr(execution_manager, '_MANAGER', inline_manager)
+    monkeypatch.setattr(execution_api, 'get_execution_manager', lambda: inline_manager)
+    from docker import configuration
+    unit_registry = {'settings':{},'models':{'test':{'enabled':True,'context':'131072'}},
+        'services':{'test-chat':{'kind':'local','model':'test'}},'accounts':{},
+        'routes':{'extract':'test-chat','graph':'test-chat','agent':'test-chat'}}
+    monkeypatch.setattr(configuration,'read_registry',lambda **kw: (unit_registry,'unit-fixture') if kw.get('with_revision') else unit_registry)
     sys.modules.update(protocol.stubs)
     try:
         yield
@@ -213,19 +226,16 @@ def protocol_module():
     }
     # Package stubs retain real config submodules; HTTP request snapshots resolve versions.
     stubs['algorithm.knowledge_extract'].__path__ = [str(ROOT / 'algorithm/knowledge_extract')]
+    stubs['algorithm.knowledge_extract.v2.config'].get_llm_policy = stubs['algorithm.knowledge_extract.v2.config'].get_llm_config
     original_environment = {
         name: os.environ.get(name)
         for name in (
-            "EXECUTION_MODE",
-            "EXECUTION_REDIS_URL",
             "ENVIRONMENT",
         )
     }
     # Existing protocol tests exercise algorithm contracts without starting
     # Redis or a Worker. Inline is explicit test configuration, never a
     # production fallback.
-    os.environ["EXECUTION_MODE"] = "inline"
-    os.environ.pop("EXECUTION_REDIS_URL", None)
     os.environ["ENVIRONMENT"] = "test"
     original = {name: sys.modules.get(name) for name in stubs}
     application_modules = [

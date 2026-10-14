@@ -101,9 +101,9 @@ def test_agent_worker_new_task_refreshes_route_and_same_task_keeps_snapshot(monk
         llm.set_task_id('task-a')
         current.update(base_url='https://second.invalid/v1', model='second')
         llm.set_task_id('task-a')
-        assert llm._cfg['model']=='first' and len(calls)==2
+        assert llm._cfg['model']=='first' and len(calls)==1
         llm.set_task_id('task-b')
-        assert llm._cfg['model']=='second' and len(calls)==3
+        assert llm._cfg['model']=='second' and len(calls)==2
         assert llm._url=='https://second.invalid/v1/chat/completions'
     finally:
         llm.close()
@@ -136,7 +136,7 @@ def test_graph_uses_registered_service_and_same_admission(monkeypatch):
     from external_services.llm import service as entry
     sent, admissions = [], []
     service = {'service_id':'shared','base_url':'https://routed.invalid/v1','model':'registered'}
-    monkeypatch.setattr(entry, 'resolve_chat_service', lambda _: (service, 'key'))
+    monkeypatch.setattr(entry, 'resolve_chat_service', lambda _, **kw: (service, 'key'))
     @contextmanager
     def admit(snapshot, payload, **kw):
         admissions.append((snapshot,payload))
@@ -160,7 +160,7 @@ def test_agent_summary_defaults_to_registered_model_and_admission(monkeypatch):
     from external_services.llm import service as entry
     sent, admitted = [], []
     snapshot = {'service_id':'agent-service','base_url':'https://summary.invalid/v1','model':'same-agent'}
-    monkeypatch.setattr(entry,'resolve_chat_service',lambda _: (snapshot,''))
+    monkeypatch.setattr(entry,'resolve_chat_service',lambda _, **kw: (snapshot,''))
     @contextmanager
     def admit(service,payload,**kwargs):
         admitted.append(service)
@@ -177,3 +177,83 @@ def test_agent_summary_defaults_to_registered_model_and_admission(monkeypatch):
     compactor=memory_tool.MemoryCompactor()
     assert compactor._generate_summary('conversation')=='summary'
     assert sent[0]['model']=='same-agent' and admitted==[snapshot]
+
+
+def test_missing_or_disabled_service_never_uses_old_environment(monkeypatch):
+    from external_services import model_routes
+    from external_services.llm.service import resolve_chat_service
+    monkeypatch.setenv('AGENT_LLM_BASE_URL','https://legacy.invalid/v1')
+    monkeypatch.setenv('AGENT_LLM_MODEL','legacy')
+    monkeypatch.setattr(model_routes,'registry_snapshot',lambda: ({'services':{},'routes':{}},'unit'))
+    with pytest.raises(ValueError,match='用途路由'):
+        resolve_chat_service('agent',required=True)
+    registry={'services':{'a':{'kind':'api','enabled':False,'base_url':'https://api.invalid','model':'m'}},'routes':{'agent':'a'}}
+    with pytest.raises(ValueError,match='关闭'):
+        resolve_service('agent',registry=registry)
+
+
+def test_live_algorithm_factory_requires_registered_or_explicit_connection(monkeypatch):
+    from external_services import model_routes
+    from algorithm.knowledge_extract.v3 import llm_client
+    import openai
+    calls=[]
+    monkeypatch.setenv('KG_EXTRACT_LLM_BASE_URL','https://legacy.invalid/v1')
+    monkeypatch.setattr(model_routes,'registry_snapshot',lambda: ({'services':{},'routes':{}},'unit'))
+    monkeypatch.setattr(openai,'OpenAI',lambda **kw: calls.append(kw))
+    with pytest.raises(ValueError,match='未选择'):
+        llm_client.create_llm_client()
+    assert calls==[]
+
+
+def test_graph_connection_migration_requires_review_and_preserves_ssl_value():
+    old={'GRAPH_LLM_BASE_URL':'https://graph.invalid/v1','GRAPH_LLM_MODEL':'g',
+         'GRAPH_LLM_VERIFY_SSL':'false','GRAPH_LLM_TIMEOUT_SECONDS':'17'}
+    services,_,_,conflicts=migrate_api_services(old,{}, {},{})
+    assert services['migrated-graph']['connection']=={'verify_ssl':False,'timeout_seconds':17}
+    existing=deepcopy(services)
+    existing['migrated-graph']['connection']['verify_ssl']=True
+    _,_,_,conflicts=migrate_api_services(old,existing,{}, {'graph':'migrated-graph'})
+    assert 'services.migrated-graph.connection' in conflicts
+
+
+def test_agent_subtasks_keep_parent_service_snapshot(monkeypatch):
+    from agent.agentcode import worker
+    monkeypatch.setattr(worker,'_load_env',lambda: pytest.fail('must not resolve a new subtask route'))
+    cfg={'base_url':'https://parent.invalid/v1','model':'parent','timeout_s':120}
+    llm=worker._make_tagged_llm(None,'parent-task','subtask',service_config=cfg)
+    try:
+        assert llm._cfg['model']=='parent' and llm._task_id=='parent-task'
+    finally:
+        llm.close()
+
+
+def test_missing_route_fails_task_and_worker_continues(monkeypatch):
+    import threading
+    from contextlib import nullcontext
+    from agent.agentcode import worker, stream_broker
+    stop=threading.Event()
+    queue=[('missing',{'user_message':'first'}),('ready',{'user_message':'second'})]
+    statuses={}
+    class LLM:
+        _cfg={}
+        def __init__(self, **kwargs): pass
+        def set_task_id(self, task_id):
+            if task_id=='missing': raise ValueError('模型用途未配置')
+        def close(self): pass
+    def dequeue(**kwargs):
+        if queue: return queue.pop(0)
+        stop.set()
+        return None
+    monkeypatch.setattr(worker,'_StreamingWorkerLLM',LLM)
+    monkeypatch.setattr(worker.task_store,'dequeue',dequeue)
+    monkeypatch.setattr(worker.task_store,'update',lambda tid,status,**kw: statuses.update({tid:status}))
+    monkeypatch.setattr(worker.task_store,'get',lambda tid: {'status':statuses[tid]})
+    monkeypatch.setattr(worker.task_store,'delete_auth_context',lambda *a: None)
+    monkeypatch.setattr(worker.task_store,'load_auth_context',lambda *a: {})
+    monkeypatch.setattr(worker,'_build_config',lambda *a:(None,None))
+    monkeypatch.setattr(worker,'run_orchestrated',lambda **kw: SimpleNamespace(status='ok',payload={},spent={},trace_ref=None))
+    monkeypatch.setattr(stream_broker,'get_broker',lambda:SimpleNamespace(publish=lambda *a:None))
+    tm=SimpleNamespace(bind_user_headers=lambda *a:nullcontext())
+    pool=SimpleNamespace(borrow=lambda **kw:nullcontext(tm))
+    worker._process_one(pool,None,None,None,stop,0)
+    assert statuses=={'missing':'failed','ready':'completed'}

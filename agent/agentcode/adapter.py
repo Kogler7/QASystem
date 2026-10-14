@@ -26,19 +26,14 @@ def _load_env() -> dict[str, Any]:
     if root_env.exists():
         load_dotenv(root_env, override=False)
     values = {
-        "base_url": (config_getenv("AGENT_LLM_BASE_URL") or "http://localhost:9999").strip(),
-        "api_key": (config_getenv("AGENT_LLM_API_KEY") or "").strip(),
-        "model": (config_getenv("AGENT_LLM_MODEL") or "Qwen/Qwen3-8B").strip(),
         "temperature": float(config_getenv("AGENT_TEMPLATE_TEMPERATURE") or 0.2),
         "max_tokens": int(config_getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),
         "timeout_s": int(config_getenv("AGENT_TEMPLATE_TIMEOUT_SECONDS") or 120),
     }
     from external_services.llm.service import resolve_chat_service
-    routed = resolve_chat_service('agent')
-    if routed:
-        service, credential = routed
-        values.update(base_url=service['base_url'], model=service['model'],
-                      api_key=credential, service_snapshot=service)
+    service, credential = resolve_chat_service('agent', required=True)
+    values.update(base_url=service['base_url'], model=service['model'],
+                  api_key=credential, service_snapshot=service)
     return values
 
 
@@ -52,15 +47,9 @@ def _chat_completions_url(base_url: str) -> str:
     return f"{base}/v1/chat/completions"
 
 
-def _default_mcp_path() -> Path:
-    """获取默认 MCP 配置文件路径，优先 AGENT_MCP_CONFIG 环境变量。"""
-    for candidate in [
-        Path(config_getenv("AGENT_MCP_CONFIG") or ""),
-        Path(__file__).resolve().parent / "tools" / "mcp_tools" / "mcp_config.json",
-    ]:
-        if candidate.is_file():
-            return candidate
-    return Path(config_getenv("AGENT_MCP_CONFIG") or "mcp_config.json")
+def _default_mcp_path() -> None:
+    """None selects the built-in deployment topology, without a user path."""
+    return None
 
 
 def _messages_to_openai(agent_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:

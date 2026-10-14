@@ -34,7 +34,7 @@ transport 取值与必需字段：
 """
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv, required as config_required
+from docker.startup_contract import internal_agent_mcp_url
 
 import json
 import os
@@ -44,12 +44,14 @@ from typing import Any
 from ...models import McpServerConfig, SessionConfig, SkillRef, BudgetConfig, ToolPolicy, DeliveryConfig
 
 
-def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
+def load_mcp_servers(config_path: str | Path | None = None) -> list[McpServerConfig]:
     """读取 mcp_config.json，返回 McpServerConfig 列表。
 
     每个 key 对应一个 MCP 服务名。HTTP/SSE transport 需要 url；
     stdio transport 需要 command，可选 args/cwd/env。
     """
+    if config_path is None:
+        return [McpServerConfig(name="agent-tools", transport="streamable_http", url=internal_agent_mcp_url())]
     config_path = Path(config_path)
     if not config_path.is_file():
         raise FileNotFoundError(f"MCP 配置文件不存在: {config_path}")
@@ -71,8 +73,6 @@ def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
             raise ValueError(f"MCP 服务 {name} 不支持的 transport: {transport}")
 
         url = (cfg.get("url") or "").strip() or None
-        if len(mcp_servers) == 1 and config_getenv("AGENT_MCP_URL"):
-            url = config_required('AGENT_MCP_URL').strip()
         command = (cfg.get("command") or "").strip() or None
         if transport == "stdio" and not command:
             raise ValueError(f"MCP 服务 {name} 缺少 command 字段")
@@ -109,7 +109,7 @@ def load_mcp_servers(config_path: str | Path) -> list[McpServerConfig]:
 
 
 def build_config_from_mcp_json(
-    config_path: str | Path,
+    config_path: str | Path | None = None,
     *,
     session_id: str | None = None,
     trace_id: str | None = None,

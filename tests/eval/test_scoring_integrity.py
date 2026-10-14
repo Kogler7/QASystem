@@ -222,7 +222,7 @@ def test_temporary_judge_configuration_ignores_persistent_defaults(monkeypatch):
     client = run.build_judge_client({"eval": {"judge_base_url": "https://config.example.test/v1", "judge_model": "config"}})
     assert client.base_url == "https://config.example.test/v1"
     assert client.model == "config"
-    assert client.api_key == "judge-key"
+    assert client.api_key == ""
 
 
 def test_explicit_judge_params_override_extraction_environment(monkeypatch):

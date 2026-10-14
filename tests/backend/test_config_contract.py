@@ -166,10 +166,10 @@ def test_retired_variables_are_removed_only_from_reviewable_plan(tmp_path):
 
 def test_observation_revision_is_bound_to_the_read_hot_snapshot(monkeypatch):
     from docker import runtime_config
-    monkeypatch.setattr(runtime_config, 'read_settings', lambda **kw: ({'KG_EXTRACT_LLM_MODEL': 'old'}, 1))
+    monkeypatch.setattr(runtime_config, 'read_settings', lambda **kw: ({'KG_EXTRACT_ALGO_VERSION': 'v3'}, 1))
     observations = []
     monkeypatch.setattr(configuration, '_observe', lambda *args, **kw: observations.append((args, kw)))
-    assert configuration.getenv('KG_EXTRACT_LLM_MODEL') == 'old'
+    assert configuration.getenv('KG_EXTRACT_ALGO_VERSION') == 'v3'
     assert observations[0][1]['revision'] == 1
 
 

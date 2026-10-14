@@ -68,11 +68,12 @@ def test_route_change_affects_new_request_only(registry):
 
 def test_services_keep_explicit_account_quota_group_and_share_pool(registry, monkeypatch):
     from external_services.llm import runtime
-    monkeypatch.setenv('KG_EXTRACT_LLM_QUOTA_GROUP', 'shared-account')
+    registry['accounts'] = {'shared-account': {'max_concurrency':4,'qps':0,'qpm':0}}
+    registry['services']['chat']['account_id']='shared-account'
     monkeypatch.setattr(runtime, '_pools', {})
     first = extraction_config.resolve_config({'version': 'v3'})
     registry['models']['qwen2'] = registry['models']['qwen'].copy()
-    registry['services']['chat2'] = {'kind': 'local', 'model': 'qwen2'}
+    registry['services']['chat2'] = {'kind': 'local', 'model': 'qwen2','account_id':'shared-account'}
     registry['routes']['extract'] = 'chat2'
     second = extraction_config.resolve_config({'version': 'v3'})
     assert first['model_service'] != second['model_service']
@@ -91,12 +92,12 @@ def test_bad_route_never_falls_back_to_legacy(registry, mutation):
 
 
 def test_explicit_provider_profile_wins_default_route(registry, monkeypatch):
-    monkeypatch.setenv('KG_EXTRACT_PROVIDERS_JSON', json.dumps({'chosen': {
+    registry['services']['chosen'] = {'kind':'api',
         'base_url': 'https://api.example/v1', 'model': 'explicit-model',
-        'api_key_env': 'KG_EXTRACT_LLM_API_KEY', 'quota_group': 'api'}}))
+        'api_key_env': 'KG_EXTRACT_LLM_API_KEY'}
     monkeypatch.setenv('KG_EXTRACT_LLM_API_KEY', 'secret-api')
     result = extraction_config.resolve_config({'version': 'v3', 'provider': 'chosen'})
-    assert result['model'] == 'explicit-model' and 'model_service' not in result
+    assert result['model'] == 'explicit-model' and result['model_service']=='chosen'
 
 
 def test_entity_model_explicit_selection_and_default_route(registry):

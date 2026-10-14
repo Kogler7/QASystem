@@ -36,6 +36,31 @@ def test_http_config_preserves_headers(tmp_path) -> None:
     assert server.headers == {"Authorization": "Bearer test"}
 
 
+def test_default_connection_is_generated_from_topology(monkeypatch):
+    from agentcode import adapter
+    from agentcode.tools.mcp_tools import mcp_loader
+    monkeypatch.setenv("AGENT_MCP_CONFIG", "missing.json")
+    monkeypatch.setenv("AGENT_MCP_URL", "http://unapproved/mcp")
+    monkeypatch.setattr(mcp_loader, "internal_agent_mcp_url", lambda: "http://agent-mcp:9181/mcp")
+    assert adapter._default_mcp_path() is None
+    server = load_mcp_servers()[0]
+    assert server.name == "agent-tools"
+    assert server.url == "http://agent-mcp:9181/mcp"
+
+
+def test_explicit_multiple_external_servers_remain_supported(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_MCP_URL", "http://unapproved/mcp")
+    path = tmp_path / "external.json"
+    path.write_text(json.dumps({"mcpServers": {
+        "first": {"transport": "http", "url": "https://first/mcp"},
+        "second": {"transport": "stdio", "command": "python", "args": ["-m", "local_tools"]},
+    }}), encoding="utf-8")
+    servers = load_mcp_servers(path)
+    assert [server.name for server in servers] == ["first", "second"]
+    assert servers[0].url == "https://first/mcp"
+    assert servers[1].command == "python"
+
+
 def test_http_worker_binds_answer_v1_delivery(tmp_path, monkeypatch) -> None:
     from agentcode.delivery import ANSWER_V1_ID, ANSWER_V1_SCHEMA
     from agentcode.worker import _build_config

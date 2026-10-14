@@ -11,18 +11,18 @@ def _env(key: str, *fallback_keys: str, default: str = "") -> str:
     return default
 
 
-KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", default="http://localhost:9999")
-KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", default="")
-KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", default="deepseek-v4-flash")
+KG_EXTRACT_API_URL = ""
+KG_EXTRACT_API_KEY = ""
+KG_EXTRACT_MODEL = ""
 KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", default="16384"))
 # 实体输出去截断：整块调用失败后按 markdown 段落切段，分段输出再组装。
 KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS = int(_env("KG_EXTRACT_ENTITY_SEGMENT_TARGET_CHARS", default="2600"))
 KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS = int(_env("KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS", default="400"))
 KG_EXTRACT_ENTITY_SEGMENT_OVERLAP = int(_env("KG_EXTRACT_ENTITY_SEGMENT_OVERLAP", default="50"))
 KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH = int(_env("KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH", default="3"))
-KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
-KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
-KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
+KG_EXTRACT_MAX_CONCURRENCY = 4
+KG_EXTRACT_QPS = 0
+KG_EXTRACT_QPM = 0
 KG_EXTRACT_REQUEST_TIMEOUT = float(_env("KG_EXTRACT_LLM_TIMEOUT_SECONDS", default="300"))
 # 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启
 KG_EXTRACT_DISABLE_THINKING = _env("KG_EXTRACT_LLM_DISABLE_THINKING", default="1") != "0"
@@ -46,7 +46,7 @@ def get_evidence_admission() -> str:
     return "reject" if KG_EXTRACT_EVIDENCE_ADMISSION == "reject" else "warn"
 
 
-def get_llm_config() -> dict:
+def get_llm_policy() -> dict:
     return {
         "base_url": KG_EXTRACT_API_URL,
         "api_key": KG_EXTRACT_API_KEY,
@@ -66,3 +66,8 @@ def get_llm_config() -> dict:
         "max_repair_rounds": min(2, max(0, KG_EXTRACT_MAX_REPAIR_ROUNDS)),
         "max_attempts": max(1, KG_EXTRACT_LLM_MAX_ATTEMPTS),
     }
+
+
+def get_llm_config() -> dict:
+    from algorithm.knowledge_extract.service_configuration import fill_service
+    return fill_service(get_llm_policy())

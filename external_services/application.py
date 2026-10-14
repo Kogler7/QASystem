@@ -25,18 +25,18 @@ USER_CONTEXT_HEADERS = (
 class Endpoint:
     method: str
     path: str | None
-    env_name: str
+    env_name: str | None = None
 
 
 # All application-team APIs are registered here. A missing path means the
 # contract has not been opened yet and must fail only when invoked.
 ENDPOINTS: dict[str, Endpoint] = {
-    "files.upload": Endpoint("POST", "/third/files/upload", "APPLICATION_API_FILE_UPLOAD_PATH"),
-    "vectors.store": Endpoint("POST", "/third/vectors/store", "APPLICATION_API_VECTOR_STORE_PATH"),
-    "graph.cypher.query": Endpoint("POST", "/third/cypher/query", "APPLICATION_API_CYPHER_QUERY_PATH"),
-    "graph.write": Endpoint("POST", None, "APPLICATION_API_GRAPH_WRITE_PATH"),
-    "confidence.calculate": Endpoint("POST", None, "APPLICATION_API_CONFIDENCE_PATH"),
-    "documents.evidence.search": Endpoint("POST", None, "APPLICATION_API_DOCUMENT_EVIDENCE_PATH"),
+    "files.upload": Endpoint("POST", "/third/files/upload"),
+    "vectors.store": Endpoint("POST", "/third/vectors/store"),
+    "graph.cypher.query": Endpoint("POST", "/third/cypher/query"),
+    "graph.write": Endpoint("POST", None),
+    "confidence.calculate": Endpoint("POST", None),
+    "documents.evidence.search": Endpoint("POST", None),
     "models.embeddings.create": Endpoint("POST", "/v1/embeddings", "EMBEDDING_SERVICE_PATH"),
     "models.decisions.create": Endpoint("POST", "/v1/systemone", "CLEF_SERVICE_PATH"),
     "models.nanojev.create": Endpoint("POST", "/v1/systemone", "NANOJEV_SERVICE_PATH"),
@@ -71,7 +71,7 @@ def endpoint_for(capability: str) -> Endpoint:
         registered = ENDPOINTS[capability]
     except KeyError as exc:
         raise ExternalCapabilityUnavailable(capability, "能力未注册") from exc
-    configured_path = getenv(registered.env_name, "").strip()
+    configured_path = getenv(registered.env_name, "").strip() if registered.env_name else ""
     path = configured_path or registered.path
     if not path:
         raise ExternalCapabilityUnavailable(capability, "第三方接口尚未开通")

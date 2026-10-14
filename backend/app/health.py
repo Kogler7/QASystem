@@ -96,18 +96,37 @@ def runtime_checks() -> dict[str, Any]:
     return checks
 
 
-def dependency_checks() -> dict[str, Any]:
-    database_port = config_getenv("DATABASE_PORT", "3306")
+def _sql_database_check(value: str) -> dict[str, Any]:
+    """Inspect the actual SQL connection without exposing its credentials."""
+    if not value.strip():
+        return {"ok": True, "skipped": True, "reason": "未配置关系型 SQL 数据库"}
+    from sqlalchemy.engine import make_url
     try:
-        database_port_number = int(database_port)
-    except ValueError:
-        database_port_number = None
+        url = make_url(value)
+        dialect = url.get_backend_name()
+        if dialect == "sqlite":
+            return {"ok": True, "skipped": True, "dialect": dialect, "reason": "SQLite 无网络端口；本检查不验证文件可读性"}
+        default_ports = {"mysql": 3306, "mariadb": 3306, "postgresql": 5432, "mssql": 1433, "oracle": 1521}
+        port = url.port or default_ports.get(dialect)
+        host = url.host
+        if not host or not port or not 0 < port <= 65535:
+            return {"ok": False, "reason": "SQL 连接缺少有效主机或端口；特殊连接需显式提供端口"}
+    except (ValueError, TypeError):
+        return {"ok": False, "reason": "关系型 SQL 数据库连接格式无效"}
+    except Exception:
+        return {"ok": False, "reason": "关系型 SQL 数据库连接无法解析"}
+    return {"dialect": dialect, **_tcp_check("sql_database", host, port)}
+
+
+def dependency_checks() -> dict[str, Any]:
     from external_services.application import get_application_service_url
+    from external_services.model_routes import resolve_service
+    llm_service = resolve_service('extract')
 
     checks = {
-        "mysql": _tcp_check("mysql", config_getenv("DATABASE_HOST", "").strip(), database_port_number),
+        "sql_database": _sql_database_check(config_getenv("DATABASE_URL", "")),
         "knowledge_llm": _url_tcp_check(
-            "knowledge_llm", config_getenv("KG_EXTRACT_LLM_BASE_URL", "").strip(), 80
+            "knowledge_llm", llm_service['base_url'] if llm_service else '', 80
         ),
         "application_service": _url_tcp_check(
             "application_service", get_application_service_url(), 80

@@ -11,7 +11,7 @@
 
 | 文件 / 目录 | 作用 |
 | --- | --- |
-| `runtime.py` | 单例 `FastMCP`（`MCP_HOST` / `MCP_PORT`） |
+| `runtime.py` | 单例 MCP（内部监听约定，部署HTTP挂载到Backend） |
 | `server.py` | 注册各领域模块并启动（默认 Streamable HTTP） |
 | `result.py` | 统一返回契约与错误码 |
 | `dispatch.py` | 执行模式与队列分发（`maybe_submit`） |
@@ -146,3 +146,9 @@ mcp_services 工具（薄适配）
 - 返回统一走 `tool_success` / `tool_error` / `normalize_tool_result`，不要自定义结构；
 - 需要入队的工具使用 `maybe_submit`，并在 `backend/app/execution/operations.py` 补对应映射；
 - 工具名与 schema 变更需同步使用方（skills/契约测试）。
+
+## 开发启动与关系型 SQL
+
+标准部署的 MCP HTTP 接口由 Backend 内置，无单独监听环境变量。独立开发可用 `python -m mcp_services.server --transport stdio`，或 `--transport streamable-http --host 127.0.0.1 --port 8890` 显式绑定；这些参数不改变 Backend 的内置接口。
+
+`DATABASE_URL` 是关系型数据库 SQL 连接，不是图数据库或向量数据库地址，部署默认空。工具请求显式 `database_url` 参数保持兼容；未填参数和配置时明确失败。旧 `MCP_DATABASE_URL` 在 ops 中经人工审核迁移，运行时无旧名回退。

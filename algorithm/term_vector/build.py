@@ -12,11 +12,10 @@
 """
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
 
 import argparse
 import json
-import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -39,58 +38,26 @@ def _split_synonyms(value: Any) -> list[str]:
     return [p.strip() for p in text.splitlines() if p.strip()]
 
 
-# ── 取数通道 ─────────────────────────────────────────────
-# 优先直连图库 HTTP 事务接口（需 TERM_GRAPH_HTTP_URL/USER/PASSWORD，仅内网）。
-# 未配置时回退到 KnowledgeMapClient 网关——注意网关要求透传登录用户头，
-# 独立脚本/容器内无用户上下文时会鉴权失败，仅适合已绑定用户头的环境。
-
-_DIRECT_ENV_KEYS = ("TERM_GRAPH_HTTP_URL", "TERM_GRAPH_USER", "TERM_GRAPH_PASSWORD")
-
-
-def _direct_db_configured() -> bool:
-    return bool(config_getenv("TERM_GRAPH_HTTP_URL", "").strip())
-
-
-def _http_cypher(statement: str, parameters: dict[str, Any]) -> list[dict[str, Any]]:
-    import base64
-
-    import httpx
-
-    base = config_getenv("TERM_GRAPH_HTTP_URL", "").strip().rstrip("/")
-    user = config_getenv("TERM_GRAPH_USER", "").strip()
-    password = config_getenv("TERM_GRAPH_PASSWORD", "").strip()
-    database = config_getenv("TERM_GRAPH_DB", "neo4j").strip() or "neo4j"
-    if not user or not password:
-        raise SystemExit("直连图库缺少 TERM_GRAPH_USER / TERM_GRAPH_PASSWORD，请在内网 .env 配置")
-    url = f"{base}/db/{database}/tx/commit"
-    token = base64.b64encode(f"{user}:{password}".encode()).decode()
-    response = httpx.post(
-        url,
-        headers={
-            "content-type": "application/json",
-            "authorization": f"Basic {token}",
-        },
-        json={"statements": [{"statement": statement, "parameters": parameters or {}}]},
-        timeout=60,
-    )
-    response.raise_for_status()
-    body = response.json()
-    errors = body.get("errors") or []
-    if errors:
-        raise SystemExit(f"图库直连查询失败：{errors[0]}")
-    results = body.get("results") or []
-    if not results:
-        return []
-    result = results[0]
-    columns = result.get("columns") or []
-    return [
-        dict(zip(columns, row.get("row") or []))
-        for row in result.get("data") or []
-    ]
+# Only the registered application gateway may query graph data. Standalone
+# CLI calls must already have a user context; there is no direct DB fallback.
+def _gateway_query(statement: str, parameters: dict[str, Any]) -> list[dict[str, Any]]:
+    from external_services.application import get_user_headers, ExternalCapabilityUnavailable
+    if not get_user_headers().get("authorization"):
+        raise ExternalCapabilityUnavailable("graph.cypher.query", "术语索引构建需要已绑定的用户授权上下文；不支持独立直连图数据库")
+    from backend.app.execution.manager import get_execution_manager, ExecutionUnavailable
+    manager = get_execution_manager()
+    if not manager.is_async:
+        raise ExecutionUnavailable("术语索引取数必须使用共享执行队列")
+    submission = manager.submit(operation="term_vector.query", resource_class="io.db",
+                                payload={"statement": statement, "parameters": parameters})
+    execution = manager.wait_blocking(submission.job_id, None)
+    if execution["status"] != "succeeded":
+        raise RuntimeError("术语索引应用服务查询任务未成功完成")
+    return manager.result(submission.job_id)
 
 
 def fetch_terms(limit: int, term_type: str) -> list[dict[str, Any]]:
-    """拉取 Term 节点（先直连图库；未配置则回退网关，网关需要用户上下文）。"""
+    """通过认证队列和应用服务拉取 Term 节点。"""
     statement = (
         "MATCH (n:KnowledgeUnit) "
         "WHERE n.resource_type CONTAINS $term_type "
@@ -100,13 +67,7 @@ def fetch_terms(limit: int, term_type: str) -> list[dict[str, Any]]:
         "LIMIT $limit"
     )
     parameters = {"term_type": term_type, "limit": limit}
-    if _direct_db_configured():
-        return _http_cypher(statement, parameters)
-    from algorithm.ans.QA.knowledge_map_client import KnowledgeMapClient
-
-    km = KnowledgeMapClient()
-    rows = km.execute_cypher(statement, parameters)
-    return [dict(row) for row in rows]
+    return [dict(row) for row in _gateway_query(statement, parameters)]
 
 
 def fetch_logical_props(term_type: str, limit: int) -> dict[str, list[dict[str, Any]]]:
@@ -119,13 +80,7 @@ def fetch_logical_props(term_type: str, limit: int) -> dict[str, list[dict[str, 
         "LIMIT $limit"
     )
     parameters = {"term_type": term_type, "limit": limit}
-    if _direct_db_configured():
-        rows = _http_cypher(statement, parameters)
-    else:
-        from algorithm.ans.QA.knowledge_map_client import KnowledgeMapClient
-
-        km = KnowledgeMapClient()
-        rows = km.execute_cypher(statement, parameters)
+    rows = _gateway_query(statement, parameters)
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         grouped.setdefault(str(row.get("id") or ""), []).append(dict(row))
@@ -199,28 +154,23 @@ def _extract_logical(props: list[dict[str, Any]]) -> dict[str, Any]:
     return out
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="构建 Term 语义向量索引")
     parser.add_argument(
         "--output",
-        default=config_getenv("TERM_VECTOR_INDEX", "term_index.json"),
-        help="索引输出路径（env TERM_VECTOR_INDEX 可覆盖）",
+        default=str(Path(__file__).resolve().parents[2] / "backend" / "data" / "term_index.json"),
+        help="索引输出路径，默认写入可写backend-data卷",
     )
     parser.add_argument("--limit", type=int, default=10000, help="最大拉取 Term 条数")
     parser.add_argument(
         "--term-type",
-        default=config_getenv("TERM_RESOURCE_TYPE", "Term"),
+        default="Term",
         help="resource_type 过滤关键词（默认 Term，与实体链接一致）",
     )
     parser.add_argument("--no-logical", action="store_true", help="跳过逻辑属性兜底")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    if _direct_db_configured():
-        print("取数通道：直连图库（TERM_GRAPH_HTTP_URL）")
-    else:
-        print("取数通道：应用团队 Cypher 网关（需透传登录用户头；"
-              "独立脚本/容器内无用户上下文会鉴权失败）。"
-              "如需直连，请在 .env 配置 TERM_GRAPH_HTTP_URL/USER/PASSWORD。")
+    print("取数通道：应用团队 Cypher 网关，共享认证队列；需要已绑定用户授权上下文。")
 
     terms = fetch_terms(args.limit, args.term_type)
     if not terms:
@@ -275,6 +225,7 @@ def main() -> None:
 
     from algorithm.term_vector.index import TermVectorIndex
 
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     TermVectorIndex(records, vectors).to_json(args.output)
 
     print(f"Term 总数：{len(records)}")

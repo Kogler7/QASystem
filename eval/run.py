@@ -1978,15 +1978,10 @@ def build_judge_client(params: dict[str, Any]) -> JudgeClient:
                 base_url = "https://api.deepseek.com/v1"
             else:
                 raise RuntimeError("Chat judge 必须配置 --judge-base-url ")
-    key_env = overrides.get("key_env") or "QASYSTEM_JUDGE_API_KEY"
-    api_key = os.environ.get(key_env, "")
-    if adapter == "chat" and not api_key and key_env == "QASYSTEM_JUDGE_API_KEY":
-        if urlsplit(base_url).hostname == "api.deepseek.com":
-            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-        else:
-            api_key = os.environ.get("KG_EXTRACT_LLM_API_KEY", "")
+    key_env = overrides.get("key_env") or ("DEEPSEEK_API_KEY" if urlsplit(base_url).hostname == "api.deepseek.com" else None)
+    api_key = os.environ.get(key_env, "") if key_env else ""
     if adapter == "chat" and urlsplit(base_url).hostname == "api.deepseek.com" and not api_key:
-        raise RuntimeError("DeepSeek API judge 未配置凭据：设置 DEEPSEEK_API_KEY 或 QASYSTEM_JUDGE_API_KEY")
+        raise RuntimeError("DeepSeek API judge 未配置凭据：设置 DEEPSEEK_API_KEY 或每轮传 --judge-key-env")
     timeout = float(overrides.get("timeout_seconds") or eval_cfg.get("judge_timeout_seconds") or 300)
     max_tokens = int(overrides.get("max_tokens") or eval_cfg.get("judge_max_tokens") or 8192)
     return JudgeClient(

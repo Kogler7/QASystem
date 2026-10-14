@@ -1,5 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
+from docker.startup_contract import runtime_ready_file
 
 import logging
 import os
@@ -60,7 +61,7 @@ def _auto_vlm_workers(cpu_count: int, gpu_count: int) -> int:
 
 
 class RuntimeSupervisor:
-    def __init__(self) -> None:
+    def __init__(self, *, ready_file: Path | None = None) -> None:
         self.children: list[ChildProcess] = []
         self.engines: list[tuple[str, int, subprocess.Popen]] = []
         self.stopping = False
@@ -74,7 +75,7 @@ class RuntimeSupervisor:
             if selected_gpu not in self.gpu_ids: raise ValueError('MinerU 指定GPU不可用，拒绝回退')
             self.gpu_ids = [selected_gpu]
         self.base_port = int((self.model_record or {}).get('port', '8100'))
-        self.ready_file = Path(config_getenv("EXECUTION_RUNTIME_READY_FILE", "/tmp/qasystem-runtime-ready"))
+        self.ready_file = Path(ready_file) if ready_file is not None else runtime_ready_file()
         self.ready_file.unlink(missing_ok=True)
 
     def stop(self, *_args) -> None:

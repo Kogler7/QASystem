@@ -19,7 +19,6 @@ from external_services.application import capture_user_headers, get_user_headers
 def _manager(tmp_path, monkeypatch, *, mode: str = "inline") -> tuple[ExecutionManager, MemoryExecutionStore]:
     ResourceScheduler._local_leases.clear()
     ResourceScheduler._local_workers.clear()
-    monkeypatch.setenv("EXECUTION_MODE", mode)
     monkeypatch.setenv("EXECUTION_GPU_SCHEDULING", "true")
     monkeypatch.setenv("EXECUTION_GPU_DEVICE_IDS", "0")
     store = MemoryExecutionStore()
@@ -27,6 +26,7 @@ def _manager(tmp_path, monkeypatch, *, mode: str = "inline") -> tuple[ExecutionM
         store=store,
         hub=ExecutionEventHub(store),
         artifacts=ArtifactStore(tmp_path / "execution"),
+        mode=mode,
     )
     return manager, store
 

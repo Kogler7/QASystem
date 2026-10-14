@@ -6,12 +6,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 HOT_KEYS = frozenset({
-    "KG_EXTRACT_ALGO_VERSION", "KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_LLM_MODEL",
-    "KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_LLM_MAX_INPUT_TOKENS",
-    "KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS", "KG_EXTRACT_LLM_MAX_CONCURRENCY",
-    "KG_EXTRACT_LLM_QPS", "KG_EXTRACT_LLM_QPM", "KG_EXTRACT_LLM_TIMEOUT_SECONDS",
-    "KG_EXTRACT_LLM_DISABLE_THINKING", "KG_EXTRACT_LLM_QUOTA_GROUP",
-    "KG_EXTRACT_V31_REQUEST_TIMEOUT", "KG_EXTRACT_V31_DOCUMENT_TIMEOUT",
+    "KG_EXTRACT_ALGO_VERSION",     "KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_LLM_MAX_INPUT_TOKENS",
+    "KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS",     "KG_EXTRACT_LLM_TIMEOUT_SECONDS",
+    "KG_EXTRACT_LLM_DISABLE_THINKING",     "KG_EXTRACT_V31_REQUEST_TIMEOUT", "KG_EXTRACT_V31_DOCUMENT_TIMEOUT",
     "EMBEDDING_SERVICE_URL", "EMBEDDING_SERVICE_PATH", "EMBEDDING_MODEL",
     "EMBEDDING_TIMEOUT_SECONDS", "EMBEDDING_MAX_BATCH_SIZE",
     "DOCUMENT_PARSE_SERVICE_URL", "DOCUMENT_PARSE_SERVICE_PATH", "DOCUMENT_PARSE_TIMEOUT_SECONDS",
@@ -126,10 +123,10 @@ def _validate_document(data):
         raise ValueError('Invalid service routes')
     for service in services.values():
         allowed = {'kind', 'model', 'api_key_env'} if service.get('kind') == 'local' else {'kind', 'model', 'api_key_env', 'adapter', 'base_url'}
-        allowed |= {'limits', 'capabilities', 'account_id'}
+        allowed |= {'limits', 'capabilities', 'account_id', 'connection', 'enabled'}
         if set(service) - allowed or service.get('kind') not in {'local', 'api', 'worker'}:
             raise ValueError('Invalid service record keys')
-        if any(not isinstance(v, str) for k, v in service.items() if k not in {'limits', 'capabilities'}): raise ValueError('Invalid service values')
+        if any(not isinstance(v, str) for k, v in service.items() if k not in {'limits', 'capabilities', 'connection', 'enabled'}): raise ValueError('Invalid service values')
         if service.get('kind') == 'api':
             url = urlsplit(service.get('base_url', ''))
             if url.scheme not in {'http', 'https'} or not url.hostname or url.username or url.password or url.query or url.fragment:

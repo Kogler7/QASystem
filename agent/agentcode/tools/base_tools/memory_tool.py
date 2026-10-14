@@ -14,8 +14,7 @@ from openai import OpenAI
 SYNTHETIC_PREFIXES = ("<background-results>", "<inbox>", "<agent-injected>")
 
 DEFAULT_THRESHOLD = 8000
-# 兜底模型名；实际优先取 AGENT_LLM_MODEL（摘要走与主模型同一网关，避免网关里
-# 没有该模型名时压缩静默失败、上下文被清空）。
+# 显式开发连接的兜底模型名；正式摘要使用 Agent 登记服务的模型。
 DEFAULT_MODEL = "deepseek-chat"
 DEFAULT_TRANSCRIPT_DIR = ""
 
@@ -51,8 +50,8 @@ class MemoryCompactor:
         Args:
             threshold: 待压缩消息的 token 上限。
             model: 摘要生成模型名。
-            api_key: API 密钥，默认从 AGENT_LLM_API_KEY 环境变量读取。
-            base_url: API 地址，默认从 AGENT_LLM_BASE_URL 环境变量读取。
+            api_key: 显式开发连接的 API 密钥；正式调用从 Agent 服务凭据引用读取。
+            base_url: 显式开发连接的 API 地址；不指定则必须选择 Agent 登记服务。
             transcript_dir: transcript 保存目录，默认为 workspace/transcripts。
         """
         self.threshold = threshold
@@ -60,19 +59,21 @@ class MemoryCompactor:
         self._encoding = tiktoken.get_encoding("cl100k_base")
 
         from external_services.llm.service import resolve_chat_service
-        routed = resolve_chat_service('agent') if api_key is None and base_url is None else None
+        routed = resolve_chat_service('agent', required=True) if base_url is None else None
         self._service_snapshot = None
         if routed:
             self._service_snapshot, api_key = routed
             base_url = self._service_snapshot['base_url']
             model = model or self._service_snapshot['model']
         else:
-            api_key = api_key or config_getenv("AGENT_LLM_API_KEY", "")
-            base_url = base_url or config_getenv("AGENT_LLM_BASE_URL", "http://localhost:9999")
+            api_key = api_key or ''
         self._client: OpenAI | None = None
         if api_key or self._service_snapshot:
-            self._client = OpenAI(base_url=base_url, api_key=api_key or 'not-needed', max_retries=0)
-        self._model = model or config_getenv("AGENT_LLM_MODEL", "") or DEFAULT_MODEL
+            import httpx
+            connection = (self._service_snapshot or {}).get('connection') or {}
+            self._client = OpenAI(base_url=base_url, api_key=api_key or 'not-needed', max_retries=0,
+                http_client=httpx.Client(verify=connection.get('ca_bundle') or connection.get('verify_ssl', True)))
+        self._model = model or DEFAULT_MODEL
 
         self._transcript_dir = Path(transcript_dir) if transcript_dir else None
 

@@ -1,5 +1,6 @@
 """Explicit migrations into the current configuration vocabulary."""
 ALIASES = {
+    'MCP_DATABASE_URL': 'DATABASE_URL',
     "KG_API_RECORD_ENABLED": "API_RECORD_ENABLED",
     "KG_API_RECORD_RETENTION_DAYS": "API_RECORD_RETENTION_DAYS",
     'KG_EXTRACT_API_URL': 'KG_EXTRACT_LLM_BASE_URL',

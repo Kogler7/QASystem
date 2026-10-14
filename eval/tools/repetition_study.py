@@ -75,12 +75,18 @@ def quality_metrics(text,messages,anchors):
     hits=sum(any(r.get('type')==a['type'] and a['mention_contains'] in r.get('mention','') for r in rows) for a in supported)
     return {'input_text_chars':len(source),'literal_mention_fraction':literal/len(entities) if entities else None,'anchor_hits':hits,'anchor_count':len(supported),'anchor_scope_excluded':len(anchors)-len(supported),'type_counts':dict(collections.Counter(r.get('type') for r in entities))}
 
-def replay(dataset,out,plan,workers=2,max_tokens=8192,timeout=180):
+def replay(dataset,out,plan,workers=2,max_tokens=8192,timeout=180,service_id=None):
     from openai import OpenAI
-    # Docker environment values are read in memory; credentials never enter artifacts.
-    import os
-    profiles=json.loads(os.environ['KG_EXTRACT_PROVIDERS_JSON']);profile=profiles['siliconflow']
-    client=OpenAI(base_url=profile['base_url'],api_key=os.environ[profile['api_key_env']],timeout=timeout,max_retries=0)
+    from external_services.model_routes import resolve_service
+    from external_services.llm.service import model_call
+    from docker.configuration import getenv
+    profile=resolve_service('extract',service_id=service_id)
+    if not profile:
+        raise ValueError('Replay requires an ops registered extraction service or --service-id')
+    credential=getenv(profile['api_key_env'],'') if profile.get('api_key_env') else ''
+    if profile['kind']=='api' and not credential:
+        raise ValueError('Registered replay service credential is not configured')
+    client=OpenAI(base_url=profile['base_url'],api_key=credential or 'not-needed',timeout=timeout,max_retries=0)
     out.mkdir(parents=True,exist_ok=True)
     def one(spec):
         cid,method,repeat=spec;case=json.loads((dataset/(cid+'.json')).read_text(encoding='utf8'));messages,temp,extra=variant(case,method)
@@ -90,20 +96,22 @@ def replay(dataset,out,plan,workers=2,max_tokens=8192,timeout=180):
         start=time.monotonic();text='';finish=None;usage=None;stopped=False;error=None;metadata={}
         try:
             params=dict(model=profile['model'],messages=messages,temperature=temp,max_tokens=max_tokens,extra_body={'thinking':{'type':'disabled'}},**extra)
-            if method=='stream_guard':
-                stream=client.chat.completions.create(**params,stream=True)
-                checked=0
-                for item in stream:
-                    if not item.choices:continue
-                    text+=item.choices[0].delta.content or '';finish=item.choices[0].finish_reason or finish
-                    if len(text)-checked<256:continue
-                    checked=len(text);m=metrics(text)
-                    if m['max_exact_multiplicity']>=3 or m['repeated_substring_chars']>=400:
-                        stream.close();stopped=True;break
-            else:
-                response=client.chat.completions.create(**params);text=response.choices[0].message.content or '';finish=response.choices[0].finish_reason;usage=response.usage.model_dump() if response.usage else None
-                metadata={key:getattr(response,key,None) for key in ['id','model','created','system_fingerprint']}
-        except Exception as exc:error={'type':type(exc).__name__,'message':str(exc).replace(os.environ[profile['api_key_env']],'[REDACTED]')[:500]}
+            with model_call(profile,params,timeout=timeout) as remaining:
+                params['timeout']=remaining
+                if method=='stream_guard':
+                    stream=client.chat.completions.create(**params,stream=True)
+                    checked=0
+                    for item in stream:
+                        if not item.choices:continue
+                        text+=item.choices[0].delta.content or '';finish=item.choices[0].finish_reason or finish
+                        if len(text)-checked<256:continue
+                        checked=len(text);m=metrics(text)
+                        if m['max_exact_multiplicity']>=3 or m['repeated_substring_chars']>=400:
+                            stream.close();stopped=True;break
+                else:
+                    response=client.chat.completions.create(**params);text=response.choices[0].message.content or '';finish=response.choices[0].finish_reason;usage=response.usage.model_dump() if response.usage else None
+                    metadata={key:getattr(response,key,None) for key in ['id','model','created','system_fingerprint']}
+        except Exception as exc:error={'type':type(exc).__name__,'message':(str(exc).replace(credential,'[REDACTED]') if credential else type(exc).__name__)[:500]}
         from algorithm.knowledge_extract.jsonl_protocol import decode_jsonl
         from algorithm.knowledge_extract.v3.structured_output import validate_json_schema
         decoded,parse_errors=decode_jsonl(text,case['call']['schema']);schema_errors=validate_json_schema(decoded,case['call']['schema'])
@@ -113,5 +121,5 @@ def replay(dataset,out,plan,workers=2,max_tokens=8192,timeout=180):
     (out/'summary.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf8',newline='\n');return results
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--dataset',type=Path,required=True);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--max-tokens',type=int,default=8192);parser.add_argument('--timeout',type=float,default=180);args=parser.parse_args()
-    replay(args.dataset,args.out,json.loads(args.plan.read_text(encoding='utf8')),max_tokens=args.max_tokens,timeout=args.timeout)
+    parser=argparse.ArgumentParser();parser.add_argument('--dataset',type=Path,required=True);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--plan',type=Path,required=True);parser.add_argument('--service-id');parser.add_argument('--max-tokens',type=int,default=8192);parser.add_argument('--timeout',type=float,default=180);args=parser.parse_args()
+    replay(args.dataset,args.out,json.loads(args.plan.read_text(encoding='utf8')),max_tokens=args.max_tokens,timeout=args.timeout,service_id=args.service_id)

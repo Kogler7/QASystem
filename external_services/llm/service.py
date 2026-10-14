@@ -9,9 +9,11 @@ from docker import configuration
 from external_services.model_routes import resolve_service
 
 
-def resolve_chat_service(purpose):
+def resolve_chat_service(purpose, *, required=False):
     service = resolve_service(purpose)
     if service is None:
+        if required:
+            raise ValueError('功能未选择已登记的模型服务；请使用 ops 配置用途路由')
         return None
     credential = configuration.getenv(service['api_key_env'], '') if service.get('api_key_env') else ''
     if service['kind'] == 'api' and not credential:
@@ -36,6 +38,8 @@ def check_service_budget(payload, service):
 @contextmanager
 def model_call(service, payload, *, timeout, cancelled=None):
     check_service_budget(payload, service)
+    connection = (service or {}).get('connection') or {}
+    timeout = min(timeout, connection.get('timeout_seconds', timeout))
     deadline = time.monotonic()+timeout
     if service:
         from .distributed import service_pool

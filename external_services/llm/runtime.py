@@ -79,12 +79,17 @@ class ScheduledClient:
         # Registered callers retry through the algorithm, acquiring each time.
         self.client = client.with_options(max_retries=0) if config.get('service_snapshot') and hasattr(client, 'with_options') else client
         self.service_snapshot = config.get('service_snapshot')
+        connection = (self.service_snapshot or {}).get('connection') or {}
+        verify = connection.get('ca_bundle') or connection.get('verify_ssl', True)
+        if verify is not True and hasattr(self.client, 'with_options'):
+            import httpx
+            self.client = self.client.with_options(http_client=httpx.Client(verify=verify, trust_env=False))
         if config.get('service_snapshot'):
             from .distributed import service_pool
             self.pool = service_pool(config['service_snapshot'])
         else:
             self.pool = get_pool(config["quota_group"], config)
-        self.timeout = float(config["request_timeout"])
+        self.timeout = min(float(config["request_timeout"]), float(connection.get('timeout_seconds', config['request_timeout'])))
         self.thinking_parameter = config.get("thinking_parameter", "thinking")
         self.disable_thinking = config["disable_thinking"]
         self.response_format = config.get("response_format", "auto")

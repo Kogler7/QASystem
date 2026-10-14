@@ -55,84 +55,56 @@ def has_overrides(options: dict[str, Any]) -> bool:
     return any(options.get(key) is not None for key in OVERRIDE_FIELDS)
 
 
-def _credential_env() -> str:
-    return "KG_EXTRACT_LLM_API_KEY"
-
-
 def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None = None) -> dict[str, Any]:
-    """Resolve non-secret defaults once at submission, not again on retry."""
+    """Resolve policy and registered service once; no legacy connection fallback."""
     document, revision = registry if registry is not None else registry_snapshot()
     hot = document.get('settings', {})
     def setting(key, default=None):
-        return hot.get(key, config_getenv(key, default))
-    version = options.get("version") or str(setting("KG_EXTRACT_ALGO_VERSION", "latest")).strip().lower()
+        return hot[key] if key in hot else config_getenv(key, default)
+    version = options.get('version') or str(setting('KG_EXTRACT_ALGO_VERSION', 'latest')).strip().lower()
     if version not in SUPPORTED_VERSIONS:
-        raise ValueError("Unsupported extraction version")
-    if version == "jev" and has_overrides(options):
-        raise ValueError("Request configuration overrides do not support jev")
-    package = {"v2.1": "v2_1", "v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
-    defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
-    # Snapshot once: retries retain the submitted configuration.
-    casts = {"BASE_URL": ("base_url", str), "MODEL": ("model", str),
-             "MAX_TOKENS": ("max_tokens", int), "MAX_CONCURRENCY": ("max_concurrency", int),
-             "QPS": ("qps", int), "QPM": ("qpm", int),
-             "TIMEOUT_SECONDS": ("request_timeout", float),
-             "DISABLE_THINKING": ("disable_thinking", lambda v: v.lower() not in {"0", "false", "no"})}
-    for suffix, (field, cast) in casts.items():
-        key = "KG_EXTRACT_LLM_" + suffix
-        if key in hot:
-            defaults[field] = cast(hot[key])
-    provider = options.get("provider") or "default"
+        raise ValueError('Unsupported extraction version')
+    if version == 'jev' and has_overrides(options):
+        raise ValueError('Request configuration overrides do not support jev')
+    package = {'v2.1': 'v2_1', 'v2.2': 'v2_2', 'v3.1': 'v3_1', 'jev': 'v2'}.get(version, version)
+    defaults = importlib.import_module(f'algorithm.knowledge_extract.{package}.config').get_llm_policy()
+    provider = options.get('provider') or 'default'
     routed = resolve_service('extract', registry=document, revision=revision,
-        service_id=provider if provider in document.get('services', {}) else None) if (
-        provider == 'default' or provider in document.get('services', {})) else None
-    if provider == "default" or routed:
-        values = {key: defaults[key] for key in (
-            "base_url", "model", "max_tokens", "request_timeout", "disable_thinking",
-            "max_concurrency", "qps", "qpm",
-        )}
-        values.update(api_key_env=_credential_env(),
-                      quota_group=setting("KG_EXTRACT_LLM_QUOTA_GROUP", "default"),
-                      api_mode="auto", thinking_parameter="thinking")
-        values["max_input_tokens"] = int(setting("KG_EXTRACT_LLM_MAX_INPUT_TOKENS", "65536"))
-        values["max_output_tokens"] = int(setting("KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS") or values["max_tokens"])
-        values["max_tokens"] = values["max_output_tokens"]
-        if values["max_input_tokens"] < 1 or values["max_output_tokens"] < 1:
-            raise ValueError("Token limits must be positive")
-        if routed:
-            values.update(base_url=routed['base_url'], model=routed['model'],
-                          api_key_env=routed['api_key_env'])
-            for field, value in (routed.get('capabilities') or {}).items():
-                if field in {'api_mode', 'thinking_parameter', 'response_format'}:
-                    values[field] = value
-            if routed['kind'] == 'api' and not setting(routed['api_key_env'], '').strip():
-                raise ValueError('Extraction service credential is not configured')
-    else:
-        try:
-            profiles = json.loads(setting("KG_EXTRACT_PROVIDERS_JSON", "{}"))
-            values = ProviderProfile.model_validate(profiles[provider]).model_dump()
-        except Exception:
-            # Pydantic/JSON errors may echo configuration values. Never expose them.
-            raise ValueError("Unknown or invalid extraction provider profile") from None
-        url = urlsplit(values["base_url"])
-        if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password or url.query or url.fragment:
-            raise ValueError("Provider base_url must be an HTTP(S) URL without credentials or query")
-        if not values['api_key_env'] or not setting(values["api_key_env"], "").strip():
-            raise ValueError("Extraction provider credential is not configured")
-    if version == "v3.1":
-        if provider == "default":
-            values["request_timeout"] = float(setting("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
-            values["disable_thinking"] = defaults["disable_thinking"]
-        document_timeout = float(setting("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "900"))
+                             service_id=None if provider == 'default' else provider)
+    if routed is None:
+        raise ValueError('知识抽取未选择已登记的模型服务；请使用 ops 配置抽取用途')
+    values = {key: defaults[key] for key in ('max_tokens', 'request_timeout', 'disable_thinking')}
+    values.update(base_url=routed['base_url'], model=routed['model'], api_key_env=routed['api_key_env'],
+                  quota_group=routed.get('account_id') or routed['service_id'],
+                  api_mode='auto', thinking_parameter='thinking')
+    from docker.api_services import LIMIT_DEFAULTS
+    values.update(routed.get('limits') or LIMIT_DEFAULTS)
+    values['max_input_tokens'] = int(setting('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '65536'))
+    values['max_output_tokens'] = int(setting('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS') or values['max_tokens'])
+    values['max_tokens'] = values['max_output_tokens']
+    capabilities = routed.get('capabilities') or {}
+    if capabilities.get('max_output_tokens'):
+        values['max_tokens'] = values['max_output_tokens'] = min(values['max_output_tokens'], capabilities['max_output_tokens'])
+    if capabilities.get('context_tokens'):
+        available = capabilities['context_tokens'] - values['max_output_tokens']
+        if available < 1:
+            raise ValueError('Registered context leaves no extraction input capacity')
+        values['max_input_tokens'] = min(values['max_input_tokens'], available)
+    for field, value in (routed.get('capabilities') or {}).items():
+        if field in {'api_mode', 'thinking_parameter', 'response_format'}:
+            values[field] = value
+    if routed['kind'] == 'api' and (not routed['api_key_env'] or not setting(routed['api_key_env'], '').strip()):
+        raise ValueError('Extraction service credential is not configured')
+    if version == 'v3.1':
+        values['request_timeout'] = float(setting('KG_EXTRACT_V31_REQUEST_TIMEOUT', '120'))
+        document_timeout = float(setting('KG_EXTRACT_V31_DOCUMENT_TIMEOUT', '900'))
     else:
         document_timeout = None
-    checked = ProviderProfile.model_validate(values)
-    values = checked.model_dump()
-    values.update(version=version, provider=provider, document_timeout=document_timeout)
-    if routed:
-        values.update(model_service=routed['service_id'], config_revision=revision,
-                      credential_required=routed['kind'] == 'api', service_snapshot=routed)
-    for key in ("model", "request_timeout", "document_timeout"):
+    values = ProviderProfile.model_validate(values).model_dump()
+    values.update(version=version, provider=provider, document_timeout=document_timeout,
+                  model_service=routed['service_id'], config_revision=revision,
+                  credential_required=routed['kind']=='api', service_snapshot=routed)
+    for key in ('model', 'request_timeout', 'document_timeout'):
         if options.get(key) is not None:
             values[key] = options[key]
     return values

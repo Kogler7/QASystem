@@ -88,7 +88,7 @@ def main(argv=None):
     parser.add_argument("--adapter",choices=["chat","systemone"],default="chat")
     parser.add_argument("--base-url")
     parser.add_argument("--model")
-    parser.add_argument("--key-env",default="QASYSTEM_JUDGE_API_KEY")
+    parser.add_argument("--key-env",default="DEEPSEEK_API_KEY")
     parser.add_argument("--timeout",type=float,default=60)
     parser.add_argument("--max-tokens",type=int,default=2048)
     parser.add_argument("--repeats",type=int,default=1)

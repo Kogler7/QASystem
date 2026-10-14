@@ -581,8 +581,9 @@ def test_subtask_trace_sink_tags_events() -> None:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def test_streaming_llm_publishes_subtask_field() -> None:
+def test_streaming_llm_publishes_subtask_field(monkeypatch) -> None:
     from agentcode.worker import _StreamingWorkerLLM
+    monkeypatch.setattr('agentcode.worker._load_env', lambda: {'base_url':'https://unit.invalid/v1','timeout_s':120})
 
     llm = _StreamingWorkerLLM(broker=None)
     llm.set_task_id("t1")
@@ -597,8 +598,9 @@ def test_streaming_llm_publishes_subtask_field() -> None:
     llm.close()
 
 
-def test_make_tagged_llm_sets_ids() -> None:
+def test_make_tagged_llm_sets_ids(monkeypatch) -> None:
     from agentcode.worker import _make_tagged_llm
+    monkeypatch.setattr('agentcode.worker._load_env', lambda: {'base_url':'https://unit.invalid/v1','timeout_s':120})
 
     broker = FakeBroker()
     llm = _make_tagged_llm(broker, "t1", "sub-2")

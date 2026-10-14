@@ -86,7 +86,8 @@ class _StreamingLLM(LLMBackend):
         finish_reason = ""
 
         try:
-            with httpx.Client(timeout=self.cfg["timeout_s"]) as client:
+            connection = (self.cfg.get('service_snapshot') or {}).get('connection') or {}
+            with httpx.Client(timeout=self.cfg["timeout_s"], verify=connection.get('ca_bundle') or connection.get('verify_ssl', True)) as client:
                 from external_services.llm.service import model_call
                 with model_call(self.cfg.get('service_snapshot'), payload,
                                 timeout=self.cfg['timeout_s']) as remaining, client.stream("POST", self.url, json=payload, headers=headers, timeout=remaining) as resp:
@@ -375,13 +376,13 @@ def main() -> None:
     args = parser.parse_args()
 
     mcp_path = Path(args.mcp_config) if args.mcp_config else _default_mcp_path()
-    if not mcp_path.is_file():
+    if mcp_path is not None and not mcp_path.is_file():
         _cprint("red", f"✗ MCP 配置文件不存在: {mcp_path}")
-        _cprint("dim", "  设置 AGENT_MCP_CONFIG 环境变量 或 在 tools/mcp_tools/mcp_config.json 放置配置")
+        _cprint("dim", "  使用 --mcp-config 显式指定开发扩展配置；省略时使用内置工具服务")
         sys.exit(1)
 
     try:
-        config = build_config_from_mcp_json(str(mcp_path))
+        config = build_config_from_mcp_json(mcp_path)
     except Exception as exc:
         _cprint("red", f"✗ 加载 MCP 配置失败: {exc}")
         sys.exit(1)

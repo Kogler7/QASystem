@@ -27,25 +27,24 @@ def test_alias_moves_to_standard_without_values_in_conflicts(old, new):
 
 
 def test_editor_proposes_migration_without_touching_original(tmp_path):
-    original = 'KG_EXTRACT_MODEL=test-model\nKG_EXTRACT_API_KEY=secret\n'
+    original = 'KG_EXTRACT_API_URL=http://model.test/v1\nKG_EXTRACT_MODEL=test-model\nKG_EXTRACT_API_KEY=secret\n'
     editor = make_editor(tmp_path, original)
     assert (tmp_path / '.env').read_text() == original
     proposed = editor.pending_payloads()
     env = configure.helper.read_env(proposed[tmp_path / '.env'])
-    settings = json.loads(proposed[editor.directory / 'config.json'])['settings']
-    assert settings['KG_EXTRACT_LLM_MODEL'] == 'test-model'
+    registry = json.loads(proposed[editor.directory / 'config.json'])
+    assert registry['services'][registry['routes']['extract']]['model'] == 'test-model'
     assert env['KG_EXTRACT_LLM_API_KEY'] == 'secret'
-    assert 'KG_EXTRACT_MODEL' not in env
-    assert 'KG_EXTRACT_API_KEY' not in env
-    assert any('迁移：KG_EXTRACT_MODEL' in f['description'] for f in editor.fields)
+    assert 'KG_EXTRACT_MODEL' not in env and 'KG_EXTRACT_API_KEY' not in env
+    assert any('迁移：KG_EXTRACT_API_KEY' in f['description'] for f in editor.fields)
 
 
 def test_alias_conflict_with_canonical_hot_setting_requires_explicit_choice(tmp_path):
     (tmp_path / 'runtime-config').mkdir()
-    (tmp_path / 'runtime-config/config.json').write_text(json.dumps({'settings': {'KG_EXTRACT_LLM_MODEL': 'current'}, 'models': {}}))
-    editor = make_editor(tmp_path, 'KG_EXTRACT_MODEL=legacy\n')
+    (tmp_path / 'runtime-config/config.json').write_text(json.dumps({'settings': {'KG_EXTRACT_LLM_MAX_TOKENS': '64'}, 'models': {}}))
+    editor = make_editor(tmp_path, 'KG_EXTRACT_MAX_TOKENS=32\n')
     assert any('冲突' in e for e in editor.validate())
-    editor.resolved_migrations.add('KG_EXTRACT_LLM_MODEL')
+    editor.resolved_migrations.add('KG_EXTRACT_LLM_MAX_TOKENS')
     assert not any('冲突' in e for e in editor.validate())
 
 

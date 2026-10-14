@@ -76,7 +76,7 @@ def test_reload_cannot_approve_or_restart(project, monkeypatch):
     assert ops.main(['--project-dir', str(root), 'reload']) == 2
     assert commands == []
     assert not (directory / 'approved-config.json').exists()
-    save(project, {'KG_EXTRACT_LLM_MODEL': 'new-model'})
+    save(project, {'KG_EXTRACT_ALGO_VERSION': 'v3'})
     assert ops.main(['--project-dir', str(root), 'reload']) == 0
     assert len(commands) == 2
     assert all('exec' in c and '_probe' in c and 'restart' not in c for c in commands)
@@ -108,7 +108,7 @@ def test_probe_detects_startup_changes_without_disclosing_secrets(project, monke
 
 
 def test_probe_checks_request_configuration_and_reports_only_keys(project, monkeypatch, capsys):
-    save(project, {'KG_EXTRACT_LLM_MODEL': 'private-model-name'})
+    save(project, {'KG_EXTRACT_ALGO_VERSION': 'v2'})
     monkeypatch.setenv('GPU_DEVICE_IDS', '4,5')
     monkeypatch.setenv('SERVICE_API_KEY', 'hidden')
     calls = []
@@ -116,8 +116,8 @@ def test_probe_checks_request_configuration_and_reports_only_keys(project, monke
     assert ops.probe_runtime(*project) == 0
     output = capsys.readouterr().out
     assert calls == [{}]
-    assert 'KG_EXTRACT_LLM_MODEL' in output
-    assert 'private-model-name' not in output and 'hidden' not in output
+    assert 'KG_EXTRACT_ALGO_VERSION' in output
+    assert 'v2' not in output and 'hidden' not in output
 
 
 def test_packaging_delivers_controller():

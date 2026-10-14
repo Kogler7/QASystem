@@ -168,7 +168,7 @@ Chat judge 可配置 `eval.judge_transport_attempts`（1–3，默认 1）。仅
 ### 准备
 
 1. Backend 已启动（默认 `http://127.0.0.1:8006`，MCP 默认 `{backend}/mcp`）。
-2. 默认 LLM-judge 使用 DeepSeek API `deepseek-flash`，需要现有 `DEEPSEEK_API_KEY` 或 `QASYSTEM_JUDGE_API_KEY`。地址和模型按命令行 → 应用裁判设置 → 默认 API 配置读取，不随抽取供应商变化。官方 DeepSeek 不回退到其他供应商的抽取密钥；缺凭据在抽取前报错。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
+2. 默认 LLM-judge 使用 DeepSeek API `deepseek-flash`，需要现有 `DEEPSEEK_API_KEY`，其它服务每轮显式传 `--judge-key-env`。地址和模型按本轮命令行参数 → 官方 DeepSeek API 默认值读取，不随抽取供应商变化。官方 DeepSeek 不回退到其他供应商的抽取密钥；缺凭据在抽取前报错。具体替换方法见下文。只检查链路时显式指定 `--match-mode identity`；`--dry-run` 不调用或要求 judge。
 3. 需要鉴权时设环境变量 `AUTHORIZATION`。
 
 地址通过 `--backend-url` / `--mcp-url` 指定；切片、抽取、存储与裁判参数使用对应 CLI。密钥仅使用环境变量，不放进命令行。
@@ -341,7 +341,7 @@ python3 eval/run.py --stage backend --mode extract \
 **替换抽取模型和裁判模型**
 
 普通评测与快速评测默认裁判为 DeepSeek API `deepseek-flash`，使用 Chat API 按窗口判断候选匹配；语义规则、关系端点上下文、最终一对一匹配和裁判失败门禁继续由统一评分器维护。
-默认 API 地址为 `https://api.deepseek.com/v1`，密钥读取 `QASYSTEM_JUDGE_API_KEY` 或 `DEEPSEEK_API_KEY`。显式选择 Clef 时，地址取 `CLEF_SERVICE_URL` 或 `http://127.0.0.1:8188`。88 的 Clef 当前位于 Compose 内部网络：在同网络容器中用 `http://clef:8188`；宿主机或开发机运行评测时，须指定实际可达的服务地址，不要将未开放的宿主端口当成可用地址。
+默认 API 地址为 `https://api.deepseek.com/v1`，密钥读取 `DEEPSEEK_API_KEY`；其它服务每轮显式传 `--judge-key-env`。显式选择 Clef 时，地址取 `CLEF_SERVICE_URL` 或 `http://127.0.0.1:8188`。88 的 Clef 当前位于 Compose 内部网络：在同网络容器中用 `http://clef:8188`；宿主机或开发机运行评测时，须指定实际可达的服务地址，不要将未开放的宿主端口当成可用地址。
 
 抽取模型和裁判独立配置。例如使用已在 Backend 注册的供应商与模型，并切换到 API 裁判：
 
@@ -349,7 +349,7 @@ python3 eval/run.py --stage backend --mode extract \
 python3 eval/run.py --stage backend --mode extract --from-run <冻结切片批次> \
   --extract-version v3 --extract-provider siliconflow --extract-model deepseek-ai/DeepSeek-V4-Flash \
   --judge-adapter chat --judge-model deepseek-flash --judge-base-url https://api.deepseek.com/v1 \
-  --judge-key-env QASYSTEM_JUDGE_API_KEY --case-attempts 1
+  --judge-key-env DEEPSEEK_API_KEY --case-attempts 1
 ```
 
 换 Clef 裁判用 `--judge-adapter systemone --judge-model clef-flash --judge-base-url <Clef地址>`。参数优先级：命令行 > 应用裁判配置 > 默认 API 配置；密钥仅从环境变量读取。官方 DeepSeek 用 `DEEPSEEK_API_KEY`，其他 Chat 可兼容抽取 API key。抽取的 provider 必须预先在 Backend 配置，不从评测命令传入供应商密钥或地址。

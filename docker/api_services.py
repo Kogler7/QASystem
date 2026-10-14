@@ -7,15 +7,25 @@ from copy import deepcopy
 
 LIMIT_FIELDS = ('max_concurrency', 'qps', 'qpm')
 CAPABILITY_FIELDS = ('context_tokens', 'max_output_tokens', 'thinking_parameter', 'api_mode', 'response_format')
+CONNECTION_FIELDS = ('verify_ssl', 'ca_bundle', 'timeout_seconds')
 LIMIT_DEFAULTS = {'max_concurrency': 4, 'qps': 0, 'qpm': 0}
+LEGACY_CREDENTIAL_REFERENCES = {'extract':'KG_EXTRACT_LLM_API_KEY',
+    'graph':'GRAPH_LLM_API_KEY', 'agent':'AGENT_LLM_API_KEY'}
+CREDENTIAL_REFERENCE_KEYS = tuple(LEGACY_CREDENTIAL_REFERENCES.values()) + ('SILICONFLOW_API_KEY', 'DEEPSEEK_API_KEY')
 API_REGISTRY_CONTRACT = {
-    'service_fields': ['kind', 'model', 'base_url', 'adapter', 'api_key_env', 'capabilities', 'limits', 'account_id'],
+    'service_fields': ['kind', 'model', 'base_url', 'adapter', 'api_key_env', 'capabilities', 'limits', 'account_id', 'connection', 'enabled'],
+    'connection_fields': list(CONNECTION_FIELDS), 'connection_defaults': {'verify_ssl': True},
     'account_fields': list(LIMIT_FIELDS), 'capability_fields': list(CAPABILITY_FIELDS),
     'limit_defaults': LIMIT_DEFAULTS, 'routes': ['extract', 'graph', 'agent', 'entity_count'],
     'capability_defaults': {}, 'credential_storage': 'reference-only',
     'scheduler': 'internal-redis-fifo-service-and-account', 'hot_reload': 'new-request-snapshot',
+    'credential_references': list(CREDENTIAL_REFERENCE_KEYS),
 }
 SERVICE_DESCRIPTIONS = {
+    'enabled': '是否允许新请求使用服务；关闭仍保留记录，已引用用途必须先调整。',
+    'verify_ssl': '验证远程服务TLS证书，默认开启；自签证书建议填写可信CA。',
+    'ca_bundle': '可信CA证书文件路径，需要在调用进程所在环境中可读；不存证书私钥。',
+    'timeout_seconds': '一次HTTP通信最长等待秒数，与算法任务总预算分开。',
     'base_url': 'OpenAI兼容API地址，不允许URL携带用户名、密码、查询参数或片段。',
     'model': '供应商提供的模型名称；本地服务引用已登记的模型记录。',
     'api_key_env': '已声明的凭据变量名；这里只保存引用，不填写密钥。',
@@ -28,11 +38,13 @@ SERVICE_DESCRIPTIONS = {
 }
 API_REGISTRY_CONTRACT['descriptions'] = SERVICE_DESCRIPTIONS
 FIELD_LABELS = {
+    'enabled': '允许调用',
     'base_url': 'API 地址', 'model': '模型名称', 'api_key_env': '凭据变量引用',
     'account_id': '共享账号', 'context_tokens': '上下文上限', 'max_output_tokens': '输出上限',
     'max_concurrency': '同时请求上限', 'qps': '每秒请求上限', 'qpm': '每分钟请求上限',
     'thinking_parameter': '思考参数协议', 'api_mode': '调用协议', 'response_format': '格式协议',
     'service': '选择服务', 'delete': '删除记录', 'create': '添加记录',
+    'verify_ssl': '验证TLS证书', 'ca_bundle': '可信CA文件', 'timeout_seconds': '通信等待上限（秒）',
 }
 
 
@@ -47,11 +59,11 @@ def ui_rows(config):
     rows.append(row('新增服务', '', 'create', 'Enter 添加 LLM API'))
     rows.append(row('新增账号', '', 'create', 'Enter 添加共享账号额度'))
     for name, service in config.services.items():
-        for key in ('model', 'base_url', 'api_key_env', 'account_id'):
+        for key in ('enabled', 'model', 'base_url', 'api_key_env', 'account_id'):
             if key == 'base_url' and service.get('kind') != 'api':
                 continue
-            rows.append(row('服务', name, key, service.get(key, '')))
-        for group, fields in (('limits', LIMIT_FIELDS), ('capabilities', CAPABILITY_FIELDS)):
+            rows.append(row('服务', name, key, service.get(key, True if key=='enabled' else '')))
+        for group, fields in (('limits', LIMIT_FIELDS), ('capabilities', CAPABILITY_FIELDS), ('connection', CONNECTION_FIELDS)):
             for key in fields:
                 rows.append(row('服务', name, key, service.get(group, {}).get(key), (group,)))
         rows.append(row('服务', name, 'delete', 'Enter 删除（检查引用）'))
@@ -99,6 +111,14 @@ def edit_field(config, row, screen=None, *, prompt=input):
     for part in row.get('path', ()):
         target = target.setdefault(part, {})
     numeric = field in LIMIT_FIELDS or field in {'context_tokens', 'max_output_tokens'}
+    if field in {'verify_ssl', 'enabled'}:
+        if value.lower() not in {'true','false','1','0'}:
+            raise ValueError('TLS验证请选择true/false')
+        target[field] = value.lower() in {'true','1'}
+        return
+    if field == 'timeout_seconds':
+        target[field] = float(value)
+        return
     if not value and row.get('path') == ('capabilities',):
         target.pop(field, None)
     else:
@@ -155,13 +175,19 @@ def migrate_api_services(env, services, accounts, routes):
         selected = routes.get(purpose)
         name = selected or 'migrated-'+purpose
         proposal = {'kind': 'api', 'adapter': 'chat', 'base_url': env.get(prefix+'BASE_URL', ''),
-                    'model': env.get(prefix+'MODEL', ''), 'api_key_env': prefix+'API_KEY'}
+                    'model': env.get(prefix+'MODEL', ''), 'api_key_env': LEGACY_CREDENTIAL_REFERENCES[purpose]}
         if purpose == 'extract':
             proposal['limits'] = {k: int(env.get(prefix+{'max_concurrency':'MAX_CONCURRENCY','qps':'QPS','qpm':'QPM'}[k], 4 if k == 'max_concurrency' else 0)) for k in LIMIT_FIELDS}
             group = env.get(prefix+'QUOTA_GROUP')
             if group:
                 proposal['account_id'] = group
                 accounts.setdefault(group, deepcopy(proposal['limits']))
+        if purpose == 'graph':
+            proposal['connection'] = {}
+            if 'GRAPH_LLM_VERIFY_SSL' in env:
+                proposal['connection']['verify_ssl'] = env['GRAPH_LLM_VERIFY_SSL'].lower() not in {'false','0','no','off'}
+            if env.get('GRAPH_LLM_TIMEOUT_SECONDS'):
+                proposal['connection']['timeout_seconds'] = float(env['GRAPH_LLM_TIMEOUT_SECONDS'])
         # Registered local routing is authoritative; show the old conflicting
         # endpoint for review, never convert a local model into a remote API.
         merge(name, proposal)
@@ -187,6 +213,18 @@ def validate_api_registry(services, accounts, routes):
             raise ValueError('账号必须有稳定名称')
         validate_limits(limits, required=True)
     for service in services.values():
+        if 'enabled' in service and type(service['enabled']) is not bool:
+            raise ValueError('服务调用开关必须是布尔值')
+        connection = service.get('connection', {})
+        if not isinstance(connection, dict) or set(connection) - set(CONNECTION_FIELDS):
+            raise ValueError('无效的服务连接参数')
+        if 'verify_ssl' in connection and type(connection['verify_ssl']) is not bool:
+            raise ValueError('TLS证书验证必须是开关')
+        if 'ca_bundle' in connection and not isinstance(connection['ca_bundle'], str):
+            raise ValueError('可信CA文件必须是路径')
+        timeout = connection.get('timeout_seconds')
+        if timeout is not None and (type(timeout) not in {int,float} or not math.isfinite(timeout) or timeout <= 0):
+            raise ValueError('通信等待上限必须是正数')
         if 'limits' in service:
             validate_limits(service['limits'], required=True)
         account = service.get('account_id')

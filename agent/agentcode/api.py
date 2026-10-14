@@ -116,7 +116,7 @@ def _start_workers() -> None:
     if api_workers > 1 and not task_store.is_distributed():
         raise RuntimeError("Redis is required when AGENT_API_WORKERS > 1")
 
-    mcp_path = str(_default_mcp_path())
+    mcp_path = _default_mcp_path()
     logger.info("API worker: 初始化 MCP 路径=%s", mcp_path)
 
     # ── 创建 ToolManager 连接池 ──
@@ -202,13 +202,7 @@ _USER_CONTEXT_HEADERS = {
 
 def _request_data(req: QueryRequest) -> dict[str, Any]:
     if req.mcp_config_path:
-        requested = Path(req.mcp_config_path).resolve()
-        configured = _default_mcp_path().resolve()
-        if requested != configured:
-            raise HTTPException(
-                400,
-                "per-request mcp_config_path is unsupported; configure AGENT_MCP_CONFIG at service startup",
-            )
+        raise HTTPException(400, "per-request mcp_config_path is unsupported; HTTP uses built-in tools, CLI extensions use --mcp-config")
     data = req.model_dump(exclude={"mcp_config_path"})
     return {key: value for key, value in data.items() if key.lower() not in _SENSITIVE_REQUEST_KEYS}
 

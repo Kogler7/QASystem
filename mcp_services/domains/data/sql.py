@@ -10,9 +10,9 @@ from mcp_services.dispatch import maybe_submit
 def _executor(database_url: str | None = None, *, read_only: bool = True):
     from algorithm.data_access.sql import SQLExecutor
 
-    url = database_url or config_getenv("MCP_DATABASE_URL") or config_getenv("DATABASE_URL", "")
+    url = database_url or config_getenv("DATABASE_URL", "")
     if not url:
-        raise ValueError("未配置 MCP_DATABASE_URL 或 DATABASE_URL")
+        raise ValueError("未配置关系型 SQL 数据库连接 DATABASE_URL")
     return SQLExecutor(url, read_only=read_only)
 
 

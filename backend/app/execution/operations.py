@@ -343,7 +343,15 @@ def _mcp_draw_chart(payload: dict[str, Any]) -> dict[str, Any]:
         return _draw(method, arguments)
 
 
+def _term_vector_query(payload):
+    from external_services.application import ApplicationServiceClient, get_user_headers, ExternalCapabilityUnavailable
+    if not get_user_headers().get("authorization"):
+        raise ExternalCapabilityUnavailable("graph.cypher.query", "术语索引查询缺少用户授权上下文")
+    return ApplicationServiceClient().execute_cypher(payload["statement"], payload.get("parameters") or {})
+
+
 _OPERATIONS = {
+    "term_vector.query": _term_vector_query,
     "document.parse": _parse_document,
     "document.parse.shard": _parse_document_shard,
     "document.chunk": _chunk_document,

@@ -1,7 +1,7 @@
 """SQL 执行工具——原样搬运自旧 MCP data/sql.py（该域唯一活跃工具 execute_sql）。
 
 agent-mcp 容器不挂 mcp_services 卷，不走统一执行队列（maybe_submit），
-直接同步调用 algorithm.data_access.sql.SQLExecutor；连接串取 MCP_DATABASE_URL / DATABASE_URL
+直接同步调用 algorithm.data_access.sql.SQLExecutor；关系型 SQL 连接串取 DATABASE_URL
 （.env 已配置，host.docker.internal 经 extra_hosts 可达）。
 """
 from docker.configuration import getenv as config_getenv
@@ -15,9 +15,9 @@ from agent_mcp.runtime import mcp
 def _executor(database_url: str | None = None, *, read_only: bool = True):
     from algorithm.data_access.sql import SQLExecutor
 
-    url = database_url or config_getenv("MCP_DATABASE_URL") or config_getenv("DATABASE_URL", "")
+    url = database_url or config_getenv("DATABASE_URL", "")
     if not url:
-        raise ValueError("未配置 MCP_DATABASE_URL 或 DATABASE_URL")
+        raise ValueError("未配置关系型 SQL 数据库连接 DATABASE_URL")
     return SQLExecutor(url, read_only=read_only)
 
 

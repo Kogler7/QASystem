@@ -65,12 +65,13 @@ class ProviderConfig:
                 match = re.search(pattern, text, flags=re.IGNORECASE)
                 if match:
                     values[name] = match.group(1).rstrip(',')
-        for name, variable in [('base_url','KG_EXTRACT_LLM_BASE_URL'), ('model','KG_EXTRACT_LLM_MODEL'), ('api_key','KG_EXTRACT_LLM_API_KEY')]:
-            if config_getenv(variable):
-                values[name] = config_required(variable)
+        if not values:
+            from external_services.llm.service import resolve_chat_service
+            service, credential = resolve_chat_service('extract', required=True)
+            values.update(base_url=service['base_url'], model=service['model'], api_key=credential)
         config = cls(**values)
         if not config.api_key:
-            raise ValueError('V3 API key missing: configure eval_api.md or KG_EXTRACT_LLM_API_KEY')
+            raise ValueError('JEV 抽取服务凭据未配置；请在 ops 登记服务引用')
         return config
 
     def safe_dict(self) -> dict:

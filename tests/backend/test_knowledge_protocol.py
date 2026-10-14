@@ -139,7 +139,7 @@ def test_v1_all_failed_extraction_returns_error_and_failed_execution(protocol_mo
     from backend.app.services import algorithm_capabilities
 
     store = MemoryExecutionStore()
-    manager = ExecutionManager(store=store, hub=ExecutionEventHub(store), artifacts=ArtifactStore(tmp_path))
+    manager = ExecutionManager(store=store, hub=ExecutionEventHub(store), artifacts=ArtifactStore(tmp_path), mode='inline')
     monkeypatch.setattr(api, "get_execution_manager", lambda: manager)
     monkeypatch.delenv("KG_EXTRACT_STRICT_CHUNK_FAILURES", raising=False)
     monkeypatch.setattr(algorithm_capabilities, "extract_chunks", lambda **_kwargs: [{

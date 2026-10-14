@@ -132,7 +132,22 @@ class Configuration:
         self.directory.chmod(0o700)
         hot = self.input_directory / "config.json"
         document = read_document(hot, migration=True)
+        # Preserve recognized retirement inputs for the UI proposal, before the
+        # runtime reader filters them out. Canonical config.json remains the
+        # sole source; never overlay a stale settings.json when it exists.
+        from docker.configuration import declarations
+        migration_source = hot if hot.is_file() else self.input_directory / 'settings.json'
+        raw_settings = {}
+        if migration_source.is_file():
+            raw = json.loads(migration_source.read_text(encoding='utf-8-sig'))
+            candidate = raw.get('settings', {}) if migration_source == hot else raw
+            if isinstance(candidate, dict):
+                raw_settings = {key: value for key, value in candidate.items()
+                                if key in declarations().get('retired', [])}
+        migration_values, legacy_alias_conflicts = migrate({
+            **helper.read_env(self.original), **raw_settings, **document['settings']})
         original_values, self.migration_conflicts = migrate({**helper.read_env(self.original), **document['settings']})
+        self.migration_conflicts.update(legacy_alias_conflicts)
         self.migration_conflicts.update({key: old for key, old in duplicate_conflicts(self.original).items()
                                          if key in helper.read_env(self.template)})
         self.values.update(original_values)
@@ -151,12 +166,12 @@ class Configuration:
         self.migration_conflicts.update(model_conflicts)
         from docker.config_migrations import migrate_inference
         self.models, self.services, self.routes, conflicts = migrate_inference(
-            {**helper.read_env(self.original), **document['settings']}, self.models, document['services'], document['routes'])
+            migration_values, self.models, document['services'], document['routes'])
         self.migration_conflicts.update(conflicts)
         self.accounts = document.get('accounts', {})
         from docker.api_services import migrate_api_services
         self.services, self.accounts, self.routes, api_conflicts = migrate_api_services(
-            {**helper.read_env(self.original), **document['settings']}, self.services, self.accounts, self.routes)
+            migration_values, self.services, self.accounts, self.routes)
         self.migration_conflicts.update(api_conflicts)
         known = {m['repo'] for m in self.catalog}
         from docker.model_services import BUILTIN_MODELS
@@ -291,6 +306,7 @@ class Configuration:
         return (self.root / path).resolve() if not path.is_absolute() else path.resolve()
 
     def rows(self, query: str = "") -> list[dict]:
+        from docker.configuration import declarations
         rows = []
         for container in self.live:
             status = {'running': '运行中', 'exited': '已停止', 'created': '未启动', 'restarting': '重启中'}.get(container['status'], container['status'])
@@ -323,6 +339,10 @@ class Configuration:
                 rows.append(dict(kind='migration_review', key=conflict, label=conflict,
                     display_name='[迁移冲突] ' + conflict, display_value='需人工选择',
                     description='登记记录与旧配置不同；Enter 选择保留当前或迁移旧值，不自动覆盖。'))
+            elif conflict in declarations().get('retired', []) and conflict not in self.resolved_migrations:
+                rows.append(dict(kind='retirement_review', key=conflict, label=conflict,
+                    display_name='[迁移冲突] ' + conflict, display_value='需核对服务提案',
+                    description='旧别名取值不同。请先编辑服务提案，再回车确认这些旧入口退役；不自动覆盖服务。'))
         for field in self.fields:
             if field["key"] in LEGACY_MODEL_KEYS: continue
             value = self.values.get(field["key"], "")
@@ -729,8 +749,15 @@ def _ui(config: Configuration) -> None:
                             else: config.services[name][field] = deepcopy(details['legacy'])
                     config.resolved_migrations.add(conflict)
                     continue
+                if row['kind'] == 'retirement_review':
+                    if input('已核对对应服务提案，输入 reviewed 确认旧入口退役: ').strip() == 'reviewed':
+                        config.resolved_migrations.add(row['key'])
+                    continue
                 if row['kind'] == 'api_registry':
-                    if key != ' ':
+                    if key == ' ' and row['registry_kind'] == '服务' and row['key'] == 'enabled':
+                        record = config.services[row['record_id']]
+                        record['enabled'] = not record.get('enabled', True)
+                    elif key != ' ':
                         from docker.api_services import edit_field
                         edit_field(config, row, screen)
                     continue

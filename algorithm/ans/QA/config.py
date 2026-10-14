@@ -27,14 +27,15 @@ class Config:
     """项目配置类"""
 
     # ===== LLM 配置 =====
-    GRAPH_LLM_MODEL: str = "Qwen/Qwen3-8B"
+    GRAPH_LLM_MODEL: str = ""
     GRAPH_LLM_API_KEY: str = ""
 
     @classmethod
     def from_env(cls):
         """从环境变量加载配置"""
-        llm_model = config_getenv("GRAPH_LLM_MODEL") or cls.GRAPH_LLM_MODEL
-        llm_api_key = config_getenv("GRAPH_LLM_API_KEY") or cls.GRAPH_LLM_API_KEY
+        from external_services.llm.service import resolve_chat_service
+        service, llm_api_key = resolve_chat_service('graph', required=True)
+        llm_model = service['model']
         return cls(
             GRAPH_LLM_MODEL=llm_model,
             GRAPH_LLM_API_KEY=llm_api_key,

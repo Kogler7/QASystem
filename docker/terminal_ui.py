@@ -61,7 +61,7 @@ def item_line(row: dict, cells: int, selected: bool = False) -> str:
 
 def section(row: dict) -> str:
     if row['kind'] == 'runtime': return '运行'
-    if row['kind'] in {'registry', 'api_registry', 'migration_review'}: return '服务'
+    if row['kind'] in {'registry', 'api_registry', 'migration_review', 'retirement_review'}: return '服务'
     if row["kind"] == "model" or row["key"].startswith("LLM_"): return "模型"
     key = row["key"]
     if key.startswith("QASYSTEM_JUDGE_"): return "裁判"
@@ -87,7 +87,7 @@ def detail(row: dict | None, config) -> list[str]:
                 '模型: ' + (c['model'] or '应用服务'), 'GPU: ' + c['gpu'], '宿主端口: ' + c['host_ports'],
                 '上下文: ' + (c['context'] or '未声明'), '', '只读展示 Docker 实际配置。',
                 '按 r 刷新；这里不修改外部服务。', '参数以实际运行容器为准。']
-    if row['kind'] in {'api_registry', 'migration_review'}:
+    if row['kind'] in {'api_registry', 'migration_review', 'retirement_review'}:
         return [row['display_name'], '', row.get('description', ''), '', '配置计划: ' + row['display_value'], '', 'Enter 编辑单个字段；保存需逐页审核。', '服务登记不启动本地模型；功能只引用服务。']
     if row['kind'] == 'registry': return [row['display_name'], '', row['description'], '', row['display_value'], '', '回车编辑JSON；保存需要逐页审核。', '', 'API登记不会启动本地进程。']
     if row["kind"] == "model":
@@ -162,7 +162,7 @@ def render(config, rows: list[dict], index: int, selected: str, query: str, noti
                        f"GPU: {c['gpu']}    宿主端口: {c['host_ports']}",
                        '上下文: ' + (c['context'] or '未声明'), '镜像: ' + c['image']]
         else:
-            compact = details if current and current["kind"] in {'model', 'api_registry', 'migration_review'} else (
+            compact = details if current and current["kind"] in {'model', 'api_registry', 'migration_review', 'retirement_review'} else (
                 [details[i] for i in (0, 2, 3, 4, 6, 8) if i < len(details)] if current else details)
         text = [part for item in compact for part in wrap(item, cells - 2)]
         output += [full(" " + (text[i] if i < len(text) else ""), "muted") for i in range(6)]

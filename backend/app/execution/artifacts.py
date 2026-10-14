@@ -1,5 +1,5 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from docker.startup_contract import execution_data_directory
 
 import json
 import os
@@ -16,8 +16,7 @@ class ArtifactStore:
     """
 
     def __init__(self, root: str | os.PathLike[str] | None = None):
-        configured = root or config_getenv("EXECUTION_DATA_DIR")
-        self.root = Path(configured or (Path.cwd() / "data" / "execution"))
+        self.root = Path(root) if root is not None else execution_data_directory()
         self.payloads = self.root / "payloads"
         self.results = self.root / "results"
         self.blobs = self.root / "blobs"

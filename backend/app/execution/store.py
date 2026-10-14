@@ -1,5 +1,6 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
+from docker.startup_contract import internal_redis_url, EXECUTION_TOPOLOGY
 
 import json
 import os
@@ -288,7 +289,6 @@ class RedisExecutionStore:
             self.redis.delete(self._auth_context_key(auth_context_id))
 
 
-_MEMORY_STORE = MemoryExecutionStore()
 _STORE_LOCK = threading.Lock()
 _STORE: MemoryExecutionStore | RedisExecutionStore | None = None
 _STORE_KEY: str | None = None
@@ -296,14 +296,11 @@ _STORE_KEY: str | None = None
 
 def get_execution_store() -> MemoryExecutionStore | RedisExecutionStore:
     global _STORE, _STORE_KEY
-    url = config_getenv("EXECUTION_REDIS_URL", "").strip()
-    key = url or "memory"
+    url = internal_redis_url(EXECUTION_TOPOLOGY['redis_database'])
+    key = url
     with _STORE_LOCK:
         if _STORE is not None and _STORE_KEY == key:
             return _STORE
-        if url:
-            _STORE = RedisExecutionStore(url)
-        else:
-            _STORE = _MEMORY_STORE
+        _STORE = RedisExecutionStore(url)
         _STORE_KEY = key
         return _STORE

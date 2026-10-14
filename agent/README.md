@@ -109,25 +109,15 @@ $env:PYTHONPATH = "$PWD"
 python -m agentcode.api --host 127.0.0.1 --port 9180
 ```
 
-默认 MCP 配置位于：
+内置 MCP 连接由启动拓扑自动生成：容器内连接 `http://agent-mcp:9181/mcp`，本地开发连接 `http://127.0.0.1:9181/mcp`。本地先运行 `python -m agent_mcp`，不再填写 AGENT_MCP_URL/HOST/PORT/CONFIG。
 
-```text
-agent/agentcode/tools/mcp_tools/mcp_config.json
-```
-
-当前默认连接容器网络内的 agent-mcp（`http://agent-mcp:9181/mcp`）。本地开发时该主机名不可解析，需先在本地起 agent-mcp（`python -m agent_mcp`）并覆盖：
+独立 CLI 仍可显式加载外部 HTTP、SSE、stdio 或多个 MCP 服务：
 
 ```bash
-export AGENT_MCP_URL=http://127.0.0.1:9181/mcp
+python -m agentcode.cli --mcp-config /absolute/path/external-tools.json
 ```
 
-也可以指定另一份配置：
-
-```bash
-AGENT_MCP_CONFIG=/absolute/path/to/mcp_config.json
-```
-
-MCP 连接池在服务启动时建立，工具表在启动时拉取；修改 `AGENT_MCP_URL` 或 MCP 代码后必须 recreate 容器（restart 不会重读 .env）。
+HTTP Agent 固定使用内置工具，不接受请求上传任意配置文件路径。外部工具的 ops 注册 UI 尚未实现，不能在当前界面勾选外部 MCP 服务。连接池与工具表在启动时建立，修改工具实现后重启相应服务。
 
 ## 工具服务与鉴权透传
 
@@ -233,13 +223,11 @@ result = runtime.run_session(
 
 ## 常用配置
 
+模型地址与名称通过 `ops config` 的服务登记维护，然后给 Agent 用途选择服务。缺少路由时任务明确失败；不再从旧 AGENT_LLM_BASE_URL / MODEL 自动回退。服务及账号限额由内部 Redis 跨进程共同执行，摘要默认使用同一登记服务。
+
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `AGENT_MCP_URL` | mcp_config.json 中的地址 | 单 MCP 服务器时覆盖其 URL（容器内为 `http://agent-mcp:9181/mcp`） |
-| `AGENT_MCP_CONFIG` | `agent/agentcode/tools/mcp_tools/mcp_config.json` | MCP 配置文件绝对路径 |
-| `AGENT_LLM_BASE_URL` | `http://localhost:9999` | OpenAI 兼容 API 根地址 |
 | `AGENT_LLM_API_KEY` | 空 | 模型 API Key |
-| `AGENT_LLM_MODEL` | `Qwen/Qwen3-8B` | 模型名 |
 | `AGENT_TEMPLATE_TIMEOUT_SECONDS` | `120` | 单次模型请求超时 |
 | `AGENT_WORKER_CONCURRENCY` | `4` | 每个 API 进程的 Worker 线程数 |
 | `AGENT_DECOMPOSITION_ENABLED` | `1` | 问题分解开关；`0` 时所有任务走直连路径 |

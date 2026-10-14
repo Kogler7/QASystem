@@ -29,6 +29,8 @@ def resolve_service(
     service = services.get(selected)
     if not isinstance(service, dict):
         raise ModelRouteError('模型服务路由指向未登记服务')
+    if service.get('enabled', True) is not True:
+        raise ModelRouteError('模型服务路由指向已关闭服务')
     kind = service.get('kind')
     if kind == 'local':
         model_id = service.get('model')
@@ -62,6 +64,7 @@ def resolve_service(
         'capabilities': capabilities,
         'limits': service.get('limits', {}),
         'account_id': service.get('account_id', ''),
+        'connection': service.get('connection', {}),
     }
     if snapshot['account_id']:
         account = registry.get('accounts', {}).get(snapshot['account_id'])
