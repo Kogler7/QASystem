@@ -154,7 +154,7 @@ def test_observation_revision_is_bound_to_the_read_hot_snapshot(monkeypatch):
 
 def test_public_extraction_error_redacts_undeclared_provider_configuration(monkeypatch):
     from backend.app.services import extraction_config
-    def fail(_):
+    def fail(_, **kwargs):
         raise configuration.UndeclaredConfigurationError('private config details')
     monkeypatch.setattr(extraction_config, 'resolve_config', fail)
     with pytest.raises(extraction_config.ExtractionConfigurationError) as error:

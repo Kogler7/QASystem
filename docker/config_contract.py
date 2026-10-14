@@ -85,6 +85,12 @@ def check(root, *, deployed=False):
             errors.append('模型配置迁移规则与当前版本声明不一致')
         if catalog.get('fixed_contracts') != {'process_environment': PROCESS_ENVIRONMENT, 'runtime_directory': RUNTIME_DIRECTORY_NAME}:
             errors.append('固定启动约定变化，必须登记配置声明新版本')
+        if 'inference_contract' in catalog:
+            from docker.model_services import REGISTRY_CONTRACT
+            from docker.config_migrations import NATIVE_STARTUP_KEYS, WORKER_STARTUP_KEYS
+            actual = {**REGISTRY_CONTRACT, 'native_migration': sorted(NATIVE_STARTUP_KEYS), 'worker_migration': sorted(WORKER_STARTUP_KEYS)}
+            if catalog['inference_contract'] != actual:
+                errors.append('模型引擎/记录/迁移契约变化，必须登记配置声明新版本')
     for key, item in catalog['items'].items():
         if item.get('mode') != ('hot' if key in HOT_KEYS else 'startup'):
             errors.append(f'{key} 热更新属性与实际读取规则不一致')

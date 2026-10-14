@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.1",
+  "version": "2026.10.14.3",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -8,8 +8,22 @@
   "retired": [
     "AGENT_MEMORY_LIMIT",
     "BACKEND_MEMORY_LIMIT",
+    "CLEF_BIND",
+    "CLEF_CPU_THREADS",
+    "CLEF_CUDA_VISIBLE_DEVICES",
+    "CLEF_DEVICE",
+    "CLEF_DTYPE",
+    "CLEF_MAX_LENGTH",
+    "CLEF_MAX_OPTIONS",
+    "CLEF_MAX_QUESTIONS",
+    "CLEF_MAX_QUEUE_SIZE",
+    "CLEF_MAX_REQUEST_BYTES",
+    "CLEF_MAX_TOTAL_OPTIONS",
+    "CLEF_MODEL_DIR",
+    "CLEF_PORT",
     "CLEF_PYTHON",
     "CLEF_SOURCE_DIR",
+    "COMPOSE_PROFILES",
     "CONFIDENCE_SBERT_MODEL_PATH",
     "DOCUMENT_PARSE_MAX_CONCURRENCY",
     "DOCUMENT_PARSE_MAX_FILE_MB",
@@ -52,6 +66,19 @@
     "LLM_MAX_NUM_SEQS",
     "LLM_MODEL_DIR",
     "LLM_SERVED_MODEL_NAME",
+    "NANOJEV_BIND",
+    "NANOJEV_CPU_THREADS",
+    "NANOJEV_CUDA_VISIBLE_DEVICES",
+    "NANOJEV_DEVICE",
+    "NANOJEV_DTYPE",
+    "NANOJEV_MAX_LENGTH",
+    "NANOJEV_MAX_OPTIONS",
+    "NANOJEV_MAX_QUESTIONS",
+    "NANOJEV_MAX_QUEUE_SIZE",
+    "NANOJEV_MAX_REQUEST_BYTES",
+    "NANOJEV_MAX_TOTAL_OPTIONS",
+    "NANOJEV_MODEL_DIR",
+    "NANOJEV_PORT",
     "NANOJEV_REVISION",
     "NL2CYPHER_EMBEDDING_MODEL_PATH",
     "PYTHONPATH",
@@ -66,7 +93,14 @@
     "QASYSTEM_RUNTIME_SETTINGS_FILE",
     "REDIS_MEMORY_LIMIT",
     "SOFFICE_PATH",
-    "VLLM_MODEL_VERSION"
+    "VLLM_BASE_PORT",
+    "VLLM_ENABLED",
+    "VLLM_EXTRA_ARGS",
+    "VLLM_GPU_MEMORY_UTILIZATION",
+    "VLLM_MAX_NUM_SEQS",
+    "VLLM_MODEL_PATH",
+    "VLLM_MODEL_VERSION",
+    "VLLM_SERVED_MODEL_NAME"
   ],
   "items": {
     "BACKEND_BIND": {
@@ -235,19 +269,6 @@
         {
           "path": "backend/app/execution/resources.py",
           "expression": "None"
-        }
-      ]
-    },
-    "COMPOSE_PROFILES": {
-      "desc": "部署参数 COMPOSE_PROFILES",
-      "default": "decisions",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "profiles:"
         }
       ]
     },
@@ -3276,11 +3297,6 @@
       "mode": "hot",
       "consumers": [
         {
-          "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "kind": "read",
-          "token": "CLEF_SERVICE_URL"
-        },
-        {
           "path": "eval/run.py",
           "kind": "external",
           "token": "CLEF_SERVICE_URL"
@@ -3370,217 +3386,6 @@
         }
       ]
     },
-    "CLEF_MODEL_DIR": {
-      "desc": "以下两项仅供旧宿主 systemd 服务使用；Compose 使用 /app 和镜像内 venv。",
-      "default": "/models/clef-flash",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "model_dir"
-        }
-      ]
-    },
-    "CLEF_BIND": {
-      "desc": "部署参数 CLEF_BIND",
-      "default": "0.0.0.0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/__main__.py",
-          "kind": "read",
-          "token": "CLEF_BIND"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "clef_service/__main__.py",
-          "expression": "'127.0.0.1'"
-        }
-      ]
-    },
-    "CLEF_PORT": {
-      "desc": "部署参数 CLEF_PORT",
-      "default": "8188",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/__main__.py",
-          "kind": "read",
-          "token": "CLEF_PORT"
-        },
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "CLEF_PORT"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "CLEF_PORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "clef_service/__main__.py",
-          "expression": "'8188'"
-        }
-      ]
-    },
-    "CLEF_CUDA_VISIBLE_DEVICES": {
-      "desc": "A40 默认与 NanoJev 共用 7 卡；3090 请分卡。同步设置 EXECUTION_GPU_RESERVED_DEVICE_IDS。",
-      "default": "7",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "read",
-          "token": "CLEF_CUDA_VISIBLE_DEVICES"
-        },
-        {
-          "path": "clef_service/__main__.py",
-          "kind": "read",
-          "token": "CLEF_CUDA_VISIBLE_DEVICES"
-        },
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "CLEF_CUDA_VISIBLE_DEVICES"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "CLEF_CUDA_VISIBLE_DEVICES"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "clef_service/app.py",
-          "expression": "None"
-        },
-        {
-          "path": "clef_service/app.py",
-          "expression": "None"
-        },
-        {
-          "path": "clef_service/__main__.py",
-          "expression": "None"
-        },
-        {
-          "path": "clef_service/__main__.py",
-          "expression": "None"
-        }
-      ]
-    },
-    "CLEF_DEVICE": {
-      "desc": "部署参数 CLEF_DEVICE",
-      "default": "cuda:0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "device"
-        }
-      ]
-    },
-    "CLEF_DTYPE": {
-      "desc": "部署参数 CLEF_DTYPE",
-      "default": "bfloat16",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "dtype"
-        }
-      ]
-    },
-    "CLEF_MAX_LENGTH": {
-      "desc": "部署参数 CLEF_MAX_LENGTH",
-      "default": "8192",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_length"
-        }
-      ]
-    },
-    "CLEF_MAX_REQUEST_BYTES": {
-      "desc": "部署参数 CLEF_MAX_REQUEST_BYTES",
-      "default": "65536",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_request_bytes"
-        }
-      ]
-    },
-    "CLEF_MAX_QUESTIONS": {
-      "desc": "部署参数 CLEF_MAX_QUESTIONS",
-      "default": "16",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_questions"
-        }
-      ]
-    },
-    "CLEF_MAX_OPTIONS": {
-      "desc": "部署参数 CLEF_MAX_OPTIONS",
-      "default": "32",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_options"
-        }
-      ]
-    },
-    "CLEF_MAX_TOTAL_OPTIONS": {
-      "desc": "部署参数 CLEF_MAX_TOTAL_OPTIONS",
-      "default": "128",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_total_options"
-        }
-      ]
-    },
-    "CLEF_MAX_QUEUE_SIZE": {
-      "desc": "部署参数 CLEF_MAX_QUEUE_SIZE",
-      "default": "4",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_queue_size"
-        }
-      ]
-    },
     "CLEF_API_KEY": {
       "desc": "如启用服务鉴权，须与 Backend 的 CLEF_SERVICE_API_KEY 相同。",
       "default": "",
@@ -3589,8 +3394,8 @@
       "consumers": [
         {
           "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "api_key"
+          "kind": "reference",
+          "token": "CLEF_API_KEY"
         }
       ]
     },
@@ -3684,223 +3489,6 @@
         }
       ]
     },
-    "NANOJEV_MODEL_DIR": {
-      "desc": "部署参数 NANOJEV_MODEL_DIR",
-      "default": "/models/nanojev",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "model_dir"
-        }
-      ]
-    },
-    "NANOJEV_BIND": {
-      "desc": "部署参数 NANOJEV_BIND",
-      "default": "0.0.0.0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "nanojev_service/__main__.py",
-          "kind": "read",
-          "token": "NANOJEV_BIND"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "nanojev_service/__main__.py",
-          "expression": "'127.0.0.1'"
-        }
-      ]
-    },
-    "NANOJEV_PORT": {
-      "desc": "部署参数 NANOJEV_PORT",
-      "default": "8189",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "nanojev_service/__main__.py",
-          "kind": "read",
-          "token": "NANOJEV_PORT"
-        },
-        {
-          "path": "docker-compose.yml",
-          "kind": "external",
-          "token": "NANOJEV_PORT"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "NANOJEV_PORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "nanojev_service/__main__.py",
-          "expression": "'8189'"
-        }
-      ]
-    },
-    "NANOJEV_CUDA_VISIBLE_DEVICES": {
-      "desc": "部署参数 NANOJEV_CUDA_VISIBLE_DEVICES",
-      "default": "7",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "nanojev_service/app.py",
-          "kind": "read",
-          "token": "NANOJEV_CUDA_VISIBLE_DEVICES"
-        },
-        {
-          "path": "nanojev_service/__main__.py",
-          "kind": "read",
-          "token": "NANOJEV_CUDA_VISIBLE_DEVICES"
-        },
-        {
-          "path": "docker/configure.py",
-          "kind": "external",
-          "token": "NANOJEV_CUDA_VISIBLE_DEVICES"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "nanojev_service/app.py",
-          "expression": "None"
-        },
-        {
-          "path": "nanojev_service/__main__.py",
-          "expression": "''"
-        }
-      ]
-    },
-    "NANOJEV_DEVICE": {
-      "desc": "部署参数 NANOJEV_DEVICE",
-      "default": "cuda:0",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "device"
-        }
-      ]
-    },
-    "NANOJEV_DTYPE": {
-      "desc": "部署参数 NANOJEV_DTYPE",
-      "default": "bfloat16",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "dtype"
-        }
-      ]
-    },
-    "NANOJEV_CPU_THREADS": {
-      "desc": "部署参数 NANOJEV_CPU_THREADS",
-      "default": "4",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "nanojev_service/app.py",
-          "kind": "read",
-          "token": "NANOJEV_CPU_THREADS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "nanojev_service/app.py",
-          "expression": "'4'"
-        }
-      ]
-    },
-    "NANOJEV_MAX_LENGTH": {
-      "desc": "部署参数 NANOJEV_MAX_LENGTH",
-      "default": "8192",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_length"
-        }
-      ]
-    },
-    "NANOJEV_MAX_REQUEST_BYTES": {
-      "desc": "部署参数 NANOJEV_MAX_REQUEST_BYTES",
-      "default": "65536",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_request_bytes"
-        }
-      ]
-    },
-    "NANOJEV_MAX_QUESTIONS": {
-      "desc": "部署参数 NANOJEV_MAX_QUESTIONS",
-      "default": "16",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_questions"
-        }
-      ]
-    },
-    "NANOJEV_MAX_OPTIONS": {
-      "desc": "部署参数 NANOJEV_MAX_OPTIONS",
-      "default": "32",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_options"
-        }
-      ]
-    },
-    "NANOJEV_MAX_TOTAL_OPTIONS": {
-      "desc": "部署参数 NANOJEV_MAX_TOTAL_OPTIONS",
-      "default": "128",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_total_options"
-        }
-      ]
-    },
-    "NANOJEV_MAX_QUEUE_SIZE": {
-      "desc": "部署参数 NANOJEV_MAX_QUEUE_SIZE",
-      "default": "4",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "max_queue_size"
-        }
-      ]
-    },
     "NANOJEV_API_KEY": {
       "desc": "部署参数 NANOJEV_API_KEY",
       "default": "",
@@ -3909,8 +3497,8 @@
       "consumers": [
         {
           "path": "clef_service/app.py",
-          "kind": "external",
-          "token": "api_key"
+          "kind": "reference",
+          "token": "NANOJEV_API_KEY"
         }
       ]
     },
@@ -4127,63 +3715,6 @@
         {
           "path": "algorithm/preproc/preproc_src/processors/mineru4_processor.py",
           "expression": "None"
-        }
-      ]
-    },
-    "VLLM_MODEL_PATH": {
-      "desc": "vLLM VLM 池。默认由容器内 supervisor 自动探测 GPU 并管理进程。 / 4.0 的 GPU 提速可将这里指向 4.0 的 VLM 权重（需先下载非 GGUF 版本），并令 / MINERU_MODEL_VLM_ENGINE=vllm；未准备好时保持 2.x 路径不影响 CPU（llama.cpp）链路。",
-      "default": "/models/mineru/vlm",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_MODEL_PATH"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "'/models/mineru/vlm'"
-        }
-      ]
-    },
-    "VLLM_GPU_MEMORY_UTILIZATION": {
-      "desc": "部署参数 VLLM_GPU_MEMORY_UTILIZATION",
-      "default": "0.82",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_GPU_MEMORY_UTILIZATION"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "'0.82'"
-        }
-      ]
-    },
-    "VLLM_MAX_NUM_SEQS": {
-      "desc": "部署参数 VLLM_MAX_NUM_SEQS",
-      "default": "32",
-      "scope": "deployment",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_MAX_NUM_SEQS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "'32'"
         }
       ]
     },
@@ -4440,34 +3971,6 @@
         {
           "path": "backend/app/health.py",
           "expression": "'3306'"
-        }
-      ]
-    },
-    "VLLM_ENABLED": {
-      "desc": "内部/兼容参数 VLLM_ENABLED，消费者见 consumers；未列入部署模板",
-      "default": "true",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/health.py",
-          "kind": "read",
-          "token": "VLLM_ENABLED"
-        },
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_ENABLED"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/health.py",
-          "expression": "'true'"
-        },
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "'true'"
         }
       ]
     },
@@ -5196,25 +4699,6 @@
         }
       ]
     },
-    "VLLM_BASE_PORT": {
-      "desc": "内部/兼容参数 VLLM_BASE_PORT，消费者见 consumers；未列入部署模板",
-      "default": 8100,
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_BASE_PORT"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "8100"
-        }
-      ]
-    },
     "API_WORKERS": {
       "desc": "内部/兼容参数 API_WORKERS，消费者见 consumers；未列入部署模板",
       "default": null,
@@ -5231,30 +4715,6 @@
         {
           "path": "backend/app/execution/supervisor.py",
           "expression": "1 if is_remote_only() else 2"
-        }
-      ]
-    },
-    "VLLM_SERVED_MODEL_NAME": {
-      "desc": "内部/兼容参数 VLLM_SERVED_MODEL_NAME，消费者见 consumers；未列入部署模板",
-      "default": "mineru-vlm",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_SERVED_MODEL_NAME"
-        },
-        {
-          "path": "docker/vllm_readiness.py",
-          "kind": "external",
-          "token": "VLLM_SERVED_MODEL_NAME"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "'mineru-vlm'"
         }
       ]
     },
@@ -5344,25 +4804,6 @@
         {
           "path": "algorithm/preproc/preproc_src/main_processor.py",
           "expression": "'vlm-http-client'"
-        }
-      ]
-    },
-    "VLLM_EXTRA_ARGS": {
-      "desc": "内部/兼容参数 VLLM_EXTRA_ARGS，消费者见 consumers；未列入部署模板",
-      "default": "",
-      "scope": "internal",
-      "mode": "startup",
-      "consumers": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "kind": "read",
-          "token": "VLLM_EXTRA_ARGS"
-        }
-      ],
-      "fallbacks": [
-        {
-          "path": "backend/app/execution/supervisor.py",
-          "expression": "''"
         }
       ]
     },
@@ -6503,7 +5944,6 @@
       "config_getenv('DATABASE_PORT', '3306')",
       "config_getenv(name, '')",
       "config_getenv('MINERU_MODEL_BASE_DIR', '/models/mineru4')",
-      "config_getenv('VLLM_ENABLED', 'true')",
       "config_getenv('DATABASE_HOST', '')",
       "config_getenv('KG_EXTRACT_LLM_BASE_URL', '')",
       "config_getenv('DOCUMENT_PARSE_SERVICE_URL', '')",
@@ -6594,22 +6034,15 @@
     "backend/app/execution/supervisor.py": [
       "_env_int('EXECUTION_CPU_WORKERS', 2, minimum=1, maximum=32)",
       "_env_int('EXECUTION_VLM_WORKERS_PER_GPU', 2, minimum=1, maximum=8)",
-      "_env_int('VLLM_BASE_PORT', 8100, minimum=1024, maximum=65000)",
       "_env_int('API_WORKERS', 1 if is_remote_only() else 2, minimum=1, maximum=16)",
       "_env_int('EXECUTION_AUX_WORKERS_PER_GPU', 1, minimum=0, maximum=4)",
       "config_getenv('EXECUTION_RUNTIME_READY_FILE', '/tmp/qasystem-runtime-ready')",
-      "config_getenv('VLLM_MODEL_PATH', '/models/mineru/vlm')",
-      "config_getenv('VLLM_SERVED_MODEL_NAME', 'mineru-vlm')",
-      "config_getenv('VLLM_GPU_MEMORY_UTILIZATION', '0.82')",
-      "config_getenv('VLLM_MAX_NUM_SEQS', '32')",
       "config_getenv('VLLM_READINESS_SCRIPT', '/usr/local/bin/vllm_readiness.py')",
-      "config_getenv('VLLM_EXTRA_ARGS', '')",
       "config_getenv('VLLM_STARTUP_TIMEOUT_SECONDS', '900')",
       "config_getenv(name, str(default))",
       "config_getenv('EXECUTION_CPU_WORKERS', 'auto')",
       "config_getenv('EXECUTION_VLM_WORKERS_PER_GPU', 'auto')",
       "config_getenv('EXECUTION_LOG_LEVEL', 'INFO')",
-      "config_getenv('VLLM_ENABLED', 'true')",
       "config_getenv('VLLM_WARMUP_TIMEOUT_SECONDS', '300')"
     ],
     "backend/app/execution/worker.py": [
@@ -6638,7 +6071,8 @@
       "setting('KG_EXTRACT_PROVIDERS_JSON', '{}')",
       "setting('KG_EXTRACT_V31_REQUEST_TIMEOUT', '120')",
       "setting(values['api_key_env'], '')",
-      "setting('KG_EXTRACT_ALGO_VERSION', 'latest')"
+      "setting('KG_EXTRACT_ALGO_VERSION', 'latest')",
+      "setting(routed['api_key_env'], '')"
     ],
     "backend/app/services/knowledge_extract_adapter.py": [
       "config_getenv('KG_EXTRACT_PUBLISH_BEST_EFFORT', '1')"
@@ -6880,7 +6314,6 @@
       "config_getenv(k)",
       "_env('KG_EXTRACT_IDENTITY_ADMISSION', default='quarantine')",
       "_env('KG_EXTRACT_V22_CLEF_ENABLED', default='0')",
-      "_env('CLEF_SERVICE_URL', default='')",
       "_env('KG_EXTRACT_JEV_ACCEPT', default='0.9')",
       "_env('KG_EXTRACT_JEV_REJECT', default='0.9')",
       "_env('KG_EXTRACT_JEV_CHOICE_CONFIDENCE', default='0.9')",
@@ -6975,6 +6408,7 @@
     "external_services/clef.py": [
       "config_getenv(f'{env_prefix}_SERVICE_API_KEY', '')",
       "getenv('CLEF_MODEL', '')",
+      "config_getenv(service['api_key_env'], '')",
       "getenv(f'{env_prefix}_SERVICE_TIMEOUT_SECONDS', '120')",
       "getenv(f'{env_prefix}_SERVICE_URL', '')"
     ],
@@ -6989,25 +6423,8 @@
       "getenv('DOCUMENT_PARSE_SERVICE_URL', '')"
     ],
     "clef_service/app.py": [
-      "@dataclass(frozen=True)\nclass Settings:\n    model_dir: str = ''\n    device: str = 'cuda:0'\n    dtype: str = 'bfloat16'\n    max_length: int = 2048\n    max_request_bytes: int = 65536\n    max_questions: int = 16\n    max_options: int = 32\n    max_total_options: int = 128\n    max_queue_size: int = 4\n    api_key: str = field(default='', repr=False)\n\n    @classmethod\n    def from_env(cls, prefix: str='CLEF_') -> 'Settings':\n        values: dict[str, Any] = {}\n        for name in cls.__dataclass_fields__:\n            value = config_getenv(prefix + name.upper())\n            if value is not None:\n                if name.startswith('max_'):\n                    try:\n                        value = int(value)\n                    except ValueError:\n                        raise ValueError(f'{prefix}{name.upper()} must be an integer') from None\n                values[name] = value\n        settings = cls(**values)\n        if any((getattr(settings, name) < 1 for name in cls.__dataclass_fields__ if name.startswith('max_'))):\n            raise ValueError('CLEF limits must be positive')\n        if settings.dtype not in {'bfloat16', 'float16', 'float32'}:\n            raise ValueError('CLEF_DTYPE must be bfloat16, float16, or float32')\n        if not (settings.device == 'cpu' or settings.device == 'cuda' or settings.device.startswith('cuda:')):\n            raise ValueError('CLEF_DEVICE must select one CPU or CUDA device')\n        return settings",
-      "config_getenv('CLEF_CUDA_VISIBLE_DEVICES')",
-      "config_getenv(prefix + name.upper())",
-      "config_required('CLEF_CUDA_VISIBLE_DEVICES')"
-    ],
-    "clef_service/__main__.py": [
-      "config_getenv('CLEF_CUDA_VISIBLE_DEVICES')",
-      "config_required('CLEF_CUDA_VISIBLE_DEVICES')",
-      "config_getenv('CLEF_BIND', '127.0.0.1')",
-      "config_getenv('CLEF_PORT', '8188')"
-    ],
-    "nanojev_service/app.py": [
-      "config_getenv('NANOJEV_CUDA_VISIBLE_DEVICES')",
-      "config_getenv('NANOJEV_CPU_THREADS', '4')"
-    ],
-    "nanojev_service/__main__.py": [
-      "config_getenv('NANOJEV_CUDA_VISIBLE_DEVICES', '')",
-      "config_getenv('NANOJEV_BIND', '127.0.0.1')",
-      "config_getenv('NANOJEV_PORT', '8189')"
+      "@dataclass(frozen=True)\nclass Settings:\n    model_dir: str = ''\n    device: str = 'cuda:0'\n    dtype: str = 'bfloat16'\n    max_length: int = 2048\n    max_request_bytes: int = 65536\n    max_questions: int = 16\n    max_options: int = 32\n    max_total_options: int = 128\n    max_queue_size: int = 4\n    api_key: str = field(default='', repr=False)\n\n    @classmethod\n    def from_env(cls, prefix: str='CLEF_') -> 'Settings':\n        values: dict[str, Any] = {}\n        from docker.model_services import selected_native\n        adapter = 'nanojev' if prefix == 'NANOJEV_' else 'clef'\n        record = selected_native(adapter)\n        if record is not None:\n            values.update(record.get('engine_options', {}))\n            key_env = values.pop('api_key_env', {'clef': 'CLEF_API_KEY', 'nanojev': 'NANOJEV_API_KEY'}[adapter])\n            values.pop('cpu_threads', None)\n            values.update(model_dir='/models/' + record['model_dir'], device='cpu' if record['device'] == 'cpu' else 'cuda:0', api_key=config_getenv(key_env, '') if key_env else '')\n        for name in list(values):\n            if name.startswith('max_'):\n                values[name] = int(values[name])\n        settings = cls(**values)\n        if any((getattr(settings, name) < 1 for name in cls.__dataclass_fields__ if name.startswith('max_'))):\n            raise ValueError('CLEF limits must be positive')\n        if settings.dtype not in {'bfloat16', 'float16', 'float32'}:\n            raise ValueError('CLEF_DTYPE must be bfloat16, float16, or float32')\n        if not (settings.device == 'cpu' or settings.device == 'cuda' or settings.device.startswith('cuda:')):\n            raise ValueError('CLEF_DEVICE must select one CPU or CUDA device')\n        return settings",
+      "config_getenv(key_env, '')"
     ],
     "mcp_services/dispatch.py": [
       "config_getenv('MCP_EXECUTION_MODE', 'inline')"
@@ -7068,7 +6485,11 @@
   },
   "model_defaults": {
     "enabled": false,
-    "gpu": "",
+    "device": "",
+    "engine": "vllm",
+    "adapter": "chat",
+    "manager": "ops",
+    "engine_options": {},
     "port": "9998",
     "context": "32768",
     "utilization": "0.90",
@@ -7080,7 +6501,7 @@
   },
   "model_migrations": {
     "LLM_MODEL_DIR": "model_dir",
-    "LLM_GPU_DEVICE_IDS": "gpu",
+    "LLM_GPU_DEVICE_IDS": "device",
     "LLM_BIND": "bind",
     "LLM_HOST_PORT": "port",
     "LLM_GPU_MEMORY_UTILIZATION": "utilization",
@@ -7092,7 +6513,11 @@
   },
   "model_descriptions": {
     "enabled": "勾选只改变启用计划，部署后才启动服务。",
-    "gpu": "宿主机单个 GPU 编号，必须在允许列表内且没有其他服务占用。",
+    "device": "cpu 或 gpu:<宿主物理编号>；worker 仅用于 Backend 管理的解析引擎，不自动回退。",
+    "engine": "推理方式：vllm 或 native。",
+    "adapter": "已注册的启动适配器：chat、clef、nanojev。",
+    "manager": "唯一启动管理者：ops 或 backend-worker。",
+    "engine_options": "引擎专属参数 JSON；不包含密钥值。",
     "port": "宿主机监听端口，不能与其他服务重复；新模型按清单顺序从 9997 分配。",
     "context": "单次输入与输出 token 的合计上限。",
     "utilization": "vLLM 可使用的 GPU 显存比例，必须在 0 与 1 之间。",
@@ -7109,5 +6534,138 @@
       "PYTHONUNBUFFERED": "1"
     },
     "runtime_directory": "runtime-config"
+  },
+  "inference_contract": {
+    "engines": {
+      "vllm": {
+        "adapters": [
+          "chat"
+        ],
+        "devices": [
+          "gpu",
+          "worker"
+        ]
+      },
+      "native": {
+        "adapters": [
+          "clef",
+          "nanojev"
+        ],
+        "devices": [
+          "cpu",
+          "gpu"
+        ]
+      }
+    },
+    "native_options": [
+      "api_key_env",
+      "cpu_threads",
+      "dtype",
+      "max_length",
+      "max_options",
+      "max_questions",
+      "max_queue_size",
+      "max_request_bytes",
+      "max_total_options"
+    ],
+    "worker_options": [
+      "extra_args",
+      "served_model"
+    ],
+    "builtin_models": {
+      "clef-flash": {
+        "engine": "native",
+        "adapter": "clef",
+        "manager": "ops",
+        "model_dir": "clef-flash",
+        "port": "8188",
+        "device": "",
+        "utilization": "0.25",
+        "engine_options": {
+          "dtype": "bfloat16",
+          "max_length": "8192"
+        }
+      },
+      "nanojev": {
+        "engine": "native",
+        "adapter": "nanojev",
+        "manager": "ops",
+        "model_dir": "nanojev",
+        "port": "8189",
+        "device": "",
+        "utilization": "0.25",
+        "engine_options": {
+          "dtype": "bfloat16",
+          "max_length": "8192",
+          "cpu_threads": "4"
+        }
+      },
+      "mineru-vlm": {
+        "engine": "vllm",
+        "adapter": "chat",
+        "manager": "backend-worker",
+        "model_dir": "mineru/vlm",
+        "port": "8100",
+        "device": "worker",
+        "utilization": "0.82",
+        "max_num_seqs": "32",
+        "engine_options": {}
+      }
+    },
+    "registry_fields": [
+      "settings",
+      "models",
+      "services",
+      "routes"
+    ],
+    "managers": [
+      "ops",
+      "backend-worker"
+    ],
+    "internal_port": 8000,
+    "consumers": [
+      "docker/configure.py",
+      "backend/app/execution/supervisor.py",
+      "clef_service/app.py",
+      "nanojev_service/app.py",
+      "external_services/model_routes.py"
+    ],
+    "native_migration": [
+      "CLEF_BIND",
+      "CLEF_CPU_THREADS",
+      "CLEF_CUDA_VISIBLE_DEVICES",
+      "CLEF_DEVICE",
+      "CLEF_DTYPE",
+      "CLEF_MAX_LENGTH",
+      "CLEF_MAX_OPTIONS",
+      "CLEF_MAX_QUESTIONS",
+      "CLEF_MAX_QUEUE_SIZE",
+      "CLEF_MAX_REQUEST_BYTES",
+      "CLEF_MAX_TOTAL_OPTIONS",
+      "CLEF_MODEL_DIR",
+      "CLEF_PORT",
+      "NANOJEV_BIND",
+      "NANOJEV_CPU_THREADS",
+      "NANOJEV_CUDA_VISIBLE_DEVICES",
+      "NANOJEV_DEVICE",
+      "NANOJEV_DTYPE",
+      "NANOJEV_MAX_LENGTH",
+      "NANOJEV_MAX_OPTIONS",
+      "NANOJEV_MAX_QUESTIONS",
+      "NANOJEV_MAX_QUEUE_SIZE",
+      "NANOJEV_MAX_REQUEST_BYTES",
+      "NANOJEV_MAX_TOTAL_OPTIONS",
+      "NANOJEV_MODEL_DIR",
+      "NANOJEV_PORT"
+    ],
+    "worker_migration": [
+      "VLLM_BASE_PORT",
+      "VLLM_ENABLED",
+      "VLLM_EXTRA_ARGS",
+      "VLLM_GPU_MEMORY_UTILIZATION",
+      "VLLM_MAX_NUM_SEQS",
+      "VLLM_MODEL_PATH",
+      "VLLM_SERVED_MODEL_NAME"
+    ]
   }
 }

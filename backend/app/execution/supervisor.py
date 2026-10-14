@@ -66,7 +66,14 @@ class RuntimeSupervisor:
         self.stopping = False
         self.gpu_ids = _gpu_ids()
         self.cpu_count = os.cpu_count() or 4
-        self.base_port = _env_int("VLLM_BASE_PORT", 8100, minimum=1024, maximum=65000)
+        from docker.model_services import worker_record
+        self.model_record = worker_record()
+        from docker.model_services import physical_gpu
+        selected_gpu = physical_gpu(self.model_record or {})
+        if selected_gpu:
+            if selected_gpu not in self.gpu_ids: raise ValueError('MinerU 指定GPU不可用，拒绝回退')
+            self.gpu_ids = [selected_gpu]
+        self.base_port = int((self.model_record or {}).get('port', '8100'))
         self.ready_file = Path(config_getenv("EXECUTION_RUNTIME_READY_FILE", "/tmp/qasystem-runtime-ready"))
         self.ready_file.unlink(missing_ok=True)
 
@@ -85,19 +92,19 @@ class RuntimeSupervisor:
             "-m",
             "vllm.entrypoints.openai.api_server",
             "--model",
-            config_getenv("VLLM_MODEL_PATH", "/models/mineru/vlm"),
+            '/models/' + self.model_record['model_dir'],
             "--host",
             "127.0.0.1",
             "--port",
             str(port),
             "--served-model-name",
-            config_getenv("VLLM_SERVED_MODEL_NAME", "mineru-vlm"),
+            self.model_record.get('engine_options', {}).get('served_model', 'mineru-vlm'),
             "--gpu-memory-utilization",
-            config_getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.82"),
+            self.model_record['utilization'],
             "--max-num-seqs",
-            config_getenv("VLLM_MAX_NUM_SEQS", "32"),
+            self.model_record['max_num_seqs'],
         ]
-        command.extend(shlex.split(config_getenv("VLLM_EXTRA_ARGS", "")))
+        command.extend(shlex.split(self.model_record.get('engine_options', {}).get('extra_args', '')))
         return command
 
     def _planned_engine_ports(self) -> list[int]:
@@ -109,7 +116,7 @@ class RuntimeSupervisor:
         """
         if is_remote_only():
             return []
-        if not self.gpu_ids or config_getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+        if not self.gpu_ids or not self.model_record or not self.model_record.get('enabled'):
             return []
         return [self.base_port + index for index in range(len(self.gpu_ids))]
 
@@ -117,10 +124,14 @@ class RuntimeSupervisor:
         if is_remote_only():
             LOGGER.info("remote-only profile: skip local vLLM engines")
             return
+        if self.engines:
+            raise RuntimeError('解析引擎已启动，拒绝重复启动')
         ports = self._planned_engine_ports()
         if not ports:
             LOGGER.warning("no vLLM engine started; detected GPUs=%s", self.gpu_ids)
             return
+        from docker.model_services import validate_record
+        validate_record('mineru-vlm', self.model_record, root=Path('/models'), check_files=True)
         for index, gpu_id in enumerate(self.gpu_ids):
             port = ports[index]
             env = os.environ.copy()

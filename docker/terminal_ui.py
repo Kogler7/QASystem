@@ -61,6 +61,7 @@ def item_line(row: dict, cells: int, selected: bool = False) -> str:
 
 def section(row: dict) -> str:
     if row['kind'] == 'runtime': return '运行'
+    if row['kind'] == 'registry': return '服务'
     if row["kind"] == "model" or row["key"].startswith("LLM_"): return "模型"
     key = row["key"]
     if key.startswith("QASYSTEM_JUDGE_"): return "裁判"
@@ -86,6 +87,7 @@ def detail(row: dict | None, config) -> list[str]:
                 '模型: ' + (c['model'] or '应用服务'), 'GPU: ' + c['gpu'], '宿主端口: ' + c['host_ports'],
                 '上下文: ' + (c['context'] or '未声明'), '', '只读展示 Docker 实际配置。',
                 '按 r 刷新；这里不修改外部服务。', '参数以实际运行容器为准。']
+    if row['kind'] == 'registry': return [row['display_name'], '', row['description'], '', row['display_value'], '', '回车编辑JSON；保存需要逐页审核。', '', 'API登记不会启动本地进程。']
     if row["kind"] == "model":
         model = config.models[row["repo"]]
         running = [c for c in config.live if c['model'] == row['repo'] and c['status'] == 'running']
@@ -93,7 +95,7 @@ def detail(row: dict | None, config) -> list[str]:
                 "配置: " + str(model[row['key']]), "默认: " + str(row.get('default', False)),
                 "实际状态: " + (f"{len(running)} 个服务运行中" if running else '未发现运行服务' if not config.live_error else '未确认'),
                 "计划状态: " + ("启用" if model["enabled"] else "关闭"),
-                f"GPU: {model['gpu'] or '未选择'}", f"端口: {model['port']}",
+                f"设备: {model['device'] or '未选择'}", f"端口: {model['port']}",
                 f"上下文: {model['context']}", f"显存比例: {model['utilization']}", "",
                 "空格勾选模型，回车编辑参数。", "保存只生成配置，不启动模型。",
                 "校验权重按 v；实际部署按 a。", "启动参数变化需重建对应模型容器。"]
@@ -163,6 +165,6 @@ def render(config, rows: list[dict], index: int, selected: str, query: str, noti
         text = [part for item in compact for part in wrap(item, cells - 2)]
         output += [full(" " + (text[i] if i < len(text) else ""), "muted") for i in range(6)]
     output += [full(f" {index + 1 if rows else 0}/{len(rows)} 项    备份: {config.backup.name}", "muted"),
-               full(" " + (config.live_error if selected == '运行' and config.live_error else notice), "warning"), full(" ↑↓ 移动  Space 开关  Enter 编辑  d 默认  PgUp/PgDn 翻页", "muted"),
+               full(" " + (config.live_error if selected == '运行' and config.live_error else notice), "warning"), full(" ↑↓ 移动 Space 开关 Enter 编辑 n 新模型 d 默认  PgUp/PgDn 翻页", "muted"),
                full(" s 保存  v 校验权重  a 部署  q 退出", "title")]
     return "\n".join(output[:lines])

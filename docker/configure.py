@@ -8,6 +8,7 @@ import json
 import math
 import os
 from pathlib import Path
+from copy import deepcopy
 import re
 import shutil
 import shlex
@@ -148,17 +149,28 @@ class Configuration:
         from docker.config_migrations import migrate_models
         self.models, model_conflicts = migrate_models(helper.read_env(self.original), document['models'], self.catalog)
         self.migration_conflicts.update(model_conflicts)
-        if set(self.models) - {m['repo'] for m in self.catalog}:
-            raise ValueError('模型计划包含未登记模型，请先更新当前版本模型清单')
+        from docker.config_migrations import migrate_inference
+        self.models, self.services, self.routes, conflicts = migrate_inference(
+            {**helper.read_env(self.original), **document['settings']}, self.models, document['services'], document['routes'])
+        self.migration_conflicts.update(conflicts)
+        known = {m['repo'] for m in self.catalog}
+        from docker.model_services import BUILTIN_MODELS
+        for model_id, defaults in BUILTIN_MODELS.items():
+            self.catalog.append({'repo': model_id, 'files': [], 'defaults': deepcopy(defaults)})
+        known = {m['repo'] for m in self.catalog}
+        for model_id in set(self.models) - known:
+            self.catalog.append({'repo': model_id, 'files': []})
         models = self.input_directory / "models.json"  # migration input only
         applied = self.input_directory / "applied-models.json"
         self.previous_models = json.loads(applied.read_text()) if applied.exists() else {}
+        from docker.runtime_config import migrate_record
+        self.previous_models = {name: migrate_record(record) for name, record in self.previous_models.items()}
         self.model_defaults = {}
         for index, model in enumerate(self.catalog):
             from docker.runtime_config import MODEL_DEFAULTS
             self.model_defaults[model['repo']] = {**MODEL_DEFAULTS, 'port': str(9997 + index),
-                'model_dir': 'llm/' + model['repo'].replace('/', '--')}
-            self.models[model['repo']] = {**self.model_defaults[model['repo']], **self.models.get(model['repo'], {})}
+                'model_dir': 'llm/' + model['repo'].replace('/', '--'), **model.get('defaults', {})}
+            self.models[model['repo']] = deepcopy({**self.model_defaults[model['repo']], **self.models.get(model['repo'], {})})
         # Back up on entry, before any edits. Permission-restricted, never displayed.
         self.backup = self.directory / ("backups/" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
         self.backup.mkdir(parents=True, mode=0o700)
@@ -176,8 +188,14 @@ class Configuration:
         self.expected.update({p: p.read_bytes() if p.exists() else None for p in
                               (self.directory / 'config.json',
                                self.input_directory / 'settings.json', self.input_directory / 'models.compose.json')})
+        for model_id, record in self.models.items():
+            if record['manager'] == 'ops':
+                adapter = record['adapter']
+                key_env = 'CLEF_SERVICE_API_KEY' if adapter == 'clef' else 'NANOJEV_SERVICE_API_KEY' if adapter == 'nanojev' else ''
+                self.services.setdefault(model_id, {'kind': 'local', 'model': model_id, 'api_key_env': key_env})
         self.legacy_expected = self.legacy_snapshot()
         self.live = []
+        self.gpu_identity = {}
         self.live_error = "实际状态尚未读取"
         self.pending_reservations = set()
 
@@ -217,6 +235,7 @@ class Configuration:
                     index, sep, uuid = line.partition(',')
                     if sep and index.strip().isdigit(): gpu_names[uuid.strip()] = index.strip()
             except (OSError, RuntimeError, subprocess.TimeoutExpired): pass
+            self.gpu_identity = gpu_names
             for c in self.live:
                 env = c['env']; command = c.get('command') or []
                 tokens = []
@@ -226,7 +245,7 @@ class Configuration:
                 def flag(name):
                     try: return tokens[tokens.index(name) + 1]
                     except (ValueError, IndexError): return ''
-                c['model'] = flag('--served-model-name') or env.get('LLM_SERVED_MODEL_NAME', '')
+                c['model'] = flag('--served-model-name') or flag('--record') or env.get('LLM_SERVED_MODEL_NAME', '')
                 if not c['model'] and 'vllm' in tokens and 'serve' in tokens:
                     try: c['model'] = tokens[tokens.index('serve') + 1]
                     except IndexError: pass
@@ -279,11 +298,11 @@ class Configuration:
             state = self.models[repo]
             exists = (self.model_root() / state['model_dir']).is_dir()
             rows.append(dict(kind="model", repo=repo, key="enabled",
-                display_name=f"[{ 'x' if state['enabled'] else ' ' }] {repo}",
+                display_name=f"[{state['engine']}] [{ 'x' if state['enabled'] else ' ' }] {repo}",
                 display_value='权重已找到' if exists else '无本地权重',
                 label=f"[{ 'x' if state['enabled'] else ' ' }] {repo} ({'权重已找到' if exists else '无本地权重'})"))
             if state["enabled"] or any(key.startswith(repo + '.') for key in self.migration_conflicts):
-                for key, name in (("gpu", "GPU编号"), ("port", "宿主端口"), ("context", "上下文上限"), ("utilization", "显存比例"),
+                for key, name in (("engine", "推理方式"), ("adapter", "启动适配器"), ("manager", "唯一管理者"), ("device", "设备选择"), ("engine_options", "引擎专属参数JSON"), ("port", "宿主端口"), ("context", "上下文上限"), ("utilization", "显存比例"),
                                   ('bind', '监听地址'), ('model_dir', '权重相对路径'), ('max_num_seqs', '最大并发序列'),
                                   ('max_num_batched_tokens', '批处理 token 上限'), ('dtype', '计算精度')):
                     conflict = repo + '.' + key in self.migration_conflicts and repo + '.' + key not in self.resolved_migrations
@@ -291,7 +310,11 @@ class Configuration:
                     rows.append(dict(kind="model", repo=repo, key=key, display_name=f"  [启动] {name}",
                         default=self.model_defaults[repo][key],
                         description=('[冲突] 请编辑本项确认取值。' if conflict else '') + MODEL_DESCRIPTIONS[key],
-                        display_value=('! ' if conflict else '') + (state[key] or '(空)'), label=f"    {name}: {state[key]}"))
+                        display_value=('! ' if conflict else '') + (str(state[key]) or '(空)'), label=f"    {name}: {state[key]}"))
+        for name, value in [('services', self.services), ('routes', self.routes)]:
+            rows.append(dict(kind='registry', key=name, display_name='[审核] ' + name,
+                display_value=json.dumps(value, ensure_ascii=False), label=name,
+                description='集中服务登记与用途路由；输入 JSON，无凭据值，仅引用已有 key 环境变量名。'))
         for field in self.fields:
             if field["key"] in LEGACY_MODEL_KEYS: continue
             value = self.values.get(field["key"], "")
@@ -311,17 +334,17 @@ class Configuration:
                 errors.append(f'{key} 与旧配置 {", ".join(old)} 冲突；在 UI 中编辑标准项确认取值')
         allowed = set(helper.read_env("GPU_DEVICE_IDS=" + self.values.get("GPU_DEVICE_IDS", ""))["GPU_DEVICE_IDS"].split(","))
         reserved = set(self.values.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(","))
-        own = {m["gpu"] for m in self.previous_models.values() if m.get("enabled")}
+        own = {self.model_gpu(m) for m in self.previous_models.values() if m.get("enabled")}
         own.update(self.pending_reservations)
         try:
             guard.require(self.root, self.directory)
             approved_values = guard.approved(self.directory)['snapshot']['values']
-            own.update(m['gpu'] for repo, m in self.models.items()
+            own.update(self.model_gpu(m) for repo, m in self.models.items()
                        if approved_values.get(f'models.{repo}.enabled', {}).get('value') == 'True'
-                       and approved_values.get(f'models.{repo}.gpu', {}).get('value') == m['gpu'])
+                       and approved_values.get(f'models.{repo}.device', {}).get('value') == m['device'])
         except (ValueError, OSError):
             pass
-        for key in ("BACKEND_HOST_PORT", "AGENT_HOST_PORT", "CLEF_PORT", "NANOJEV_PORT"):
+        for key in ("BACKEND_HOST_PORT", "AGENT_HOST_PORT"):
             if self.values.get(key):
                 try:
                     port = int(self.values[key])
@@ -341,19 +364,25 @@ class Configuration:
                     raise ValueError()
                 if port in ports: errors.append(f"{repo} 与 {ports[port]} 端口重复")
                 ports[port] = repo
-                gpu = model["gpu"]
-                if not gpu.isdigit() or (self.values.get("GPU_DEVICE_IDS") and gpu not in allowed):
+                gpu = self.model_gpu(model)
+                if gpu and self.values.get("GPU_DEVICE_IDS") and self.gpu_identity.get(gpu, gpu) not in allowed:
                     errors.append(f"{repo} GPU 不在允许列表")
-                if gpu in gpus: errors.append(f"{repo} 与 {gpus[gpu]} 使用同一卡")
+                if gpu:
+                    budget_gpu = self.gpu_identity.get(gpu, gpu)
+                    previous_name, previous_budget = gpus.get(budget_gpu, ('', 0.0))
+                    if previous_budget + ratio > 1: errors.append(f'{repo} 与 {previous_name} 使用同一卡的显存预算超过100%')
+                    gpus[budget_gpu] = (repo, previous_budget + ratio)
                 if gpu in reserved and gpu not in own: errors.append(f"{repo} GPU 已被其他服务预留")
-                gpus[gpu] = repo
+
+                from docker.model_services import validate_record
+                validate_record(repo, model, root=self.model_root())
                 path = (self.model_root() / model['model_dir']).resolve()
                 if not model['model_dir'] or not path.is_relative_to(self.model_root()):
                     raise ValueError()
                 if not path.is_dir(): errors.append(f"{repo} 本地权重目录不存在")
                 previous = self.previous_models.get(repo, {})
                 unchanged_port = previous.get("enabled") and previous.get("port") == model["port"]
-                if probe and not unchanged_port:
+                if probe and not unchanged_port and model['manager'] == 'ops':
                     with socket.socket() as sock: sock.bind((model['bind'], port))
             except (ValueError, OSError): errors.append(f"{repo} 参数无效或端口被其他进程占用")
         for key, value in self.values.items():
@@ -363,6 +392,20 @@ class Configuration:
                     if not math.isfinite(number) or number < 0 or (number == 0 and not key.endswith(("QPS", "QPM"))): raise ValueError()
                     if "TIMEOUT" not in key and not number.is_integer(): raise ValueError()
                 except ValueError: errors.append(f"{key} 数值无效")
+        from external_services.model_routes import resolve_service
+        proposed = {'models': self.models, 'services': self.services, 'routes': self.routes}
+        from docker.runtime_config import _validate_document
+        try: _validate_document({'settings': {}, **proposed})
+        except ValueError as exc: errors.append(str(exc))
+        names = {}
+        from docker.model_services import service_name
+        for model_id in self.models:
+            name = service_name(model_id)
+            if name in names: errors.append('模型记录生成相同服务名称；请调整记录ID')
+            names[name] = model_id
+        for purpose in self.routes:
+            try: resolve_service(purpose, registry=proposed)
+            except ValueError as exc: errors.append(str(exc))
         if self.values.get("KG_EXTRACT_ALGO_VERSION") not in {"latest", "v0", "v2", "v2.1", "v2.2", "v3", "v3.1", "jev"}:
             errors.append("抽取算法版本无效")
         a, b = self.values.get("KG_EXTRACT_LLM_MAX_TOKENS"), self.values.get("KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS")
@@ -377,23 +420,30 @@ class Configuration:
         if self.values.get("QASYSTEM_ENV_IMAGE", "").split(":")[0] != "qasystem-env-v1": errors.append("环境镜像必须为 qasystem-env-v1")
         return errors
 
+    @staticmethod
+    def model_gpu(model):
+        from docker.model_services import physical_gpu
+        return physical_gpu(model)
+
     def compose(self) -> dict:
+        from docker.model_services import service_name, startup_command
         services = {}
-        for repo, model in self.models.items():
-            if not model["enabled"]: continue
-            services[slug(repo)] = dict(image=self.values["QASYSTEM_ENV_IMAGE"], pull_policy="never",
+        for model_id, model in self.models.items():
+            if not model['enabled'] or model['manager'] != 'ops': continue
+            environment = {**self.process_environment(), 'CUDA_VISIBLE_DEVICES': self.model_gpu(model),
+                           'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1', 'VLLM_NO_USAGE_STATS': '1'}
+            service = dict(image=self.values['QASYSTEM_ENV_IMAGE'], pull_policy='never',
                 entrypoint=['python', '/app/docker/config_guard.py', '--project-dir', '/app', '--runtime-dir', '/app/runtime-config', '--exec'],
-                restart="unless-stopped", init=True, gpus="all", environment={**self.process_environment(), "CUDA_VISIBLE_DEVICES": model["gpu"],
-                "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "VLLM_NO_USAGE_STATS": "1"},
-                volumes=[f"{self.model_root()}:/models:ro", f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
-                         f"{self.directory}:/app/runtime-config:ro", f"{self.directory / 'observed'}:/app/runtime-config/observed", f"{self.root / '.env'}:/app/.env:ro",
-                         f"{self.root / '.env.example'}:/app/deployment.env.example:ro"], ports=[f"{model['bind']}:{model['port']}:8000"],
-                command=["vllm", "serve", "/models/" + model['model_dir'], "--served-model-name", repo,
-                         "--max-model-len", model["context"], "--gpu-memory-utilization", model["utilization"],
-                         "--max-num-seqs", model['max_num_seqs'], "--max-num-batched-tokens",
-                         model['max_num_batched_tokens'], "--dtype", model['dtype'], "--language-model-only"],
-                healthcheck=dict(test=["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"], interval="15s", timeout="5s", retries=40, start_period="300s"))
-        return {"services": services}
+                restart='unless-stopped', init=True, environment=environment, env_file=[str(self.root / '.env')],
+                volumes=[f'{self.model_root()}:/models:ro', f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
+                         f'{self.directory}:/app/runtime-config:ro', f'{self.directory / "observed"}:/app/runtime-config/observed',
+                         f'{self.root / ".env"}:/app/.env:ro', f'{self.root / ".env.example"}:/app/deployment.env.example:ro'],
+                ports=[f"{model['bind']}:{model['port']}:8000"], command=startup_command(model_id, model),
+                working_dir='/app', healthcheck=dict(test=['CMD-SHELL', "curl --noproxy '*' -fsS http://127.0.0.1:8000/health"],
+                    interval='30s', timeout='10s', retries=5, start_period='180s'))
+            if self.model_gpu(model): service['gpus'] = 'all'
+            services[service_name(model_id)] = service
+        return {'services': services}
 
     def pending_payloads(self) -> dict:
         from docker.configuration import declarations
@@ -410,7 +460,7 @@ class Configuration:
         settings = dict(self.persisted_hot)
         settings.update({k: v for k, v in self.values.items() if k in HOT_KEYS and self.initial_hot.get(k) != v})
         return {self.root / '.env': env, self.root / '.env.example': self.template,
-                self.directory / 'config.json': json.dumps({'settings': settings, 'models': self.models}, ensure_ascii=False, indent=2) + '\n',
+                self.directory / 'config.json': json.dumps({'settings': settings, 'models': self.models, 'services': self.services, 'routes': self.routes}, ensure_ascii=False, indent=2) + '\n',
                 self.directory / 'models.compose.json': json.dumps(self.compose(), ensure_ascii=False, indent=2) + '\n'}
 
     def save(self) -> None:
@@ -448,6 +498,7 @@ class Configuration:
     def verify_weights(self) -> None:
         for entry in self.catalog:
             if self.models[entry["repo"]]["enabled"]:
+                if not entry['files']: raise ValueError('此模型未登记 SHA 文件清单；不会伪称完整校验通过')
                 folder = self.model_root() / self.models[entry['repo']]['model_dir']
                 for i, part in enumerate(entry["files"], 1):
                     helper.progress(f"{entry['repo']} 校验 {i}/{len(entry['files'])}，{part['size']/1024**3:.2f} GiB：{part['rfilename']}")
@@ -455,6 +506,9 @@ class Configuration:
 
     def apply(self) -> None:
         """Explicit action only; never called on entry or Save."""
+        from docker.model_services import validate_record
+        for model_id, record in self.models.items():
+            if record.get('enabled'): validate_record(model_id, record, root=self.model_root(), check_files=True)
         # Approval is checked before even temporary Docker probes.
         guard.require(self.root, self.directory)
         if any((p.read_text(encoding='utf-8') if p.exists() else None) != value
@@ -472,8 +526,10 @@ class Configuration:
         command += ["-f", str(self.directory / "models.compose.json")]
         guard.require(self.root, self.directory)
         helper.run(command + ["config", "--quiet"], cwd=self.root)
-        changed = [slug(repo) for repo, old in self.previous_models.items() if old.get("enabled") and
-                   self.models.get(repo) != old]
+        from docker.model_services import service_name
+        previous_services = json.loads(prior_compose.read_text()).get('services', {}) if prior_compose.exists() else {}
+        changed = [name for repo, old in self.previous_models.items() if old.get('enabled') and self.models.get(repo) != old
+                   for name in (slug(repo), service_name(repo)) if name in previous_services]
         if changed:
             helper.progress("停用或重启本界面管理且参数发生变化的模型；不处理其他模型服务")
             helper.run(command + ["stop", *changed], cwd=self.root, timeout=120)
@@ -481,18 +537,18 @@ class Configuration:
             "--query-gpu=index,name,memory.total,memory.used,utilization.gpu", "--format=csv,noheader,nounits"], cwd=self.root))
         for entry in self.catalog:
             model = self.models[entry["repo"]]
-            if not model["enabled"]: continue
+            if not model["enabled"] or not self.model_gpu(model) or model["manager"] != "ops": continue
             if self.previous_models.get(entry["repo"], {}) == model: continue
             check = dict(self.values, utilization=model["utilization"])
-            own = {m["gpu"] for m in self.previous_models.values() if m.get("enabled")}
-            own.update(m['gpu'] for m in self.models.values() if m.get('enabled'))
+            own = {self.model_gpu(m) for m in self.previous_models.values() if m.get("enabled")}
+            own.update(self.model_gpu(m) for m in self.models.values() if m.get('enabled'))
             check["EXECUTION_GPU_RESERVED_DEVICE_IDS"] = ",".join(set(check.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(",")) - own)
             size = sum(p["size"] for p in entry["files"] if p["rfilename"].endswith(".safetensors"))
-            helper.choose_gpu(gpus, model["gpu"], check, size)
+            helper.choose_gpu(gpus, self.gpu_identity.get(self.model_gpu(model), self.model_gpu(model)), check, size)
         # Reserve GPUs only when deploying, not when merely saving a plan.
         reserved = set(filter(None, self.values.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(",")))
-        reserved.update(m["gpu"] for m in self.models.values() if m["enabled"])
-        reserved.update(m["gpu"] for m in self.previous_models.values() if m.get("enabled"))
+        reserved.update(self.model_gpu(m) for m in self.models.values() if m["enabled"] and self.model_gpu(m))
+        reserved.update(self.model_gpu(m) for m in self.previous_models.values() if m.get("enabled") and self.model_gpu(m))
         configured = set(filter(None, self.values.get('EXECUTION_GPU_RESERVED_DEVICE_IDS', '').split(',')))
         if not reserved <= configured:
             raise ValueError('模型 GPU 预留尚未审核；请重新确认保存配置')
@@ -511,8 +567,8 @@ class Configuration:
         errors = self.validate(probe=True)
         if errors:
             raise ValueError('；'.join(errors))
-        self.pending_reservations = {m['gpu'] for m in self.models.values() if m.get('enabled')}
-        self.pending_reservations.update(m['gpu'] for m in self.previous_models.values() if m.get('enabled'))
+        self.pending_reservations = {self.model_gpu(m) for m in self.models.values() if m.get('enabled') and m.get('manager') == 'ops' and self.model_gpu(m)}
+        self.pending_reservations.update(self.model_gpu(m) for m in self.previous_models.values() if m.get('enabled') and self.model_gpu(m))
         reserved = set(filter(None, self.values.get('EXECUTION_GPU_RESERVED_DEVICE_IDS', '').split(',')))
         self.values['EXECUTION_GPU_RESERVED_DEVICE_IDS'] = ','.join(sorted(reserved | self.pending_reservations))
 
@@ -600,14 +656,14 @@ def review_save(config: Configuration) -> bool:
 
 def _ui(config: Configuration) -> None:
     index, query, notice, selected = 0, "", "原配置已备份。保存、校验、部署分别操作。", 0
-    baseline = json.dumps([config.values, config.models], sort_keys=True)
+    baseline = json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
     while True:
         category = screen.SECTIONS[selected]
         rows = screen.filter_rows(config.rows(query), category)
         index = min(index, max(0, len(rows) - 1))
         columns, lines = shutil.get_terminal_size((100, 28))
         height = screen.page_size(columns, lines)
-        dirty = baseline != json.dumps([config.values, config.models], sort_keys=True)
+        dirty = baseline != json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
         frame = screen.render(config, rows, index, category, query, notice, columns, lines,
                               dirty=dirty, color="NO_COLOR" not in os.environ)
         print("\x1b[H" + frame + "\x1b[J", end="", flush=True)
@@ -623,6 +679,21 @@ def _ui(config: Configuration) -> None:
             elif key == "pagedown": index = min(max(0, len(rows) - 1), index + height)
             elif key == "home": index = 0
             elif key == "end": index = max(0, len(rows) - 1)
+            elif key == 'n':
+                model_id = input('新模型记录 ID（或仓库名）: ').strip()
+                if not model_id or model_id in config.models: raise ValueError('记录 ID 为空或已存在')
+                from docker.runtime_config import MODEL_DEFAULTS
+                engine = input('推理方式 vllm/native: ').strip()
+                adapter = input('适配器 chat/clef/nanojev: ').strip()
+                if engine not in {'vllm', 'native'} or adapter not in {'chat', 'clef', 'nanojev'}:
+                    raise ValueError('推理方式/适配器未登记')
+                state = deepcopy(MODEL_DEFAULTS)
+                state.update(engine=engine, adapter=adapter, model_dir='llm/' + model_id.replace('/', '--'))
+                config.models[model_id] = state
+                config.model_defaults[model_id] = deepcopy(state)
+                config.catalog.append({'repo': model_id, 'files': []})
+                config.services[model_id] = {'kind': 'local', 'model': model_id, 'api_key_env': ''}
+                notice = '已添加关闭的模型计划；请编辑目录/设备/端口，审核后才可启动。'
             elif key == "/":
                 print("\n", end="")
                 query = input("搜索配置名称/说明（空为全部）: ").strip()
@@ -634,11 +705,19 @@ def _ui(config: Configuration) -> None:
                 if row['kind'] == 'runtime':
                     notice = "此行为运行中的实际服务；启用计划请切换到“模型”分区编辑。"
                     continue
+                if row['kind'] == 'registry':
+                    if key != ' ':
+                        value = json.loads(input(row['key'] + ' JSON → ').strip())
+                        if not isinstance(value, dict): raise ValueError('服务/路由必须为 JSON 对象')
+                        setattr(config, row['key'], value)
+                    continue
                 if row["kind"] == "model":
                     state = config.models[row["repo"]]
                     if row["key"] == "enabled": state["enabled"] = not state["enabled"]
                     elif key == 'd': state[row['key']] = row['default']
-                    elif key != " ": state[row["key"]] = input(f"{row['label']} → ").strip()
+                    elif key != " ":
+                        value = input(f"{row['label']} → ").strip()
+                        state[row["key"]] = json.loads(value) if row["key"] == "engine_options" else value
                     if key != " ": config.resolved_migrations.add(row['repo'] + '.' + row['key'])
                 else:
                     name = row["key"]; value = config.values.get(name, "")
@@ -650,7 +729,7 @@ def _ui(config: Configuration) -> None:
                     if key != " ": config.resolved_migrations.add(name)
             elif key == "s":
                 if review_save(config):
-                    baseline = json.dumps([config.values, config.models], sort_keys=True)
+                    baseline = json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
                     notice = '配置已审核、保存并记录版本；没有启动模型。'
                 else:
                     notice = '已取消审核，文件未修改。'
@@ -665,7 +744,7 @@ def _ui(config: Configuration) -> None:
                         notice = '已取消审核；未部署。'
                         continue
                     config.apply()
-                    baseline = json.dumps([config.values, config.models], sort_keys=True)
+                    baseline = json.dumps([config.values, config.models, config.services, config.routes], sort_keys=True)
                     input("回车返回配置界面。")
         except (ValueError, OSError, RuntimeError) as exc: notice = str(exc)
 

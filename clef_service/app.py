@@ -40,15 +40,18 @@ class Settings:
     @classmethod
     def from_env(cls, prefix: str = "CLEF_") -> "Settings":
         values: dict[str, Any] = {}
-        for name in cls.__dataclass_fields__:
-            value = config_getenv(prefix + name.upper())
-            if value is not None:
-                if name.startswith("max_"):
-                    try:
-                        value = int(value)
-                    except ValueError:
-                        raise ValueError(f"{prefix}{name.upper()} must be an integer") from None
-                values[name] = value
+        from docker.model_services import selected_native
+        adapter = 'nanojev' if prefix == 'NANOJEV_' else 'clef'
+        record = selected_native(adapter)
+        if record is not None:
+            values.update(record.get('engine_options', {}))
+            key_env = values.pop('api_key_env', {'clef': 'CLEF_API_KEY', 'nanojev': 'NANOJEV_API_KEY'}[adapter])
+            values.pop('cpu_threads', None)
+            values.update(model_dir='/models/' + record['model_dir'],
+                          device='cpu' if record['device'] == 'cpu' else 'cuda:0',
+                          api_key=config_getenv(key_env, '') if key_env else '')
+        for name in list(values):
+            if name.startswith('max_'): values[name] = int(values[name])
         settings = cls(**values)
         if any(getattr(settings, name) < 1 for name in cls.__dataclass_fields__ if name.startswith("max_")):
             raise ValueError("CLEF limits must be positive")
@@ -152,14 +155,17 @@ class LocalRuntime:
         if not self.settings.model_dir or not directory.is_dir() or not (directory / "joint_schema_model.py").is_file():
             raise RuntimeError("CLEF_MODEL_DIR must contain a local Clef release")
         # Apply isolation before importing torch, transformers, or the model module.
-        if config_getenv("CLEF_CUDA_VISIBLE_DEVICES"):
-            os.environ["CUDA_VISIBLE_DEVICES"] = config_required('CLEF_CUDA_VISIBLE_DEVICES')
-            os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+
         os.environ["HF_HUB_OFFLINE"] = "1"
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
         # Importing the supplied loader must not create __pycache__ in the model directory.
         sys.dont_write_bytecode = True
+        from docker.model_services import selected_native, physical_gpu
+        selected = selected_native('clef')
+        if selected is not None:
+            os.environ['CUDA_VISIBLE_DEVICES'] = physical_gpu(selected)
+            os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
         import torch
 
         self.torch = torch

@@ -7,7 +7,8 @@ from backend.app.execution import supervisor as supervisor_mod
 
 def _capture_core_worker_env(monkeypatch, *, vlm_enabled: str, gpu_ids: list[str]) -> list[dict]:
     """运行 _start_core_workers 并收集各 spawn 调用的 env（不真正起进程）。"""
-    monkeypatch.setenv("VLLM_ENABLED", vlm_enabled)
+    monkeypatch.setattr(supervisor_mod, '_gpu_ids', lambda: gpu_ids)
+    monkeypatch.setattr('docker.model_services.worker_record', lambda: {'enabled': vlm_enabled == 'true', 'port': '8100', 'device': 'worker'})
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     captured: list[dict] = []
 
@@ -51,8 +52,8 @@ def test_planned_engine_ports_follows_vlm_enabled(monkeypatch):
     sup = supervisor_mod.RuntimeSupervisor()
     sup.gpu_ids = ["4", "5"]
 
-    monkeypatch.setenv("VLLM_ENABLED", "false")
+    sup.model_record = {"enabled": False}
     assert sup._planned_engine_ports() == []
 
-    monkeypatch.setenv("VLLM_ENABLED", "true")
+    sup.model_record = {"enabled": True}
     assert sup._planned_engine_ports() == [sup.base_port, sup.base_port + 1]

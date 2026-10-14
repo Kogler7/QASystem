@@ -91,7 +91,7 @@ def test_reload_stops_on_service_failure(project, monkeypatch):
 
 
 def test_reload_refuses_unapplied_model_plan(project, monkeypatch):
-    save(project, {}, {'test/model': {'enabled': True, 'gpu': '5', 'port': '9998'}})
+    save(project, {}, {'test/model': {'enabled': True, 'device': 'gpu:5', 'port': '9998'}})
     monkeypatch.setattr(ops, 'run', lambda *args: pytest.fail('Must not execute Docker'))
     with pytest.raises(ops.ControlError, match='尚未部署'):
         ops.reload_services(*project, ['backend'])

@@ -79,6 +79,11 @@ def snapshot(root, directory, *, payloads=None):
     for repo, model in document['models'].items():
         for key, value in model.items():
             values[f'models.{repo}.{key}'] = {'value': str(value)}
+    for name, service in document.get('services', {}).items():
+        for key, value in service.items():
+            values[f'services.{name}.{key}'] = {'value': str(value)} if key == 'api_key_env' else safe_value(key, str(value))
+    for purpose, service_id in document.get('routes', {}).items():
+        values[f'routes.{purpose}'] = {'value': service_id}
     # Exact file hashes catch comments, quoting, duplicate assignments and catalog changes.
     files = {'.env': digest(content(env_path)), 'config.json': digest(content(config_path)),
              '.env.example': digest(content(template)),

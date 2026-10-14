@@ -101,7 +101,7 @@ def test_headless_ui_cannot_approve(monkeypatch):
 
 def test_compose_startup_runs_guard_for_all_application_services():
     compose = yaml.safe_load((ROOT / 'docker-compose.yml').read_text(encoding='utf-8'))
-    for name in ['backend', 'agent', 'clef', 'nanojev']:
+    for name in ['backend', 'agent']:
         service = compose['services'][name]
         assert service['entrypoint'][1] == '/app/docker/config_guard.py'
         assert service['entrypoint'][-1] == '--exec'

@@ -86,10 +86,12 @@ def runtime_checks() -> dict[str, Any]:
     else:
         checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
         checks["mineru4"] = _directory_check(Path(config_getenv("MINERU_MODEL_BASE_DIR", "/models/mineru4")))
-        if config_getenv("VLLM_ENABLED", "true").lower() in {"0", "false", "off", "no"}:
+        from docker.model_services import worker_record
+        record = worker_record()
+        if not record or not record.get('enabled'):
             checks["mineru_vlm"] = {"ok": True, "skipped": True, "reason": "VLLM 未启用，2.x VLM 权重不参与运行"}
         else:
-            checks["mineru_vlm"] = _directory_check(Path("/models/mineru/vlm"))
+            checks["mineru_vlm"] = _directory_check(Path("/models") / record["model_dir"])
         checks.update({name.lower(): _optional_directory_check(name) for name in OPTIONAL_MODEL_ENV})
     return checks
 

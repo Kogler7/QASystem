@@ -51,7 +51,9 @@ def enable(editor, index, gpu='6', port='60123'):
     entry = editor.catalog[index]
     directory = editor.model_root() / 'llm' / entry['repo'].replace('/', '--')
     directory.mkdir(parents=True)
-    editor.models[entry['repo']].update(enabled=True, gpu=gpu, port=port)
+    (directory / 'config.json').write_text('{}')
+    (directory / 'model.safetensors').write_bytes(b'fixture')
+    editor.models[entry['repo']].update(enabled=True, device='gpu:' + gpu, port=port)
     return entry['repo']
 
 
@@ -112,7 +114,7 @@ def test_new_requests_reload_model_and_version_existing_snapshot_is_stable(edito
 
 def test_model_compose_uses_unified_image_offline_readonly_weights(editor):
     repo = enable(editor, 0)
-    service = editor.compose()['services'][configure.slug(repo)]
+    service = editor.compose()['services'][__import__('docker.model_services', fromlist=['service_name']).service_name(repo)]
     assert service['image'] == 'qasystem-env-v1'
     assert service['volumes'][0].endswith(':/models:ro')
     assert service['environment']['HF_HUB_OFFLINE'] == '1'
@@ -145,7 +147,7 @@ def test_apply_reserves_gpu_before_recreating_existing_backend(editor, monkeypat
     editor.apply()
     commands = [c for c in calls if 'up' in c]
     assert commands[0][-2:] == ['backend', 'agent']
-    assert commands[1][-1].startswith('llm_')
+    assert commands[1][-1].startswith('model_')
     assert all('build' not in c and 'pull' not in c for c in calls)
     assert (editor.directory / 'applied-models.json').exists()
 
@@ -163,7 +165,7 @@ def test_disabled_model_stops_only_previously_managed_service(editor, monkeypatc
     editor.apply()
     stops = [c for c in calls if 'stop' in c]
     assert len(stops) == 1
-    assert stops[0][-1] == configure.slug(repo)
+    assert stops[0][-1] == __import__('docker.model_services', fromlist=['service_name']).service_name(repo)
     assert not any('clef' in c or 'nanojev' in c for c in calls)
 
 
@@ -321,7 +323,7 @@ def test_canonical_runtime_file_does_not_overlay_old_files(editor):
     from docker.runtime_config import read_document
     (editor.directory / 'config.json').write_text('{"settings": {}, "models": {}}')
     (editor.directory / 'settings.json').write_text('{"KG_EXTRACT_LLM_MODEL":"stale"}')
-    assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}}
+    assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}, 'services': {}, 'routes': {}}
 
 
 @pytest.mark.parametrize('filename', ['settings.json', 'models.json'])

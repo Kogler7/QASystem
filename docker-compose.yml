@@ -83,62 +83,6 @@ services:
       retries: 5
       start_period: 60s
 
-  clef:
-    image: ${QASYSTEM_ENV_IMAGE:?Run ops config to generate configuration}
-    pull_policy: never
-    profiles: [decisions]
-    container_name: qasystem_clef
-    restart: unless-stopped
-    init: true
-    entrypoint: ["python", "/app/docker/config_guard.py", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
-    gpus: all
-    env_file:
-      - .env
-    environment: *qasystem-process-environment
-    volumes:
-      - ${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro
-      - ./runtime-config:/app/runtime-config:ro
-      - ./runtime-config/observed:/app/runtime-config/observed
-      - ./.env:/app/.env:ro
-      - ./.env.example:/app/deployment.env.example:ro
-      - ${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro
-    working_dir: /app
-    command: ["/bin/sh", "-ec", "test -n \"$$CLEF_CUDA_VISIBLE_DEVICES\" || { echo 'Set CLEF_CUDA_VISIBLE_DEVICES to a dedicated GPU'; exit 1; }; exec python -m clef_service"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:$$CLEF_PORT/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-
-  nanojev:
-    image: ${QASYSTEM_ENV_IMAGE:?Run ops config to generate configuration}
-    pull_policy: never
-    profiles: [decisions]
-    container_name: qasystem_nanojev
-    restart: unless-stopped
-    init: true
-    entrypoint: ["python", "/app/docker/config_guard.py", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
-    gpus: all
-    env_file:
-      - .env
-    environment: *qasystem-process-environment
-    volumes:
-      - ${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro
-      - ./runtime-config:/app/runtime-config:ro
-      - ./runtime-config/observed:/app/runtime-config/observed
-      - ./.env:/app/.env:ro
-      - ./.env.example:/app/deployment.env.example:ro
-      - ${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro
-    working_dir: /app
-    command: python -m nanojev_service
-    healthcheck:
-      test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:$$NANOJEV_PORT/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-
   redis:
     image: redis:7-alpine
     container_name: qasystem_agent_redis

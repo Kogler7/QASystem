@@ -31,12 +31,14 @@ def _module(name: str, **attributes: object) -> types.ModuleType:
 
 
 @pytest.fixture(autouse=True)
-def _protocol_stub_lifetime(request):
+def _protocol_stub_lifetime(request, monkeypatch):
     """Keep the session app stable but restore global stubs after each test."""
     if "protocol_module" not in request.fixturenames:
         yield
         return
     protocol = request.getfixturevalue("protocol_module")
+    monkeypatch.setenv("EXECUTION_MODE", "inline")
+    monkeypatch.setenv("EXECUTION_REDIS_URL", "")
     sys.modules.update(protocol.stubs)
     try:
         yield
@@ -209,6 +211,8 @@ def protocol_module():
         ),
         "mcp_services.server": _module("mcp_services.server", mcp=_MCPStub()),
     }
+    # Package stubs retain real config submodules; HTTP request snapshots resolve versions.
+    stubs['algorithm.knowledge_extract'].__path__ = [str(ROOT / 'algorithm/knowledge_extract')]
     original_environment = {
         name: os.environ.get(name)
         for name in (

@@ -37,20 +37,24 @@ def test_native_triton_probe_does_not_hide_unrelated_import_failure(monkeypatch)
         jev_client._has_native_triton()
 
 
-def test_clef_deployment_uses_shared_image_and_read_only_external_assets():
-    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
-    service = compose["services"]["clef"]
-    assert service["image"] == compose["services"]["backend"]["image"]
-    assert service["profiles"] == ["decisions"]
-    assert "${QASYSTEM_SOURCE_DIR:?Run ops config to generate configuration}:/app:ro" in service["volumes"]
-    assert "${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro" in service["volumes"]
-    assert "ports" not in service
-    assert "exec python -m clef_service" in service["command"][-1]
-    assert "clef_service" in (ROOT / "package-deploy.ps1").read_text(encoding="utf-8")
-    nano = compose["services"]["nanojev"]
-    assert nano["image"] == service["image"]
-    assert nano["volumes"] == service["volumes"]
-    assert nano["command"] == "python -m nanojev_service"
+def test_clef_deployment_uses_shared_image_and_read_only_external_assets(tmp_path):
+    from docker.configure import Configuration
+    from docker.model_services import service_name
+    editor = Configuration(tmp_path)
+    base = yaml.safe_load((ROOT / 'docker-compose.yml').read_text(encoding='utf8'))
+    assert 'clef' not in base['services'] and 'nanojev' not in base['services']
+    for model_id in ('clef-flash', 'nanojev'):
+        editor.models[model_id].update(enabled=True, device='cpu')
+    services = editor.compose()['services']
+    for model_id in ('clef-flash', 'nanojev'):
+        service = services[service_name(model_id)]
+        assert service['image'] == 'qasystem-env-v1'
+        assert 'gpus' not in service
+        assert any(v.endswith(':/models:ro') for v in service['volumes'])
+        assert any(v.endswith(':/app:ro') for v in service['volumes'])
+        assert '--record' in service['command']
+        assert service['command'][-2:] == [model_id, '--container']
+
 
 
 def test_decision_runtime_reuses_backend_dependency_versions():

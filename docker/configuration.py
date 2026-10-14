@@ -64,3 +64,9 @@ def required(key):
     if value is None:
         raise KeyError(key)
     return value
+
+
+def read_registry(*, with_revision=False):
+    """Read one approved snapshot; callers retain it for in-flight work."""
+    from docker.runtime_config import read_registry as read
+    return read(with_revision=with_revision)
