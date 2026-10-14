@@ -21,8 +21,8 @@ def registry(monkeypatch):
         'clef': {'kind': 'local', 'model': 'clef-flash'},
         'nano': {'kind': 'local', 'model': 'nanojev'},
     }, 'routes': {'extract': 'chat', 'entity_count': 'clef'}}
-    monkeypatch.setattr(model_routes, 'registry_snapshot', lambda: (deepcopy(data), 'revision-1'))
-    monkeypatch.setattr(extraction_config, 'registry_snapshot', lambda: (deepcopy(data), 'revision-1'))
+    monkeypatch.setattr(model_routes, 'registry_snapshot', lambda: (deepcopy(data), 1))
+    monkeypatch.setattr(extraction_config, 'registry_snapshot', lambda: (deepcopy(data), 1))
     from qasystem_config import model_registry as model_services
     monkeypatch.setattr(model_services, 'local_model_endpoint', lambda name, record: {
         'base_url': f'http://local-{name}:8000' + ('/v1' if record['adapter'] == 'chat' else ''),
@@ -38,7 +38,7 @@ def test_registered_extraction_route_wins_legacy_address_and_has_no_key(registry
     assert result['base_url'] == 'http://local-qwen:8000/v1'
     assert result['model'] == 'qwen'
     assert result['api_key_env'] == '' and result['credential_required'] is False
-    assert result['config_revision'] == 'revision-1'
+    assert result['config_revision'] == 1
     assert 'secret-legacy' not in json.dumps(result)
 
 
