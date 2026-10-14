@@ -70,9 +70,9 @@ _seen = set()
 _lock = threading.Lock()
 
 
-def observe_read(key, value, *, directory, revision, source):
+def observe_read(key, value, *, directory, revision, source, credential=False):
     from qasystem_config.config_guard import safe_value
-    encoded = {'value': None} if value is None else safe_value(key, str(value))
+    encoded = {'value': None} if value is None else safe_value(key, str(value), credential=credential)
     identity = (str(directory), revision, key, json.dumps(encoded, sort_keys=True), source)
     with _lock:
         if identity in _seen:

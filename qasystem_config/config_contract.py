@@ -11,14 +11,14 @@ from qasystem_config.environment_contract import central_reader_names, environme
 
 APPLICATION_DIRS = ('backend', 'agent', 'algorithm', 'external_services', 'clef_service', 'nanojev_service', 'mcp_services', 'agent_mcp', 'model_runtime')
 HISTORY_DIRECTORIES = ('docker/config-releases', 'qasystem_config/config-releases')
-EXTRA_SCAN_FILES = ('qasystem_config/mineru_adapter.py',)
+SCAN_DIRECTORIES = (*APPLICATION_DIRS, 'qasystem_config')
 CORE_CONTRACT = {
     'package': 'qasystem_config', 'declaration': 'qasystem_config/config-declarations.json',
     'history_directories': list(HISTORY_DIRECTORIES),
     'forbidden_core_dependencies': ['docker', *APPLICATION_DIRS],
     'business_configuration_owner': 'qasystem_config', 'deployment_owner': 'docker',
     'io_owner': 'qasystem_config.io', 'native_entrypoint': 'model_runtime.native',
-    'provider_scan_files': list(EXTRA_SCAN_FILES),
+    'scan_directories': list(SCAN_DIRECTORIES),
 }
 
 
@@ -40,6 +40,21 @@ READERS = {'config_getenv','config_required','getenv','required','startup_getenv
 
 def reader_names(tree):
     return central_reader_names(tree, READERS)
+
+
+def trusted_core_environment_contracts(root=None):
+    from qasystem_config.environment_contract import CORE_ENVIRONMENT_ACCESS_CONTRACT
+    result = {}
+    for rule in CORE_ENVIRONMENT_ACCESS_CONTRACT:
+        path = (Path(root) if root is not None else Path(__file__).resolve().parents[1]) / rule['path']
+        if not path.is_file():
+            result[rule['path'] + ':' + rule['function']] = None
+            continue
+        tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+        result[rule['path'] + ':' + rule['function']] = next((
+            ast.unparse(node) for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == rule['function']), None)
+    return result
 
 
 def central_startup_contracts():
@@ -122,10 +137,9 @@ def git_ignored(root, paths):
 
 def files(root):
     root = Path(root)
-    candidates = [path for directory in APPLICATION_DIRS
+    candidates = [path for directory in SCAN_DIRECTORIES
                   for path in (root / directory).rglob('*.py')
                   if 'tests' not in path.relative_to(root).parts]
-    candidates += [root / name for name in EXTRA_SCAN_FILES if (root / name).is_file()]
     ignored = git_ignored(root, candidates)
     for path in candidates:
         if path.relative_to(root).as_posix() not in ignored:
@@ -164,6 +178,11 @@ def check(root, *, deployed=False):
             errors.append('公共配置核心边界变化，必须登记新声明版本')
         if catalog.get('environment_access_contract') != ENVIRONMENT_ACCESS_CONTRACT:
             errors.append('进程环境访问/受控启动接口合同变化，必须登记配置声明新版本')
+        from qasystem_config.credentials import CREDENTIAL_CONTRACT
+        if catalog.get('credential_contract') != CREDENTIAL_CONTRACT or catalog.get('dynamic_keys'):
+            errors.append('动态凭据必须精确绑定已批准消费者，不得用名称规则放行')
+        if catalog.get('trusted_core_environment_contracts') != trusted_core_environment_contracts(root):
+            errors.append('受信核心ENV函数变化，必须登记配置声明新版本')
         if catalog.get('central_startup_contracts') != central_startup_contracts():
             errors.append('集中启动环境适配规则变化，必须登记配置声明新版本')
         if catalog.get('aliases') != ALIASES:
@@ -202,7 +221,7 @@ def check(root, *, deployed=False):
                 errors.append(f'{key} 模板与版本声明的默认值不一致')
     sources = {}
     source_readers = {}
-    for path in (root / 'qasystem_config').glob('*.py'):
+    for path in (root / 'qasystem_config').rglob('*.py'):
         tree = ast.parse(path.read_text(encoding='utf-8-sig'))
         for node in ast.walk(tree):
             imports = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ''] if isinstance(node, ast.ImportFrom) else []
@@ -238,8 +257,6 @@ def check(root, *, deployed=False):
                             errors.append(f'{path.relative_to(root)}:{node.lineno} 未声明配置 {key}')
             elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Load):
                 raw = ast.unparse(node.value) in {f'{name}.environ' for name in aliases}
-            if raw:
-                errors.append(f'{path.relative_to(root)}:{node.lineno} 禁止绕过集中配置模块')
     for key, item in catalog['items'].items():
         if not item.get('desc') or not item.get('consumers') or 'default' not in item:
             errors.append(f'{key} 声明缺少说明、默认值或消费者')

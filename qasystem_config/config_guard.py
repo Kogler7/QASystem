@@ -25,8 +25,8 @@ def digest(value):
     return hashlib.sha256(value).hexdigest()
 
 
-def safe_value(key, value):
-    if sensitive(key) or re.search(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+@', value):
+def safe_value(key, value, *, credential=False):
+    if credential or sensitive(key) or re.search(r'[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+@', value):
         return {'value': '[凭据已隐藏]', 'fingerprint': digest(value.encode())}
     return {'value': value}
 
@@ -64,7 +64,12 @@ def snapshot(root, directory, *, payloads=None):
         document = json.loads(payloads[config_path])
     else:
         document = read_document(config_path)
-    values = {'env.' + k: safe_value(k, v) for k, v in env.items()}
+    from qasystem_config.credentials import bindings
+    credential_keys = set(bindings(document))
+    previous = approved(directory)
+    credential_keys.update(key[4:] for key, value in (previous or {}).get('snapshot', {}).get('values', {}).items()
+                           if key.startswith('env.') and 'fingerprint' in value)
+    values = {'env.' + k: safe_value(k, v, credential=k in credential_keys) for k, v in env.items()}
     try:
         displayed_directory = './' + directory.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
@@ -94,7 +99,7 @@ def snapshot(root, directory, *, payloads=None):
     if declaration.exists():
         registry = json.loads(declaration.read_text(encoding='utf-8'))
         values['declarations.version'] = {'value': registry['version']}
-        for key in ('aliases', 'model_defaults', 'model_descriptions', 'model_migrations', 'retired', 'fixed_contracts'):
+        for key in ('aliases', 'model_defaults', 'model_descriptions', 'model_migrations', 'retired', 'fixed_contracts', 'credential_contract'):
             values['declarations.' + key] = {'value': json.dumps(registry.get(key), ensure_ascii=False, sort_keys=True)}
         for key, item in registry['items'].items():
             values['declarations.' + key] = {**safe_value(key, str(item['default'])),

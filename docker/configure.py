@@ -129,6 +129,8 @@ class Configuration:
         self.directory.chmod(0o700)
         hot = self.input_directory / "config.json"
         document = read_document(hot, migration=True)
+        from qasystem_config.credentials import bindings
+        self.initial_credential_keys = set(bindings(document))
         # Preserve recognized retirement inputs for the UI proposal, before the
         # runtime reader filters them out. Canonical config.json remains the
         # sole source; never overlay a stale settings.json when it exists.
@@ -216,6 +218,14 @@ class Configuration:
         self.live_error = "实际状态尚未读取"
         self.process_status = None
         self.pending_reservations = set()
+        self.refresh_credential_fields()
+
+    def refresh_credential_fields(self):
+        from qasystem_config.credentials import fields
+        dynamic = fields({'services': self.services, 'models': self.models})
+        self.fields = [field for field in self.fields if not field.get('dynamic')] + dynamic
+        for field in dynamic:
+            self.values.setdefault(field['key'], '')
 
     def refresh_live(self) -> None:
         """Read only selected non-secret environment keys; never dump container Env."""
@@ -321,6 +331,7 @@ class Configuration:
         return (self.root / path).resolve() if not path.is_absolute() else path.resolve()
 
     def rows(self, query: str = "") -> list[dict]:
+        self.refresh_credential_fields()
         from qasystem_config.configuration import declarations
         rows = []
         for container in self.live:
@@ -510,6 +521,8 @@ class Configuration:
         from qasystem_config.configuration import declarations
         from qasystem_config.config_migrations import ALIASES
         retired = set(declarations().get('retired', [])) | set(ALIASES)
+        from qasystem_config.credentials import bindings, FIXED_CREDENTIALS
+        retired |= self.initial_credential_keys - set(bindings({'services': self.services, 'models': self.models})) - FIXED_CREDENTIALS
         static = {k: v for k, v in self.values.items() if k not in PERSISTED_KEYS and k not in retired}
         original_values = config_io.read_env(self.original or self.template)
         # Rewrite declared keys once, eliminating duplicate assignments.

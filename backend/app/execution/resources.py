@@ -214,6 +214,8 @@ class ResourceScheduler:
 
     @staticmethod
     def _memory_request(resource_class: str) -> int:
+        if resource_class not in {'gpu.vlm', 'gpu.embedding', 'gpu.confidence'}:
+            raise ResourceLeaseUnavailable('未登记GPU资源类，拒绝默认显存回退')
         suffix = str(resource_class).replace(".", "_").replace("-", "_").upper()
         value = config_getenv(f"EXECUTION_GPU_MEMORY_REQUEST_MB_{suffix}")
         value = value or config_getenv("EXECUTION_GPU_MEMORY_REQUEST_MB", "0")

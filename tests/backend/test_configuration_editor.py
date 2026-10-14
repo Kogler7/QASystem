@@ -4,7 +4,8 @@ from pathlib import Path
 import pytest
 
 from docker import configure
-from algorithm import runtime_settings
+from qasystem_config import configuration
+from qasystem_config import runtime_config
 from backend.app.services import extraction_config
 
 
@@ -21,7 +22,7 @@ def editor(tmp_path, monkeypatch):
 
 def test_catalog_covers_every_release_key_and_masks_secrets(editor):
     assert {r['key'] for r in editor.fields} == set(configure.config_io.read_env(editor.template))
-    assert configure.HOT_KEYS == runtime_settings.HOT_KEYS
+    assert configure.HOT_KEYS == runtime_config.HOT_KEYS
     rows = editor.rows()
     assert all(not editor.models[m['repo']]['enabled'] for m in editor.catalog)
     assert all('never-print' not in r['label'] for r in rows)
@@ -40,11 +41,11 @@ def test_save_generates_defaults_and_hot_file_without_deploy(editor, monkeypatch
     assert json.loads((editor.directory / 'models.compose.json').read_text()) == {'services': {}}
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
     monkeypatch.chdir(editor.root)
-    assert runtime_settings.getenv('KG_EXTRACT_ALGO_VERSION') == 'v3'
+    assert configuration.getenv('KG_EXTRACT_ALGO_VERSION') == 'v3'
     editor.values['KG_EXTRACT_ALGO_VERSION'] = 'v2'
     editor.save()
     configure.guard.record(editor.directory, configure.guard.snapshot(editor.root, editor.directory), reason='test', reviewer='tester')
-    assert runtime_settings.getenv('KG_EXTRACT_ALGO_VERSION') == 'v2'
+    assert configuration.getenv('KG_EXTRACT_ALGO_VERSION') == 'v2'
 
 
 def enable(editor, index, gpu='6', port='60123'):
@@ -91,10 +92,10 @@ def test_runtime_rejects_secrets_and_malformed_file(tmp_path, monkeypatch):
     path = tmp_path / 'settings.json'
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv('KG_EXTRACT_ALGO_VERSION', 'v2')
-    assert runtime_settings.getenv('KG_EXTRACT_ALGO_VERSION') == 'v2'
+    assert configuration.getenv('KG_EXTRACT_ALGO_VERSION') == 'v2'
     for text in ('{', '{"KG_EXTRACT_LLM_API_KEY":"secret"}', '[]'):
         path.write_text(text)
-        with pytest.raises(ValueError, match='Invalid runtime'): runtime_settings.read_settings(path)
+        with pytest.raises(ValueError, match='Invalid runtime'): runtime_config.read_settings(path)
 
 
 def test_new_requests_reload_model_and_version_existing_snapshot_is_stable(editor, monkeypatch):

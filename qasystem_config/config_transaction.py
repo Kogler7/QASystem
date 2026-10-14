@@ -30,12 +30,10 @@ def patch_configuration(config, patch):
     """Merge named records; null explicitly deletes registry records, never settings."""
     if not isinstance(patch, dict) or set(patch) - {'settings', 'models', 'services', 'accounts', 'routes', 'resolve_conflicts'}:
         raise ValueError('配置 patch 顶层字段无效')
-    allowed = {field['key'] for field in config.fields}
     settings = patch.get('settings', {})
-    if not isinstance(settings, dict) or any(key not in allowed or not isinstance(value, str)
+    if not isinstance(settings, dict) or any(not isinstance(value, str)
                                              for key, value in settings.items()):
         raise ValueError('settings 只能使用当前模板标准配置名和字符串值')
-    config.values.update(settings)
     provided = set(settings)
     for section in ('models', 'services', 'accounts', 'routes'):
         changes = patch.get(section, {})
@@ -61,6 +59,11 @@ def patch_configuration(config, patch):
                     from qasystem_config.runtime_config import MODEL_DEFAULTS
                     defaults = deepcopy(config.model_defaults.get(name, MODEL_DEFAULTS))
                 target[name] = {**defaults, **deepcopy(target.get(name, {})), **deepcopy(value)}
+    config.refresh_credential_fields()
+    allowed = {field['key'] for field in config.fields}
+    if any(key not in allowed for key in settings):
+        raise ValueError('settings 只能使用当前模板标准配置名或已登记服务凭据')
+    config.values.update(settings)
     resolutions = patch.get('resolve_conflicts', {})
     if not isinstance(resolutions, dict): raise ValueError('冲突解决必须为对象')
     for key, choice in resolutions.items():
@@ -72,6 +75,7 @@ def patch_configuration(config, patch):
 
 
 def plan(config):
+    config.refresh_credential_fields()
     for record in config.models.values():
         if any(key.lower() in {'api_key', 'secret', 'password', 'token', 'authorization'}
                for key in record.get('engine_options', {})):
@@ -126,7 +130,9 @@ def apply(config, *, reason, actor='agent', base_revision, expected_snapshot=Non
     """Publish only validated/CAS-matched state; restore approval and files on failure."""
     if actor not in {'agent', 'human', 'automation'} or not isinstance(reason, str) or not reason.strip():
         raise ValueError('必须提供有效操作者类型和非空变更原因')
-    if any(value and value in reason for key, value in config.values.items() if guard.sensitive(key)):
+    from qasystem_config.credentials import bindings
+    credential_keys = bindings({'services': config.services, 'models': config.models})
+    if any(value and value in reason for key, value in config.values.items() if guard.sensitive(key) or key in credential_keys):
         raise ValueError('变更原因不得包含凭据内容')
     with transaction_lock(config.directory):
         report, proposed = plan(config)

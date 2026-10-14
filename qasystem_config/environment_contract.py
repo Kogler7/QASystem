@@ -67,7 +67,23 @@ CONTROLLED_ENVIRONMENT_CALL_CONTRACT = [
           'Forward the three registered MinerU loader dependency parameters at initialization.'),
 ]
 
-ENVIRONMENT_ACCESS_CONTRACT = PROCESS_ENVIRONMENT_ACCESS_CONTRACT + CONTROLLED_ENVIRONMENT_CALL_CONTRACT
+CORE_ENVIRONMENT_ACCESS_CONTRACT = [
+    *[_rule('qasystem_config/configuration.py', function, 'read', None,
+            'Declared central adapter; complete function is frozen.')
+      for function in ('getenv', 'startup_getenv')],
+    _rule('qasystem_config/configuration.py', 'getenv', 'contains', None,
+          'Record whether the declared value came from ENV or fallback.'),
+    _rule('qasystem_config/configuration.py', 'bootstrap_local_environment', 'dotenv', None,
+          'Repository-root development bootstrap; complete function is frozen.'),
+    _rule('qasystem_config/configuration.py', 'prepare_dev_agent_startup', 'write',
+          ('AGENT_WORKER_CONCURRENCY',), 'Validated unmanaged development CLI carrier.'),
+    _rule('qasystem_config/configuration.py', 'configure_mineru_loader_environment', 'write',
+          ('MINERU_TOOLS_CONFIG_JSON', 'MINERU_CONFIG_PATH', 'MINERU_MODEL_SOURCE'),
+          'Registered legacy OCR dependency initialization.'),
+    _rule('qasystem_config/config_database.py', 'observe_read', 'read', ('HOSTNAME',),
+          'Process identity for redacted consumption events.'),
+]
+ENVIRONMENT_ACCESS_CONTRACT = PROCESS_ENVIRONMENT_ACCESS_CONTRACT + CONTROLLED_ENVIRONMENT_CALL_CONTRACT + CORE_ENVIRONMENT_ACCESS_CONTRACT
 
 
 class _Scanner(ast.NodeVisitor):
@@ -203,12 +219,20 @@ class _Scanner(ast.NodeVisitor):
                 self.record(value, 'snapshot')
         self.generic_visit(node)
 
+    def visit_Compare(self, node):
+        for operator, operand in zip(node.ops, node.comparators):
+            if isinstance(operator, (ast.In, ast.NotIn)) and self.capability(operand) == 'environ':
+                self.record(node, 'contains', self.literal_key(node.left))
+        self.generic_visit(node)
+
     def _reference(self, node):
         capability = self.capability(node)
         if capability not in ('environ', 'getenv', 'putenv', 'unsetenv', 'load_dotenv') and not (
                 capability and capability.startswith(('environ.', 'controlled.'))):
             return
         parent = self.parents.get(node)
+        if isinstance(parent, ast.Compare) and any(operand is node and isinstance(op, (ast.In, ast.NotIn)) for op, operand in zip(parent.ops, parent.comparators)):
+            return
         if isinstance(parent, ast.Attribute) and parent.value is node:
             return
         if isinstance(parent, ast.Call) and parent.func is node:

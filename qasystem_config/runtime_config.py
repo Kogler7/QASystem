@@ -145,6 +145,8 @@ def _validate_document(data):
     accounts = data.get('accounts', {})
     from qasystem_config.api_services import validate_api_registry
     validate_api_registry(services, accounts, routes)
+    from qasystem_config.credentials import bindings
+    bindings(data)
     return {"settings": settings, "models": models, 'services': services, 'routes': routes, 'accounts': accounts}
 
 
