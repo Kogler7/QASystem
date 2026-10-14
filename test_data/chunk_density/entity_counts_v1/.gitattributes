@@ -1,0 +1,3 @@
+# Frozen corpus checksums use exact UTF-8/LF bytes on every checkout platform.
+*.jsonl text eol=lf
+*.json text eol=lf

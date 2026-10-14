@@ -1,5 +1,23 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "serialization": {
+    "encoding": "UTF-8",
+    "record_separator": "LF",
+    "final_newline": true,
+    "hash_scope": "exact_bytes"
+  },
+  "checksum_migration": {
+    "source_version": "1.0.0",
+    "source_commit": "d6d65ea5e98adfb05138d94da7d49eb254de0ecf",
+    "reason": "The original manifest hashed CRLF records; Git committed LF records. Only record separators differ, and reconstructing CRLF reproduces every original digest.",
+    "source_record_separator": "CRLF",
+    "source_files_sha256": {
+      "cases.jsonl": "19cfcfb318924b8324b3c060c96c5494bdc8205a9bde0dc2e181efc97cb95cfe",
+      "calibration.jsonl": "bd0b721096eae49663fdb38e3c5f6eaf82af269593ff3b4f180e05008d278c7d",
+      "test.jsonl": "7fcff56c9762b2676d3a390492ae8f6fb3fb4197735a6d8221c085194fc51cdc",
+      "review_queue.jsonl": "726a60aa35467a1e83f65819f808d484c4871df9615a6ef6897144d85e77cdb5"
+    }
+  },
   "label_kind": "historical_extraction_proxy",
   "not_human_ground_truth": true,
   "matching": "original input.text must exactly equal decoded entity-call current chunk.text",
@@ -38,9 +56,9 @@
     "Rows with identical text have no cross-split leakage; unknown shared original documents may still leak."
   ],
   "files_sha256": {
-    "cases.jsonl": "19cfcfb318924b8324b3c060c96c5494bdc8205a9bde0dc2e181efc97cb95cfe",
-    "calibration.jsonl": "bd0b721096eae49663fdb38e3c5f6eaf82af269593ff3b4f180e05008d278c7d",
-    "test.jsonl": "7fcff56c9762b2676d3a390492ae8f6fb3fb4197735a6d8221c085194fc51cdc",
-    "review_queue.jsonl": "726a60aa35467a1e83f65819f808d484c4871df9615a6ef6897144d85e77cdb5"
+    "cases.jsonl": "5503e40260ca1303d7ce84d937616e28b2ca779d966cd7252a5d8c89c24f2d35",
+    "calibration.jsonl": "a657b3fad7d9877dcddd8c08c74b95994262dfade8c536c6b34195490857c045",
+    "test.jsonl": "8e2d373f9412ae2c452a23fc0a75d7d43a4d2325c9aa1ac7511a11c4a8cd21b3",
+    "review_queue.jsonl": "102d1ac38dfd1eb8e034995393fc80c3680bee9811ca8cd5be96fa0e2096b6ac"
   }
 }
