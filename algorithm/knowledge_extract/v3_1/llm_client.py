@@ -10,12 +10,20 @@ import math
 from typing import Any
 from urllib.parse import urlparse
 
+from external_services.llm.chat import thinking_unsupported
 from ._logging import get_step_logger
 from .config import get_llm_config
 from .prompt_router import ChatMessages
 
 
 logger = get_step_logger(__name__)
+
+# Exact semantic operations, never inferred from retry counts or error strings.
+SEMANTIC_THINKING_PASSES = frozenset({
+    "entity_verification", "entity_admission", "property_verification",
+    "evidence_verification", "candidate_identity", "candidate_identity_verification",
+    "property_conflict", "repair_entity", "repair_property",
+})
 
 
 # DeepSeek's Responses strict-schema implementation intentionally supports a
@@ -102,6 +110,28 @@ def _field(value: Any, name: str, default: Any = None) -> Any:
     return getattr(value, name, default)
 
 
+def explicit_document_field(item):
+    labels = {'文件标题', '来文字号', '收文号', '来文单位', '收文日期', '收文部门',
+              '联系电话', '密级', '缓急'}
+    return (item.get('type') == 'OfficialDocument'
+        and item.get('property') in labels and type(item.get('value')) in (str, int, float)
+        and len(str(item['value'])) <= 256 and bool(item.get('evidence_quotes'))
+        and 'previous_value' not in item and 'conflicting_values' not in item)
+
+
+def _explicit_document_fields(messages, run_context):
+    """A short semantic review still checks ownership; complex claims keep thinking."""
+    if (run_context or {}).get('pass_name') != 'property_verification':
+        return False
+    import json
+    try:
+        user = json.loads(messages[-1]['content'])
+        items = user['task']['items']
+    except (ValueError, KeyError, TypeError, IndexError):
+        return False
+    return bool(items) and all(explicit_document_field(item) for item in items)
+
+
 class StructuredLLMResponse:
     """Internal structured response envelope with string-like compatibility."""
 
@@ -116,6 +146,7 @@ class StructuredLLMResponse:
         incomplete_details: dict[str, Any] | None = None,
         usage: dict[str, Any] | None = None,
         usage_unavailable: bool = False,
+        thinking: dict[str, Any] | None = None,
     ) -> None:
         self.text = text or ""
         self.api = api
@@ -125,6 +156,7 @@ class StructuredLLMResponse:
         self.incomplete_details = dict(incomplete_details or {})
         self.usage = dict(usage or {}) if usage is not None else None
         self.usage_unavailable = usage is None or usage_unavailable
+        self.thinking = dict(thinking or {})
 
     def __str__(self) -> str:
         return self.text
@@ -153,6 +185,7 @@ class StructuredLLMResponse:
             "incomplete_details": dict(self.incomplete_details),
             "usage": self.usage,
             "usage_unavailable": self.usage_unavailable,
+            "thinking": dict(self.thinking),
         }
 
 
@@ -210,53 +243,80 @@ class OpenAICompatibleLLM:
         disable_thinking: bool,
         base_url: str = "",
         generation_temperature: float = 0,
+        semantic_thinking: bool = True,
+        thinking_parameter: str = "thinking",
+        stream_generation: bool = False,
+        verification_max_tokens: int | None = None,
+        fast_verification: bool = False,
     ) -> None:
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.disable_thinking = disable_thinking
+        self.semantic_thinking = semantic_thinking
+        self.stream_generation = bool(stream_generation)
+        self.verification_max_tokens = max(1, int(verification_max_tokens or max_tokens))
+        self.fast_verification = bool(fast_verification)
+        if thinking_parameter not in {"thinking", "enable_thinking", "none"}:
+            raise ValueError("Invalid thinking parameter")
+        self.thinking_parameter = thinking_parameter
         self.base_url = base_url
         if not math.isfinite(generation_temperature) or not 0 <= generation_temperature <= 2:
             raise ValueError('generation_temperature must be finite and between 0 and 2')
         self.generation_temperature = generation_temperature
 
     def _create(self, messages: ChatMessages, *, response_format: dict[str, Any] | None = None,
-                temperature: float = 0) -> Any:
+                temperature: float = 0, thinking: bool | None = None,
+                thinking_trace: dict[str, Any] | None = None,
+                stream: bool = False, max_tokens: int | None = None) -> Any:
+        enabled = not self.disable_thinking if thinking is None else thinking
+        mode = "enabled" if enabled else "disabled"
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": self.max_tokens,
+            "max_tokens": min(self.max_tokens, max_tokens or self.max_tokens),
         }
+        if stream:
+            from .streaming import consume_entity_stream
+            from external_services.llm.runtime import ScheduledClient
+            kwargs.update(stream=True, stream_options={"include_usage": True})
+            if isinstance(self.client, ScheduledClient):
+                kwargs['_response_consumer'] = lambda result: consume_entity_stream(
+                    result, deadline=self.client.call_deadline)
         if response_format is not None:
             kwargs["response_format"] = response_format
+        if self.thinking_parameter == "thinking":
+            kwargs["extra_body"] = {"thinking": {"type": mode}}
+        elif self.thinking_parameter == "enable_thinking":
+            kwargs["extra_body"] = {"enable_thinking": enabled}
+        if thinking_trace is not None:
+            thinking_trace.update(requested=mode, parameter=self.thinking_parameter,
+                                  sent=mode if "extra_body" in kwargs else "provider_default", fallback=False)
         logger.info(
             "[步骤][LLM-Client] 请求: model=%s messages=%d prompt=%d字符 max_tokens=%s response_format=%s thinking=%s temperature=%s",
             self.model,
             len(messages),
             sum(len(str(item.get("content") or "")) for item in messages),
-            self.max_tokens,
+            kwargs['max_tokens'],
             (response_format or {}).get("type") if isinstance(response_format, dict) else None,
-            "disabled" if self.disable_thinking else "default",
+            mode if "extra_body" in kwargs else "provider_default",
             temperature,
         )
         try:
-            if self.disable_thinking:
-                response = self.client.chat.completions.create(
-                    **kwargs,
-                    # OpenAI-compatible SDKs forward provider-specific fields
-                    # through ``extra_body``.  DeepSeek V4 documents the
-                    # thinking toggle in this location rather than as a
-                    # top-level SDK argument.
-                    extra_body={"thinking": {"type": "disabled"}},
-                )
-            else:
-                response = self.client.chat.completions.create(**kwargs)
+            response = self.client.chat.completions.create(**kwargs)
         except Exception as exc:  # noqa: BLE001 - compatible providers vary
-            if not self.disable_thinking or not _unsupported_parameter(exc):
+            if "extra_body" not in kwargs or not thinking_unsupported(exc):
                 raise
             logger.info("[步骤][LLM-Client] thinking 参数不被支持，改用默认思考模式重试")
+            kwargs.pop("extra_body")
+            if thinking_trace is not None:
+                thinking_trace.update(sent="provider_default", fallback=True)
             response = self.client.chat.completions.create(**kwargs)
+        if stream and '_response_consumer' not in kwargs:
+            from .request_budget import document_deadline
+            deadline = document_deadline(self)
+            response = consume_entity_stream(response, deadline=deadline)
         logger.info(
             "[步骤][LLM-Client] 响应: id=%s finish_reason=%s usage=%s 文本=%d字符",
             _field(response, "id"),
@@ -333,8 +393,14 @@ class OpenAICompatibleLLM:
         response_mode: str,
         response_format: dict[str, Any] | None = None,
         temperature: float = 0,
+        thinking: bool | None = None,
+        stream: bool = False,
+        max_tokens: int | None = None,
     ) -> StructuredLLMResponse:
-        response = self._create(messages, response_format=response_format, temperature=temperature)
+        thinking_trace: dict[str, Any] = {}
+        response = self._create(messages, response_format=response_format, temperature=temperature,
+                                thinking=thinking, thinking_trace=thinking_trace,
+                                stream=stream, max_tokens=max_tokens)
         text = self._chat_text(response)
         finish_reason = self._chat_finish_reason(response)
         return StructuredLLMResponse(
@@ -344,6 +410,8 @@ class OpenAICompatibleLLM:
             status=self._response_status(response, text=text, finish_reason=finish_reason),
             finish_reason=finish_reason,
             usage=_usage_dict(_field(response, "usage")),
+            thinking=thinking_trace,
+            incomplete_details=_incomplete_details_dict(_field(response, "incomplete_details")),
         )
 
     def _responses_structured(
@@ -376,9 +444,17 @@ class OpenAICompatibleLLM:
     ) -> StructuredLLMResponse:
         """Use plain chat text; JSONL parsing and schema validation are local."""
         generation = (run_context or {}).get('pass_name') in {
-            'entity', 'repair_entity', 'property', 'repair_property', 'candidate_identity'}
+            'entity', 'recover_entity', 'repair_entity', 'property', 'property_conflict', 'repair_property', 'candidate_identity'}
+        thinking = not self.disable_thinking or (
+            self.semantic_thinking and (run_context or {}).get("pass_name") in SEMANTIC_THINKING_PASSES)
+        fast = self.fast_verification and _explicit_document_fields(messages, run_context)
+        if fast:
+            thinking = False
+        stream = self.stream_generation and (run_context or {}).get('pass_name') in {
+            'entity', 'recover_entity', 'repair_entity'} and 'entities' in schema.get('properties', {})
         return self._chat_structured(messages, response_mode="plain",
-            temperature=self.generation_temperature if generation else 0)
+            temperature=self.generation_temperature if generation else 0, thinking=thinking,
+            stream=stream, max_tokens=self.verification_max_tokens if fast else None)
 
 
 def create_llm_client(
@@ -389,11 +465,17 @@ def create_llm_client(
     max_tokens: int | None = None,
     disable_thinking: bool | None = None,
     request_timeout: float | None = None,
+    schedule_requests: bool = True,
+    semantic_thinking: bool | None = None,
+    thinking_parameter: str = "thinking",
+    stream_generation: bool | None = None,
+    verification_max_tokens: int | None = None,
+    fast_verification: bool | None = None,
 ) -> OpenAICompatibleLLM:
     """Build an OpenAI-compatible live client without importing OpenAI at module import."""
     from openai import OpenAI  # lazy import：仅 live 调用时才需要
 
-    config = get_llm_config()
+    config = get_llm_config(include_quota=schedule_requests, include_thinking=semantic_thinking is None)
     client = OpenAI(
         base_url=base_url or config["base_url"],
         api_key=api_key or config["api_key"] or "not-needed",
@@ -409,6 +491,13 @@ def create_llm_client(
         # SDK retries enabled multiplies requests invisibly and breaks budgets.
         max_retries=0,
     )
+    if schedule_requests:
+        from external_services.llm.runtime import ScheduledClient
+        client = ScheduledClient(client, {**config,
+            "request_timeout": config["request_timeout"] if request_timeout is None else request_timeout,
+            "max_tokens": max_tokens or config["max_tokens"],
+            "disable_thinking": config["disable_thinking"] if disable_thinking is None else disable_thinking,
+            "thinking_parameter": thinking_parameter})
     return OpenAICompatibleLLM(
         client,
         model=model or config["model"],
@@ -418,6 +507,11 @@ def create_llm_client(
         ),
         base_url=base_url or config["base_url"],
         generation_temperature=config['generation_temperature'],
+        semantic_thinking=config["semantic_thinking"] if semantic_thinking is None else semantic_thinking,
+        thinking_parameter=thinking_parameter,
+        stream_generation=config['stream_generation'] if stream_generation is None else stream_generation,
+        verification_max_tokens=config['verification_max_tokens'] if verification_max_tokens is None else verification_max_tokens,
+        fast_verification=config['fast_verification'] if fast_verification is None else fast_verification,
     )
 
 

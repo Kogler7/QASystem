@@ -328,7 +328,7 @@ def test_deprecated_pipeline_uses_v1_fields_and_response_shape(protocol_module):
     assert body["data"]["stats"]["extraction"]["chunks_extracted"] == 1
     assert body["data"]["stats"]["extraction"]["attempts"] == []
     assert body["data"]["stats"]["extraction"]["scheduler"] == {
-        "max_concurrency": 4,
+        "max_concurrency": 16,
         "qps": 0.0,
         "qpm": 0,
     }

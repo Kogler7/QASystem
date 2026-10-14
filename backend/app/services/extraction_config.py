@@ -1,6 +1,6 @@
 """Request-scoped extraction configuration; snapshots never contain credentials."""
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv, UndeclaredConfigurationError
+from docker.configuration import getenv as config_getenv, declarations, UndeclaredConfigurationError
 
 from copy import deepcopy
 import importlib
@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from algorithm.runtime_settings import getenv
 from algorithm.knowledge_extract.version import SUPPORTED_VERSIONS, get_extract_version
 from external_services.model_routes import registry_snapshot, resolve_service, snapshot_entity_service
+from external_services.llm.quota import parse_quota_tiers
 
 
 class ProviderProfile(BaseModel):
@@ -22,20 +23,24 @@ class ProviderProfile(BaseModel):
     api_key_env: str = Field(pattern=r"^(?:[A-Z][A-Z0-9_]*)?$")
     model: str = Field(min_length=1)
     quota_group: str = Field(min_length=1)
-    max_concurrency: int = Field(default=4, ge=1)
+    max_concurrency: int = Field(default=16, ge=1)
     qps: int = Field(default=0, ge=0)
     qpm: int = Field(default=0, ge=0)
+    quota_tiers: list[dict[str, int]] | None = None
     max_tokens: int = Field(default=16384, ge=1)
     max_input_tokens: int = Field(default=65536, ge=1)
     max_output_tokens: int | None = Field(default=None, ge=1)
     request_timeout: float = Field(default=300, gt=0, allow_inf_nan=False)
     disable_thinking: bool = True
+    semantic_thinking: bool | None = None
     api_mode: Literal["auto", "chat"] = "auto"
     thinking_parameter: Literal["thinking", "enable_thinking", "none"] = "thinking"
     response_format: Literal["auto", "json_object"] = "auto"
 
     @model_validator(mode="after")
     def resolve_output_budget(self):
+        if self.quota_tiers is not None:
+            self.quota_tiers = [vars(tier) for tier in parse_quota_tiers(self.quota_tiers)]
         if self.max_output_tokens is not None:
             if "max_tokens" in self.model_fields_set and self.max_tokens != self.max_output_tokens:
                 raise ValueError("Conflicting output token limits")
@@ -131,7 +136,8 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
     package = {"v2.1": "v2_1", "v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
-    defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
+    config_module = importlib.import_module(f"algorithm.knowledge_extract.{package}.config")
+    defaults = config_module.get_llm_config(**({"include_quota": False, "include_thinking": False} if version == "v3.1" else {}))
     # Snapshot once: retries retain the submitted configuration.
     casts = {"BASE_URL": ("base_url", str), "MODEL": ("model", str),
              "MAX_TOKENS": ("max_tokens", int), "MAX_CONCURRENCY": ("max_concurrency", int),
@@ -143,6 +149,9 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         if key in hot:
             defaults[field] = cast(hot[key])
     provider = options.get("provider") or "default"
+    quota_tiers = [vars(tier) for tier in parse_quota_tiers(setting(
+        "KG_EXTRACT_LLM_QUOTA_TIERS_JSON",
+        declarations()["items"]["KG_EXTRACT_LLM_QUOTA_TIERS_JSON"]["default"]))]
     routed = resolve_service('extract', registry=document, revision=revision) if provider == 'default' else None
     if provider == "default":
         values = {key: defaults[key] for key in (
@@ -175,6 +184,10 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         if not values['api_key_env'] or not setting(values["api_key_env"], "").strip():
             raise ValueError("Extraction provider credential is not configured")
     if version == "v3.1":
+        if values.get("semantic_thinking") is None:
+            values["semantic_thinking"] = config_module.parse_semantic_thinking(setting(
+                "KG_EXTRACT_V31_SEMANTIC_THINKING",
+                declarations()["items"]["KG_EXTRACT_V31_SEMANTIC_THINKING"]["default"]))
         if provider == "default":
             values["request_timeout"] = float(setting("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
             values["disable_thinking"] = defaults["disable_thinking"]
@@ -184,7 +197,12 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         document_timeout = None
     checked = ProviderProfile.model_validate(values)
     values = checked.model_dump()
+    if values["quota_tiers"] is None:
+        values["quota_tiers"] = quota_tiers
     values.update(version=version, provider=provider, document_timeout=document_timeout)
+    if version == 'v3.1':
+        for key in ('stream_generation', 'verification_max_tokens', 'fast_verification'):
+            values[key] = defaults[key]
     if routed:
         values.update(model_service=routed['service_id'], config_revision=revision,
                       credential_required=routed['kind'] == 'api')
@@ -199,7 +217,12 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
         "version", "provider", "model", "request_timeout", "document_timeout",
         "max_tokens", "max_input_tokens", "max_output_tokens", "disable_thinking",
         "api_mode", "thinking_parameter", "response_format",
+        "max_concurrency", "qps", "qpm", "quota_tiers",
     )}
+    if config.get("version") == "v3.1":
+        result["semantic_thinking"] = config.get("semantic_thinking", False)
+        for key in ('stream_generation', 'verification_max_tokens', 'fast_verification'):
+            result[key] = config.get(key)
     if config.get("version") in {"v0", "v2", "v2.1", "v3", "latest"}:
         # Provider profiles can retain legacy preferences, but extraction no
         # longer sends a response_format parameter on the wire.

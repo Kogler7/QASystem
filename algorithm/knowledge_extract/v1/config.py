@@ -16,7 +16,7 @@ KG_EXTRACT_API_URL = _env("KG_EXTRACT_LLM_BASE_URL", default="http://localhost:9
 KG_EXTRACT_API_KEY = _env("KG_EXTRACT_LLM_API_KEY", default="")
 KG_EXTRACT_MODEL = _env("KG_EXTRACT_LLM_MODEL", default="deepseek-v4-flash-0731")
 KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", default="16384"))
-KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
+KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="16"))
 KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
 KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
 # 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启

@@ -1,6 +1,6 @@
 """Property support is independent of entity-name/source binding."""
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from docker.configuration import getenv as config_getenv, declarations
 
 from copy import deepcopy
 from dataclasses import replace
@@ -12,7 +12,7 @@ import unicodedata
 from .chunk_context import ChunkContextManager, ExtractionChunk
 from .evidence import locate_quote
 from .graph_utils import append_warning
-from .request_budget import fits, document_expired, split_request_failure, recover_split_attempts
+from .request_budget import fits, document_expired, split_request_failure, recover_split_attempts, RecoveryBudget
 from .task_runtime import synchronous, invoke, ordered_tasks, current_runtime
 from .semantic_evidence import build_verification_messages
 from .output_contracts import verification_schema, validate_verification_items
@@ -31,9 +31,131 @@ def locate_in_sources(quote, sources):
     return None
 
 
-def locate_property_quote(quote, sources):
-    """Do not bind an ambiguous short quote to the first unrelated occurrence."""
-    matches, contexts = {}, set()
+def _label_key(value):
+    return re.sub(r"[\s#*:：]+", "", unicodedata.normalize('NFKC', str(value or '')))
+
+
+def _subject_sources(subject, sources):
+    """Unknown document IDs never establish a shared document boundary."""
+    anchors = list((subject.get('entity_evidence') or {}).get('sources', []))
+    evidence = subject.get('evidence') or {}
+    if evidence.get('span_id'):
+        anchors.append(evidence)
+    elif evidence.get('quote'):
+        found = locate_in_sources(evidence['quote'], sources)
+        if found:
+            anchors.append(found)
+    ids = {cid for span in anchors for cid in span.get('source_block_ids', [])}
+    documents = {source.document_id for source in sources
+                 if source.chunk_id in ids and source.document_id}
+    return [source for source in sources if source.chunk_id in ids
+            or source.document_id and source.document_id in documents]
+
+
+def _field_precedes(source, left, labels):
+    # A form label may be on the previous nonempty line. Do not reach past
+    # another field/value merely because the desired label occurs nearby.
+    prefix = source.text[max(0, left - 100):left].rstrip()
+    previous = prefix.rsplit('\n', 1)[-1].strip()
+    if not re.search(r'[:：][\s*]*$', previous):
+        return False
+    key = _label_key(previous)
+    return any(key == label or key.endswith(label) for label in labels if label)
+
+
+def _layout_property_spans(quote, source, labels):
+    """Align CJK layout whitespace and an interrupting *same-field* label.
+
+    This is exact character alignment, never fuzzy/OCR spelling correction.
+    Removed labels create separate source spans; their text is not silently
+    incorporated into a fabricated contiguous quotation.
+    """
+    removed = []
+    for match in re.finditer(r'(?m)^[ \t#]*[^\n]{1,40}[:：][ \t*]*$', source.text):
+        if _label_key(match.group()) in labels:
+            removed.append(match.span())
+
+    def normalized(text, omitted=()):
+        chars, offsets = [], []
+        ranges = iter(omitted)
+        current = next(ranges, None)
+        for offset, char in enumerate(text):
+            while current and offset >= current[1]:
+                current = next(ranges, None)
+            if current and current[0] <= offset < current[1]:
+                continue
+            for mapped in unicodedata.normalize('NFKC', char):
+                chars.append(mapped)
+                offsets.append(offset)
+        # Only CJK layout gaps can disappear. Latin words/numbers retain their
+        # token boundaries, and punctuation/negation is never discarded.
+        value = ''.join(chars)
+        keep = [True] * len(chars)
+        for match in re.finditer(r'(?<=[\u3400-\u9fff，。；：！？、,.;:!?])\s+(?=[\u3400-\u9fff，。；：！？、,.;:!?])', value):
+            keep[match.start():match.end()] = [False] * (match.end() - match.start())
+        return ''.join(c for i, c in enumerate(chars) if keep[i]), [o for i, o in enumerate(offsets) if keep[i]]
+
+    needle, _ = normalized(quote.strip())
+    haystack, offsets = normalized(source.text, removed)
+    if not needle:
+        return []
+    matches, cursor = [], 0
+    while True:
+        found = haystack.find(needle, cursor)
+        if found < 0:
+            break
+        left, right = offsets[found], offsets[found + len(needle) - 1] + 1
+        cuts = [(a, b) for a, b in removed if left < a < b < right]
+        segments, start = [], left
+        for a, b in cuts + [(right, right)]:
+            while start < a and source.text[start].isspace():
+                start += 1
+            end = a
+            while end > start and source.text[end - 1].isspace():
+                end -= 1
+            if start < end:
+                fragment = replace(source, text=source.text[start:end], metadata={**source.metadata,
+                    '_v31_window_start': int(source.metadata.get('_v31_window_start', 0)) + start})
+                segments.append(locate_in_sources(fragment.text, [fragment]))
+            start = b
+        matches.append((left, right, segments))
+        cursor = found + len(needle)
+    return matches
+
+
+def locate_property_quote(quote, sources, *, subject=None, property_labels=(), preferred_spans=()):
+    """Locate evidence alternatives without treating occurrences as entailment.
+
+    Ambiguous literals stay rejected unless a source-bound subject and the
+    actual field label (or its complete document title) disambiguate them. The
+    resulting alternatives still require independent semantic verification.
+    """
+    # Reusing an existing receipt supplies coordinates, never a new semantic
+    # verdict. Recheck the original bytes and the requested quotation first.
+    preferred = {}
+    normalize = lambda text: re.sub(r'\s+', ' ', unicodedata.normalize('NFKC', text)).strip()
+    for previous in preferred_spans:
+        for source in sources:
+            if source.chunk_id not in previous.get('source_block_ids', []):
+                continue
+            base = int(source.metadata.get('_v31_window_start', 0))
+            left, right = previous.get('start_char', -1) - base, previous.get('end_char', -1) - base
+            if not 0 <= left < right <= len(source.text):
+                continue
+            text = source.text[left:right]
+            if text != previous.get('quote') or normalize(text) != normalize(quote):
+                continue
+            fragment = replace(source, text=text, metadata={**source.metadata, '_v31_window_start': base + left})
+            span = locate_in_sources(text, [fragment])
+            preferred[span['span_id']] = span
+    if preferred:
+        return list(preferred.values())
+    matches, contexts, selected = {}, set(), {}
+    labels = {_label_key(label) for label in property_labels if label}
+    scoped = _subject_sources(subject, sources) if subject else []
+    scoped_ids = {source.chunk_id for source in scoped}
+    title = bool(subject and any(re.search(r'标题|title', label, re.I) for label in labels)
+                 and _label_key(quote) == _label_key(subject.get('name')))
     for source in sources:
         cursor = 0
         while cursor < len(source.text):
@@ -55,10 +177,17 @@ def locate_property_quote(quote, sources):
             if row_ranges:
                 context_left, context_right = row_ranges[0]
             contexts.add((source.document_id, source.text[context_left:context_right]))
+            if source.chunk_id in scoped_ids and (title or _field_precedes(source, left, labels)):
+                selected[span['span_id']] = span
             cursor = right
-    # COSEC: A literal occurrence cannot choose between different supporting
-    # subjects/conditions. The model must supply a disambiguating longer quote.
-    return list(matches.values()) if len(matches) == 1 or len(contexts) == 1 else []
+    if selected:
+        return list(selected.values())
+    if matches:
+        return list(matches.values()) if len(matches) == 1 or len(contexts) == 1 else []
+    # Layout recovery is source-scoped and exact. Never bridge arbitrary words,
+    # unrelated labels, chunks, documents, or a changed OCR character.
+    layout = [entry for source in scoped for entry in _layout_property_spans(quote, source, labels)]
+    return layout[0][2] if len(layout) == 1 else []
 
 
 def merge_evidences(*collections):
@@ -189,6 +318,9 @@ async def _review_batches(pending, context_for, llm, *, attempts, warnings, call
         # Entity admission can be reviewed separately without multiplying all
         # attribute calls. Both paths retain the same scheduler and hard budget.
         limit = min(limit, max(1, int(config_getenv('KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE', str(limit)))))
+    elif pass_name == 'property_verification':
+        limit = min(limit, max(1, int(config_getenv('KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE',
+            declarations()['items']['KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE']['default']))))
     output_cap = getattr(llm, 'max_tokens', None)
     if isinstance(output_cap, (int, float)) and output_cap > 0:
         limit = min(limit, max(1, int(output_cap) // 128))
@@ -218,6 +350,7 @@ async def _review_batches(pending, context_for, llm, *, attempts, warnings, call
 
     async def review(batch):
         local_attempts, local_metrics = [], []
+        recovery_budget = RecoveryBudget(max_attempts, len(batch))
         async def execute(current, *, force_review=False, diagnostics=None):
             recorded_attempts, recorded_metrics = diagnostics or (local_attempts, local_metrics)
             messages = request(current)
@@ -248,6 +381,7 @@ async def _review_batches(pending, context_for, llm, *, attempts, warnings, call
                 chunk_id=next((span['source_block_ids'][0] for entry in current for span in entry[3]), 'verification'), max_attempts=max_attempts,
                 retry_base_seconds=retry_base_seconds, call_metrics=recorded_metrics,
                 split_on_overflow=len(current) > 1,
+                recovery_budget=recovery_budget,
                 validator=lambda payload: validate_verification_items(payload, items))
             verdicts = {v['item_id']: v['supported'] for v in (parsed or {}).get('verdicts', [])}
             for item in items:
@@ -289,8 +423,18 @@ async def _review_batches(pending, context_for, llm, *, attempts, warnings, call
         return batch, await execute(batch), local_attempts, local_metrics
 
     results = []
+    def policy_batches():
+        if pass_name == 'property_verification' and getattr(llm, 'fast_verification', False):
+            from itertools import groupby
+            from .llm_client import explicit_document_field
+            # Long instructions must not accidentally promote adjacent short
+            # header fields into the expensive semantic policy. Preserve order.
+            for _, entries in groupby(pending, key=lambda entry: explicit_document_field(entry[-1])):
+                yield from partition(list(entries))
+        else:
+            yield from partition(pending)
     for batch, verdicts, local_attempts, local_metrics in await ordered_tasks(
-            review, partition(pending), limit=max_workers):
+            review, policy_batches(), limit=max_workers):
         attempts.extend(local_attempts)
         if call_metrics is not None:
             for call in local_metrics:
@@ -343,7 +487,7 @@ async def admit_entity_names(rows, sources, llm, *, attempts, warnings, use_sche
 async def ground_properties(rows, sources, llm, *, attempts, warnings, use_scheduler=False,
                       max_attempts=3, retry_base_seconds=0.05, call_metrics=None, prior=None, plan=None,
                       route=None, assembly_planner=None, conflicts=None, priors=None, conflicts_by_key=None,
-                      max_workers=1):
+                      max_workers=1, source_receipts=None):
     """Remove unsupported values; accept semantic values only after explicit yes.
 
     Receipts are created here, never supplied by the extraction model. A forged
@@ -384,7 +528,10 @@ async def ground_properties(rows, sources, llm, *, attempts, warnings, use_sched
                 append_warning(warnings, 'PROPERTY_IDENTIFIER_UNGROUNDED',
                     '身份或编码值缺少完整原文支持，禁止拼造或截取标识片段', f"{row['type']}::{row['name']}.{prop}")
                 continue
-            located_quotes = [locate_property_quote(q, sources) for q in quotes]
+            located_quotes = [locate_property_quote(q, sources, subject=row,
+                property_labels=(prop, spec.display_name if spec else prop),
+                preferred_spans=((source_receipts or {}).get((row['type'], row['name']), {})
+                                 .get(prop, {}).get('sources', []))) for q in quotes]
             supported = bool(located_quotes) and all(located_quotes)
             spans = merge_evidences([span for matches in located_quotes for span in matches])
             meaningful = any(span["quote"].strip() != row["name"] or len(span["quote"]) > 32

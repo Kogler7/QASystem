@@ -25,7 +25,10 @@ def test_neighbour_completion_batches_keys_without_losing_subjects():
     assert result['status'] == 'succeeded'
     assert len(result['raw']['entities']) == 12
     assert all(e['properties'] == {'duty': '检查'} for e in result['raw']['entities'])
-    assert len([p for t, p in llm.calls if t == 'property']) == 1
+    property_calls = [json.loads(p)['task']['known_entities'] for t, p in llm.calls if t == 'property']
+    assert len(property_calls) == 3
+    assert all(len(batch) == 4 for batch in property_calls)
+    assert {row['name'] for batch in property_calls for row in batch} == set(names)
     for row in result['raw']['entities']:
         assert any(e['source_block_ids'] == ['b'] for e in row['evidences'])
 

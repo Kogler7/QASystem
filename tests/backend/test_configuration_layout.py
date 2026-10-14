@@ -36,6 +36,23 @@ def test_root_is_the_only_configuration_source():
     assert not (ROOT / "docker" / "docker-compose.deploy.yml").exists()
 
 
+def test_quota_curve_is_hot_validated_and_visible_in_configuration_ui():
+    import json
+    import pytest
+    from docker.configure import schema
+    from docker.runtime_config import HOT_KEYS, _validate_document
+    key = "KG_EXTRACT_LLM_QUOTA_TIERS_JSON"
+    rows = {row["key"]: row for row in schema((ROOT / ".env.example").read_text())}
+    assert rows["KG_EXTRACT_LLM_MAX_CONCURRENCY"]["default"] == "16"
+    assert key in HOT_KEYS and rows[key]["hot"] and not rows[key]["secret"]
+    curve = json.loads(rows[key]["default"])
+    assert [(r["rpm"], r["tpm"]) for r in curve] == [(56, 460000), (26, 420000), (11, 350000), (4, 280000)]
+    _validate_document({"settings": {key: rows[key]["default"]}})
+    _validate_document({"settings": {key: "[]"}})
+    with pytest.raises(ValueError, match="Invalid extraction quota tiers"):
+        _validate_document({"settings": {key: "{}"}})
+
+
 def test_environment_template_uses_module_specific_llm_keys():
     template = (ROOT / ".env.example").read_text(encoding="utf-8")
     for prefix in ("KG_EXTRACT_LLM_", "GRAPH_LLM_", "AGENT_LLM_"):
@@ -45,6 +62,27 @@ def test_environment_template_uses_module_specific_llm_keys():
     assert "DIFY_" not in template
     assert "\nLLM_BASE_URL=" not in template
     assert "\nOPENAI_BASE_URL=" not in template
+
+
+def test_v31_semantic_thinking_is_hot_visible_and_rejects_invalid_values():
+    import pytest
+    from docker.configure import schema
+    from docker.runtime_config import HOT_KEYS, _validate_document
+    key = "KG_EXTRACT_V31_SEMANTIC_THINKING"
+    rows = {row["key"]: row for row in schema((ROOT / ".env.example").read_text())}
+    assert key in HOT_KEYS and rows[key]["hot"] and not rows[key]["secret"]
+    assert rows[key]["default"] == "1"
+    from docker.configuration import declarations
+    from algorithm.knowledge_extract.v3_1.config import get_llm_config
+    declared = declarations()["items"][key]
+    assert declared["default"] == rows[key]["default"] and declared["mode"] == "hot"
+    assert {c["path"] for c in declared["consumers"]} == {
+        "algorithm/knowledge_extract/v3_1/config.py", "backend/app/services/extraction_config.py"}
+    assert isinstance(get_llm_config()["semantic_thinking"], bool)
+    for value in ("1", "0", "true", "false", "on", "off"):
+        _validate_document({"settings": {key: value}})
+    with pytest.raises(ValueError, match="Invalid v3.1 semantic thinking"):
+        _validate_document({"settings": {key: "invalid-private-value"}})
 
 
 def test_compose_reuses_root_environment_without_variable_duplication():

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.5",
+  "version": "2026.10.14.9",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -310,6 +310,11 @@
           "path": "backend/app/execution/store.py",
           "kind": "read",
           "token": "EXECUTION_REDIS_URL"
+        },
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "EXECUTION_REDIS_URL"
         }
       ],
       "fallbacks": [
@@ -320,6 +325,10 @@
         {
           "path": "backend/app/execution/store.py",
           "expression": "''"
+        },
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['EXECUTION_REDIS_URL']['default']"
         }
       ]
     },
@@ -1529,7 +1538,7 @@
       ]
     },
     "KG_EXTRACT_LLM_MAX_INPUT_TOKENS": {
-      "desc": "输入预算按本地保守估算检查；输出新变量为空时兼容上面的 MAX_TOKENS。",
+      "desc": "完整请求按本地匹配版本 tokenizer 及正向 usage 校准检查输入 token 上限；不可用时显式保守估算。",
       "default": "65536",
       "scope": "deployment",
       "mode": "hot",
@@ -1538,21 +1547,12 @@
           "path": "backend/app/services/extraction_config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
         }
       ],
       "fallbacks": [
         {
           "path": "backend/app/services/extraction_config.py",
           "expression": "'65536'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
-          "expression": "None"
         }
       ]
     },
@@ -1651,7 +1651,7 @@
       ]
     },
     "KG_EXTRACT_LLM_DISABLE_THINKING": {
-      "desc": "默认 1：关闭模型 thinking；设 0 后允许模型思考。",
+      "desc": "默认 1：常规抽取关闭 thinking；设 0 全部允许。v3.1 语义步骤另由 KG_EXTRACT_V31_SEMANTIC_THINKING 控制。",
       "default": "1",
       "scope": "deployment",
       "mode": "hot",
@@ -1729,6 +1729,34 @@
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "expression": "'1'"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_SEMANTIC_THINKING": {
+      "desc": "v3.1 实体准入、属性证据核验、同名消歧、属性冲突和定向语义修复开启 thinking；0 沿用常规开关。JSON 格式、截断或网络重试沿用原步骤；热更新仅影响新提交任务。",
+      "default": "1",
+      "scope": "deployment",
+      "mode": "hot",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_SEMANTIC_THINKING"
+        },
+        {
+          "path": "backend/app/services/extraction_config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_SEMANTIC_THINKING"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_SEMANTIC_THINKING']['default']"
+        },
+        {
+          "path": "backend/app/services/extraction_config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_SEMANTIC_THINKING']['default']"
         }
       ]
     },
@@ -2055,8 +2083,8 @@
       ]
     },
     "KG_EXTRACT_LLM_MAX_CONCURRENCY": {
-      "desc": "同时在途的知识抽取请求数；应结合 LLM 服务的并发容量设置",
-      "default": "4",
+      "desc": "同时在途的知识抽取请求上限；实际并发同时受 RPM/TPM 配额约束。",
+      "default": "16",
       "scope": "deployment",
       "mode": "hot",
       "consumers": [
@@ -2104,40 +2132,40 @@
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/latest/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v0/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v1/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v2/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v2_1/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v3/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
-          "expression": "'4'"
+          "expression": "'16'"
         }
       ]
     },
     "KG_EXTRACT_LLM_QPS": {
-      "desc": "0 表示不限速；非 0 时同时满足每秒和每分钟两个滑动窗口限制",
+      "desc": "0 表示不额外限制 QPS/QPM；非 0 时叠加每秒和每分钟滑动窗口限制。",
       "default": "0",
       "scope": "deployment",
       "mode": "hot",
@@ -2219,7 +2247,7 @@
       ]
     },
     "KG_EXTRACT_LLM_QPM": {
-      "desc": "部署参数 KG_EXTRACT_LLM_QPM",
+      "desc": "额外每分钟请求数上限；0 不额外限制，仍受分档 RPM/TPM 约束。",
       "default": "0",
       "scope": "deployment",
       "mode": "hot",
@@ -2300,6 +2328,34 @@
         }
       ]
     },
+    "KG_EXTRACT_LLM_QUOTA_TIERS_JSON": {
+      "desc": "按完整输入 token 上界向上选档；TPM 按输入+输出合计，四档共用账号额度。先预留输入+最大输出，返回后按 usage 校正；[] 显式关闭分档限制。",
+      "default": "[{\"max_input_tokens\":8192,\"rpm\":56,\"tpm\":460000},{\"max_input_tokens\":16384,\"rpm\":26,\"tpm\":420000},{\"max_input_tokens\":32768,\"rpm\":11,\"tpm\":350000},{\"max_input_tokens\":65536,\"rpm\":4,\"tpm\":280000}]",
+      "scope": "deployment",
+      "mode": "hot",
+      "consumers": [
+        {
+          "path": "backend/app/services/extraction_config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QUOTA_TIERS_JSON"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QUOTA_TIERS_JSON"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "backend/app/services/extraction_config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_QUOTA_TIERS_JSON']['default']"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_QUOTA_TIERS_JSON']['default']"
+        }
+      ]
+    },
     "KG_EXTRACT_LLM_QUOTA_GROUP": {
       "desc": "请求级供应商选择：这里只登记地址、模型、配额组和密钥环境变量名，禁止放密钥值。 / 同一账号的别名应共用 quota_group；与默认供应商共额度时也设成同一个组。",
       "default": "default",
@@ -2310,11 +2366,20 @@
           "path": "backend/app/services/extraction_config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_QUOTA_GROUP"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QUOTA_GROUP"
         }
       ],
       "fallbacks": [
         {
           "path": "backend/app/services/extraction_config.py",
+          "expression": "'default'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
           "expression": "'default'"
         }
       ]
@@ -6024,6 +6089,215 @@
           "expression": "'16'"
         }
       ]
+    },
+    "KG_EXTRACT_V31_PROPERTY_BATCH_SIZE": {
+      "desc": "属性补全每批独立实体数（1–24）；仅合并同类型、同来源窗口任务，各实体窗口顺序不变。",
+      "default": "4",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_enrichment.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_PROPERTY_BATCH_SIZE"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_enrichment.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_PROPERTY_BATCH_SIZE']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE": {
+      "desc": "属性核验每批属性项数（1–24）；不大于通用核验批次；继续受完整输入预算约束。",
+      "default": "8",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_TOKENIZER_DIR": {
+      "desc": "本地 DeepSeek tokenizer 资产目录，运行时不下载；缺失时显式回退。",
+      "default": "",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "KG_EXTRACT_LLM_TOKENIZER_DIR"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_TOKENIZER_DIR']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_TOKENIZER_REVISION": {
+      "desc": "tokenizer 固定版本，须与本地资产清单及模型版本一致。",
+      "default": "",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "KG_EXTRACT_LLM_TOKENIZER_REVISION"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_TOKENIZER_REVISION']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_MAX_INPUT_BYTES": {
+      "desc": "独立于模型 token 上限的输入请求体字节保护。",
+      "default": "1048576",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "KG_EXTRACT_LLM_MAX_INPUT_BYTES"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_MAX_INPUT_BYTES']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_QUOTA_BACKEND": {
+      "desc": "额度状态后端：local 为单进程，redis 为共享账号额度；redis 失败不得静默回退。",
+      "default": "local",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "KG_EXTRACT_LLM_QUOTA_BACKEND"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_QUOTA_BACKEND']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_QUOTA_REDIS_URL": {
+      "desc": "共享额度 Redis 地址；留空沿用 EXECUTION_REDIS_URL，不写入公开快照。",
+      "default": "",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "KG_EXTRACT_LLM_QUOTA_REDIS_URL"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_QUOTA_REDIS_URL']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_ADAPTIVE_INITIAL_INPUT_TOKENS": {
+      "desc": "自适应限流初始输入档位；真实长输入仍受长档约束，稳定后有界恢复。",
+      "default": "16384",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "external_services/llm/settings.py",
+          "kind": "literal",
+          "token": "KG_EXTRACT_LLM_ADAPTIVE_INITIAL_INPUT_TOKENS"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "external_services/llm/settings.py",
+          "expression": "declarations()['items']['KG_EXTRACT_LLM_ADAPTIVE_INITIAL_INPUT_TOKENS']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_STREAM_GENERATION": {
+      "desc": "v3.1 实体生成流式检测完整记录重复及连续空证据，保留完整候选并标记未完成。",
+      "default": "true",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_STREAM_GENERATION"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_STREAM_GENERATION']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS": {
+      "desc": "v3.1 显式公文标量字段短核验输出上限；复杂语义核验保留原预算。",
+      "default": "4096",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS']['default']"
+        }
+      ]
+    },
+    "KG_EXTRACT_V31_FAST_VERIFICATION": {
+      "desc": "v3.1 显式公文标量字段采用关闭思考的独立语义核验，冲突与复杂字段保留思考。",
+      "default": "true",
+      "scope": "deployment",
+      "mode": "startup",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_FAST_VERIFICATION"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "declarations()['items']['KG_EXTRACT_V31_FAST_VERIFICATION']['default']"
+        }
+      ]
     }
   },
   "reader_contracts": {
@@ -6161,9 +6435,11 @@
       "config_getenv(key, default)",
       "setting('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '65536')",
       "setting('KG_EXTRACT_V31_DOCUMENT_TIMEOUT')",
+      "setting('KG_EXTRACT_LLM_QUOTA_TIERS_JSON', declarations()['items']['KG_EXTRACT_LLM_QUOTA_TIERS_JSON']['default'])",
       "setting('KG_EXTRACT_LLM_QUOTA_GROUP', 'default')",
       "setting('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS')",
       "setting('KG_EXTRACT_PROVIDERS_JSON', '{}')",
+      "setting('KG_EXTRACT_V31_SEMANTIC_THINKING', declarations()['items']['KG_EXTRACT_V31_SEMANTIC_THINKING']['default'])",
       "setting('KG_EXTRACT_V31_REQUEST_TIMEOUT', '120')",
       "setting(values['api_key_env'], '')",
       "setting('KG_EXTRACT_ALGO_VERSION', 'latest')",
@@ -6297,7 +6573,7 @@
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS', default='400')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_OVERLAP', default='200')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH', default='3')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
@@ -6313,7 +6589,7 @@
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
       "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
@@ -6337,7 +6613,7 @@
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
       "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash-0731')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
@@ -6352,7 +6628,7 @@
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
       "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
@@ -6376,7 +6652,7 @@
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
       "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
@@ -6400,7 +6676,7 @@
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
       "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
@@ -6435,7 +6711,7 @@
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MIN_CHARS', default='400')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_OVERLAP', default='50')",
       "_env('KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH', default='3')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
@@ -6455,16 +6731,21 @@
       "_env('KG_EXTRACT_LLM_API_KEY', default='')",
       "_env('KG_EXTRACT_LLM_MODEL', default='deepseek-v4-flash')",
       "_env('KG_EXTRACT_LLM_MAX_TOKENS', default='16384')",
-      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='4')",
+      "_env('KG_EXTRACT_LLM_MAX_CONCURRENCY', default='16')",
       "_env('KG_EXTRACT_LLM_QPS', default='0')",
       "_env('KG_EXTRACT_LLM_QPM', default='0')",
       "_env('KG_EXTRACT_LLM_TIMEOUT_SECONDS', default='300')",
       "_env('KG_EXTRACT_LLM_DISABLE_THINKING', default='1')",
       "config_getenv(k)",
-      "_env('KG_EXTRACT_V31_GENERATION_TEMPERATURE', default='0')"
+      "config_getenv('KG_EXTRACT_LLM_QUOTA_GROUP', 'default')",
+      "_env('KG_EXTRACT_V31_GENERATION_TEMPERATURE', default='0')",
+      "config_getenv('KG_EXTRACT_V31_STREAM_GENERATION', declarations()['items']['KG_EXTRACT_V31_STREAM_GENERATION']['default'])",
+      "config_getenv('KG_EXTRACT_V31_FAST_VERIFICATION', declarations()['items']['KG_EXTRACT_V31_FAST_VERIFICATION']['default'])",
+      "config_getenv('KG_EXTRACT_V31_SEMANTIC_THINKING', declarations()['items']['KG_EXTRACT_V31_SEMANTIC_THINKING']['default'])",
+      "config_getenv('KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS', declarations()['items']['KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS']['default'])",
+      "config_getenv('KG_EXTRACT_LLM_QUOTA_TIERS_JSON', declarations()['items']['KG_EXTRACT_LLM_QUOTA_TIERS_JSON']['default'])"
     ],
     "algorithm/knowledge_extract/v3_1/request_budget.py": [
-      "config_getenv('KG_EXTRACT_LLM_MAX_INPUT_TOKENS')",
       "config_getenv('KG_EXTRACT_V31_MAX_INPUT_BYTES', '48000')",
       "config_getenv('KG_EXTRACT_V31_WINDOW_CHARS', '2000')"
     ],
@@ -6567,10 +6848,17 @@
     ],
     "algorithm/knowledge_extract/v3_1/property_grounding.py": [
       "config_getenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '16')",
-      "config_getenv('KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE', str(limit))"
+      "config_getenv('KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE', str(limit))",
+      "config_getenv('KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE', declarations()['items']['KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE']['default'])"
     ],
     "algorithm/knowledge_extract/v3_1/task_runtime.py": [
       "config_getenv('KG_EXTRACT_V31_MAX_CALLS', '512')"
+    ],
+    "algorithm/knowledge_extract/v3_1/property_enrichment.py": [
+      "config_getenv('KG_EXTRACT_V31_PROPERTY_BATCH_SIZE', declarations()['items']['KG_EXTRACT_V31_PROPERTY_BATCH_SIZE']['default'])"
+    ],
+    "external_services/llm/settings.py": [
+      "getenv(key, declarations()['items'][key]['default'])"
     ]
   },
   "aliases": {

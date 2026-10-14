@@ -25,7 +25,13 @@ def create_request_llm(config: dict[str, Any]):
     # to an unrelated API credential for an unauthenticated local service.
     llm = factory(base_url=config["base_url"], api_key=credential or 'not-needed',
                   model=config["model"], max_tokens=config.get("max_output_tokens") or config["max_tokens"],
-                  request_timeout=config["request_timeout"], disable_thinking=config["disable_thinking"])
+                  request_timeout=config["request_timeout"], disable_thinking=config["disable_thinking"],
+                  **({"schedule_requests": False,
+                      "semantic_thinking": config.get("semantic_thinking", False),
+                      **{key: config[key] for key in ('stream_generation', 'verification_max_tokens', 'fast_verification')
+                         if key in config},
+                      "thinking_parameter": config.get("thinking_parameter", "thinking")}
+                     if version == "v3.1" else {}))
     llm.client = ScheduledClient(llm.client, config)
     llm.api_mode = config.get("api_mode", "auto")
     llm.max_input_tokens = int(config.get("max_input_tokens", 65536))

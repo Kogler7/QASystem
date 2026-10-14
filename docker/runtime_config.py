@@ -9,9 +9,10 @@ HOT_KEYS = frozenset({
     "KG_EXTRACT_ALGO_VERSION", "KG_EXTRACT_LLM_BASE_URL", "KG_EXTRACT_LLM_MODEL",
     "KG_EXTRACT_LLM_MAX_TOKENS", "KG_EXTRACT_LLM_MAX_INPUT_TOKENS",
     "KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS", "KG_EXTRACT_LLM_MAX_CONCURRENCY",
-    "KG_EXTRACT_LLM_QPS", "KG_EXTRACT_LLM_QPM", "KG_EXTRACT_LLM_TIMEOUT_SECONDS",
+    "KG_EXTRACT_LLM_QPS", "KG_EXTRACT_LLM_QPM", "KG_EXTRACT_LLM_QUOTA_TIERS_JSON", "KG_EXTRACT_LLM_TIMEOUT_SECONDS",
     "KG_EXTRACT_LLM_DISABLE_THINKING", "KG_EXTRACT_LLM_QUOTA_GROUP",
     "KG_EXTRACT_V31_REQUEST_TIMEOUT", "KG_EXTRACT_V31_DOCUMENT_TIMEOUT",
+    "KG_EXTRACT_V31_SEMANTIC_THINKING",
     "EMBEDDING_SERVICE_URL", "EMBEDDING_SERVICE_PATH", "EMBEDDING_MODEL",
     "EMBEDDING_TIMEOUT_SECONDS", "EMBEDDING_MAX_BATCH_SIZE",
     "DOCUMENT_PARSE_SERVICE_URL", "DOCUMENT_PARSE_SERVICE_PATH", "DOCUMENT_PARSE_TIMEOUT_SECONDS",
@@ -85,6 +86,12 @@ def _validate_document(data):
     if not isinstance(settings, dict) or any(k not in HOT_KEYS or not isinstance(v, str) for k, v in settings.items()):
         raise ValueError("Invalid runtime settings keys or values")
     for key, value in settings.items():
+        if key == 'KG_EXTRACT_V31_SEMANTIC_THINKING' and value.strip().lower() not in {
+                '1', 'true', 'yes', 'on', '0', 'false', 'no', 'off'}:
+            raise ValueError('Invalid v3.1 semantic thinking setting')
+        if key == 'KG_EXTRACT_LLM_QUOTA_TIERS_JSON':
+            from external_services.llm.quota import parse_quota_tiers
+            parse_quota_tiers(value)
         if key.endswith('_SERVICE_URL') and value:
             url = urlsplit(value)
             if url.scheme not in {'http', 'https'} or not url.hostname or url.username or url.password or url.query or url.fragment:
