@@ -206,7 +206,7 @@ def _has_collection_envelope(text: str, collection_name: str) -> bool:
     return False
 
 
-def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, incomplete_lines=None) -> tuple[list[dict[str, Any]], list[str]]:
+def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, incomplete_lines=None, verdict_schema=None) -> tuple[list[dict[str, Any]], list[str]]:
     """Read independent complete lines; damaged lines never erase their neighbours."""
     rows, errors = [], []
     text = _response_text(response)
@@ -260,6 +260,22 @@ def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, inc
                 envelope = decoder.decode(text)
             except (json.JSONDecodeError, ValueError):
                 envelope = None
+            bare_array = isinstance(envelope, list)
+            if bare_array:
+                # A bare verification array is transport syntax only when
+                # the entire active verdict contract passes before unwrapping.
+                # No partial-array salvage, inferred IDs or nested extraction.
+                expected = (_expected_record_keys(verdict_schema, 'verdicts')
+                            if verdict_schema is not None else None)
+                payload = {'verdicts': envelope}
+                if (collection_name != 'verdicts' or not envelope
+                        or expected is None or not all(isinstance(row, dict) for row in envelope)
+                        or validate_json_schema(payload, verdict_schema)):
+                    return [], ['核验裸数组必须完整符合当前逐项 schema；不接受空数组或其他数组']
+                ids = [row['item_id'] for row in envelope]
+                if len(ids) != len(expected) or set(ids) != expected:
+                    return [], ['核验裸数组必须逐项且仅一次覆盖当前全部 item_id']
+                envelope = payload
             if (collection_name != 'verdicts' or not isinstance(envelope, dict)
                     or set(envelope) != {'verdicts'}
                     or not isinstance(envelope['verdicts'], list)
@@ -267,7 +283,7 @@ def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, inc
                 return [], [f'JSONL 包装必须是完整且仅含 verdicts 对象列表的核验封套；不接受 {collection_name} 的其他包装']
             text = '\n'.join(json.dumps(row, ensure_ascii=False, allow_nan=False)
                              for row in envelope['verdicts'])
-            normalizations.append('complete_verdicts_envelope')
+            normalizations.append('complete_verdicts_array' if bare_array else 'complete_verdicts_envelope')
         # A provider may return pretty-printed or adjacent top-level objects
         # instead of JSONL. Normalize only a fully consumed object stream. No
         # prefix/suffix stripping, nested-object extraction, or JSON repair.
@@ -688,7 +704,8 @@ async def generate_structured(
             pre_parse_error = _pre_parse_response_error(response)
             if collection_name in {"entities", "verdicts"}:
                 rows, line_errors = _jsonl_rows(response, collection_name,
-                    normalizations=response_normalizations, incomplete_lines=incomplete_lines)
+                    normalizations=response_normalizations, incomplete_lines=incomplete_lines,
+                    verdict_schema=attempt_schema if collection_name == 'verdicts' else None)
                 valid_rows = _valid_recovered_items(rows, collection_name=collection_name,
                     schema=attempt_schema, validator=item_validator or validator,
                     rejection_reasons=rejection_reasons)

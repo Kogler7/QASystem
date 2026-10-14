@@ -392,7 +392,8 @@ def test_v31_semantic_thinking_defaults_ignore_retired_environment(providers, mo
     assert config.public_config(chosen)['semantic_thinking'] is True
 
 
-def test_v31_semantic_thinking_submission_is_preserved_after_hot_configuration_changes(providers, monkeypatch):
+@pytest.mark.parametrize('pass_name, enabled', [('candidate_identity', True), ('entity_verification', False)])
+def test_v31_semantic_thinking_submission_is_preserved_after_hot_configuration_changes(providers, monkeypatch, pass_name, enabled):
     import openai
     monkeypatch.setenv("KG_EXTRACT_V31_SEMANTIC_THINKING", "0")
     chosen = config.resolve_config({"version": "v3.1", "provider": "siliconflow"})
@@ -408,10 +409,10 @@ def test_v31_semantic_thinking_submission_is_preserved_after_hot_configuration_c
     monkeypatch.setattr(llm_runtime, "_pools", {})
     llm = runtime.create_request_llm(chosen)
     result = llm.generate_structured({}, [{"role": "user", "content": "x"}],
-                                     {"pass_name": "entity_verification"})
+                                     {"pass_name": pass_name})
     assert llm.semantic_thinking is True
-    assert seen[0]["extra_body"] == {"enable_thinking": True}
-    assert result.thinking["sent"] == "enabled"
+    assert seen[0]["extra_body"] == {"enable_thinking": enabled}
+    assert result.thinking["sent"] == ('enabled' if enabled else 'disabled')
     assert config.resolve_config({"version": "v3.1"})["semantic_thinking"] is True
 
 
@@ -430,8 +431,10 @@ def test_v31_scheduled_client_preserves_enabled_semantic_pass_and_parameter_fall
     monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: SimpleNamespace(
         chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
     llm = runtime.create_request_llm(chosen)
+    # repair_property is on the semantic policy; support checks stay on the
+    # regular switch and no longer escalate to thinking.
     result = llm.generate_structured({}, [{"role": "user", "content": "x"}],
-                                     {"pass_name": "property_verification"})
+                                     {"pass_name": "repair_property"})
     assert seen[0]["extra_body"] == {"enable_thinking": True}
     assert "extra_body" not in seen[1]
     assert result.thinking["fallback"] is True

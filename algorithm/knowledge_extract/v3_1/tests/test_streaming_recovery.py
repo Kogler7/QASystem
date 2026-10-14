@@ -176,8 +176,10 @@ def test_only_explicit_document_fields_use_short_semantic_review(field, fast):
         'type': 'OfficialDocument', 'property': field, 'value': '原文值',
         'evidence_quotes': ['文件标题：原文值']}]}}, ensure_ascii=False)}]
     client.generate_structured({}, messages, {'pass_name': 'property_verification'})
+    # Support checks follow the regular switch, so thinking stays off either way;
+    # the fast path is what still separates explicit header fields from the rest.
     assert calls[0]['max_tokens'] == (4096 if fast else 16384)
-    assert calls[0]['extra_body']['thinking']['type'] == ('disabled' if fast else 'enabled')
+    assert calls[0]['extra_body']['thinking']['type'] == 'disabled'
 
 
 def test_document_conflict_keeps_full_semantic_budget():
@@ -198,7 +200,7 @@ def test_mixed_document_review_keeps_short_fields_out_of_long_thinking_batch():
                                     'reason': '原文逐项支持'}) for item in items)
         return {'choices': [{'message': {'content': body}, 'finish_reason': 'stop'}]}
     client = OpenAICompatibleLLM(SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
-        model='deepseek-v4-flash-0731', max_tokens=16384, disable_thinking=True,
+        model='deepseek-v4-flash-0731', max_tokens=16384, disable_thinking=False,
         fast_verification=True, verification_max_tokens=4096)
     text = '文件标题：测试通知\n领导批示：请协调落实\n联系电话：12345678'
     row = {'type': 'OfficialDocument', 'name': '测试通知',
@@ -215,6 +217,8 @@ def test_mixed_document_review_keeps_short_fields_out_of_long_thinking_batch():
     assert [[i['property'] for i in items] for items, _ in calls] == [
         ['文件标题'], ['领导批示'], ['联系电话']]
     assert [kwargs['max_tokens'] for _, kwargs in calls] == [4096, 16384, 4096]
+    # Ordinary fields now inherit the regular switch (enabled here), while the
+    # short-field fast path stays disabled instead of sharing their batch.
     assert [kwargs['extra_body']['thinking']['type'] for _, kwargs in calls] == [
         'disabled', 'enabled', 'disabled']
 

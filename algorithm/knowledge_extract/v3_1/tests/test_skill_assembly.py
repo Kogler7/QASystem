@@ -166,7 +166,7 @@ class OfficialDocument {
 
     llm = JsonlLLM()
     result = extract_harness(ontology=ontology, chunks=[ExtractionChunk('c1', text)],
-                             llm=llm, use_scheduler=False, retry_base_seconds=0, skill_refs=['official_document@13'])
+                             llm=llm, use_scheduler=False, retry_base_seconds=0, skill_refs=['official_document@14'])
     assert result['status'] == 'succeeded'
     assert [(ctx['pass_name'], ctx['attempt']) for _, _, ctx in llm.calls] == [
         ('entity', 1), ('entity', 2), ('property', 1),
@@ -183,4 +183,4 @@ class OfficialDocument {
     assert assembly['calls'] == []
     assert len(assembly['plans']) == 1
     assert assembly['plans'][0]['route']['kind'] == 'official_document'
-    assert assembly['plans'][0]['read_skills'][0]['version'] == '13'
+    assert assembly['plans'][0]['read_skills'][0]['version'] == '14'

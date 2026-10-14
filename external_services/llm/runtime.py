@@ -13,6 +13,7 @@ from .quota import rate_limit_signal
 from .quota_state import QuotaState, Reservation
 from .settings import scheduler_settings
 from .tokenization import TokenCounter
+from .stream_prefix import capture_stream
 
 
 class QuotaPool(QuotaState):
@@ -140,6 +141,7 @@ class ScheduledClient:
         calibration = None
         rate_signal = None
         consumer = kwargs.pop('_response_consumer', None)
+        deadline_prefix = False
         try:
             if kwargs.get('stream') and consumer is None:
                 raise ValueError('Scheduled streaming requires a response consumer')
@@ -188,7 +190,12 @@ class ScheduledClient:
                 try:
                     response = method(**kwargs)
                     if consumer is not None:
-                        response = consumer(response)
+                        capture = (capture_stream(response, deadline=call_deadline, clock=time.monotonic)
+                                   if kwargs.get('stream') else None)
+                        response = consumer(capture if capture is not None else response)
+                        prefix = capture.redeem(response) if capture is not None else None
+                        if prefix is not None:
+                            response, deadline_prefix = prefix, True
                     reservation.settle(response)
                 except Exception as exc:
                     if request_record:
@@ -201,7 +208,9 @@ class ScheduledClient:
                     except Exception:
                         # Trace serialization must never change the generation result.
                         trace.write(request_record + "-response", {"status": "unserializable"})
-                if time.monotonic() >= call_deadline:
+                finished_at = time.monotonic()
+                if ((self.deadline is not None and finished_at >= self.deadline)
+                        or (finished_at >= call_deadline and not deadline_prefix)):
                     raise TimeoutError("Extraction response arrived after deadline")
                 return response
         except Exception as exc:

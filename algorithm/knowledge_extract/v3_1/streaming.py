@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import json
 import time
+from external_services.llm.stream_prefix import (
+    _StreamDeadlineReached, is_captured_stream, preserve_deadline_prefix,
+)
 
 
 def _field(value, name, default=None):
@@ -180,7 +183,7 @@ def consume_entity_stream(stream, *, deadline=None, character_limit=1048576):
     received_finish = False
     try:
         for chunk in stream:
-            if deadline is not None and time.monotonic() >= deadline:
+            if not is_captured_stream(stream) and deadline is not None and time.monotonic() >= deadline:
                 stop_reason = 'stream_deadline'
                 break
             response_id = _field(chunk, 'id') or response_id
@@ -216,6 +219,10 @@ def consume_entity_stream(stream, *, deadline=None, character_limit=1048576):
                 break
         if not stop_reason and not received_finish:
             stop_reason = 'stream_ended_without_finish'
+    except _StreamDeadlineReached:
+        if not content and not reasoning:
+            raise
+        stop_reason = 'stream_deadline'
     except Exception:
         if not content and not reasoning:
             raise
@@ -231,10 +238,11 @@ def consume_entity_stream(stream, *, deadline=None, character_limit=1048576):
                 # replace the original transport failure with credential text.
                 if content or reasoning:
                     stop_reason = stop_reason or 'stream_close_failed'
-    return {'id': response_id, 'choices': [{'message': {
+    body = {'id': response_id, 'choices': [{'message': {
         'content': ''.join(content), 'reasoning_content': ''.join(reasoning)},
         'finish_reason': finish if not stop_reason else 'cancelled'}],
         'usage': usage, 'status': 'incomplete' if stop_reason else 'completed',
         'incomplete_details': {'reason': stop_reason} if stop_reason else {},
         'streaming': {'received_characters': count, 'complete_records': progress.records,
                       'stop_reason': stop_reason, 'usage_unavailable': usage is None}}
+    return preserve_deadline_prefix(stream, body)

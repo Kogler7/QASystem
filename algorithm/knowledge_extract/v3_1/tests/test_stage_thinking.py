@@ -39,8 +39,9 @@ def client_for(outcomes=None, **policy):
 
 @pytest.mark.parametrize("stage,enabled", [
     ("entity", False), ("property", False), ("skill_selection", False),
-    ("entity_verification", True), ("entity_admission", True), ("property_verification", True),
-    ("evidence_verification", True), ("candidate_identity", True),
+    ("entity_verification", False), ("entity_admission", False), ("property_verification", False),
+    ("evidence_verification", False), ("candidate_identity_verification", False),
+    ("candidate_identity", True),
     ("property_conflict", True),
     ("repair_entity", True), ("repair_property", True),
     ("recover_entity", False), ("repair_json", False), ("unknown", False), (None, False),
@@ -86,7 +87,9 @@ def test_only_explicit_unsupported_thinking_error_falls_back(parameter, status):
     failure.status_code = status
     llm, calls = client_for([failure, response()],
                             thinking_parameter=parameter)
-    result = llm.generate_structured(SCHEMA, MESSAGES, {"pass_name": "entity_verification"})
+    # repair_property stays on the semantic policy, so the capability fallback is
+    # still exercised on a stage that really requests thinking.
+    result = llm.generate_structured(SCHEMA, MESSAGES, {"pass_name": "repair_property"})
     assert len(calls) == 2 and "extra_body" not in calls[1]
     assert result.thinking["requested"] == "enabled"
     assert result.thinking["sent"] == "provider_default" and result.thinking["fallback"]
@@ -113,7 +116,7 @@ def test_http_outages_and_auth_failures_do_not_trigger_thinking_capability_fallb
 
 def test_provider_without_toggle_reports_provider_default():
     llm, calls = client_for(thinking_parameter="none")
-    result = llm.generate_structured(SCHEMA, MESSAGES, {"pass_name": "entity_verification"})
+    result = llm.generate_structured(SCHEMA, MESSAGES, {"pass_name": "repair_property"})
     assert "extra_body" not in calls[0]
     assert result.thinking == {"requested": "enabled", "parameter": "none",
                                "sent": "provider_default", "fallback": False}
@@ -221,8 +224,9 @@ def test_concurrent_semantic_and_generation_calls_keep_independent_modes():
     with ThreadPoolExecutor(max_workers=len(stages)) as pool:
         results = list(pool.map(call, stages))
     for stage, body in calls:
-        mode = "disabled" if stage in {"entity", "property", "skill_selection"} else "enabled"
+        mode = ("enabled" if stage in {"candidate_identity", "property_conflict", "repair_entity", "repair_property"}
+                else "disabled")
         assert body == {"thinking": {"type": mode}}
     assert [r.thinking["requested"] for r in results] == [
-        "disabled", "enabled", "disabled", "enabled", "disabled", "enabled", "disabled", "enabled"]
+        "disabled", "disabled", "disabled", "disabled", "disabled", "enabled", "disabled", "enabled"]
     assert llm.disable_thinking is True
