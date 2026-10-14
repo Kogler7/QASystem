@@ -25,6 +25,7 @@ class ProviderProfile(BaseModel):
     max_concurrency: int = Field(default=4, ge=1)
     qps: int = Field(default=0, ge=0)
     qpm: int = Field(default=0, ge=0)
+    tpm: int = Field(default=0, ge=0)
     max_tokens: int = Field(default=16384, ge=1)
     max_input_tokens: int = Field(default=65536, ge=1)
     max_output_tokens: int | None = Field(default=None, ge=1)
@@ -70,12 +71,12 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         raise ValueError("Unsupported extraction version")
     if version == "jev" and has_overrides(options):
         raise ValueError("Request configuration overrides do not support jev")
-    package = {"v2.1": "v2_1", "v2.2": "v2_2", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
+    package = {"v2.1": "v2_1", "v2.2": "v2_2", "v2.2-v31": "v2_2_v31", "v3.1": "v3_1", "jev": "v2"}.get(version, version)
     defaults = importlib.import_module(f"algorithm.knowledge_extract.{package}.config").get_llm_config()
     # Snapshot once: retries retain the submitted configuration.
     casts = {"BASE_URL": ("base_url", str), "MODEL": ("model", str),
              "MAX_TOKENS": ("max_tokens", int), "MAX_CONCURRENCY": ("max_concurrency", int),
-             "QPS": ("qps", int), "QPM": ("qpm", int),
+             "QPS": ("qps", int), "QPM": ("qpm", int), "TPM": ("tpm", int),
              "TIMEOUT_SECONDS": ("request_timeout", float),
              "DISABLE_THINKING": ("disable_thinking", lambda v: v.lower() not in {"0", "false", "no"})}
     for suffix, (field, cast) in casts.items():
@@ -89,7 +90,7 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     if provider == "default" or routed:
         values = {key: defaults[key] for key in (
             "base_url", "model", "max_tokens", "request_timeout", "disable_thinking",
-            "max_concurrency", "qps", "qpm",
+            "max_concurrency", "qps", "qpm", "tpm",
         )}
         values.update(api_key_env=_credential_env(),
                       quota_group=setting("KG_EXTRACT_LLM_QUOTA_GROUP", "default"),

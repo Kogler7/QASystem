@@ -24,7 +24,7 @@ tags: []
 | `preproc/` | 各类文档解析为 Markdown（PDF/图片/Word/Excel/HTML/OFD） |
 | `knowledge_pipeline/` | 语义切片、演示视图与向量存储编排 |
 | `knowledge_extract/` | 第一版知识抽取（本体驱动）；现同时承载 V1 契约/共享件、版本路由 shim 与无本体摘要 |
-| `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3` / `v3.1` / `jev`，默认 `latest`），并做合法性校验；`jev` 只进入实验副本 |
+| `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v2.2` / `v2.2-v31` / `v3` / `v3.1` / `jev`，默认 `latest`），并做合法性校验；`jev` 只进入实验副本 |
 | `knowledge_extract/latest/` | `latest` 实体包：当前主版本代码副本，不是 v3 的软链/映射 |
 | `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |
@@ -116,7 +116,7 @@ tags: []
 
 | 文件 | 作用 |
 | --- | --- |
-| `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v3` / `v3.1` / `jev`，默认 `latest`），并做合法性校验；`jev` 只进入实验副本 |
+| `knowledge_extract/version.py` | 读取 `KG_EXTRACT_ALGO_VERSION`（`latest` / `v2` / `v2.2` / `v2.2-v31` / `v3` / `v3.1` / `jev`，默认 `latest`），并做合法性校验；`jev` 只进入实验副本 |
 | `knowledge_extract/latest/` | `latest` 实体包：当前主版本代码副本，不是 v3 的软链/映射 |
 | `knowledge_extract/v2/` | 新版抽取与本体编译，导出统一签名 `extract_aggregate` |
 | `knowledge_extract/v3/` | 第三代抽取（独立重写），导出 `extract_aggregate` 并把 flat facts 转成 V2 聚合契约 |

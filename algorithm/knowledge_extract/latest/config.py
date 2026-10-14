@@ -23,6 +23,7 @@ KG_EXTRACT_ENTITY_SEGMENT_MAX_DEPTH = int(_env("KG_EXTRACT_ENTITY_SEGMENT_MAX_DE
 KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
 KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
 KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
+KG_EXTRACT_TPM = int(_env("KG_EXTRACT_LLM_TPM", default="0"))
 KG_EXTRACT_REQUEST_TIMEOUT = float(_env("KG_EXTRACT_LLM_TIMEOUT_SECONDS", default="300"))
 # 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启
 KG_EXTRACT_DISABLE_THINKING = _env("KG_EXTRACT_LLM_DISABLE_THINKING", default="1") != "0"
@@ -55,6 +56,7 @@ def get_llm_config() -> dict:
         "max_concurrency": max(1, KG_EXTRACT_MAX_CONCURRENCY),
         "qps": max(0, KG_EXTRACT_QPS),
         "qpm": max(0, KG_EXTRACT_QPM),
+        "tpm": max(0, KG_EXTRACT_TPM),
         "request_timeout": max(1.0, KG_EXTRACT_REQUEST_TIMEOUT),
         "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
         "identity_admission": (

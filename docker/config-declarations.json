@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.6",
+  "version": "2026.10.14.8",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -124,7 +124,8 @@
           "kind": "external",
           "token": "BACKEND_BIND"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "BACKEND_HOST_PORT": {
       "desc": "部署参数 BACKEND_HOST_PORT",
@@ -142,7 +143,8 @@
           "kind": "external",
           "token": "BACKEND_HOST_PORT"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "AGENT_HOST_PORT": {
       "desc": "Agent 容器对外发布的宿主机端口（容器内固定 9180）。",
@@ -160,7 +162,8 @@
           "kind": "external",
           "token": "AGENT_HOST_PORT"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "QASYSTEM_ENV_IMAGE": {
       "desc": "部署参数 QASYSTEM_ENV_IMAGE",
@@ -183,7 +186,8 @@
           "kind": "external",
           "token": "QASYSTEM_ENV_IMAGE"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "QASYSTEM_SOURCE_DIR": {
       "desc": "部署参数 QASYSTEM_SOURCE_DIR",
@@ -201,7 +205,8 @@
           "kind": "external",
           "token": "QASYSTEM_SOURCE_DIR"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "HOST_MODELS_DIR": {
       "desc": "部署参数 HOST_MODELS_DIR",
@@ -224,7 +229,8 @@
           "kind": "external",
           "token": "HOST_MODELS_DIR"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "GPU_DEVICE_IDS": {
       "desc": "逗号分隔的宿主机 NVIDIA GPU 编号；目标 8 卡 A40 机器默认只使用后四张卡。 / supervisor 仅在所选卡内自动启动和调度进程，测试机器可按实际空闲卡覆盖。",
@@ -247,7 +253,8 @@
           "kind": "external",
           "token": "GPU_DEVICE_IDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EXECUTION_GPU_RESERVED_DEVICE_IDS": {
       "desc": "A40 默认：7 卡常驻 Clef + NanoJev，4/5/6 卡供通用任务；不改变允许使用的卡范围。 / 3090 显存较小，建议两模型分卡，并把模型卡和外部 judge 卡都加入保留列表。",
@@ -517,7 +524,8 @@
           "kind": "reference",
           "token": "EXECUTION_GPU_MEMORY_REQUEST_MB_"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING": {
       "desc": "部署参数 EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_EMBEDDING",
@@ -530,7 +538,8 @@
           "kind": "reference",
           "token": "EXECUTION_GPU_MEMORY_REQUEST_MB_"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE": {
       "desc": "部署参数 EXECUTION_GPU_MEMORY_REQUEST_MB_GPU_CONFIDENCE",
@@ -543,7 +552,8 @@
           "kind": "reference",
           "token": "EXECUTION_GPU_MEMORY_REQUEST_MB_"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EXECUTION_CPU_WORKERS": {
       "desc": "部署参数 EXECUTION_CPU_WORKERS",
@@ -1030,7 +1040,8 @@
           "kind": "external",
           "token": "QASYSTEM_JUDGE_API_KEY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "KG_EXTRACT_LLM_BASE_URL": {
       "desc": "知识抽取 LLM",
@@ -1092,6 +1103,16 @@
           "path": "algorithm/knowledge_extract/jev_extract/client.py",
           "kind": "reference",
           "token": "KG_EXTRACT_LLM_BASE_URL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_BASE_URL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_BASE_URL"
         }
       ],
       "fallbacks": [
@@ -1129,6 +1150,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'http://localhost:9999'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'http://localhost:9999'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'http://localhost:9999'"
         }
       ]
@@ -1173,6 +1202,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_TIMEOUT_SECONDS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TIMEOUT_SECONDS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TIMEOUT_SECONDS"
         }
       ],
       "fallbacks": [
@@ -1202,6 +1241,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'300'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'300'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'300'"
         }
       ]
@@ -1266,6 +1313,16 @@
           "path": "algorithm/knowledge_extract/jev_extract/client.py",
           "kind": "reference",
           "token": "KG_EXTRACT_LLM_API_KEY"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_API_KEY"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_API_KEY"
         }
       ],
       "fallbacks": [
@@ -1299,6 +1356,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "''"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "''"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "''"
         }
       ]
@@ -1353,6 +1418,16 @@
           "path": "algorithm/knowledge_extract/jev_extract/client.py",
           "kind": "reference",
           "token": "KG_EXTRACT_LLM_MODEL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MODEL"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MODEL"
         }
       ],
       "fallbacks": [
@@ -1386,6 +1461,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'deepseek-v4-flash'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'deepseek-v4-flash'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'deepseek-v4-flash'"
         }
       ]
@@ -1440,6 +1523,16 @@
           "path": "docker/configure.py",
           "kind": "external",
           "token": "KG_EXTRACT_LLM_MAX_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_TOKENS"
         }
       ],
       "fallbacks": [
@@ -1474,6 +1567,14 @@
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "expression": "'16384'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'16384'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "expression": "'16384'"
         }
       ]
     },
@@ -1492,6 +1593,11 @@
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
         }
       ],
       "fallbacks": [
@@ -1501,6 +1607,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "expression": "None"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
           "expression": "None"
         }
       ]
@@ -1625,6 +1735,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_DISABLE_THINKING"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_DISABLE_THINKING"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_DISABLE_THINKING"
         }
       ],
       "fallbacks": [
@@ -1659,6 +1779,14 @@
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "expression": "'1'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'1'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "expression": "'1'"
         }
       ]
     },
@@ -1687,6 +1815,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_ENABLED"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_ENABLED"
         }
       ],
       "fallbacks": [
@@ -1704,6 +1837,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'0'"
         }
       ]
@@ -1733,6 +1870,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_MODEL_PATH"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_MODEL_PATH"
         }
       ],
       "fallbacks": [
@@ -1750,6 +1892,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'/models/nanojev'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'/models/nanojev'"
         }
       ]
@@ -1779,6 +1925,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_ACCEPT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_ACCEPT"
         }
       ],
       "fallbacks": [
@@ -1796,6 +1947,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0.9'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'0.9'"
         }
       ]
@@ -1825,6 +1980,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_REJECT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_REJECT"
         }
       ],
       "fallbacks": [
@@ -1842,6 +2002,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0.9'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'0.9'"
         }
       ]
@@ -1871,6 +2035,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_CHOICE_CONFIDENCE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_CHOICE_CONFIDENCE"
         }
       ],
       "fallbacks": [
@@ -1888,6 +2057,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0.9'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'0.9'"
         }
       ]
@@ -1917,6 +2090,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_PRECISION"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_PRECISION"
         }
       ],
       "fallbacks": [
@@ -1934,6 +2112,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'bf16'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'bf16'"
         }
       ]
@@ -1963,6 +2145,11 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_JEV_BATCH_QUESTIONS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_JEV_BATCH_QUESTIONS"
         }
       ],
       "fallbacks": [
@@ -1980,6 +2167,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'32'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'32'"
         }
       ]
@@ -2029,6 +2220,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_MAX_CONCURRENCY"
         }
       ],
       "fallbacks": [
@@ -2062,6 +2263,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'4'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'4'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'4'"
         }
       ]
@@ -2111,6 +2320,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_QPS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QPS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QPS"
         }
       ],
       "fallbacks": [
@@ -2144,6 +2363,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'0'"
         }
       ]
@@ -2193,6 +2420,16 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_QPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_QPM"
         }
       ],
       "fallbacks": [
@@ -2226,6 +2463,14 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'0'"
         }
       ]
@@ -2279,7 +2524,8 @@
           "kind": "reference",
           "token": "api_key_env"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "DEEPSEEK_API_KEY": {
       "desc": "部署参数 DEEPSEEK_API_KEY",
@@ -2292,7 +2538,8 @@
           "kind": "external",
           "token": "DEEPSEEK_API_KEY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "QASYSTEM_LOCAL_LLM_API_KEY": {
       "desc": "本地无鉴权 LLM 的占位凭据，仅用于供应商配置的非空校验；不要复用云端密钥。",
@@ -2305,7 +2552,8 @@
           "kind": "reference",
           "token": "api_key_env"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "KG_EXTRACT_IDENTITY_ADMISSION": {
       "desc": "observe 仅标记缺少稳定身份的实体；quarantine 阻止其及关联关系进入正式图谱",
@@ -2342,6 +2590,11 @@
           "path": "algorithm/knowledge_extract/v3/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_IDENTITY_ADMISSION"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_IDENTITY_ADMISSION"
         }
       ],
       "fallbacks": [
@@ -2367,6 +2620,10 @@
         },
         {
           "path": "algorithm/knowledge_extract/v3/config.py",
+          "expression": "'quarantine'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'quarantine'"
         }
       ]
@@ -2456,7 +2713,7 @@
       ]
     },
     "KG_EXTRACT_ALGO_VERSION": {
-      "desc": "抽取算法版本：latest | v2 | v3 | v3.1 | jev，默认 latest（独立代码包）。 / v3.1 对应 Python 包 v3_1（通用语义 harness：主模型生成 + Clef 语义裁决）。 / jev 只运行 knowledge_extract/jev_extract，不影响默认抽取。说明见 docs/算法/JEV决策层.md。 / 在 test_data/eval-v2-opt 上评测 v2 带路由时设为 v2，并保持下方路由开关为 1。",
+      "desc": "抽取算法版本：latest | v0 | v2 | v2.1 | v2.2 | v2.2-v31 | v3 | v3.1 | jev，默认 latest（独立代码包）。 / v2.2 对应 Python 包 v2_2；v2.2-v31 对应 v2_2_v31（Stage1=v3.1 对齐实体 + Stage2=v2.2 关系）。 / v3.1 对应 Python 包 v3_1（通用语义 harness：主模型生成 + Clef 语义裁决）。 / jev 只运行 knowledge_extract/jev_extract，不影响默认抽取。",
       "default": "latest",
       "scope": "deployment",
       "mode": "hot",
@@ -3073,7 +3330,8 @@
           "kind": "reference",
           "token": "EMBEDDING_SERVICE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EMBEDDING_SERVICE_API_KEY": {
       "desc": "部署参数 EMBEDDING_SERVICE_API_KEY",
@@ -3167,6 +3425,10 @@
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "expression": "''"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "''"
         }
       ]
     },
@@ -3181,7 +3443,8 @@
           "kind": "reference",
           "token": "CLEF_SERVICE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "CLEF_SERVICE_API_KEY": {
       "desc": "部署参数 CLEF_SERVICE_API_KEY",
@@ -3194,7 +3457,8 @@
           "kind": "reference",
           "token": "_SERVICE_API_KEY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "CLEF_SERVICE_TIMEOUT_SECONDS": {
       "desc": "部署参数 CLEF_SERVICE_TIMEOUT_SECONDS",
@@ -3207,7 +3471,8 @@
           "kind": "reference",
           "token": "_SERVICE_TIMEOUT_SECONDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "CLEF_MODEL": {
       "desc": "部署参数 CLEF_MODEL",
@@ -3258,7 +3523,8 @@
           "kind": "reference",
           "token": "CLEF_API_KEY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "NANOJEV_SERVICE_URL": {
       "desc": "NanoJev 常驻服务；各 GPU worker 走 HTTP，不重复加载 checkpoint。",
@@ -3322,7 +3588,8 @@
           "kind": "reference",
           "token": "NANOJEV_SERVICE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "NANOJEV_SERVICE_API_KEY": {
       "desc": "部署参数 NANOJEV_SERVICE_API_KEY",
@@ -3335,7 +3602,8 @@
           "kind": "reference",
           "token": "_SERVICE_API_KEY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "NANOJEV_SERVICE_TIMEOUT_SECONDS": {
       "desc": "部署参数 NANOJEV_SERVICE_TIMEOUT_SECONDS",
@@ -3348,7 +3616,8 @@
           "kind": "reference",
           "token": "_SERVICE_TIMEOUT_SECONDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "NANOJEV_API_KEY": {
       "desc": "部署参数 NANOJEV_API_KEY",
@@ -3361,7 +3630,8 @@
           "kind": "reference",
           "token": "NANOJEV_API_KEY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "DOCUMENT_PARSE_SERVICE_URL": {
       "desc": "远程文档解析（remote-only 模式必填；full-runtime 模式可留空）",
@@ -3402,7 +3672,8 @@
           "kind": "reference",
           "token": "DOCUMENT_PARSE_SERVICE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "DOCUMENT_PARSE_SERVICE_API_KEY": {
       "desc": "部署参数 DOCUMENT_PARSE_SERVICE_API_KEY",
@@ -3500,7 +3771,8 @@
           "kind": "external",
           "token": "mineru"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "MINERU_MODEL_BASE_DIR": {
       "desc": "部署参数 MINERU_MODEL_BASE_DIR",
@@ -3532,7 +3804,8 @@
           "kind": "external",
           "token": "mineru"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "MINERU_MODEL_VLM_ENGINE": {
       "desc": "VLM 引擎：llama-cpp（CPU，默认）/ vllm（GPU 提速，用镜像自带 vLLM，见下方 VLLM 段）。 / 配 vllm 时需另外准备非 GGUF 权重并设置 MINERU_MODEL_VLM_SERVER_URL（或用本地 vLLM 服务）。",
@@ -3545,7 +3818,8 @@
           "kind": "external",
           "token": "mineru"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "MINERU4_LOCK_DIR": {
       "desc": "4.0 会在模型根目录下写 .locks；模型本体只读挂载时，需要把该目录单独叠成可写。 / 宿主上必须先创建 ${MINERU4_LOCK_DIR}，并保证容器用户可写。",
@@ -3558,7 +3832,8 @@
           "kind": "external",
           "token": "MINERU4_LOCK_DIR"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "MINERU4_TIER": {
       "desc": "解析档位：flash / basic / standard / advanced。默认 standard； / advanced 是 xhigh effort（走 hybrid VLM 管线，CPU 上约慢 5 倍，模型与 standard 相同）。 / 注意：DOC/DOCX/PPT/PPTX/XLS/XLSX/OFD/CSV/HTML/EPUB 在 4.0 只有 flash 档，运行时会自动降到 flash。",
@@ -3590,7 +3865,8 @@
           "kind": "external",
           "token": "VLLM_WARMUP_ENABLED"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "VLLM_WARMUP_TIMEOUT_SECONDS": {
       "desc": "部署参数 VLLM_WARMUP_TIMEOUT_SECONDS",
@@ -3712,7 +3988,8 @@
           "kind": "reference",
           "token": "QASYSTEM_ALERT_STAGE_SLOW_PARSE_SECONDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "QASYSTEM_ALERT_STAGE_SLOW_CHUNK_SECONDS": {
       "desc": "部署参数 QASYSTEM_ALERT_STAGE_SLOW_CHUNK_SECONDS",
@@ -3725,7 +4002,8 @@
           "kind": "reference",
           "token": "QASYSTEM_ALERT_STAGE_SLOW_CHUNK_SECONDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "QASYSTEM_ALERT_STAGE_SLOW_EXTRACT_SECONDS": {
       "desc": "部署参数 QASYSTEM_ALERT_STAGE_SLOW_EXTRACT_SECONDS",
@@ -3738,7 +4016,8 @@
           "kind": "reference",
           "token": "QASYSTEM_ALERT_STAGE_SLOW_EXTRACT_SECONDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "ENVIRONMENT": {
       "desc": "内部/兼容参数 ENVIRONMENT，消费者见 consumers；未列入部署模板",
@@ -4332,7 +4611,8 @@
           "kind": "reference",
           "token": "EXECUTION_GPU_DEVICE_IDS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EXECUTION_KEY_PREFIX": {
       "desc": "内部/兼容参数 EXECUTION_KEY_PREFIX，消费者见 consumers；未列入部署模板",
@@ -4577,7 +4857,8 @@
           "kind": "reference",
           "token": "CUDA_DEVICE_ORDER"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "MINERU_VLM_BACKEND": {
       "desc": "内部/兼容参数 MINERU_VLM_BACKEND，消费者见 consumers；未列入部署模板",
@@ -4646,7 +4927,8 @@
           "kind": "external",
           "token": "VLLM_WARMUP_BASE_URL"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "VLLM_WARMUP_MARKER": {
       "desc": "内部/兼容参数 VLLM_WARMUP_MARKER，消费者见 consumers；未列入部署模板",
@@ -4664,7 +4946,8 @@
           "kind": "external",
           "token": "VLLM_WARMUP_MARKER"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "VLLM_SERVER_PID": {
       "desc": "内部/兼容参数 VLLM_SERVER_PID，消费者见 consumers；未列入部署模板",
@@ -4682,7 +4965,8 @@
           "kind": "external",
           "token": "VLLM_SERVER_PID"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "VLLM_WARMUP_REPORT_FAILURE": {
       "desc": "内部/兼容参数 VLLM_WARMUP_REPORT_FAILURE，消费者见 consumers；未列入部署模板",
@@ -4700,7 +4984,8 @@
           "kind": "external",
           "token": "VLLM_WARMUP_REPORT_FAILURE"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "EXECUTION_RESOURCE_CLASS": {
       "desc": "内部/兼容参数 EXECUTION_RESOURCE_CLASS，消费者见 consumers；未列入部署模板",
@@ -4789,7 +5074,8 @@
           "kind": "reference",
           "token": "AGENT_DECOMPOSE_MAX_SUBPROBLEMS"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "AGENT_DECOMPOSE_MAX_PARALLEL": {
       "desc": "内部/兼容参数 AGENT_DECOMPOSE_MAX_PARALLEL，消费者见 consumers；未列入部署模板",
@@ -4802,7 +5088,8 @@
           "kind": "reference",
           "token": "AGENT_DECOMPOSE_MAX_PARALLEL"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "TASK_STORE_KEY_PREFIX": {
       "desc": "内部/兼容参数 TASK_STORE_KEY_PREFIX，消费者见 consumers；未列入部署模板",
@@ -5149,11 +5436,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_ENABLED"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_ENABLED"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'0'"
         }
       ]
@@ -5168,11 +5464,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_ACCEPT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_ACCEPT"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0.9'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'0.9'"
         }
       ]
@@ -5187,11 +5492,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_MAX_QUESTIONS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_MAX_QUESTIONS"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'16'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'16'"
         }
       ]
@@ -5206,11 +5520,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_TIMEOUT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_TIMEOUT"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'10'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'10'"
         }
       ]
@@ -5225,11 +5548,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_MAX_CALLS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_MAX_CALLS"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'512'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'512'"
         }
       ]
@@ -5244,11 +5576,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_STATE_CHARS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_STATE_CHARS"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'800'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'800'"
         }
       ]
@@ -5263,11 +5604,20 @@
           "path": "algorithm/knowledge_extract/v2_2/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V22_CLEF_MAX_INFLIGHT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V22_CLEF_MAX_INFLIGHT"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'2'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
           "expression": "'2'"
         }
       ]
@@ -5448,7 +5798,8 @@
           "kind": "reference",
           "token": "APPLICATION_API_FILE_UPLOAD_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "APPLICATION_API_VECTOR_STORE_PATH": {
       "desc": "内部/兼容参数 APPLICATION_API_VECTOR_STORE_PATH，消费者见 consumers；未列入部署模板",
@@ -5461,7 +5812,8 @@
           "kind": "reference",
           "token": "APPLICATION_API_VECTOR_STORE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "APPLICATION_API_CYPHER_QUERY_PATH": {
       "desc": "内部/兼容参数 APPLICATION_API_CYPHER_QUERY_PATH，消费者见 consumers；未列入部署模板",
@@ -5474,7 +5826,8 @@
           "kind": "reference",
           "token": "APPLICATION_API_CYPHER_QUERY_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "APPLICATION_API_GRAPH_WRITE_PATH": {
       "desc": "内部/兼容参数 APPLICATION_API_GRAPH_WRITE_PATH，消费者见 consumers；未列入部署模板",
@@ -5487,7 +5840,8 @@
           "kind": "reference",
           "token": "APPLICATION_API_GRAPH_WRITE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "APPLICATION_API_CONFIDENCE_PATH": {
       "desc": "内部/兼容参数 APPLICATION_API_CONFIDENCE_PATH，消费者见 consumers；未列入部署模板",
@@ -5500,7 +5854,8 @@
           "kind": "reference",
           "token": "APPLICATION_API_CONFIDENCE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "APPLICATION_API_DOCUMENT_EVIDENCE_PATH": {
       "desc": "内部/兼容参数 APPLICATION_API_DOCUMENT_EVIDENCE_PATH，消费者见 consumers；未列入部署模板",
@@ -5513,7 +5868,8 @@
           "kind": "reference",
           "token": "APPLICATION_API_DOCUMENT_EVIDENCE_PATH"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "HF_HUB_OFFLINE": {
       "desc": "内部/兼容参数 HF_HUB_OFFLINE，消费者见 consumers；未列入部署模板",
@@ -5536,7 +5892,8 @@
           "kind": "external",
           "token": "HF_HUB_OFFLINE"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "TRANSFORMERS_OFFLINE": {
       "desc": "内部/兼容参数 TRANSFORMERS_OFFLINE，消费者见 consumers；未列入部署模板",
@@ -5559,7 +5916,8 @@
           "kind": "external",
           "token": "TRANSFORMERS_OFFLINE"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "HF_HUB_DISABLE_TELEMETRY": {
       "desc": "内部/兼容参数 HF_HUB_DISABLE_TELEMETRY，消费者见 consumers；未列入部署模板",
@@ -5577,7 +5935,8 @@
           "kind": "reference",
           "token": "HF_HUB_DISABLE_TELEMETRY"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "MCP_PORT": {
       "desc": "内部/兼容参数 MCP_PORT，消费者见 consumers；未列入部署模板",
@@ -5674,11 +6033,20 @@
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_MAX_INPUT_BYTES"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_MAX_INPUT_BYTES"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "expression": "'48000'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
           "expression": "'48000'"
         }
       ]
@@ -5693,11 +6061,20 @@
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_WINDOW_CHARS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_WINDOW_CHARS"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
+          "expression": "'2000'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/request_budget.py",
           "expression": "'2000'"
         }
       ]
@@ -5712,11 +6089,20 @@
           "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_TRACE_CALLS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_TRACE_CALLS"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "expression": "'32'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py",
           "expression": "'32'"
         }
       ]
@@ -5732,7 +6118,8 @@
           "kind": "external",
           "token": "AGENT_BIND"
         }
-      ]
+      ],
+      "fallbacks": []
     },
     "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE": {
       "desc": "实体准入可单独缩小核验批次；不大于 KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE，未配置时沿用该值。",
@@ -5744,11 +6131,20 @@
           "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_ENTITY_VERIFICATION_BATCH_SIZE"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "expression": "str(limit)"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py",
           "expression": "str(limit)"
         }
       ]
@@ -5763,11 +6159,20 @@
           "path": "algorithm/knowledge_extract/v3_1/config.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_GENERATION_TEMPERATURE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_GENERATION_TEMPERATURE"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
           "expression": "'0'"
         }
       ]
@@ -5782,11 +6187,20 @@
           "path": "algorithm/knowledge_extract/v3_1/task_runtime.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_MAX_CALLS"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/task_runtime.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_MAX_CALLS"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/task_runtime.py",
+          "expression": "'512'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/task_runtime.py",
           "expression": "'512'"
         }
       ]
@@ -5801,11 +6215,20 @@
           "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_TYPE_COMPLETION_AUDIT"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/candidate_generation.py",
+          "expression": "'false'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/candidate_generation.py",
           "expression": "'false'"
         }
       ]
@@ -5820,11 +6243,20 @@
           "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
           "kind": "read",
           "token": "KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE"
         }
       ],
       "fallbacks": [
         {
           "path": "algorithm/knowledge_extract/v3_1/property_grounding.py",
+          "expression": "'16'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/property_grounding.py",
           "expression": "'16'"
         }
       ]
@@ -5864,6 +6296,106 @@
         {
           "path": "backend/app/api_recording.py",
           "expression": "'7'"
+        }
+      ]
+    },
+    "KG_EXTRACT_LLM_TPM": {
+      "desc": "知识抽取每分钟 token 上限（输入+输出估算合计）；0 表示本系统不额外限 TPM。开启后按输入档位与账号表取更严值。",
+      "default": "0",
+      "scope": "deployment",
+      "mode": "hot",
+      "consumers": [
+        {
+          "path": "algorithm/knowledge_extract/latest/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v0/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "kind": "read",
+          "token": "KG_EXTRACT_LLM_TPM"
+        }
+      ],
+      "fallbacks": [
+        {
+          "path": "algorithm/knowledge_extract/latest/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v0/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v1/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_1/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v3_1/config.py",
+          "expression": "'0'"
+        },
+        {
+          "path": "algorithm/knowledge_extract/v2_2_v31/entity_stage/config.py",
+          "expression": "'0'"
         }
       ]
     }

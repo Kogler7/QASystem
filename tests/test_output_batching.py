@@ -3,6 +3,8 @@ import importlib
 import json
 from pathlib import Path
 import sys
+import threading
+import time
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -155,6 +157,39 @@ def test_batch_budget_tracks_output_limit_and_density():
     assert output_batch_size(SimpleNamespace(max_tokens=4096), tokens_per_item=1024, ceiling=24) == 2
     assert output_batch_size(SimpleNamespace(max_tokens=16384), tokens_per_item=1024, ceiling=24) == 10
     assert output_batch_size(SimpleNamespace(max_tokens=16384), tokens_per_item=2048, ceiling=24) == 5
+
+
+def test_independent_sibling_batches_run_concurrently(cg):
+    barrier = threading.Barrier(2, timeout=5)
+    lock = threading.Lock()
+    inflight = 0
+    peak = 0
+    seen = []
+
+    def generate(llm, messages, schema, **kwargs):
+        nonlocal inflight, peak
+        ids = schema['properties']['updates']['items']['properties']['id']['enum']
+        with lock:
+            inflight += 1
+            peak = max(peak, inflight)
+            seen.append(list(ids))
+        barrier.wait()
+        time.sleep(0.01)
+        with lock:
+            inflight -= 1
+        return {'updates': [{'id': item} for item in ids]}
+
+    model = SimpleNamespace(max_tokens=16384, max_concurrency=2)
+    attempts = []
+    result = generate_batched(
+        [1, 2, 3, 4], build_request, generate, model,
+        batch_size=2, attempts=attempts, pass_name='property', chunk_id='c1',
+        max_attempts=1, retry_base_seconds=0, use_scheduler=False,
+    )
+    assert peak >= 2
+    assert sorted(tuple(row) for row in seen) == [(1, 2), (3, 4)]
+    assert sorted(item['id'] for item in result['updates']) == [1, 2, 3, 4]
+    assert not attempts
 
 
 def test_expired_document_does_not_start_more_batches(cg):

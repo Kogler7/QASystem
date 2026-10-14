@@ -19,6 +19,7 @@ KG_EXTRACT_MAX_TOKENS = int(_env("KG_EXTRACT_LLM_MAX_TOKENS", default="16384"))
 KG_EXTRACT_MAX_CONCURRENCY = int(_env("KG_EXTRACT_LLM_MAX_CONCURRENCY", default="4"))
 KG_EXTRACT_QPS = int(_env("KG_EXTRACT_LLM_QPS", default="0"))
 KG_EXTRACT_QPM = int(_env("KG_EXTRACT_LLM_QPM", default="0"))
+KG_EXTRACT_TPM = int(_env("KG_EXTRACT_LLM_TPM", default="0"))
 # 默认关闭 thinking（与 agent 部分一致）；设置 "0" 可开启
 KG_EXTRACT_DISABLE_THINKING = _env("KG_EXTRACT_LLM_DISABLE_THINKING", default="1") != "0"
 
@@ -32,5 +33,6 @@ def get_llm_config() -> dict:
         "max_concurrency": max(1, KG_EXTRACT_MAX_CONCURRENCY),
         "qps": max(0, KG_EXTRACT_QPS),
         "qpm": max(0, KG_EXTRACT_QPM),
+        "tpm": max(0, KG_EXTRACT_TPM),
         "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
     }

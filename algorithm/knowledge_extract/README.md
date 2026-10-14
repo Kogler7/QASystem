@@ -279,9 +279,10 @@ summary = summarize_text(text=document_text)
 | `KG_EXTRACT_LLM_DISABLE_THINKING` | 是否关闭 thinking，默认 `1` 关闭；设 `0` 开启 |
 | `KG_EXTRACT_LLM_MAX_TOKENS`      | 最大输出 token 数                   |
 | `KG_EXTRACT_LLM_JSON_RETRIES`    | JSON 格式错误后的重试次数           |
-| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认`4` |
+| `KG_EXTRACT_LLM_MAX_CONCURRENCY` | 全局同时在途的抽取请求数，默认`4`；同组小批并行也受此上限 |
 | `KG_EXTRACT_LLM_QPS`             | 每秒最大请求数，`0` 表示不限制    |
 | `KG_EXTRACT_LLM_QPM`             | 每分钟最大请求数，`0` 表示不限制  |
+| `KG_EXTRACT_LLM_TPM`             | 每分钟 token 上限（输入+输出估算），`0` 表示不限制；与 QPM 开启后按输入档位收紧 |
 
 部分配置保留旧环境变量作为回退，具体以 `config.py` 和 `extractor.py` 为准。
 

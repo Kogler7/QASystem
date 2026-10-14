@@ -14,6 +14,8 @@ def create_request_llm(config: dict[str, Any]):
         package = "v2_1"
     elif version == "v2.2":
         package = "v2_2"
+    elif version == "v2.2-v31":
+        package = "v2_2_v31"
     else:
         package = version
     module = importlib.import_module(f"algorithm.knowledge_extract.{package}.llm_client")
@@ -30,6 +32,7 @@ def create_request_llm(config: dict[str, Any]):
     llm.api_mode = config.get("api_mode", "auto")
     llm.max_input_tokens = int(config.get("max_input_tokens", 65536))
     llm.max_output_tokens = int(config.get("max_output_tokens") or config["max_tokens"])
+    llm.max_concurrency = max(1, int(config.get("max_concurrency", 4)))
     from backend.app.api_recording import create_extraction_trace
     trace = create_extraction_trace(config=config, secrets=(credential,))
     if trace is not None:

@@ -3386,7 +3386,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE), help="工作区根目录，默认 test_data/eval")
     add_runtime_arguments(parser)
-    parser.add_argument("--extract-version", choices=("v0", "v2", "v2.1", "v2.2", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
+    parser.add_argument("--extract-version", choices=("v0", "v2", "v2.1", "v2.2", "v2.2-v31", "v3", "v3.1", "latest"), help="本次抽取算法版本，覆盖 Backend 默认值")
     parser.add_argument("--extract-provider", help="Backend 预配置供应商名称，不接受密钥或 URL")
     parser.add_argument("--extract-model", help="本次抽取模型，裁判模型保持独立")
     parser.add_argument("--extract-request-timeout", type=float, help="单次模型调用预算（秒，包含限流等待）")

@@ -9,6 +9,7 @@
 对外版本号 ``v0`` 对应 Python 包 ``v0``（只做实体 + 属性抽取，不抽取任何关系）。
 对外版本号 ``v2.1`` 对应 Python 包 ``v2_1``（v2 流水线 + rule 文档路由与规则抽取 prompt 扩展）。
 对外版本号 ``v2.2`` 对应 Python 包 ``v2_2``（v2 流水线 + 可选 Clef 预判）。
+对外版本号 ``v2.2-v31`` 对应 Python 包 ``v2_2_v31``（Stage1=v3.1 对齐实体 + Stage2=v2.2 关系）。
 ``jev`` 只在显式设置时运行 ``jev_extract``，不改变默认抽取。
 """
 from __future__ import annotations
@@ -20,15 +21,16 @@ V0 = "v0"
 V2 = "v2"
 V21 = "v2.1"
 V22 = "v2.2"
+V22_V31 = "v2.2-v31"
 V3 = "v3"
 V31 = "v3.1"
 JEV = "jev"
-SUPPORTED_VERSIONS = (LATEST, V0, V2, V21, V22, V3, V31, JEV)
+SUPPORTED_VERSIONS = (LATEST, V0, V2, V21, V22, V22_V31, V3, V31, JEV)
 DEFAULT_VERSION = LATEST
 
 
 def get_extract_version_label() -> str:
-    """返回配置原值（可能是 latest / v2 / v2.2 / v3 / v3.1 / jev），不做 latest 解析。"""
+    """返回配置原值（可能是 latest / v2 / v2.2 / v2.2-v31 / v3 / v3.1 / jev），不做 latest 解析。"""
     value = getenv("KG_EXTRACT_ALGO_VERSION", DEFAULT_VERSION).strip().lower()
     if value in SUPPORTED_VERSIONS:
         return value
