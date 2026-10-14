@@ -9,14 +9,16 @@ from ..ontology_compiler import compile_plan
 from ..output_contracts import property_entity_schema
 from ..prompt_router import build_chat_messages, resolve_document_route
 from ..prompt_templates import FACT_EVIDENCE_RULES
-from ..semantic_evidence import VERIFICATION_DECISION_RULES, build_verification_messages
+from ..semantic_evidence import (VERIFICATION_DECISION_RULES, ENTITY_VERIFICATION_SYSTEM_PROMPT,
+                                 build_verification_messages)
 from ..skill_planner import SkillAssemblyPlanner
 from ..skill_registry import SkillRegistry
 from .stub_llm import StubLLM, span_item
 
 
 @pytest.mark.parametrize('skill_id', ['official_document', 'rule', 'trouble'])
-@pytest.mark.parametrize('stage', ['entity', 'property', 'repair_entity', 'repair_property', 'verification'])
+@pytest.mark.parametrize('stage', ['entity', 'property', 'repair_entity', 'repair_property',
+                                  'verification', 'entity_verification'])
 def test_shared_semantics_are_identical_and_operations_stay_in_their_stage(skill_id, stage):
     # Renamed type/field identifiers do not change the frozen skill or source.
     ontology = '@startuml\nclass Subject {\n + 说明 (statement): String\n}\n@enduml'
@@ -28,12 +30,15 @@ def test_shared_semantics_are_identical_and_operations_stay_in_their_stage(skill
     planner = SkillAssemblyPlanner(registry)
     planner.prepare(route.to_dict(), skill_refs=[ref])
     known = [{'type': 'Subject', 'name': '对象甲', 'properties': {}}]
-    if stage == 'verification':
+    if stage in {'verification', 'entity_verification'}:
+        item = {'item_id': 'check', 'type': 'Subject', 'name': '对象甲',
+                'candidate_properties': {'statement': '阶段二检查正常'}, 'evidence_quotes': [chunk.text]}
+        if stage == 'verification':
+            item.update(property='statement', value='阶段二检查正常',
+                        property_description='指定对象及阶段的原文说明')
         messages = build_verification_messages(chunk=chunk, route=route, assembly_planner=planner,
-            items=[{'item_id': 'check', 'type': 'Subject', 'name': '对象甲',
-                    'property': 'statement', 'value': '阶段二检查正常',
-                    'property_description': '指定对象及阶段的原文说明',
-                    'evidence_quotes': [chunk.text]}])
+                                               plan=plan, items=[item])
+        assert messages[0]['content'].startswith(ENTITY_VERIFICATION_SYSTEM_PROMPT) == (stage == 'entity_verification')
         applicable = {'all', 'semantics'}
     else:
         is_property = stage in {'property', 'repair_property'}
@@ -77,7 +82,7 @@ def test_shared_semantics_are_identical_and_operations_stay_in_their_stage(skill
     assert user['documents'] == chunk.text
     assert 'internal-source' not in messages[1]['content']
     assert user['output_contract']['format'] == 'jsonl'
-    if stage == 'verification':
+    if stage in {'verification', 'entity_verification'}:
         assert VERIFICATION_DECISION_RULES in messages[0]['content']
         assert VERIFICATION_DECISION_RULES in user['output_contract']['constraints']
         assert set(user['output_contract']['success_schema']['properties']) == {'item_id', 'supported', 'reason'}
@@ -108,7 +113,7 @@ def test_sample_uses_common_prompts_and_preserves_instance_and_business_name(bin
     entity = result['raw']['entities'][0]
     assert (entity['type'], entity['name'], entity['properties']['name']) == (type_id, '维护角色_B', '维护工程师')
     assert result['raw']['relations'] == []
-    assert result['run_trace']['prompt_version'] == 'knowledge-extract-v3.1-all-entity-admission-v35'
+    assert result['run_trace']['prompt_version'] == 'knowledge-extract-v3.1-tokenized-recovery-v37'
     assert {item['name'] for item in SkillRegistry().selection_catalog()} == {'official_document', 'rule', 'trouble'}
     for messages in seen:
         user = json.loads(messages[1]['content'])

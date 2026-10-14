@@ -112,3 +112,37 @@ def test_redis_failure_does_not_run_unlimited():
     with pytest.raises(ModelSchedulingError, match='unavailable'):
         with pool.request_slot(time.monotonic()+.5):
             pytest.fail('must not run downstream')
+
+
+def test_account_token_budget_settles_usage_without_a_second_queue(real_redis):
+    import json
+    account = uuid.uuid4().hex
+    first, second = record(account=account, concurrency=16), record(account=account, concurrency=16)
+    for service in (first, second):
+        service.update(revision=1, account_limits={'max_concurrency':16,'qps':0,'qpm':0,'tpm':100})
+    pool1, pool2 = (RedisAdmission(service, redis_client=real_redis) for service in (first, second))
+    with pool1.request_slot(time.monotonic()+2, input_tokens=20, max_output_tokens=50) as reservation:
+        with pytest.raises(TimeoutError):
+            with pool2.request_slot(time.monotonic()+.1,input_tokens=10,max_output_tokens=40):
+                pytest.fail('shared token budget exceeded')
+        reservation.settle({'usage':{'prompt_tokens':5,'completion_tokens':0}})
+        with pool2.request_slot(time.monotonic()+2,input_tokens=10,max_output_tokens=40):
+            state = json.loads(real_redis.get(pool2.state_keys[1]))
+            assert sum(item['total_tokens'] for item in state['reservations']) == 55
+            assert state['active'] == 2
+
+
+def test_new_revision_relaxes_caps_but_preserves_live_reservation(real_redis):
+    import json
+    original = {**record(), 'revision':1}
+    first = RedisAdmission(original,redis_client=real_redis)
+    relaxed = {**original,'revision':2,'limits':{'max_concurrency':2,'qps':0,'qpm':0}}
+    second = RedisAdmission(relaxed,redis_client=real_redis)
+    with first.request_slot(time.monotonic()+2,input_tokens=40,max_output_tokens=10) as live:
+        with second.request_slot(time.monotonic()+2,input_tokens=10):
+            state=json.loads(real_redis.get(first.state_keys[0]))
+            assert state['active'] == 2 and state['policy_revision'] == 2
+            assert next(item for item in state['reservations'] if item['id']==live.id)['total_tokens'] == 50
+        # The older snapshot cannot overwrite newer shared scope policy.
+        with first.request_slot(time.monotonic()+2,input_tokens=10):
+            assert json.loads(real_redis.get(first.state_keys[0]))['active'] == 2

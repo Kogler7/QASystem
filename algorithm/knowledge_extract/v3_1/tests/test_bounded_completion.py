@@ -383,8 +383,11 @@ def test_property_overflow_splits_sources_and_retains_both_ends():
             self.properties.append(text)
             if text.count('记录编号') > 2 and not user['task']['known_entities'][0].get('properties'):
                 return StructuredLLMResponse(text='', api='chat.completions', response_mode='plain', status='incomplete', finish_reason='length')
+            # The repeated short sentence cannot identify a source. Supply the
+            # complete record quotation so the split response can be grounded.
+            quote = source_documents(user)[0]['text']
             return json.dumps({'type': 'Person', 'name': '张三', 'properties': {'duty': '检查'},
-                               'evidence': {'quote': '张三负责检查。'}}, ensure_ascii=False)
+                               'evidence': {'quote': quote, 'property_quotes': {'duty': [quote]}}}, ensure_ascii=False)
     chunks = [ExtractionChunk(str(i), '张三负责检查。' + f'记录编号{i}。') for i in range(6)]
     llm = PropertyOverflow()
     result = extract(chunks, llm)

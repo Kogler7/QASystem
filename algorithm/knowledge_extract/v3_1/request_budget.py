@@ -5,20 +5,55 @@ from qasystem_config.configuration import getenv as config_getenv
 import json
 import math
 import time
+import threading
+from collections import deque
 from dataclasses import replace
+from uuid import uuid4
+
+
+class RecoveryBudget:
+    """One finite attempt allowance shared by every descendant of a failed task."""
+
+    def __init__(self, attempts, branches=1):
+        self.limit = max(1, 2 * int(attempts) - 1) + 2 * max(0, int(branches) - 1)
+        self.used = 0
+        self.task_id = uuid4().hex[:16]
+        self.lock = threading.Lock()
+
+    def claim(self):
+        return self.claim_trace() is not None
+
+    def claim_trace(self):
+        with self.lock:
+            if self.used >= self.limit:
+                return None
+            self.used += 1
+            return self.trace()
+
+    def trace(self):
+        return {'logical_task_id': self.task_id, 'logical_attempt': self.used,
+                'logical_attempt_limit': self.limit}
+
+
+def fair_source_windows(chunks, limit):
+    """Give every original source a turn before one large table fills the queue."""
+    pending = deque(iter(iter_windows(chunk, limit)) for chunk in chunks)
+    while pending:
+        iterator = pending.popleft()
+        try:
+            yield next(iterator)
+        except StopIteration:
+            continue
+        pending.append(iterator)
 
 
 def input_limit(llm=None):
-    # UTF-8 bytes are a conservative token upper bound; no provider tokenizer
-    # dependency is needed. Honour the request-specific client limit as well.
+    # Byte limits protect serialized requests; they are not model token counts.
     limits = [int(config_getenv("KG_EXTRACT_V31_MAX_INPUT_BYTES", "48000"))]
     for owner in (llm, getattr(llm, "client", None)):
-        value = getattr(owner, "max_input_tokens", None)
+        value = getattr(owner, "max_input_bytes", None)
         if isinstance(value, (int, float)) and value > 0:
             limits.append(int(value))
-    value = config_getenv("KG_EXTRACT_LLM_MAX_INPUT_TOKENS")
-    if value:
-        limits.append(int(value))
     return max(1, min(limits))
 
 
@@ -27,7 +62,21 @@ def message_bytes(messages):
 
 
 def fits(messages, llm=None, *, reserve=2048):
-    return message_bytes(messages) + reserve <= input_limit(llm)
+    if message_bytes(messages) + reserve > input_limit(llm):
+        return False
+    owners = (llm, getattr(llm, "client", None))
+    limits = [int(value) for owner in owners
+              if isinstance(value := getattr(owner, 'max_input_tokens', None), (int, float)) and value > 0]
+    if not limits:
+        return True
+    measure = next((getattr(owner, 'measure_input') for owner in owners
+                    if callable(getattr(owner, 'measure_input', None))), None)
+    if measure is not None:
+        tokens = measure({'messages': messages}).tokens
+    else:
+        from algorithm.token_budget import estimate_input_tokens
+        tokens = estimate_input_tokens({'messages': messages})
+    return tokens <= min(limits)
 
 
 def window_chars(llm=None):

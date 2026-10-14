@@ -36,6 +36,20 @@ def test_root_is_the_only_configuration_source():
     assert not (ROOT / "docker" / "docker-compose.deploy.yml").exists()
 
 
+def test_quota_curve_is_hot_validated_and_visible_in_configuration_ui():
+    from types import SimpleNamespace
+    import pytest
+    from qasystem_config.api_services import validate_limits
+    from docker.api_ui import ui_rows
+    config=SimpleNamespace(services={'api':{'kind':'api','limits':{'max_concurrency':4,'quota_tiers':[
+        dict(max_input_tokens=100,rpm=2,tpm=200)]}}}, accounts={}, routes={})
+    rows=ui_rows(config)
+    assert any('档位 1' in r['display_name'] for r in rows)
+    assert any(r['key']=='tier_create' for r in rows)
+    validate_limits(config.services['api']['limits'])
+    with pytest.raises(ValueError): validate_limits({'max_concurrency':4,'quota_tiers':'private'})
+
+
 def test_environment_template_uses_module_specific_llm_keys():
     template = (ROOT / ".env.example").read_text(encoding="utf-8")
     for prefix in ("KG_EXTRACT_LLM_", "GRAPH_LLM_", "AGENT_LLM_"):
@@ -45,6 +59,15 @@ def test_environment_template_uses_module_specific_llm_keys():
     assert "DIFY_" not in template
     assert "\nLLM_BASE_URL=" not in template
     assert "\nOPENAI_BASE_URL=" not in template
+
+
+def test_v31_semantic_policy_is_algorithm_owned_not_deployment_environment():
+    from qasystem_config.configuration import declarations
+    from algorithm.knowledge_extract.v3_1.config import get_llm_policy
+    assert 'KG_EXTRACT_V31_SEMANTIC_THINKING' not in declarations()['items']
+    assert get_llm_policy()['semantic_thinking'] is True
+    assert get_llm_policy()['stream_generation'] is True
+    assert get_llm_policy()['verification_max_tokens'] == 4096
 
 
 def test_compose_reuses_root_environment_without_variable_duplication():

@@ -5,8 +5,10 @@ import math
 import json
 from copy import deepcopy
 
-LIMIT_FIELDS = ('max_concurrency', 'qps', 'qpm')
-CAPABILITY_FIELDS = ('context_tokens', 'max_output_tokens', 'thinking_parameter', 'api_mode', 'response_format')
+BASE_LIMIT_FIELDS = ('max_concurrency', 'qps', 'qpm')
+LIMIT_FIELDS = BASE_LIMIT_FIELDS + ('tpm', 'quota_tiers', 'adaptive_initial_input_tokens')
+CAPABILITY_FIELDS = ('context_tokens', 'max_output_tokens', 'thinking_parameter', 'api_mode', 'response_format',
+                     'tokenizer_dir', 'tokenizer_revision', 'max_input_bytes')
 CONNECTION_FIELDS = ('verify_ssl', 'ca_bundle', 'timeout_seconds')
 LIMIT_DEFAULTS = {'max_concurrency': 4, 'qps': 0, 'qpm': 0}
 LEGACY_CREDENTIAL_REFERENCES = {'extract':'KG_EXTRACT_LLM_API_KEY',
@@ -34,6 +36,12 @@ SERVICE_DESCRIPTIONS = {
     'max_concurrency': '所有 Backend / Agent 进程共同允许的在途请求数。',
     'qps': '每秒最多开始多少请求；0 表示本系统不额外限速。',
     'qpm': '每分钟最多开始多少请求；0 表示本系统不额外限速。',
+    'tpm': '每分钟输入与输出 token 合计预算；0 不额外限制，未知 usage 保守保留预留量。',
+    'quota_tiers': '可选输入长度档位，每档登记输入上限、RPM、TPM；空列表不施加供应商分档限制。',
+    'adaptive_initial_input_tokens': '429 后恢复时使用的初始输入档位下限；0 不强制更高档。',
+    'tokenizer_dir': '调用进程可读取的离线 tokenizer 资产目录，通常位于只读 /models；不自动下载。',
+    'tokenizer_revision': '离线资产对应的固定模型提交版本（40位十六进制），必须与 manifest 一致。',
+    'max_input_bytes': '可选 API 输入字节硬上限，与算法自己的窗口策略分开。',
     'account_id': '选择共享账号额度；关联的所有服务同时受账号总限制。',
 }
 API_REGISTRY_CONTRACT['descriptions'] = SERVICE_DESCRIPTIONS
@@ -45,6 +53,10 @@ FIELD_LABELS = {
     'thinking_parameter': '思考参数协议', 'api_mode': '调用协议', 'response_format': '格式协议',
     'service': '选择服务', 'delete': '删除记录', 'create': '添加记录',
     'verify_ssl': '验证TLS证书', 'ca_bundle': '可信CA文件', 'timeout_seconds': '通信等待上限（秒）',
+    'tpm': '每分钟 token 上限', 'quota_tiers': '输入档位额度',
+    'adaptive_initial_input_tokens': '恢复初始输入档位', 'tokenizer_dir': '离线 tokenizer 目录',
+    'tokenizer_revision': 'tokenizer 固定版本', 'max_input_bytes': 'API 输入字节上限',
+    'max_input_tokens': '档位输入上限', 'rpm': '档位每分钟请求数', 'tier_create': '添加配额档位', 'tier_delete': '删除配额档位',
 }
 
 
@@ -81,7 +93,7 @@ def migrate_api_services(env, services, accounts, routes):
     for name, profile in profiles.items():
         proposal = {'kind': 'api', 'adapter': 'chat', 'base_url': profile.get('base_url', ''),
                     'model': profile.get('model', ''), 'api_key_env': profile.get('api_key_env', ''),
-                    'limits': {k: int(profile.get(k, 4 if k == 'max_concurrency' else 0)) for k in LIMIT_FIELDS},
+                    'limits': {k: int(profile.get(k, 4 if k == 'max_concurrency' else 0)) for k in BASE_LIMIT_FIELDS},
                     'capabilities': {}}
         # Legacy token budgets describe algorithm requests, not verified API
         # capabilities. Do not turn them into a guessed physical service cap.
@@ -104,7 +116,7 @@ def migrate_api_services(env, services, accounts, routes):
         proposal = {'kind': 'api', 'adapter': 'chat', 'base_url': env.get(prefix+'BASE_URL', ''),
                     'model': env.get(prefix+'MODEL', ''), 'api_key_env': LEGACY_CREDENTIAL_REFERENCES[purpose]}
         if purpose == 'extract':
-            proposal['limits'] = {k: int(env.get(prefix+{'max_concurrency':'MAX_CONCURRENCY','qps':'QPS','qpm':'QPM'}[k], 4 if k == 'max_concurrency' else 0)) for k in LIMIT_FIELDS}
+            proposal['limits'] = {k: int(env.get(prefix+{'max_concurrency':'MAX_CONCURRENCY','qps':'QPS','qpm':'QPM'}[k], 4 if k == 'max_concurrency' else 0)) for k in BASE_LIMIT_FIELDS}
             group = env.get(prefix+'QUOTA_GROUP')
             if group:
                 proposal['account_id'] = group
@@ -119,6 +131,24 @@ def migrate_api_services(env, services, accounts, routes):
         # endpoint for review, never convert a local model into a remote API.
         merge(name, proposal)
         routes.setdefault(purpose, name)
+    legacy = {
+        'KG_EXTRACT_LLM_QUOTA_TIERS_JSON': ('limits', 'quota_tiers', json.loads),
+        'KG_EXTRACT_LLM_ADAPTIVE_INITIAL_INPUT_TOKENS': ('limits', 'adaptive_initial_input_tokens', int),
+        'KG_EXTRACT_LLM_TOKENIZER_DIR': ('capabilities', 'tokenizer_dir', str),
+        'KG_EXTRACT_LLM_TOKENIZER_REVISION': ('capabilities', 'tokenizer_revision', str),
+        'KG_EXTRACT_LLM_MAX_INPUT_BYTES': ('capabilities', 'max_input_bytes', int),
+    }
+    for old, (group, key, cast) in legacy.items():
+        if old not in env or env[old] == '': continue
+        name = routes.get('extract')
+        if name not in services:
+            raise ValueError('旧 LLM 容量配置需先登记抽取服务，不能静默丢弃')
+        try: value = cast(env[old])
+        except (TypeError, ValueError): raise ValueError('旧 LLM 容量配置无效') from None
+        target = services[name].setdefault(group, {})
+        if key not in target: target[key] = value
+        elif target[key] != value:
+            conflicts[f'services.{name}.{group}'] = {'current': target.copy(), 'legacy': {**target, key: value}}
     return services, accounts, routes, conflicts
 
 
@@ -128,6 +158,11 @@ def validate_limits(limits, *, required=False):
     if required and 'max_concurrency' not in limits:
         raise ValueError('服务或账号必须登记并发上限')
     for key, value in limits.items():
+        if key == 'quota_tiers':
+            from qasystem_config.quota_schema import parse_quota_tiers
+            if not isinstance(value, list): raise ValueError('配额档位必须为结构化列表')
+            parse_quota_tiers(value)
+            continue
         if type(value) is not int or value < (1 if key == 'max_concurrency' else 0):
             raise ValueError('无效的服务或账号限额')
 
@@ -160,9 +195,15 @@ def validate_api_registry(services, accounts, routes):
         caps = service.get('capabilities', {})
         if not isinstance(caps, dict) or set(caps) - set(CAPABILITY_FIELDS):
             raise ValueError('无效的服务能力登记')
-        for key in ('context_tokens', 'max_output_tokens'):
+        for key in ('context_tokens', 'max_output_tokens', 'max_input_bytes'):
             if key in caps and (type(caps[key]) is not int or caps[key] < 1):
                 raise ValueError('服务 token 上限必须为正整数')
+        for key in ('tokenizer_dir', 'tokenizer_revision'):
+            if key in caps and not isinstance(caps[key], str): raise ValueError('tokenizer 配置必须为字符串')
+        if caps.get('tokenizer_dir'):
+            import re
+            if not re.fullmatch('[a-f0-9]{40}', caps.get('tokenizer_revision', '')):
+                raise ValueError('离线 tokenizer 必须登记固定版本')
         if caps.get('max_output_tokens', 0) > caps.get('context_tokens', math.inf):
             raise ValueError('输出上限不能超过上下文上限')
         for key, allowed in {'thinking_parameter': {'thinking', 'enable_thinking', 'none'},

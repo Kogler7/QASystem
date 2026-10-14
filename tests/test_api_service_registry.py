@@ -116,10 +116,12 @@ def test_extraction_sdk_uses_shared_service_admission_and_checks_capability(monk
     service = {'service_id':'shared', 'limits':{'max_concurrency':1},
                'capabilities':{'max_output_tokens':5}}
     class Pool:
+        def calibration(self, key): return {'max_underestimate':0, 'samples':0}
         @contextmanager
-        def request_slot(self, deadline):
+        def request_slot(self, deadline, **quota):
+            from external_services.llm.quota_state import Reservation
             entered.append(deadline)
-            yield
+            yield Reservation(0, quota['input_tokens'], quota['input_tokens'] + quota['max_output_tokens'])
     monkeypatch.setattr(distributed, 'service_pool', lambda snapshot: Pool())
     sdk = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: sent.append(kw) or 'ok')))
     cfg = {'service_snapshot':service,'quota_group':'ignored','request_timeout':3,

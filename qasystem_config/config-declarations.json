@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.14",
+  "version": "2026.10.14.15",
   "dynamic_keys": [],
   "retired": [
     "AGENT_API_WORKERS",
@@ -152,7 +152,20 @@
     "VLLM_MAX_NUM_SEQS",
     "VLLM_MODEL_PATH",
     "VLLM_MODEL_VERSION",
-    "VLLM_SERVED_MODEL_NAME"
+    "VLLM_SERVED_MODEL_NAME",
+    "KG_EXTRACT_LLM_QUOTA_TIERS_JSON",
+    "KG_EXTRACT_LLM_TOKENIZER_DIR",
+    "KG_EXTRACT_LLM_TOKENIZER_REVISION",
+    "KG_EXTRACT_LLM_MAX_INPUT_BYTES",
+    "KG_EXTRACT_LLM_QUOTA_BACKEND",
+    "KG_EXTRACT_LLM_QUOTA_REDIS_URL",
+    "KG_EXTRACT_LLM_ADAPTIVE_INITIAL_INPUT_TOKENS",
+    "KG_EXTRACT_V31_SEMANTIC_THINKING",
+    "KG_EXTRACT_V31_STREAM_GENERATION",
+    "KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS",
+    "KG_EXTRACT_V31_FAST_VERIFICATION",
+    "KG_EXTRACT_V31_PROPERTY_BATCH_SIZE",
+    "KG_EXTRACT_V31_PROPERTY_VERIFICATION_BATCH_SIZE"
   ],
   "items": {
     "BACKEND_BIND": {
@@ -932,18 +945,13 @@
       ]
     },
     "KG_EXTRACT_LLM_MAX_INPUT_TOKENS": {
-      "desc": "输入预算按本地保守估算检查；输出新变量为空时兼容上面的 MAX_TOKENS。",
+      "desc": "完整请求的输入 token 上限；有匹配 tokenizer 时计量实际请求，无资产时明确使用保守估算。",
       "default": "65536",
       "scope": "deployment",
       "mode": "hot",
       "consumers": [
         {
           "path": "backend/app/services/extraction_config.py",
-          "kind": "read",
-          "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
           "kind": "read",
           "token": "KG_EXTRACT_LLM_MAX_INPUT_TOKENS"
         },
@@ -957,10 +965,6 @@
         {
           "path": "backend/app/services/extraction_config.py",
           "expression": "'65536'"
-        },
-        {
-          "path": "algorithm/knowledge_extract/v3_1/request_budget.py",
-          "expression": "None"
         }
       ]
     },
@@ -5117,7 +5121,6 @@
       "_env('KG_EXTRACT_V31_GENERATION_TEMPERATURE', default='0')"
     ],
     "algorithm/knowledge_extract/v3_1/request_budget.py": [
-      "config_getenv('KG_EXTRACT_LLM_MAX_INPUT_TOKENS')",
       "config_getenv('KG_EXTRACT_V31_MAX_INPUT_BYTES', '48000')",
       "config_getenv('KG_EXTRACT_V31_WINDOW_CHARS', '2000')"
     ],
@@ -5518,14 +5521,20 @@
     "account_fields": [
       "max_concurrency",
       "qps",
-      "qpm"
+      "qpm",
+      "tpm",
+      "quota_tiers",
+      "adaptive_initial_input_tokens"
     ],
     "capability_fields": [
       "context_tokens",
       "max_output_tokens",
       "thinking_parameter",
       "api_mode",
-      "response_format"
+      "response_format",
+      "tokenizer_dir",
+      "tokenizer_revision",
+      "max_input_bytes"
     ],
     "limit_defaults": {
       "max_concurrency": 4,
@@ -5562,6 +5571,12 @@
       "max_concurrency": "所有 Backend / Agent 进程共同允许的在途请求数。",
       "qps": "每秒最多开始多少请求；0 表示本系统不额外限速。",
       "qpm": "每分钟最多开始多少请求；0 表示本系统不额外限速。",
+      "tpm": "每分钟输入与输出 token 合计预算；0 不额外限制，未知 usage 保守保留预留量。",
+      "quota_tiers": "可选输入长度档位，每档登记输入上限、RPM、TPM；空列表不施加供应商分档限制。",
+      "adaptive_initial_input_tokens": "429 后恢复时使用的初始输入档位下限；0 不强制更高档。",
+      "tokenizer_dir": "调用进程可读取的离线 tokenizer 资产目录，通常位于只读 /models；不自动下载。",
+      "tokenizer_revision": "离线资产对应的固定模型提交版本（40位十六进制），必须与 manifest 一致。",
+      "max_input_bytes": "可选 API 输入字节硬上限，与算法自己的窗口策略分开。",
       "account_id": "选择共享账号额度；关联的所有服务同时受账号总限制。"
     }
   },

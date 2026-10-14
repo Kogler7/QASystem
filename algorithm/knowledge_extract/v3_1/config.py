@@ -33,6 +33,10 @@ def get_llm_policy() -> dict:
         "qpm": max(0, KG_EXTRACT_QPM),
         "request_timeout": max(1.0, KG_EXTRACT_REQUEST_TIMEOUT),
         "disable_thinking": KG_EXTRACT_DISABLE_THINKING,
+        "semantic_thinking": True,
+        "stream_generation": True,
+        "verification_max_tokens": 4096,
+        "fast_verification": True,
         "generation_temperature": float(_env("KG_EXTRACT_V31_GENERATION_TEMPERATURE", default="0")),
     }
 

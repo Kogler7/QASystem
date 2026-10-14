@@ -132,8 +132,10 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     values.update(base_url=routed['base_url'], model=routed['model'], api_key_env=routed['api_key_env'],
                   quota_group=routed.get('account_id') or routed['service_id'],
                   api_mode='auto', thinking_parameter='thinking')
-    from qasystem_config.api_services import LIMIT_DEFAULTS
-    values.update(routed.get('limits') or LIMIT_DEFAULTS)
+    from qasystem_config.api_services import LIMIT_DEFAULTS, validate_limits
+    validate_limits(routed.get('limits') or LIMIT_DEFAULTS, required=True)
+    values.update({key: value for key, value in (routed.get('limits') or LIMIT_DEFAULTS).items()
+                   if key in {'max_concurrency', 'qps', 'qpm'}})
     values['max_input_tokens'] = int(setting('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '65536'))
     values['max_output_tokens'] = int(setting('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS') or values['max_tokens'])
     values['max_tokens'] = values['max_output_tokens']
@@ -156,6 +158,9 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     else:
         document_timeout = None
     values = ProviderProfile.model_validate(values).model_dump()
+    if version == 'v3.1':
+        for key in ('semantic_thinking', 'stream_generation', 'verification_max_tokens', 'fast_verification'):
+            values[key] = defaults[key]
     values.update(version=version, provider=provider, document_timeout=document_timeout,
                   model_service=routed['service_id'], config_revision=revision,
                   credential_required=routed['kind']=='api', service_snapshot=routed)
@@ -171,6 +176,9 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
         "max_tokens", "max_input_tokens", "max_output_tokens", "disable_thinking",
         "api_mode", "thinking_parameter", "response_format",
     )}
+    if config.get("version") == "v3.1":
+        for key in ("semantic_thinking", "stream_generation", "verification_max_tokens", "fast_verification"):
+            result[key] = config.get(key)
     if config.get("version") in {"v0", "v2", "v2.1", "v3", "latest"}:
         # Provider profiles can retain legacy preferences, but extraction no
         # longer sends a response_format parameter on the wire.

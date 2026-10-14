@@ -6,6 +6,7 @@ from bisect import bisect_left
 from copy import deepcopy
 from dataclasses import replace
 import json
+PROPERTY_BATCH_SIZE = 4
 
 from .candidate_generation import generate_structured, _append_call
 from .chunk_context import ExtractionChunk
@@ -13,7 +14,7 @@ from .output_contracts import property_entity_schema, validate_property_proposal
 from .prompt_router import build_chat_messages
 from .property_grounding import ground_properties, merge_evidences
 from .request_budget import (fits, input_limit, recover_split_attempts,
-                             split_request_failure, window_chars, windows, document_expired)
+                             split_request_failure, window_chars, windows, document_expired, RecoveryBudget)
 from .source_windows import source_parts, table_windows
 from .task_runtime import synchronous, invoke, TaskBatcher
 import asyncio
@@ -54,13 +55,16 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
                              call_metrics=None, use_scheduler=False,
                              local_previous=1, local_next=1, same_section=True,
                              max_attempts=3, retry_base_seconds=0.05,
-                             batch_size=24, max_workers=1, task='property', repair_issues=None):
+                             batch_size=None, max_workers=1, task='property', repair_issues=None):
     """Copy verified facts; ask the LLM only for missing context or conflicts.
 
     Keys may span arbitrarily many source windows. Each request carries bounded
     source text plus the current verified state. A failed window retains earlier
     facts and a terminal attempt, rather than dropping the entire entity batch.
     """
+    if batch_size is None:
+        batch_size = PROPERTY_BATCH_SIZE
+    batch_size = max(1, min(24, int(batch_size)))
     completed = {}
     stats = {'calls': 0, 'applied': 0, 'rejected': 0, 'verifications': 0,
              'skipped': 0, 'source_windows': 0}
@@ -207,6 +211,8 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
                 'missing_properties': {p.identifier: {'display_name': p.display_name, 'data_type': p.data_type}
                     for p in plan.class_specs[type_id].properties if p.identifier not in state['properties']}}]
             request_task = 'repair' if focused_conflict else task
+            pass_name = ('repair_property' if request_task == 'repair' else
+                         'property_conflict' if unresolved_conflicts else 'property')
             request_issues = repair_issues
             if focused_conflict:
                 known[0]['requested_properties'] = sorted(unresolved_conflicts)
@@ -241,11 +247,12 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
             if not too_big:
                 ticket = {'key': key, 'messages': messages, 'schema': schema,
                     'task': request_task, 'repair_issues': request_issues,
+                    'pass_name': pass_name,
                     'known': known, 'documents': documents, 'sources': sources,
                     'prior': state, 'conflicts': conflict_values,
                     'label': label,
                     'split': depth < 12 and (len(sources) > 1 or len(sources[0].text) > 256)}
-                signature = (request_task, key[0], tuple((source.chunk_id, source.metadata.get('_v31_window_start', 0), source.text)
+                signature = (request_task, pass_name, key[0], tuple((source.chunk_id, source.metadata.get('_v31_window_start', 0), source.text)
                                            for source in sources))
                 parsed, request_failures = await batcher.submit(signature, ticket)
             if too_big or (parsed is None and split_request_failure(request_failures)):
@@ -323,7 +330,9 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
         for part in source_windows():
             if budget_exhausted:
                 break
-            if packet and (size + len(part.text) > text_limit or len(packet) >= max(1, batch_size)):
+            # Entity batching must not shrink an entity's source coverage packet.
+            # Retain the existing 24-window packing bound and text budget.
+            if packet and (size + len(part.text) > text_limit or len(packet) >= 24):
                 await process(packet)
                 packet, size = [], 0
             packet.append(part)
@@ -384,10 +393,11 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
         local_attempts, local_warnings, local_metrics = job['attempts'], job['warnings'], job['metrics']
         before = len(local_attempts)
         parsed = await invoke(generate_structured, llm, messages, schema, use_scheduler=use_scheduler,
-            attempts=local_attempts, pass_name='repair_property' if tickets[0].get('task', task) == 'repair' else 'property', chunk_id=tickets[0]['label'],
+            attempts=local_attempts, pass_name=tickets[0]['pass_name'], chunk_id=tickets[0]['label'],
             max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
             call_metrics=local_metrics, validator=validate,
             item_validator=validate_rows,
+            recovery_budget=job['recovery_budget'],
             split_on_overflow=any(ticket['split'] for ticket in tickets))
         recovered_keys = {(row['type'], row['name']) for row in (parsed or {}).get('entities', [])}
         remaining = [ticket for ticket in tickets if ticket['key'] not in recovered_keys]
@@ -421,6 +431,7 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
     async def run_packet(tickets):
         # Local diagnostics merge by submission order; task completion stays dynamic.
         job = {'attempts': [], 'warnings': [], 'metrics': [], 'calls': 0, 'verifications': 0,
+               'recovery_budget': RecoveryBudget(max_attempts, len(tickets)),
                'verification_workers': max(1, max_workers)}
         jobs.append(job)
         return await execute(tickets, job)

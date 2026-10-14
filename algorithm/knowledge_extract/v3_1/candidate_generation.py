@@ -9,6 +9,7 @@ from qasystem_config.configuration import getenv as config_getenv
 import json
 import re
 import time
+from algorithm.extraction_trace import traced_generation
 from copy import deepcopy
 from collections.abc import Iterable
 from typing import Any
@@ -18,7 +19,8 @@ from .evidence import Evidence, bind_evidence, locate_quote
 from .graph_utils import append_warning as _append_warning, canonical_name
 from .ontology_compiler import ExtractionPlan
 from .output_contracts import output_schema_for_types, validate_candidate_properties
-from .request_budget import fits, input_limit, message_bytes, window_chars, windows, iter_windows, split_request_failure, recover_split_attempts, document_expired
+from .request_budget import (fits, input_limit, message_bytes, window_chars, windows, iter_windows,
+    split_request_failure, recover_split_attempts, document_expired, RecoveryBudget, fair_source_windows)
 from .source_windows import source_parts
 from .ontology_schema import OntologySchema
 from ._logging import get_step_logger
@@ -166,12 +168,68 @@ def _unclosed_json_record(line):
     return quoted or bool(stack)
 
 
+def _has_collection_envelope(text: str, collection_name: str) -> bool:
+    """Recognize root envelopes even when their contents fail strict decoding.
+
+    This is only a rejection boundary: recognizing a key never authorizes its
+    value. In particular, malformed wrappers must not expose nested JSONL rows
+    through the independent-line recovery path.
+    """
+    stack, quoted, escaped, token = [], False, False, []
+    for index, char in enumerate(text):
+        if quoted:
+            token.append(char)
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == '"':
+                quoted = False
+                cursor = index + 1
+                while cursor < len(text) and text[cursor] in ' \t\r\n':
+                    cursor += 1
+                if stack == ['{'] and text[cursor:cursor + 1] == ':':
+                    try:
+                        if json.loads(''.join(token)) == collection_name:
+                            return True
+                    except ValueError:
+                        pass
+            continue
+        if char == '"':
+            quoted, token = True, ['"']
+        elif char in '{[':
+            if not stack and char == '[':
+                return True
+            stack.append(char)
+        elif char in '}]' and stack:
+            stack.pop()
+    return False
+
+
 def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, incomplete_lines=None) -> tuple[list[dict[str, Any]], list[str]]:
     """Read independent complete lines; damaged lines never erase their neighbours."""
     rows, errors = [], []
     text = _response_text(response)
     if not text.strip():
         return [], ["LLM 返回为空"]
+    def unique_object(pairs):
+        # COSEC: Reject duplicate keys instead of silently replacing a verdict/value.
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("重复 JSON 字段")
+            result[key] = value
+        return result
+
+    def reject_constant(value):
+        raise ValueError("非有限数值不是合法 JSON")
+
+    def finite_float(literal):
+        value = float(literal)
+        if value in (float('inf'), float('-inf')):
+            raise ValueError("非有限数值不是合法 JSON")
+        return value
+
     # COSEC: Only remove a complete, unambiguous transport envelope. Do not
     # repair JSON, extract nested objects, or discard arbitrary surrounding text.
     if normalizations is not None:
@@ -192,18 +250,64 @@ def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, inc
             if not prefix_errors:
                 text = prefix
                 normalizations.append('final_empty_marker')
-
-    def unique_object(pairs):
-        # COSEC: Reject duplicate keys instead of silently replacing a verdict/value.
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("重复 JSON 字段")
-            result[key] = value
-        return result
-
-    def reject_constant(value):
-        raise ValueError("非有限数值不是合法 JSON")
+        decoder = json.JSONDecoder(object_pairs_hook=unique_object,
+            parse_constant=reject_constant, parse_float=finite_float)
+        if _has_collection_envelope(text, collection_name):
+            # Live verification alone accepts one exact, fully consumed wrapper.
+            # Duplicate fields/nonfinite numbers fail before any row can escape;
+            # the usual schema, ID and ambiguity checks still apply afterwards.
+            try:
+                envelope = decoder.decode(text)
+            except (json.JSONDecodeError, ValueError):
+                envelope = None
+            if (collection_name != 'verdicts' or not isinstance(envelope, dict)
+                    or set(envelope) != {'verdicts'}
+                    or not isinstance(envelope['verdicts'], list)
+                    or not all(isinstance(row, dict) for row in envelope['verdicts'])):
+                return [], [f'JSONL 包装必须是完整且仅含 verdicts 对象列表的核验封套；不接受 {collection_name} 的其他包装']
+            text = '\n'.join(json.dumps(row, ensure_ascii=False, allow_nan=False)
+                             for row in envelope['verdicts'])
+            normalizations.append('complete_verdicts_envelope')
+        # A provider may return pretty-printed or adjacent top-level objects
+        # instead of JSONL. Normalize only a fully consumed object stream. No
+        # prefix/suffix stripping, nested-object extraction, or JSON repair.
+        _, strict_errors = _jsonl_rows(text, collection_name)
+        if strict_errors:
+            complete, cursor, wrapped = [], 0, False
+            try:
+                while cursor < len(text):
+                    while cursor < len(text) and text[cursor] in ' \t\r\n':
+                        cursor += 1
+                    if cursor == len(text):
+                        break
+                    if text[cursor] == '[':
+                        wrapped = True
+                        break
+                    if text[cursor] != '{':
+                        raise ValueError('not an object stream')
+                    record, cursor = decoder.raw_decode(text, cursor)
+                    if collection_name in record:
+                        wrapped = True
+                        break
+                    complete.append(record)
+                if wrapped:
+                    return [], [f'JSONL 必须是独立记录，不使用数组或 {collection_name} 包装']
+                empty = [index for index, record in enumerate(complete) if not record]
+                valid_empty = (not empty or collection_name == 'entities'
+                               and empty == [len(complete) - 1])
+                if complete and valid_empty:
+                    trailing_empty = len(complete) > 1 and not complete[-1]
+                    if trailing_empty:
+                        complete.pop()
+                    text = '\n'.join(json.dumps(record, ensure_ascii=False, allow_nan=False)
+                                     for record in complete)
+                    normalizations.append('complete_object_stream')
+                    if trailing_empty:
+                        normalizations.append('final_empty_marker')
+            except (json.JSONDecodeError, ValueError):
+                # Preserve the established strict per-line partial recovery;
+                # the failed formatting repair never authorizes a whole result.
+                pass
 
     all_lines = text.split('\n')
     last_line = max((i for i, line in enumerate(all_lines, 1) if line.strip()), default=0)
@@ -211,7 +315,8 @@ def _jsonl_rows(response: Any, collection_name: str, *, normalizations=None, inc
         if not line.strip():
             continue
         try:
-            row = json.loads(line, object_pairs_hook=unique_object, parse_constant=reject_constant)
+            row = json.loads(line, object_pairs_hook=unique_object, parse_constant=reject_constant,
+                             parse_float=finite_float)
         except json.JSONDecodeError:
             errors.append(f"JSONL 第 {number} 行不完整或不是合法 JSON")
             if incomplete_lines is not None and number == last_line and _unclosed_json_record(line):
@@ -389,6 +494,7 @@ def _response_metadata(response: Any) -> dict[str, Any]:
                 "incomplete_details": trace.get("incomplete_details") or {},
                 "usage": trace.get("usage"),
                 "usage_unavailable": bool(trace.get("usage_unavailable", trace.get("usage") is None)),
+                "thinking": trace.get("thinking") or {},
             }
     usage = getattr(response, "usage", None)
     status = getattr(response, "status", None)
@@ -422,6 +528,9 @@ def _pre_parse_response_error(response: Any) -> tuple[str, str] | None:
     return None
 
 
+
+
+@traced_generation
 def _invoke_generation(
     llm: Any,
     schema: dict[str, Any],
@@ -432,6 +541,7 @@ def _invoke_generation(
     attempt_number: int,
     response_mode: str,
     record_table: bool = False,
+    logical_context: dict | None = None,
 ) -> Any:
     # 以下为安全注释COSEC：扩展适配器只能操作副本，不得改写本地准入契约或重试证据。
     schema, messages = deepcopy(schema), deepcopy(messages)
@@ -447,6 +557,7 @@ def _invoke_generation(
                 "attempt": attempt_number,
                 "response_mode": response_mode,
                 "record_table": record_table,
+                **(logical_context or {}),
             },
         )
     return llm(messages)
@@ -471,6 +582,7 @@ async def generate_structured(
     item_validator=None,
     split_on_overflow: bool = False,
     saved_entity_keys=(),
+    recovery_budget=None,
 ) -> dict[str, Any] | None:
     """Bounded JSONL calls retain individually validated records across failures."""
     messages, schema = deepcopy(messages), deepcopy(schema)
@@ -504,6 +616,12 @@ async def generate_structured(
             attempts.append({'attempt': attempt_number, 'type': 'timeout', 'pass': pass_name,
                 'chunk': chunk_id, 'message': 'document deadline exhausted',
                 'retryable': False, 'terminal': True})
+            return partial_result()
+        logical_context = recovery_budget.claim_trace() if recovery_budget is not None else None
+        if recovery_budget is not None and logical_context is None:
+            attempts.append({'attempt': attempt_number, 'type': 'recovery_budget', 'pass': pass_name,
+                'chunk': chunk_id, 'message': 'logical task recovery budget exhausted',
+                'retryable': False, 'terminal': True, **recovery_budget.trace()})
             return partial_result()
         started = time.monotonic()
         error_type = ""
@@ -539,7 +657,8 @@ async def generate_structured(
             def request_once():
                 if document_expired(llm):
                     raise TimeoutError('document deadline exhausted before generation')
-                if use_scheduler:
+                from external_services.llm.runtime import ScheduledClient
+                if use_scheduler and not isinstance(getattr(llm, 'client', None), ScheduledClient):
                     from .request_budget import document_deadline
                     with get_llm_scheduler().request_slot(deadline=document_deadline(llm)):
                         if document_expired(llm):
@@ -549,6 +668,7 @@ async def generate_structured(
                             pass_name=pass_name, chunk_id=chunk_id,
                             attempt_number=attempt_number, response_mode=response_mode,
                             record_table=record_table_flag,
+                            logical_context=logical_context,
                         )
                 return _invoke_generation(
                     llm,
@@ -559,6 +679,7 @@ async def generate_structured(
                     attempt_number=attempt_number,
                     response_mode=response_mode,
                     record_table=record_table_flag,
+                    logical_context=logical_context,
                 )
             response = await current_runtime().call(request_once, stage=pass_name, llm=llm)
             # A provider may ignore its timeout. A late result is not a successful attempt.
@@ -651,17 +772,21 @@ async def generate_structured(
                         messages=attempt_messages, response=response, response_mode=response_mode)
                     if call_metrics:
                         call_metrics[-1].update(response_normalizations=response_normalizations,
-                                                ignored_saved_records=ignored_saved_records)
+                                                ignored_saved_records=ignored_saved_records,
+                                                **(logical_context or {}))
                     return parsed
             largest_invalid_response = max(largest_invalid_response, len(_response_text(response)))
         except Exception as exc:  # noqa: BLE001 - recorded as typed run evidence
-            error_type = 'call_budget' if isinstance(exc, CallBudgetExceeded) else "timeout" if _is_timeout(exc) else "request"
+            from algorithm.token_budget import InputTokenLimitError
+            error_type = ('input_budget' if isinstance(exc, InputTokenLimitError) else
+                          'call_budget' if isinstance(exc, CallBudgetExceeded) else "timeout" if _is_timeout(exc) else "request")
             # 以下为安全注释COSEC：供应商异常可能回显鉴权头、URL 或请求正文。
             # 仅保留控制重试所需的错误类别，不将原始异常写入日志或结果。
             raw_message = str(exc).lower()
             overflow = any(text in raw_message for text in
                 ('context length', 'context_length', 'maximum context', 'token limit', 'too many tokens'))
-            message = ('document model call budget exhausted' if error_type == 'call_budget' else
+            message = ('request input budget exceeded' if error_type == 'input_budget' else
+                       'document model call budget exhausted' if error_type == 'call_budget' else
                        'context length exceeded' if overflow else
                        'document deadline exhausted' if document_expired(llm) else
                        'LLM request timed out' if error_type == 'timeout' else 'LLM provider request failed')
@@ -704,6 +829,9 @@ async def generate_structured(
         )
 
         response_metadata = _response_metadata(response)
+        stream_reason = (response_metadata.get('incomplete_details') or {}).get('reason')
+        if stream_reason in {'repetitive_entity_output', 'consecutive_empty_evidence', 'repetitive_malformed_object'}:
+            repetitive_entity_output = True
         attempts.append(
             {
                 "attempt": attempt_number,
@@ -734,6 +862,7 @@ async def generate_structured(
                 "elapsed_seconds": round(time.monotonic() - started, 6),
                 "retryable": retryable,
                 "terminal": False,
+                **(logical_context or {}),
             }
         )
         _record_call(
@@ -968,11 +1097,13 @@ async def entity_pass(
     call_metrics: list[dict[str, Any]] | None = None,
     task: str = "entity",
     repair_issues: list[dict[str, Any]] | None = None,
+    recovery_chunk_ids: Iterable[str] = (),
     local_previous: int = 1,
     local_next: int = 1,
     same_section: bool = True,
 ) -> list[tuple[str, list[dict[str, Any]]]]:
     chunks = list(request.chunks)
+    recovery_chunk_ids = frozenset(recovery_chunk_ids)
 
     async def run(chunk: ExtractionChunk, *, type_ids=None, saved_keys=(), audit_types=True) -> tuple[
         str,
@@ -984,6 +1115,8 @@ async def entity_pass(
         local_attempts: list[dict[str, Any]] = []
         local_warnings: list[dict[str, Any]] = []
         local_call_metrics: list[dict[str, Any]] = []
+        pass_name = ('recover_entity' if task == 'repair' and chunk.chunk_id in recovery_chunk_ids else
+                     'repair_entity' if task == 'repair' else 'entity')
         from .property_grounding import ground_properties, admit_entity_names
 
         def context_sources(part):
@@ -1032,10 +1165,16 @@ async def entity_pass(
                 retry_base_seconds=retry_base_seconds, call_metrics=local_call_metrics, plan=plan,
                 route=route, assembly_planner=assembly_planner, max_workers=max_workers)
 
-        async def scan(part, types, depth=0, accepted_keys=()):
+        async def scan(part, types, depth=0, accepted_keys=(), recovery_budget=None):
+            if recovery_budget is None:
+                recovery_budget = RecoveryBudget(max_attempts,
+                    # Recovery windows overlap and punctuation can shorten them.
+                    # Count actual minimum windows before allocating the shared
+                    # tree allowance; dividing source length silently undercounts.
+                    branches=max(1, len(types)) * len(windows(part, 128)))
             if document_expired(llm):
                 local_attempts.append({'attempt': 1, 'type': 'timeout',
-                    'pass': 'repair_entity' if task == 'repair' else 'entity',
+                    'pass': pass_name,
                     'chunk': chunk.chunk_id, 'message': 'document deadline exhausted',
                     'retryable': False, 'terminal': True})
                 return []
@@ -1054,14 +1193,14 @@ async def entity_pass(
             if not too_big:
                 parsed = await invoke(generate_structured, llm, messages, output_schema,
                     use_scheduler=use_scheduler, attempts=local_attempts,
-                    pass_name="repair_entity" if task == "repair" else "entity", chunk_id=chunk.chunk_id,
+                    pass_name=pass_name, chunk_id=chunk.chunk_id,
                     max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
                     call_metrics=local_call_metrics,
                     split_on_overflow=depth < 12 and (len(types) > 1 or len(part.text) > 256),
                     # Source entailment is a candidate admission decision, not
                     # a serialization failure requiring regeneration of peers.
                     validator=lambda payload: validate_candidate_properties(payload, plan),
-                    saved_entity_keys=accepted_keys)
+                    saved_entity_keys=accepted_keys, recovery_budget=recovery_budget)
             if parsed is None and document_expired(llm):
                 return []
             output_failure = bool(local_attempts[before:] and local_attempts[-1].get('terminal')
@@ -1078,13 +1217,13 @@ async def entity_pass(
                     repetition = any(a.get('repetitive_entity_output') for a in parent_failures)
                     if len(types) > 1 and (too_big or parsed is not None) and (repetition or not unfinished_tail):
                         mid = len(types) // 2
-                        first = await scan(part, types[:mid], depth + 1, saved)
+                        first = await scan(part, types[:mid], depth + 1, saved, recovery_budget)
                         saved.update((row['type'], row['name']) for row in first)
-                        return retained + first + await scan(part, types[mid:], depth + 1, saved)
+                        return retained + first + await scan(part, types[mid:], depth + 1, saved, recovery_budget)
                     if len(part.text) > 256 and not part.metadata.get('_v31_atomic_table'):
                         found = list(retained)
                         for sub in windows(part, max(128, len(part.text) // 2)):
-                            additions = await scan(sub, types, depth + 1, saved)
+                            additions = await scan(sub, types, depth + 1, saved, recovery_budget)
                             found.extend(additions)
                             # Different source windows may contain another
                             # occurrence/new properties of the same key. Only
@@ -1092,10 +1231,10 @@ async def entity_pass(
                             # properties are explicitly rescanned afterwards.
                         return found
                     mid = len(types) // 2
-                    return retained + await scan(part, types[:mid], depth + 1, saved) + await scan(part, types[mid:], depth + 1, saved)
+                    return retained + await scan(part, types[:mid], depth + 1, saved, recovery_budget) + await scan(part, types[mid:], depth + 1, saved, recovery_budget)
                 if too_big:
                     local_attempts.append({"attempt": 0, "type": "input_budget",
-                        "pass": "repair_entity" if task == "repair" else "entity", "chunk": chunk.chunk_id,
+                        "pass": pass_name, "chunk": chunk.chunk_id,
                         "message": "minimum source/schema window exceeds request budget", "terminal": True})
                 return await finish(parsed, part) if parsed is not None else []
             if parsed is None:
@@ -1134,7 +1273,7 @@ async def entity_pass(
             local_call_metrics,
         )
 
-    pending_chunks = (part for chunk in chunks for part in iter_windows(chunk, window_chars(llm)))
+    pending_chunks = fair_source_windows(chunks, window_chars(llm))
     outputs = await ordered_tasks(run, pending_chunks, limit=max(1, max_workers) * 2)
     results: dict[str, list[dict[str, Any]]] = {chunk.chunk_id: [] for chunk in chunks}
     for chunk_id, entities, local_attempts, local_warnings, local_calls in outputs:
@@ -1196,6 +1335,7 @@ def _record_call(
             "usage": usage,
             "usage_unavailable": response_metadata.get("usage_unavailable"),
             "token_usage": usage,
+            "thinking": deepcopy(response_metadata.get("thinking") or {}),
             "messages": [dict(message) for message in messages],
             **({"response_text": text} if response is not None else {}),
         }

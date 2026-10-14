@@ -34,6 +34,7 @@ def providers(monkeypatch):
         accounts = {}
         for name, profile in profiles.items():
             limits = {k: profile.get(k, 4 if k=='max_concurrency' else 0) for k in ('max_concurrency','qps','qpm')}
+            limits.update({k: profile[k] for k in ('tpm','quota_tiers','adaptive_initial_input_tokens') if k in profile})
             group = profile.get('quota_group','test-account')
             accounts[group] = limits
             services[name] = {'kind':'api','adapter':'chat','base_url':profile['base_url'],
@@ -42,6 +43,8 @@ def providers(monkeypatch):
                 'capabilities': {k:profile[k] for k in ('api_mode','thinking_parameter','response_format','context_tokens','max_output_tokens') if k in profile}}
         return (deepcopy({'settings':{},'models':{},'services':services,'accounts':accounts,
                          'routes':{'extract':'default-chat'}}), 'unit-approved')
+    from qasystem_config import configuration as declared_configuration
+    monkeypatch.setattr(declared_configuration,'read_registry',lambda **kwargs: snapshot())
     monkeypatch.setattr(config,'registry_snapshot',snapshot)
     monkeypatch.setattr(model_routes,'registry_snapshot',snapshot)
     monkeypatch.setattr(distributed,'service_pool',lambda s: llm_runtime.get_pool(s.get('account_id') or s['service_id'],s.get('limits') or {'max_concurrency':4,'qps':0,'qpm':0}))
@@ -81,6 +84,19 @@ def test_default_environment_separates_budgets(providers, monkeypatch):
     chosen = config.resolve_config({'version': 'v3'})
     assert chosen['max_input_tokens'] == 32000
     assert chosen['max_tokens'] == chosen['max_output_tokens'] == 8000
+
+
+def test_v31_decoder_policy_is_snapshotted_and_publicly_reviewable(providers, monkeypatch):
+    monkeypatch.setenv('KG_EXTRACT_V31_STREAM_GENERATION', 'true')
+    monkeypatch.setenv('KG_EXTRACT_V31_FAST_VERIFICATION', 'true')
+    monkeypatch.setenv('KG_EXTRACT_V31_VERIFICATION_MAX_TOKENS', '4096')
+    chosen = config.resolve_config({'version': 'v3.1', 'provider': 'siliconflow'})
+    monkeypatch.setenv('KG_EXTRACT_V31_STREAM_GENERATION', 'false')
+    public = config.public_config(chosen)
+    assert public['stream_generation'] is True
+    assert public['fast_verification'] is True
+    assert public['verification_max_tokens'] == 4096
+    assert config.resolve_config({'version': 'v3.1', 'provider': 'siliconflow'})['stream_generation'] is True
 
 
 def test_oversized_input_never_consumes_quota_or_calls_provider(providers, monkeypatch):
@@ -316,7 +332,123 @@ def test_refactored_v31_default_config_and_live_factory(providers, monkeypatch):
     runtime.create_request_llm(chosen)
     assert seen["model"] == chosen["model"]
     assert seen["disable_thinking"] == chosen["disable_thinking"]
+    assert seen["schedule_requests"] is False
+    assert seen["semantic_thinking"] is chosen["semantic_thinking"]
+    assert seen["thinking_parameter"] == chosen["thinking_parameter"]
     assert config.public_config(chosen).get("output_format") != "jsonl"
+
+
+def test_quota_curve_defaults_provider_override_and_snapshot(providers, monkeypatch):
+    curve = [dict(max_input_tokens=8192, rpm=3, tpm=50000)]
+    chosen = config.resolve_config({'version':'v3.1','provider':'siliconflow'})
+    assert chosen['service_snapshot']['limits'].get('quota_tiers',[]) == []
+    providers['siliconflow']['quota_tiers'] = curve
+    data = config.snapshot_payload('graph.extract', {'ontology':'x','items':[{'text':'x'}],
+        'options':{'version':'v3.1','provider':'siliconflow'}})
+    providers['siliconflow']['quota_tiers'] = []
+    assert data['__extraction_config']['service_snapshot']['limits']['quota_tiers'] == curve
+    assert config.resolve_config({'provider':'siliconflow'})['service_snapshot']['limits']['quota_tiers'] == []
+
+
+def test_quota_curve_is_bound_to_hot_registry_snapshot(providers):
+    curve = [dict(max_input_tokens=8192,rpm=3,tpm=50000)]
+    providers['siliconflow']['quota_tiers'] = curve
+    registry, _ = config.registry_snapshot()
+    chosen = config.resolve_config({'version':'v3.1','provider':'siliconflow'},registry=(registry,7))
+    assert chosen['service_snapshot']['revision'] == 7
+    assert chosen['service_snapshot']['limits']['quota_tiers'] == curve
+
+
+def test_invalid_quota_configuration_is_redacted_at_submission(providers, monkeypatch):
+    providers['siliconflow']['quota_tiers'] = 'private-invalid-quota'
+    with pytest.raises(ValueError) as error:
+        config.resolve_config({'version':'v3.1','provider':'siliconflow'})
+    assert 'private' not in str(error.value)
+
+
+def test_named_provider_rejects_increasing_quota_curve(providers, monkeypatch):
+    providers['siliconflow']['quota_tiers'] = [dict(max_input_tokens=10,rpm=1,tpm=100),dict(max_input_tokens=20,rpm=2,tpm=80)]
+    with pytest.raises(ValueError): config.resolve_config({'provider':'siliconflow'})
+
+
+def test_v31_retry_factory_retains_submitted_quota_snapshot(providers, monkeypatch):
+    import openai
+    curve = [dict(max_input_tokens=8192,rpm=3,tpm=50000)]
+    providers['siliconflow']['quota_tiers'] = curve
+    chosen = config.resolve_config({'version':'v3.1','provider':'siliconflow'})
+    providers['siliconflow']['quota_tiers'] = []
+    monkeypatch.setattr(openai,'OpenAI',lambda **kwargs: SimpleNamespace())
+    monkeypatch.setattr(llm_runtime,'_pools',{})
+    llm = runtime.create_request_llm(chosen)
+    assert [vars(t) for t in llm.client.pool.tiers] == curve
+    assert not isinstance(llm.client.client,runtime.ScheduledClient)
+
+
+def test_v31_semantic_thinking_defaults_ignore_retired_environment(providers, monkeypatch):
+    monkeypatch.setenv('KG_EXTRACT_V31_SEMANTIC_THINKING', '0')
+    options = {'version': 'v3.1', 'provider': 'siliconflow'}
+    chosen = config.resolve_config(options)
+    assert chosen['disable_thinking'] is True and chosen['semantic_thinking'] is True
+    assert config.public_config(chosen)['semantic_thinking'] is True
+
+
+def test_v31_semantic_thinking_submission_is_preserved_after_hot_configuration_changes(providers, monkeypatch):
+    import openai
+    monkeypatch.setenv("KG_EXTRACT_V31_SEMANTIC_THINKING", "0")
+    chosen = config.resolve_config({"version": "v3.1", "provider": "siliconflow"})
+    chosen["quota_tiers"] = []
+    monkeypatch.setenv("KG_EXTRACT_V31_SEMANTIC_THINKING", "invalid-new-plan")
+    monkeypatch.setenv("KG_EXTRACT_TRACE_DIR", "")
+    seen = []
+    def create(**kwargs):
+        seen.append(kwargs)
+        return {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    monkeypatch.setattr(llm_runtime, "_pools", {})
+    llm = runtime.create_request_llm(chosen)
+    result = llm.generate_structured({}, [{"role": "user", "content": "x"}],
+                                     {"pass_name": "entity_verification"})
+    assert llm.semantic_thinking is True
+    assert seen[0]["extra_body"] == {"enable_thinking": True}
+    assert result.thinking["sent"] == "enabled"
+    assert config.resolve_config({"version": "v3.1"})["semantic_thinking"] is True
+
+
+def test_v31_scheduled_client_preserves_enabled_semantic_pass_and_parameter_fallback(providers, monkeypatch):
+    import openai
+    chosen = config.resolve_config({"version": "v3.1", "provider": "siliconflow"})
+    chosen["quota_tiers"] = []
+    monkeypatch.setenv("KG_EXTRACT_TRACE_DIR", "")
+    monkeypatch.setattr(llm_runtime, "_pools", {})
+    seen = []
+    def create(**kwargs):
+        seen.append(kwargs)
+        if len(seen) == 1:
+            raise ValueError("unknown parameter enable_thinking")
+        return {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    llm = runtime.create_request_llm(chosen)
+    result = llm.generate_structured({}, [{"role": "user", "content": "x"}],
+                                     {"pass_name": "property_verification"})
+    assert seen[0]["extra_body"] == {"enable_thinking": True}
+    assert "extra_body" not in seen[1]
+    assert result.thinking["fallback"] is True
+    assert len(llm.client.pool.starts) == 2
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_shared_scheduler_maps_per_call_thinking_instead_of_global_disable(providers, monkeypatch, enabled):
+    chosen = config.resolve_config({"provider": "siliconflow"})
+    chosen["quota_tiers"] = []
+    seen = []
+    sdk = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: seen.append(kw))))
+    monkeypatch.setattr(llm_runtime, "_pools", {})
+    wrapped = runtime.ScheduledClient(sdk, chosen)
+    wrapped.chat.completions.create(extra_body={"thinking": {"type": "enabled" if enabled else "disabled"},
+                                              "other": "preserved"})
+    assert seen[0]["extra_body"] == {"enable_thinking": enabled, "other": "preserved"}
 
 
 def test_document_scale_reads_chunks_and_estimates_uploaded_files():

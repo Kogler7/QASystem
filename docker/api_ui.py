@@ -13,6 +13,14 @@ def ui_rows(config):
                     label=f'{name} {field}', description=SERVICE_DESCRIPTIONS.get(field, field))
     rows.append(row('新增服务', '', 'create', 'Enter 添加 LLM API'))
     rows.append(row('新增账号', '', 'create', 'Enter 添加共享账号额度'))
+    def quota_rows(kind, name, limits, path):
+        rows.append(row(kind, name, 'tier_create', 'Enter 添加档位', path + ('quota_tiers',)))
+        for index, tier in enumerate(limits.get('quota_tiers', [])):
+            for key in ('max_input_tokens', 'rpm', 'tpm'):
+                item = row(kind, name, key, tier[key], path + ('quota_tiers', index))
+                item['display_name'] = f'[{kind}] {name} · 档位 {index + 1} · {FIELD_LABELS[key]}'
+                rows.append(item)
+            rows.append(row(kind, name, 'tier_delete', f'Enter 删除档位 {index + 1}', path + ('quota_tiers', index)))
     for name, service in config.services.items():
         for key in ('enabled', 'model', 'base_url', 'api_key_env', 'account_id'):
             if key == 'base_url' and service.get('kind') != 'api':
@@ -20,11 +28,15 @@ def ui_rows(config):
             rows.append(row('服务', name, key, service.get(key, True if key=='enabled' else '')))
         for group, fields in (('limits', LIMIT_FIELDS), ('capabilities', CAPABILITY_FIELDS), ('connection', CONNECTION_FIELDS)):
             for key in fields:
+                if key == 'quota_tiers': continue
                 rows.append(row('服务', name, key, service.get(group, {}).get(key), (group,)))
+        quota_rows('服务', name, service.get('limits', {}), ('limits',))
         rows.append(row('服务', name, 'delete', 'Enter 删除（检查引用）'))
     for name, limits in getattr(config, 'accounts', {}).items():
         for key in LIMIT_FIELDS:
+            if key == 'quota_tiers': continue
             rows.append(row('账号', name, key, limits.get(key)))
+        quota_rows('账号', name, limits, ())
         rows.append(row('账号', name, 'delete', 'Enter 删除（检查引用）'))
     for purpose in ('extract', 'graph', 'agent', 'entity_count'):
         rows.append(row('用途', purpose, 'service', config.routes.get(purpose, '')))
@@ -51,6 +63,15 @@ def edit_field(config, row, screen=None, *, prompt=input):
         if prompt('输入 DELETE 确认从计划删除: ').strip() == 'DELETE':
             (config.services if kind == '服务' else config.accounts).pop(name)
         return
+    if field in {'tier_create', 'tier_delete'}:
+        target = config.services[name] if kind == '服务' else config.accounts[name]
+        for part in row['path'][:-1]: target = target.setdefault(part, {}) if isinstance(part, str) else target[part]
+        if field == 'tier_create':
+            # Last path element is quota_tiers; require explicit numeric values, no guessed vendor curve.
+            target.setdefault('quota_tiers', []).append({key: int(prompt(FIELD_LABELS[key] + ': '))
+                                                      for key in ('max_input_tokens', 'rpm', 'tpm')})
+        else: target.pop(row['path'][-1])
+        return
     value = prompt(row['display_name'] + ' 新值: ').strip()
     if kind == '用途':
         if value and value not in config.services:
@@ -64,8 +85,8 @@ def edit_field(config, row, screen=None, *, prompt=input):
         raise ValueError('请选择已登记账号')
     target = config.services[name] if kind == '服务' else config.accounts[name]
     for part in row.get('path', ()):
-        target = target.setdefault(part, {})
-    numeric = field in LIMIT_FIELDS or field in {'context_tokens', 'max_output_tokens'}
+        target = target[part] if isinstance(part, int) else target.setdefault(part, {})
+    numeric = field in LIMIT_FIELDS or field in {'context_tokens', 'max_output_tokens', 'max_input_bytes', 'max_input_tokens', 'rpm'}
     if field in {'verify_ssl', 'enabled'}:
         if value.lower() not in {'true','false','1','0'}:
             raise ValueError('TLS验证请选择true/false')
@@ -75,6 +96,8 @@ def edit_field(config, row, screen=None, *, prompt=input):
         target[field] = float(value)
         return
     if not value and row.get('path') == ('capabilities',):
+        target.pop(field, None)
+    elif not value and field in {'tpm', 'adaptive_initial_input_tokens'}:
         target.pop(field, None)
     else:
         target[field] = int(value) if numeric else value

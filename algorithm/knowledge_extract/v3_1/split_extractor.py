@@ -1,4 +1,4 @@
-"""Entity discovery followed by complete LLM records, without entity merging."""
+"""Entity discovery with grounded properties and source-proven document aliases."""
 from __future__ import annotations
 import re
 import uuid
@@ -25,6 +25,7 @@ from .verification import ExtractionVerifier
 from .output_contracts import validate_candidate_properties
 from .structured_output import validate_json_schema
 from .request_budget import document_expired
+from .quality_metrics import completeness_metrics
 
 
 def _custom_repair_candidates(proposal, plan):
@@ -160,8 +161,8 @@ def extract_split(
 ):
     """Discover per-chunk names, then let the LLM return complete entity records.
 
-    No entity pool, ID assignment or alias resolution. Cross-chunk consolidation
-    of exact type/name keys is authored by the property LLM.
+    Candidate identities are reconciled with source-backed semantic review.
+    Cross-chunk consolidation of exact type/name keys retains verified fields.
     Graph UIDs exist only in the compatibility projection, never in prompts/raw.
     """
     if isinstance(chunks, (str, bytes, dict)):
@@ -192,7 +193,7 @@ def extract_split(
     attempts, calls = [], []
     run = ExtractionRun.create(run_id=run_id or f"ke-{uuid.uuid4().hex}", ontology=ontology,
         markdown="\n".join(c.text for c in chunks), model=model,
-        prompt_version="knowledge-extract-v3.1-all-entity-admission-v35", best_effort=best_effort)
+        prompt_version="knowledge-extract-v3.1-tokenized-recovery-v37", best_effort=best_effort)
     run.start()
     for c in chunks:
         run.register_block(c.chunk_id, block_id=str(c.metadata.get("block_id") or c.chunk_id), kind="chunk")
@@ -213,6 +214,11 @@ def extract_split(
         local_previous=local_previous, local_next=local_next, same_section=same_section) if chunks and selection_ok else []
     from .candidate_identity import reconcile_candidate_identities
     discovered = reconcile_candidate_identities(discovered, manager, plan, llm, route=route,
+        assembly_planner=planner, attempts=attempts, warnings=warnings, call_metrics=calls,
+        use_scheduler=use_scheduler, max_attempts=max_attempts,
+        retry_base_seconds=retry_base_seconds, max_workers=max_workers)
+    from .official_identity import reconcile_official_identities
+    discovered = reconcile_official_identities(discovered, manager, plan, llm, route=route,
         assembly_planner=planner, attempts=attempts, warnings=warnings, call_metrics=calls,
         use_scheduler=use_scheduler, max_attempts=max_attempts,
         retry_base_seconds=retry_base_seconds, max_workers=max_workers)
@@ -301,11 +307,19 @@ def extract_split(
             if not discovery_issues:
                 continue
             discovery_sources = _repair_context_chunks(discovery_issues, manager, entities=entities, relations=[])
+            # A failed transport/JSON response cannot establish a semantic
+            # omission. Keep rediscovery of those chunks on the base policy.
+            recovery_chunk_ids = {attempt.get('chunk') for attempt in attempts
+                if attempt.get('terminal')
+                and attempt.get('pass') in {'entity', 'recover_entity'}
+                and attempt.get('type') in {'json', 'schema', 'incomplete', 'empty',
+                                           'request', 'timeout', 'input_budget'}}
             grouped = _entity_pass(plan, schema, manager, ExtractionRequest(discovery_sources, request.target_types),
                 llm, route=route, assembly_planner=planner, max_workers=max_workers,
                 use_scheduler=use_scheduler, attempts=attempts, warnings=warnings,
                 max_attempts=max_attempts, retry_base_seconds=retry_base_seconds,
                 call_metrics=calls, task="repair", repair_issues=discovery_issues,
+                recovery_chunk_ids=recovery_chunk_ids,
                 local_previous=local_previous, local_next=local_next, same_section=same_section)
         grouped = _admit_repair_scope(grouped, issues, entities, manager, warnings)
         affected = {(e["type"], e["name"]) for _, rows in grouped for e in rows}
@@ -377,6 +391,7 @@ def extract_split(
         "profile": {"document_route": route.to_dict(), "pipeline": "entity_property", "chunks": len(chunks),
             "generation_temperature": getattr(llm, 'generation_temperature', None),
             "skill_selection": selection,
+            "quality": completeness_metrics(final_entities, plan),
             "prompt_assembly": {"mode": "request_skill_selection", "plans": planner.audit(),
                 "calls": [c for c in calls if c.get('pass') == 'skill_selection'],
                 "attempts": [a for a in attempts if a.get('pass') == 'skill_selection']},

@@ -201,3 +201,54 @@ def test_partial_v31_never_publishable_when_structure_is_valid():
     result={'extract_version':'v3.1','status':'partial','verification':{'valid':True},
             'graph':{'nodes':[],'relationships':[]},'attempts':[]}
     assert project_items(result,texts=['原文'])[0]['quality']['graph_publishable'] is False
+
+
+@pytest.mark.parametrize('configured,size', [(None, 4), ('2', 2)])
+def test_completion_batches_entities_and_overlap(monkeypatch, configured, size):
+    if configured is not None:
+        from .. import property_enrichment
+        monkeypatch.setattr(property_enrichment, 'PROPERTY_BATCH_SIZE', int(configured))
+    names = list('甲乙丙丁戊己庚辛')[:size * 2]
+    chunk = ExtractionChunk('c', ''.join(f'{name}负责检查。' for name in names))
+    rows = [('c', [{'type': 'A', 'name': name, 'properties': {},
+                    'evidence': locate_in_sources(name, [chunk])} for name in names])]
+    barrier = threading.Barrier(2, timeout=3)
+    batches = []
+    def response(prompt, source):
+        known = json.loads(prompt)['task']['known_entities']
+        batches.append([row['name'] for row in known])
+        barrier.wait()
+        return {'entities': [{'type': row['type'], 'name': row['name'],
+            'properties': {'duty': '检查'}, 'evidence': {'quote': f"{row['name']}负责检查。"}}
+            for row in known]}
+    entities, stats, attempts, _ = complete([chunk], rows,
+        StubLLM(property_handler=response, verification_handler=lambda i, c: 'yes'), 2)
+    assert sorted(map(len, batches)) == [size, size]
+    assert sorted(name for batch in batches for name in batch) == sorted(names)
+    assert [row['name'] for row in entities] == names
+    assert all(row['properties'] == {'duty': '检查'} for row in entities)
+    assert stats['calls'] == 2 and not attempts
+
+
+@pytest.mark.parametrize('configured,sizes', [(None, [1, 8]), ('3', [3, 3, 3])])
+def test_property_verification_batches_preserve_receipts(monkeypatch, configured, sizes):
+    if configured is not None:
+        from .. import property_grounding
+        monkeypatch.setattr(property_grounding, 'PROPERTY_VERIFICATION_BATCH_SIZE', int(configured))
+    monkeypatch.setenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '16')
+    names = list('甲乙丙丁戊己庚辛壬')
+    chunk = ExtractionChunk('c', ''.join(f'{name}负责检查。' for name in names))
+    rows = [{'type': 'A', 'name': name, 'properties': {'duty': '检查'},
+             'evidence': {'quote': f'{name}负责检查。'}} for name in names]
+    batches = []
+    def llm(messages):
+        items = json.loads(messages[-1]['content'])['task']['items']
+        batches.append([item['name'] for item in items])
+        return '\n'.join(json.dumps({'item_id': item['item_id'], 'supported': 'yes', 'reason': '支持'}) for item in items)
+    attempts = []
+    ground_properties(rows, [chunk], llm, plan=compile_plan(ONTOLOGY), attempts=attempts,
+        warnings=[], max_workers=2, max_attempts=1, retry_base_seconds=0)
+    assert sorted(map(len, batches)) == sizes
+    assert all(row['properties'] == {'duty': '检查'} for row in rows)
+    assert all(row['property_evidence']['duty']['sources'][0]['quote'] == f"{row['name']}负责检查。" for row in rows)
+    assert not attempts

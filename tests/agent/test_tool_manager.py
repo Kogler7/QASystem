@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import pytest
 import os
+import sys
 
+from agentcode.errors import ErrorCode
 from agentcode.models import BudgetConfig, SessionConfig, ToolPolicy
+from agentcode.tools.base_tools import shell_tool
+from agentcode.tools.mcp_tools import tool_manager
 from agentcode.tools.mcp_tools.tool_manager import ToolManager
 
 
@@ -16,6 +20,20 @@ def _make_config(**kwargs) -> SessionConfig:
         budget=BudgetConfig(),
         **kwargs,
     )
+
+
+@pytest.fixture
+def command_io_manager(monkeypatch) -> ToolManager:
+    # This fixture tests dispatch and command I/O, not resource enforcement.
+    # Keep defaults on Linux; Darwin's VM map cannot fit the default RLIMIT_AS,
+    # and platforms without resource need an explicit test-only opt-out.
+    limits = {}
+    if not shell_tool._HAS_RESOURCE:
+        limits = dict(mem_limit_mb=0, cpu_limit_s=0, file_size_limit_mb=0, nproc_limit=0)
+    elif sys.platform == "darwin":
+        limits = dict(mem_limit_mb=0)
+    monkeypatch.setattr(tool_manager, "ShellTool", lambda: shell_tool.ShellTool(**limits))
+    return ToolManager(_make_config())
 
 
 class TestToolManagerBaseTools:
@@ -35,12 +53,47 @@ class TestToolManagerBaseTools:
         assert base_tool["input_schema"]["type"] == "object"
         assert "command" in base_tool["input_schema"]["required"]
 
-    def test_call_base_tool(self) -> None:
-        tm = ToolManager(_make_config())
+    def test_call_base_tool(self, command_io_manager) -> None:
+        tm = command_io_manager
         command = "cmd /d /c echo hello_from_manager" if os.name == "nt" else "echo hello_from_manager"
         result = tm.call_tool("base__execute_command", {"command": command}, timeout_s=30, retries=0)
         assert result["ok"] is True
         assert "hello_from_manager" in result["content"]
+
+    @pytest.mark.parametrize("dispatch", ["single", "batch"])
+    def test_default_resource_rejection_propagates_without_execution(self, tmp_path, monkeypatch, dispatch) -> None:
+        marker = tmp_path / "must_not_exist"
+        script = tmp_path / "side_effect.py"
+        script.write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\n")
+
+        if shell_tool._HAS_RESOURCE:
+            def reject_limit(*args):
+                raise ValueError("injected setrlimit rejection")
+
+            monkeypatch.setattr(shell_tool._resource_module, "setrlimit", reject_limit)
+            expected_error = "Error: 无法应用子进程资源限制"
+        else:
+            expected_error = "Error: 当前平台不支持所请求的资源限制"
+
+        tm = ToolManager(_make_config())
+        assert tm._shell_tool._mem_limit_mb == 512
+        arguments = {"command": f'"{sys.executable}" "{script}"'}
+        if dispatch == "single":
+            result = tm.call_tool("base__execute_command", arguments, timeout_s=30, retries=0)
+            assert result["ok"] is False
+        else:
+            result = tm.call_many(
+                [{"id": "resource-rejection", "name": "base__execute_command", "input": arguments}],
+                timeout_s=30,
+                retries=0,
+            )[0]
+            assert result["is_error"] is True
+        assert result["error_code"] == ErrorCode.MCP_PROTOCOL_ERROR.value
+        assert result["error"].startswith(expected_error)
+        assert "RLIMIT_AS(MB)=512" in result["error"]
+        assert "命令未执行" in result["error"]
+        assert not result.get("content")
+        assert not marker.exists()
 
     def test_call_base_tool_blocked_command(self) -> None:
         tm = ToolManager(_make_config())

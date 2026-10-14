@@ -26,4 +26,8 @@ def test_transport_messages_and_response_are_saved_without_headers(tmp_path, fai
     assert request['call_id'] == 'logical-call' and request['request']['messages'] == messages
     response = json.loads(record.with_name(record.stem+'-response.json').read_text())
     assert response['status'] == ('failed' if failed else 'returned')
+    metric = json.loads(next(trace.directory.glob('*-http.json')).read_text())
+    assert metric['estimated_input_tokens'] > 0
+    assert metric['reserved_output_tokens'] == 0
+    assert metric['accounted_tokens'] == metric['estimated_input_tokens']
     assert 'secret-value' not in ''.join(p.read_text() for p in trace.directory.glob('*.json'))
