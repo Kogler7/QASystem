@@ -1,0 +1,3156 @@
+{
+  "run_id": "20261012-011048",
+  "case": "official/official_01",
+  "backend": "http://127.0.0.1:8034",
+  "algo_version": "v2.2",
+  "mode": "extract",
+  "from_run": "tmp/eval/runs/20261011-221308",
+  "entity_count": 73,
+  "relation_count": 237,
+  "entity_types": {
+    "DocumentUnit": 14,
+    "OfficialDocument": 1,
+    "OperationalActivity": 18,
+    "OperationalAgent": 15,
+    "OperationalConstraint": 6,
+    "OperationalExchange": 4,
+    "OperationalInformation": 9,
+    "OperationalObject": 6
+  },
+  "relation_types": {
+    "APPLIES_TO": 14,
+    "CONCERNS_OBJECT": 5,
+    "DEFINES": 9,
+    "HAS_EXCHANGE": 3,
+    "HAS_KEY_INFORMATION": 9,
+    "HAS_PART": 14,
+    "ISSUED_BY": 14,
+    "REQUIRES_ACTIVITY": 15,
+    "ACTS_ON": 21,
+    "EVIDENCED_BY": 37,
+    "PERFORMED_BY": 23,
+    "PRECEDES": 20,
+    "USES_INFORMATION": 6,
+    "PRODUCES": 4,
+    "CONSTRAINS_ACTIVITY": 6,
+    "CONSTRAINS_AGENT": 10,
+    "EXCHANGES_INFORMATION": 2,
+    "sourceAgent": 5,
+    "SUPPORTS_ACTIVITY": 5,
+    "targetAgent": 5,
+    "RELATED_TO": 10
+  },
+  "entities": [
+    {
+      "type": "DocumentUnit",
+      "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "properties": {
+        "单元标识": "title",
+        "单元标题": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "单元类型": "文件标题",
+        "原文位置": "chunk-0000",
+        "原文内容": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "顺序号": "0"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "关联文件：",
+      "properties": {
+        "单元标识": "关联文件：",
+        "单元标题": "关联文件：",
+        "单元类型": "章节",
+        "原文位置": "chunk-0010",
+        "原文内容": "关联文件：",
+        "顺序号": ""
+      },
+      "chunk_indices": [
+        10
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "承办处理",
+      "properties": {
+        "单元标识": "承办处理",
+        "单元标题": "承办处理",
+        "单元类型": "章节",
+        "原文位置": "chunk-0010",
+        "原文内容": "承办处理",
+        "顺序号": ""
+      },
+      "chunk_indices": [
+        10
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "报送要求",
+      "properties": {
+        "单元标识": "报送要求",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》报送要求段落",
+        "单元类型": "段落",
+        "单元标题": "排查情况报送要求",
+        "原文内容": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+        "顺序号": "5"
+      },
+      "chunk_indices": [
+        0,
+        10
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "排查要求一",
+      "properties": {
+        "单元标识": "排查要求一",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》一",
+        "单元类型": "条",
+        "单元标题": "全面组织开展排查",
+        "顺序号": "一",
+        "原文内容": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "排查要求三",
+      "properties": {
+        "单元标识": "排查要求三",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》三",
+        "单元类型": "条",
+        "单元标题": "对于网络安全防护等级三级及以上网络系统",
+        "顺序号": "三",
+        "原文内容": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "排查要求二",
+      "properties": {
+        "单元标识": "排查要求二",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》二",
+        "单元类型": "条",
+        "单元标题": "各企业要严格执行内部办公网络与互联网有效隔离",
+        "顺序号": "二",
+        "原文内容": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "排查要求五",
+      "properties": {
+        "单元标识": "排查要求五",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》五",
+        "单元类型": "条",
+        "单元标题": "加强网络和数据安全监测",
+        "顺序号": "五",
+        "原文内容": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "排查要求四",
+      "properties": {
+        "单元标识": "排查要求四",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》四",
+        "单元类型": "条",
+        "单元标题": "对于其他网络系统",
+        "顺序号": "四",
+        "原文内容": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "收文处理单",
+      "properties": {
+        "单元标识": "收文处理单",
+        "单元标题": "收文处理单",
+        "单元类型": "表单",
+        "原文位置": "chunk-0000",
+        "原文内容": "收文处理单",
+        "顺序号": ""
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "通知正文",
+      "properties": {
+        "单元标识": "通知正文",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》正文",
+        "单元类型": "正文",
+        "单元标题": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "原文内容": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。",
+        "顺序号": "1"
+      },
+      "chunk_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "附件/相关文件",
+      "properties": {
+        "单元标识": "附件/相关文件",
+        "单元标题": "附件/相关文件",
+        "单元类型": "章节",
+        "原文位置": "chunk-0010",
+        "原文内容": "附件/相关文件",
+        "顺序号": ""
+      },
+      "chunk_indices": [
+        10
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "附件：",
+      "properties": {
+        "单元标识": "附件：",
+        "单元标题": "附件：",
+        "单元类型": "章节",
+        "原文位置": "chunk-0010",
+        "原文内容": "附件：",
+        "顺序号": ""
+      },
+      "chunk_indices": [
+        10
+      ]
+    },
+    {
+      "type": "DocumentUnit",
+      "name": "附件列表",
+      "properties": {
+        "单元标识": "附件列表",
+        "原文位置": "《关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知》附件",
+        "单元类型": "附件",
+        "单元标题": "附件",
+        "原文内容": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n2．“龙虾”等开源智能体安全风险排查反馈表中国中车集团 公星10 1 0 8 1 580629",
+        "顺序号": "6"
+      },
+      "chunk_indices": [
+        0,
+        10
+      ]
+    },
+    {
+      "type": "OfficialDocument",
+      "name": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "properties": {
+        "文件标题": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+        "来文字号": "中车集团办科信［2026]18号"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "专项排查工作",
+      "properties": {
+        "活动名称": "专项排查工作",
+        "活动类型": "排查",
+        "动作词": "组织开展",
+        "活动描述": "组织开展开源智能体安全风险专项排查工作",
+        "预期结果": "保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "严控各类风险",
+      "properties": {
+        "活动名称": "严控各类风险",
+        "活动类型": "风险管控",
+        "动作词": "严控",
+        "活动描述": "严控各类风险"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "严格执行内部办公网络与互联网有效隔离",
+      "properties": {
+        "活动名称": "严格执行内部办公网络与互联网有效隔离",
+        "活动类型": "隔离管控",
+        "动作词": "执行",
+        "活动描述": "严格执行内部办公网络与互联网有效隔离"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "修订有关制度",
+      "properties": {
+        "活动名称": "修订有关制度",
+        "活动描述": "修订有关制度，从技术和管理两方面着手，严格杜绝此类现象发生",
+        "活动类型": "管理",
+        "动作词": "修订",
+        "预期结果": "从技术和管理两方面着手，严格杜绝此类现象发生"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "做好针对性风险防范",
+      "properties": {
+        "活动名称": "做好针对性风险防范",
+        "活动类型": "风险防范",
+        "动作词": "做好",
+        "活动描述": "参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "全面组织开展排查",
+      "properties": {
+        "活动名称": "全面组织开展排查",
+        "活动类型": "排查",
+        "动作词": "组织开展",
+        "活动描述": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "加强网络和数据安全监测",
+      "properties": {
+        "活动名称": "加强网络和数据安全监测",
+        "活动类型": "监测",
+        "动作词": "加强",
+        "活动描述": "加强网络和数据安全监测"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "各企业要认真落实通知要求",
+      "properties": {
+        "活动名称": "各企业要认真落实通知要求",
+        "活动描述": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+        "活动标识": "activity-30",
+        "活动类型": "落实要求",
+        "动作词": "落实",
+        "预期结果": "完成开源智能体安全风险排查情况报送",
+        "优先级": ""
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "摸清安全风险底数",
+      "properties": {
+        "活动名称": "摸清安全风险底数",
+        "活动类型": "摸底",
+        "动作词": "摸清",
+        "活动描述": "摸清安全风险底数"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "梳理本企业使用开源智能体情况",
+      "properties": {
+        "活动名称": "梳理本企业使用开源智能体情况",
+        "活动类型": "梳理",
+        "动作词": "梳理",
+        "活动描述": "梳理本企业使用开源智能体情况"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "研讨制定公司部署、使用开源智能体的规范、安全措施",
+      "properties": {},
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "第一时间处置",
+      "properties": {
+        "活动名称": "第一时间处置",
+        "活动类型": "处置",
+        "动作词": "处置",
+        "活动描述": "一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+      "properties": {
+        "活动名称": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+        "活动描述": "组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作",
+        "活动标识": "activity-47",
+        "活动类型": "排查",
+        "动作词": "组织",
+        "预期结果": "完成公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查",
+        "优先级": ""
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "组织排查，及时修正存在的风险隐患",
+      "properties": {
+        "活动名称": "组织排查，及时修正存在的风险隐患",
+        "活动描述": "组织排查开源智能体风险，及时修正存在的风险隐患",
+        "活动类型": "排查",
+        "动作词": "组织",
+        "预期结果": "及时修正存在的风险隐患"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "请公司领导阅，各中心和各事业部阅",
+      "properties": {
+        "活动名称": "请公司领导阅，各中心和各事业部阅",
+        "活动描述": "请公司领导及各中心、各事业部阅知",
+        "活动类型": "审批",
+        "动作词": "请",
+        "预期结果": "公司领导及各中心、各事业部阅知"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "谨慎使用",
+      "properties": {
+        "活动名称": "谨慎使用",
+        "活动类型": "使用",
+        "动作词": "使用",
+        "活动描述": "对于其他网络系统，建议谨慎使用"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "风险排查工作",
+      "properties": {
+        "活动名称": "风险排查工作",
+        "活动描述": "配合做好风险排查工作",
+        "活动类型": "排查工作",
+        "动作词": "排查"
+      },
+      "chunk_indices": [
+        4
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "中国中车集团有限公司",
+      "properties": {
+        "主体名称": "中国中车集团有限公司",
+        "主体类型": "组织",
+        "组织层级": "集团",
+        "职责": "发文单位，部署开源智能体安全风险排查工作"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "中国中车集团有限公司办公室",
+      "properties": {
+        "主体名称": "中国中车集团有限公司办公室",
+        "主体类型": "发文单位",
+        "组织层级": "集团总部"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+      "properties": {
+        "主体名称": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+        "主体类型": "收文单位",
+        "组织层级": "集团及子公司"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "各中心和各事业部",
+      "properties": {
+        "主体名称": "各中心和各事业部",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "阅知并参与研讨制定公司部署、使用开源智能体的规范、安全措施"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "国家网络安全监管部门",
+      "properties": {
+        "主体名称": "国家网络安全监管部门",
+        "主体类型": "监管机构",
+        "组织层级": "国家"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "境外企业、境外人员",
+      "properties": {
+        "主体名称": "境外企业、境外人员",
+        "主体类型": "境外主体",
+        "组织层级": "境外"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "安全中心",
+      "properties": {
+        "主体名称": "安全中心",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "配合技术中心开展开源智能体风险排查工作"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "技术中心",
+      "properties": {
+        "主体名称": "技术中心",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "牵头组织公司自建自用信息系统和员工电脑终端安装使用开源智能体风险排查工作"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "抄送：公司领导，总师级领导，纪委副书记、工会副主席",
+      "properties": {
+        "主体名称": "公司领导，总师级领导，纪委副书记、工会副主席",
+        "主体标识": "agent-37",
+        "主体类型": "角色",
+        "组织层级": "公司",
+        "职责": "抄送对象"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "李欣华",
+      "properties": {
+        "主体名称": "李欣华",
+        "主体类型": "人员",
+        "职责": "配合做好风险排查工作"
+      },
+      "chunk_indices": [
+        4
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+      "properties": {
+        "主体名称": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "收文部门"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "资源服务中心",
+      "properties": {
+        "主体名称": "资源服务中心",
+        "主体类型": "部门",
+        "组织层级": "部门",
+        "职责": "组织排查，及时修正存在的风险隐患"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "集团",
+      "properties": {
+        "主体名称": "集团",
+        "主体类型": "组织",
+        "组织层级": "集团",
+        "职责": "接收排查反馈表，制定规范要求"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "集团党委",
+      "properties": {
+        "主体名称": "集团党委",
+        "主体类型": "党组织",
+        "组织层级": "集团"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalAgent",
+      "name": "集团科信部",
+      "properties": {
+        "主体名称": "集团科信部",
+        "主体标识": "agent-33",
+        "主体类型": "部门",
+        "组织层级": "集团",
+        "职责": "接收各企业报送的开源智能体安全风险排查情况"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "properties": {
+        "约束名称": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+        "约束类型": "禁止性约束",
+        "强制程度": "严禁",
+        "约束原文": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "从技术和管理两方面着手，严格杜绝此类现象发生",
+      "properties": {},
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+      "properties": {
+        "约束名称": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+        "约束类型": "禁止性约束",
+        "强制程度": "不得",
+        "约束原文": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "禁止计算机等办公设备内、外网混用",
+      "properties": {
+        "约束名称": "禁止计算机等办公设备内、外网混用",
+        "约束类型": "禁止性约束",
+        "强制程度": "禁止",
+        "约束原文": "禁止计算机等办公设备内、外网混用"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+      "properties": {
+        "交互类型": "报送",
+        "交互标识": "exchange-31",
+        "交互描述": "各企业于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "向集团报告",
+      "properties": {
+        "交互类型": "报告",
+        "交互标识": "",
+        "交互描述": "各企业一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "填报反馈表经公司领导审核后报集团",
+      "properties": {},
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalExchange",
+      "name": "李欣华配合",
+      "properties": {
+        "交互类型": "配合",
+        "交互描述": "李欣华配合做好风险排查工作"
+      },
+      "chunk_indices": [
+        4
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "properties": {
+        "信息标识": "info-36",
+        "信息名称": "“龙虾”等开源智能体安全风险排查反馈表",
+        "信息类型": "附件",
+        "定义": "用于反馈开源智能体安全风险排查情况的表格",
+        "来源文本": "2．“龙虾”等开源智能体安全风险排查反馈表"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）",
+      "properties": {
+        "信息名称": "《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）",
+        "信息类型": "附件",
+        "来源文本": "参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "properties": {
+        "信息标识": "附件2",
+        "信息名称": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+        "信息类型": "附件",
+        "定义": "",
+        "来源文本": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx"
+      },
+      "chunk_indices": [
+        10
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "反馈表",
+      "properties": {},
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "开源智能体安全风险排查情况（附件2）",
+      "properties": {
+        "信息标识": "info-32",
+        "信息名称": "开源智能体安全风险排查情况（附件2）",
+        "信息类型": "报告",
+        "定义": "各企业排查开源智能体安全风险后形成的报告材料",
+        "来源文本": "开源智能体安全风险排查情况（附件2）"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011",
+      "properties": {
+        "信息标识": "info-34",
+        "信息名称": "联系人及联系电话",
+        "信息类型": "联系信息",
+        "定义": "集团科信部齐希同，17707336697；信息公司张振威，18600540011",
+        "来源文本": "联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf",
+      "properties": {
+        "信息标识": "附件1",
+        "信息名称": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf",
+        "信息类型": "附件",
+        "定义": "",
+        "来源文本": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf"
+      },
+      "chunk_indices": [
+        10
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+      "properties": {
+        "信息标识": "info-35",
+        "信息名称": "关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+        "信息类型": "附件",
+        "定义": "防范OpenClaw（“龙虾”）开源智能体安全风险的建议",
+        "来源文本": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalInformation",
+      "name": "风险隐患",
+      "properties": {
+        "信息名称": "风险隐患",
+        "信息类型": "数据",
+        "定义": "开源智能体可能引发的安全风险隐患",
+        "来源文本": "及时修正存在的风险隐患"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalObject",
+      "name": "公司自建自用信息系统",
+      "properties": {
+        "对象类型": "系统",
+        "对象描述": "公司自建自用信息系统",
+        "对象名称": "公司自建自用信息系统",
+        "所属领域": "信息化"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalObject",
+      "name": "其他网络系统",
+      "properties": {
+        "对象名称": "其他网络系统",
+        "对象类型": "网络系统",
+        "所属领域": "网络安全",
+        "对象描述": "除网络安全防护等级三级及以上、存储重要数据或核心数据网络系统之外的其他网络系统"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalObject",
+      "name": "员工电脑终端",
+      "properties": {
+        "对象类型": "设备",
+        "对象标识": "object-55",
+        "对象描述": "员工使用的电脑终端",
+        "对象名称": "员工电脑终端",
+        "所属领域": "网络安全"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalObject",
+      "name": "存储重要数据、核心数据的网络系统",
+      "properties": {
+        "对象名称": "存储重要数据、核心数据的网络系统",
+        "对象类型": "网络系统",
+        "所属领域": "数据安全",
+        "对象描述": "存储重要数据、核心数据的网络系统"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalObject",
+      "name": "开源智能体",
+      "properties": {
+        "对象类型": "智能体",
+        "对象描述": "开源智能体，如OpenClaw（“龙虾”）等，存在较高安全风险",
+        "对象名称": "开源智能体",
+        "所属领域": "网络安全"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalObject",
+      "name": "网络安全防护等级三级及以上网络系统",
+      "properties": {
+        "对象名称": "网络安全防护等级三级及以上网络系统",
+        "对象类型": "网络系统",
+        "所属领域": "网络安全",
+        "对象描述": "网络安全防护等级三级及以上的网络系统"
+      },
+      "chunk_indices": [
+        0
+      ]
+    },
+    {
+      "type": "OperationalActivity",
+      "name": "请刘总阅批",
+      "properties": {
+        "活动名称": "请刘总阅批",
+        "活动描述": "拟办意见，请刘总阅批",
+        "活动类型": "审批",
+        "动作词": "请",
+        "预期结果": "刘总阅批"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "保证开发、应用智能体期间的数据安全",
+      "properties": {
+        "强制程度": "必须",
+        "约束原文": "保证开发、应用智能体期间的数据安全",
+        "约束名称": "数据安全保障要求",
+        "约束类型": "安全约束"
+      },
+      "chunk_indices": [
+        1
+      ]
+    },
+    {
+      "type": "OperationalConstraint",
+      "name": "按照集团规范要求开展开源智能体部署安装",
+      "properties": {
+        "强制程度": "必须",
+        "约束原文": "按照集团规范要求开展开源智能体部署安装",
+        "约束名称": "部署安装规范要求",
+        "约束类型": "流程约束"
+      },
+      "chunk_indices": [
+        1
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "中国中车集团有限公司办公室\n\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司办公室",
+      "quote": "中国中车集团有限公司办公室\n\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司各一级子公司,中国中车股份有限公司各一级子公司,总部各部门",
+      "quote": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "各中心和各事业部",
+      "quote": "请公司领导阅，各中心和各事业部阅。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "国家网络安全监管部门",
+      "quote": "国家网络安全监管部门监测发现",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "境外企业、境外人员",
+      "quote": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "安全中心",
+      "quote": "安全中心配合",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "技术中心",
+      "quote": "技术中心牵头",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "李欣华",
+      "quote": "请李欣华配合",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+      "quote": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "资源服务中心",
+      "quote": "请韩总指导资源服务中心组织排查",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "集团有限公司办公室\n\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "集团党委",
+      "quote": "为贯彻落实国家有关部门和集团党委工作要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "APPLIES_TO",
+      "to_type": "OperationalAgent",
+      "to_name": "集团科信部",
+      "quote": "报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "公司自建自用信息系统",
+      "quote": "公司自建自用信息系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "其他网络系统",
+      "quote": "对于其他网络系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "存储重要数据、核心数据的网络系统",
+      "quote": "存储重要数据、核心数据的网络系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "CONCERNS_OBJECT",
+      "to_type": "OperationalObject",
+      "to_name": "网络安全防护等级三级及以上网络系统",
+      "quote": "网络安全防护等级三级及以上网络系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "《关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议》(附件1)",
+      "quote": "《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "quote": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "开源智能体安全风险排查情况（附件2）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "联系人及联系电话:集团科信部齐希同,17707336697;信息公司张振威,18600540011",
+      "quote": "联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "附件1关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议.pdf",
+      "quote": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "DEFINES",
+      "to_type": "OperationalInformation",
+      "to_name": "风险隐患",
+      "quote": "风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "向集团报告",
+      "quote": "向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_EXCHANGE",
+      "to_type": "OperationalExchange",
+      "to_name": "李欣华配合",
+      "quote": "请李欣华配合",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "《关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议》(附件1)",
+      "quote": "《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "quote": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "开源智能体安全风险排查情况（附件2）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "联系人及联系电话:集团科信部齐希同,17707336697;信息公司张振威,18600540011",
+      "quote": "联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "附件1关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议.pdf",
+      "quote": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_KEY_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "风险隐患",
+      "quote": "风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "quote": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "关联文件:",
+      "quote": "# 关联文件：",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "承办处理",
+      "quote": "# 承办处理",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求一",
+      "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求三",
+      "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求二",
+      "quote": "二、各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求五",
+      "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求四",
+      "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "收文处理单",
+      "quote": "收文处理单",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "quote": "国家网络安全监管部门监测发现，“龙虾”等开源智能体（及相关衍生组件）存在较高安全风险，该智能体若被引入内部系统，极易被攻击者利用进行横向移动、数据窃取或植入勒索病毒，对网络安全造成较大威胁隐患。为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。现将有关要求通知如下。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "附件/相关文件",
+      "quote": "# 附件/相关文件",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "附件:",
+      "quote": "# 附件：",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "HAS_PART",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2．“龙虾”等开源智能体安全风险排查反馈表中国中车集团 公星10 1 0 8 1 580629",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "中国中车集团有限公司办公室\n\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司办公室",
+      "quote": "中国中车集团有限公司办公室\n\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司各一级子公司,中国中车股份有限公司各一级子公司,总部各部门",
+      "quote": "关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知\n\n中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各中心和各事业部",
+      "quote": "请公司领导阅，各中心和各事业部阅。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "国家网络安全监管部门",
+      "quote": "国家网络安全监管部门监测发现",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "境外企业、境外人员",
+      "quote": "境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "安全中心",
+      "quote": "安全中心配合",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "技术中心",
+      "quote": "技术中心牵头",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "李欣华",
+      "quote": "请李欣华配合",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "综合管理部(党群工作部、董事会办公室、企业文化部)",
+      "quote": "综合管理部（党群工作部、董事会办公室、企业文化部)",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "资源服务中心",
+      "quote": "请韩总指导资源服务中心组织排查",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "集团有限公司办公室\n\n# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团党委",
+      "quote": "为贯彻落实国家有关部门和集团党委工作要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "ISSUED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团科信部",
+      "quote": "报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "专项排查工作",
+      "quote": "决定组织开展专项排查工作",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严控各类风险",
+      "quote": "严控各类风险",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严格执行内部办公网络与互联网有效隔离",
+      "quote": "各企业要严格执行内部办公网络与互联网有效隔离",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "修订有关制度",
+      "quote": "并修订有关制度",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "做好针对性风险防范",
+      "quote": "做好针对性风险防范",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "全面组织开展排查",
+      "quote": "全面组织开展排查",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "加强网络和数据安全监测",
+      "quote": "加强网络和数据安全监测",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "各企业要认真落实通知要求",
+      "quote": "各企业要认真落实通知要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "摸清安全风险底数",
+      "quote": "摸清安全风险底数",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "梳理本企业使用开源智能体情况",
+      "quote": "梳理本企业使用开源智能体情况",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "第一时间处置",
+      "quote": "第一时间处置",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "组织排查,及时修正存在的风险隐患",
+      "quote": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "请公司领导阅,各中心和各事业部阅",
+      "quote": "请公司领导阅，各中心和各事业部阅。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "谨慎使用",
+      "quote": "建议谨慎使用",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OfficialDocument",
+      "from_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "rel_type": "REQUIRES_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "风险排查工作",
+      "quote": "# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "专项排查工作",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "为贯彻落实国家有关部门和集团党委工作要求，保障集团及各子企业信息系统网络和数据安全，切实做好开源智能体风险防范，决定组织开展专项排查工作。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "专项排查工作",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "quote": "专项排查工作",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "专项排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "国家网络安全监管部门",
+      "quote": "国家网络安全监管部门监测发现",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "专项排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "为贯彻落实国家有关部门和集团党委工作要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "专项排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团党委",
+      "quote": "为贯彻落实国家有关部门和集团党委工作要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严控各类风险",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "存储重要数据、核心数据的网络系统",
+      "quote": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严控各类风险",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严控各类风险",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求二",
+      "quote": "严控各类风险",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严控各类风险",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "严控各类风险",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严格执行内部办公网络与互联网有效隔离",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "各企业要严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严格执行内部办公网络与互联网有效隔离",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求二",
+      "quote": "严格执行内部办公网络与互联网有效隔离",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严格执行内部办公网络与互联网有效隔离",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "境外企业、境外人员",
+      "quote": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严格执行内部办公网络与互联网有效隔离",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "各企业要严格执行内部办公网络与互联网有效隔离",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "严格执行内部办公网络与互联网有效隔离",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "严控各类风险",
+      "quote": "严格执行内部办公网络与互联网有效隔离，禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "其他网络系统",
+      "quote": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "存储重要数据、核心数据的网络系统",
+      "quote": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "网络安全防护等级三级及以上网络系统",
+      "quote": "对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求四",
+      "quote": "做好针对性风险防范",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "做好针对性风险防范",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "第一时间处置",
+      "quote": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "做好针对性风险防范",
+      "rel_type": "USES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "《关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议》(附件1)",
+      "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "全面组织开展排查",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "全面组织开展排查",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求一",
+      "quote": "全面组织开展排查",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "全面组织开展排查",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "严格执行内部办公网络与互联网有效隔离",
+      "quote": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "全面组织开展排查",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "摸清安全风险底数",
+      "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "全面组织开展排查",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "梳理本企业使用开源智能体情况",
+      "quote": "全面组织开展排查，梳理本企业使用开源智能体情况",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "其他网络系统",
+      "quote": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求五",
+      "quote": "加强网络和数据安全监测",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "做好针对性风险防范",
+      "quote": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "第一时间处置",
+      "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "PRODUCES",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "加强网络和数据安全监测",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "加强网络和数据安全监测",
+      "rel_type": "USES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "《关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议》(附件1)",
+      "quote": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "各企业要认真落实通知要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "各企业要认真落实通知要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "各企业要认真落实通知要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "加强网络和数据安全监测",
+      "quote": "各企业要认真落实通知要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "第一时间处置",
+      "quote": "各企业要认真落实通知要求",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "PRODUCES",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "各企业要认真落实通知要求",
+      "rel_type": "USES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "摸清安全风险底数",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "摸清安全风险底数",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "摸清安全风险底数",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求一",
+      "quote": "摸清安全风险底数",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "摸清安全风险底数",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "严格执行内部办公网络与互联网有效隔离",
+      "quote": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "梳理本企业使用开源智能体情况",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "梳理本企业使用开源智能体情况",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "梳理本企业使用开源智能体情况",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求一",
+      "quote": "梳理本企业使用开源智能体情况",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "梳理本企业使用开源智能体情况",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "严格执行内部办公网络与互联网有效隔离",
+      "quote": "全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "梳理本企业使用开源智能体情况",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "全面组织开展排查",
+      "quote": "全面组织开展排查，梳理本企业使用开源智能体情况",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "梳理本企业使用开源智能体情况",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "摸清安全风险底数",
+      "quote": "一、全面组织开展排查，梳理本企业使用开源智能体情况，摸清安全风险底数。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "第一时间处置",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "第一时间处置",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求五",
+      "quote": "第一时间处置",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "第一时间处置",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "加强网络和数据安全监测",
+      "quote": "第一时间处置，并向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "其他网络系统",
+      "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求四",
+      "quote": "谨慎使用",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "做好针对性风险防范",
+      "quote": "建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "加强网络和数据安全监测",
+      "quote": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "第一时间处置",
+      "quote": "对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "谨慎使用",
+      "rel_type": "USES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "《关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议》(附件1)",
+      "quote": "四、对于其他网络系统，建议谨慎使用，并参照《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）等规范，做好针对性风险防范。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "请李欣华配合，做好风险排查工作。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司办公室",
+      "quote": "中国中车集团有限公司办公室",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司各一级子公司,中国中车股份有限公司各一级子公司,总部各部门",
+      "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门：",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "中国中车集团有限公司办公室",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "quote": "中国中车集团有限公司办公室",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "中国中车集团有限公司各一级子公司,中国中车股份有限公司各一级子公司,总部各部门",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "关于开展openclaw(“龙虾”)等开源智能体安全风险排查工作的通知",
+      "quote": "中国中车集团有限公司各一级子公司，中国中车股份有限公司各一级子公司，总部各部门",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "国家网络安全监管部门",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "quote": "国家网络安全监管部门",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "境外企业、境外人员",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求二",
+      "quote": "境外企业、境外人员",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "抄送:公司领导,总师级领导,纪委副书记、工会副主席",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "抄送：公司领导，总师级领导，纪委副书记、工会副主席",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "集团",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "集团",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "集团党委",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "通知正文",
+      "quote": "集团党委",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalAgent",
+      "from_name": "集团科信部",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严控各类风险",
+      "quote": "尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严格执行内部办公网络与互联网有效隔离",
+      "quote": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "境外企业、境外人员",
+      "quote": "尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求二",
+      "quote": "严禁办公电脑、办公移动设备未经集团批准安装各类智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "未经本企业充分论证和安全测试,未经集团批准,不得部署安装各类开源智能体",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严控各类风险",
+      "quote": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "未经本企业充分论证和安全测试,未经集团批准,不得部署安装各类开源智能体",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "三、对于网络安全防护等级三级及以上网络系统，或存储重要数据、核心数据的网络系统，未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "未经本企业充分论证和安全测试,未经集团批准,不得部署安装各类开源智能体",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求三",
+      "quote": "未经本企业充分论证和安全测试，未经集团批准，不得部署安装各类开源智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "禁止计算机等办公设备内、外网混用",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严控各类风险",
+      "quote": "禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员严禁办公电脑、办公移动设备未经集团批准安装各类智能体，严控各类风险。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "禁止计算机等办公设备内、外网混用",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "严格执行内部办公网络与互联网有效隔离",
+      "quote": "禁止计算机等办公设备内、外网混用",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "禁止计算机等办公设备内、外网混用",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "境外企业、境外人员",
+      "quote": "禁止计算机等办公设备内、外网混用。尤其是境外企业、境外人员",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "禁止计算机等办公设备内、外网混用",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "禁止计算机等办公设备内、外网混用",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "禁止计算机等办公设备内、外网混用",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求二",
+      "quote": "禁止计算机等办公设备内、外网混用",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "EXCHANGES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团科信部",
+      "quote": "报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "加强网络和数据安全监测",
+      "quote": "于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "各企业要认真落实通知要求",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "于2026年4月10日前将开源智能体安全风险排查情况(附件2)通过内网办公邮箱报集团科信部",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团科信部",
+      "quote": "各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）通过内网办公邮箱报集团科信部（电子邮箱：010099900594@crrcgc.cc）。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求五",
+      "quote": "向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "EXCHANGES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "开源智能体安全风险排查情况(附件2)",
+      "quote": "向集团报告。\n\n各企业要认真落实通知要求，于2026年4月10日前将开源智能体安全风险排查情况（附件2）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团科信部",
+      "quote": "向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "加强网络和数据安全监测",
+      "quote": "加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "各企业要认真落实通知要求",
+      "quote": "向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "五、加强网络和数据安全监测，一旦发现或获知开源智能体引发的本企业安全事件，第一时间处置，并向集团报告。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "向集团报告",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "集团科信部",
+      "quote": "向集团报告",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "《关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议》(附件1)",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求四",
+      "quote": "《关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议》（附件1）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "反馈表",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "反馈表",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "quote": "2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "反馈表",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "开源智能体安全风险排查情况(附件2)",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "开源智能体安全风险排查情况（附件2）",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "联系人及联系电话:集团科信部齐希同,17707336697;信息公司张振威,18600540011",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "报送要求",
+      "quote": "联系人及联系电话：集团科信部齐希同，17707336697；信息公司张振威，18600540011",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "2.“龙虾”等开源智能体安全风险排查反馈表",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "附件:1.关于防范0penclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "附件：1.关于防范0penClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议\n\n2．“龙虾”等开源智能体安全风险排查反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "其他网络系统",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求四",
+      "quote": "其他网络系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "存储重要数据、核心数据的网络系统",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求三",
+      "quote": "存储重要数据、核心数据的网络系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "开源智能体",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "附件列表",
+      "quote": "开源智能体",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalObject",
+      "from_name": "网络安全防护等级三级及以上网络系统",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "排查要求三",
+      "quote": "网络安全防护等级三级及以上网络系统",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "修订有关制度",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "电脑终端安装使用开源智能体风险排查工作",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "修订有关制度",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "\"中国中车集团有限公司_2\": \"电脑终端安装使用开源智能体风险排查工作，填报反馈表经公司领导 审核后报集团，并修订有关制度，从技术和管理两方面着手，严格杜 绝此类现象发生。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各中心和各事业部",
+      "quote": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "资源服务中心",
+      "quote": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患：同时 组织各中心和事业部研讨制定公司部署、使用开源智能体的规范、安 全措施，保证开发、应用智能体期间的数据安全。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "请公司领导阅,各中心和各事业部阅",
+      "quote": "请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "PRODUCES",
+      "to_type": "OperationalInformation",
+      "to_name": "风险隐患",
+      "quote": "组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "组织排查,及时修正存在的风险隐患",
+      "rel_type": "USES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "风险隐患",
+      "quote": "组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请公司领导阅,各中心和各事业部阅",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "请公司领导阅，各中心和各事业部阅",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请公司领导阅,各中心和各事业部阅",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "中国中车集团有限公司",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请公司领导阅,各中心和各事业部阅",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "各中心和各事业部",
+      "quote": "请公司领导阅，各中心和各事业部阅。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请公司领导阅,各中心和各事业部阅",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "资源服务中心",
+      "quote": "请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请公司领导阅,各中心和各事业部阅",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "请公司领导阅，各中心和各事业部阅。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请公司领导阅,各中心和各事业部阅",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "组织排查,及时修正存在的风险隐患",
+      "quote": "请公司领导阅，各中心和各事业部阅。请韩总指导资源服务中心组织排查，及时修正存在的风险隐患",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "请刘总阅批",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "请刘总阅批。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "ACTS_ON",
+      "to_type": "OperationalObject",
+      "to_name": "开源智能体",
+      "quote": "# 关于开展OpenClaw（“龙虾”）等开源智能体安全风险排查工作的通知",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "中国中车集团有限公司办公室",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "中国中车集团有限公司办公室",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PRECEDES",
+      "to_type": "OperationalActivity",
+      "to_name": "修订有关制度",
+      "quote": "\"中国中车集团有限公司\": \"电脑终端安装使用开源智能体风险排查工作，填报反馈表经公司领导 审核后报集团，并修订有关制度，从技术和管理两方面着手，严格杜 绝此类现象发生。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PRODUCES",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "\"中国中车集团有限公司\": \"电脑终端安装使用开源智能体风险排查工作，填报反馈表经公司领导 审核后报集团，并修订有关制度，从技术和管理两方面着手，严格杜 绝此类现象发生。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "USES_INFORMATION",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "填报反馈表",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "保证开发、应用智能体期间的数据安全",
+      "rel_type": "CONSTRAINS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "组织排查,及时修正存在的风险隐患",
+      "quote": "保证开发、应用智能体期间的数据安全",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "保证开发、应用智能体期间的数据安全",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "保证开发、应用智能体期间的数据安全",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "保证开发、应用智能体期间的数据安全",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "各中心和各事业部",
+      "quote": "保证开发、应用智能体期间的数据安全",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "保证开发、应用智能体期间的数据安全",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "保证开发、应用智能体期间的数据安全",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按照集团规范要求开展开源智能体部署安装",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "中国中车集团有限公司",
+      "quote": "按照集团规范要求开展开源智能体部署安装",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalConstraint",
+      "from_name": "按照集团规范要求开展开源智能体部署安装",
+      "rel_type": "CONSTRAINS_AGENT",
+      "to_type": "OperationalAgent",
+      "to_name": "集团",
+      "quote": "请部门员工阅，按照集团规范要求开展开源智能体部署安装。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "反馈表",
+      "quote": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "反馈表",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "quote": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalActivity",
+      "from_name": "风险排查工作",
+      "rel_type": "PERFORMED_BY",
+      "to_type": "OperationalAgent",
+      "to_name": "李欣华",
+      "quote": "请李欣华配合，做好风险排查工作。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "李欣华配合",
+      "rel_type": "sourceAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "李欣华",
+      "quote": "请李欣华配合",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "李欣华配合",
+      "rel_type": "SUPPORTS_ACTIVITY",
+      "to_type": "OperationalActivity",
+      "to_name": "风险排查工作",
+      "quote": "请李欣华配合，做好风险排查工作。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalExchange",
+      "from_name": "李欣华配合",
+      "rel_type": "targetAgent",
+      "to_type": "OperationalAgent",
+      "to_name": "李欣华",
+      "quote": "请李欣华配合，做好风险排查工作。",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "承办处理",
+      "quote": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "附件1关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议.pdf",
+      "quote": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf\n\n区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "附件1关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议.pdf",
+      "rel_type": "EVIDENCED_BY",
+      "to_type": "DocumentUnit",
+      "to_name": "承办处理",
+      "quote": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf",
+      "provenance_status": "inferred_from_endpoints"
+    },
+    {
+      "from_type": "OperationalInformation",
+      "from_name": "附件1关于防范openclaw(“龙虾”)开源智能体安全风险的“六要六不要”建议.pdf",
+      "rel_type": "RELATED_TO",
+      "to_type": "OperationalInformation",
+      "to_name": "区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "quote": "附件1关于防范OpenClaw（“龙虾”）开源智能体安全风险的“六要六不要”建议.pdf\n\n区附件2“龙虾”等开源智能体安全风险排查反馈表.xlsx",
+      "provenance_status": "inferred_from_endpoints"
+    }
+  ]
+}
