@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "cases": [
+    {
+      "id": "trouble/trouble_mini",
+      "group": "trouble",
+      "case": "trouble_mini",
+      "sources": [
+        {
+          "path": "trouble/trouble_mini/docs/行修更换、互换记录50.xlsx",
+          "sha256": "32645930deefe41dbbad4d44e7fed898afc014ebbfccc29b7729a75614a6b075",
+          "missing": false
+        }
+      ],
+      "golden": {
+        "path": "trouble/trouble_mini/extract/golden.json",
+        "sha256": "e59fb4ec27041921f98391920822be64132b5f7de34c4a5d3cbbc3e2b972476d",
+        "missing": false
+      },
+      "ontology": {
+        "path": "trouble/ontology",
+        "kind": "directory",
+        "files": [
+          {
+            "path": "trouble.puml",
+            "sha256": "63d49b97970374447584e4a56d5ab7987e7b88f6c7aff96cb1d403aeaa8823ba",
+            "missing": false
+          }
+        ],
+        "sha256": "0a2c66fa101573f9844abb3394d89c24e687a9b2e3aafc858f79586807aeefc9",
+        "missing": false
+      },
+      "input_mode": {
+        "backend_extract": "reused_chunks"
+      },
+      "reused_inputs": [
+        {
+          "kind": "chunks",
+          "path": "trouble/trouble_mini/chunks.json",
+          "sha256": "2c729a1f9e7d3accc02f6534c07f772c70e4b63b693fafc39478b6c5a3e4457d",
+          "missing": false
+        }
+      ]
+    }
+  ],
+  "dataset_sha256": "d5dd18751a6ae99c9809ceb4becb951a71c49724c153745991966a497c5693ef",
+  "evaluator": {
+    "files": [
+      {
+        "path": "provenance.py",
+        "sha256": "4d7175348925347f318075029ba688269329e8dc9e035076a9a83d740cab83f4",
+        "missing": false
+      },
+      {
+        "path": "quality.py",
+        "sha256": "dada64584e75d8495c8b46d918468dde12a441aca412aa954275f63527cf79e2",
+        "missing": false
+      },
+      {
+        "path": "run.py",
+        "sha256": "67bad4b3a51e61c9b204a282b397e72a6ba0f219fc15873a302c15e26d4cc3d4",
+        "missing": false
+      }
+    ],
+    "sha256": "4d4859926a777773bbc2b377102c7e43e0cc8c3e175c3cbe34913d82af4dbb50"
+  },
+  "settings": {
+    "stage": "backend",
+    "modes": [
+      "extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    },
+    "options": {
+      "parser": {
+        "engine": "auto",
+        "force": false,
+        "page_sharding": "auto",
+        "page_shard_size": 0,
+        "max_page_shards": 16,
+        "mineru_options": {
+          "language": "ch",
+          "ocr_mode": "auto",
+          "table_enable": true,
+          "formula_enable": true
+        },
+        "keep_page_edges": "first_page",
+        "page_edge_min_chars": 3
+      },
+      "chunking": {
+        "strategy": "recursive",
+        "size": 4000,
+        "chunk_overlap": 0,
+        "similarity": 0.6,
+        "separators": null,
+        "size_unit": "char",
+        "breakpoint_method": "percentile"
+      },
+      "extraction": {
+        "model": null,
+        "merge": true
+      },
+      "storage": {
+        "persist_graph": false,
+        "knowledge_space_id": null
+      }
+    }
+  },
+  "scoring_contract": {
+    "stage": "backend",
+    "modes": [
+      "extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    }
+  },
+  "reused_predictions": []
+}
