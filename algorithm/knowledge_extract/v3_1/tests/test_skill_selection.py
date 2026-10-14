@@ -99,7 +99,7 @@ def test_generic_route_can_select_rule_or_trouble_for_the_same_source(name, onto
 
 
 @pytest.mark.parametrize('payload', [decision(['missing@1']), decision(['rule@wrong']),
-    decision(['rule@8', 'rule@8']), decision([], 'selected'), decision(['rule@8'], 'no_match'),
+    decision(['rule@10', 'rule@10']), decision([], 'selected'), decision(['rule@10'], 'no_match'),
     decision([], 'ambiguous'), {'status': 'no_match', 'skill_refs': []}])
 def test_invalid_or_ambiguous_selection_fails_without_extracting(payload):
     llm = StubLLM(selection_handler=lambda user: payload)
@@ -225,7 +225,7 @@ def test_late_selector_result_is_not_accepted():
     llm = StubLLM()
     def select(user):
         llm.deadline = time.monotonic() - 1
-        return decision(['rule@8'])
+        return decision(['rule@10'])
     llm.selection_handler = select
     result = run(llm)
     assert result['error_code'] == 'LLM_TIMEOUT'
