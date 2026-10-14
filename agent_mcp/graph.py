@@ -3,7 +3,7 @@
 所有查询经 KnowledgeMapClient → 前端接口，自动带权限过滤；
 用户上下文请求头由 app.py 的中间件捕获并随查询透传。
 """
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 import logging

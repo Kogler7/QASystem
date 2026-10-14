@@ -1,6 +1,6 @@
 """Request-local cooperative tasks; threads execute one provider attempt only."""
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import asyncio
 from collections import deque

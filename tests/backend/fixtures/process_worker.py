@@ -13,7 +13,7 @@ parser.add_argument('--artifacts', required=True)
 parser.add_argument('--ready', required=True)
 args = parser.parse_args()
 sys.path.insert(0, args.source)
-from docker import runtime_config
+from qasystem_config import runtime_config
 # This isolated lifecycle test has no deployment configuration. Production guard
 # behavior is covered separately; locate test defaults outside image scaffolding.
 runtime_config.runtime_path = lambda *a, **kw: Path(args.artifacts) / 'test-empty-registry' / 'config.json'

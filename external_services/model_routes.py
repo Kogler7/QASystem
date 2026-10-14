@@ -4,7 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from docker import configuration
+from qasystem_config import configuration
 
 
 class ModelRouteError(ValueError):
@@ -39,7 +39,7 @@ def resolve_service(
             raise ModelRouteError('模型服务路由指向未启用模型')
         if record.get('manager', 'ops') != 'ops':
             raise ModelRouteError('模型服务路由不能启动或调用 Backend worker')
-        from docker.model_services import local_model_endpoint
+        from qasystem_config.model_registry import local_model_endpoint
         endpoint = local_model_endpoint(model_id, record)
         base_url, adapter, model = endpoint['base_url'], endpoint['adapter'], endpoint['model']
     elif kind == 'api':
@@ -53,7 +53,7 @@ def resolve_service(
         raise ModelRouteError('实体数量路由必须指向 Clef 或 NanoJev')
     capabilities = deepcopy(service.get('capabilities', {}))
     if kind == 'local' and adapter == 'chat':
-        from docker.runtime_config import MODEL_DEFAULTS
+        from qasystem_config.runtime_config import MODEL_DEFAULTS
         actual_context = int(record.get('context', MODEL_DEFAULTS['context']))
         capabilities['context_tokens'] = min(capabilities.get('context_tokens', actual_context), actual_context)
     snapshot = {

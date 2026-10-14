@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from docker import config_guard as guard, configure, config_transaction as tx
+from docker import configure
+
+from qasystem_config import config_guard as guard, config_transaction as tx
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -143,7 +145,7 @@ def test_registry_migration_patch_is_explicitly_audited(editor):
 def test_cli_plan_apply_dispatch_uses_same_transaction(monkeypatch, tmp_path, capsys):
     from docker import ops
     calls = []
-    monkeypatch.setattr(tx, 'run', lambda root, **kw: calls.append((root, kw)) or {'deployed': False})
+    monkeypatch.setattr(configure, 'run_transaction', lambda root, **kw: calls.append((root, kw)) or {'deployed': False})
     assert ops.main(['--project-dir', str(tmp_path), 'config', 'plan', '--patch', 'private.json']) == 0
     assert calls[-1][1]['operation'] == 'plan'
     assert json.loads(capsys.readouterr().out)['deployed'] is False

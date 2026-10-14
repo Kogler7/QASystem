@@ -1,6 +1,6 @@
 """KG_JEV_* configuration. This module does not read KG_EXTRACT_JEV_*."""
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import os
 

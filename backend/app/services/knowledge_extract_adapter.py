@@ -35,7 +35,7 @@ Two deliberate choices worth knowing about for the V2 path:
   failure attribution remains meaningful.
 """
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 from algorithm.table_jsonl import decode_records, row_boundaries

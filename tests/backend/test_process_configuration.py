@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from docker import configuration, runtime_config
+from qasystem_config import configuration, runtime_config
 from docker.configure import Configuration
 
 
@@ -73,7 +73,7 @@ def test_supervisor_startup_reads_same_committed_plan(monkeypatch):
     from backend.app.execution import supervisor
     monkeypatch.setenv('EXECUTION_CPU_WORKERS', '31')
     monkeypatch.setattr(supervisor, '_gpu_ids', lambda: [])
-    monkeypatch.setattr('docker.model_services.worker_record', lambda: None)
+    monkeypatch.setattr('qasystem_config.model_registry.worker_record', lambda: None)
     monkeypatch.setattr(configuration, 'approved_execution_plan', lambda **kwargs: {'revision': 7, 'cpu_workers': '2'})
     runtime = supervisor.RuntimeSupervisor()
     assert runtime.cpu_worker_count == 2 and runtime.cpu_plan['revision'] == 7
@@ -82,7 +82,7 @@ def test_supervisor_startup_reads_same_committed_plan(monkeypatch):
 def test_supervisor_cpu_spawn_never_enters_fail_all_collection(monkeypatch):
     from backend.app.execution import supervisor
     monkeypatch.setattr(supervisor, '_gpu_ids', lambda: [])
-    monkeypatch.setattr('docker.model_services.worker_record', lambda: None)
+    monkeypatch.setattr('qasystem_config.model_registry.worker_record', lambda: None)
     monkeypatch.setattr(configuration, 'approved_execution_plan',
                         lambda **kwargs: {'revision': 7, 'cpu_workers': '1'})
     events = []

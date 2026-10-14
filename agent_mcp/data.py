@@ -4,7 +4,7 @@ agent-mcp 容器不挂 mcp_services 卷，不走统一执行队列（maybe_submi
 直接同步调用 algorithm.data_access.sql.SQLExecutor；关系型 SQL 连接串取 DATABASE_URL
 （.env 已配置，host.docker.internal 经 extra_hosts 可达）。
 """
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import os
 from typing import Any

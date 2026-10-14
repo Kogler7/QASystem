@@ -11,7 +11,7 @@ from backend.app.execution.queue import RedisTaskQueue
 from backend.app.execution.resources import ResourceScheduler, GpuSnapshot
 from backend.app.execution.store import MemoryExecutionStore
 from backend.app.execution.worker import WorkerRuntime, _error_retryable
-from docker.startup_contract import EXECUTION_LIVENESS
+from qasystem_config.startup_contract import EXECUTION_LIVENESS
 
 
 @pytest.fixture

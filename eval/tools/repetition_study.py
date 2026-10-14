@@ -79,7 +79,7 @@ def replay(dataset,out,plan,workers=2,max_tokens=8192,timeout=180,service_id=Non
     from openai import OpenAI
     from external_services.model_routes import resolve_service
     from external_services.llm.service import model_call
-    from docker.configuration import getenv
+    from qasystem_config.configuration import getenv
     profile=resolve_service('extract',service_id=service_id)
     if not profile:
         raise ValueError('Replay requires an ops registered extraction service or --service-id')

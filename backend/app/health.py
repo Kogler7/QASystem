@@ -1,5 +1,5 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import importlib.util
 import os
@@ -86,7 +86,7 @@ def runtime_checks() -> dict[str, Any]:
     else:
         checks.update({name: _directory_check(path) for name, path in MODEL_PATHS.items()})
         checks["mineru4"] = _directory_check(Path(config_getenv("MINERU_MODEL_BASE_DIR", "/models/mineru4")))
-        from docker.model_services import worker_record
+        from qasystem_config.model_registry import worker_record
         record = worker_record()
         if not record or not record.get('enabled'):
             checks["mineru_vlm"] = {"ok": True, "skipped": True, "reason": "VLLM 未启用，2.x VLM 权重不参与运行"}

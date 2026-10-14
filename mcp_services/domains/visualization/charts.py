@@ -1,4 +1,4 @@
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import os
 from functools import lru_cache
 from pathlib import Path

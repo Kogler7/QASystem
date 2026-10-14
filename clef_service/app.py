@@ -1,7 +1,7 @@
 """Bounded text/JSON HTTP adapter around the locally supplied official loader."""
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv, required as config_required
+from qasystem_config.configuration import getenv as config_getenv, required as config_required
 
 import asyncio
 import gc
@@ -40,7 +40,7 @@ class Settings:
     @classmethod
     def from_env(cls, prefix: str = "CLEF_") -> "Settings":
         values: dict[str, Any] = {}
-        from docker.model_services import selected_native
+        from qasystem_config.model_registry import selected_native
         adapter = 'nanojev' if prefix == 'NANOJEV_' else 'clef'
         record = selected_native(adapter)
         if record is not None:
@@ -161,7 +161,7 @@ class LocalRuntime:
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
         # Importing the supplied loader must not create __pycache__ in the model directory.
         sys.dont_write_bytecode = True
-        from docker.model_services import selected_native, physical_gpu
+        from qasystem_config.model_registry import selected_native, physical_gpu
         selected = selected_native('clef')
         if selected is not None:
             os.environ['CUDA_VISIBLE_DEVICES'] = physical_gpu(selected)

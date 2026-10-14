@@ -16,16 +16,13 @@ import socket
 import subprocess
 import sys
 
-try:
-    from docker import setup_llm as helper
-    from docker import terminal_ui as screen
-    from docker.runtime_config import HOT_KEYS, PROCESS_KEYS, PERSISTED_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
-    from docker import config_guard as guard
-except ImportError:
-    import setup_llm as helper
-    import terminal_ui as screen
-    from runtime_config import HOT_KEYS, PROCESS_KEYS, PERSISTED_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
-    import config_guard as guard
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from docker import setup_llm as helper
+from docker import terminal_ui as screen
+from qasystem_config.runtime_config import HOT_KEYS, PROCESS_KEYS, PERSISTED_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
+from qasystem_config import config_guard as guard, io as config_io
 
 
 
@@ -46,7 +43,7 @@ def schema(text: str) -> list[dict]:
             key = line.split("=", 1)[0]
             if comments:
                 group = comments[0]
-            default = helper.read_env(line)[key]
+            default = config_io.read_env(line)[key]
             rows.append(dict(key=key, default=default, description=" / ".join(comments) or f"{key}；当前版本默认值见下方",
                              group=group, hot=key in HOT_KEYS, process=key in PROCESS_KEYS, secret=secret(key)))
             comments = []
@@ -60,7 +57,7 @@ def slug(repo: str) -> str:
 class Configuration:
     @staticmethod
     def process_environment():
-        from docker.startup_contract import PROCESS_ENVIRONMENT
+        from qasystem_config.startup_contract import PROCESS_ENVIRONMENT
         return dict(PROCESS_ENVIRONMENT)
 
     MIGRATION_STATE = ('approved-config.json', 'history', 'versions', 'events', 'observed',
@@ -113,11 +110,11 @@ class Configuration:
         self.template = (release_template if release_template.is_file() else root / '.env.example').read_text(encoding='utf-8-sig')
         self.fields = schema(self.template)
         self.original = (root / ".env").read_text(encoding="utf-8-sig") if (root / ".env").exists() else ""
-        from docker.config_migrations import migrate, duplicate_conflicts
-        original_values, self.migration_conflicts = migrate(helper.read_env(self.original))
+        from qasystem_config.config_migrations import migrate, duplicate_conflicts
+        original_values, self.migration_conflicts = migrate(config_io.read_env(self.original))
         self.resolved_migrations = set()
-        self.values = {**helper.read_env(self.template), **original_values}
-        from docker.startup_contract import runtime_directory
+        self.values = {**config_io.read_env(self.template), **original_values}
+        from qasystem_config.startup_contract import runtime_directory
         self.directory = runtime_directory(root)
         old_directory = Path(self.values.get('QASYSTEM_RUNTIME_CONFIG_DIR', './runtime-config'))
         self.input_directory = (root / old_directory).resolve()
@@ -135,7 +132,7 @@ class Configuration:
         # Preserve recognized retirement inputs for the UI proposal, before the
         # runtime reader filters them out. Canonical config.json remains the
         # sole source; never overlay a stale settings.json when it exists.
-        from docker.configuration import declarations
+        from qasystem_config.configuration import declarations
         migration_source = hot if hot.is_file() else self.input_directory / 'settings.json'
         raw_settings = {}
         if migration_source.is_file():
@@ -145,15 +142,15 @@ class Configuration:
                 raw_settings = {key: value for key, value in candidate.items()
                                 if key in declarations().get('retired', [])}
         migration_values, legacy_alias_conflicts = migrate({
-            **helper.read_env(self.original), **raw_settings, **document['settings']})
-        original_values, self.migration_conflicts = migrate({**helper.read_env(self.original), **document['settings']})
+            **config_io.read_env(self.original), **raw_settings, **document['settings']})
+        original_values, self.migration_conflicts = migrate({**config_io.read_env(self.original), **document['settings']})
         self.migration_conflicts.update(legacy_alias_conflicts)
         self.migration_conflicts.update({key: old for key, old in duplicate_conflicts(self.original).items()
-                                         if key in helper.read_env(self.template)})
+                                         if key in config_io.read_env(self.template)})
         self.values.update(original_values)
-        from docker.config_migrations import ALIASES
+        from qasystem_config.config_migrations import ALIASES
         for field in self.fields:
-            old = [key for key, target in ALIASES.items() if target == field['key'] and key in helper.read_env(self.original)]
+            old = [key for key, target in ALIASES.items() if target == field['key'] and key in config_io.read_env(self.original)]
             if old:
                 field['description'] += ' / 迁移：' + ', '.join(old) + ' → ' + field['key']
             if field['key'] in self.migration_conflicts:
@@ -161,20 +158,20 @@ class Configuration:
         self.persisted_hot = {k: v for k, v in original_values.items() if k in PERSISTED_KEYS}
         self.persisted_hot.update(document['settings'])
         self.initial_hot = {k: self.values[k] for k in PERSISTED_KEYS if k in self.values}
-        from docker.config_migrations import migrate_models
-        self.models, model_conflicts = migrate_models(helper.read_env(self.original), document['models'], self.catalog)
+        from qasystem_config.config_migrations import migrate_models
+        self.models, model_conflicts = migrate_models(config_io.read_env(self.original), document['models'], self.catalog)
         self.migration_conflicts.update(model_conflicts)
-        from docker.config_migrations import migrate_inference
+        from qasystem_config.config_migrations import migrate_inference
         self.models, self.services, self.routes, conflicts = migrate_inference(
             migration_values, self.models, document['services'], document['routes'])
         self.migration_conflicts.update(conflicts)
         self.accounts = document.get('accounts', {})
-        from docker.api_services import migrate_api_services
+        from qasystem_config.api_services import migrate_api_services
         self.services, self.accounts, self.routes, api_conflicts = migrate_api_services(
             migration_values, self.services, self.accounts, self.routes)
         self.migration_conflicts.update(api_conflicts)
         known = {m['repo'] for m in self.catalog}
-        from docker.model_services import BUILTIN_MODELS
+        from qasystem_config.model_registry import BUILTIN_MODELS
         for model_id, defaults in BUILTIN_MODELS.items():
             self.catalog.append({'repo': model_id, 'files': [], 'defaults': deepcopy(defaults)})
         known = {m['repo'] for m in self.catalog}
@@ -183,11 +180,11 @@ class Configuration:
         models = self.input_directory / "models.json"  # migration input only
         applied = self.input_directory / "applied-models.json"
         self.previous_models = json.loads(applied.read_text()) if applied.exists() else {}
-        from docker.runtime_config import migrate_record
+        from qasystem_config.runtime_config import migrate_record
         self.previous_models = {name: migrate_record(record) for name, record in self.previous_models.items()}
         self.model_defaults = {}
         for index, model in enumerate(self.catalog):
-            from docker.runtime_config import MODEL_DEFAULTS
+            from qasystem_config.runtime_config import MODEL_DEFAULTS
             self.model_defaults[model['repo']] = {**MODEL_DEFAULTS, 'port': str(9997 + index),
                 'model_dir': 'llm/' + model['repo'].replace('/', '--'), **model.get('defaults', {})}
             self.models[model['repo']] = deepcopy({**self.model_defaults[model['repo']], **self.models.get(model['repo'], {})})
@@ -324,7 +321,7 @@ class Configuration:
         return (self.root / path).resolve() if not path.is_absolute() else path.resolve()
 
     def rows(self, query: str = "") -> list[dict]:
-        from docker.configuration import declarations
+        from qasystem_config.configuration import declarations
         rows = []
         for container in self.live:
             status = {'running': '运行中', 'exited': '已停止', 'created': '未启动', 'restarting': '重启中'}.get(container['status'], container['status'])
@@ -345,12 +342,12 @@ class Configuration:
                                   ('bind', '监听地址'), ('model_dir', '权重相对路径'), ('max_num_seqs', '最大并发序列'),
                                   ('max_num_batched_tokens', '批处理 token 上限'), ('dtype', '计算精度')):
                     conflict = repo + '.' + key in self.migration_conflicts and repo + '.' + key not in self.resolved_migrations
-                    from docker.runtime_config import MODEL_DESCRIPTIONS
+                    from qasystem_config.runtime_config import MODEL_DESCRIPTIONS
                     rows.append(dict(kind="model", repo=repo, key=key, display_name=f"  [启动] {name}",
                         default=self.model_defaults[repo][key],
                         description=('[冲突] 请编辑本项确认取值。' if conflict else '') + MODEL_DESCRIPTIONS[key],
                         display_value=('! ' if conflict else '') + (str(state[key]) or '(空)'), label=f"    {name}: {state[key]}"))
-        from docker.api_services import ui_rows
+        from docker.api_ui import ui_rows
         rows.extend(ui_rows(self))
         for conflict, details in self.migration_conflicts.items():
             if isinstance(details, dict) and conflict not in self.resolved_migrations:
@@ -381,7 +378,7 @@ class Configuration:
         for key, old in self.migration_conflicts.items():
             if key not in self.resolved_migrations:
                 errors.append(f'{key} 与旧配置 {", ".join(old)} 冲突；在 UI 中编辑标准项确认取值')
-        allowed = set(helper.read_env("GPU_DEVICE_IDS=" + self.values.get("GPU_DEVICE_IDS", ""))["GPU_DEVICE_IDS"].split(","))
+        allowed = set(config_io.read_env("GPU_DEVICE_IDS=" + self.values.get("GPU_DEVICE_IDS", ""))["GPU_DEVICE_IDS"].split(","))
         reserved = set(self.values.get("EXECUTION_GPU_RESERVED_DEVICE_IDS", "").split(","))
         own = {self.model_gpu(m) for m in self.previous_models.values() if m.get("enabled")}
         own.update(self.pending_reservations)
@@ -423,7 +420,7 @@ class Configuration:
                     gpus[budget_gpu] = (repo, previous_budget + ratio)
                 if gpu in reserved and gpu not in own: errors.append(f"{repo} GPU 已被其他服务预留")
 
-                from docker.model_services import validate_record
+                from qasystem_config.model_registry import validate_record
                 validate_record(repo, model, root=self.model_root())
                 path = (self.model_root() / model['model_dir']).resolve()
                 if not model['model_dir'] or not path.is_relative_to(self.model_root()):
@@ -441,15 +438,15 @@ class Configuration:
                     if not math.isfinite(number) or number < 0 or (number == 0 and not key.endswith(("QPS", "QPM"))): raise ValueError()
                     if "TIMEOUT" not in key and not number.is_integer(): raise ValueError()
                 except ValueError: errors.append(f"{key} 数值无效")
-        from docker.api_services import validate_api_registry
+        from qasystem_config.api_services import validate_api_registry
         validate_api_registry(self.services, self.accounts, self.routes)
         from external_services.model_routes import resolve_service
         proposed = {'models': self.models, 'services': self.services, 'routes': self.routes, 'accounts': self.accounts}
-        from docker.runtime_config import _validate_document
+        from qasystem_config.runtime_config import _validate_document
         try: _validate_document({'settings': {}, **proposed})
         except ValueError as exc: errors.append(str(exc))
         names = {}
-        from docker.model_services import service_name
+        from qasystem_config.model_registry import service_name
         for model_id in self.models:
             name = service_name(model_id)
             if name in names: errors.append('模型记录生成相同服务名称；请调整记录ID')
@@ -473,18 +470,19 @@ class Configuration:
 
     @staticmethod
     def model_gpu(model):
-        from docker.model_services import physical_gpu
+        from qasystem_config.model_registry import physical_gpu
         return physical_gpu(model)
 
     def compose(self) -> dict:
-        from docker.model_services import service_name, startup_command
+        from qasystem_config.model_registry import service_name
+        from docker.model_services import startup_command
         services = {}
         for model_id, model in self.models.items():
             if not model['enabled'] or model['manager'] != 'ops': continue
             environment = {**self.process_environment(), 'CUDA_VISIBLE_DEVICES': self.model_gpu(model),
                            'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1', 'VLLM_NO_USAGE_STATS': '1'}
             service = dict(image=self.values['QASYSTEM_ENV_IMAGE'], pull_policy='never',
-                entrypoint=['python', '/app/docker/config_guard.py', '--project-dir', '/app', '--runtime-dir', '/app/runtime-config', '--exec'],
+                entrypoint=['python', '-m', 'qasystem_config.config_guard', '--project-dir', '/app', '--runtime-dir', '/app/runtime-config', '--exec'],
                 restart='unless-stopped', init=True, environment=environment, env_file=[str(self.root / '.env')],
                 volumes=[f'{self.model_root()}:/models:ro', f"{(self.root / self.values.get('QASYSTEM_SOURCE_DIR', '.')).resolve()}:/app:ro",
                          f'{self.directory}:/app/runtime-config:ro', f'{self.directory / "observed"}:/app/runtime-config/observed',
@@ -497,15 +495,15 @@ class Configuration:
         return {'services': services}
 
     def pending_payloads(self) -> dict:
-        from docker.configuration import declarations
-        from docker.config_migrations import ALIASES
+        from qasystem_config.configuration import declarations
+        from qasystem_config.config_migrations import ALIASES
         retired = set(declarations().get('retired', [])) | set(ALIASES)
         static = {k: v for k, v in self.values.items() if k not in PERSISTED_KEYS and k not in retired}
-        original_values = helper.read_env(self.original or self.template)
+        original_values = config_io.read_env(self.original or self.template)
         # Rewrite declared keys once, eliminating duplicate assignments.
         # Unknown user-owned values remain untouched until consumers are known.
         changes = {k: v for k, v in static.items() if k in declarations()['items'] or original_values.get(k) != v}
-        env = helper.update_env(self.original or self.template, changes)
+        env = config_io.update_env(self.original or self.template, changes)
         env = "\n".join(line for line in env.splitlines() if not (
             (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in PERSISTED_KEYS | retired)) + "\n"
         settings = dict(self.persisted_hot)
@@ -528,13 +526,13 @@ class Configuration:
         try:
             copied = self.copy_legacy_runtime()
             for path, content in payloads.items():
-                helper.atomic_write(path, content)
+                config_io.atomic_write(path, content)
                 written.append(path)
         except Exception:
             for path in reversed(written):
                 old = self.expected[path]
                 if old is None: path.unlink(missing_ok=True)
-                else: helper.atomic_write(path, old.decode("utf-8-sig"))
+                else: config_io.atomic_write(path, old.decode("utf-8-sig"))
             self.rollback_migration(copied)
             raise
         self.approval_directory = self.directory
@@ -558,7 +556,7 @@ class Configuration:
 
     def apply(self) -> None:
         """Explicit action only; never called on entry or Save."""
-        from docker.model_services import validate_record
+        from qasystem_config.model_registry import validate_record
         for model_id, record in self.models.items():
             if record.get('enabled'): validate_record(model_id, record, root=self.model_root(), check_files=True)
         # Approval is checked before even temporary Docker probes.
@@ -578,7 +576,7 @@ class Configuration:
         command += ["-f", str(self.directory / "models.compose.json")]
         guard.require(self.root, self.directory)
         helper.run(command + ["config", "--quiet"], cwd=self.root)
-        from docker.model_services import service_name
+        from qasystem_config.model_registry import service_name
         previous_services = json.loads(prior_compose.read_text()).get('services', {}) if prior_compose.exists() else {}
         changed = [name for repo, old in self.previous_models.items() if old.get('enabled') and self.models.get(repo) != old
                    for name in (slug(repo), service_name(repo)) if name in previous_services]
@@ -612,8 +610,8 @@ class Configuration:
             helper.run(command + ["up", "-d", "--no-deps", *names], cwd=self.root, timeout=120)
         helper.progress("启动命令已提交；模型加载及健康状态请查看 docker compose ps / logs。保存不等于部署成功。")
         self.previous_models = json.loads(json.dumps(self.models))
-        helper.atomic_write(self.directory / "applied-models.json", json.dumps(self.previous_models, indent=2))
-        helper.atomic_write(prior_compose, json.dumps(self.compose(), indent=2))
+        config_io.atomic_write(self.directory / "applied-models.json", json.dumps(self.previous_models, indent=2))
+        config_io.atomic_write(prior_compose, json.dumps(self.compose(), indent=2))
 
     def prepare_deployment(self):
         errors = self.validate(probe=True)
@@ -697,7 +695,7 @@ def review_save(config: Configuration) -> bool:
                 continue
             if input(f'输入 confirm r{revision} 批准并保存，其他输入取消: ') != f'confirm r{revision}':
                 return False
-            from docker.config_transaction import apply as commit_configuration
+            from qasystem_config.config_transaction import apply as commit_configuration
             commit_configuration(config, reason=reason, actor='human', reviewer=getpass.getuser(),
                                  base_revision=revision - 1, expected_snapshot=current)
             return True
@@ -731,7 +729,7 @@ def _ui(config: Configuration) -> None:
             elif key == 'n':
                 model_id = input('新模型记录 ID（或仓库名）: ').strip()
                 if not model_id or model_id in config.models: raise ValueError('记录 ID 为空或已存在')
-                from docker.runtime_config import MODEL_DEFAULTS
+                from qasystem_config.runtime_config import MODEL_DEFAULTS
                 engine = input('推理方式 vllm/native: ').strip()
                 adapter = input('适配器 chat/clef/nanojev: ').strip()
                 if engine not in {'vllm', 'native'} or adapter not in {'chat', 'clef', 'nanojev'}:
@@ -777,7 +775,7 @@ def _ui(config: Configuration) -> None:
                         record = config.services[row['record_id']]
                         record['enabled'] = not record.get('enabled', True)
                     elif key != ' ':
-                        from docker.api_services import edit_field
+                        from docker.api_ui import edit_field
                         edit_field(config, row, screen)
                     continue
                 if row["kind"] == "model":
@@ -816,6 +814,19 @@ def _ui(config: Configuration) -> None:
                     baseline = json.dumps([config.values, config.models, config.services, config.routes, config.accounts], sort_keys=True)
                     input("回车返回配置界面。")
         except (ValueError, OSError, RuntimeError) as exc: notice = str(exc)
+
+
+def run_transaction(root, *, operation, patch_path=None, reason=None, actor='agent', base_revision=None):
+    """Host editor factory; transaction validation itself lives in public core."""
+    from qasystem_config.config_transaction import read_patch, patch_configuration, plan, apply
+    config = Configuration(Path(root))
+    if patch_path is not None:
+        patch_configuration(config, read_patch(patch_path))
+    if operation in {'plan', 'diff'}:
+        return plan(config)[0]
+    if base_revision is None:
+        raise ValueError('apply 必须提供 --base-revision，首次为 0')
+    return apply(config, reason=reason, actor=actor, base_revision=base_revision)
 
 
 def main(argv=None) -> int:

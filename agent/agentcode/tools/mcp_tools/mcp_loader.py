@@ -34,7 +34,7 @@ transport 取值与必需字段：
 """
 
 from __future__ import annotations
-from docker.startup_contract import internal_agent_mcp_url
+from qasystem_config.startup_contract import internal_agent_mcp_url
 
 import json
 import os

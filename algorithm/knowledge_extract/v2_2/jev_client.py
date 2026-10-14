@@ -5,7 +5,7 @@ It answers a Jev-shaped ``state + questions`` request in one forward pass and
 does not decode text.  Harness code in ``jev_harness`` decides what to ask.
 """
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import importlib.util
 import os

@@ -11,8 +11,8 @@ import json
 import os
 from pathlib import Path
 
-from docker import config_guard as guard
-from docker.config_database import database, private_write
+from qasystem_config import config_guard as guard
+from qasystem_config.config_database import database, private_write
 
 
 def read_patch(path):
@@ -58,7 +58,7 @@ def patch_configuration(config, patch):
                 if section == 'services': provided.add(section + '.' + name + '.legacy_api')
                 defaults = {}
                 if section == 'models':
-                    from docker.runtime_config import MODEL_DEFAULTS
+                    from qasystem_config.runtime_config import MODEL_DEFAULTS
                     defaults = deepcopy(config.model_defaults.get(name, MODEL_DEFAULTS))
                 target[name] = {**defaults, **deepcopy(target.get(name, {})), **deepcopy(value)}
     resolutions = patch.get('resolve_conflicts', {})
@@ -87,13 +87,13 @@ def plan(config):
         action = 'added' if key not in old else 'removed' if key not in new else 'changed'
         mode = 'hot' if key.startswith(('settings.', 'services.', 'routes.', 'accounts.')) else 'container'
         if key.startswith('settings.'):
-            from docker.configuration import declarations
+            from qasystem_config.configuration import declarations
             if declarations()['items'].get(key.split('.', 1)[1], {}).get('mode') in {'process', 'processes'}: mode = 'process'
         if key.startswith(('declarations.', 'catalog.', 'release.')): mode = 'review'
         rows.append({'key': key, 'action': action, 'before': old.get(key), 'after': new.get(key), 'effect': mode})
-    from docker.config_migrations import ALIASES
-    from docker.configuration import declarations
-    from docker.setup_llm import read_env
+    from qasystem_config.config_migrations import ALIASES
+    from qasystem_config.configuration import declarations
+    from qasystem_config.io import read_env
     retired = set(declarations().get('retired', []))
     migrations = [{'source': key, 'target': ALIASES.get(key),
                    'action': 'migrated' if key in ALIASES else 'retired',
@@ -184,11 +184,3 @@ def apply(config, *, reason, actor='agent', base_revision, expected_snapshot=Non
             for name, value in editor_state.items(): setattr(config, name, value)
             raise
 
-
-def run(root, *, operation, patch_path=None, reason=None, actor='agent', base_revision=None):
-    from docker.configure import Configuration
-    config = Configuration(Path(root))
-    if patch_path is not None: patch_configuration(config, read_patch(patch_path))
-    if operation in {'plan', 'diff'}: return plan(config)[0]
-    if base_revision is None: raise ValueError('apply 必须提供 --base-revision，首次为 0')
-    return apply(config, reason=reason, actor=actor, base_revision=base_revision)

@@ -1,4 +1,4 @@
-from docker.startup_contract import INTERNAL_MCP_BIND, INTERNAL_MCP_PORT
+from qasystem_config.startup_contract import INTERNAL_MCP_BIND, INTERNAL_MCP_PORT
 from importlib.metadata import version
 
 MCP_V2 = int(version("mcp").split(".")[0]) >= 2

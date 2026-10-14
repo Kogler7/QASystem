@@ -20,7 +20,7 @@ def editor(tmp_path, monkeypatch):
 
 
 def test_catalog_covers_every_release_key_and_masks_secrets(editor):
-    assert {r['key'] for r in editor.fields} == set(configure.helper.read_env(editor.template))
+    assert {r['key'] for r in editor.fields} == set(configure.config_io.read_env(editor.template))
     assert configure.HOT_KEYS == runtime_settings.HOT_KEYS
     rows = editor.rows()
     assert all(not editor.models[m['repo']]['enabled'] for m in editor.catalog)
@@ -32,7 +32,7 @@ def test_save_generates_defaults_and_hot_file_without_deploy(editor, monkeypatch
     editor.values['KG_EXTRACT_ALGO_VERSION'] = 'v3'
     editor.save()
     assert json.loads((editor.directory / 'config.json').read_text())['settings']['KG_EXTRACT_ALGO_VERSION'] == 'v3'
-    env = configure.helper.read_env((editor.root / '.env').read_text())
+    env = configure.config_io.read_env((editor.root / '.env').read_text())
     assert env['PRIVATE_API_KEY'] == 'never-print'
     assert env['GPU_DEVICE_IDS'] == '4,5,6,7'
     assert env['EXECUTION_GPU_RESERVED_DEVICE_IDS'] == '7'
@@ -119,7 +119,7 @@ def test_new_requests_reload_model_and_version_existing_snapshot_is_stable(edito
 
 def test_model_compose_uses_unified_image_offline_readonly_weights(editor):
     repo = enable(editor, 0)
-    service = editor.compose()['services'][__import__('docker.model_services', fromlist=['service_name']).service_name(repo)]
+    service = editor.compose()['services'][__import__('qasystem_config.model_registry', fromlist=['service_name']).service_name(repo)]
     assert service['image'] == 'qasystem-env-v1'
     assert service['volumes'][0].endswith(':/models:ro')
     assert service['environment']['HF_HUB_OFFLINE'] == '1'
@@ -145,7 +145,7 @@ def test_apply_reserves_gpu_before_recreating_existing_backend(editor, monkeypat
         if '--query-gpu=index,name,memory.total,memory.used,utilization.gpu' in command:
             return '6, A40, 46080, 0, 0'
         if '--force-recreate' in command:
-            current = configure.helper.read_env((editor.root / '.env').read_text())
+            current = configure.config_io.read_env((editor.root / '.env').read_text())
             assert current['EXECUTION_GPU_RESERVED_DEVICE_IDS'] == '6,7'
         return ''
     monkeypatch.setattr(configure.helper, 'run', run)
@@ -160,7 +160,7 @@ def test_apply_reserves_gpu_before_recreating_existing_backend(editor, monkeypat
 def test_disabled_model_stops_only_previously_managed_service(editor, monkeypatch):
     repo = enable(editor, 0)
     editor.previous_models = json.loads(json.dumps(editor.models))
-    configure.helper.atomic_write(editor.directory / 'applied.compose.json', json.dumps(editor.compose()))
+    configure.config_io.atomic_write(editor.directory / 'applied.compose.json', json.dumps(editor.compose()))
     editor.models[repo]['enabled'] = False
     editor.prepare_deployment()
     editor.save()
@@ -170,7 +170,7 @@ def test_disabled_model_stops_only_previously_managed_service(editor, monkeypatc
     editor.apply()
     stops = [c for c in calls if 'stop' in c]
     assert len(stops) == 1
-    assert stops[0][-1] == __import__('docker.model_services', fromlist=['service_name']).service_name(repo)
+    assert stops[0][-1] == __import__('qasystem_config.model_registry', fromlist=['service_name']).service_name(repo)
     assert not any('clef' in c or 'nanojev' in c for c in calls)
 
 
@@ -320,7 +320,7 @@ def test_save_migrates_legacy_without_optional_defaults_but_persists_required_cp
     settings = json.loads((directory / 'config.json').read_text())['settings']
     assert settings == {'KG_EXTRACT_ALGO_VERSION': 'v3', 'KG_EXTRACT_LLM_MAX_TOKENS': '3',
                         'EXECUTION_CPU_WORKERS': 'auto'}
-    assert 'KG_EXTRACT_LLM_MAX_TOKENS' not in configure.helper.read_env((editor.root / '.env').read_text())
+    assert 'KG_EXTRACT_LLM_MAX_TOKENS' not in configure.config_io.read_env((editor.root / '.env').read_text())
     assert not (directory / 'settings.json').exists()
     assert not (directory / 'models.json').exists()
     assert (reopened.backup / 'settings.json').is_file()
@@ -328,7 +328,7 @@ def test_save_migrates_legacy_without_optional_defaults_but_persists_required_cp
 
 
 def test_canonical_runtime_file_does_not_overlay_old_files(editor):
-    from docker.runtime_config import read_document
+    from qasystem_config.runtime_config import read_document
     (editor.directory / 'config.json').write_text('{"settings": {}, "models": {}}')
     (editor.directory / 'settings.json').write_text('{"KG_EXTRACT_ALGO_VERSION":"stale"}')
     assert read_document(editor.directory / 'config.json') == {'settings': {}, 'models': {}, 'services': {}, 'routes': {}, 'accounts': {}}
@@ -336,14 +336,14 @@ def test_canonical_runtime_file_does_not_overlay_old_files(editor):
 
 @pytest.mark.parametrize('filename', ['settings.json', 'models.json'])
 def test_migration_rejects_invalid_legacy_structure(editor, filename):
-    from docker.runtime_config import read_document
+    from qasystem_config.runtime_config import read_document
     (editor.directory / filename).write_text('[]')
     with pytest.raises(ValueError, match='Invalid runtime'):
         read_document(editor.directory / 'config.json')
 
 
 def test_container_mount_precedes_host_relative_config_dir(monkeypatch):
-    from docker.runtime_config import runtime_path
+    from qasystem_config.runtime_config import runtime_path
     original = Path.is_dir
     monkeypatch.setattr(Path, 'is_dir', lambda path: str(path).replace('\\', '/') == '/app/runtime-config' or original(path))
     assert str(runtime_path(Path('/app'), {'QASYSTEM_RUNTIME_CONFIG_DIR': './host-only'})).replace('\\', '/') == '/app/runtime-config/config.json'
@@ -447,12 +447,12 @@ def test_directory_migration_rejects_concurrent_history_change(tmp_path):
 def test_directory_migration_write_failure_rolls_back_copied_state(tmp_path, monkeypatch):
     editor, old = legacy_editor(tmp_path)
     original_env = (tmp_path / '.env').read_bytes()
-    original = configure.helper.atomic_write
+    original = configure.config_io.atomic_write
     def write(path, content):
         if path == editor.directory / 'config.json':
             raise OSError('simulated write failure')
         original(path, content)
-    monkeypatch.setattr(configure.helper, 'atomic_write', write)
+    monkeypatch.setattr(configure.config_io, 'atomic_write', write)
     with pytest.raises(OSError, match='simulated'):
         editor.save()
     assert (tmp_path / '.env').read_bytes() == original_env

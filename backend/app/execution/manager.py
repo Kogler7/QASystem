@@ -1,6 +1,6 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
-from docker.startup_contract import EXECUTION_LIVENESS, EXECUTION_TOPOLOGY
+from qasystem_config.configuration import getenv as config_getenv
+from qasystem_config.startup_contract import EXECUTION_LIVENESS, EXECUTION_TOPOLOGY
 
 import base64
 import copy

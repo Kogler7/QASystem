@@ -108,7 +108,7 @@ def test_term_index_build_preserves_explicit_cli_inputs(monkeypatch, tmp_path):
     (False, "http://127.0.0.1:9180", "http://127.0.0.1:9181/mcp"),
 ])
 def test_internal_agent_connections_follow_topology(monkeypatch, container, agent, mcp):
-    from docker import startup_contract
+    from qasystem_config import startup_contract
     monkeypatch.setattr(startup_contract, "in_container_runtime", lambda: container)
     assert startup_contract.internal_agent_url() == agent
     assert startup_contract.internal_agent_mcp_url() == mcp

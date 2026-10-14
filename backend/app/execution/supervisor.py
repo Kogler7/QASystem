@@ -1,6 +1,6 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
-from docker.startup_contract import runtime_ready_file
+from qasystem_config.configuration import getenv as config_getenv
+from qasystem_config.startup_contract import runtime_ready_file
 
 import logging
 import os
@@ -70,11 +70,11 @@ class RuntimeSupervisor:
         self.stopping = False
         self.gpu_ids = _gpu_ids()
         self.cpu_count = os.cpu_count() or 4
-        from docker.configuration import approved_execution_plan
+        from qasystem_config.configuration import approved_execution_plan
         if cpu_workers is None:
             self.cpu_plan = approved_execution_plan()
         else:
-            from docker.configuration import read_registry, should_load_local_dotenv
+            from qasystem_config.configuration import read_registry, should_load_local_dotenv
             if not should_load_local_dotenv():
                 raise ValueError('受管部署不能通过启动参数覆盖 CPU 配置')
             _, revision = read_registry(with_revision=True)
@@ -82,9 +82,9 @@ class RuntimeSupervisor:
                 raise ValueError('受管部署不能通过启动参数覆盖 CPU 配置')
             self.cpu_plan = {'revision': None, 'cpu_workers': str(cpu_workers)}
         self.cpu_worker_count = _auto_cpu_workers(self.cpu_count, self.cpu_plan['cpu_workers'])
-        from docker.model_services import worker_record
+        from qasystem_config.model_registry import worker_record
         self.model_record = worker_record()
-        from docker.model_services import physical_gpu
+        from qasystem_config.model_registry import physical_gpu
         selected_gpu = physical_gpu(self.model_record or {})
         if selected_gpu:
             if selected_gpu not in self.gpu_ids: raise ValueError('MinerU 指定GPU不可用，拒绝回退')
@@ -96,7 +96,7 @@ class RuntimeSupervisor:
         self.control_socket = None
 
     def _approved_cpu_count(self, role: str, revision: int) -> int:
-        from docker.configuration import approved_execution_plan
+        from qasystem_config.configuration import approved_execution_plan
         plan = approved_execution_plan(revision=revision)
         configured = plan['cpu_workers']
         if configured == 'auto':
@@ -106,7 +106,7 @@ class RuntimeSupervisor:
     def _record_cpu_control(self, event):
         if event.get('revision') is None:
             return
-        from docker.config_database import append_event
+        from qasystem_config.config_database import append_event
         directory = Path('/app/runtime-config/observed')
         if not directory.is_dir() or not os.access(directory, os.W_OK):
             raise ValueError('进程应用记录目录不可写')
@@ -166,7 +166,7 @@ class RuntimeSupervisor:
         if not ports:
             LOGGER.warning("no vLLM engine started; detected GPUs=%s", self.gpu_ids)
             return
-        from docker.model_services import validate_record
+        from qasystem_config.model_registry import validate_record
         validate_record('mineru-vlm', self.model_record, root=Path('/models'), check_files=True)
         for index, gpu_id in enumerate(self.gpu_ids):
             port = ports[index]

@@ -1,5 +1,5 @@
 """知识抽取 V2 配置：从环境变量读取 LLM API 参数。"""
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import os
 
 

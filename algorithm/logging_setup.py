@@ -10,7 +10,7 @@ handler、级别也停在默认的 WARNING，于是模块级 `logger.info(...)` 
 一定能把 INFO 打到 stderr，且不依赖 root 的 handler / 级别。
 """
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 import logging

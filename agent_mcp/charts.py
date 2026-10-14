@@ -4,7 +4,7 @@
 compose 中 agent-mcp 与 agent 容器共享 agent-output 卷，agent 容器内同路径可见。
 不导入 mcp_services（容器未挂该卷），直接同步调用 algorithm.visualization.charts.VisualizationExecutor。
 """
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import os
 from functools import lru_cache

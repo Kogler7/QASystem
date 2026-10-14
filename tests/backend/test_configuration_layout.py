@@ -8,7 +8,7 @@ def test_compose_has_no_second_defaults_catalog_and_all_variables_are_declared()
     import json
     import re
     compose = (ROOT / 'docker-compose.yml').read_text(encoding='utf8')
-    catalog = json.loads((ROOT / 'docker/config-declarations.json').read_text(encoding='utf8'))
+    catalog = json.loads((ROOT / 'qasystem_config/config-declarations.json').read_text(encoding='utf8'))
     assert not re.search(r'\$\{[A-Z][A-Z0-9_]*:-', compose)
     assert set(re.findall(r'\$\{([A-Z][A-Z0-9_]*)', compose)) <= catalog['items'].keys()
 
@@ -158,7 +158,7 @@ def test_runtime_version_check_accepts_cuda_build_tag_but_rejects_release_drift(
 
 def test_fixed_process_contract_and_runtime_mounts_are_shared():
     import yaml
-    from docker.startup_contract import PROCESS_ENVIRONMENT
+    from qasystem_config.startup_contract import PROCESS_ENVIRONMENT
     compose = yaml.safe_load((ROOT / 'docker-compose.yml').read_text())
     for name in ('backend', 'agent'):
         service = compose['services'][name]

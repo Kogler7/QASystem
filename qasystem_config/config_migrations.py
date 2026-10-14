@@ -64,7 +64,7 @@ def migrate(values):
 
 def duplicate_conflicts(text):
     """Repeated assignments with different values require an explicit UI choice."""
-    from docker.setup_llm import read_env
+    from qasystem_config.io import read_env
     seen, conflicts = {}, {}
     for line in text.splitlines():
         for old, value in read_env(line).items():

@@ -35,8 +35,13 @@ Write-ProgressLog "[1/6] Preparing deployment directory"
 $configPython = Join-Path $repoRoot '.venv/Scripts/python.exe'
 if (-not (Test-Path -LiteralPath $configPython)) { $configPython = 'python' }
 Write-ProgressLog 'Checking versioned configuration declarations and consumers'
-& $configPython -m docker.config_contract
-if ($LASTEXITCODE -ne 0) { throw 'Configuration contract gate failed; packaging is blocked' }
+Push-Location -LiteralPath $repoRoot
+try {
+    & $configPython -m qasystem_config.config_contract
+    if ($LASTEXITCODE -ne 0) { throw 'Configuration contract gate failed; packaging is blocked' }
+} finally {
+    Pop-Location
+}
 New-Item -ItemType Directory -Force -Path $deployDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $deployDir "models") | Out-Null
 New-Item -ItemType Directory -Force -Path $offlineDir | Out-Null
@@ -53,6 +58,8 @@ foreach ($item in @(
     @{ source = "docker-compose.yml"; destination = "docker-compose.yml" },
     @{ source = "docs/部署/小模型统一部署.md"; destination = "LLM_MODELS.md" },
     @{ source = "docs/部署/配置体系说明.md"; destination = "CONFIGURATION.md" },
+    @{ source = "docs/部署/ops操作手册.md"; destination = "OPS.md" },
+    @{ source = "docs/部署/进程局部控制.md"; destination = "PROCESS_CONTROL.md" },
     @{ source = "download-models.ps1"; destination = "download-models.ps1" },
     @{ source = "run-offline-validation.ps1"; destination = "run-offline-validation.ps1" },
     @{ source = "docs/部署/环境变量迁移说明.md"; destination = "ENV_MIGRATION.md" },
@@ -73,7 +80,7 @@ Set-Content -LiteralPath (Join-Path $deployDir ".env.example") -Value $deliveryE
 
 Write-ProgressLog "[3/6] Creating the read-only runtime source directory"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
-foreach ($directory in @("backend", "algorithm", "mcp_services", "agent_mcp", "agent", "external_services", "clef_service", "nanojev_service")) {
+foreach ($directory in @("backend", "algorithm", "mcp_services", "agent_mcp", "agent", "external_services", "clef_service", "nanojev_service", "qasystem_config", "model_runtime")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination (Join-Path $runtimeDir $directory) -Recurse -Force
 }
 # v4 是本地实验副本：不进 Git、不登记配置声明，因此也不进交付源码包（否则服务器启动门禁会因未声明消费者失败）
@@ -88,7 +95,7 @@ if (Test-Path -LiteralPath $localOnlySource) {
     Remove-Item -LiteralPath $localOnlySource -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir "docker") | Out-Null
-foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "runtime_config.py", "startup_contract.py", "model_services.py", "api_services.py", "config_guard.py", "configuration.py", "config_contract.py", "environment_contract.py", "config_database.py", "config_migrations.py", "config_transaction.py", "config-declarations.json", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
+foreach ($file in @("__init__.py", "verify_runtime.py", "download_models.py", "download_llm_models.py", "setup_llm.py", "configure.py", "ops.py", "terminal_ui.py", "model_services.py", "api_ui.py", "llm-models.json", "offline_mock_llm.py", "offline_validation.py", "vllm_readiness.py")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docker/$file") -Destination (Join-Path $runtimeDir "docker/$file") -Force
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docker/config-releases') -Destination (Join-Path $runtimeDir 'docker/config-releases') -Recurse -Force

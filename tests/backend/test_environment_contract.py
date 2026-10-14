@@ -2,7 +2,7 @@ import ast
 
 import pytest
 
-from docker.environment_contract import environment_errors, scan_environment_access, central_reader_names
+from qasystem_config.environment_contract import environment_errors, scan_environment_access, central_reader_names
 
 
 @pytest.mark.parametrize('code', [
@@ -34,7 +34,7 @@ def test_environment_bypasses_are_rejected(code):
 
 
 def test_central_getter_and_local_dict_do_not_touch_environment():
-    source = 'from docker.configuration import getenv\nx=getenv("K")\nenv={"K":"x"}\nenv["K"]="y"\nx=env.get("K")'
+    source = 'from qasystem_config.configuration import getenv\nx=getenv("K")\nenv={"K":"x"}\nenv["K"]="y"\nx=env.get("K")'
     assert not environment_errors('backend/business.py', source)
 
 
@@ -75,11 +75,11 @@ def test_source_access_has_traceable_operation_and_function():
 
 
 @pytest.mark.parametrize(('source', 'function'), [
-    ('from docker import configuration as cfg\nx=cfg.getenv("K")', 'cfg.getenv'),
-    ('import docker.configuration as cfg\nx=cfg.required("K")', 'cfg.required'),
-    ('import docker as d\nx=d.configuration.getenv("K")', 'd.configuration.getenv'),
-    ('from docker.configuration import getenv as cfg\nread=cfg\nf=read\nx=f("K")', 'f'),
-    ('from docker.configuration import startup_getenv\nread:object=startup_getenv\nx=read("K")', 'read'),
+    ('from qasystem_config import configuration as cfg\nx=cfg.getenv("K")', 'cfg.getenv'),
+    ('import qasystem_config.configuration as cfg\nx=cfg.required("K")', 'cfg.required'),
+    ('import qasystem_config as d\nx=d.configuration.getenv("K")', 'd.configuration.getenv'),
+    ('from qasystem_config.configuration import getenv as cfg\nread=cfg\nf=read\nx=f("K")', 'f'),
+    ('from qasystem_config.configuration import startup_getenv\nread:object=startup_getenv\nx=read("K")', 'read'),
 ])
 def test_central_import_and_assignment_aliases_are_registered(source, function):
     assert function in central_reader_names(ast.parse(source))
@@ -90,18 +90,18 @@ def test_unrelated_getenv_is_not_registered_as_central():
 
 
 @pytest.mark.parametrize('code', [
-    'from docker.configuration import prepare_dev_agent_startup\nprepare_dev_agent_startup(8)',
-    'from docker.configuration import bootstrap_local_environment\nbootstrap_local_environment()',
-    'from docker import configuration as cfg\ncfg.configure_mineru_loader_environment("x", "local")',
+    'from qasystem_config.configuration import prepare_dev_agent_startup\nprepare_dev_agent_startup(8)',
+    'from qasystem_config.configuration import bootstrap_local_environment\nbootstrap_local_environment()',
+    'from qasystem_config import configuration as cfg\ncfg.configure_mineru_loader_environment("x", "local")',
 ])
 def test_controlled_environment_helpers_cannot_be_called_by_business_code(code):
     assert environment_errors('backend/business.py', code)
 
 
 def test_controlled_startup_and_dependency_calls_require_exact_consumers():
-    source = 'from docker.configuration import prepare_dev_agent_startup as prepare\ndef main():\n prepare(8)'
+    source = 'from qasystem_config.configuration import prepare_dev_agent_startup as prepare\ndef main():\n prepare(8)'
     assert not environment_errors('agent/agentcode/api.py', source)
     assert environment_errors('agent/agentcode/api.py', source.replace('main', 'handle_request'))
-    source = 'from docker.configuration import configure_mineru_loader_environment as setup\nclass OCRProcessor:\n def __init__(self):\n  setup("x", "local")'
+    source = 'from qasystem_config.configuration import configure_mineru_loader_environment as setup\nclass OCRProcessor:\n def __init__(self):\n  setup("x", "local")'
     assert not environment_errors('algorithm/preproc/preproc_src/processors/ocr_processor.py', source)
     assert environment_errors('algorithm/preproc/preproc_src/processors/ocr_processor.py', source.replace('__init__', 'process'))

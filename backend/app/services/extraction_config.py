@@ -1,6 +1,6 @@
 """Request-scoped extraction configuration; snapshots never contain credentials."""
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv, UndeclaredConfigurationError
+from qasystem_config.configuration import getenv as config_getenv, UndeclaredConfigurationError
 
 from copy import deepcopy
 import importlib
@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from algorithm.runtime_settings import getenv
+from qasystem_config.configuration import getenv
 from algorithm.knowledge_extract.version import SUPPORTED_VERSIONS, get_extract_version
 from external_services.model_routes import registry_snapshot, resolve_service, snapshot_entity_service
 
@@ -132,7 +132,7 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     values.update(base_url=routed['base_url'], model=routed['model'], api_key_env=routed['api_key_env'],
                   quota_group=routed.get('account_id') or routed['service_id'],
                   api_mode='auto', thinking_parameter='thinking')
-    from docker.api_services import LIMIT_DEFAULTS
+    from qasystem_config.api_services import LIMIT_DEFAULTS
     values.update(routed.get('limits') or LIMIT_DEFAULTS)
     values['max_input_tokens'] = int(setting('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '65536'))
     values['max_output_tokens'] = int(setting('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS') or values['max_tokens'])

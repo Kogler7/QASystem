@@ -45,7 +45,7 @@ MODEL_DESCRIPTIONS = {
 
 def runtime_path(root: Path | None = None, env=None) -> Path:
     root = Path.cwd() if root is None else Path(root)
-    from docker.startup_contract import runtime_directory
+    from qasystem_config.startup_contract import runtime_directory
     return Path('/app/runtime-config/config.json') if Path('/app/runtime-config').is_dir() else runtime_directory(root) / 'config.json'
 
 
@@ -71,7 +71,7 @@ def read_document(path: Path | None = None, *, root: Path | None = None, env=Non
     elif path.name != "config.json" and isinstance(data, dict) and "settings" not in data:
         data = {"settings": data, "models": {}}
     if migration and isinstance(data, dict) and isinstance(data.get('settings'), dict):
-        from docker.configuration import declarations
+        from qasystem_config.configuration import declarations
         retired = set(declarations().get('retired', []))
         data = {**data, 'settings': {k: v for k, v in data['settings'].items() if k not in retired}}
     if migration and isinstance(data, dict) and isinstance(data.get('models'), dict):
@@ -143,7 +143,7 @@ def _validate_document(data):
             import re
             if not re.fullmatch(r'[A-Z][A-Z0-9_]*', service['api_key_env']): raise ValueError('Invalid credential reference')
     accounts = data.get('accounts', {})
-    from docker.api_services import validate_api_registry
+    from qasystem_config.api_services import validate_api_registry
     validate_api_registry(services, accounts, routes)
     return {"settings": settings, "models": models, 'services': services, 'routes': routes, 'accounts': accounts}
 
@@ -154,10 +154,7 @@ def read_registry(path: Path | None = None, *, root: Path | None = None, env=Non
         (path.parent / 'approved-config.json').exists() or (path.parent / 'history').is_dir() or
         str(path).replace('\\', '/') == '/app/runtime-config/config.json')
     if managed:
-        try:
-            from docker.config_guard import require_runtime
-        except ImportError:
-            from config_guard import require_runtime
+        from qasystem_config.config_guard import require_runtime
         raw = path.read_bytes() if path.is_file() else None
         revision = require_runtime(path.parent, config_bytes=raw)
         try:

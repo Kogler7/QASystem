@@ -1,4 +1,4 @@
-from docker.model_services import native_main
+from model_runtime.native import native_main
 
 
 if __name__ == '__main__':

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_llm_uses_shared_image_readonly_models_and_explicit_gpu(tmp_path):
     from docker.configure import Configuration
-    from docker.model_services import service_name
+    from qasystem_config.model_registry import service_name
     editor = Configuration(tmp_path)
     repo = editor.catalog[0]['repo']
     editor.models[repo].update(enabled=True, device='gpu:6')
@@ -21,7 +21,7 @@ def test_llm_uses_shared_image_readonly_models_and_explicit_gpu(tmp_path):
     assert backend['image'].startswith('${QASYSTEM_ENV_IMAGE')
     assert any(v.endswith(':/models:ro') for v in service['volumes'])
     assert any(v.endswith(':/app/.env:ro') for v in service['volumes'])
-    assert 'config_guard.py' in service['entrypoint'][1]
+    assert service['entrypoint'][:3] == ['python', '-m', 'qasystem_config.config_guard']
     assert service["environment"]["CUDA_VISIBLE_DEVICES"] == '6'
     assert service["environment"]["VLLM_NO_USAGE_STATS"] == "1"
     assert service["command"][:2] == ['vllm', 'serve']

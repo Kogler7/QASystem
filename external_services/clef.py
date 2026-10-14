@@ -1,5 +1,5 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 import math
@@ -9,7 +9,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
-from algorithm.runtime_settings import getenv
+from qasystem_config.configuration import getenv
 
 from .application import endpoint_for
 from .models import ModelServiceError

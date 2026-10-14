@@ -23,7 +23,7 @@ def registry(monkeypatch):
     }, 'routes': {'extract': 'chat', 'entity_count': 'clef'}}
     monkeypatch.setattr(model_routes, 'registry_snapshot', lambda: (deepcopy(data), 'revision-1'))
     monkeypatch.setattr(extraction_config, 'registry_snapshot', lambda: (deepcopy(data), 'revision-1'))
-    from docker import model_services
+    from qasystem_config import model_registry as model_services
     monkeypatch.setattr(model_services, 'local_model_endpoint', lambda name, record: {
         'base_url': f'http://local-{name}:8000' + ('/v1' if record['adapter'] == 'chat' else ''),
         'adapter': record['adapter'], 'model': name})

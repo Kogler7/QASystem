@@ -1,5 +1,5 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import os
 from contextlib import contextmanager
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import httpx
-from algorithm.runtime_settings import getenv
+from qasystem_config.configuration import getenv
 
 
 USER_CONTEXT_HEADERS = (

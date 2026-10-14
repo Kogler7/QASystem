@@ -10,14 +10,14 @@
 """
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 import os
 from pathlib import Path
 from typing import Any
 
-from docker.configuration import bootstrap_local_environment
+from qasystem_config.configuration import bootstrap_local_environment
 
 
 def _load_env() -> dict[str, Any]:

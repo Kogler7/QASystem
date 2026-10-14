@@ -39,7 +39,7 @@ def test_native_triton_probe_does_not_hide_unrelated_import_failure(monkeypatch)
 
 def test_clef_deployment_uses_shared_image_and_read_only_external_assets(tmp_path):
     from docker.configure import Configuration
-    from docker.model_services import service_name
+    from qasystem_config.model_registry import service_name
     editor = Configuration(tmp_path)
     base = yaml.safe_load((ROOT / 'docker-compose.yml').read_text(encoding='utf8'))
     assert 'clef' not in base['services'] and 'nanojev' not in base['services']

@@ -4,7 +4,8 @@ from contextlib import contextmanager
 
 import pytest
 
-from docker.api_services import edit_field, ui_rows, validate_api_registry, migrate_api_services
+from qasystem_config.api_services import validate_api_registry, migrate_api_services
+from docker.api_ui import edit_field, ui_rows
 from external_services.model_routes import resolve_service
 from external_services.llm.service import check_service_budget
 
@@ -41,7 +42,7 @@ def test_schema_and_snapshot_share_account_without_secrets():
 
 
 def test_local_context_is_derived_from_ops_model_not_duplicated_or_overridden(monkeypatch):
-    from docker import model_services
+    from qasystem_config import model_registry as model_services
     monkeypatch.setattr(model_services,'local_model_endpoint',lambda *a:{'base_url':'http://local:8000/v1','model':'qwen','adapter':'chat'})
     registry={'models':{'qwen':{'enabled':True,'context':'4096'}},
               'services':{'a':{'kind':'local','model':'qwen','capabilities':{'context_tokens':99999}}},

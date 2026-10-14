@@ -40,7 +40,7 @@ def test_runtime_cli_round_trip_has_no_files():
 
 
 def test_judge_explicit_cli_tokens_win_over_hot(monkeypatch):
-    monkeypatch.setattr("docker.runtime_config.read_settings", lambda: {"QASYSTEM_JUDGE_MAX_TOKENS": "9999"})
+    monkeypatch.setattr("qasystem_config.runtime_config.read_settings", lambda: {"QASYSTEM_JUDGE_MAX_TOKENS": "9999"})
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only")
     params = run.params_from_args(run.parse_args(["--judge-max-tokens", "2048", "--judge-timeout-seconds", "90"]))
     client = run.build_judge_client(params)

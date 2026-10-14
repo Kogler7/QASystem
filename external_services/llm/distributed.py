@@ -82,7 +82,7 @@ class RedisAdmission:
         self.poll_seconds = poll_seconds
         if self.lease_ms < 100:
             raise ValueError('Model lease must be at least 100ms')
-        from docker.api_services import LIMIT_DEFAULTS, validate_limits
+        from qasystem_config.api_services import LIMIT_DEFAULTS, validate_limits
         limits = service.get('limits') or LIMIT_DEFAULTS
         validate_limits(limits, required=True)
         scopes = [('service:' + service['service_id'], limits)]

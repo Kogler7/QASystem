@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from docker import configuration, config_contract, config_database, config_guard
+from qasystem_config import configuration, config_contract, config_database, config_guard
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,14 +13,14 @@ ROOT = Path(__file__).resolve().parents[2]
 @pytest.fixture
 def contract(tmp_path):
     (tmp_path / 'backend').mkdir()
-    (tmp_path / 'docker/config-releases').mkdir(parents=True)
+    (tmp_path / 'qasystem_config/config-releases').mkdir(parents=True)
     source = tmp_path / 'backend/settings.py'
-    source.write_text('from docker.configuration import getenv as config_getenv\nvalue = config_getenv("TEST_SETTING", "x")\n')
+    source.write_text('from qasystem_config.configuration import getenv as config_getenv\nvalue = config_getenv("TEST_SETTING", "x")\n')
     catalog = {'version': '1', 'dynamic_keys': [], 'items': {'TEST_SETTING': {
         'desc': 'A test setting', 'default': 'x', 'mode': 'startup', 'consumers': [
             {'path': 'backend/settings.py', 'kind': 'read', 'token': 'TEST_SETTING'}]}}}
     catalog['reader_contracts'] = config_contract.reader_contracts(tmp_path)
-    for path in ('docker/config-declarations.json', 'docker/config-releases/1.json'):
+    for path in ('qasystem_config/config-declarations.json', 'qasystem_config/config-releases/1.json'):
         (tmp_path / path).write_text(json.dumps(catalog))
     return tmp_path, source
 
@@ -81,7 +81,7 @@ def test_undeclared_literal_key_is_blocked(contract):
 
 def test_alias_import_cannot_bypass_declaration_gate(contract):
     root, source = contract
-    source.write_text('from docker.configuration import getenv as config\nx = config("UNDECLARED_SETTING")')
+    source.write_text('from qasystem_config.configuration import getenv as config\nx = config("UNDECLARED_SETTING")')
     assert any('未声明配置' in e for e in config_contract.check(root))
 
 
@@ -89,9 +89,9 @@ def test_default_change_requires_versioned_declaration(contract):
     root, _ = contract
     (root / '.env.example').write_text('TEST_SETTING=changed\n')
     assert any('默认值不一致' in e for e in config_contract.check(root))
-    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog = json.loads((root / 'qasystem_config/config-declarations.json').read_text())
     catalog['items']['TEST_SETTING']['default'] = 'changed'
-    (root / 'docker/config-declarations.json').write_text(json.dumps(catalog))
+    (root / 'qasystem_config/config-declarations.json').write_text(json.dumps(catalog))
     assert any('不可变版本记录不一致' in e for e in config_contract.check(root))
 
 
@@ -165,7 +165,7 @@ def test_retired_variables_are_removed_only_from_reviewable_plan(tmp_path):
 
 
 def test_observation_revision_is_bound_to_the_read_hot_snapshot(monkeypatch):
-    from docker import runtime_config
+    from qasystem_config import runtime_config
     monkeypatch.setattr(runtime_config, 'read_settings', lambda **kw: ({'KG_EXTRACT_ALGO_VERSION': 'v3'}, 1))
     observations = []
     monkeypatch.setattr(configuration, '_observe', lambda *args, **kw: observations.append((args, kw)))
@@ -185,21 +185,21 @@ def test_public_extraction_error_redacts_undeclared_provider_configuration(monke
 
 def test_missing_consumer_is_rejected_even_if_another_consumer_survives(contract):
     root, source = contract
-    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog = json.loads((root / 'qasystem_config/config-declarations.json').read_text())
     catalog['items']['TEST_SETTING']['consumers'].append(
         {'path': 'backend/deleted.py', 'kind': 'read', 'token': 'TEST_SETTING'})
     for name in ('config-declarations.json', 'config-releases/1.json'):
-        (root / 'docker' / name).write_text(json.dumps(catalog))
+        (root / 'qasystem_config' / name).write_text(json.dumps(catalog))
     assert any('消费者路径不存在' in e for e in config_contract.check(root))
 
 
 def test_external_tools_can_be_excluded_only_in_delivered_source(contract):
     root, source = contract
-    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog = json.loads((root / 'qasystem_config/config-declarations.json').read_text())
     catalog['items']['TEST_SETTING']['consumers'].append(
         {'path': 'eval/absent.py', 'kind': 'external', 'token': 'TEST_SETTING'})
     for name in ('config-declarations.json', 'config-releases/1.json'):
-        (root / 'docker' / name).write_text(json.dumps(catalog))
+        (root / 'qasystem_config' / name).write_text(json.dumps(catalog))
     assert any('消费者路径不存在' in e for e in config_contract.check(root))
     assert config_contract.check(root, deployed=True) == []
 
@@ -208,11 +208,11 @@ def test_consumer_leftover_token_is_rejected_even_when_other_consumer_survives(c
     root, source = contract
     stale = root / 'backend/old_consumer.py'
     stale.write_text('old_name="TEST_SETTING"\n')
-    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog = json.loads((root / 'qasystem_config/config-declarations.json').read_text())
     catalog['items']['TEST_SETTING']['consumers'].append(
         {'path': 'backend/old_consumer.py', 'kind': 'read', 'token': 'TEST_SETTING'})
     for name in ('config-declarations.json', 'config-releases/1.json'):
-        (root / 'docker' / name).write_text(json.dumps(catalog))
+        (root / 'qasystem_config' / name).write_text(json.dumps(catalog))
     assert any('old_consumer.py' in error and '已失效' in error for error in config_contract.check(root))
 
 
@@ -231,9 +231,9 @@ def test_original_six_environment_bypasses_are_rejected_by_active_gate(contract,
 
 
 @pytest.mark.parametrize('code', [
-    'from docker import configuration as cfg\nx=cfg.getenv("UNDECLARED")',
-    'from docker.configuration import getenv as cfg\nread=cfg\nx=read("UNDECLARED")',
-    'from docker.configuration import getenv as cfg\nx=cfg(key="UNDECLARED")',
+    'from qasystem_config import configuration as cfg\nx=cfg.getenv("UNDECLARED")',
+    'from qasystem_config.configuration import getenv as cfg\nread=cfg\nx=read("UNDECLARED")',
+    'from qasystem_config.configuration import getenv as cfg\nx=cfg(key="UNDECLARED")',
 ])
 def test_central_alias_and_keyword_calls_cannot_bypass_declaration_gate(contract, code):
     root, source = contract
@@ -252,11 +252,11 @@ def test_already_committed_history_corruption_is_rejected(contract, operation):
     root, source = contract
     subprocess.run(['git', 'init', '-q', str(root)], check=True)
     _git_commit(root, 'original immutable release')
-    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog = json.loads((root / 'qasystem_config/config-declarations.json').read_text())
     catalog['version'] = '2'
-    for relative in ('docker/config-declarations.json', 'docker/config-releases/2.json'):
+    for relative in ('qasystem_config/config-declarations.json', 'qasystem_config/config-releases/2.json'):
         (root / relative).write_text(json.dumps(catalog))
-    previous = root / 'docker/config-releases/1.json'
+    previous = root / 'qasystem_config/config-releases/1.json'
     if operation == 'rewrite':
         old = json.loads(previous.read_text())
         old['items']['TEST_SETTING']['default'] = 'rewritten-history'
@@ -282,11 +282,54 @@ def test_merge_retains_first_parent_release_despite_side_branch_collision(contra
     subprocess.run(['git', 'branch', 'side'], cwd=root, check=True)
     _git_commit(root, 'main published release')
     subprocess.run(['git', 'checkout', '-q', 'side'], cwd=root, check=True)
-    (root / 'docker/config-releases').mkdir(parents=True, exist_ok=True)
-    (root / 'docker/config-releases/1.json').write_text('{"different":"side branch release"}')
+    (root / 'qasystem_config/config-releases').mkdir(parents=True, exist_ok=True)
+    (root / 'qasystem_config/config-releases/1.json').write_text('{"different":"side branch release"}')
     _git_commit(root, 'independent side release with same filename')
     subprocess.run(['git', 'checkout', '-q', branch], cwd=root, check=True)
     subprocess.run(['git', 'merge', '--no-ff', '--no-commit', '-X', 'ours', 'side'], cwd=root, check=True,
                    capture_output=True, text=True)
     _git_commit(root, 'merge preserving main published freeze')
     assert config_contract.check(root) == []
+
+
+def test_public_core_cannot_import_deployment_or_business_modules(contract):
+    root, _ = contract
+    source = root / 'qasystem_config/illegal_dependency.py'
+    source.write_text('from docker.configure import Configuration\n')
+    assert any('公共配置核心禁止' in error for error in config_contract.check(root))
+    source.write_text('from backend.app.schemas import ChunkOptions\n')
+    assert any('公共配置核心禁止' in error for error in config_contract.check(root))
+
+
+def test_business_cannot_restore_deployment_configuration_import(contract):
+    root, _ = contract
+    source = root / 'backend/deployment_dependency.py'
+    source.write_text('from docker.configuration import getenv\n')
+    assert any('业务模块禁止' in error for error in config_contract.check(root))
+
+
+@pytest.mark.parametrize('operation', ['rewrite', 'delete'])
+def test_legacy_docker_history_remains_immutable_after_core_move(contract, operation):
+    root, _ = contract
+    legacy = root / 'docker/config-releases/legacy.json'
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text('{"version":"legacy-before-public-core"}')
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    _git_commit(root, 'receive legacy and public frozen versions')
+    if operation == 'delete':
+        legacy.unlink()
+    else:
+        legacy.write_text('{"version":"rewritten-legacy"}')
+    _git_commit(root, 'corrupt legacy version after moving core')
+    assert any('既有声明' in error and 'legacy.json' in error for error in config_contract.check(root))
+
+
+def test_public_core_has_one_implementation_and_separate_native_entry():
+    assert not (ROOT / 'algorithm/runtime_settings.py').exists()
+    for name in ('configuration', 'runtime_config', 'config_guard', 'config_database',
+                 'config_contract', 'config_migrations', 'environment_contract', 'startup_contract', 'api_services'):
+        assert (ROOT / 'qasystem_config' / (name + '.py')).is_file()
+        assert not (ROOT / 'docker' / (name + '.py')).exists()
+    assert not hasattr(__import__('qasystem_config.model_registry', fromlist=['startup_command']), 'startup_command')
+    assert not hasattr(__import__('qasystem_config.model_registry', fromlist=['native_main']), 'native_main')
+    assert not hasattr(__import__('qasystem_config.config_transaction', fromlist=['run']), 'run')

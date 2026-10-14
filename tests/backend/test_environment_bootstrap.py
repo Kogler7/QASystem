@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from backend.app import environment
-from docker import configuration, startup_contract
+from qasystem_config import configuration, startup_contract
 
 
 @pytest.fixture(autouse=True)

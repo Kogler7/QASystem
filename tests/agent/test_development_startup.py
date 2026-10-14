@@ -1,5 +1,5 @@
 from agentcode import api
-from docker import configuration, startup_contract
+from qasystem_config import configuration, startup_contract
 
 
 def test_development_multi_process_cli_keeps_explicit_concurrency(monkeypatch):

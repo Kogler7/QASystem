@@ -14,7 +14,7 @@
 """
 from __future__ import annotations
 
-from algorithm.runtime_settings import getenv
+from qasystem_config.configuration import getenv
 
 LATEST = "latest"
 V0 = "v0"

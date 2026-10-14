@@ -8,7 +8,7 @@
   超过环境变量预算时发送 slow_stage 告警（只告警，不中断任务）。
 """
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import contextvars
 import json

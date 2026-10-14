@@ -4,7 +4,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from docker import config_guard as guard, configure
+from docker import configure
+
+from qasystem_config import config_guard as guard
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -103,14 +105,14 @@ def test_compose_startup_runs_guard_for_all_application_services():
     compose = yaml.safe_load((ROOT / 'docker-compose.yml').read_text(encoding='utf-8'))
     for name in ['backend', 'agent']:
         service = compose['services'][name]
-        assert service['entrypoint'][1] == '/app/docker/config_guard.py'
+        assert service['entrypoint'][:3] == ['python', '-m', 'qasystem_config.config_guard']
         assert service['entrypoint'][-1] == '--exec'
         assert './.env:/app/.env:ro' in service['volumes']
         assert './runtime-config:/app/runtime-config:ro' in service['volumes']
 
 
 def test_runtime_rejects_unapproved_and_modified_hot_configuration(project):
-    from docker.runtime_config import read_settings
+    from qasystem_config.runtime_config import read_settings
     root, directory = project
     with pytest.raises(ValueError, match='人工确认'):
         read_settings(directory / 'config.json')
@@ -122,7 +124,7 @@ def test_runtime_rejects_unapproved_and_modified_hot_configuration(project):
 
 
 def test_deleted_canonical_config_cannot_fall_back_to_unreviewed_legacy_file(project):
-    from docker.runtime_config import read_settings
+    from qasystem_config.runtime_config import read_settings
     root, directory = project
     approve(project)
     (directory / 'config.json').unlink()
@@ -132,7 +134,7 @@ def test_deleted_canonical_config_cannot_fall_back_to_unreviewed_legacy_file(pro
 
 
 def test_unknown_model_credential_fields_are_rejected_before_logging(project):
-    from docker.runtime_config import read_document
+    from qasystem_config.runtime_config import read_document
     _, directory = project
     (directory / 'config.json').write_text('{"settings":{},"models":{"custom":{"API_KEY":"never-log"}}}')
     with pytest.raises(ValueError, match='Invalid runtime model') as error:

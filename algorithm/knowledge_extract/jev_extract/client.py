@@ -4,7 +4,7 @@ The extraction runtime is SDK independent; callers can inject any messages
 callable. The benchmark uses this same adapter for both V2 and V3.
 """
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv, required as config_required
+from qasystem_config.configuration import getenv as config_getenv, required as config_required
 
 from dataclasses import asdict, dataclass, field
 import json

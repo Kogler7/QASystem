@@ -1,6 +1,6 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
-from docker.startup_contract import internal_redis_url, EXECUTION_TOPOLOGY
+from qasystem_config.configuration import getenv as config_getenv
+from qasystem_config.startup_contract import internal_redis_url, EXECUTION_TOPOLOGY
 
 import json
 import os

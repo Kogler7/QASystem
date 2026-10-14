@@ -1,5 +1,5 @@
 from __future__ import annotations
-from docker.startup_contract import execution_data_directory
+from qasystem_config.startup_contract import execution_data_directory
 
 import json
 import os

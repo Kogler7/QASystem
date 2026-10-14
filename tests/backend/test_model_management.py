@@ -6,9 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from docker import configure, model_services as engines
-from docker.config_migrations import migrate_inference
-from docker.runtime_config import MODEL_DEFAULTS
+from docker import configure
+
+from qasystem_config import model_registry as engines
+from docker import model_services as deployment
+from model_runtime import native as native_startup
+from qasystem_config.config_migrations import migrate_inference
+from qasystem_config.runtime_config import MODEL_DEFAULTS
 
 
 def record(**values):
@@ -48,7 +52,7 @@ def test_directory_discovery_never_enables_any_model(editor):
 def test_new_same_engine_model_needs_record_only_not_env(editor):
     before = set(editor.values)
     editor.models['another/chat'] = record(enabled=True, device='gpu:4', model_dir='custom/chat')
-    assert engines.startup_command('another/chat', editor.models['another/chat'])[:2] == ['vllm', 'serve']
+    assert deployment.startup_command('another/chat', editor.models['another/chat'])[:2] == ['vllm', 'serve']
     assert engines.service_name('another/chat') in editor.compose()['services']
     assert set(editor.values) == before
 
@@ -88,7 +92,7 @@ def test_worker_has_exactly_one_manager_and_no_ops_instance(editor):
     model['enabled'] = True
     assert engines.service_name('mineru-vlm') not in editor.compose()['services']
     with pytest.raises(ValueError, match='禁止 ops'):
-        engines.startup_command('mineru-vlm', model)
+        deployment.startup_command('mineru-vlm', model)
     with pytest.raises(ValueError, match='Worker'):
         engines.local_model_endpoint('mineru-vlm', model)
 
@@ -126,21 +130,21 @@ def test_missing_gpu_cannot_fall_back_to_cpu(tmp_path, monkeypatch):
     native_files(tmp_path / 'checkpoint')
     model = record(enabled=True, engine='native', adapter='clef', device='gpu:4', model_dir='checkpoint')
     monkeypatch.setattr(engines, '_SELECTED', None)
-    monkeypatch.setattr(engines, 'selected_native', lambda _: model)
+    monkeypatch.setattr(native_startup, 'selected_native', lambda _: model)
     original = engines.validate_record
-    monkeypatch.setattr(engines, 'validate_record', lambda name, state, **kw: original(name, state, root=tmp_path, check_files=True))
+    monkeypatch.setattr(native_startup, 'validate_record', lambda name, state, **kw: original(name, state, root=tmp_path, check_files=True))
     monkeypatch.setattr(sys, 'argv', ['clef', '--record', 'checkpoint', '--container'])
     monkeypatch.setenv('CUDA_VISIBLE_DEVICES', '')
     monkeypatch.setitem(sys.modules, 'torch', SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False)))
     with pytest.raises(RuntimeError, match='不会回退'):
-        engines.native_main('clef')
+        native_startup.native_main('clef')
 
 
 def test_duplicate_worker_engine_start_is_rejected(monkeypatch):
     from backend.app.execution.supervisor import RuntimeSupervisor
     monkeypatch.setattr('backend.app.execution.supervisor._gpu_ids', lambda: [])
     monkeypatch.setattr('backend.app.execution.supervisor.is_remote_only', lambda: False)
-    monkeypatch.setattr('docker.configuration.approved_execution_plan',
+    monkeypatch.setattr('qasystem_config.configuration.approved_execution_plan',
                         lambda **kwargs: {'revision': 7, 'cpu_workers': 'auto'})
     supervisor = RuntimeSupervisor()
     supervisor.engines = [('4', 8100, object())]

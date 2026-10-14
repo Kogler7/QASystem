@@ -1,4 +1,4 @@
-from docker.startup_contract import INTERNAL_MCP_BIND, INTERNAL_AGENT_MCP_PORT
+from qasystem_config.startup_contract import INTERNAL_MCP_BIND, INTERNAL_AGENT_MCP_PORT
 
 from mcp.server.fastmcp import FastMCP
 

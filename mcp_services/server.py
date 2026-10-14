@@ -1,5 +1,5 @@
 import argparse
-from docker.startup_contract import INTERNAL_MCP_BIND, INTERNAL_MCP_PORT
+from qasystem_config.startup_contract import INTERNAL_MCP_BIND, INTERNAL_MCP_PORT
 
 from .runtime import mcp, MCP_V2
 from .domains.data import sql as _sql

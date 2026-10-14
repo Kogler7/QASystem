@@ -1,5 +1,5 @@
 """知识抽取 V3.1 的 LLM 环境配置。"""
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 
 def _env(key: str, *fallback_keys: str, default: str = "") -> str:

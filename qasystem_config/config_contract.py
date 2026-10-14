@@ -7,9 +7,17 @@ from functools import lru_cache
 from pathlib import Path
 import re
 import subprocess
-from docker.environment_contract import central_reader_names, environment_errors, ENVIRONMENT_ACCESS_CONTRACT
+from qasystem_config.environment_contract import central_reader_names, environment_errors, ENVIRONMENT_ACCESS_CONTRACT
 
-APPLICATION_DIRS = ('backend', 'agent', 'algorithm', 'external_services', 'clef_service', 'nanojev_service', 'mcp_services', 'agent_mcp')
+APPLICATION_DIRS = ('backend', 'agent', 'algorithm', 'external_services', 'clef_service', 'nanojev_service', 'mcp_services', 'agent_mcp', 'model_runtime')
+HISTORY_DIRECTORIES = ('docker/config-releases', 'qasystem_config/config-releases')
+CORE_CONTRACT = {
+    'package': 'qasystem_config', 'declaration': 'qasystem_config/config-declarations.json',
+    'history_directories': list(HISTORY_DIRECTORIES),
+    'forbidden_core_dependencies': ['docker', *APPLICATION_DIRS],
+    'business_configuration_owner': 'qasystem_config', 'deployment_owner': 'docker',
+    'io_owner': 'qasystem_config.io', 'native_entrypoint': 'model_runtime.native',
+}
 
 
 READERS = {'config_getenv','config_required','getenv','required','startup_getenv','setting','_env','_flag','_env_int','_env_float','_bounded_int'}
@@ -34,7 +42,7 @@ def historical_release_errors(root):
     if not (root / '.git').exists():
         return []
     log = subprocess.run(['git', 'log', 'HEAD', '--first-parent', '--diff-filter=A', '--format=COMMIT:%H',
-                          '--name-only', '--', 'docker/config-releases'], cwd=root,
+                          '--name-only', '--', *HISTORY_DIRECTORIES], cwd=root,
                          capture_output=True, text=True, timeout=30)
     if log.returncode != 0:
         # A newly initialized fixture repository may have no commits. Production
@@ -47,7 +55,7 @@ def historical_release_errors(root):
     for line in log.stdout.splitlines():
         if line.startswith('COMMIT:'):
             commit = line.split(':', 1)[1]
-        elif line.startswith('docker/config-releases/') and line.endswith('.json'):
+        elif any(line.startswith(directory + '/') for directory in HISTORY_DIRECTORIES) and line.endswith('.json'):
             originals.setdefault(line, set()).add(commit)
     errors = []
     for relative, commits in sorted(originals.items()):
@@ -110,7 +118,7 @@ def files(root):
 
 def check(root, *, deployed=False):
     root = Path(root)
-    catalog = json.loads((root / 'docker/config-declarations.json').read_text(encoding='utf-8'))
+    catalog = json.loads((root / 'qasystem_config/config-declarations.json').read_text(encoding='utf-8'))
     errors = []
     if not catalog.get('version'):
         errors.append('配置声明缺少版本')
@@ -119,21 +127,23 @@ def check(root, *, deployed=False):
     for name in sorted(set(actual_readers) | set(expected_readers)):
         if actual_readers.get(name) != expected_readers.get(name):
             errors.append(f'{name} 配置读取或默认回退变化，必须登记配置声明新版本')
-    release = root / 'docker/config-releases' / (str(catalog.get('version')) + '.json')
+    release = root / 'qasystem_config/config-releases' / (str(catalog.get('version')) + '.json')
     if not release.is_file() or json.loads(release.read_text(encoding='utf-8')) != catalog:
         errors.append('当前声明与不可变版本记录不一致；修改声明必须登记新版本')
     if (root / '.git').exists():
         # Historical release files tracked by Git cannot be revised in place.
-        changed = subprocess.run(['git', 'diff', 'HEAD', '--name-only', '--diff-filter=DMR', '--', 'docker/config-releases'],
+        changed = subprocess.run(['git', 'diff', 'HEAD', '--name-only', '--diff-filter=DMR', '--', *HISTORY_DIRECTORIES],
                                  cwd=root, capture_output=True, text=True, timeout=10)
         if changed.returncode == 0 and changed.stdout.strip():
             errors.append('禁止修改既有声明版本文件；请新增版本文件')
         errors.extend(historical_release_errors(root))
-    from docker.runtime_config import HOT_KEYS
-    from docker.runtime_config import MODEL_DEFAULTS, MODEL_DESCRIPTIONS
-    from docker.config_migrations import ALIASES, MODEL_KEYS
-    from docker.startup_contract import PROCESS_ENVIRONMENT, RUNTIME_DIRECTORY_NAME, EXECUTION_LIVENESS, EXECUTION_TOPOLOGY, SERVICE_TOPOLOGY
+    from qasystem_config.runtime_config import HOT_KEYS
+    from qasystem_config.runtime_config import MODEL_DEFAULTS, MODEL_DESCRIPTIONS
+    from qasystem_config.config_migrations import ALIASES, MODEL_KEYS
+    from qasystem_config.startup_contract import PROCESS_ENVIRONMENT, RUNTIME_DIRECTORY_NAME, EXECUTION_LIVENESS, EXECUTION_TOPOLOGY, SERVICE_TOPOLOGY
     if catalog.get('schema') == 1:
+        if catalog.get('core_contract') != CORE_CONTRACT:
+            errors.append('公共配置核心边界变化，必须登记新声明版本')
         if catalog.get('environment_access_contract') != ENVIRONMENT_ACCESS_CONTRACT:
             errors.append('进程环境访问/受控启动接口合同变化，必须登记配置声明新版本')
         if catalog.get('central_startup_contracts') != central_startup_contracts():
@@ -149,16 +159,16 @@ def check(root, *, deployed=False):
         if catalog.get('fixed_contracts') != {'process_environment': PROCESS_ENVIRONMENT, 'runtime_directory': RUNTIME_DIRECTORY_NAME, 'execution_liveness': EXECUTION_LIVENESS, 'execution_topology': EXECUTION_TOPOLOGY, 'service_topology': SERVICE_TOPOLOGY}:
             errors.append('固定启动约定变化，必须登记配置声明新版本')
         if 'inference_contract' in catalog:
-            from docker.model_services import REGISTRY_CONTRACT
-            from docker.config_migrations import NATIVE_STARTUP_KEYS, WORKER_STARTUP_KEYS
+            from qasystem_config.model_registry import REGISTRY_CONTRACT
+            from qasystem_config.config_migrations import NATIVE_STARTUP_KEYS, WORKER_STARTUP_KEYS
             actual = {**REGISTRY_CONTRACT, 'native_migration': sorted(NATIVE_STARTUP_KEYS), 'worker_migration': sorted(WORKER_STARTUP_KEYS)}
             if catalog['inference_contract'] != actual:
                 errors.append('模型引擎/记录/迁移契约变化，必须登记配置声明新版本')
-    from docker.api_services import API_REGISTRY_CONTRACT
+    from qasystem_config.api_services import API_REGISTRY_CONTRACT
     if catalog.get('schema') == 1 and catalog.get('api_registry_contract') != API_REGISTRY_CONTRACT:
         errors.append('API服务/账号登记规则变化，必须登记新配置声明版本')
     for key, item in catalog['items'].items():
-        from docker.runtime_config import PROCESS_KEYS
+        from qasystem_config.runtime_config import PROCESS_KEYS
         expected_mode = 'processes' if key in PROCESS_KEYS else 'hot' if key in HOT_KEYS else 'startup'
         if item.get('mode') != expected_mode:
             errors.append(f'{key} 热更新属性与实际读取规则不一致')
@@ -174,6 +184,12 @@ def check(root, *, deployed=False):
                 errors.append(f'{key} 模板与版本声明的默认值不一致')
     sources = {}
     source_readers = {}
+    for path in (root / 'qasystem_config').glob('*.py'):
+        tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+        for node in ast.walk(tree):
+            imports = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ''] if isinstance(node, ast.ImportFrom) else []
+            if any(name.split('.')[0] in CORE_CONTRACT['forbidden_core_dependencies'] for name in imports):
+                errors.append(f'{path.relative_to(root)}:{node.lineno} 公共配置核心禁止依赖部署或业务模块')
     for path in files(root):
         tree = ast.parse(path.read_text(encoding='utf-8-sig'))
         sources[path.relative_to(root).as_posix()] = tree
@@ -182,6 +198,11 @@ def check(root, *, deployed=False):
         source_readers[path.relative_to(root).as_posix()] = names
         errors.extend(environment_errors(path.relative_to(root).as_posix(), tree))
         for node in ast.walk(tree):
+            imports = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ''] if isinstance(node, ast.ImportFrom) else []
+            if any(name == 'docker' or name.startswith('docker.') for name in imports):
+                errors.append(f'{path.relative_to(root)}:{node.lineno} 业务模块禁止依赖Docker配置或运维层')
+            if 'algorithm.runtime_settings' in imports:
+                errors.append(f'{path.relative_to(root)}:{node.lineno} 禁止恢复旧配置转发层，请直接使用公共配置接口')
             if isinstance(node, ast.Import):
                 aliases.update(alias.asname or 'os' for alias in node.names if alias.name == 'os')
             if isinstance(node, ast.ImportFrom) and node.module == 'os' and any(n.name in {'getenv', 'environ'} for n in node.names):
@@ -248,9 +269,9 @@ def _checked(root, signature, deployed):
 
 def require_contract(root):
     root = Path(root)
-    paths = list(files(root)) + list((root / 'docker/config-releases').glob('*.json'))
-    paths += [root / '.env.example', root / 'docker/config-declarations.json']
-    paths += [root / 'docker/config_contract.py', root / 'docker/environment_contract.py']
+    paths = list(files(root)) + [path for directory in HISTORY_DIRECTORIES for path in (root / directory).glob('*.json')]
+    paths += [root / '.env.example', root / 'qasystem_config/config-declarations.json']
+    paths += list((root / 'qasystem_config').glob('*.py'))
     signature = tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size) for path in sorted(paths) if path.is_file())
     return _checked(str(root), signature, (root / 'SOURCE_COMMIT').is_file())
 

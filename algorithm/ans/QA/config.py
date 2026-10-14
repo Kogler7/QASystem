@@ -1,8 +1,8 @@
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 # config.py
 import os
 from dataclasses import dataclass
-from docker.configuration import bootstrap_local_environment
+from qasystem_config.configuration import bootstrap_local_environment
 
 
 def _running_in_container() -> bool:

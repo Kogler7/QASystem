@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from docker import configure, configuration
-from docker.config_migrations import ALIASES, migrate
+from docker import configure
+
+from qasystem_config import configuration
+from qasystem_config.config_migrations import ALIASES, migrate
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,7 +51,7 @@ def test_alias_conflict_with_canonical_hot_setting_requires_explicit_choice(tmp_
 
 
 def test_old_persisted_judge_is_removed_only_in_migration_mode(tmp_path):
-    from docker.runtime_config import read_document
+    from qasystem_config.runtime_config import read_document
     directory = tmp_path / 'runtime-config'
     directory.mkdir()
     path = directory / 'config.json'
@@ -67,7 +69,7 @@ def test_retired_secret_names_cannot_bypass_declarations():
 
 
 def test_current_registry_contains_no_aliases_or_false_revision_config():
-    catalog = json.loads((ROOT / 'docker/config-declarations.json').read_text(encoding='utf8'))
+    catalog = json.loads((ROOT / 'qasystem_config/config-declarations.json').read_text(encoding='utf8'))
     assert not set(ALIASES) & catalog['items'].keys()
     assert 'NANOJEV_REVISION' not in catalog['items']
     assert catalog['aliases'] == ALIASES

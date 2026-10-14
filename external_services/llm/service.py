@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import time
 
 from algorithm.token_budget import check_input_budget
-from docker import configuration
+from qasystem_config import configuration
 from external_services.model_routes import resolve_service
 
 

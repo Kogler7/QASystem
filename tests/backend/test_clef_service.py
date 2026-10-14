@@ -299,7 +299,7 @@ def test_loader_is_local_only_and_applies_cuda_before_torch(tmp_path, monkeypatc
     )
     for key in ["HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"]:
         monkeypatch.setenv(key, os.environ.get(key, ""))
-    monkeypatch.setattr('docker.model_services.selected_native', lambda _: {'device': 'gpu:GPU-unit-test'})
+    monkeypatch.setattr('qasystem_config.model_registry.selected_native', lambda _: {'device': 'gpu:GPU-unit-test'})
     monkeypatch.setattr(sys, "dont_write_bytecode", False)
     monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(bfloat16="bf16"))
     monkeypatch.setitem(sys.modules, "_clef_release_model", None)
@@ -316,8 +316,8 @@ def test_loader_is_local_only_and_applies_cuda_before_torch(tmp_path, monkeypatc
 
 def test_settings_from_environment(monkeypatch):
     monkeypatch.setenv("CLEF_MAX_LENGTH", "1024")
-    monkeypatch.setattr('docker.model_services.selected_native', lambda _: {'model_dir': 'clef-flash', 'device': 'cpu', 'engine_options': {'max_length': '1024'}})
+    monkeypatch.setattr('qasystem_config.model_registry.selected_native', lambda _: {'model_dir': 'clef-flash', 'device': 'cpu', 'engine_options': {'max_length': '1024'}})
     assert Settings.from_env().max_length == 1024
-    monkeypatch.setattr('docker.model_services.selected_native', lambda _: {'model_dir': 'clef-flash', 'device': 'cpu', 'engine_options': {'max_length': '0'}})
+    monkeypatch.setattr('qasystem_config.model_registry.selected_native', lambda _: {'model_dir': 'clef-flash', 'device': 'cpu', 'engine_options': {'max_length': '0'}})
     with pytest.raises(ValueError, match="positive"):
         Settings.from_env()

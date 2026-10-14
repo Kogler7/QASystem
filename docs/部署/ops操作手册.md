@@ -8,6 +8,8 @@ tags: []
 
 本文说明当前已经提交的操作入口。独立 vLLM、Clef、NanoJev 已由 ops 模型记录管理；API 服务、共享账号和用途选择已接入表单与跨进程调度。88 尚未部署本轮配置改动；更新源码不等于已经审核服务器配置。后续清理尚未全部完成，旧兼容入口的边界见[LLM 服务与统一调度](LLM服务与统一调度.md)。
 
+公共配置、声明、历史与事务现由 `qasystem_config/` 管理。ops 的界面与 Docker 操作使用同一个核心，公共核心不依赖界面或 Docker daemon；旧 `docker.configuration` 等接口已删除。
+
 ## 首次使用
 
 在宿主机操作，不在 Backend 容器里操作。需要 Python、Docker 和 Compose；启动 GPU 模型还需要 NVIDIA 驱动及容器 GPU 支持。权重需事先下载到宿主机，ops 不会因勾选自动下载权重。
@@ -22,6 +24,10 @@ python3 ops.py install
 安装器把命令绑定到这份部署目录，在用户目录创建启动器并登记 PATH，无需管理员权限。Linux 重新登录 SSH 后使用 `ops`；当前终端也可执行 `export PATH="$HOME/.local/bin:$PATH"`。Windows 使用 `python ops.py install`，然后重新打开终端。目录移动后需要重新安装；发现同名其他命令时会拒绝覆盖。
 
 不安装也能使用：将下文的 `ops` 换成 `python3 ops.py`。Windows 换成 `python ops.py`。这些 Python 命令均在包含入口文件的目录执行。
+
+也可以从任意工作目录执行部署入口的绝对路径，例如 `python3 /opt/qasystem/ops.py --help`；入口会按文件位置找到 `runtime/qasystem_config` 和宿主 Docker 工具。`--help` 与公共配置读取不需要 Docker daemon。
+
+公共门禁命令为 `python3 -m qasystem_config.config_contract`，在源码根目录运行。源码与配置结构升级后先查看 `ops config plan`，再通过同一事务提交有效版本；不复制或编辑旧核心文件恢复兼容入口。
 
 如果源码目录与部署目录分开，尚未放置部署根入口，可显式指定根目录。例如 88 现有目录布局在同步新版源码后，可使用：
 

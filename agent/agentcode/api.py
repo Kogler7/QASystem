@@ -31,7 +31,7 @@ agentcode HTTP API — 高并发异步任务模型。
 """
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import asyncio
 import logging
@@ -440,7 +440,7 @@ def main():
 
     # 将 CLI 参数写入环境变量，以便 uvicorn fork 后子进程继承
     if args.concurrency:
-        from docker.configuration import prepare_dev_agent_startup
+        from qasystem_config.configuration import prepare_dev_agent_startup
         prepare_dev_agent_startup(args.concurrency)
         _WORKER_CONCURRENCY = args.concurrency
     if args.pool_size:

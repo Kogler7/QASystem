@@ -28,7 +28,7 @@ def declared(key):
 
 def startup_getenv(key, default=None):
     declared(key)
-    from docker.runtime_config import PROCESS_KEYS
+    from qasystem_config.runtime_config import PROCESS_KEYS
     if key in PROCESS_KEYS:
         return getenv(key, default)
     return os.getenv(key, default)
@@ -39,8 +39,8 @@ def _observe(key, value, source, revision=None):
     # service data volume, never to the approved configuration directory.
     if not Path('/app/runtime-config/approved-config.json').is_file():
         return
-    from docker.config_database import observe_read
-    from docker.config_guard import verified_record
+    from qasystem_config.config_database import observe_read
+    from qasystem_config.config_guard import verified_record
     if revision is None:
         revision = verified_record(Path('/app/runtime-config'))['revision']
     directory = Path('/app/runtime-config/observed')
@@ -51,7 +51,7 @@ def _observe(key, value, source, revision=None):
 
 def getenv(key, default=None):
     declared(key)
-    from docker.runtime_config import HOT_KEYS, PROCESS_KEYS, read_settings
+    from qasystem_config.runtime_config import HOT_KEYS, PROCESS_KEYS, read_settings
     if key in PROCESS_KEYS:
         settings, revision = read_settings(with_revision=True)
         if revision is None or key not in settings:
@@ -77,7 +77,7 @@ def required(key):
 
 def read_registry(*, with_revision=False):
     """Read one approved snapshot; callers retain it for in-flight work."""
-    from docker.runtime_config import read_registry as read
+    from qasystem_config.runtime_config import read_registry as read
     return read(with_revision=with_revision)
 
 
@@ -99,7 +99,7 @@ def approved_execution_plan(*, revision=None):
 
 
 def should_load_local_dotenv():
-    from docker.startup_contract import in_container_runtime
+    from qasystem_config.startup_contract import in_container_runtime
     return not in_container_runtime() and startup_getenv('ENVIRONMENT') is None
 
 
@@ -118,7 +118,7 @@ def prepare_dev_agent_startup(concurrency):
     Managed deployments can only change this setting through approved ops
     configuration. The application-side caller is limited by the source gate.
     """
-    from docker.startup_contract import in_container_runtime
+    from qasystem_config.startup_contract import in_container_runtime
     if in_container_runtime() or startup_getenv('ENVIRONMENT') is not None:
         raise ValueError('受管部署不能用CLI覆盖任务并发，请通过ops审核配置')
     if isinstance(concurrency, bool) or not isinstance(concurrency, int) or not 1 <= concurrency <= 256:

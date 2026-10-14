@@ -11,11 +11,14 @@ import subprocess
 import sys
 import uuid
 
-from docker import config_guard as guard
-from docker.runtime_config import HOT_KEYS, read_document, read_settings
-from docker.setup_llm import read_env
-from docker.config_database import append_event, database
-from docker.configuration import UndeclaredConfigurationError
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from qasystem_config import config_guard as guard
+from qasystem_config.runtime_config import HOT_KEYS, read_document, read_settings
+from qasystem_config.io import read_env
+from qasystem_config.config_database import append_event, database
+from qasystem_config.configuration import UndeclaredConfigurationError
 
 
 class ControlError(ValueError):
@@ -72,7 +75,7 @@ def install_command(root):
 
 
 def directory_for(root):
-    from docker.startup_contract import runtime_directory
+    from qasystem_config.startup_contract import runtime_directory
     return runtime_directory(root)
 
 
@@ -159,7 +162,7 @@ def main(argv=None):
     try:
         if args.action == 'config':
             if args.operation:
-                from docker.config_transaction import run as configuration_transaction
+                from docker.configure import run_transaction as configuration_transaction
                 report = configuration_transaction(root, operation=args.operation, patch_path=args.patch,
                     reason=args.reason, actor=args.actor, base_revision=args.base_revision)
                 print(json.dumps(report, ensure_ascii=False, indent=2))

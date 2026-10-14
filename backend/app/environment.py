@@ -1,6 +1,6 @@
 from __future__ import annotations
-from docker.configuration import bootstrap_local_environment
-from docker.configuration import should_load_local_dotenv
+from qasystem_config.configuration import bootstrap_local_environment
+from qasystem_config.configuration import should_load_local_dotenv
 
 from pathlib import Path
 

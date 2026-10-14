@@ -12,7 +12,7 @@ worker 拿到任务后先走 run_orchestrated 入口：
 """
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 import logging

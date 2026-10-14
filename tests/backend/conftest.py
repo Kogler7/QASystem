@@ -47,7 +47,7 @@ def _protocol_stub_lifetime(request, monkeypatch, tmp_path_factory):
         artifacts=ArtifactStore(tmp_path_factory.mktemp('protocol-execution')), hub=ExecutionEventHub(store), mode='inline')
     monkeypatch.setattr(execution_manager, '_MANAGER', inline_manager)
     monkeypatch.setattr(execution_api, 'get_execution_manager', lambda: inline_manager)
-    from docker import configuration
+    from qasystem_config import configuration
     unit_registry = {'settings':{},'models':{'test':{'enabled':True,'context':'131072'}},
         'services':{'test-chat':{'kind':'local','model':'test'}},'accounts':{},
         'routes':{'extract':'test-chat','graph':'test-chat','agent':'test-chat'}}

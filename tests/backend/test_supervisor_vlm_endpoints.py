@@ -9,7 +9,7 @@ from backend.app.execution import supervisor as supervisor_mod
 @pytest.fixture(autouse=True)
 def _approved_cpu_plan(monkeypatch):
     """These model-endpoint tests use one committed plan, not developer ENV."""
-    monkeypatch.setattr('docker.configuration.approved_execution_plan',
+    monkeypatch.setattr('qasystem_config.configuration.approved_execution_plan',
                         lambda **kwargs: {'revision': 7, 'cpu_workers': 'auto'})
     monkeypatch.setattr(supervisor_mod.RuntimeSupervisor, '_record_cpu_control', lambda *args: None)
 
@@ -17,7 +17,7 @@ def _approved_cpu_plan(monkeypatch):
 def _capture_core_worker_env(monkeypatch, *, vlm_enabled: str, gpu_ids: list[str]) -> list[dict]:
     """运行 _start_core_workers 并收集各 spawn 调用的 env（不真正起进程）。"""
     monkeypatch.setattr(supervisor_mod, '_gpu_ids', lambda: gpu_ids)
-    monkeypatch.setattr('docker.model_services.worker_record', lambda: {'enabled': vlm_enabled == 'true', 'port': '8100', 'device': 'worker'})
+    monkeypatch.setattr('qasystem_config.model_registry.worker_record', lambda: {'enabled': vlm_enabled == 'true', 'port': '8100', 'device': 'worker'})
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     captured: list[dict] = []
 
@@ -70,7 +70,7 @@ def test_planned_engine_ports_follows_vlm_enabled(monkeypatch):
 
 def test_repeated_core_start_does_not_spawn_second_gateway(monkeypatch):
     monkeypatch.setattr(supervisor_mod, '_gpu_ids', lambda: [])
-    monkeypatch.setattr('docker.model_services.worker_record', lambda: None)
+    monkeypatch.setattr('qasystem_config.model_registry.worker_record', lambda: None)
     sup = supervisor_mod.RuntimeSupervisor()
     started = []
     monkeypatch.setattr(sup, '_spawn', lambda name, command, **kwargs:

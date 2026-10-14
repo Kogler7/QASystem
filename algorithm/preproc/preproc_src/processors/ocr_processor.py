@@ -1,4 +1,4 @@
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import os
 import json
 import importlib
@@ -121,7 +121,7 @@ class OCRProcessor(BaseProcessor):
                 )
 
         # MinerU 实际读取 MINERU_TOOLS_CONFIG_JSON，而不是 MINERU_CONFIG_PATH。
-        from docker.configuration import configure_mineru_loader_environment
+        from qasystem_config.configuration import configure_mineru_loader_environment
         configure_mineru_loader_environment(effective_config_path, effective_model_source)
 
         from mineru.utils import config_reader as mineru_config_reader

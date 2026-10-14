@@ -3,7 +3,7 @@
 知识更新服务 - Neo4j + Milvus 同步脚本
 向量化使用 transformers 直接加载 bge-small-zh-v1.5，不依赖 sentence-transformers
 """
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import json
 import os
 import uuid

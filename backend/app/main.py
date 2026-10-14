@@ -1,4 +1,4 @@
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -56,7 +56,7 @@ async def capture_application_user_context(request: Request, call_next):
 
 async def _proxy_agent(request: Request, path: str = "") -> StreamingResponse:
     """Expose the isolated Agent service through the Backend public endpoint."""
-    from docker.startup_contract import internal_agent_url
+    from qasystem_config.startup_contract import internal_agent_url
     upstream = internal_agent_url()
     target = f"{upstream}/{path.lstrip('/')}"
     headers = {
@@ -143,7 +143,7 @@ async def health(
     full: bool = Query(default=False),
     validate_models: bool = Query(default=False),
 ) -> dict | JSONResponse:
-    from docker.startup_contract import runtime_ready_file, in_container_runtime
+    from qasystem_config.startup_contract import runtime_ready_file, in_container_runtime
     if in_container_runtime() and not runtime_ready_file().is_file():
         return JSONResponse(status_code=503, content={"status": "starting", "reason": "runtime warmup pending"})
     if full or validate_models:

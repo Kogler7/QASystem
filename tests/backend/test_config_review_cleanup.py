@@ -4,21 +4,25 @@ from pathlib import Path
 
 import pytest
 
-from docker import startup_contract
-from docker.runtime_config import read_document
+from qasystem_config import startup_contract
+from qasystem_config.runtime_config import read_document
 from docker.configure import Configuration
 
 
 def test_ops_delivery_includes_local_configuration_dependencies():
     root = Path(__file__).resolve().parents[2]
     packaging = (root / 'package-deploy.ps1').read_text(encoding='utf-8-sig')
-    for name in ('configure', 'runtime_config', 'config_contract', 'configuration'):
-        tree = ast.parse((root / 'docker' / (name + '.py')).read_text(encoding='utf-8-sig'))
+    for relative in ('docker/configure.py', 'docker/ops.py', 'qasystem_config/runtime_config.py',
+                     'qasystem_config/config_contract.py', 'qasystem_config/configuration.py'):
+        tree = ast.parse((root / relative).read_text(encoding='utf-8-sig'))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith('docker.'):
                 filename = node.module.split('.')[-1] + '.py'
                 if (root / 'docker' / filename).is_file():
                     assert '"' + filename + '"' in packaging, filename
+            if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith('qasystem_config.'):
+                assert '"qasystem_config"' in packaging
+                assert (root / 'qasystem_config' / (node.module.split('.')[-1] + '.py')).is_file()
 
 
 def test_internal_redis_follows_topology_not_legacy_env(monkeypatch):

@@ -1,5 +1,5 @@
 """NanoJev uses the bounded SystemOne transport and a single warmed predictor."""
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import gc
 import importlib.util
 import json
@@ -25,14 +25,14 @@ class NanoRuntime:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
         sys.dont_write_bytecode = True
-        from docker.model_services import selected_native, physical_gpu
+        from qasystem_config.model_registry import selected_native, physical_gpu
         selected = selected_native('nanojev')
         if selected is not None:
             os.environ['CUDA_VISIBLE_DEVICES'] = physical_gpu(selected)
             os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
         import torch
         self.torch = torch
-        from docker.model_services import selected_native
+        from qasystem_config.model_registry import selected_native
         record = selected_native('nanojev')
         torch.set_num_threads(int((record or {}).get('engine_options', {}).get('cpu_threads', '4')))
         spec = importlib.util.spec_from_file_location("_nanojev_predictor", script)

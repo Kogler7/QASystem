@@ -1,4 +1,4 @@
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.settings import settings as docling_settings
 from docling.datamodel.pipeline_options import PdfPipelineOptions

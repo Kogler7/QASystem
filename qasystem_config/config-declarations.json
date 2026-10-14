@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.11",
+  "version": "2026.10.14.12",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -480,7 +480,7 @@
       "mode": "processes",
       "consumers": [
         {
-          "path": "docker/configuration.py",
+          "path": "qasystem_config/configuration.py",
           "kind": "reference",
           "token": "EXECUTION_CPU_WORKERS"
         }
@@ -691,7 +691,7 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "docker/api_services.py",
+          "path": "qasystem_config/api_services.py",
           "kind": "external",
           "token": "GRAPH_LLM_API_KEY"
         }
@@ -797,7 +797,7 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "docker/api_services.py",
+          "path": "qasystem_config/api_services.py",
           "kind": "external",
           "token": "KG_EXTRACT_LLM_API_KEY"
         }
@@ -1886,7 +1886,7 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "docker/api_services.py",
+          "path": "qasystem_config/api_services.py",
           "kind": "external",
           "token": "AGENT_LLM_API_KEY"
         }
@@ -2804,7 +2804,7 @@
       "mode": "startup",
       "consumers": [
         {
-          "path": "docker/configuration.py",
+          "path": "qasystem_config/configuration.py",
           "kind": "read",
           "token": "ENVIRONMENT"
         }
@@ -3193,6 +3193,11 @@
           "path": "algorithm/knowledge_extract/v2_2_v31/jev_client.py",
           "kind": "read",
           "token": "CUDA_VISIBLE_DEVICES"
+        },
+        {
+          "path": "model_runtime/native.py",
+          "kind": "reference",
+          "token": "CUDA_VISIBLE_DEVICES"
         }
       ],
       "fallbacks": [
@@ -3559,6 +3564,11 @@
         },
         {
           "path": "nanojev_service/app.py",
+          "kind": "reference",
+          "token": "CUDA_DEVICE_ORDER"
+        },
+        {
+          "path": "model_runtime/native.py",
           "kind": "reference",
           "token": "CUDA_DEVICE_ORDER"
         }
@@ -5071,7 +5081,7 @@
       "getenv('DOCUMENT_PARSE_SERVICE_URL', '')"
     ],
     "clef_service/app.py": [
-      "@dataclass(frozen=True)\nclass Settings:\n    model_dir: str = ''\n    device: str = 'cuda:0'\n    dtype: str = 'bfloat16'\n    max_length: int = 2048\n    max_request_bytes: int = 65536\n    max_questions: int = 16\n    max_options: int = 32\n    max_total_options: int = 128\n    max_queue_size: int = 4\n    api_key: str = field(default='', repr=False)\n\n    @classmethod\n    def from_env(cls, prefix: str='CLEF_') -> 'Settings':\n        values: dict[str, Any] = {}\n        from docker.model_services import selected_native\n        adapter = 'nanojev' if prefix == 'NANOJEV_' else 'clef'\n        record = selected_native(adapter)\n        if record is not None:\n            values.update(record.get('engine_options', {}))\n            key_env = values.pop('api_key_env', {'clef': 'CLEF_API_KEY', 'nanojev': 'NANOJEV_API_KEY'}[adapter])\n            values.pop('cpu_threads', None)\n            values.update(model_dir='/models/' + record['model_dir'], device='cpu' if record['device'] == 'cpu' else 'cuda:0', api_key=config_getenv(key_env, '') if key_env else '')\n        for name in list(values):\n            if name.startswith('max_'):\n                values[name] = int(values[name])\n        settings = cls(**values)\n        if any((getattr(settings, name) < 1 for name in cls.__dataclass_fields__ if name.startswith('max_'))):\n            raise ValueError('CLEF limits must be positive')\n        if settings.dtype not in {'bfloat16', 'float16', 'float32'}:\n            raise ValueError('CLEF_DTYPE must be bfloat16, float16, or float32')\n        if not (settings.device == 'cpu' or settings.device == 'cuda' or settings.device.startswith('cuda:')):\n            raise ValueError('CLEF_DEVICE must select one CPU or CUDA device')\n        return settings",
+      "@dataclass(frozen=True)\nclass Settings:\n    model_dir: str = ''\n    device: str = 'cuda:0'\n    dtype: str = 'bfloat16'\n    max_length: int = 2048\n    max_request_bytes: int = 65536\n    max_questions: int = 16\n    max_options: int = 32\n    max_total_options: int = 128\n    max_queue_size: int = 4\n    api_key: str = field(default='', repr=False)\n\n    @classmethod\n    def from_env(cls, prefix: str='CLEF_') -> 'Settings':\n        values: dict[str, Any] = {}\n        from qasystem_config.model_registry import selected_native\n        adapter = 'nanojev' if prefix == 'NANOJEV_' else 'clef'\n        record = selected_native(adapter)\n        if record is not None:\n            values.update(record.get('engine_options', {}))\n            key_env = values.pop('api_key_env', {'clef': 'CLEF_API_KEY', 'nanojev': 'NANOJEV_API_KEY'}[adapter])\n            values.pop('cpu_threads', None)\n            values.update(model_dir='/models/' + record['model_dir'], device='cpu' if record['device'] == 'cpu' else 'cuda:0', api_key=config_getenv(key_env, '') if key_env else '')\n        for name in list(values):\n            if name.startswith('max_'):\n                values[name] = int(values[name])\n        settings = cls(**values)\n        if any((getattr(settings, name) < 1 for name in cls.__dataclass_fields__ if name.startswith('max_'))):\n            raise ValueError('CLEF limits must be positive')\n        if settings.dtype not in {'bfloat16', 'float16', 'float32'}:\n            raise ValueError('CLEF_DTYPE must be bfloat16, float16, or float32')\n        if not (settings.device == 'cpu' or settings.device == 'cuda' or settings.device.startswith('cuda:')):\n            raise ValueError('CLEF_DEVICE must select one CPU or CUDA device')\n        return settings",
       "config_getenv(key_env, '')"
     ],
     "mcp_services/dispatch.py": [
@@ -5452,6 +5462,16 @@
   },
   "environment_access_contract": [
     {
+      "path": "model_runtime/native.py",
+      "function": "native_main",
+      "operation": "write",
+      "keys": [
+        "CUDA_DEVICE_ORDER",
+        "CUDA_VISIBLE_DEVICES"
+      ],
+      "desc": "Bind the selected native model process GPU before loading Torch."
+    },
+    {
       "path": "backend/app/execution/worker.py",
       "function": "_bind_gpu",
       "operation": "write",
@@ -5590,12 +5610,36 @@
     }
   ],
   "central_startup_contracts": {
-    "startup_getenv": "def startup_getenv(key, default=None):\n    declared(key)\n    from docker.runtime_config import PROCESS_KEYS\n    if key in PROCESS_KEYS:\n        return getenv(key, default)\n    return os.getenv(key, default)",
-    "getenv": "def getenv(key, default=None):\n    declared(key)\n    from docker.runtime_config import HOT_KEYS, PROCESS_KEYS, read_settings\n    if key in PROCESS_KEYS:\n        settings, revision = read_settings(with_revision=True)\n        if revision is None or key not in settings:\n            raise ValueError('执行进程配置未提交；请通过 ops 更新配置')\n        _observe(key, settings[key], 'process-plan', revision=revision)\n        return settings[key]\n    if key in HOT_KEYS:\n        settings, revision = read_settings(with_revision=True)\n        if key in settings:\n            _observe(key, settings[key], 'hot', revision=revision)\n            return settings[key]\n    value = os.getenv(key, default)\n    _observe(key, value, 'environment' if key in os.environ else 'fallback')\n    return value",
+    "startup_getenv": "def startup_getenv(key, default=None):\n    declared(key)\n    from qasystem_config.runtime_config import PROCESS_KEYS\n    if key in PROCESS_KEYS:\n        return getenv(key, default)\n    return os.getenv(key, default)",
+    "getenv": "def getenv(key, default=None):\n    declared(key)\n    from qasystem_config.runtime_config import HOT_KEYS, PROCESS_KEYS, read_settings\n    if key in PROCESS_KEYS:\n        settings, revision = read_settings(with_revision=True)\n        if revision is None or key not in settings:\n            raise ValueError('执行进程配置未提交；请通过 ops 更新配置')\n        _observe(key, settings[key], 'process-plan', revision=revision)\n        return settings[key]\n    if key in HOT_KEYS:\n        settings, revision = read_settings(with_revision=True)\n        if key in settings:\n            _observe(key, settings[key], 'hot', revision=revision)\n            return settings[key]\n    value = os.getenv(key, default)\n    _observe(key, value, 'environment' if key in os.environ else 'fallback')\n    return value",
     "approved_execution_plan": "def approved_execution_plan(*, revision=None):\n    \"\"\"Read the committed process plan; old container ENV never overrides it.\"\"\"\n    document, actual_revision = read_registry(with_revision=True)\n    if actual_revision is None or (revision is not None and actual_revision != revision):\n        raise ValueError('执行进程配置尚未提交或版本已变化；请通过 ops 更新配置')\n    configured = document.get('settings', {}).get('EXECUTION_CPU_WORKERS')\n    if not isinstance(configured, str):\n        raise ValueError('配置缺少 CPU 执行计划；请通过 ops 升级配置')\n    normalized = configured.strip().lower()\n    if normalized != 'auto':\n        if not normalized.isdigit() or not 1 <= int(normalized) <= 32:\n            raise ValueError('CPU 进程数必须为 auto 或 1–32')\n        normalized = str(int(normalized))\n    _observe('EXECUTION_CPU_WORKERS', normalized, 'process-plan', revision=actual_revision)\n    return {'revision': actual_revision, 'cpu_workers': normalized}",
-    "should_load_local_dotenv": "def should_load_local_dotenv():\n    from docker.startup_contract import in_container_runtime\n    return not in_container_runtime() and startup_getenv('ENVIRONMENT') is None",
+    "should_load_local_dotenv": "def should_load_local_dotenv():\n    from qasystem_config.startup_contract import in_container_runtime\n    return not in_container_runtime() and startup_getenv('ENVIRONMENT') is None",
     "bootstrap_local_environment": "def bootstrap_local_environment():\n    \"\"\"Load only the repository-root dotenv for unmanaged development startup.\"\"\"\n    if not should_load_local_dotenv():\n        return False\n    from dotenv import load_dotenv\n    load_dotenv(Path(__file__).resolve().parents[1] / '.env', override=False)\n    return True",
-    "prepare_dev_agent_startup": "def prepare_dev_agent_startup(concurrency):\n    \"\"\"Carry one validated CLI option to spawned development API processes.\n\n    Managed deployments can only change this setting through approved ops\n    configuration. The application-side caller is limited by the source gate.\n    \"\"\"\n    from docker.startup_contract import in_container_runtime\n    if in_container_runtime() or startup_getenv('ENVIRONMENT') is not None:\n        raise ValueError('受管部署不能用CLI覆盖任务并发，请通过ops审核配置')\n    if isinstance(concurrency, bool) or not isinstance(concurrency, int) or (not 1 <= concurrency <= 256):\n        raise ValueError('开发启动并发必须为1到256之间的整数')\n    os.environ['AGENT_WORKER_CONCURRENCY'] = str(concurrency)",
+    "prepare_dev_agent_startup": "def prepare_dev_agent_startup(concurrency):\n    \"\"\"Carry one validated CLI option to spawned development API processes.\n\n    Managed deployments can only change this setting through approved ops\n    configuration. The application-side caller is limited by the source gate.\n    \"\"\"\n    from qasystem_config.startup_contract import in_container_runtime\n    if in_container_runtime() or startup_getenv('ENVIRONMENT') is not None:\n        raise ValueError('受管部署不能用CLI覆盖任务并发，请通过ops审核配置')\n    if isinstance(concurrency, bool) or not isinstance(concurrency, int) or (not 1 <= concurrency <= 256):\n        raise ValueError('开发启动并发必须为1到256之间的整数')\n    os.environ['AGENT_WORKER_CONCURRENCY'] = str(concurrency)",
     "configure_mineru_loader_environment": "def configure_mineru_loader_environment(config_path, model_source):\n    \"\"\"Registered MinerU loader dependency initialization; not a generic setter.\"\"\"\n    os.environ['MINERU_TOOLS_CONFIG_JSON'] = str(config_path)\n    os.environ['MINERU_CONFIG_PATH'] = str(config_path)\n    os.environ['MINERU_MODEL_SOURCE'] = str(model_source)"
+  },
+  "core_contract": {
+    "package": "qasystem_config",
+    "declaration": "qasystem_config/config-declarations.json",
+    "history_directories": [
+      "docker/config-releases",
+      "qasystem_config/config-releases"
+    ],
+    "forbidden_core_dependencies": [
+      "docker",
+      "backend",
+      "agent",
+      "algorithm",
+      "external_services",
+      "clef_service",
+      "nanojev_service",
+      "mcp_services",
+      "agent_mcp",
+      "model_runtime"
+    ],
+    "business_configuration_owner": "qasystem_config",
+    "deployment_owner": "docker",
+    "io_owner": "qasystem_config.io",
+    "native_entrypoint": "model_runtime.native"
   }
 }

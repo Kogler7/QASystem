@@ -8,7 +8,7 @@
 """
 
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import json
 import logging
@@ -21,7 +21,7 @@ from typing import Any
 
 logger = logging.getLogger("agentcode.task_store")
 
-from docker.startup_contract import internal_redis_url
+from qasystem_config.startup_contract import internal_redis_url
 
 _REDIS_URL = internal_redis_url(0)
 _KEY_PREFIX = config_getenv("TASK_STORE_KEY_PREFIX", "agentcode:task")

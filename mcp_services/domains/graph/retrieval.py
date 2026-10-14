@@ -1,4 +1,4 @@
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 import json
 import logging
 import os

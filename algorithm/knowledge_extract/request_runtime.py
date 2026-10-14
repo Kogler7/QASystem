@@ -2,7 +2,7 @@
 from __future__ import annotations
 import importlib
 from typing import Any
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 from external_services.llm.runtime import QuotaPool, ScheduledClient, get_pool
 
 

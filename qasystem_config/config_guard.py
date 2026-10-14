@@ -12,12 +12,8 @@ import sys
 from functools import lru_cache
 import subprocess
 
-try:
-    from docker.runtime_config import HOT_KEYS, read_document
-    from docker.setup_llm import read_env, atomic_write
-except ImportError:
-    from runtime_config import HOT_KEYS, read_document
-    from setup_llm import read_env, atomic_write
+from qasystem_config.runtime_config import HOT_KEYS, read_document
+from qasystem_config.io import read_env, atomic_write
 
 
 def sensitive(key):
@@ -173,7 +169,7 @@ def record(directory, current, *, reason, reviewer, root=None, actor='human', au
     data = {'schema': 1, 'revision': revision, 'time': datetime.now(timezone.utc).isoformat(),
             'reviewer': reviewer, 'reason': reason, 'previous': digest(json.dumps(previous, sort_keys=True).encode()) if previous else None,
             'changes': changes(previous, current), 'snapshot': current, 'actor': actor, 'audit': audit or {}}
-    from docker.config_database import record_approval
+    from qasystem_config.config_database import record_approval
     record_approval(directory, data, root=root)
     history = directory / 'history'
     history.mkdir(mode=0o700, exist_ok=True)
@@ -239,7 +235,7 @@ def require_runtime(directory, *, config_bytes=None):
 
 
 def require(root, directory):
-    from docker.config_contract import require_contract
+    from qasystem_config.config_contract import require_contract
     # Validate current source, including an external packaged source directory.
     source = Path(__file__).resolve().parents[1]
     errors = require_contract(source)
@@ -247,7 +243,7 @@ def require(root, directory):
         raise ValueError('配置声明门禁失败：' + '；'.join(errors))
     previous = verified_record(directory)
     current = snapshot(root, directory)
-    from docker.configuration import declarations
+    from qasystem_config.configuration import declarations
     retired = set(declarations().get('retired', []))
     if any('env.' + key in current['values'] for key in retired):
         raise ValueError('配置仍含已删除或迁移的参数；请通过 ops config 审核迁移后部署')
@@ -264,7 +260,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         root = args.project_dir.resolve()
-        from docker.startup_contract import runtime_directory
+        from qasystem_config.startup_contract import runtime_directory
         directory = args.runtime_dir or runtime_directory(root)
         revision = require(root, directory)
         print(f'配置 guard 通过，批准版本 r{revision}', flush=True)

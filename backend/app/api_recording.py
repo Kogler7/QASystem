@@ -15,7 +15,7 @@
   通过敏感字段与Bearer脱敏；原始上传仍属于业务数据。记录失败只告警，不影响响应。
 """
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
+from qasystem_config.configuration import getenv as config_getenv
 
 import contextvars
 import json

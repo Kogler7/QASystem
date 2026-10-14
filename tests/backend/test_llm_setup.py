@@ -4,12 +4,13 @@ from pathlib import Path
 import pytest
 
 from docker import setup_llm as wizard
+from qasystem_config import io as config_io
 
 
 def test_env_update_preserves_secrets_and_gpu_pool_and_removes_duplicate_keys():
     text = '# preserved\nAPI_KEY="secret"\nGPU_DEVICE_IDS=4,5,6,7\nLLM_MODEL_DIR=old\nLLM_MODEL_DIR=duplicate\n'
-    new = wizard.update_env(text, {"LLM_MODEL_DIR": "llm/a b", "EXECUTION_GPU_RESERVED_DEVICE_IDS": "6,7"})
-    values = wizard.read_env(new)
+    new = config_io.update_env(text, {"LLM_MODEL_DIR": "llm/a b", "EXECUTION_GPU_RESERVED_DEVICE_IDS": "6,7"})
+    values = config_io.read_env(new)
     assert values["API_KEY"] == "secret"
     assert values["GPU_DEVICE_IDS"] == "4,5,6,7"
     assert values["LLM_MODEL_DIR"] == "llm/a b"

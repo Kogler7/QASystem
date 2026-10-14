@@ -23,7 +23,7 @@ def test_full_health_reports_failed_runtime_check(monkeypatch):
 
 def test_basic_health_waits_for_supervisor_runtime_marker(tmp_path, monkeypatch):
     marker = tmp_path / "runtime-ready"
-    from docker import startup_contract
+    from qasystem_config import startup_contract
     monkeypatch.setattr(startup_contract, 'runtime_ready_file', lambda: marker)
     monkeypatch.setattr(startup_contract, 'in_container_runtime', lambda: True)
 

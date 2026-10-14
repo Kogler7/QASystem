@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from docker import config_guard as guard, ops
-from docker.runtime_config import read_document
+from docker import ops
+
+from qasystem_config import config_guard as guard
+from qasystem_config.runtime_config import read_document
 from backend.app.services import extraction_config
 from external_services.models import RemoteEmbeddingClient, RemoteDocumentParserClient
 from external_services.clef import ClefFlashClient

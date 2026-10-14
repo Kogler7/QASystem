@@ -31,6 +31,8 @@ _CONTROLLED_FUNCTIONS = ('bootstrap_local_environment', 'prepare_dev_agent_start
 # Process startup is the only application-side reason to change process ENV.
 # Keep this contract versioned when integrated into config-declarations.json.
 PROCESS_ENVIRONMENT_ACCESS_CONTRACT = [
+    _rule('model_runtime/native.py', 'native_main', 'write', _CUDA,
+          'Bind the selected native model process GPU before loading Torch.'),
     _rule('backend/app/execution/worker.py', '_bind_gpu', 'write', _CUDA,
           'Bind the worker GPU before importing CUDA dependencies.'),
     _rule('backend/app/execution/worker.py', 'WorkerRuntime.__init__', 'write',
@@ -82,21 +84,21 @@ class _Scanner(ast.NodeVisitor):
                 for entry in node.names:
                     if entry.name in ('os', 'dotenv'):
                         self.bindings[entry.asname or entry.name] = entry.name
-                    elif entry.name == 'docker.configuration':
+                    elif entry.name == 'qasystem_config.configuration':
                         self.bindings[entry.asname or entry.name] = 'configuration'
-                    elif entry.name == 'docker':
-                        self.bindings[entry.asname or entry.name] = 'docker'
+                    elif entry.name == 'qasystem_config':
+                        self.bindings[entry.asname or entry.name] = 'qasystem_config'
             elif isinstance(node, ast.ImportFrom) and node.module in ('os', 'dotenv'):
                 for entry in node.names:
                     if entry.name in ('environ', 'getenv', 'putenv', 'unsetenv', 'load_dotenv'):
                         self.bindings[entry.asname or entry.name] = entry.name
                     elif entry.name == '*':
                         self.record(node, 'wildcard_import')
-            elif isinstance(node, ast.ImportFrom) and node.module == 'docker.configuration':
+            elif isinstance(node, ast.ImportFrom) and node.module == 'qasystem_config.configuration':
                 for entry in node.names:
                     if entry.name in _CONTROLLED_FUNCTIONS:
                         self.bindings[entry.asname or entry.name] = 'controlled.' + entry.name
-            elif isinstance(node, ast.ImportFrom) and node.module == 'docker':
+            elif isinstance(node, ast.ImportFrom) and node.module == 'qasystem_config':
                 for entry in node.names:
                     if entry.name == 'configuration':
                         self.bindings[entry.asname or entry.name] = 'configuration'
@@ -125,7 +127,7 @@ class _Scanner(ast.NodeVisitor):
                 return 'environ.' + node.attr
             if parent == 'environment_snapshot':
                 return 'snapshot.' + node.attr
-            if parent == 'docker' and node.attr == 'configuration':
+            if parent == 'qasystem_config' and node.attr == 'configuration':
                 return 'configuration'
             if parent == 'configuration' and node.attr in _CONTROLLED_FUNCTIONS:
                 return 'controlled.' + node.attr
@@ -263,17 +265,17 @@ def central_reader_names(tree, initial=()):
     modules = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
-            if node.module in ('docker.configuration', 'algorithm.runtime_settings'):
+            if node.module == 'qasystem_config.configuration':
                 readers.update(entry.asname or entry.name for entry in node.names
                                if entry.name in ('getenv', 'required', 'startup_getenv'))
-            elif node.module == 'docker':
+            elif node.module == 'qasystem_config':
                 modules.update(entry.asname or entry.name for entry in node.names
                                if entry.name == 'configuration')
         elif isinstance(node, ast.Import):
             for entry in node.names:
-                if entry.name in ('docker.configuration', 'algorithm.runtime_settings'):
+                if entry.name == 'qasystem_config.configuration':
                     modules.add(entry.asname or entry.name)
-                elif entry.name == 'docker':
+                elif entry.name == 'qasystem_config':
                     modules.add((entry.asname or entry.name) + '.configuration')
     readers.update(module + '.' + member for module in modules
                    for member in ('getenv', 'required', 'startup_getenv'))

@@ -10,7 +10,7 @@ services:
     container_name: qasystem_backend
     restart: unless-stopped
     init: true
-    entrypoint: ["python", "/app/docker/config_guard.py", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
+    entrypoint: ["python", "-m", "qasystem_config.config_guard", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
     gpus: all
     env_file:
       - .env
@@ -28,7 +28,7 @@ services:
       - ${HOST_MODELS_DIR:?Run ops config to generate configuration}:/models:ro
       # MinerU 4.0 会在模型根目录下写 .locks 互斥锁（下载/加载时），模型本体仍只读：
       # 这里只把 .locks 这一层叠成可写挂载。宿主需先建好该目录。
-      - ${MINERU4_LOCK_DIR:?Run ops config to generate configuration}:/models/mineru4/.locks
+      - ${MINERU4_LOCK_DIR:?Run ops config to generate configuration}:${MINERU_MODEL_BASE_DIR:?Run ops config to generate configuration}/.locks
       - backend-data:/app/backend/data
       # preproc 默认输出 cwd/tmp/processed（/app/backend/tmp），源码只读，
       #  scratch 写入命名卷；宿主需预建 backend/tmp 与 backend/data 挂载点。
@@ -53,7 +53,7 @@ services:
     container_name: qasystem_agent
     restart: unless-stopped
     init: true
-    entrypoint: ["python", "/app/docker/config_guard.py", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
+    entrypoint: ["python", "-m", "qasystem_config.config_guard", "--project-dir", "/app", "--runtime-dir", "/app/runtime-config", "--exec"]
     env_file:
       - .env
     environment: *qasystem-process-environment

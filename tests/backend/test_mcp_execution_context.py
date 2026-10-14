@@ -60,7 +60,7 @@ def test_worker_activity_isolated_between_async_tasks():
 
 def test_worker_activity_does_not_mutate_process_configuration(monkeypatch):
     monkeypatch.setenv('MCP_EXECUTION_MODE', 'async')
-    from docker.configuration import startup_getenv
+    from qasystem_config.configuration import startup_getenv
     from backend.app.execution.operations import _mcp_activity_context
     with _mcp_activity_context():
         assert _execution_mode() == 'inline'

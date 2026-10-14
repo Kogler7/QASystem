@@ -71,7 +71,7 @@ _lock = threading.Lock()
 
 
 def observe_read(key, value, *, directory, revision, source):
-    from docker.config_guard import safe_value
+    from qasystem_config.config_guard import safe_value
     encoded = {'value': None} if value is None else safe_value(key, str(value))
     identity = (str(directory), revision, key, json.dumps(encoded, sort_keys=True), source)
     with _lock:

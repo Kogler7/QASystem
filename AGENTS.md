@@ -1,8 +1,9 @@
 # Repository Delivery Rules
 
-- 应用配置统一从 `docker.configuration` 读取，不得在 Backend、Agent、算法、外部服务适配器、模型服务或 MCP 应用中新增直接的 `os.getenv`、`os.environ.get`、环境下标读取。启动时绑定 GPU、传递子进程环境等进程管理操作不作为业务配置读取入口。
-- 配置声明维护于 `docker/config-declarations.json`，部署默认值仍只在根 `.env.example` 定义；声明版本保存在 `docker/config-releases/`，旧版本不得覆盖。声明包括说明、默认值、消费者、热更新属性和兼容回退表达式。增删消费者、修改默认回退或热更新属性必须登记新声明版本。
-- 发布、打包和部署必须通过 `python -m docker.config_contract` 门禁；不得静默重新扫描生成声明来消除失败，不得保留失去消费者的配置。外部依赖自行读取的参数必须明确登记外部消费契约。
+- 应用配置统一从 `qasystem_config.configuration` 读取，不得在 Backend、Agent、算法、外部服务适配器、模型服务或 MCP 应用中新增直接的 `os.getenv`、`os.environ.get`、环境下标读取。启动时绑定 GPU、传递子进程环境等进程管理操作不作为业务配置读取入口。
+- 公共配置核心只在 `qasystem_config/` 维护，包含读取、schema、迁移、版本、guard、事务、历史及纯I/O，不依赖 Docker 运行时或 CLI UI。`docker/` 只保留部署工具、容器启动命令和运维 UI；禁止保留旧核心兼容副本或从 Docker 模块重新导出公共配置接口。
+- 配置声明维护于 `qasystem_config/config-declarations.json`，部署默认值仍只在根 `.env.example` 定义；新声明版本保存在 `qasystem_config/config-releases/`。迁移前的 `docker/config-releases/` 只保留不可变历史证据，不是当前配置入口；旧版本不得覆盖。声明包括说明、默认值、消费者、热更新属性和兼容回退表达式。增删消费者、修改默认回退或热更新属性必须登记新声明版本。
+- 发布、打包和部署必须通过 `python -m qasystem_config.config_contract` 门禁；不得静默重新扫描生成声明来消除失败，不得保留失去消费者的配置。外部依赖自行读取的参数必须明确登记外部消费契约。
 - 每次受控配置事务批准自动归档独立配置版本；保存批准、容器可读验证和进程实际读取分开记录。原始 `.env` 归档仅保存在私有目录，不进入 Git、报告或 JSON 历史视图；JSON 只保留凭据指纹。允许 Agent 在用户授权范围内通过 ops 受控事务自动操作并生成批准版本，必须记录操作者、原因及脱敏变更清单；不得手改批准记录。
 
 - The only application environment image is `qasystem-env-v1`.
