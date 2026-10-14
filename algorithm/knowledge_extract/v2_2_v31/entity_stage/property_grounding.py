@@ -184,7 +184,7 @@ async def _review_batches(pending, context_for, llm, *, attempts, warnings, call
                     retry_base_seconds, max_workers, plan=None):
     """Read-only batch workers; apply verdicts/receipts later on the caller thread."""
     from .candidate_generation import generate_structured, _append_call
-    limit = max(1, min(24, int(config_getenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '16'))))
+    limit = max(1, min(24, int(config_getenv('KG_EXTRACT_V31_VERIFICATION_BATCH_SIZE', '2'))))
     if pass_name == 'entity_verification':
         # Entity admission can be reviewed separately without multiplying all
         # attribute calls. Both paths retain the same scheduler and hard budget.

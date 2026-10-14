@@ -126,6 +126,40 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
     provider = options.get('provider') or 'default'
     routed = resolve_service('extract', registry=document, revision=revision,
                              service_id=None if provider == 'default' else provider)
+    # Mini-eval / 未挂 ops registry 时：直接读进程环境合成抽取服务快照。
+    # BASE_URL/MODEL 等已从声明退休，只能走 os.environ，不能走 config_getenv。
+    if routed is None and provider == 'default':
+        import os
+        base_url = str(os.environ.get('KG_EXTRACT_LLM_BASE_URL', '') or '').strip()
+        model = str(os.environ.get('KG_EXTRACT_LLM_MODEL', '') or '').strip()
+        api_key = str(setting('KG_EXTRACT_LLM_API_KEY', '') or os.environ.get('KG_EXTRACT_LLM_API_KEY', '') or '').strip()
+        if base_url and model and api_key:
+            from docker.api_services import LIMIT_DEFAULTS, LEGACY_CREDENTIAL_REFERENCES
+            def _env_int(key, default):
+                raw = os.environ.get(key)
+                try:
+                    return int(raw) if raw not in (None, '') else int(default)
+                except ValueError:
+                    return int(default)
+            limits = {
+                'max_concurrency': _env_int('KG_EXTRACT_LLM_MAX_CONCURRENCY', LIMIT_DEFAULTS['max_concurrency']),
+                'qps': _env_int('KG_EXTRACT_LLM_QPS', LIMIT_DEFAULTS['qps']),
+                'qpm': _env_int('KG_EXTRACT_LLM_QPM', LIMIT_DEFAULTS['qpm']),
+            }
+            # 无 ops accounts 登记时不要填 account_id，否则调度读 account_limits 会 KeyError。
+            routed = {
+                'service_id': 'env-extract',
+                'kind': 'api',
+                'adapter': 'chat',
+                'base_url': base_url,
+                'model': model,
+                'api_key_env': LEGACY_CREDENTIAL_REFERENCES['extract'],
+                'revision': revision,
+                'capabilities': {},
+                'limits': limits,
+                'account_id': '',
+                'connection': {},
+            }
     if routed is None:
         raise ValueError('知识抽取未选择已登记的模型服务；请使用 ops 配置抽取用途')
     values = {key: defaults[key] for key in ('max_tokens', 'request_timeout', 'disable_thinking')}

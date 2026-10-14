@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "cases": [
+    {
+      "id": "trouble/trouble_mini",
+      "group": "trouble",
+      "case": "trouble_mini",
+      "sources": [
+        {
+          "path": "trouble/trouble_mini/docs/行修更换、互换记录50.xlsx",
+          "sha256": "32645930deefe41dbbad4d44e7fed898afc014ebbfccc29b7729a75614a6b075",
+          "missing": false
+        }
+      ],
+      "golden": {
+        "path": "trouble/trouble_mini/extract/golden.json",
+        "sha256": "e59fb4ec27041921f98391920822be64132b5f7de34c4a5d3cbbc3e2b972476d",
+        "missing": false
+      },
+      "ontology": {
+        "path": "trouble/ontology",
+        "kind": "directory",
+        "files": [
+          {
+            "path": "trouble.puml",
+            "sha256": "63d49b97970374447584e4a56d5ab7987e7b88f6c7aff96cb1d403aeaa8823ba",
+            "missing": false
+          }
+        ],
+        "sha256": "0a2c66fa101573f9844abb3394d89c24e687a9b2e3aafc858f79586807aeefc9",
+        "missing": false
+      },
+      "input_mode": {
+        "backend_extract": "reused_chunks"
+      },
+      "reused_inputs": [
+        {
+          "kind": "chunks",
+          "path": "trouble/trouble_mini/chunks.json",
+          "sha256": "2c729a1f9e7d3accc02f6534c07f772c70e4b63b693fafc39478b6c5a3e4457d",
+          "missing": false
+        }
+      ]
+    }
+  ],
+  "dataset_sha256": "d5dd18751a6ae99c9809ceb4becb951a71c49724c153745991966a497c5693ef",
+  "evaluator": {
+    "files": [
+      {
+        "path": "provenance.py",
+        "sha256": "4d7175348925347f318075029ba688269329e8dc9e035076a9a83d740cab83f4",
+        "missing": false
+      },
+      {
+        "path": "quality.py",
+        "sha256": "dada64584e75d8495c8b46d918468dde12a441aca412aa954275f63527cf79e2",
+        "missing": false
+      },
+      {
+        "path": "run.py",
+        "sha256": "61a65c1fae0b11d2cbef61463225cfa25d53dded4ea8d15ebaa452b18bcbbfbc",
+        "missing": false
+      }
+    ],
+    "sha256": "bb1de667363ecbf23a9dfd14fa6b2476fb51e309f210c4a595b2e8dcbe9ce484"
+  },
+  "settings": {
+    "stage": "backend",
+    "modes": [
+      "extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    },
+    "options": {
+      "extraction": {
+        "version": "v2.2-v31"
+      }
+    }
+  },
+  "scoring_contract": {
+    "stage": "backend",
+    "modes": [
+      "extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    }
+  },
+  "reused_predictions": []
+}

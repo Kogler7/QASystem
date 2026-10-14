@@ -18,6 +18,17 @@ tags: []
 
 Benchmark 数据集仍在 `test_data/eval-v2/`；在线链路评测走 `eval/run.py`（`KG_EXTRACT_ALGO_VERSION=v2.2-v31`）。
 
+关系-only 诊断（golden 实体种子 → 纯 LLM 关系，跳过 Stage1/确定性补充/结构边）：
+
+```bash
+python3 eval/run.py test_data/eval/trouble/trouble_mini \
+  --mode extract --from-run tmp/eval/runs/<冻结切片> \
+  --extract-version v2.2-v31 --relation-only-from-golden \
+  --match-mode llm --min-relation-f1 0.5
+```
+
+算法侧等价：`extract_harness(..., seed_entities=golden_entities, relation_only=True)`。
+
 ## 公共入口
 
 ```python

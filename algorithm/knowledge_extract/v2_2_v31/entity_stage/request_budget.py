@@ -31,7 +31,8 @@ def fits(messages, llm=None, *, reserve=2048):
 
 
 def window_chars(llm=None):
-    value = max(128, int(config_getenv("KG_EXTRACT_V31_WINDOW_CHARS", "2000")))
+    # 默认 128（代码下限；原 2000/600/300）：抽取内分窗，不改上游切片，压 length 截断。
+    value = max(128, int(config_getenv("KG_EXTRACT_V31_WINDOW_CHARS", "128")))
     for owner in (llm, getattr(llm, "client", None)):
         cap = getattr(owner, "max_tokens", None)
         if isinstance(cap, (int, float)) and cap > 0:
