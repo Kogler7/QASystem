@@ -9,9 +9,8 @@ from external_services.llm.chat import create_chat_completion
 from external_services.llm.runtime import (
     QuotaPool,
     ScheduledClient,
-    effective_rate_limits,
-    select_rate_tier,
 )
+from qasystem_config.quota_schema import parse_quota_tiers, select_tier
 
 
 def _call(create, **options):
@@ -82,17 +81,24 @@ def test_each_compatibility_attempt_acquires_shared_quota():
     (40000, 4, 280_000),
 ])
 def test_rate_tiers_follow_input_size(tokens, rpm, tpm):
-    assert select_rate_tier(tokens) == (rpm, tpm)
-    assert effective_rate_limits(qpm=100, tpm=500_000, input_tokens=tokens) == (rpm, tpm)
-    assert effective_rate_limits(qpm=0, tpm=0, input_tokens=tokens) == (0, 0)
+    curve = [dict(max_input_tokens=bound, rpm=rate, tpm=budget) for bound, rate, budget in
+             [(8192,56,460000),(16384,26,420000),(32768,11,350000),(65536,4,280000)]]
+    tier = select_tier(parse_quota_tiers(curve), tokens)
+    assert (tier.rpm, tier.tpm) == (rpm, tpm)
+    pool = QuotaPool({'max_concurrency':4,'qps':0,'qpm':100,'tpm':500000,'quota_tiers':curve})
+    with pool.request_slot(time.monotonic()+1, input_tokens=tokens) as reservation:
+        assert pool._tier(reservation) == tier
+        assert pool.next_start == pytest.approx(reservation.started + 60/rpm)
+    unlimited = QuotaPool({'max_concurrency':4,'qps':0,'qpm':0})
+    assert unlimited.tiers == () and unlimited.limits['tpm'] == 0
 
 
 def test_tpm_window_blocks_until_budget_frees():
     pool = QuotaPool({"max_concurrency": 4, "qps": 0, "qpm": 0, "tpm": 1000})
-    with pool.request_slot(tokens=900, input_tokens=1000):
+    with pool.request_slot(input_tokens=900):
         started = time.monotonic()
         with pytest.raises(TimeoutError, match="queue wait"):
-            with pool.request_slot(started + 0.05, tokens=200, input_tokens=1000):
+            with pool.request_slot(started + 0.05, input_tokens=200):
                 pytest.fail("TPM bypassed")
     assert pool.active == 0
 
@@ -112,7 +118,7 @@ def test_scheduled_client_reserves_input_plus_output_tokens(monkeypatch):
     client.chat.completions.create(
         model="m", messages=[{"role": "user", "content": "hello"}], max_tokens=128,
     )
-    assert len(client.pool.token_starts) == 1
-    reserved = client.pool.token_starts[0][1]
+    assert len(client.pool.reservations) == 1
+    reserved = client.pool.reservations[0].total_tokens
     assert reserved > 128
     assert seen and seen[0]["max_tokens"] == 128
