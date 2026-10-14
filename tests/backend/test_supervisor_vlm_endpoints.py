@@ -12,10 +12,10 @@ def _capture_core_worker_env(monkeypatch, *, vlm_enabled: str, gpu_ids: list[str
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
     captured: list[dict] = []
 
-    sup = supervisor_mod.RuntimeSupervisor()
+    sup = supervisor_mod.RuntimeSupervisor(cpu_workers='auto')
     sup.gpu_ids = gpu_ids
 
-    def fake_spawn(name, command, *, env=None):
+    def fake_spawn(name, command, *, env=None, supervised=True):
         captured.append(dict(env or {}))
         return object()
 
@@ -49,7 +49,7 @@ def test_core_workers_injected_vlm_url_when_vlm_enabled(monkeypatch):
 
 def test_planned_engine_ports_follows_vlm_enabled(monkeypatch):
     monkeypatch.delenv("MINERU_VLM_SERVER_URL", raising=False)
-    sup = supervisor_mod.RuntimeSupervisor()
+    sup = supervisor_mod.RuntimeSupervisor(cpu_workers='auto')
     sup.gpu_ids = ["4", "5"]
 
     sup.model_record = {"enabled": False}
@@ -57,3 +57,16 @@ def test_planned_engine_ports_follows_vlm_enabled(monkeypatch):
 
     sup.model_record = {"enabled": True}
     assert sup._planned_engine_ports() == [sup.base_port, sup.base_port + 1]
+
+
+def test_repeated_core_start_does_not_spawn_second_gateway(monkeypatch):
+    monkeypatch.setattr(supervisor_mod, '_gpu_ids', lambda: [])
+    monkeypatch.setattr('docker.model_services.worker_record', lambda: None)
+    sup = supervisor_mod.RuntimeSupervisor(cpu_workers='auto')
+    started = []
+    monkeypatch.setattr(sup, '_spawn', lambda name, command, **kwargs: started.append(name) or object())
+    sup._start_core_workers()
+    before = list(started)
+    with pytest.raises(RuntimeError, match='拒绝重复'):
+        sup._start_core_workers()
+    assert started == before

@@ -28,6 +28,9 @@ def declared(key):
 
 def startup_getenv(key, default=None):
     declared(key)
+    from docker.runtime_config import PROCESS_KEYS
+    if key in PROCESS_KEYS:
+        return getenv(key, default)
     return os.getenv(key, default)
 
 
@@ -48,7 +51,13 @@ def _observe(key, value, source, revision=None):
 
 def getenv(key, default=None):
     declared(key)
-    from docker.runtime_config import HOT_KEYS, read_settings
+    from docker.runtime_config import HOT_KEYS, PROCESS_KEYS, read_settings
+    if key in PROCESS_KEYS:
+        settings, revision = read_settings(with_revision=True)
+        if revision is None or key not in settings:
+            raise ValueError('执行进程配置未提交；请通过 ops 更新配置')
+        _observe(key, settings[key], 'process-plan', revision=revision)
+        return settings[key]
     if key in HOT_KEYS:
         settings, revision = read_settings(with_revision=True)
         if key in settings:
@@ -70,6 +79,23 @@ def read_registry(*, with_revision=False):
     """Read one approved snapshot; callers retain it for in-flight work."""
     from docker.runtime_config import read_registry as read
     return read(with_revision=with_revision)
+
+
+def approved_execution_plan(*, revision=None):
+    """Read the committed process plan; old container ENV never overrides it."""
+    document, actual_revision = read_registry(with_revision=True)
+    if actual_revision is None or (revision is not None and actual_revision != revision):
+        raise ValueError('执行进程配置尚未提交或版本已变化；请通过 ops 更新配置')
+    configured = document.get('settings', {}).get('EXECUTION_CPU_WORKERS')
+    if not isinstance(configured, str):
+        raise ValueError('配置缺少 CPU 执行计划；请通过 ops 升级配置')
+    normalized = configured.strip().lower()
+    if normalized != 'auto':
+        if not normalized.isdigit() or not 1 <= int(normalized) <= 32:
+            raise ValueError('CPU 进程数必须为 auto 或 1–32')
+        normalized = str(int(normalized))
+    _observe('EXECUTION_CPU_WORKERS', normalized, 'process-plan', revision=actual_revision)
+    return {'revision': actual_revision, 'cpu_workers': normalized}
 
 
 def should_load_local_dotenv():

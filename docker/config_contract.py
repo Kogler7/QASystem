@@ -22,7 +22,8 @@ def reader_names(tree):
 def central_startup_contracts():
     source = Path(__file__).with_name('configuration.py')
     names = {'should_load_local_dotenv', 'bootstrap_local_environment',
-             'prepare_dev_agent_startup', 'configure_mineru_loader_environment'}
+             'prepare_dev_agent_startup', 'configure_mineru_loader_environment',
+             'getenv', 'startup_getenv', 'approved_execution_plan'}
     return {node.name: ast.unparse(node) for node in ast.parse(source.read_text(encoding='utf-8-sig')).body
             if isinstance(node, ast.FunctionDef) and node.name in names}
 
@@ -157,8 +158,12 @@ def check(root, *, deployed=False):
     if catalog.get('schema') == 1 and catalog.get('api_registry_contract') != API_REGISTRY_CONTRACT:
         errors.append('API服务/账号登记规则变化，必须登记新配置声明版本')
     for key, item in catalog['items'].items():
-        if item.get('mode') != ('hot' if key in HOT_KEYS else 'startup'):
+        from docker.runtime_config import PROCESS_KEYS
+        expected_mode = 'processes' if key in PROCESS_KEYS else 'hot' if key in HOT_KEYS else 'startup'
+        if item.get('mode') != expected_mode:
             errors.append(f'{key} 热更新属性与实际读取规则不一致')
+        if key in PROCESS_KEYS and item.get('source') != 'runtime':
+            errors.append(f'{key} 进程计划必须使用批准配置文件作为唯一来源')
     template = root / '.env.example'
     if template.is_file():
         for line in template.read_text(encoding='utf-8-sig').splitlines():

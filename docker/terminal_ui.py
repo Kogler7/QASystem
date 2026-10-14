@@ -108,7 +108,7 @@ def detail(row: dict | None, config) -> list[str]:
         default = "******（已隐藏）" if default else "(空)"
     return [row["key"], "", "实际: " + row.get('actual_value', '未确认'),
             "配置: " + (value or "(空)"), "默认: " + (default or "(空)"), "",
-            "生效: " + ("热更新 / 新请求" if row["hot"] else "启动配置 / 需相应服务重启"), "",
+            "生效: " + ("进程计划 / 保存后需 ops runtime apply" if row.get('process') else "热更新 / 新请求" if row["hot"] else "启动配置 / 需相应服务重启"), "",
             row["description"], "", "Enter 编辑  ·  d 恢复默认", "凭据不会回显。" if row["secret"] else ""]
 
 
@@ -127,7 +127,7 @@ def render(config, rows: list[dict], index: int, selected: str, query: str, noti
               full(f" 实际运行服务 {running}    计划启用模型 {count}    {'● 未保存修改' if dirty else '○ 配置未修改'}", "warning" if dirty else "muted")]
     tabs = "  ".join(f"[{s}]" if s == selected else s for s in SECTIONS)
     if width(tabs) > cells - 2: tabs = f"分区: {selected}    ← → 切换 / Tab 下一分区"
-    output += [full(" " + tabs, "title"), full(f" 搜索: {query or '全部配置'}   [启动]需重启 / [热更]新请求   r 刷新实际状态", "muted")]
+    output += [full(" " + tabs, "title"), full(f" 搜索: {query or '全部配置'}   [启动]需重启 / [热更]新请求 / [进程]需应用   r 刷新实际状态", "muted")]
     height = page_size(columns, lines)
     start = min(max(0, index - height + 1), max(0, len(rows) - height))
     details = detail(current, config)

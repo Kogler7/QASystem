@@ -140,3 +140,16 @@ patch 示例（没有密钥）：
 凭据仅能通过私有 patch 文件中的已登记秘密字段输入，服务保存凭据变量引用；不要把密钥写在命令参数、变更原因或普通报告中。patch 不属于源码，不提交 Git。原始 `.env` 仍留在私有备份与版本归档，JSON 历史和报告只记录凭据指纹。
 
 每次成功保存生成 `runtime-config/changes/rNNNNNN/changes.json` 和 `changes.md`，记录操作者、原因、基准版本、源代码/声明版本及脱敏差异，并立即刷新 `runtime-config/database.json`。之后是否 reload、局部重启或 deploy 按报告动作和部署授权另行执行；自动配置没有 guard 跳过开关。
+
+## CPU 执行进程局部控制
+
+```bash
+ops runtime status
+ops runtime apply
+ops runtime restart
+ops runtime drain
+```
+
+这四个命令只控制 Backend 的 CPU worker，网关和容器保留。数量在 ops config 中修改，标为 `[进程]`；保存后要执行 `runtime apply` 才调整实际数量。排空等待在途任务完成，超时不会强杀或重复启动。输出的操作编号可以通过 `--request-id` 重试同一操作；`accepted/running` 表示处理中，`applied` 表示 CPU 操作完成，不代表整个系统健康。
+
+CPU 实际数量通过 supervisor IPC 查询，配置读取与应用事件分别入历史。GPU worker、解析引擎与 Agent 尚未支持这套局部控制。详见[进程局部控制](进程局部控制.md)。

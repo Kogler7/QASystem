@@ -43,7 +43,7 @@ PROCESS_ENVIRONMENT_ACCESS_CONTRACT = [
     *[_rule('backend/app/execution/supervisor.py', 'RuntimeSupervisor.' + function,
             'snapshot', None, 'Copy process ENV for a managed child process.')
       for function in ('_spawn', '_start_engines', '_wait_until_warm',
-                       '_worker_env', '_start_core_workers')],
+                       '_worker_env', '_start_core_workers', '_spawn_cpu_worker')],
     _rule('algorithm/preproc/preproc_src/processors/mineru4_processor.py',
           'Mineru4Processor._run_in_subprocess', 'snapshot', None,
           'Copy process ENV into the isolated parsing child process.'),

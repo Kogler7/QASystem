@@ -16,6 +16,10 @@ HOT_KEYS = frozenset({
     "NANOJEV_SERVICE_URL", "NANOJEV_SERVICE_PATH", "NANOJEV_SERVICE_TIMEOUT_SECONDS",
 })
 
+# Persisted plans read by the supervisor; saving does not resize live processes.
+PROCESS_KEYS = frozenset({'EXECUTION_CPU_WORKERS'})
+PERSISTED_KEYS = HOT_KEYS | PROCESS_KEYS
+
 LEGACY_MODEL_KEYS = frozenset({"LLM_MODEL_DIR", "LLM_SERVED_MODEL_NAME", "LLM_GPU_DEVICE_IDS",
     "LLM_BIND", "LLM_HOST_PORT", "LLM_GPU_MEMORY_UTILIZATION", "LLM_MAX_MODEL_LEN",
     "LLM_MAX_NUM_SEQS", "LLM_MAX_NUM_BATCHED_TOKENS", "LLM_DTYPE"})
@@ -79,9 +83,13 @@ def _validate_document(data):
     if not isinstance(data, dict) or set(data) - {"settings", "models", "services", "routes", "accounts"}:
         raise ValueError("Invalid runtime configuration structure")
     settings, models = data.get("settings", {}), data.get("models", {})
-    if not isinstance(settings, dict) or any(k not in HOT_KEYS or not isinstance(v, str) for k, v in settings.items()):
+    if not isinstance(settings, dict) or any(k not in PERSISTED_KEYS or not isinstance(v, str) for k, v in settings.items()):
         raise ValueError("Invalid runtime settings keys or values")
     for key, value in settings.items():
+        if key == 'EXECUTION_CPU_WORKERS':
+            normalized = value.strip().lower()
+            if normalized != 'auto' and (not normalized.isdigit() or not 1 <= int(normalized) <= 32):
+                raise ValueError('CPU 进程数必须为 auto 或 1–32')
         if key.endswith('_SERVICE_URL') and value:
             url = urlsplit(value)
             if url.scheme not in {'http', 'https'} or not url.hostname or url.username or url.password or url.query or url.fragment:

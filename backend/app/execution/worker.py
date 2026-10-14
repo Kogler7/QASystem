@@ -303,9 +303,13 @@ class WorkerRuntime:
             self._maybe_reap()
             handled = False
             for resource_class in self.resource_classes:
+                if self.stopped:
+                    break
                 target = self.worker_id
                 message = self.queue.consume(resource_class, getattr(self, 'consumer_id', self.worker_id), block_ms=10, target_worker=target)
                 if message is None:
+                    if self.stopped:
+                        break
                     target = None
                     message = self.queue.consume(resource_class, getattr(self, 'consumer_id', self.worker_id), block_ms=50)
                 if message is None:

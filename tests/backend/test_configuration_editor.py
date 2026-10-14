@@ -283,7 +283,9 @@ def test_live_inspection_is_readonly_masks_secrets_and_reports_actual_difference
         return 'abc def' if command[1] == 'ps' else raw
     monkeypatch.setattr(configure.helper, 'run', run)
     editor.refresh_live()
-    assert all(c[0] == 'nvidia-smi' or c[1] in {'ps', 'inspect'} for c in commands)
+    assert all(c[0] == 'nvidia-smi' or c[1] in {'ps', 'inspect'} or
+        c[1:] == ['exec', 'qasystem_backend', 'python', '-m', 'app.execution.process_control', 'status']
+        for c in commands)
     assert 'KG_EXTRACT_LLM_API_KEY' not in commands[1][3]
     assert editor.actual_value('KG_EXTRACT_ALGO_VERSION') == 'v3'
     rows = editor.rows()
@@ -306,7 +308,7 @@ def test_actual_value_uses_live_mount_not_unapplied_edit_directory(editor, tmp_p
     assert editor.actual_value('KG_EXTRACT_ALGO_VERSION') == 'v3'
 
 
-def test_save_migrates_legacy_files_and_env_without_persisting_template_defaults(editor):
+def test_save_migrates_legacy_without_optional_defaults_but_persists_required_cpu_plan(editor):
     directory = editor.directory
     (directory / 'settings.json').write_text(json.dumps({'KG_EXTRACT_ALGO_VERSION': 'v3'}))
     (directory / 'models.json').write_text('{}')
@@ -316,7 +318,8 @@ def test_save_migrates_legacy_files_and_env_without_persisting_template_defaults
     assert reopened.values['KG_EXTRACT_ALGO_VERSION'] == 'v3'
     reopened.save()
     settings = json.loads((directory / 'config.json').read_text())['settings']
-    assert settings == {'KG_EXTRACT_ALGO_VERSION': 'v3', 'KG_EXTRACT_LLM_MAX_TOKENS': '3'}
+    assert settings == {'KG_EXTRACT_ALGO_VERSION': 'v3', 'KG_EXTRACT_LLM_MAX_TOKENS': '3',
+                        'EXECUTION_CPU_WORKERS': 'auto'}
     assert 'KG_EXTRACT_LLM_MAX_TOKENS' not in configure.helper.read_env((editor.root / '.env').read_text())
     assert not (directory / 'settings.json').exists()
     assert not (directory / 'models.json').exists()

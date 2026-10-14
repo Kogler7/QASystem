@@ -9,6 +9,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import uuid
 
 from docker import config_guard as guard
 from docker.runtime_config import HOT_KEYS, read_document, read_settings
@@ -143,6 +144,10 @@ def main(argv=None):
     history = sub.add_parser('history', help='查看配置版本和实际读取记录，生成本地 JSON 数据库视图')
     history.add_argument('--json', action='store_true', help='输出脱敏 JSON 历史')
     sub.add_parser('deploy', help='调用现有部署流程；必须通过有效配置事务')
+    runtime = sub.add_parser('runtime', help='控制 Backend CPU 执行进程，不重启网关或容器')
+    runtime.add_argument('operation', choices=['status', 'drain', 'restart', 'apply'])
+    runtime.add_argument('--role', choices=['cpu'], default='cpu')
+    runtime.add_argument('--request-id', help='重试同一操作时使用同一编号；输出包含操作状态')
     reload_parser = sub.add_parser('reload', help='核对动态配置在容器内可读，不重启容器')
     reload_parser.add_argument('--services', nargs='+', choices=['backend', 'agent'], default=['backend', 'agent'])
     for action in ('restart', 'logs'):
@@ -189,7 +194,15 @@ def main(argv=None):
             return code if valid else 2
         if args.action == 'logs':
             return run(compose_command(root, directory) + ['logs', '--tail', '100', *args.services], root)
-        guard.require(root, directory)
+        revision = guard.require(root, directory)
+        if args.action == 'runtime':
+            command = compose_command(root, directory) + ['exec', '-T', 'backend', 'python', '-m',
+                'app.execution.process_control', args.operation]
+            if args.operation != 'status':
+                request_id = args.request_id or uuid.uuid4().hex
+                print(f'进程操作编号：{request_id}；accepted/running 表示处理中，applied 仅表示进程操作完成。', flush=True)
+                command += ['--role', args.role, '--revision', str(revision), '--request-id', request_id]
+            return run(command, root)
         if args.action == 'reload':
             return reload_services(root, directory, args.services)
         from docker.configure import Configuration

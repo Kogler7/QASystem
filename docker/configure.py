@@ -19,12 +19,12 @@ import sys
 try:
     from docker import setup_llm as helper
     from docker import terminal_ui as screen
-    from docker.runtime_config import HOT_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
+    from docker.runtime_config import HOT_KEYS, PROCESS_KEYS, PERSISTED_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
     from docker import config_guard as guard
 except ImportError:
     import setup_llm as helper
     import terminal_ui as screen
-    from runtime_config import HOT_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
+    from runtime_config import HOT_KEYS, PROCESS_KEYS, PERSISTED_KEYS, LEGACY_MODEL_KEYS, read_document, read_settings
     import config_guard as guard
 
 
@@ -48,7 +48,7 @@ def schema(text: str) -> list[dict]:
                 group = comments[0]
             default = helper.read_env(line)[key]
             rows.append(dict(key=key, default=default, description=" / ".join(comments) or f"{key}；当前版本默认值见下方",
-                             group=group, hot=key in HOT_KEYS, secret=secret(key)))
+                             group=group, hot=key in HOT_KEYS, process=key in PROCESS_KEYS, secret=secret(key)))
             comments = []
     return rows
 
@@ -158,9 +158,9 @@ class Configuration:
                 field['description'] += ' / 迁移：' + ', '.join(old) + ' → ' + field['key']
             if field['key'] in self.migration_conflicts:
                 field['description'] += ' / [冲突] 请编辑本项，明确确认最终取值后才能保存'
-        self.persisted_hot = {k: v for k, v in original_values.items() if k in HOT_KEYS}
+        self.persisted_hot = {k: v for k, v in original_values.items() if k in PERSISTED_KEYS}
         self.persisted_hot.update(document['settings'])
-        self.initial_hot = {k: self.values[k] for k in HOT_KEYS if k in self.values}
+        self.initial_hot = {k: self.values[k] for k in PERSISTED_KEYS if k in self.values}
         from docker.config_migrations import migrate_models
         self.models, model_conflicts = migrate_models(helper.read_env(self.original), document['models'], self.catalog)
         self.migration_conflicts.update(model_conflicts)
@@ -217,11 +217,13 @@ class Configuration:
         self.live = []
         self.gpu_identity = {}
         self.live_error = "实际状态尚未读取"
+        self.process_status = None
         self.pending_reservations = set()
 
     def refresh_live(self) -> None:
         """Read only selected non-secret environment keys; never dump container Env."""
         self.live = []
+        self.process_status = None
         try:
             ids = helper.run(["docker", "ps", "-aq"], cwd=self.root).split()
             if not ids:
@@ -283,12 +285,28 @@ class Configuration:
                 # Discard raw command: arbitrary arguments may include credentials.
                 c.pop('command', None)
             self.live_error = ""
+            backend = next((c for c in self.live if c['name'] == 'qasystem_backend' and c['status'] == 'running'), None)
+            if backend:
+                try:
+                    raw = helper.run(['docker', 'exec', backend['name'], 'python', '-m',
+                        'app.execution.process_control', 'status'], cwd=self.root)
+                    response = json.loads(raw)
+                    if response.get('ok'):
+                        self.process_status = response.get('roles', {}).get('cpu')
+                except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired):
+                    pass
         except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired):
             self.live_error = "读取实际状态失败；检查 Docker 权限/连接，按 r 重试"
 
     def actual_value(self, key: str) -> str:
         backend = next((c for c in self.live if c['name'] == 'qasystem_backend' and c['status'] == 'running'), None)
         if backend is None: return '未确认（没有运行中的 Backend）'
+        if key in PROCESS_KEYS:
+            status = self.process_status
+            if status is None:
+                return '未确认（CPU 进程状态未读取，不使用容器旧环境值）'
+            states = [p.get('state') for p in status.get('processes', [])]
+            return f"运行 {states.count('running')} / 排空 {states.count('draining')} / 失败 {states.count('failed')}；已应用 r{status.get('applied_revision')}"
         if key in HOT_KEYS:
             mount = next((m for m in backend['mounts'] if m['Destination'] == '/app/runtime-config'), None)
             if mount:
@@ -349,10 +367,13 @@ class Configuration:
             shown = "******" if field["secret"] and value else value
             actual = self.actual_value(field['key']) if not field['secret'] else '隐藏（未读取容器凭据）'
             pending = not field['secret'] and not actual.startswith(('未', '隐藏')) and actual != (value or '(空)')
+            flag = '[进程]' if field.get('process') else '[热更]' if field['hot'] else '[启动]'
+            if field.get('process'):
+                pending = bool(self.process_status and self.process_status.get('busy'))
             rows.append(dict(kind="env", **field, actual_value=actual,
-                display_name=f"{'[热更]' if field['hot'] else '[启动]'} {field['key']}",
+                display_name=f"{flag} {field['key']}",
                 display_value=('! ' if pending else '') + (shown or '(空)'),
-                label=f"{'[热更]' if field['hot'] else '[启动]'} {field['key']} = {shown}"))
+                label=f"{flag} {field['key']} = {shown}"))
         return [r for r in rows if query.lower() in (r["label"] + r.get("description", "")).lower()]
 
     def validate(self, probe: bool = False) -> list[str]:
@@ -479,16 +500,17 @@ class Configuration:
         from docker.configuration import declarations
         from docker.config_migrations import ALIASES
         retired = set(declarations().get('retired', [])) | set(ALIASES)
-        static = {k: v for k, v in self.values.items() if k not in HOT_KEYS and k not in retired}
+        static = {k: v for k, v in self.values.items() if k not in PERSISTED_KEYS and k not in retired}
         original_values = helper.read_env(self.original or self.template)
         # Rewrite declared keys once, eliminating duplicate assignments.
         # Unknown user-owned values remain untouched until consumers are known.
         changes = {k: v for k, v in static.items() if k in declarations()['items'] or original_values.get(k) != v}
         env = helper.update_env(self.original or self.template, changes)
         env = "\n".join(line for line in env.splitlines() if not (
-            (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in HOT_KEYS | retired)) + "\n"
+            (match := re.match(r"^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=", line)) and match[1] in PERSISTED_KEYS | retired)) + "\n"
         settings = dict(self.persisted_hot)
         settings.update({k: v for k, v in self.values.items() if k in HOT_KEYS and self.initial_hot.get(k) != v})
+        settings.update({k: v for k, v in self.values.items() if k in PROCESS_KEYS})
         return {self.root / '.env': env, self.root / '.env.example': self.template,
                 self.directory / 'config.json': json.dumps({'settings': settings, 'models': self.models, 'services': self.services, 'routes': self.routes, 'accounts': self.accounts}, ensure_ascii=False, indent=2) + '\n',
                 self.directory / 'models.compose.json': json.dumps(self.compose(), ensure_ascii=False, indent=2) + '\n'}
@@ -523,7 +545,7 @@ class Configuration:
             legacy.unlink(missing_ok=True)
         self.expected = {p: p.read_bytes() if p.exists() else None for p in self.expected}
         self.persisted_hot = json.loads(payloads[self.directory / 'config.json'])['settings']
-        self.initial_hot = {k: self.values[k] for k in HOT_KEYS if k in self.values}
+        self.initial_hot = {k: self.values[k] for k in PERSISTED_KEYS if k in self.values}
 
     def verify_weights(self) -> None:
         for entry in self.catalog:
