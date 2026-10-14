@@ -194,7 +194,7 @@ def test_entity_review_receives_complete_type_catalog_without_extra_tasks():
     from ..skill_planner import SkillAssemblyPlanner
     planner = SkillAssemblyPlanner()
     route = resolve_document_route(plan, [chunk])
-    planner.prepare(route.to_dict(), skill_refs=['official_document@12'])
+    planner.prepare(route.to_dict(), skill_refs=['official_document@13'])
     attempts = []
     assert admit_entity_names([row], [chunk], llm, plan=plan, route=route, assembly_planner=planner,
         attempts=attempts, warnings=[], max_attempts=1) == []
