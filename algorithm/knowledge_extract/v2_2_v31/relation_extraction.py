@@ -23,8 +23,8 @@ from .relation_context import build_relation_index
 
 logger = get_step_logger(__name__)
 
-# 32 是单次调用上限，不是一篇文档的关系总数。输出预算更紧时继续缩小。
-RELATION_CANDIDATE_BATCH_SIZE = 32
+# 16 是单次调用上限（原 32），压低单批输出，减少 length 截断；文档关系总数不限。
+RELATION_CANDIDATE_BATCH_SIZE = 4
 # 约 4K token 的保守字符预算，为提示词、端点和 schema 留出余量。
 _EVIDENCE_CHAR_BUDGET = 8000
 # 短端点「引文只剩两个名字」才拒；长标题/名单类引文常无额外谓词，放行以免误伤召回。

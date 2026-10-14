@@ -54,7 +54,7 @@ async def enrich_entity_properties(entity_results, manager, plan, llm, *, route,
                              call_metrics=None, use_scheduler=False,
                              local_previous=1, local_next=1, same_section=True,
                              max_attempts=3, retry_base_seconds=0.05,
-                             batch_size=24, max_workers=1, task='property', repair_issues=None):
+                             batch_size=2, max_workers=1, task='property', repair_issues=None):
     """Copy verified facts; ask the LLM only for missing context or conflicts.
 
     Keys may span arbitrarily many source windows. Each request carries bounded

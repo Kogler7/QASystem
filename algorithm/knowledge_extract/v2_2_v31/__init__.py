@@ -32,6 +32,8 @@ def extract_aggregate(
     llm: Any | None = None,
     use_scheduler: bool = True,
     clef: Any = None,
+    seed_entities: Iterable[dict[str, Any]] | None = None,
+    relation_only: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
     """Run the pipeline over ``chunks`` and return the aggregate contract."""
@@ -48,6 +50,8 @@ def extract_aggregate(
         llm=llm,
         use_scheduler=use_scheduler,
         clef=clef,
+        seed_entities=seed_entities,
+        relation_only=relation_only,
     )
 
 

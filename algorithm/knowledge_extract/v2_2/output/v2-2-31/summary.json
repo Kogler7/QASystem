@@ -1,0 +1,3773 @@
+{
+  "manifest": {
+    "schema_version": 1,
+    "hash_algorithm": "sha256",
+    "cases": [
+      {
+        "id": "trouble/trouble_mini",
+        "group": "trouble",
+        "case": "trouble_mini",
+        "sources": [
+          {
+            "path": "trouble/trouble_mini/docs/行修更换、互换记录50.xlsx",
+            "sha256": "32645930deefe41dbbad4d44e7fed898afc014ebbfccc29b7729a75614a6b075",
+            "missing": false
+          }
+        ],
+        "golden": {
+          "path": "trouble/trouble_mini/extract/golden.json",
+          "sha256": "e59fb4ec27041921f98391920822be64132b5f7de34c4a5d3cbbc3e2b972476d",
+          "missing": false
+        },
+        "ontology": {
+          "path": "trouble/ontology",
+          "kind": "directory",
+          "files": [
+            {
+              "path": "trouble.puml",
+              "sha256": "63d49b97970374447584e4a56d5ab7987e7b88f6c7aff96cb1d403aeaa8823ba",
+              "missing": false
+            }
+          ],
+          "sha256": "0a2c66fa101573f9844abb3394d89c24e687a9b2e3aafc858f79586807aeefc9",
+          "missing": false
+        },
+        "input_mode": {
+          "backend_extract": "reused_chunks"
+        },
+        "reused_inputs": [
+          {
+            "kind": "chunks",
+            "path": "trouble/trouble_mini/chunks.json",
+            "sha256": "2c729a1f9e7d3accc02f6534c07f772c70e4b63b693fafc39478b6c5a3e4457d",
+            "missing": false
+          }
+        ]
+      }
+    ],
+    "dataset_sha256": "d5dd18751a6ae99c9809ceb4becb951a71c49724c153745991966a497c5693ef",
+    "evaluator": {
+      "files": [
+        {
+          "path": "provenance.py",
+          "sha256": "4d7175348925347f318075029ba688269329e8dc9e035076a9a83d740cab83f4",
+          "missing": false
+        },
+        {
+          "path": "quality.py",
+          "sha256": "dada64584e75d8495c8b46d918468dde12a441aca412aa954275f63527cf79e2",
+          "missing": false
+        },
+        {
+          "path": "run.py",
+          "sha256": "61a65c1fae0b11d2cbef61463225cfa25d53dded4ea8d15ebaa452b18bcbbfbc",
+          "missing": false
+        }
+      ],
+      "sha256": "bb1de667363ecbf23a9dfd14fa6b2476fb51e309f210c4a595b2e8dcbe9ce484"
+    },
+    "settings": {
+      "stage": "backend",
+      "modes": [
+        "extract"
+      ],
+      "match_mode": "llm",
+      "judge": {
+        "adapter": "chat",
+        "model": "deepseek-flash",
+        "base_url": "https://api.deepseek.com/v1",
+        "timeout": 300.0,
+        "max_tokens": 8192,
+        "response_format": "auto",
+        "disable_thinking": true,
+        "batch_size": 20,
+        "golden_batch_size": 40
+      },
+      "options": {
+        "extraction": {
+          "version": "v2.2-v31"
+        }
+      }
+    },
+    "scoring_contract": {
+      "stage": "backend",
+      "modes": [
+        "extract"
+      ],
+      "match_mode": "llm",
+      "judge": {
+        "adapter": "chat",
+        "model": "deepseek-flash",
+        "base_url": "https://api.deepseek.com/v1",
+        "timeout": 300.0,
+        "max_tokens": 8192,
+        "response_format": "auto",
+        "disable_thinking": true,
+        "batch_size": 20,
+        "golden_batch_size": 40
+      }
+    },
+    "reused_predictions": []
+  },
+  "run_id": "20261014-042823",
+  "started_at": "2026-10-14T04:28:23.955966",
+  "workspace": "/home/ycheng/ZhCHRAG/qasystem/test_data/eval",
+  "backend_url": "http://127.0.0.1:8034",
+  "mcp_url": "http://127.0.0.1:8034/mcp",
+  "stage": "backend",
+  "modes": [
+    "extract"
+  ],
+  "match_mode": "llm",
+  "reuse_extract_from": null,
+  "groups": [
+    {
+      "name": "trouble",
+      "cases": 1
+    }
+  ],
+  "cases": [
+    {
+      "group": "trouble",
+      "case": "trouble_mini",
+      "files": [
+        "行修更换、互换记录50.xlsx"
+      ],
+      "golden": "/home/ycheng/ZhCHRAG/qasystem/test_data/eval/trouble/trouble_mini/extract/golden.json",
+      "scored": true,
+      "status": "failed",
+      "backend": {
+        "system": {
+          "status": "skipped",
+          "message": "未选择 pipeline 模式；需要时加 --mode pipeline"
+        },
+        "modules": {
+          "parse": {
+            "status": "skipped",
+            "message": "extract 模式只复用切片"
+          },
+          "chunk": {
+            "status": "reused",
+            "chunk_count": 2,
+            "source": "/home/ycheng/ZhCHRAG/qasystem/tmp/eval/runs/20261012-060131/trouble/trouble_mini/chunks.json"
+          },
+          "extract": {
+            "status": "partial",
+            "nodes": 85,
+            "relationships": 132,
+            "metrics": {
+              "entities": {
+                "golden": 105,
+                "predicted": 85,
+                "precision": 0.741176,
+                "recall": 0.6,
+                "f1": 0.663158,
+                "jaccard": 0.496063,
+                "accuracy": 0.496063,
+                "tp": 63,
+                "fp": 22,
+                "fn": 42
+              },
+              "relations": {
+                "golden": 127,
+                "predicted": 132,
+                "precision": 0.416667,
+                "recall": 0.433071,
+                "f1": 0.42471,
+                "jaccard": 0.269608,
+                "accuracy": 0.269608,
+                "tp": 55,
+                "fp": 77,
+                "fn": 72
+              },
+              "aligned_relations": {
+                "golden": 127,
+                "predicted": 132,
+                "precision": 0.280303,
+                "recall": 0.291339,
+                "f1": 0.285714,
+                "jaccard": 0.166667,
+                "accuracy": 0.166667,
+                "tp": 37,
+                "fp": 95,
+                "fn": 90,
+                "scope": "diagnostic",
+                "entity_mapping": "selected_maximum_matching"
+              },
+              "match_mode": "llm",
+              "identity": {
+                "entities": {
+                  "golden": 105,
+                  "predicted": 85,
+                  "precision": 0.211765,
+                  "recall": 0.171429,
+                  "f1": 0.189474,
+                  "jaccard": 0.104651,
+                  "accuracy": 0.104651,
+                  "tp": 18,
+                  "fp": 67,
+                  "fn": 87
+                },
+                "relations": {
+                  "golden": 127,
+                  "predicted": 132,
+                  "precision": 0.015152,
+                  "recall": 0.015748,
+                  "f1": 0.015444,
+                  "jaccard": 0.007782,
+                  "accuracy": 0.007782,
+                  "tp": 2,
+                  "fp": 130,
+                  "fn": 125
+                }
+              },
+              "predicted_graph": {
+                "nodes": [
+                  {
+                    "uid": "ExperimentResult::283KP压力开关断开",
+                    "label": "ExperimentResult",
+                    "name": "283KP压力开关断开",
+                    "properties": {
+                      "name": "283KP压力开关断开",
+                      "结果值": "283KP压力开关断开",
+                      "结果状态": "异常",
+                      "结果描述": "下载数据分析283KP压力开关断开"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::AB节空调蒸发器未结冰",
+                    "label": "ExperimentResult",
+                    "name": "AB节空调蒸发器未结冰",
+                    "properties": {
+                      "name": "AB节空调蒸发器未结冰",
+                      "结果值": "未结冰",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::B节干燥塔进出气止回阀正常",
+                    "label": "ExperimentResult",
+                    "name": "B节干燥塔进出气止回阀正常",
+                    "properties": {
+                      "name": "B节干燥塔进出气止回阀正常",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::EM231及CPU模块工作正常",
+                    "label": "ExperimentResult",
+                    "name": "EM231及CPU模块工作正常",
+                    "properties": {
+                      "name": "EM231及CPU模块工作正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::IGBT阻值正常",
+                    "label": "ExperimentResult",
+                    "name": "IGBT阻值正常",
+                    "properties": {
+                      "name": "IGBT阻值正常",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::下载数据分析结果",
+                    "label": "ExperimentResult",
+                    "name": "下载数据分析结果",
+                    "properties": {
+                      "name": "下载数据分析结果",
+                      "结果值": "AB节OCE通讯中断",
+                      "结果状态": "异常",
+                      "结果描述": "AB节OCE通讯中断"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::出风口温度14度",
+                    "label": "ExperimentResult",
+                    "name": "出风口温度14度",
+                    "properties": {
+                      "name": "出风口温度14度",
+                      "结果值": "14度",
+                      "结果状态": "正常",
+                      "结果描述": "试验测量环温32度，出风口温度14度，长时间试验AB节空调制冷正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::反复试验正常",
+                    "label": "ExperimentResult",
+                    "name": "反复试验正常",
+                    "properties": {
+                      "name": "反复试验正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::均缸缓解正常",
+                    "label": "ExperimentResult",
+                    "name": "均缸缓解正常",
+                    "properties": {
+                      "name": "均缸缓解正常",
+                      "结果值": "均缸缓解正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::多次试验正常",
+                    "label": "ExperimentResult",
+                    "name": "多次试验正常",
+                    "properties": {
+                      "name": "多次试验正常",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::库内试验正常",
+                    "label": "ExperimentResult",
+                    "name": "库内试验正常",
+                    "properties": {
+                      "name": "库内试验正常",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::库内试验结果",
+                    "label": "ExperimentResult",
+                    "name": "库内试验结果",
+                    "properties": {
+                      "name": "库内试验结果",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::总风低于750KPA时AB节压缩机自动打风",
+                    "label": "ExperimentResult",
+                    "name": "总风低于750KPA时AB节压缩机自动打风",
+                    "properties": {
+                      "name": "总风低于750KPA时AB节压缩机自动打风",
+                      "结果值": "总风低于750KPA时AB节压缩机自动打风",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::总风压力无下降",
+                    "label": "ExperimentResult",
+                    "name": "总风压力无下降",
+                    "properties": {
+                      "name": "总风压力无下降",
+                      "结果值": "总风压力无下降",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::流量计无显示",
+                    "label": "ExperimentResult",
+                    "name": "流量计无显示",
+                    "properties": {
+                      "name": "流量计无显示",
+                      "结果值": "流量计无显示",
+                      "结果状态": "异常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::环温32度",
+                    "label": "ExperimentResult",
+                    "name": "环温32度",
+                    "properties": {
+                      "name": "环温32度",
+                      "结果值": "32度",
+                      "结果状态": "未判定"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::试验制动机正常",
+                    "label": "ExperimentResult",
+                    "name": "试验制动机正常",
+                    "properties": {
+                      "name": "试验制动机正常",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::长时间试验AB节空调制冷正常",
+                    "label": "ExperimentResult",
+                    "name": "长时间试验AB节空调制冷正常",
+                    "properties": {
+                      "name": "长时间试验AB节空调制冷正常"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::181遮断阀",
+                    "label": "FaultComponent",
+                    "name": "181遮断阀",
+                    "properties": {
+                      "name": "181遮断阀",
+                      "部件名称": "181遮断阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::253YV",
+                    "label": "FaultComponent",
+                    "name": "253YV",
+                    "properties": {
+                      "name": "253YV",
+                      "部件名称": "253YV"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::283KP压力开关",
+                    "label": "FaultComponent",
+                    "name": "283KP压力开关",
+                    "properties": {
+                      "name": "283KP压力开关",
+                      "部件名称": "283KP压力开关"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::287KP",
+                    "label": "FaultComponent",
+                    "name": "287KP",
+                    "properties": {
+                      "name": "287KP",
+                      "部件名称": "287KP"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::AB节空调",
+                    "label": "FaultComponent",
+                    "name": "AB节空调",
+                    "properties": {
+                      "name": "AB节空调",
+                      "部件名称": "AB节空调"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::A网通信模块",
+                    "label": "FaultComponent",
+                    "name": "A网通信模块",
+                    "properties": {
+                      "name": "A网通信模块",
+                      "部件名称": "A网通信模块"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::B节压缩机",
+                    "label": "FaultComponent",
+                    "name": "B节压缩机",
+                    "properties": {
+                      "name": "B节压缩机",
+                      "部件名称": "B节压缩机"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::B节压缩机滤清筒",
+                    "label": "FaultComponent",
+                    "name": "B节压缩机滤清筒",
+                    "properties": {
+                      "name": "B节压缩机滤清筒",
+                      "部件名称": "B节压缩机滤清筒"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::B节干燥塔进出气止回阀",
+                    "label": "FaultComponent",
+                    "name": "B节干燥塔进出气止回阀",
+                    "properties": {
+                      "name": "B节干燥塔进出气止回阀",
+                      "部件名称": "B节干燥塔进出气止回阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::B节最小压力阀进气阀",
+                    "label": "FaultComponent",
+                    "name": "B节最小压力阀进气阀",
+                    "properties": {
+                      "name": "B节最小压力阀进气阀",
+                      "部件名称": "B节最小压力阀进气阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::CPU模块",
+                    "label": "FaultComponent",
+                    "name": "CPU模块",
+                    "properties": {
+                      "name": "CPU模块",
+                      "部件名称": "CPU模块"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::EM231模块",
+                    "label": "FaultComponent",
+                    "name": "EM231模块",
+                    "properties": {
+                      "name": "EM231模块",
+                      "部件名称": "EM231模块"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::OCE",
+                    "label": "FaultComponent",
+                    "name": "OCE",
+                    "properties": {
+                      "name": "OCE",
+                      "部件名称": "OCE"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::TCU",
+                    "label": "FaultComponent",
+                    "name": "TCU",
+                    "properties": {
+                      "name": "TCU",
+                      "部件名称": "TCU"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::中继阀",
+                    "label": "FaultComponent",
+                    "name": "中继阀",
+                    "properties": {
+                      "name": "中继阀",
+                      "部件名称": "中继阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::压缩机",
+                    "label": "FaultComponent",
+                    "name": "压缩机",
+                    "properties": {
+                      "name": "压缩机",
+                      "部件名称": "压缩机"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::门极驱动板",
+                    "label": "FaultComponent",
+                    "name": "门极驱动板",
+                    "properties": {
+                      "name": "门极驱动板",
+                      "部件名称": "门极驱动板"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换283KP压力开关",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换283KP压力开关",
+                    "properties": {
+                      "name": "预防性更换283KP压力开关",
+                      "方法名称": "预防性更换283KP压力开关",
+                      "方法类型": "更换",
+                      "处理策略": "预防性",
+                      "方法描述": "预防性更换283KP压力开关",
+                      "方法标识": "预防性更换283KP压力开关"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换287KP",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换287KP",
+                    "properties": {
+                      "name": "预防性更换287KP",
+                      "方法名称": "预防性更换287KP",
+                      "方法描述": "预防性更换287KP",
+                      "方法标识": "预防性更换287KP",
+                      "方法类型": "更换",
+                      "处理策略": "预防性"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换7002A节253YV，181遮断阀",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换7002A节253YV，181遮断阀",
+                    "properties": {
+                      "name": "预防性更换7002A节253YV，181遮断阀",
+                      "方法名称": "预防性更换7002A节253YV，181遮断阀",
+                      "方法类型": "更换",
+                      "处理策略": "预防性",
+                      "方法描述": "预防性更换7002A节253YV，181遮断阀",
+                      "方法标识": "预防性更换7002A节253YV，181遮断阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换AB节CPU板卡",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换AB节CPU板卡",
+                    "properties": {
+                      "name": "预防性更换AB节CPU板卡",
+                      "方法名称": "预防性更换AB节CPU板卡",
+                      "方法描述": "预防性更换AB节CPU板卡",
+                      "方法类型": "更换",
+                      "处理策略": "预防性",
+                      "方法标识": "预防性更换AB节CPU板卡"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换AB节EM231模块",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换AB节EM231模块",
+                    "properties": {
+                      "name": "预防性更换AB节EM231模块",
+                      "方法名称": "预防性更换AB节EM231模块",
+                      "方法描述": "预防性更换AB节EM231模块",
+                      "方法标识": "预防性更换AB节EM231模块",
+                      "方法类型": "更换",
+                      "处理策略": "预防性"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换A网通信模块",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换A网通信模块",
+                    "properties": {
+                      "name": "预防性更换A网通信模块",
+                      "方法名称": "预防性更换A网通信模块",
+                      "方法描述": "预防性更换A网通信模块",
+                      "方法标识": "预防性更换A网通信模块",
+                      "方法类型": "更换",
+                      "处理策略": "预防性"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换A节中继阀、181遮断阀",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换A节中继阀、181遮断阀",
+                    "properties": {
+                      "name": "预防性更换A节中继阀、181遮断阀",
+                      "方法名称": "预防性更换A节中继阀、181遮断阀",
+                      "方法类型": "更换",
+                      "处理策略": "预防性",
+                      "方法描述": "预防性更换A节中继阀、181遮断阀",
+                      "方法标识": "预防性更换A节中继阀、181遮断阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换B节最小压力阀进气阀",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换B节最小压力阀进气阀",
+                    "properties": {
+                      "name": "预防性更换B节最小压力阀进气阀",
+                      "方法名称": "预防性更换B节最小压力阀进气阀",
+                      "方法描述": "预防性更换B节最小压力阀进气阀",
+                      "方法标识": "预防性更换B节最小压力阀进气阀",
+                      "方法类型": "更换",
+                      "处理策略": "预防性"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换门极驱动板",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换门极驱动板",
+                    "properties": {
+                      "name": "预防性更换门极驱动板",
+                      "方法名称": "预防性更换门极驱动板",
+                      "方法描述": "预防性更换门极驱动板",
+                      "方法标识": "预防性更换门极驱动板",
+                      "方法类型": "更换",
+                      "处理策略": "预防性"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::AB节空调制冷不佳",
+                    "label": "FaultType",
+                    "name": "AB节空调制冷不佳",
+                    "properties": {
+                      "name": "AB节空调制冷不佳",
+                      "故障类型名称": "AB节空调制冷不佳",
+                      "故障描述": "AB节空调制冷不佳"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::A网脱网",
+                    "label": "FaultType",
+                    "name": "A网脱网",
+                    "properties": {
+                      "name": "A网脱网",
+                      "故障类型名称": "A网脱网",
+                      "故障类别": "通信故障",
+                      "故障描述": "运行至457KM+890M处A网脱网6:14恢复"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::A网闪红",
+                    "label": "FaultType",
+                    "name": "A网闪红",
+                    "properties": {
+                      "name": "A网闪红",
+                      "故障类型名称": "A网闪红",
+                      "故障类别": "通信故障",
+                      "故障描述": "运行至482KM+900M处A网闪红5:51恢复"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::A节大闸不缓解",
+                    "label": "FaultType",
+                    "name": "A节大闸不缓解",
+                    "properties": {
+                      "name": "A节大闸不缓解",
+                      "故障类型名称": "A节大闸不缓解",
+                      "故障类别": "气路故障",
+                      "故障描述": "换端后A节大闸不缓解，重新转93阀无效"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::B节TCU1M2A相下管故障",
+                    "label": "FaultType",
+                    "name": "B节TCU1M2A相下管故障",
+                    "properties": {
+                      "name": "B节TCU1M2A相下管故障",
+                      "故障类型名称": "B节TCU1M2A相下管故障",
+                      "故障类别": "电气故障",
+                      "故障描述": "B节TCU1M2A相下管故障，时间22:51:58-22:53:31,2:10:30-2:10-31"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::B节压缩机不打风",
+                    "label": "FaultType",
+                    "name": "B节压缩机不打风",
+                    "properties": {
+                      "name": "B节压缩机不打风",
+                      "故障类型名称": "B节压缩机不打风",
+                      "故障类别": "气路故障",
+                      "故障描述": "B节压缩机不打风，B节压缩机滤清筒往外排风0:09"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::LTE-A网脱网",
+                    "label": "FaultType",
+                    "name": "LTE-A网脱网",
+                    "properties": {
+                      "name": "LTE-A网脱网",
+                      "故障类型名称": "LTE-A网脱网",
+                      "故障类别": "通信故障",
+                      "故障描述": "运行至541KM+800M处LTE-A网脱网5:00恢复"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::OCE通讯中断",
+                    "label": "FaultType",
+                    "name": "OCE通讯中断",
+                    "properties": {
+                      "name": "OCE通讯中断",
+                      "故障类型名称": "OCE通讯中断",
+                      "故障类别": "通信故障",
+                      "故障描述": "AB节OCE通讯中断"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::从车列车管减压慢",
+                    "label": "FaultType",
+                    "name": "从车列车管减压慢",
+                    "properties": {
+                      "name": "从车列车管减压慢",
+                      "故障类型名称": "从车列车管减压慢",
+                      "故障类别": "气路故障",
+                      "故障描述": "充满后主车制动，从车列车管减压慢"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::从车没有流量显示",
+                    "label": "FaultType",
+                    "name": "从车没有流量显示",
+                    "properties": {
+                      "name": "从车没有流量显示",
+                      "故障类型名称": "从车没有流量显示",
+                      "故障描述": "从车没有流量显示",
+                      "故障类别": "气路故障"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::列车管不缓解",
+                    "label": "FaultType",
+                    "name": "列车管不缓解",
+                    "properties": {
+                      "name": "列车管不缓解",
+                      "故障类型名称": "列车管不缓解",
+                      "故障类别": "气路故障",
+                      "故障描述": "大闸运转位均缸缓解正常，列车管不缓解"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::列车管压力上升慢",
+                    "label": "FaultType",
+                    "name": "列车管压力上升慢",
+                    "properties": {
+                      "name": "列车管压力上升慢",
+                      "故障类型名称": "列车管压力上升慢",
+                      "故障类别": "气路故障",
+                      "故障描述": "编组试风缓解后，列车管压力上升慢，均缸正常，从车没有流量显示，充满后主车制动，从车列车管减压慢"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::列车管未充风",
+                    "label": "FaultType",
+                    "name": "列车管未充风",
+                    "properties": {
+                      "name": "列车管未充风",
+                      "故障类型名称": "列车管未充风",
+                      "故障类别": "气路故障",
+                      "故障描述": "判断为列车管未充风"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::总风低于750KPA，压缩机未自动打风",
+                    "label": "FaultType",
+                    "name": "总风低于750KPA，压缩机未自动打风",
+                    "properties": {
+                      "name": "总风低于750KPA，压缩机未自动打风",
+                      "故障类型名称": "总风低于750KPA，压缩机未自动打风",
+                      "故障类别": "气路故障",
+                      "故障描述": "17034次，A节运行至55KM处（6:12），75KM处（6:31），总风低于750KPA，压缩机未自动打风"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "label": "TroubleshootingExperiment",
+                    "name": "上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "properties": {
+                      "name": "上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                      "实验名称": "上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                      "实验过程": "上车多次试验总风低于750KPA时AB节压缩机自动打风"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "label": "TroubleshootingExperiment",
+                    "name": "上车检查AB节空调蒸发器",
+                    "properties": {
+                      "name": "上车检查AB节空调蒸发器",
+                      "实验名称": "上车检查AB节空调蒸发器",
+                      "实验类型": "外观检查",
+                      "实验过程": "上车检查AB节空调蒸发器"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::上车测量IGBT阻值",
+                    "label": "TroubleshootingExperiment",
+                    "name": "上车测量IGBT阻值",
+                    "properties": {
+                      "name": "上车测量IGBT阻值",
+                      "实验名称": "上车测量IGBT阻值",
+                      "实验类型": "电气测量",
+                      "实验过程": "上车测量IGBT阻值"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::下载OCE数据",
+                    "label": "TroubleshootingExperiment",
+                    "name": "下载OCE数据",
+                    "properties": {
+                      "name": "下载OCE数据",
+                      "实验名称": "下载OCE数据",
+                      "实验类型": "数据分析",
+                      "实验过程": "下载OCE数据"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::下载主从控BCU数据分析",
+                    "label": "TroubleshootingExperiment",
+                    "name": "下载主从控BCU数据分析",
+                    "properties": {
+                      "name": "下载主从控BCU数据分析",
+                      "实验名称": "下载主从控BCU数据分析",
+                      "实验类型": "数据分析",
+                      "实验过程": "下载主从控BCU数据分析为从车7002故障时刻"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::下载主车7002LTE数据",
+                    "label": "TroubleshootingExperiment",
+                    "name": "下载主车7002LTE数据",
+                    "properties": {
+                      "name": "下载主车7002LTE数据",
+                      "实验名称": "下载主车7002LTE数据",
+                      "实验类型": "数据分析",
+                      "实验过程": "下载主车7002LTE数据"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::下载从车7079数据",
+                    "label": "TroubleshootingExperiment",
+                    "name": "下载从车7079数据",
+                    "properties": {
+                      "name": "下载从车7079数据",
+                      "实验名称": "下载从车7079数据",
+                      "实验类型": "数据分析",
+                      "实验过程": "神池入库后下载从车7079数据"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::下载数据分析",
+                    "label": "TroubleshootingExperiment",
+                    "name": "下载数据分析",
+                    "properties": {
+                      "name": "下载数据分析",
+                      "实验名称": "下载数据分析",
+                      "实验类型": "数据分析"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::下载数据分析283KP压力开关",
+                    "label": "TroubleshootingExperiment",
+                    "name": "下载数据分析283KP压力开关",
+                    "properties": {
+                      "name": "下载数据分析283KP压力开关",
+                      "实验名称": "下载数据分析283KP压力开关",
+                      "实验类型": "数据分析",
+                      "实验过程": "下载数据分析283KP压力开关断开"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::反复试验",
+                    "label": "TroubleshootingExperiment",
+                    "name": "反复试验",
+                    "properties": {
+                      "name": "反复试验",
+                      "实验名称": "反复试验",
+                      "实验类型": "功能测试",
+                      "实验过程": "反复试验"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::多次试验",
+                    "label": "TroubleshootingExperiment",
+                    "name": "多次试验",
+                    "properties": {
+                      "name": "多次试验",
+                      "实验名称": "多次试验",
+                      "实验类型": "功能测试",
+                      "实验过程": "多次试验"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::库内试验",
+                    "label": "TroubleshootingExperiment",
+                    "name": "库内试验",
+                    "properties": {
+                      "name": "库内试验",
+                      "实验名称": "库内试验",
+                      "实验类型": "功能测试",
+                      "实验过程": "库内试验"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::拆解B节干燥塔进出气止回阀检查",
+                    "label": "TroubleshootingExperiment",
+                    "name": "拆解B节干燥塔进出气止回阀检查",
+                    "properties": {
+                      "name": "拆解B节干燥塔进出气止回阀检查",
+                      "实验名称": "拆解B节干燥塔进出气止回阀检查",
+                      "实验类型": "拆解检查",
+                      "实验过程": "拆解B节干燥塔进出气止回阀"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::检查OCE到交换机的线路",
+                    "label": "TroubleshootingExperiment",
+                    "name": "检查OCE到交换机的线路",
+                    "properties": {
+                      "name": "检查OCE到交换机的线路",
+                      "实验名称": "检查OCE到交换机的线路",
+                      "实验类型": "线路检查",
+                      "实验过程": "检查OCE到交换机的线路"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::试验制动机",
+                    "label": "TroubleshootingExperiment",
+                    "name": "试验制动机",
+                    "properties": {
+                      "name": "试验制动机",
+                      "实验名称": "试验制动机",
+                      "实验类型": "功能测试",
+                      "实验过程": "试验制动机"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::试验测量环温32度出风口温度14度",
+                    "label": "TroubleshootingExperiment",
+                    "name": "试验测量环温32度出风口温度14度",
+                    "properties": {
+                      "name": "试验测量环温32度出风口温度14度",
+                      "实验名称": "试验测量环温32度出风口温度14度",
+                      "实验类型": "电气测量",
+                      "实验过程": "试验测量环温32度，出风口温度14度"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::长时间试验AB节空调制冷",
+                    "label": "TroubleshootingExperiment",
+                    "name": "长时间试验AB节空调制冷",
+                    "properties": {
+                      "name": "长时间试验AB节空调制冷",
+                      "实验名称": "长时间试验AB节空调制冷",
+                      "实验类型": "功能测试",
+                      "实验过程": "长时间试验AB节空调制冷"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::OCE到交换机线路检查结果",
+                    "label": "ExperimentResult",
+                    "name": "OCE到交换机线路检查结果",
+                    "properties": {
+                      "name": "OCE到交换机线路检查结果",
+                      "结果值": "良好",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::上车试验结果",
+                    "label": "ExperimentResult",
+                    "name": "上车试验结果",
+                    "properties": {
+                      "name": "上车试验结果",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "ExperimentResult::刷新底层程序后试验结果",
+                    "label": "ExperimentResult",
+                    "name": "刷新底层程序后试验结果",
+                    "properties": {
+                      "name": "刷新底层程序后试验结果",
+                      "结果值": "正常",
+                      "结果状态": "正常"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::CPU板卡",
+                    "label": "FaultComponent",
+                    "name": "CPU板卡",
+                    "properties": {
+                      "name": "CPU板卡",
+                      "部件名称": "CPU板卡"
+                    }
+                  },
+                  {
+                    "uid": "FaultComponent::紧急阀",
+                    "label": "FaultComponent",
+                    "name": "紧急阀",
+                    "properties": {
+                      "name": "紧急阀",
+                      "部件名称": "紧急阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::刷新底层程序",
+                    "label": "FaultHandlingMethod",
+                    "name": "刷新底层程序",
+                    "properties": {
+                      "name": "刷新底层程序",
+                      "方法名称": "刷新底层程序",
+                      "方法类型": "软件处理",
+                      "方法描述": "刷新底层程序",
+                      "方法标识": "刷新底层程序",
+                      "处理策略": "预防性"
+                    }
+                  },
+                  {
+                    "uid": "FaultHandlingMethod::预防性更换B节紧急阀",
+                    "label": "FaultHandlingMethod",
+                    "name": "预防性更换B节紧急阀",
+                    "properties": {
+                      "name": "预防性更换B节紧急阀",
+                      "方法名称": "预防性更换B节紧急阀",
+                      "方法描述": "预防性更换B节紧急阀",
+                      "方法类型": "更换",
+                      "处理策略": "预防性",
+                      "方法标识": "预防性更换B节紧急阀"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::A7故障",
+                    "label": "FaultType",
+                    "name": "A7故障",
+                    "properties": {
+                      "name": "A7故障",
+                      "故障类型名称": "A7故障",
+                      "故障描述": "B节制动显示屏显示A7故障",
+                      "故障类别": "气路故障"
+                    }
+                  },
+                  {
+                    "uid": "FaultType::LTE B网脱网",
+                    "label": "FaultType",
+                    "name": "LTE B网脱网",
+                    "properties": {
+                      "name": "LTE B网脱网",
+                      "故障类型名称": "LTE B网脱网",
+                      "故障类别": "通信故障",
+                      "故障描述": "主车8016B节从车7005A节两万同步运行期间LTE B网多次脱网，分别于180km、192km、207km、231km处脱网，运行至西柏坡站分解"
+                    }
+                  },
+                  {
+                    "uid": "TroubleshootingExperiment::上车试验",
+                    "label": "TroubleshootingExperiment",
+                    "name": "上车试验",
+                    "properties": {
+                      "name": "上车试验",
+                      "实验名称": "上车试验",
+                      "实验类型": "功能测试",
+                      "实验过程": "上车试验"
+                    }
+                  }
+                ],
+                "relationships": [
+                  {
+                    "from_uid": "ExperimentResult::283KP压力开关断开",
+                    "to_uid": "FaultType::A节大闸不缓解",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::B节干燥塔进出气止回阀正常",
+                    "to_uid": "FaultType::B节压缩机不打风",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::IGBT阻值正常",
+                    "to_uid": "FaultType::B节TCU1M2A相下管故障",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::下载数据分析结果",
+                    "to_uid": "FaultType::A网脱网",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::下载数据分析结果",
+                    "to_uid": "FaultType::A网闪红",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::出风口温度14度",
+                    "to_uid": "FaultType::AB节空调制冷不佳",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::均缸缓解正常",
+                    "to_uid": "FaultType::列车管不缓解",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::总风低于750KPA时AB节压缩机自动打风",
+                    "to_uid": "FaultType::总风低于750KPA，压缩机未自动打风",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::总风压力无下降",
+                    "to_uid": "FaultType::列车管压力上升慢",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::流量计无显示",
+                    "to_uid": "FaultType::从车列车管减压慢",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::流量计无显示",
+                    "to_uid": "FaultType::从车没有流量显示",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::流量计无显示",
+                    "to_uid": "FaultType::列车管压力上升慢",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::流量计无显示",
+                    "to_uid": "FaultType::列车管未充风",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换283KP压力开关",
+                    "to_uid": "FaultComponent::283KP压力开关",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换287KP",
+                    "to_uid": "FaultComponent::287KP",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换287KP",
+                    "to_uid": "FaultComponent::压缩机",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换7002A节253YV，181遮断阀",
+                    "to_uid": "FaultComponent::181遮断阀",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换7002A节253YV，181遮断阀",
+                    "to_uid": "FaultComponent::253YV",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换AB节CPU板卡",
+                    "to_uid": "FaultComponent::OCE",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换AB节EM231模块",
+                    "to_uid": "FaultComponent::AB节空调",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换AB节EM231模块",
+                    "to_uid": "FaultComponent::CPU模块",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换AB节EM231模块",
+                    "to_uid": "FaultComponent::EM231模块",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换A网通信模块",
+                    "to_uid": "FaultComponent::A网通信模块",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换A节中继阀、181遮断阀",
+                    "to_uid": "FaultComponent::中继阀",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换B节最小压力阀进气阀",
+                    "to_uid": "FaultComponent::B节压缩机",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换B节最小压力阀进气阀",
+                    "to_uid": "FaultComponent::B节压缩机滤清筒",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换B节最小压力阀进气阀",
+                    "to_uid": "FaultComponent::B节最小压力阀进气阀",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换门极驱动板",
+                    "to_uid": "FaultComponent::TCU",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换门极驱动板",
+                    "to_uid": "FaultComponent::门极驱动板",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "TroubleshootingExperiment::试验测量环温32度出风口温度14度",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "TroubleshootingExperiment::长时间试验AB节空调制冷",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "FaultHandlingMethod::预防性更换AB节EM231模块",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "FaultComponent::AB节空调",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "FaultComponent::CPU模块",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::AB节空调制冷不佳",
+                    "to_uid": "FaultComponent::EM231模块",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网脱网",
+                    "to_uid": "TroubleshootingExperiment::下载OCE数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网脱网",
+                    "to_uid": "TroubleshootingExperiment::下载主车7002LTE数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网脱网",
+                    "to_uid": "TroubleshootingExperiment::下载从车7079数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网闪红",
+                    "to_uid": "TroubleshootingExperiment::下载OCE数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网闪红",
+                    "to_uid": "TroubleshootingExperiment::下载主车7002LTE数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网闪红",
+                    "to_uid": "TroubleshootingExperiment::下载从车7079数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A网闪红",
+                    "to_uid": "FaultComponent::A网通信模块",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A节大闸不缓解",
+                    "to_uid": "TroubleshootingExperiment::下载数据分析283KP压力开关",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A节大闸不缓解",
+                    "to_uid": "TroubleshootingExperiment::库内试验",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A节大闸不缓解",
+                    "to_uid": "FaultHandlingMethod::预防性更换283KP压力开关",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A节大闸不缓解",
+                    "to_uid": "FaultComponent::283KP压力开关",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节TCU1M2A相下管故障",
+                    "to_uid": "TroubleshootingExperiment::上车测量IGBT阻值",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节TCU1M2A相下管故障",
+                    "to_uid": "FaultHandlingMethod::预防性更换门极驱动板",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节TCU1M2A相下管故障",
+                    "to_uid": "FaultComponent::TCU",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节TCU1M2A相下管故障",
+                    "to_uid": "FaultComponent::门极驱动板",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "TroubleshootingExperiment::反复试验",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "TroubleshootingExperiment::拆解B节干燥塔进出气止回阀检查",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "FaultHandlingMethod::预防性更换B节最小压力阀进气阀",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "FaultComponent::B节压缩机",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "FaultComponent::B节压缩机滤清筒",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "FaultComponent::B节干燥塔进出气止回阀",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::B节压缩机不打风",
+                    "to_uid": "FaultComponent::B节最小压力阀进气阀",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::LTE-A网脱网",
+                    "to_uid": "TroubleshootingExperiment::下载OCE数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::LTE-A网脱网",
+                    "to_uid": "TroubleshootingExperiment::下载主车7002LTE数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::LTE-A网脱网",
+                    "to_uid": "TroubleshootingExperiment::下载从车7079数据",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::LTE-A网脱网",
+                    "to_uid": "FaultHandlingMethod::预防性更换A网通信模块",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::OCE通讯中断",
+                    "to_uid": "FaultComponent::OCE",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管不缓解",
+                    "to_uid": "TroubleshootingExperiment::下载数据分析",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管不缓解",
+                    "to_uid": "TroubleshootingExperiment::多次试验",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管不缓解",
+                    "to_uid": "FaultHandlingMethod::预防性更换A节中继阀、181遮断阀",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管不缓解",
+                    "to_uid": "FaultComponent::中继阀",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管未充风",
+                    "to_uid": "TroubleshootingExperiment::下载主从控BCU数据分析",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管未充风",
+                    "to_uid": "TroubleshootingExperiment::试验制动机",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管未充风",
+                    "to_uid": "FaultHandlingMethod::预防性更换7002A节253YV，181遮断阀",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管未充风",
+                    "to_uid": "FaultComponent::181遮断阀",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::列车管未充风",
+                    "to_uid": "FaultComponent::253YV",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::总风低于750KPA，压缩机未自动打风",
+                    "to_uid": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::总风低于750KPA，压缩机未自动打风",
+                    "to_uid": "FaultHandlingMethod::预防性更换287KP",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::总风低于750KPA，压缩机未自动打风",
+                    "to_uid": "FaultComponent::287KP",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::总风低于750KPA，压缩机未自动打风",
+                    "to_uid": "FaultComponent::压缩机",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "to_uid": "ExperimentResult::总风低于750KPA时AB节压缩机自动打风",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "to_uid": "FaultComponent::287KP",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "to_uid": "FaultComponent::B节压缩机",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "to_uid": "FaultComponent::压缩机",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "to_uid": "ExperimentResult::AB节空调蒸发器未结冰",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "to_uid": "ExperimentResult::EM231及CPU模块工作正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "to_uid": "FaultComponent::AB节空调",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "to_uid": "FaultComponent::CPU模块",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车检查AB节空调蒸发器",
+                    "to_uid": "FaultComponent::EM231模块",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车测量IGBT阻值",
+                    "to_uid": "ExperimentResult::IGBT阻值正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车测量IGBT阻值",
+                    "to_uid": "FaultComponent::TCU",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车测量IGBT阻值",
+                    "to_uid": "FaultComponent::中继阀",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车测量IGBT阻值",
+                    "to_uid": "FaultComponent::门极驱动板",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载主从控BCU数据分析",
+                    "to_uid": "ExperimentResult::均缸缓解正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载主从控BCU数据分析",
+                    "to_uid": "ExperimentResult::总风压力无下降",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载主从控BCU数据分析",
+                    "to_uid": "ExperimentResult::流量计无显示",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载主从控BCU数据分析",
+                    "to_uid": "FaultComponent::253YV",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载主车7002LTE数据",
+                    "to_uid": "FaultComponent::A网通信模块",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载数据分析",
+                    "to_uid": "ExperimentResult::下载数据分析结果",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载数据分析",
+                    "to_uid": "FaultComponent::181遮断阀",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载数据分析",
+                    "to_uid": "FaultComponent::283KP压力开关",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载数据分析283KP压力开关",
+                    "to_uid": "ExperimentResult::283KP压力开关断开",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::下载数据分析283KP压力开关",
+                    "to_uid": "FaultComponent::283KP压力开关",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::反复试验",
+                    "to_uid": "ExperimentResult::反复试验正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::反复试验",
+                    "to_uid": "FaultComponent::B节最小压力阀进气阀",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::多次试验",
+                    "to_uid": "ExperimentResult::多次试验正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::多次试验",
+                    "to_uid": "ExperimentResult::总风低于750KPA时AB节压缩机自动打风",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::多次试验",
+                    "to_uid": "FaultComponent::287KP",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::多次试验",
+                    "to_uid": "FaultComponent::B节压缩机",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::多次试验",
+                    "to_uid": "FaultComponent::压缩机",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::库内试验",
+                    "to_uid": "ExperimentResult::库内试验正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::库内试验",
+                    "to_uid": "ExperimentResult::库内试验结果",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::拆解B节干燥塔进出气止回阀检查",
+                    "to_uid": "ExperimentResult::B节干燥塔进出气止回阀正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::拆解B节干燥塔进出气止回阀检查",
+                    "to_uid": "FaultComponent::B节压缩机滤清筒",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::检查OCE到交换机的线路",
+                    "to_uid": "FaultComponent::OCE",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::试验制动机",
+                    "to_uid": "ExperimentResult::试验制动机正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::试验测量环温32度出风口温度14度",
+                    "to_uid": "ExperimentResult::出风口温度14度",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::试验测量环温32度出风口温度14度",
+                    "to_uid": "ExperimentResult::环温32度",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::长时间试验AB节空调制冷",
+                    "to_uid": "ExperimentResult::长时间试验AB节空调制冷正常",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::长时间试验AB节空调制冷",
+                    "to_uid": "FaultComponent::AB节空调",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::上车试验结果",
+                    "to_uid": "FaultType::A7故障",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::下载数据分析结果",
+                    "to_uid": "FaultType::LTE B网脱网",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "ExperimentResult::下载数据分析结果",
+                    "to_uid": "FaultType::OCE通讯中断",
+                    "type": "INDICATES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换AB节CPU板卡",
+                    "to_uid": "FaultComponent::CPU板卡",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultHandlingMethod::预防性更换B节紧急阀",
+                    "to_uid": "FaultComponent::紧急阀",
+                    "type": "ACTS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A7故障",
+                    "to_uid": "TroubleshootingExperiment::上车试验",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A7故障",
+                    "to_uid": "FaultHandlingMethod::预防性更换B节紧急阀",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::A7故障",
+                    "to_uid": "FaultComponent::紧急阀",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::OCE通讯中断",
+                    "to_uid": "TroubleshootingExperiment::检查OCE到交换机的线路",
+                    "type": "DIAGNOSED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::OCE通讯中断",
+                    "to_uid": "FaultHandlingMethod::刷新底层程序",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::OCE通讯中断",
+                    "to_uid": "FaultHandlingMethod::预防性更换AB节CPU板卡",
+                    "type": "HANDLED_BY",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "FaultType::OCE通讯中断",
+                    "to_uid": "FaultComponent::CPU板卡",
+                    "type": "OCCURS_ON",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车试验",
+                    "to_uid": "ExperimentResult::上车试验结果",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::上车试验",
+                    "to_uid": "FaultComponent::紧急阀",
+                    "type": "TARGETS",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::检查OCE到交换机的线路",
+                    "to_uid": "ExperimentResult::OCE到交换机线路检查结果",
+                    "type": "PRODUCES",
+                    "properties": {}
+                  },
+                  {
+                    "from_uid": "TroubleshootingExperiment::检查OCE到交换机的线路",
+                    "to_uid": "FaultComponent::CPU板卡",
+                    "type": "TARGETS",
+                    "properties": {}
+                  }
+                ]
+              }
+            },
+            "elapsed_seconds": 694.736,
+            "score_elapsed_seconds": 15.19,
+            "extract_version": "v2.2-v31",
+            "quality": {
+              "status": "partial",
+              "error_code": "LLM_SCHEMA_INVALID",
+              "verification": {
+                "valid": true,
+                "hard_issue_count": 0,
+                "repairable_issue_count": 4,
+                "issues": [
+                  {
+                    "code": "REQUIRED_RELATION_MISSING",
+                    "message": "FaultComponent::B节干燥塔进出气止回阀 缺少入向必需关系 TARGETS（源端基数 1）",
+                    "path": "chunk-0000:2875:2890",
+                    "severity": "warning",
+                    "repair_type": "required_relation",
+                    "context": {
+                      "gap_id": "generic-relation_coverage-86",
+                      "span_id": "chunk-0000:2875:2890",
+                      "target_type": "FaultComponent",
+                      "gap_type": "relation_coverage",
+                      "severity": "info",
+                      "evidence": "B节干燥塔进出气止回阀",
+                      "reason": "FaultComponent::B节干燥塔进出气止回阀 缺少入向必需关系 TARGETS（源端基数 1）",
+                      "expected_features": [],
+                      "expected_relations": [
+                        "TARGETS"
+                      ]
+                    }
+                  },
+                  {
+                    "code": "REQUIRED_RELATION_MISSING",
+                    "message": "ExperimentResult::刷新底层程序后试验结果 缺少入向必需关系 PRODUCES（源端基数 1）",
+                    "path": "chunk-0001:661:672",
+                    "severity": "warning",
+                    "repair_type": "required_relation",
+                    "context": {
+                      "gap_id": "generic-relation_coverage-87",
+                      "span_id": "chunk-0001:661:672",
+                      "target_type": "ExperimentResult",
+                      "gap_type": "relation_coverage",
+                      "severity": "info",
+                      "evidence": "刷新底层程序后试验结果",
+                      "reason": "ExperimentResult::刷新底层程序后试验结果 缺少入向必需关系 PRODUCES（源端基数 1）",
+                      "expected_features": [],
+                      "expected_relations": [
+                        "PRODUCES"
+                      ]
+                    }
+                  },
+                  {
+                    "code": "REQUIRED_RELATION_MISSING",
+                    "message": "FaultType::LTE-A网脱网 缺少入向必需关系 INDICATES（源端基数 1）",
+                    "path": "chunk-0000:530:563",
+                    "severity": "warning",
+                    "repair_type": "required_relation",
+                    "context": {
+                      "gap_id": "generic-relation_coverage-88",
+                      "span_id": "chunk-0000:530:563",
+                      "target_type": "FaultType",
+                      "gap_type": "relation_coverage",
+                      "severity": "info",
+                      "evidence": "LTE-A网脱网",
+                      "reason": "FaultType::LTE-A网脱网 缺少入向必需关系 INDICATES（源端基数 1）",
+                      "expected_features": [],
+                      "expected_relations": [
+                        "INDICATES"
+                      ]
+                    }
+                  },
+                  {
+                    "code": "REQUIRED_RELATION_MISSING",
+                    "message": "FaultComponent::B节干燥塔进出气止回阀 缺少入向必需关系 ACTS_ON（源端基数 1）",
+                    "path": "chunk-0000:2875:2890",
+                    "severity": "warning",
+                    "repair_type": "required_relation",
+                    "context": {
+                      "gap_id": "generic-relation_coverage-89",
+                      "span_id": "chunk-0000:2875:2890",
+                      "target_type": "FaultComponent",
+                      "gap_type": "relation_coverage",
+                      "severity": "info",
+                      "evidence": "B节干燥塔进出气止回阀",
+                      "reason": "FaultComponent::B节干燥塔进出气止回阀 缺少入向必需关系 ACTS_ON（源端基数 1）",
+                      "expected_features": [],
+                      "expected_relations": [
+                        "ACTS_ON"
+                      ]
+                    }
+                  }
+                ],
+                "coverage_gaps": [
+                  {
+                    "gap_id": "generic-feature_coverage-1",
+                    "span_id": "chunk-0000:138:155",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "283KP压力开关断开",
+                    "reason": "ExperimentResult::283KP压力开关断开 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-2",
+                    "span_id": "chunk-0000:3294:3309",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "AB节空调蒸发器未结冰",
+                    "reason": "ExperimentResult::AB节空调蒸发器未结冰 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-3",
+                    "span_id": "chunk-0000:2875:2890",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节干燥塔进出气止回阀正常",
+                    "reason": "ExperimentResult::B节干燥塔进出气止回阀正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-4",
+                    "span_id": "chunk-0000:3310:3325",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "EM231及CPU模块工作正常",
+                    "reason": "ExperimentResult::EM231及CPU模块工作正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-5",
+                    "span_id": "chunk-0000:2042:2054",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "IGBT阻值正常",
+                    "reason": "ExperimentResult::IGBT阻值正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-6",
+                    "span_id": "chunk-0001:632:646",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "OCE到交换机线路检查结果",
+                    "reason": "ExperimentResult::OCE到交换机线路检查结果 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-7",
+                    "span_id": "chunk-0001:100:106",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "上车试验结果",
+                    "reason": "ExperimentResult::上车试验结果 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-8",
+                    "span_id": "chunk-0001:614:631",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载数据分析结果",
+                    "reason": "ExperimentResult::下载数据分析结果 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-9",
+                    "span_id": "chunk-0000:3352:3360",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "出风口温度14度",
+                    "reason": "ExperimentResult::出风口温度14度 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-10",
+                    "span_id": "chunk-0001:661:672",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "刷新底层程序后试验结果",
+                    "reason": "ExperimentResult::刷新底层程序后试验结果 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-11",
+                    "span_id": "chunk-0000:2907:2913",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "反复试验正常",
+                    "reason": "ExperimentResult::反复试验正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-12",
+                    "span_id": "chunk-0000:1539:1570",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "均缸缓解正常",
+                    "reason": "ExperimentResult::均缸缓解正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-13",
+                    "span_id": "chunk-0000:1068:1096",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "多次试验正常",
+                    "reason": "ExperimentResult::多次试验正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-14",
+                    "span_id": "chunk-0000:156:182",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "库内试验正常",
+                    "reason": "ExperimentResult::库内试验正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-15",
+                    "span_id": "chunk-0001:118:124",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "库内试验结果",
+                    "reason": "ExperimentResult::库内试验结果 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-16",
+                    "span_id": "chunk-0000:2461:2488",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "总风低于750KPA时AB节压缩机自动打风",
+                    "reason": "ExperimentResult::总风低于750KPA时AB节压缩机自动打风 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-17",
+                    "span_id": "chunk-0000:1539:1570",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "总风压力无下降",
+                    "reason": "ExperimentResult::总风压力无下降 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-18",
+                    "span_id": "chunk-0000:1539:1570",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "流量计无显示",
+                    "reason": "ExperimentResult::流量计无显示 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-19",
+                    "span_id": "chunk-0000:3342:3351",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "环温32度",
+                    "reason": "ExperimentResult::环温32度 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-20",
+                    "span_id": "chunk-0000:1571:1602",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "试验制动机正常",
+                    "reason": "ExperimentResult::试验制动机正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-21",
+                    "span_id": "chunk-0000:3361:3375",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "长时间试验AB节空调制冷正常",
+                    "reason": "ExperimentResult::长时间试验AB节空调制冷正常 缺少特性 ResultId, ResultValue, ResultStatus, ResultDescription（提示，非 required）",
+                    "expected_features": [
+                      "ResultId",
+                      "ResultValue",
+                      "ResultStatus",
+                      "ResultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-22",
+                    "span_id": "chunk-0000:1068:1085",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "181遮断阀",
+                    "reason": "FaultComponent::181遮断阀 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-23",
+                    "span_id": "chunk-0000:1571:1594",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "253YV",
+                    "reason": "FaultComponent::253YV 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-24",
+                    "span_id": "chunk-0000:138:155",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "283KP压力开关",
+                    "reason": "FaultComponent::283KP压力开关 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-25",
+                    "span_id": "chunk-0000:2623:2639",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "287KP",
+                    "reason": "FaultComponent::287KP 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-26",
+                    "span_id": "chunk-0000:3477:3511",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "AB节空调",
+                    "reason": "FaultComponent::AB节空调 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-27",
+                    "span_id": "chunk-0000:664:675",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "A网通信模块",
+                    "reason": "FaultComponent::A网通信模块 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-28",
+                    "span_id": "chunk-0000:2826:2851",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节压缩机",
+                    "reason": "FaultComponent::B节压缩机 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-29",
+                    "span_id": "chunk-0000:2835:2851",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节压缩机滤清筒",
+                    "reason": "FaultComponent::B节压缩机滤清筒 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-30",
+                    "span_id": "chunk-0000:2875:2890",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节干燥塔进出气止回阀",
+                    "reason": "FaultComponent::B节干燥塔进出气止回阀 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-31",
+                    "span_id": "chunk-0000:2891:2906",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节最小压力阀进气阀",
+                    "reason": "FaultComponent::B节最小压力阀进气阀 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-32",
+                    "span_id": "chunk-0001:647:660",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "CPU板卡",
+                    "reason": "FaultComponent::CPU板卡 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-33",
+                    "span_id": "chunk-0000:3310:3325",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "CPU模块",
+                    "reason": "FaultComponent::CPU模块 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-34",
+                    "span_id": "chunk-0000:3512:3538",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "EM231模块",
+                    "reason": "FaultComponent::EM231模块 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-35",
+                    "span_id": "chunk-0001:621:631",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "OCE",
+                    "reason": "FaultComponent::OCE 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-36",
+                    "span_id": "chunk-0000:2163:2191",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "TCU",
+                    "reason": "FaultComponent::TCU 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-37",
+                    "span_id": "chunk-0000:1068:1085",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "中继阀",
+                    "reason": "FaultComponent::中继阀 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-38",
+                    "span_id": "chunk-0000:2595:2622",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "压缩机",
+                    "reason": "FaultComponent::压缩机 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-39",
+                    "span_id": "chunk-0001:107:117",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "紧急阀",
+                    "reason": "FaultComponent::紧急阀 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-40",
+                    "span_id": "chunk-0000:2192:2208",
+                    "target_type": "FaultComponent",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "门极驱动板",
+                    "reason": "FaultComponent::门极驱动板 缺少特性 ComponentId, ComponentName（提示，非 required）",
+                    "expected_features": [
+                      "ComponentId",
+                      "ComponentName"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-41",
+                    "span_id": "chunk-0001:661:672",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "刷新底层程序",
+                    "reason": "FaultHandlingMethod::刷新底层程序 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-42",
+                    "span_id": "chunk-0000:156:182",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换283KP压力开关",
+                    "reason": "FaultHandlingMethod::预防性更换283KP压力开关 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-43",
+                    "span_id": "chunk-0000:2489:2499",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换287KP",
+                    "reason": "FaultHandlingMethod::预防性更换287KP 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-44",
+                    "span_id": "chunk-0000:1571:1602",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换7002A节253YV，181遮断阀",
+                    "reason": "FaultHandlingMethod::预防性更换7002A节253YV，181遮断阀 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-45",
+                    "span_id": "chunk-0001:647:660",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换AB节CPU板卡",
+                    "reason": "FaultHandlingMethod::预防性更换AB节CPU板卡 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-46",
+                    "span_id": "chunk-0000:3326:3341",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换AB节EM231模块",
+                    "reason": "FaultHandlingMethod::预防性更换AB节EM231模块 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-47",
+                    "span_id": "chunk-0000:664:675",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换A网通信模块",
+                    "reason": "FaultHandlingMethod::预防性更换A网通信模块 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-48",
+                    "span_id": "chunk-0000:1068:1096",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换A节中继阀、181遮断阀",
+                    "reason": "FaultHandlingMethod::预防性更换A节中继阀、181遮断阀 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-49",
+                    "span_id": "chunk-0000:2891:2906",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换B节最小压力阀进气阀",
+                    "reason": "FaultHandlingMethod::预防性更换B节最小压力阀进气阀 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-50",
+                    "span_id": "chunk-0001:107:117",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换B节紧急阀",
+                    "reason": "FaultHandlingMethod::预防性更换B节紧急阀 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-51",
+                    "span_id": "chunk-0000:2055:2065",
+                    "target_type": "FaultHandlingMethod",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "预防性更换门极驱动板",
+                    "reason": "FaultHandlingMethod::预防性更换门极驱动板 缺少特性 MethodId, MethodName, MethodType, MethodStrategy, MethodDescription（提示，非 required）",
+                    "expected_features": [
+                      "MethodId",
+                      "MethodName",
+                      "MethodType",
+                      "MethodStrategy",
+                      "MethodDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-52",
+                    "span_id": "chunk-0001:77:90",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "A7故障",
+                    "reason": "FaultType::A7故障 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-53",
+                    "span_id": "chunk-0000:3275:3284",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "AB节空调制冷不佳",
+                    "reason": "FaultType::AB节空调制冷不佳 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-54",
+                    "span_id": "chunk-0000:593:623",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "A网脱网",
+                    "reason": "FaultType::A网脱网 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-55",
+                    "span_id": "chunk-0000:564:592",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "A网闪红",
+                    "reason": "FaultType::A网闪红 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-56",
+                    "span_id": "chunk-0000:97:128",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "A节大闸不缓解",
+                    "reason": "FaultType::A节大闸不缓解 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-57",
+                    "span_id": "chunk-0000:1958:2008",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节TCU1M2A相下管故障",
+                    "reason": "FaultType::B节TCU1M2A相下管故障 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-58",
+                    "span_id": "chunk-0000:2826:2851",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "B节压缩机不打风",
+                    "reason": "FaultType::B节压缩机不打风 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-59",
+                    "span_id": "chunk-0001:482:490",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "LTE B网脱网",
+                    "reason": "FaultType::LTE B网脱网 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-60",
+                    "span_id": "chunk-0000:530:563",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "LTE-A网脱网",
+                    "reason": "FaultType::LTE-A网脱网 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-61",
+                    "span_id": "chunk-0001:621:631",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "OCE通讯中断",
+                    "reason": "FaultType::OCE通讯中断 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-62",
+                    "span_id": "chunk-0000:1482:1498",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "从车列车管减压慢",
+                    "reason": "FaultType::从车列车管减压慢 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-63",
+                    "span_id": "chunk-0000:1473:1481",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "从车没有流量显示",
+                    "reason": "FaultType::从车没有流量显示 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-64",
+                    "span_id": "chunk-0000:1033:1051",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "列车管不缓解",
+                    "reason": "FaultType::列车管不缓解 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-65",
+                    "span_id": "chunk-0000:1451:1498",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "列车管压力上升慢",
+                    "reason": "FaultType::列车管压力上升慢 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-66",
+                    "span_id": "chunk-0000:1561:1570",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "列车管未充风",
+                    "reason": "FaultType::列车管未充风 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-67",
+                    "span_id": "chunk-0000:2396:2451",
+                    "target_type": "FaultType",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "总风低于750KPA，压缩机未自动打风",
+                    "reason": "FaultType::总风低于750KPA，压缩机未自动打风 缺少特性 FaultTypeId, FaultTypeName, FaultCategory, FaultDescription（提示，非 required）",
+                    "expected_features": [
+                      "FaultTypeId",
+                      "FaultTypeName",
+                      "FaultCategory",
+                      "FaultDescription"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-68",
+                    "span_id": "chunk-0000:2461:2488",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "上车多次试验总风低于750KPA时AB节压缩机自动打风",
+                    "reason": "TroubleshootingExperiment::上车多次试验总风低于750KPA时AB节压缩机自动打风 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-69",
+                    "span_id": "chunk-0000:3294:3309",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "上车检查AB节空调蒸发器",
+                    "reason": "TroubleshootingExperiment::上车检查AB节空调蒸发器 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-70",
+                    "span_id": "chunk-0000:2042:2054",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "上车测量IGBT阻值",
+                    "reason": "TroubleshootingExperiment::上车测量IGBT阻值 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-71",
+                    "span_id": "chunk-0001:100:106",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "上车试验",
+                    "reason": "TroubleshootingExperiment::上车试验 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-72",
+                    "span_id": "chunk-0000:644:663",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载OCE数据",
+                    "reason": "TroubleshootingExperiment::下载OCE数据 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-73",
+                    "span_id": "chunk-0000:1515:1538",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载主从控BCU数据分析",
+                    "reason": "TroubleshootingExperiment::下载主从控BCU数据分析 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-74",
+                    "span_id": "chunk-0000:644:663",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载主车7002LTE数据",
+                    "reason": "TroubleshootingExperiment::下载主车7002LTE数据 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-75",
+                    "span_id": "chunk-0000:683:698",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载从车7079数据",
+                    "reason": "TroubleshootingExperiment::下载从车7079数据 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-76",
+                    "span_id": "chunk-0000:1061:1096",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载数据分析",
+                    "reason": "TroubleshootingExperiment::下载数据分析 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-77",
+                    "span_id": "chunk-0000:138:155",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "下载数据分析283KP压力开关",
+                    "reason": "TroubleshootingExperiment::下载数据分析283KP压力开关 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-78",
+                    "span_id": "chunk-0000:2907:2913",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "反复试验",
+                    "reason": "TroubleshootingExperiment::反复试验 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-79",
+                    "span_id": "chunk-0000:1068:1096",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "多次试验",
+                    "reason": "TroubleshootingExperiment::多次试验 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-80",
+                    "span_id": "chunk-0000:156:182",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "库内试验",
+                    "reason": "TroubleshootingExperiment::库内试验 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-81",
+                    "span_id": "chunk-0000:2875:2890",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "拆解B节干燥塔进出气止回阀检查",
+                    "reason": "TroubleshootingExperiment::拆解B节干燥塔进出气止回阀检查 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-82",
+                    "span_id": "chunk-0001:632:646",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "检查OCE到交换机的线路",
+                    "reason": "TroubleshootingExperiment::检查OCE到交换机的线路 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-83",
+                    "span_id": "chunk-0000:1571:1602",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "试验制动机",
+                    "reason": "TroubleshootingExperiment::试验制动机 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-84",
+                    "span_id": "chunk-0000:3342:3360",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "试验测量环温32度出风口温度14度",
+                    "reason": "TroubleshootingExperiment::试验测量环温32度出风口温度14度 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-feature_coverage-85",
+                    "span_id": "chunk-0000:3361:3375",
+                    "target_type": "TroubleshootingExperiment",
+                    "gap_type": "feature_coverage",
+                    "severity": "info",
+                    "evidence": "长时间试验AB节空调制冷",
+                    "reason": "TroubleshootingExperiment::长时间试验AB节空调制冷 缺少特性 ExperimentId, ExperimentName, ExperimentType, ExperimentProcedure, ExpectedResult（提示，非 required）",
+                    "expected_features": [
+                      "ExperimentId",
+                      "ExperimentName",
+                      "ExperimentType",
+                      "ExperimentProcedure",
+                      "ExpectedResult"
+                    ],
+                    "expected_relations": []
+                  },
+                  {
+                    "gap_id": "generic-relation_coverage-86",
+                    "span_id": "chunk-0000:2875:2890",
+                    "target_type": "FaultComponent",
+                    "gap_type": "relation_coverage",
+                    "severity": "info",
+                    "evidence": "B节干燥塔进出气止回阀",
+                    "reason": "FaultComponent::B节干燥塔进出气止回阀 缺少入向必需关系 TARGETS（源端基数 1）",
+                    "expected_features": [],
+                    "expected_relations": [
+                      "TARGETS"
+                    ]
+                  },
+                  {
+                    "gap_id": "generic-relation_coverage-87",
+                    "span_id": "chunk-0001:661:672",
+                    "target_type": "ExperimentResult",
+                    "gap_type": "relation_coverage",
+                    "severity": "info",
+                    "evidence": "刷新底层程序后试验结果",
+                    "reason": "ExperimentResult::刷新底层程序后试验结果 缺少入向必需关系 PRODUCES（源端基数 1）",
+                    "expected_features": [],
+                    "expected_relations": [
+                      "PRODUCES"
+                    ]
+                  },
+                  {
+                    "gap_id": "generic-relation_coverage-88",
+                    "span_id": "chunk-0000:530:563",
+                    "target_type": "FaultType",
+                    "gap_type": "relation_coverage",
+                    "severity": "info",
+                    "evidence": "LTE-A网脱网",
+                    "reason": "FaultType::LTE-A网脱网 缺少入向必需关系 INDICATES（源端基数 1）",
+                    "expected_features": [],
+                    "expected_relations": [
+                      "INDICATES"
+                    ]
+                  },
+                  {
+                    "gap_id": "generic-relation_coverage-89",
+                    "span_id": "chunk-0000:2875:2890",
+                    "target_type": "FaultComponent",
+                    "gap_type": "relation_coverage",
+                    "severity": "info",
+                    "evidence": "B节干燥塔进出气止回阀",
+                    "reason": "FaultComponent::B节干燥塔进出气止回阀 缺少入向必需关系 ACTS_ON（源端基数 1）",
+                    "expected_features": [],
+                    "expected_relations": [
+                      "ACTS_ON"
+                    ]
+                  }
+                ]
+              },
+              "graph_publishable": true,
+              "repair_stop_reason": "repair_round_limit",
+              "extract_version": "v2.2-v31",
+              "effective_config": {
+                "version": "v2.2-v31",
+                "provider": "default",
+                "model": "deepseek-v4-flash-0731",
+                "request_timeout": 300.0,
+                "document_timeout": null,
+                "max_tokens": 16384,
+                "max_input_tokens": 65536,
+                "max_output_tokens": 16384,
+                "disable_thinking": true,
+                "api_mode": "auto",
+                "thinking_parameter": "thinking",
+                "response_format": "auto"
+              },
+              "trace_id": "b000525efbb84a578a5e4cad2ac598d6"
+            },
+            "quality_status": "partial",
+            "failed_chunks": []
+          }
+        }
+      },
+      "plugin": null,
+      "error": null,
+      "golden_counts": {
+        "entities": 105,
+        "relations": 127
+      },
+      "attempts": 1,
+      "extract_version": "v2.2-v31",
+      "empty_extraction": false,
+      "skipped_after_retries": true,
+      "elapsed_seconds": 709.936
+    }
+  ],
+  "succeeded": 0,
+  "failed": 1,
+  "skipped": 1,
+  "unscored": 0,
+  "overall": {
+    "backend_system": {
+      "entities": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      "relations": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "backend_extract": {
+      "entities": {
+        "golden": 105,
+        "predicted": 85,
+        "tp": 63,
+        "fp": 22,
+        "fn": 42,
+        "precision": 0.741176,
+        "recall": 0.6,
+        "f1": 0.663158,
+        "jaccard": 0.496063,
+        "accuracy": 0.496063
+      },
+      "relations": {
+        "golden": 127,
+        "predicted": 132,
+        "tp": 55,
+        "fp": 77,
+        "fn": 72,
+        "precision": 0.416667,
+        "recall": 0.433071,
+        "f1": 0.42471,
+        "jaccard": 0.269608,
+        "accuracy": 0.269608
+      }
+    },
+    "plugin_extract": {
+      "entities": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      "relations": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      }
+    }
+  },
+  "quality": {
+    "score_scope": "conditional_on_valid_scores",
+    "match_mode": "llm",
+    "modules": {
+      "backend_extract": {
+        "coverage": {
+          "expected": 1,
+          "scored": 1,
+          "failed": 1,
+          "missing": 0,
+          "fallback": 0,
+          "invalid": 0,
+          "mode_mismatch": 0,
+          "unscored": 0,
+          "scored_ratio": 1.0
+        },
+        "micro": {
+          "entities": {
+            "golden": 105,
+            "predicted": 85,
+            "tp": 63,
+            "fp": 22,
+            "fn": 42,
+            "precision": 0.741176,
+            "recall": 0.6,
+            "f1": 0.663158,
+            "jaccard": 0.496063,
+            "accuracy": 0.496063
+          },
+          "relations": {
+            "golden": 127,
+            "predicted": 132,
+            "tp": 55,
+            "fp": 77,
+            "fn": 72,
+            "precision": 0.416667,
+            "recall": 0.433071,
+            "f1": 0.42471,
+            "jaccard": 0.269608,
+            "accuracy": 0.269608
+          }
+        },
+        "case_macro": {
+          "entities": {
+            "cases": 1,
+            "empty_cases": 0,
+            "precision": 0.741176,
+            "recall": 0.6,
+            "f1": 0.663158
+          },
+          "relations": {
+            "cases": 1,
+            "empty_cases": 0,
+            "precision": 0.416667,
+            "recall": 0.433071,
+            "f1": 0.42471
+          }
+        },
+        "by_group": {
+          "trouble": {
+            "coverage": {
+              "expected": 1,
+              "scored": 1,
+              "failed": 1,
+              "missing": 0,
+              "fallback": 0,
+              "invalid": 0,
+              "mode_mismatch": 0,
+              "unscored": 0,
+              "scored_ratio": 1.0
+            },
+            "micro": {
+              "entities": {
+                "golden": 105,
+                "predicted": 85,
+                "tp": 63,
+                "fp": 22,
+                "fn": 42,
+                "precision": 0.741176,
+                "recall": 0.6,
+                "f1": 0.663158,
+                "jaccard": 0.496063,
+                "accuracy": 0.496063
+              },
+              "relations": {
+                "golden": 127,
+                "predicted": 132,
+                "tp": 55,
+                "fp": 77,
+                "fn": 72,
+                "precision": 0.416667,
+                "recall": 0.433071,
+                "f1": 0.42471,
+                "jaccard": 0.269608,
+                "accuracy": 0.269608
+              }
+            },
+            "case_macro": {
+              "entities": {
+                "cases": 1,
+                "empty_cases": 0,
+                "precision": 0.741176,
+                "recall": 0.6,
+                "f1": 0.663158
+              },
+              "relations": {
+                "cases": 1,
+                "empty_cases": 0,
+                "precision": 0.416667,
+                "recall": 0.433071,
+                "f1": 0.42471
+              }
+            }
+          }
+        },
+        "group_macro": {
+          "entities": {
+            "groups": 1,
+            "precision": 0.741176,
+            "recall": 0.6,
+            "f1": 0.663158
+          },
+          "relations": {
+            "groups": 1,
+            "precision": 0.416667,
+            "recall": 0.433071,
+            "f1": 0.42471
+          }
+        }
+      }
+    }
+  },
+  "overall_identity": {
+    "backend_system": {
+      "entities": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      "relations": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "backend_extract": {
+      "entities": {
+        "golden": 105,
+        "predicted": 85,
+        "precision": 0.211765,
+        "recall": 0.171429,
+        "f1": 0.189474,
+        "jaccard": 0.104651,
+        "accuracy": 0.104651,
+        "tp": 18,
+        "fp": 67,
+        "fn": 87
+      },
+      "relations": {
+        "golden": 127,
+        "predicted": 132,
+        "precision": 0.015152,
+        "recall": 0.015748,
+        "f1": 0.015444,
+        "jaccard": 0.007782,
+        "accuracy": 0.007782,
+        "tp": 2,
+        "fp": 130,
+        "fn": 125
+      }
+    },
+    "plugin_extract": {
+      "entities": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      "relations": {
+        "golden": 0,
+        "predicted": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "jaccard": 0.0,
+        "accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      }
+    }
+  },
+  "extract_versions": [
+    "v2.2-v31"
+  ],
+  "gate": {
+    "empty_failures": [],
+    "budget_violations": [],
+    "timing_unknown": [],
+    "budgets": {
+      "case_seconds": 3600.0,
+      "stage_seconds": {}
+    },
+    "min_f1": {
+      "threshold": 0.0,
+      "below": []
+    },
+    "quality": {
+      "issues": [],
+      "min_relation_f1": {
+        "threshold": 0.0,
+        "below": []
+      },
+      "passed": true
+    },
+    "passed": false
+  },
+  "finished_at": "2026-10-14T04:40:13.902218",
+  "elapsed_seconds": 709.946
+}
