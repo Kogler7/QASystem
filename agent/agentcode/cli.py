@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from dotenv import load_dotenv
 
 from .tools.mcp_tools.tool_manager import ToolManager
 from .models import SessionConfig, ToolPolicy

@@ -17,14 +17,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from docker.configuration import bootstrap_local_environment
 
 
 def _load_env() -> dict[str, Any]:
     """从仓库根目录的唯一 .env 加载 Agent LLM 配置。"""
-    root_env = Path(__file__).resolve().parents[2] / ".env"
-    if root_env.exists():
-        load_dotenv(root_env, override=False)
+    bootstrap_local_environment()
     values = {
         "temperature": float(config_getenv("AGENT_TEMPLATE_TEMPERATURE") or 0.2),
         "max_tokens": int(config_getenv("AGENT_TEMPLATE_MAX_TOKENS") or 4096),

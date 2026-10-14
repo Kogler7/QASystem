@@ -1,25 +1,10 @@
 from __future__ import annotations
-from docker.configuration import getenv as config_getenv
 
 import base64
-import os
-from contextlib import contextmanager
+from mcp_services.execution_context import worker_activity as _mcp_activity_context
 from functools import lru_cache
 from typing import Any
 
-
-@contextmanager
-def _mcp_activity_context():
-    """Prevent a Worker Activity from submitting itself back to the queue."""
-    previous = config_getenv("MCP_EXECUTION_MODE")
-    os.environ["MCP_EXECUTION_MODE"] = "inline"
-    try:
-        yield
-    finally:
-        if previous is None:
-            os.environ.pop("MCP_EXECUTION_MODE", None)
-        else:
-            os.environ["MCP_EXECUTION_MODE"] = previous
 
 from backend.app.schemas import (
     ChunkOptions,

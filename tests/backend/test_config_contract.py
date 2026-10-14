@@ -202,3 +202,91 @@ def test_external_tools_can_be_excluded_only_in_delivered_source(contract):
         (root / 'docker' / name).write_text(json.dumps(catalog))
     assert any('消费者路径不存在' in e for e in config_contract.check(root))
     assert config_contract.check(root, deployed=True) == []
+
+
+def test_consumer_leftover_token_is_rejected_even_when_other_consumer_survives(contract):
+    root, source = contract
+    stale = root / 'backend/old_consumer.py'
+    stale.write_text('old_name="TEST_SETTING"\n')
+    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog['items']['TEST_SETTING']['consumers'].append(
+        {'path': 'backend/old_consumer.py', 'kind': 'read', 'token': 'TEST_SETTING'})
+    for name in ('config-declarations.json', 'config-releases/1.json'):
+        (root / 'docker' / name).write_text(json.dumps(catalog))
+    assert any('old_consumer.py' in error and '已失效' in error for error in config_contract.check(root))
+
+
+@pytest.mark.parametrize('code', [
+    'import os\nos.environ["K"]="v"',
+    'import os\ndel os.environ["K"]',
+    'import os\nos.environ.update(K="v")',
+    'import os\nos.putenv("K","v")',
+    'import os\nenv=os.environ\nenv.get("K")',
+    'import os\nread=os.getenv\nread("K")',
+])
+def test_original_six_environment_bypasses_are_rejected_by_active_gate(contract, code):
+    root, source = contract
+    source.write_text(code)
+    assert any('禁止' in error for error in config_contract.check(root))
+
+
+@pytest.mark.parametrize('code', [
+    'from docker import configuration as cfg\nx=cfg.getenv("UNDECLARED")',
+    'from docker.configuration import getenv as cfg\nread=cfg\nx=read("UNDECLARED")',
+    'from docker.configuration import getenv as cfg\nx=cfg(key="UNDECLARED")',
+])
+def test_central_alias_and_keyword_calls_cannot_bypass_declaration_gate(contract, code):
+    root, source = contract
+    source.write_text(code)
+    assert any('未声明配置' in error for error in config_contract.check(root))
+
+
+def _git_commit(root, message):
+    subprocess.run(['git', 'add', '.'], cwd=root, check=True)
+    subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                    'commit', '-qm', message], cwd=root, check=True)
+
+
+@pytest.mark.parametrize('operation', ['rewrite', 'delete'])
+def test_already_committed_history_corruption_is_rejected(contract, operation):
+    root, source = contract
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    _git_commit(root, 'original immutable release')
+    catalog = json.loads((root / 'docker/config-declarations.json').read_text())
+    catalog['version'] = '2'
+    for relative in ('docker/config-declarations.json', 'docker/config-releases/2.json'):
+        (root / relative).write_text(json.dumps(catalog))
+    previous = root / 'docker/config-releases/1.json'
+    if operation == 'rewrite':
+        old = json.loads(previous.read_text())
+        old['items']['TEST_SETTING']['default'] = 'rewritten-history'
+        previous.write_text(json.dumps(old))
+    else:
+        previous.unlink()
+    _git_commit(root, 'corrupt published historical release')
+    assert not subprocess.run(['git', 'status', '--porcelain'], cwd=root, capture_output=True, text=True).stdout
+    assert any('既有声明' in error for error in config_contract.check(root))
+
+
+def test_merge_retains_first_parent_release_despite_side_branch_collision(contract):
+    root, source = contract
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    # Both branches start before the same release name is independently created.
+    marker = root / 'marker'
+    marker.write_text('fixture')
+    subprocess.run(['git', 'add', 'marker'], cwd=root, check=True)
+    subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                    'commit', '-qm', 'common ancestor'], cwd=root, check=True)
+    branch = subprocess.run(['git', 'branch', '--show-current'], cwd=root,
+                            capture_output=True, text=True, check=True).stdout.strip()
+    subprocess.run(['git', 'branch', 'side'], cwd=root, check=True)
+    _git_commit(root, 'main published release')
+    subprocess.run(['git', 'checkout', '-q', 'side'], cwd=root, check=True)
+    (root / 'docker/config-releases').mkdir(parents=True, exist_ok=True)
+    (root / 'docker/config-releases/1.json').write_text('{"different":"side branch release"}')
+    _git_commit(root, 'independent side release with same filename')
+    subprocess.run(['git', 'checkout', '-q', branch], cwd=root, check=True)
+    subprocess.run(['git', 'merge', '--no-ff', '--no-commit', '-X', 'ours', 'side'], cwd=root, check=True,
+                   capture_output=True, text=True)
+    _git_commit(root, 'merge preserving main published freeze')
+    assert config_contract.check(root) == []

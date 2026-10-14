@@ -440,7 +440,8 @@ def main():
 
     # 将 CLI 参数写入环境变量，以便 uvicorn fork 后子进程继承
     if args.concurrency:
-        os.environ["AGENT_WORKER_CONCURRENCY"] = str(args.concurrency)
+        from docker.configuration import prepare_dev_agent_startup
+        prepare_dev_agent_startup(args.concurrency)
         _WORKER_CONCURRENCY = args.concurrency
     if args.pool_size:
         _WORKER_POOL_SIZE = args.pool_size

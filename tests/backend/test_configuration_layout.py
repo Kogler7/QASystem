@@ -135,7 +135,7 @@ def test_dockerfile_performs_complete_runtime_verification():
 def test_agent_module_uses_registered_service_and_ignores_legacy_namespace(monkeypatch):
     from agentcode import adapter
     from external_services.llm import service
-    monkeypatch.setattr(adapter, 'load_dotenv', lambda *a, **kw: False)
+    monkeypatch.setattr(adapter, 'bootstrap_local_environment', lambda: False)
     monkeypatch.setenv('AGENT_LLM_BASE_URL', 'http://retired.invalid')
     monkeypatch.setenv('AGENT_LLM_MODEL', 'retired-model')
     monkeypatch.setattr(service, 'resolve_chat_service', lambda *a, **kw: (

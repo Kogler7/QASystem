@@ -2,7 +2,7 @@ from docker.configuration import getenv as config_getenv
 # config.py
 import os
 from dataclasses import dataclass
-from dotenv import load_dotenv
+from docker.configuration import bootstrap_local_environment
 
 
 def _running_in_container() -> bool:
@@ -44,9 +44,5 @@ class Config:
     @classmethod
     def load(cls):
         """只从仓库根目录加载图谱检索配置。"""
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
-        root_env_path = os.path.join(project_root, ".env")
-        if os.path.exists(root_env_path):
-            load_dotenv(root_env_path, override=False)
+        bootstrap_local_environment()
         return cls.from_env()

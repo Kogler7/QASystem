@@ -1,13 +1,15 @@
 from __future__ import annotations
 from docker.configuration import getenv as config_getenv
 
-import os
+from .execution_context import in_worker_activity
 from typing import Any
 
 from .result import ToolCode, tool_error, tool_success
 
 
 def _execution_mode() -> str:
+    if in_worker_activity():
+        return 'inline'
     value = config_getenv("MCP_EXECUTION_MODE", "inline").strip().lower()
     if value in {"async", "queued", "durable"}:
         return "async"

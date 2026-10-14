@@ -121,9 +121,8 @@ class OCRProcessor(BaseProcessor):
                 )
 
         # MinerU 实际读取 MINERU_TOOLS_CONFIG_JSON，而不是 MINERU_CONFIG_PATH。
-        os.environ["MINERU_TOOLS_CONFIG_JSON"] = effective_config_path
-        os.environ["MINERU_CONFIG_PATH"] = effective_config_path
-        os.environ["MINERU_MODEL_SOURCE"] = effective_model_source
+        from docker.configuration import configure_mineru_loader_environment
+        configure_mineru_loader_environment(effective_config_path, effective_model_source)
 
         from mineru.utils import config_reader as mineru_config_reader
         importlib.reload(mineru_config_reader)

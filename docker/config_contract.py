@@ -7,24 +7,65 @@ from functools import lru_cache
 from pathlib import Path
 import re
 import subprocess
+from docker.environment_contract import central_reader_names, environment_errors, ENVIRONMENT_ACCESS_CONTRACT
 
 APPLICATION_DIRS = ('backend', 'agent', 'algorithm', 'external_services', 'clef_service', 'nanojev_service', 'mcp_services', 'agent_mcp')
 
 
-READERS = {'config_getenv','config_required','getenv','setting','_env','_flag','_env_int','_env_float','_bounded_int'}
+READERS = {'config_getenv','config_required','getenv','required','startup_getenv','setting','_env','_flag','_env_int','_env_float','_bounded_int'}
 
 
 def reader_names(tree):
-    names = set(READERS)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module in {'docker.configuration', 'algorithm.runtime_settings'}:
-            names.update(alias.asname or alias.name for alias in node.names if alias.name in {'getenv','required','startup_getenv'})
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name in {'docker.configuration', 'algorithm.runtime_settings'}:
-                    prefix = alias.asname or alias.name
-                    names.update(prefix + '.' + member for member in ('getenv','required','startup_getenv'))
-    return names
+    return central_reader_names(tree, READERS)
+
+
+def central_startup_contracts():
+    source = Path(__file__).with_name('configuration.py')
+    names = {'should_load_local_dotenv', 'bootstrap_local_environment',
+             'prepare_dev_agent_startup', 'configure_mineru_loader_environment'}
+    return {node.name: ast.unparse(node) for node in ast.parse(source.read_text(encoding='utf-8-sig')).body
+            if isinstance(node, ast.FunctionDef) and node.name in names}
+
+
+def historical_release_errors(root):
+    """Verify historical Git blobs, including already committed rewrites/deletes."""
+    root = Path(root)
+    if not (root / '.git').exists():
+        return []
+    log = subprocess.run(['git', 'log', 'HEAD', '--first-parent', '--diff-filter=A', '--format=COMMIT:%H',
+                          '--name-only', '--', 'docker/config-releases'], cwd=root,
+                         capture_output=True, text=True, timeout=30)
+    if log.returncode != 0:
+        # A newly initialized fixture repository may have no commits. Production
+        # workspaces with HEAD must never silently disable the historical check.
+        head = subprocess.run(['git', 'rev-parse', '--verify', 'HEAD'], cwd=root,
+                              capture_output=True, text=True, timeout=10)
+        return [] if head.returncode != 0 else ['历史声明Git记录不可读取，拒绝跳过核验']
+    originals = {}
+    commit = None
+    for line in log.stdout.splitlines():
+        if line.startswith('COMMIT:'):
+            commit = line.split(':', 1)[1]
+        elif line.startswith('docker/config-releases/') and line.endswith('.json'):
+            originals.setdefault(line, set()).add(commit)
+    errors = []
+    for relative, commits in sorted(originals.items()):
+        path = root / relative
+        if not path.is_file():
+            errors.append(f'禁止删除既有声明版本文件：{relative}')
+            continue
+        current = subprocess.run(['git', 'hash-object', '--path', relative, str(path)], cwd=root,
+                                 capture_output=True, text=True, timeout=10)
+        if current.returncode != 0:
+            errors.append(f'历史声明当前文件不可核验：{relative}')
+            continue
+        for commit in commits:
+            previous = subprocess.run(['git', 'rev-parse', f'{commit}:{relative}'], cwd=root,
+                                      capture_output=True, text=True, timeout=10)
+            if previous.returncode != 0 or previous.stdout.strip() != current.stdout.strip():
+                errors.append(f'禁止修改既有声明版本文件（包含已提交改写）：{relative}')
+                break
+    return errors
 
 
 def reader_contracts(root):
@@ -86,11 +127,16 @@ def check(root, *, deployed=False):
                                  cwd=root, capture_output=True, text=True, timeout=10)
         if changed.returncode == 0 and changed.stdout.strip():
             errors.append('禁止修改既有声明版本文件；请新增版本文件')
+        errors.extend(historical_release_errors(root))
     from docker.runtime_config import HOT_KEYS
     from docker.runtime_config import MODEL_DEFAULTS, MODEL_DESCRIPTIONS
     from docker.config_migrations import ALIASES, MODEL_KEYS
     from docker.startup_contract import PROCESS_ENVIRONMENT, RUNTIME_DIRECTORY_NAME, EXECUTION_LIVENESS, EXECUTION_TOPOLOGY, SERVICE_TOPOLOGY
     if catalog.get('schema') == 1:
+        if catalog.get('environment_access_contract') != ENVIRONMENT_ACCESS_CONTRACT:
+            errors.append('进程环境访问/受控启动接口合同变化，必须登记配置声明新版本')
+        if catalog.get('central_startup_contracts') != central_startup_contracts():
+            errors.append('集中启动环境适配规则变化，必须登记配置声明新版本')
         if catalog.get('aliases') != ALIASES:
             errors.append('别名迁移规则与当前版本声明不一致')
         if catalog.get('model_defaults') != MODEL_DEFAULTS:
@@ -129,6 +175,7 @@ def check(root, *, deployed=False):
         aliases = {'os'}
         names = reader_names(tree)
         source_readers[path.relative_to(root).as_posix()] = names
+        errors.extend(environment_errors(path.relative_to(root).as_posix(), tree))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 aliases.update(alias.asname or 'os' for alias in node.names if alias.name == 'os')
@@ -139,8 +186,10 @@ def check(root, *, deployed=False):
                 function = ast.unparse(node.func)
                 raw = any(function in {f'{name}.getenv', f'{name}.environ.get'} for name in aliases)
                 if function in names:
-                    if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-                        key = node.args[0].value
+                    argument = node.args[0] if node.args else next(
+                        (kw.value for kw in node.keywords if kw.arg == 'key'), None)
+                    if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                        key = argument.value
                         if key not in catalog['items']:
                             errors.append(f'{path.relative_to(root)}:{node.lineno} 未声明配置 {key}')
             elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Load):
@@ -153,6 +202,7 @@ def check(root, *, deployed=False):
             continue
         found = False
         for consumer in item['consumers']:
+            consumer_found = False
             path = root / consumer['path']
             if not path.is_file():
                 # External tooling (e.g. eval) is intentionally not delivered as
@@ -163,17 +213,24 @@ def check(root, *, deployed=False):
                     errors.append(f"{key} 消费者路径不存在：{consumer['path']}")
                 continue
             if consumer['kind'] == 'external':
-                found |= consumer['token'] in path.read_text(encoding='utf-8-sig')
+                consumer_found = consumer['token'] in path.read_text(encoding='utf-8-sig')
             else:
                 tree = sources.get(consumer['path'])
+                if tree is None and path.suffix == '.py':
+                    tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+                    source_readers[consumer['path']] = reader_names(tree)
                 if tree:
                     if consumer['kind'] == 'read':
-                        found |= any(isinstance(node, ast.Call) and
+                        consumer_found = any(isinstance(node, ast.Call) and
                             ast.unparse(node.func) in source_readers[consumer['path']] and
-                            any(isinstance(arg, ast.Constant) and arg.value == consumer['token'] for arg in node.args)
+                            any(isinstance(arg, ast.Constant) and arg.value == consumer['token']
+                                for arg in [*node.args, *(kw.value for kw in node.keywords if kw.arg == 'key')])
                             for node in ast.walk(tree))
                     else:
-                        found |= any(isinstance(node, ast.Constant) and node.value == consumer['token'] for node in ast.walk(tree))
+                        consumer_found = any(isinstance(node, ast.Constant) and node.value == consumer['token'] for node in ast.walk(tree))
+            if not consumer_found:
+                errors.append(f"{key} 消费者已失效：{consumer['path']} ({consumer['kind']})")
+            found |= consumer_found
         if not found:
             errors.append(f'{key} 已失去全部消费者，请删除或迁移声明')
     return errors
@@ -188,6 +245,7 @@ def require_contract(root):
     root = Path(root)
     paths = list(files(root)) + list((root / 'docker/config-releases').glob('*.json'))
     paths += [root / '.env.example', root / 'docker/config-declarations.json']
+    paths += [root / 'docker/config_contract.py', root / 'docker/environment_contract.py']
     signature = tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size) for path in sorted(paths) if path.is_file())
     return _checked(str(root), signature, (root / 'SOURCE_COMMIT').is_file())
 

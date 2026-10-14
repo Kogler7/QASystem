@@ -70,3 +70,38 @@ def read_registry(*, with_revision=False):
     """Read one approved snapshot; callers retain it for in-flight work."""
     from docker.runtime_config import read_registry as read
     return read(with_revision=with_revision)
+
+
+def should_load_local_dotenv():
+    from docker.startup_contract import in_container_runtime
+    return not in_container_runtime() and startup_getenv('ENVIRONMENT') is None
+
+
+def bootstrap_local_environment():
+    """Load only the repository-root dotenv for unmanaged development startup."""
+    if not should_load_local_dotenv():
+        return False
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[1] / '.env', override=False)
+    return True
+
+
+def prepare_dev_agent_startup(concurrency):
+    """Carry one validated CLI option to spawned development API processes.
+
+    Managed deployments can only change this setting through approved ops
+    configuration. The application-side caller is limited by the source gate.
+    """
+    from docker.startup_contract import in_container_runtime
+    if in_container_runtime() or startup_getenv('ENVIRONMENT') is not None:
+        raise ValueError('受管部署不能用CLI覆盖任务并发，请通过ops审核配置')
+    if isinstance(concurrency, bool) or not isinstance(concurrency, int) or not 1 <= concurrency <= 256:
+        raise ValueError('开发启动并发必须为1到256之间的整数')
+    os.environ['AGENT_WORKER_CONCURRENCY'] = str(concurrency)
+
+
+def configure_mineru_loader_environment(config_path, model_source):
+    """Registered MinerU loader dependency initialization; not a generic setter."""
+    os.environ['MINERU_TOOLS_CONFIG_JSON'] = str(config_path)
+    os.environ['MINERU_CONFIG_PATH'] = str(config_path)
+    os.environ['MINERU_MODEL_SOURCE'] = str(model_source)
