@@ -60,7 +60,8 @@ def test_verifier_keeps_pronoun_antecedent():
                   verification_handler=lambda i, c: 'yes' if '张三' in c['text'] else 'uncertain')
     result = run(chunks, llm)
     completion = [json.loads(p) for t, p in llm.calls if t == 'property'][0]
-    verification = [json.loads(p) for t, p in llm.calls if t == 'evidence_verification'][0]
+    verification = next(json.loads(p) for t, p in llm.calls if t == 'evidence_verification'
+                        and 'property' in json.loads(p)['task']['items'][0])
     assert '张三到岗。' in completion['documents']
     assert '他负责检查。' in verification['documents']
     assert '张三到岗。' in verification['documents']
@@ -168,8 +169,12 @@ def test_compiler_keeps_grandparent_property_and_required_constraint():
     assert plan.class_specs['Leaf'].properties[0].required is True
     payload = {'entities': [dict(span_item('Leaf', '甲'), properties={'code': 'A01'})]}
     assert not validate_candidate_properties(payload, plan)
-    llm = lambda messages: json.dumps({'type': 'Leaf', 'mention': '甲', 'properties': {},
-                                       'evidence': {'quote': '甲的编码是A01。'}}, ensure_ascii=False)
+    def llm(messages):
+        task = json.loads(messages[-1]['content'])['task']
+        if task['operation'] == 'evidence_verification':
+            return StubLLM()(messages)
+        return json.dumps({'type': 'Leaf', 'mention': '甲', 'properties': {},
+                          'evidence': {'quote': '甲的编码是A01。'}}, ensure_ascii=False)
     result = run([ExtractionChunk('a', '甲的编码是A01。')], llm, ontology)
     assert result['status'] == 'partial'
     assert result['verification']['coverage_complete'] is False

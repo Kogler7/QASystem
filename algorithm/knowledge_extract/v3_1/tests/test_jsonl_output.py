@@ -175,7 +175,7 @@ def test_partial_verifier_retains_confirmed_property_and_removes_missing_one():
     stub = StubLLM(entity_handler=entity)
     def llm(messages):
         user = json.loads(messages[1]['content'])
-        if user['task']['operation'] == 'evidence_verification':
+        if user['task']['operation'] == 'evidence_verification' and 'property' in user['task']['items'][0]:
             assert user['output_contract']['format'] == 'jsonl'
             return '{"item_id":"0:duty","supported":"yes","reason":"原文支持"}\n{"item_id":"0:job"'
         return stub(messages)
@@ -191,8 +191,13 @@ def test_truncated_entity_response_retains_facts_but_not_complete_status():
     from .. import extract_harness
     from ..chunk_context import ExtractionChunk
     row = {**ROW, 'properties': {}}
+    def llm(messages):
+        task = json.loads(messages[-1]['content'])['task']
+        if task['operation'] == 'evidence_verification':
+            return json.dumps({'item_id': task['items'][0]['item_id'], 'supported': 'yes', 'reason': 'fixture'})
+        return json.dumps(row) + '\n{"type":'
     result = extract_harness('@startuml\nclass Person\n@enduml',
-        [ExtractionChunk('c1', '张三\n负责检查')], llm=lambda m: json.dumps(row) + '\n{"type":',
+        [ExtractionChunk('c1', '张三\n负责检查')], llm=llm,
         best_effort=True, use_scheduler=False, max_attempts=1, max_repair_rounds=0, skill_refs=[])
     assert result['status'] == 'partial'
     assert [e['name'] for e in result['raw']['entities']] == ['张三']

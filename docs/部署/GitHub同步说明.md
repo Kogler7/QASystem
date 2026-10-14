@@ -1,3 +1,9 @@
+---
+noteId: "d0d61a70c78b11f18de48d0829b834d0"
+tags: []
+
+---
+
 # GitHub 同步
 
 主仓库仍为 `origin`：`git@10.126.62.88:qasystem/qasystem.git`。GitHub 副本为 `github`：`git@github.com:Kogler7/QASystem.git`。开发、合并和发布继续在主仓库进行，GitHub 接收清理过的已发布历史，不读取工作区未提交修改，也不把 GitHub 改动合回主仓库。

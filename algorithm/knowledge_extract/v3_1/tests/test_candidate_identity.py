@@ -20,7 +20,7 @@ def test_conflicting_candidates_are_qualified_before_merge_and_reproved():
     def review(item, chunk):
         reviewed.append(dict(item))
         if not item.get('property'):
-            return 'yes' if item['name'] in {'泵甲检查', '泵乙检查'} else 'no'
+            return 'yes' if item['name'] in {'检查', '泵甲检查', '泵乙检查'} else 'no'
         return 'yes'
     def identities(user):
         assert user['task']['operation'] == 'candidate_identity'

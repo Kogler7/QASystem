@@ -46,6 +46,18 @@ class ProviderProfile(BaseModel):
 
 OVERRIDE_FIELDS = ("version", "provider", "request_timeout", "document_timeout")
 
+# v3.1 文档总预算（秒）的自适应系数。实测基线（百炼 deepseek-v4-flash，16384 输出
+# token 满额）：单次调用约 105–110s；一片切片要走「实体轮 → 校验扇出 → 修复波次」
+# 约 3 波。固定 900s 会让中等文档死在半途（official_01 3 片 4.5K 字符，900s 撞线时
+# 仍有分片在重试），所以默认值按输入规模自适应；KG_EXTRACT_V31_DOCUMENT_TIMEOUT
+# 与请求级 document_timeout 仍是显式覆盖。
+DOCUMENT_TIMEOUT_FLOOR = 900.0
+DOCUMENT_TIMEOUT_CEILING = 2400.0
+DOCUMENT_TIMEOUT_BASE_SECONDS = 300.0
+DOCUMENT_TIMEOUT_PER_CHUNK_SECONDS = 240.0
+DOCUMENT_TIMEOUT_PER_1K_CHARS_SECONDS = 90.0
+DEFAULT_CHUNK_CHARACTERS = 4000
+
 
 class ExtractionConfigurationError(ValueError):
     """Safe, public configuration error; never includes profile contents."""
@@ -55,11 +67,59 @@ def has_overrides(options: dict[str, Any]) -> bool:
     return any(options.get(key) is not None for key in OVERRIDE_FIELDS)
 
 
+def adaptive_document_timeout(characters: int, chunks: int) -> float:
+    """按输入规模估算 v3.1 文档预算，结果落在 [FLOOR, CEILING] 内。"""
+    estimate = (DOCUMENT_TIMEOUT_BASE_SECONDS
+                + DOCUMENT_TIMEOUT_PER_1K_CHARS_SECONDS * (max(0, characters) / 1000.0)
+                + DOCUMENT_TIMEOUT_PER_CHUNK_SECONDS * max(0, chunks))
+    return float(min(max(estimate, DOCUMENT_TIMEOUT_FLOOR), DOCUMENT_TIMEOUT_CEILING))
+
+
+def resolve_document_timeout(configured: Any, scale: tuple[int, int] | None) -> float:
+    """显式配置 > 按输入规模自适应 > 拿不到规模时退回单片默认。"""
+    if configured is not None and str(configured).strip():
+        return float(configured)
+    return adaptive_document_timeout(*scale) if scale else DOCUMENT_TIMEOUT_FLOOR
+
+
+def _content_characters(content: Any) -> int:
+    """原文长度：文本按字符数，二进制（PDF 等）退化为字节上界。"""
+    if content is None:
+        return 0
+    if isinstance(content, (bytes, bytearray)):
+        try:
+            return len(bytes(content).decode("utf-8"))
+        except UnicodeDecodeError:
+            return len(content)
+    return len(str(content))
+
+
+def document_scale(operation: str, payload: dict[str, Any]) -> tuple[int, int] | None:
+    """(总字符数, 片数)。graph.extract 的 items 就是切片，取值精确；
+    knowledge.ingestion 在提交时只有原文，按请求自带的切片尺寸估算片数。"""
+    if operation == "graph.extract":
+        items = payload.get("items")
+        if not isinstance(items, list) or not items:
+            return None
+        characters = sum(_content_characters(item.get("text")) for item in items if isinstance(item, dict))
+        return characters, len(items)
+    files = payload.get("files")
+    if not isinstance(files, list) or not files:
+        return None
+    characters = sum(_content_characters(entry.get("content")) for entry in files if isinstance(entry, dict))
+    size = DEFAULT_CHUNK_CHARACTERS
+    chunking = (payload.get("options") or {}).get("chunking")
+    if isinstance(chunking, dict) and isinstance(chunking.get("size"), int) and chunking["size"] > 0:
+        size = chunking["size"]
+    return characters, max(1, -(-characters // size))
+
+
 def _credential_env() -> str:
     return "KG_EXTRACT_LLM_API_KEY"
 
 
-def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None = None) -> dict[str, Any]:
+def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None = None,
+                   document_scale: tuple[int, int] | None = None) -> dict[str, Any]:
     """Resolve non-secret defaults once at submission, not again on retry."""
     document, revision = registry if registry is not None else registry_snapshot()
     hot = document.get('settings', {})
@@ -118,7 +178,8 @@ def resolve_config(options: dict[str, Any], *, registry: tuple[dict, Any] | None
         if provider == "default":
             values["request_timeout"] = float(setting("KG_EXTRACT_V31_REQUEST_TIMEOUT", "120"))
             values["disable_thinking"] = defaults["disable_thinking"]
-        document_timeout = float(setting("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "900"))
+        document_timeout = resolve_document_timeout(
+            setting("KG_EXTRACT_V31_DOCUMENT_TIMEOUT"), document_scale)
     else:
         document_timeout = None
     checked = ProviderProfile.model_validate(values)
@@ -162,6 +223,7 @@ def snapshot_payload(operation: str, payload: Any) -> Any:
     if operation == 'document.chunk':
         return result
     options = result.get("options") or {}
+    scale = document_scale(operation, result)
     if operation == "knowledge.ingestion":
         options = options.get("extraction") or {}
     from backend.app.schemas import ExtractionOptions
@@ -176,7 +238,7 @@ def snapshot_payload(operation: str, payload: Any) -> Any:
         return result
     # Always replace caller-supplied internal data at the submission boundary.
     try:
-        result["__extraction_config"] = resolve_config(options, registry=registry)
+        result["__extraction_config"] = resolve_config(options, registry=registry, document_scale=scale)
     except (ValueError, UndeclaredConfigurationError):
         raise ExtractionConfigurationError("Invalid extraction configuration or unavailable provider profile") from None
     return result

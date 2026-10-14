@@ -228,7 +228,7 @@ print(json.load(urllib.request.urlopen(req,timeout=30))['answers'])"
 
 | 调用方 | 位置 | 用法与预算 |
 | --- | --- | --- |
-| v3.1 语义 harness | `algorithm/knowledge_extract/v3_1/decisions.py`（`ClefDecider`） | 抽取过程中把实体/关系判定打包成 Clef 问题；单次超时 `KG_EXTRACT_V31_CLEF_TIMEOUT=10` 秒，总调用预算 `KG_EXTRACT_V31_CLEF_MAX_CALLS=128`，另有 `KG_EXTRACT_V31_REQUEST_TIMEOUT=120`、`KG_EXTRACT_V31_DOCUMENT_TIMEOUT=900` |
+| v3.1 语义 harness | `algorithm/knowledge_extract/v3_1/decisions.py`（`ClefDecider`） | 抽取过程中把实体/关系判定打包成 Clef 问题；单次超时 `KG_EXTRACT_V31_CLEF_TIMEOUT=10` 秒，总调用预算 `KG_EXTRACT_V31_CLEF_MAX_CALLS=128`，另有 `KG_EXTRACT_V31_REQUEST_TIMEOUT=120`；文档总预算 `KG_EXTRACT_V31_DOCUMENT_TIMEOUT` 默认按输入自适应（`[900,2400]` 秒），显式设置即覆盖 |
 | mini eval 套件 | `/mnt/data3/qasys/mini-eval-deepseek` | `config.sh` 注入 `CLEF_SERVICE_URL=http://host.docker.internal:8188`、`CLEF_MODEL=clef-flash` 到三套 Backend（只有 v3.1 真用）；`scripts/status.sh` 会检查 `172.17.0.1:8188/health` |
 | 生产 Backend | `qasystem_backend` | 未配置 `CLEF_*`，不调用；要用需在部署 `.env` 里加 `CLEF_SERVICE_URL` 并重建容器 |
 

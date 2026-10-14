@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.4",
+  "version": "2026.10.14.5",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -2564,8 +2564,8 @@
       ]
     },
     "KG_EXTRACT_V31_DOCUMENT_TIMEOUT": {
-      "desc": "部署参数 KG_EXTRACT_V31_DOCUMENT_TIMEOUT",
-      "default": "900",
+      "desc": "v3.1 文档总预算（秒）。留空按提交时的输入规模自适应：300 + 90 × 千字符 + 240 × 片数，钳在 [900, 2400]；显式填写即完全覆盖，请求级 options.document_timeout 优先；实际生效值见响应 quality.effective_config.document_timeout。",
+      "default": "",
       "scope": "deployment",
       "mode": "hot",
       "consumers": [
@@ -2578,7 +2578,7 @@
       "fallbacks": [
         {
           "path": "backend/app/services/extraction_config.py",
-          "expression": "'900'"
+          "expression": "adaptive_document_timeout(characters, chunks)"
         }
       ]
     },
@@ -6160,7 +6160,7 @@
     "backend/app/services/extraction_config.py": [
       "config_getenv(key, default)",
       "setting('KG_EXTRACT_LLM_MAX_INPUT_TOKENS', '65536')",
-      "setting('KG_EXTRACT_V31_DOCUMENT_TIMEOUT', '900')",
+      "setting('KG_EXTRACT_V31_DOCUMENT_TIMEOUT')",
       "setting('KG_EXTRACT_LLM_QUOTA_GROUP', 'default')",
       "setting('KG_EXTRACT_LLM_MAX_OUTPUT_TOKENS')",
       "setting('KG_EXTRACT_PROVIDERS_JSON', '{}')",

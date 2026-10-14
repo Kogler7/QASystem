@@ -185,9 +185,14 @@ def test_entity_pass_never_reads_unused_neighbor_context(monkeypatch):
     monkeypatch.setattr(manager, "local_context", unexpected_context)
     item = {"type": "Rule", "mention": "规则",
             "evidence": {"quote": "规则"}}
+    def llm(messages):
+        task = json.loads(messages[-1]['content'])['task']
+        if task['operation'] == 'evidence_verification':
+            return json.dumps({'item_id': task['items'][0]['item_id'], 'supported': 'yes', 'reason': 'fixture'})
+        return json.dumps(item, ensure_ascii=False)
     results = CG.entity_pass(
         plan, schema, manager, CC.ExtractionRequest([chunk]),
-        lambda messages: json.dumps(item, ensure_ascii=False),
+        llm,
         route=PR.resolve_document_route(plan, [chunk]), max_workers=1,
         use_scheduler=False, attempts=[], warnings=[], max_attempts=1,
         retry_base_seconds=0,

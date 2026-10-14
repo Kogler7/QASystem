@@ -303,22 +303,12 @@ async def _review_batches(pending, context_for, llm, *, attempts, warnings, call
 async def admit_entity_names(rows, sources, llm, *, attempts, warnings, use_scheduler=False,
                        max_attempts=3, retry_base_seconds=0.05, call_metrics=None,
                        plan=None, route=None, assembly_planner=None, max_workers=1, force_review=False):
-    """Require affirmative semantic support for names that are not literal mentions."""
-    from .candidate_generation import generate_structured
-    admitted, pending = [], []
-    # Official-document policy distinguishes duties from mere routing/signatures
-    # and document titles from register fields. A literal substring alone cannot
-    # establish these entity/type boundaries. Generic literal names retain their
-    # existing fast path; nonliteral names always require independent support.
-    review_literal = (assembly_planner.has_selected_skills if assembly_planner is not None else
-                      getattr(route, 'kind', None) in {'official_document', 'rule', 'trouble'})
+    """Require affirmative source support for every entity name and type."""
+    pending = []
+    # A literal substring establishes coordinates, never ontology membership.
+    # Skill selection and force_review cannot weaken entity admission.
     for index, row in enumerate(rows):
         literal = locate_in_sources(row['name'], sources)
-        primary_literal = locate_in_sources(row['name'], [source for source in sources
-                                                       if not source.metadata.get('_v31_context_only')])
-        if primary_literal and not review_literal and not force_review:
-            admitted.append(row)
-            continue
         span = locate_in_sources(row.get('evidence', {}).get('quote', ''), sources) or literal
         item = {'item_id': 'entity' if len(rows) == 1 else f'entity:{index}',
                 'type': row['type'], 'name': row['name'],
@@ -329,7 +319,7 @@ async def admit_entity_names(rows, sources, llm, *, attempts, warnings, use_sche
         item['evidence_quotes'] = [source['quote'] for source in spans]
         pending.append((row, '', None, spans, item))
 
-    accepted_ids = {id(row) for row in admitted}
+    accepted_ids = set()
     if pending:
         results = await _review_batches(pending, lambda batch: _verification_context(batch, sources), llm,
             attempts=attempts, warnings=warnings, call_metrics=call_metrics, pass_name='entity_verification',

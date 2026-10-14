@@ -108,7 +108,7 @@ def test_sample_uses_common_prompts_and_preserves_instance_and_business_name(bin
     entity = result['raw']['entities'][0]
     assert (entity['type'], entity['name'], entity['properties']['name']) == (type_id, '维护角色_B', '维护工程师')
     assert result['raw']['relations'] == []
-    assert result['run_trace']['prompt_version'] == 'knowledge-extract-v3.1-table-role-grounding-v34'
+    assert result['run_trace']['prompt_version'] == 'knowledge-extract-v3.1-all-entity-admission-v35'
     assert {item['name'] for item in SkillRegistry().selection_catalog()} == {'official_document', 'rule', 'trouble'}
     for messages in seen:
         user = json.loads(messages[1]['content'])

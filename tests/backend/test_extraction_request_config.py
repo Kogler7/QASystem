@@ -300,3 +300,57 @@ def test_refactored_v31_default_config_and_live_factory(monkeypatch):
     assert seen["model"] == chosen["model"]
     assert seen["disable_thinking"] == chosen["disable_thinking"]
     assert config.public_config(chosen).get("output_format") != "jsonl"
+
+
+def test_document_scale_reads_chunks_and_estimates_uploaded_files():
+    assert config.document_scale("graph.extract", {"items": [{"text": "abc"}, {"text": "de"}]}) == (5, 2)
+    assert config.document_scale("graph.extract", {"items": []}) is None
+    # 文本上传按字符数精确计数，片数按请求自己的切片尺寸估算
+    text = {"files": [{"file_name": "a.md", "content": "字" * 10_000}],
+            "options": {"chunking": {"size": 4000}}}
+    assert config.document_scale("knowledge.ingestion", text) == (10_000, 3)
+    # 二进制（PDF 等）无法解码，退化为字节上界
+    binary = {"files": [{"content": b"\xff\xfe\x00" * 100}]}
+    assert config.document_scale("knowledge.ingestion", binary) == (300, 1)
+
+
+def test_v31_document_timeout_adapts_to_input_size(providers, monkeypatch):
+    monkeypatch.delenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", raising=False)
+    single = config.resolve_config({"version": "v3.1"}, document_scale=(1000, 1))
+    medium = config.resolve_config({"version": "v3.1"}, document_scale=(4509, 3))
+    large = config.resolve_config({"version": "v3.1"}, document_scale=(22170, 9))
+    assert single["document_timeout"] == config.DOCUMENT_TIMEOUT_FLOOR
+    assert medium["document_timeout"] == pytest.approx(config.adaptive_document_timeout(4509, 3))
+    assert single["document_timeout"] < medium["document_timeout"] < large["document_timeout"]
+    assert large["document_timeout"] == config.DOCUMENT_TIMEOUT_CEILING
+    # 拿不到输入规模时保持既有单片默认，不让未知输入失去边界
+    assert config.resolve_config({"version": "v3.1"})["document_timeout"] == config.DOCUMENT_TIMEOUT_FLOOR
+    assert config.resolve_config({"version": "v3"}).__getitem__("document_timeout") is None
+
+
+def test_explicit_document_timeout_still_overrides_adaptive_default(providers, monkeypatch):
+    monkeypatch.setenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", "1500")
+    assert config.resolve_config({"version": "v3.1"}, document_scale=(22170, 9))["document_timeout"] == 1500
+    monkeypatch.delenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT")
+    chosen = config.resolve_config({"version": "v3.1", "document_timeout": 60.0}, document_scale=(22170, 9))
+    assert chosen["document_timeout"] == 60
+    with pytest.raises(config.ExtractionConfigurationError):
+        config.snapshot_payload("graph.extract", {
+            "ontology": "@startuml\nclass Term {\n name: String\n}\n@enduml",
+            "items": [{"text": "x"}], "options": {"version": "v3.1", "document_timeout": 0},
+        })
+
+
+def test_http_submission_reports_adaptive_document_timeout(providers, protocol_module, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    monkeypatch.delenv("KG_EXTRACT_V31_DOCUMENT_TIMEOUT", raising=False)
+    response = TestClient(protocol_module.app).post("/api/v1/graphs/extract", json={
+        "ontology": "@startuml\nclass Term {\n name: String\n}\n@enduml",
+        "items": [{"text": "x" * 4509}],
+        "options": {"version": "v3.1", "provider": "siliconflow"},
+    })
+    assert response.status_code == 200, response.text
+    effective = response.json()["data"]["quality"]["effective_config"]
+    assert effective["document_timeout"] == pytest.approx(config.adaptive_document_timeout(4509, 1))
+    assert effective["document_timeout"] > config.DOCUMENT_TIMEOUT_FLOOR

@@ -48,7 +48,7 @@ def test_full_source_name_unchanged_after_cross_chunk_completion():
     result=extract_split(ONTOLOGY, [ExtractionChunk('a',f'{NAME}（简称“智能装备”）负责检查。'),
                                    ExtractionChunk('b',f'{NAME}负责记录。')],
         llm=StubLLM(entity_handler=lambda p,c:[span_item('Organization',NAME, c['text'])],property_handler=properties,
-                    verification_handler=lambda item,chunk: 'yes' if item['name']==NAME and item['value']=='检查并记录' else 'no'))
+                    verification_handler=lambda item,chunk: 'yes' if item['name']==NAME and item['value']=='检查并记录' else 'no', entity_verification_handler=lambda item, chunk: 'yes'))
     assert result['status']=='succeeded'
     assert len(result['raw']['entities'])==1
     assert result['raw']['entities'][0]['name']==NAME

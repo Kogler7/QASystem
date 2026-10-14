@@ -192,7 +192,7 @@ def extract_split(
     attempts, calls = [], []
     run = ExtractionRun.create(run_id=run_id or f"ke-{uuid.uuid4().hex}", ontology=ontology,
         markdown="\n".join(c.text for c in chunks), model=model,
-        prompt_version="knowledge-extract-v3.1-table-role-grounding-v34", best_effort=best_effort)
+        prompt_version="knowledge-extract-v3.1-all-entity-admission-v35", best_effort=best_effort)
     run.start()
     for c in chunks:
         run.register_block(c.chunk_id, block_id=str(c.metadata.get("block_id") or c.chunk_id), kind="chunk")

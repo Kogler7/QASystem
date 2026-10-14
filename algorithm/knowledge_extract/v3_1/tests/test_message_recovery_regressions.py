@@ -265,6 +265,8 @@ def test_overflow_splits_keep_accepted_entity_and_resume_only_missing_candidates
             prefix = json.dumps({**span_item('Person', '甲', '甲负责巡检。'), 'properties': {}})
             return StructuredLLMResponse(text=prefix + '\n{"type":', api='chat.completions',
                 response_mode='plain', status='incomplete', finish_reason='length')
+        if user['task']['operation'] == 'evidence_verification':
+            return StubLLM()(messages)
         if user['task']['operation'] == 'property':
             return '\n'.join(json.dumps({'type': row['type'], 'name': row['name'], 'properties': {}})
                 for row in user['task']['known_entities'])
