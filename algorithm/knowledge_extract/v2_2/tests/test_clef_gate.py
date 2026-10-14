@@ -187,6 +187,41 @@ class ClefGateTest(unittest.TestCase):
         quote = GATE.cooccurrence_quote(TEXT, "张三", "示例单位")
         self.assertEqual(quote, TEXT)
 
+    def test_cooccurrence_quote_uses_line_without_period(self) -> None:
+        text = "张三\t示例单位\n下一行无关"
+        quote = GATE.cooccurrence_quote(text, "张三", "示例单位")
+        self.assertEqual(quote, "张三\t示例单位")
+
+    def test_cooccurrence_quote_prefers_nearest_pair(self) -> None:
+        # 同一长句里两端各出现两次；首现对跨度超过 max_len，应落到最近一对。
+        filler = "填充" * 120
+        text = f"张三{filler}示例单位{filler}张三就职于示例单位"
+        quote = GATE.cooccurrence_quote(text, "张三", "示例单位")
+        self.assertEqual(quote, "张三就职于示例单位")
+        self.assertNotIn("填充", quote)
+
+    def test_anchor_positive_grounds_with_local_endpoint_quote(self) -> None:
+        def respond(_qid, question, _state):
+            label = next(key for key in question["criteria"] if key != "NONE")
+            return {"type": "choice", "choice": label, "confidence": 0.96}
+
+        gate = GATE.ClefGate(client=FakeClef(respond), enabled=True, accept=0.9)
+        # 片段里只有目标侧名称（模拟文档锚点句），双端共现引文不可得。
+        text = "请总部各部门阅办。"
+        pair = {
+            "pair_id": "c-anchor",
+            "source_id": "doc",
+            "target_id": "dept",
+            "source_name": "关于开展示例专项工作的通知",
+            "target_name": "总部各部门",
+            "relation_id": "appliesTo",
+            "preserve_on_none": True,
+        }
+        grounded, pending = gate.apply_relation_gate(text, [pair], chunk_id="c0", attempts=[])
+        self.assertEqual(pending, [])
+        self.assertEqual(len(grounded), 1)
+        self.assertIn("总部各部门", grounded[0][1])
+
     def test_high_confidence_none_skips_generative_relation_call(self) -> None:
         client = FakeClef(lambda _qid, _question, _state: {
             "type": "choice", "choice": "NONE", "confidence": 0.97,

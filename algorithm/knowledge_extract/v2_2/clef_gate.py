@@ -140,18 +140,61 @@ def local_context_reason(
 
 
 def cooccurrence_quote(text: str, left: str, right: str, *, max_len: int = 400) -> str | None:
-    """返回同时包含两个名称、且是原文子串的最短可用引文。"""
+    """返回同时包含两个名称、且是原文子串的最短可用引文。
+
+    保守增强：无句号时按行切；多处出现时取最近的一对，避免首现错配拉垮跨度。
+    """
     if not text or not left or not right or left not in text or right not in text:
         return None
     for sentence in _SENTENCE.findall(text):
         quote = sentence.strip()
         if left in quote and right in quote and quote in text and len(quote) <= max_len:
             return quote
-    start = min(text.find(left), text.find(right))
-    end = max(text.find(left) + len(left), text.find(right) + len(right))
-    quote = text[start:end]
-    if quote and len(quote) <= max_len and quote in text:
-        return quote
+    # 表格行 / 无句读符号的公文名单行：按行再试一次。
+    for raw_line in text.splitlines():
+        quote = raw_line.strip()
+        if left in quote and right in quote and quote in text and 0 < len(quote) <= max_len:
+            return quote
+    left_hits = [match.start() for match in re.finditer(re.escape(left), text)]
+    right_hits = [match.start() for match in re.finditer(re.escape(right), text)]
+    best: tuple[int, int] | None = None
+    for left_start in left_hits:
+        left_end = left_start + len(left)
+        for right_start in right_hits:
+            right_end = right_start + len(right)
+            start = min(left_start, right_start)
+            end = max(left_end, right_end)
+            if end - start > max_len:
+                continue
+            if best is None or (end - start) < (best[1] - best[0]):
+                best = (start, end)
+    if best is None:
+        return None
+    quote = text[best[0] : best[1]]
+    return quote if quote in text else None
+
+
+def local_endpoint_quote(text: str, *names: str, max_len: int = 400) -> str | None:
+    """锚点等单端场景：取含某一端点名的最短句/行，供 Clef 正例保守落地。"""
+    if not text:
+        return None
+    for name in names:
+        name = (name or "").strip()
+        if not name or name not in text:
+            continue
+        for sentence in _SENTENCE.findall(text):
+            quote = sentence.strip()
+            if name in quote and quote in text and 0 < len(quote) <= max_len:
+                return quote
+        for raw_line in text.splitlines():
+            quote = raw_line.strip()
+            if name in quote and quote in text and 0 < len(quote) <= max_len:
+                return quote
+        index = text.find(name)
+        if index >= 0:
+            quote = text[index : index + len(name)]
+            if quote in text and len(quote) <= max_len:
+                return quote
     return None
 
 
@@ -349,11 +392,12 @@ class ClefGate:
                     uncertain += 1
                     pending.append(pair)
                     continue
-                quote = cooccurrence_quote(
-                    text,
-                    str(pair.get("source_surface") or pair.get("source_name") or ""),
-                    str(pair.get("target_surface") or pair.get("target_name") or ""),
-                )
+                source_name = str(pair.get("source_surface") or pair.get("source_name") or "")
+                target_name = str(pair.get("target_surface") or pair.get("target_name") or "")
+                quote = cooccurrence_quote(text, source_name, target_name)
+                # 锚点保留对：双端共现引文常缺文档标题，保守退化为含局部端点的句/行。
+                if not quote and bool(pair.get("preserve_on_none")):
+                    quote = local_endpoint_quote(text, target_name, source_name)
                 if quote:
                     grounded.append((pair, quote))
                     continue
@@ -526,17 +570,23 @@ def _relation_question(pair: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if len(relations) == 1:
         relation = relations[0]
-        instructions = f"只根据原文，{source}与{target}之间是否存在关系「{relation}」？"
-        none_text = "原文不支持这条关系"
+        instructions = (
+            f"只根据给定原文判断，勿推测未写出的事实。"
+            f"{source}与{target}之间是否存在关系「{relation}」？"
+        )
+        none_text = "原文不支持这条关系（仅名称共现不够）"
     else:
         listed = "、".join(relations)
-        instructions = f"只根据原文，{source}与{target}之间应选择哪个关系：{listed}？"
-        none_text = "原文不支持这些关系中的任何一个"
+        instructions = (
+            f"只根据给定原文判断，勿推测未写出的事实。"
+            f"{source}与{target}之间应选择哪个关系：{listed}？"
+        )
+        none_text = "原文不支持这些关系中的任何一个（仅名称共现不够）"
     return {
         "type": "choice",
         "instructions": instructions,
         "criteria": {
-            **{relation: f"原文支持{source}与{target}的{relation}" for relation in relations},
+            **{relation: f"原文明确支持{source}与{target}的{relation}" for relation in relations},
             "NONE": none_text,
         },
     }

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import re
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
@@ -26,6 +27,9 @@ logger = get_step_logger(__name__)
 RELATION_CANDIDATE_BATCH_SIZE = 32
 # 约 4K token 的保守字符预算，为提示词、端点和 schema 留出余量。
 _EVIDENCE_CHAR_BUDGET = 8000
+# 短端点「引文只剩两个名字」才拒；长标题/名单类引文常无额外谓词，放行以免误伤召回。
+_NAME_ONLY_MAX_ENDPOINT_CHARS = 20
+_NON_SIGNAL_RE = re.compile(r"[\s\W_]+", re.UNICODE)
 
 
 def relation_decision_schema(
@@ -145,6 +149,51 @@ def _quote_covers_endpoints(candidate: RelationCandidate, quote: str) -> bool:
     return source_hit and target_hit
 
 
+def _same_chunk_dual_endpoint(candidate: RelationCandidate) -> bool:
+    """是否按「同片双端」口径核对引文（局部，或同片合并邻接）。"""
+    if candidate.anchor or candidate.scope_kind == "anchor":
+        return False
+    if candidate.scope_kind == "cross_reference":
+        return False
+    if candidate.scope_kind == "adjacent":
+        return len({item.chunk_id for item in candidate.fragments}) == 1 and len(candidate.fragments) == 1
+    return candidate.scope_kind == "local"
+
+
+def _quote_is_name_cooccurrence(candidate: RelationCandidate, quote: str) -> bool:
+    """短端点同片引文若去掉两端名后无任何剩余字，视为纯共现，不入库。
+
+    不绑文档类型：只看端点长度与引文字面。长标题、主送名单等端点 (>=20 字) 跳过，
+    避免误伤「标题+收文对象」这类合法公文引文。跨片邻接/条款引用不在此列。
+    """
+    if not _same_chunk_dual_endpoint(candidate):
+        return False
+    source_name = (candidate.source_name or "").strip()
+    target_name = (candidate.target_name or "").strip()
+    if not source_name or not target_name:
+        return False
+    if source_name not in quote or target_name not in quote:
+        return False
+    if (
+        len(source_name) >= _NAME_ONLY_MAX_ENDPOINT_CHARS
+        or len(target_name) >= _NAME_ONLY_MAX_ENDPOINT_CHARS
+    ):
+        return False
+    remainder = quote
+    for name in sorted((source_name, target_name), key=len, reverse=True):
+        remainder = remainder.replace(name, "")
+    return _NON_SIGNAL_RE.sub("", remainder) == ""
+
+
+def _quote_acceptable(candidate: RelationCandidate, quote: str) -> str | None:
+    """返回拒绝原因码；通过则 None。"""
+    if not _quote_covers_endpoints(candidate, quote):
+        return "RELATION_EVIDENCE_ENDPOINT_MISS"
+    if _quote_is_name_cooccurrence(candidate, quote):
+        return "RELATION_EVIDENCE_NAME_ONLY"
+    return None
+
+
 def _apply_decisions(
     parsed: dict[str, Any] | None,
     candidates: list[RelationCandidate],
@@ -184,14 +233,14 @@ def _apply_decisions(
             bound = _bind_quote(manager, candidate, quote)
             if bound is None:
                 continue
-            if not _quote_covers_endpoints(candidate, bound["quote"]):
-                _append_warning(
-                    warnings,
-                    "RELATION_EVIDENCE_ENDPOINT_MISS",
-                    "supported 的引文未覆盖关系两端名称",
-                    path,
-                    candidate_id,
+            reject = _quote_acceptable(candidate, bound["quote"])
+            if reject is not None:
+                message = (
+                    "supported 的引文仅含两端名称、缺少关系表述"
+                    if reject == "RELATION_EVIDENCE_NAME_ONLY"
+                    else "supported 的引文未覆盖关系两端名称"
                 )
+                _append_warning(warnings, reject, message, path, candidate_id)
                 bound = None
                 continue
             break
@@ -199,7 +248,7 @@ def _apply_decisions(
             _append_warning(
                 warnings,
                 "RELATION_EVIDENCE_INVALID",
-                "supported 的引文不在本次证据片段中，或未覆盖端点名称",
+                "supported 的引文不在本次证据片段中，或未通过端点/共现核对",
                 path,
                 candidate_id,
             )
@@ -444,7 +493,7 @@ def run_relation_stage(
 
     for candidate, quote in grounded:
         bound = _bind_quote(manager, candidate, quote)
-        if bound is None or not _quote_covers_endpoints(candidate, bound["quote"]):
+        if bound is None or _quote_acceptable(candidate, bound["quote"]) is not None:
             continue
         _emit({
             "from_id": candidate.source_id,

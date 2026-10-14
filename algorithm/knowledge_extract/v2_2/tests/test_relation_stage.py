@@ -428,6 +428,71 @@ Person --> Organization : worksAt
         codes = {warning["code"] for warning in warnings}
         self.assertTrue(codes & {"RELATION_EVIDENCE_ENDPOINT_MISS", "RELATION_EVIDENCE_INVALID"})
 
+    def test_short_name_only_quote_is_rejected(self) -> None:
+        text = "张三 示例单位。张三就职于示例单位。"
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        entities = [
+            _entity("c0", "e1", "Person", "张三"),
+            _entity("c0", "e2", "Organization", "示例单位"),
+        ]
+        ontology = """@startuml
+class Person { name: String }
+class Organization { name: String }
+Person --> Organization : worksAt
+@enduml
+"""
+        # 纯共现：引文只有两端名，无关系表述 → 拒绝。
+        rejected, warnings, _llm = _run(
+            ontology,
+            [chunk],
+            entities,
+            _support_all("张三 示例单位"),
+        )
+        self.assertEqual(rejected, [])
+        self.assertIn("RELATION_EVIDENCE_NAME_ONLY", {item["code"] for item in warnings})
+
+        # 有关系表述：保留。
+        kept, _warnings, _llm = _run(
+            ontology,
+            [chunk],
+            entities,
+            _support_all("张三就职于示例单位。"),
+        )
+        self.assertEqual(
+            {(item["from_id"], item["rel_type"], item["to_id"]) for item in kept},
+            {("e1", "worksAt", "e2")},
+        )
+
+    def test_long_endpoint_name_only_quote_is_kept(self) -> None:
+        """长端点（如标题）允许「标题+对象」式引文，避免误伤名单/印发类召回。"""
+        title = "关于开展示例专项排查工作的通知文书标题文"  # len>=20，走长端点放行
+        target = "总部各部门"
+        assert len(title) >= 20
+        text = f"{title}\n\n{target}：请落实。"
+        chunk = CC.ExtractionChunk(chunk_id="c0", text=text)
+        entities = [
+            _entity("c0", "doc", "Document", title),
+            _entity("c0", "dept", "Organization", target),
+        ]
+        ontology = """@startuml
+class Document { name: String }
+class Organization { name: String }
+Document --> Organization : appliesTo
+@enduml
+"""
+        quote = f"{title}\n\n{target}"
+        relations, warnings, _llm = _run(
+            ontology,
+            [chunk],
+            entities,
+            _support_all(quote),
+        )
+        self.assertEqual(
+            {(item["from_id"], item["rel_type"], item["to_id"]) for item in relations},
+            {("doc", "appliesTo", "dept")},
+        )
+        self.assertNotIn("RELATION_EVIDENCE_NAME_ONLY", {item["code"] for item in warnings})
+
 
 if __name__ == "__main__":
     unittest.main()

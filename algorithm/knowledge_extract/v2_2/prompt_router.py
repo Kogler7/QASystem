@@ -813,7 +813,7 @@ relation
 
 ## output contract
 每个 candidate_id 必须返回一条决策，status 只能是 supported、not_supported 或 insufficient_evidence。
-supported 的 evidence.quote 必须是本次 documents 中某个片段的逐字连续原文，并且能支持这条关系，不能只因为两个名称同时出现。
+supported 的 evidence.quote 必须是本次 documents 中某个片段的逐字连续原文，并且能支持这条关系；不能只因为两个名称同时出现，也不能只粘贴两端名称而无关系表述（谓语、角色或作用说明）。
 not_supported 表示这组证据不支持该候选，不是整篇文档证明该关系不存在；此时 evidence 用空数组。
 insufficient_evidence 用于指代不清、引用目标不在本次片段中、条件无法确定。不要输出推理过程。
 
