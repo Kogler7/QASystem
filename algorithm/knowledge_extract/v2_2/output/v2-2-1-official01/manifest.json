@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "cases": [
+    {
+      "id": "official/official_01",
+      "group": "official",
+      "case": "official_01",
+      "sources": [
+        {
+          "path": "official/official_01/docs/关于开展OpenClaw(“龙虾”)等开源智能体安全风险排查工作的通知.pdf",
+          "sha256": "126ccbc08539d4ad41a93420cb0d1bde998b4fa13131321d212f62507853335d",
+          "missing": false
+        },
+        {
+          "path": "official/official_01/docs/表单.pdf",
+          "sha256": "b08ad2e425ed60befff51edb6408a271d6cbe210865f175d80990659c9ebf1f9",
+          "missing": false
+        }
+      ],
+      "golden": {
+        "path": "official/official_01/extract/golden.json",
+        "sha256": "89b620f40b217fad0d350ef11f588374e8cac9f7f3b5f35384bc6a0e21f38e79",
+        "missing": false
+      },
+      "ontology": {
+        "path": "official/ontology",
+        "kind": "directory",
+        "files": [
+          {
+            "path": "Official_Ontology.puml",
+            "sha256": "5940f10c5fe8a4558f4f5ab331939ef31f43e292faef70b5d730958750388656",
+            "missing": false
+          }
+        ],
+        "sha256": "adeea8b393069bb750451ae16cff6c9d9c3dcbf8f75bf944c05f769142060e9a",
+        "missing": false
+      },
+      "input_mode": {
+        "backend_extract": "reused_chunks"
+      },
+      "reused_inputs": [
+        {
+          "kind": "chunks",
+          "path": "official/official_01/chunks.json",
+          "sha256": "99c369f32862baa8980209c0b85cb6ed4dcd4c1e4b30d8e7955b4a4b11af77b9",
+          "missing": false
+        }
+      ]
+    }
+  ],
+  "dataset_sha256": "ea2716b1a5fd5c8951a428ab54847fa3f44470913119bccce3ce68e47584ad7e",
+  "evaluator": {
+    "files": [
+      {
+        "path": "provenance.py",
+        "sha256": "4d7175348925347f318075029ba688269329e8dc9e035076a9a83d740cab83f4",
+        "missing": false
+      },
+      {
+        "path": "quality.py",
+        "sha256": "dada64584e75d8495c8b46d918468dde12a441aca412aa954275f63527cf79e2",
+        "missing": false
+      },
+      {
+        "path": "run.py",
+        "sha256": "67bad4b3a51e61c9b204a282b397e72a6ba0f219fc15873a302c15e26d4cc3d4",
+        "missing": false
+      }
+    ],
+    "sha256": "4d4859926a777773bbc2b377102c7e43e0cc8c3e175c3cbe34913d82af4dbb50"
+  },
+  "settings": {
+    "stage": "backend",
+    "modes": [
+      "extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    },
+    "options": {
+      "parser": {
+        "engine": "auto",
+        "force": false,
+        "page_sharding": "auto",
+        "page_shard_size": 0,
+        "max_page_shards": 16,
+        "mineru_options": {
+          "language": "ch",
+          "ocr_mode": "auto",
+          "table_enable": true,
+          "formula_enable": true
+        },
+        "keep_page_edges": "first_page",
+        "page_edge_min_chars": 3
+      },
+      "chunking": {
+        "strategy": "recursive",
+        "size": 4000,
+        "chunk_overlap": 0,
+        "chunk_threshold": 12000,
+        "similarity": 0.6,
+        "separators": null,
+        "size_unit": "char",
+        "breakpoint_method": "percentile"
+      },
+      "extraction": {
+        "model": null,
+        "merge": true
+      },
+      "storage": {
+        "persist_graph": false,
+        "knowledge_space_id": null
+      }
+    }
+  },
+  "scoring_contract": {
+    "stage": "backend",
+    "modes": [
+      "extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    }
+  },
+  "reused_predictions": []
+}

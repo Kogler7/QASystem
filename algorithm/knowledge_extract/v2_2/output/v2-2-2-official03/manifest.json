@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "cases": [
+    {
+      "id": "official/official_03",
+      "group": "official",
+      "case": "official_03",
+      "sources": [
+        {
+          "path": "official/official_03/docs/关于印发《中国中车股份有限公司产品研发管理办法》的通知.pdf",
+          "sha256": "f3225b2ff1481f5abb9646e3dadf50bac8e404e2deeb3471715f28ecfeb4ceef",
+          "missing": false
+        },
+        {
+          "path": "official/official_03/docs/表单.pdf",
+          "sha256": "b7e40fe98997719121afab3cb964816caedfa7b533bff453bd64d63984fe4a1e",
+          "missing": false
+        }
+      ],
+      "golden": {
+        "path": "official/official_03/extract/golden.json",
+        "sha256": "e0f7970ea8b2b5b5a75b4eb54cd8e9bf86cfcd1cf1bd5c0cf8dd32cac7bc2066",
+        "missing": false
+      },
+      "ontology": {
+        "path": "official/ontology",
+        "kind": "directory",
+        "files": [
+          {
+            "path": "Official_Ontology.puml",
+            "sha256": "5940f10c5fe8a4558f4f5ab331939ef31f43e292faef70b5d730958750388656",
+            "missing": false
+          }
+        ],
+        "sha256": "adeea8b393069bb750451ae16cff6c9d9c3dcbf8f75bf944c05f769142060e9a",
+        "missing": false
+      },
+      "input_mode": {
+        "backend_extract": "source_documents"
+      },
+      "reused_inputs": []
+    }
+  ],
+  "dataset_sha256": "6380e21f758e08219f359a9120e9e6fcbfe846bbdbdfd42edacea0fc3cd8a004",
+  "evaluator": {
+    "files": [
+      {
+        "path": "provenance.py",
+        "sha256": "4d7175348925347f318075029ba688269329e8dc9e035076a9a83d740cab83f4",
+        "missing": false
+      },
+      {
+        "path": "quality.py",
+        "sha256": "dada64584e75d8495c8b46d918468dde12a441aca412aa954275f63527cf79e2",
+        "missing": false
+      },
+      {
+        "path": "run.py",
+        "sha256": "bceba1bb6f16e031dd824c6e5f54594fd817765a05626bdfaf39fa61e31f3626",
+        "missing": false
+      }
+    ],
+    "sha256": "7eaad723442de9df55aecaec769f2058e8b97a34ec9d6c9ccf806880929be990"
+  },
+  "settings": {
+    "stage": "backend",
+    "modes": [
+      "chunk-extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    },
+    "options": {
+      "extraction": {
+        "version": "v2.2"
+      }
+    }
+  },
+  "scoring_contract": {
+    "stage": "backend",
+    "modes": [
+      "chunk-extract"
+    ],
+    "match_mode": "llm",
+    "judge": {
+      "adapter": "chat",
+      "model": "deepseek-flash",
+      "base_url": "https://api.deepseek.com/v1",
+      "timeout": 300.0,
+      "max_tokens": 8192,
+      "response_format": "auto",
+      "disable_thinking": true,
+      "batch_size": 20,
+      "golden_batch_size": 40
+    }
+  },
+  "reused_predictions": []
+}
