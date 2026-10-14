@@ -19,10 +19,15 @@ from .prompt_router import ChatMessages
 logger = get_step_logger(__name__)
 
 # Exact semantic operations, never inferred from retry counts or error strings.
+# Support checks emit a short verdict per item, so reasoning tokens add latency
+# without changing the decision: traced entity_verification calls ran at 64.9s
+# median with reasoning at 91% of reported completion tokens, and a quarter of
+# them hit the 120s SDK timeout returning nothing. They follow the regular
+# switch (KG_EXTRACT_LLM_DISABLE_THINKING) instead of semantic thinking. The
+# passes kept here weigh conflicting evidence, which is where reasoning pays.
 SEMANTIC_THINKING_PASSES = frozenset({
-    "entity_verification", "entity_admission", "property_verification",
-    "evidence_verification", "candidate_identity", "candidate_identity_verification",
-    "property_conflict", "repair_entity", "repair_property",
+    "candidate_identity", "property_conflict",
+    "repair_entity", "repair_property",
 })
 
 

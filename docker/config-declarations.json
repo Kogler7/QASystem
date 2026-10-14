@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.14.9",
+  "version": "2026.10.14.10",
   "dynamic_keys": [
     "EXECUTION_GPU_MEMORY_REQUEST_MB_[A-Z0-9_]+",
     "[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)"
@@ -1733,7 +1733,7 @@
       ]
     },
     "KG_EXTRACT_V31_SEMANTIC_THINKING": {
-      "desc": "v3.1 实体准入、属性证据核验、同名消歧、属性冲突和定向语义修复开启 thinking；0 沿用常规开关。JSON 格式、截断或网络重试沿用原步骤；热更新仅影响新提交任务。",
+      "desc": "v3.1 同名消歧、属性冲突综合和定向语义修复开启 thinking；0 沿用常规开关。实体/属性证据核验等 yes/no 支持性判定沿用常规开关，不升级到语义思考。JSON 格式、截断或网络重试沿用原步骤；热更新仅影响新提交任务。",
       "default": "1",
       "scope": "deployment",
       "mode": "hot",

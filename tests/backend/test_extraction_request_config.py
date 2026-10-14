@@ -424,8 +424,10 @@ def test_v31_scheduled_client_preserves_enabled_semantic_pass_and_parameter_fall
     monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: SimpleNamespace(
         chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
     llm = runtime.create_request_llm(chosen)
+    # repair_property is on the semantic policy; support checks stay on the
+    # regular switch and no longer escalate to thinking.
     result = llm.generate_structured({}, [{"role": "user", "content": "x"}],
-                                     {"pass_name": "property_verification"})
+                                     {"pass_name": "repair_property"})
     assert seen[0]["extra_body"] == {"enable_thinking": True}
     assert "extra_body" not in seen[1]
     assert result.thinking["fallback"] is True

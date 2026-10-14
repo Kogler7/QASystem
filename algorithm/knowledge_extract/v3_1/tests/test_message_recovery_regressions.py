@@ -126,7 +126,7 @@ def test_required_property_repair_uses_exact_key_and_delta_contract():
     assert result['raw']['entities'][0]['properties'] == {'duty': '巡检'}
 
 
-@pytest.mark.parametrize('ref', ['official_document@13', 'rule@10', 'trouble@10'])
+@pytest.mark.parametrize('ref', ['official_document@14', 'rule@10', 'trouble@10'])
 def test_stage_operations_do_not_leak_into_discovery_or_review(ref):
     plan = compile_plan(ONTOLOGY)
     chunk = ExtractionChunk('c', '原文')
