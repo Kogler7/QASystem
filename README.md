@@ -88,7 +88,7 @@ QASystem 是一个**知识图谱驱动的问答/求解系统**：先把文档解
 | `app/services/` | 路由对应的业务编排 |
 | `app/execution/` | 异步执行框架：任务提交与调度（`manager.py`）、Worker 消费（`worker.py`）、队列与存储（`queue.py`/`store.py`）、事件推送（`hub.py`）、操作映射（`operations.py`）、资源分类（`resources.py`）、监督（`supervisor.py`） |
 | `app/schemas.py` | 请求/响应模型 |
-| `app/environment.py` | 本地启动的 dotenv 引导；容器环境由 Compose 注入，业务统一从 `docker.configuration` 读取 |
+| `app/environment.py` | 本地启动的 dotenv 引导；容器环境由 Compose 注入，业务统一从 `qasystem_config.configuration` 读取 |
 
 **资源类**（如 `io.graph`、`io.llm`、`io.db`、`cpu.chart`、`gpu.*`）决定任务进入哪个队列；
 `operations.py` 把 MCP 工具名映射为 Worker 可执行的操作。
