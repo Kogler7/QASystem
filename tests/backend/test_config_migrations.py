@@ -33,7 +33,7 @@ def test_editor_proposes_migration_without_touching_original(tmp_path):
     editor = make_editor(tmp_path, original)
     assert (tmp_path / '.env').read_text() == original
     proposed = editor.pending_payloads()
-    env = configure.helper.read_env(proposed[tmp_path / '.env'])
+    env = configure.config_io.read_env(proposed[tmp_path / '.env'])
     registry = json.loads(proposed[editor.directory / 'config.json'])
     assert registry['services'][registry['routes']['extract']]['model'] == 'test-model'
     assert env['KG_EXTRACT_LLM_API_KEY'] == 'secret'
@@ -106,4 +106,4 @@ def test_duplicate_standard_assignments_require_choice_then_emit_once(tmp_path):
     editor.resolved_migrations.add('BACKEND_HOST_PORT')
     proposed = editor.pending_payloads()[tmp_path / '.env']
     assert proposed.count('BACKEND_HOST_PORT=') == 1
-    assert configure.helper.read_env(proposed)['BACKEND_HOST_PORT'] == '8020'
+    assert configure.config_io.read_env(proposed)['BACKEND_HOST_PORT'] == '8020'
